@@ -1,0 +1,6 @@
+{
+  // Matches the electron-vite scaffold's original Prettier style.
+  "printWidth": 100,
+  "singleQuote": true,
+  "semi": false,
+}
