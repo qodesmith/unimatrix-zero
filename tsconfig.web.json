@@ -1,4 +1,7 @@
 {
+  // Renderer process — runs in Chromium. DOM + JSX types, no Node types. Sees
+  // preload's .d.ts only, so the renderer knows what's on `window` without
+  // importing implementation.
   "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
   "include": [
     "src/renderer/src/env.d.ts",
