@@ -12,6 +12,9 @@
   "compilerOptions": {
     "composite": true,
     "jsx": "react-jsx",
+    // The @electron-toolkit preset sets this to false, quietly weakening `strict`.
+    "noImplicitAny": true,
+    "verbatimModuleSyntax": true,
     "paths": {
       "@renderer/*": ["./src/renderer/src/*"]
     }

@@ -5,6 +5,9 @@
   "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*"],
   "compilerOptions": {
     "composite": true,
-    "types": ["electron-vite/node"]
+    "types": ["electron-vite/node"],
+    // The @electron-toolkit preset sets this to false, quietly weakening `strict`.
+    "noImplicitAny": true,
+    "verbatimModuleSyntax": true
   }
 }
