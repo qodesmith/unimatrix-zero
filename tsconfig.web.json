@@ -16,7 +16,7 @@
     "noImplicitAny": true,
     "verbatimModuleSyntax": true,
     "paths": {
-      "@renderer/*": ["./src/renderer/src/*"]
+      "@/*": ["./src/renderer/src/*"]
     }
   }
 }
