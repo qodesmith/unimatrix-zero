@@ -6,7 +6,7 @@
   "embeddedLanguageFormatting": "auto",
   "endOfLine": "lf",
   "htmlWhitespaceSensitivity": "css",
-  "ignorePatterns": [],
+  "ignorePatterns": [".claude/**"],
   "insertFinalNewline": true,
   "jsdoc": {
     "lineWrappingStyle": "balance",
