@@ -1,0 +1,22 @@
+{
+  // Renderer process — runs in Chromium. DOM + JSX types, no Node types. Sees
+  // preload's .d.ts only, so the renderer knows what's on `window` without
+  // importing implementation.
+  "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
+  "include": [
+    "src/renderer/src/env.d.ts",
+    "src/renderer/src/**/*",
+    "src/renderer/src/**/*.tsx",
+    "src/preload/*.d.ts"
+  ],
+  "compilerOptions": {
+    "composite": true,
+    "jsx": "react-jsx",
+    // The @electron-toolkit preset sets this to false, quietly weakening `strict`.
+    "noImplicitAny": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@renderer/*": ["./src/renderer/src/*"]
+    }
+  }
+}

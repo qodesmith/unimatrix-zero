@@ -1,0 +1,63 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "arrowParens": "avoid",
+  "bracketSameLine": false,
+  "bracketSpacing": false,
+  "embeddedLanguageFormatting": "auto",
+  "endOfLine": "lf",
+  "htmlWhitespaceSensitivity": "css",
+  "ignorePatterns": [],
+  "insertFinalNewline": true,
+  "jsdoc": {
+    "lineWrappingStyle": "balance",
+    "preferCodeFences": true,
+  },
+  "jsxSingleQuote": false,
+  "objectWrap": "preserve",
+  "overrides": [],
+  "printWidth": 80,
+  "proseWrap": "preserve",
+  "quoteProps": "as-needed",
+  "semi": false,
+  "singleAttributePerLine": false,
+  "singleQuote": true,
+
+  // This combines with the sort-imports lint rule to get full sorting.
+  "sortImports": {
+    "newlinesBetween": true,
+    "order": "asc",
+    "sortSideEffects": false,
+    "internalPattern": ["@/"],
+    "customGroups": [],
+    "groups": [
+      // All type imports are always at the top.
+      "type",
+
+      // Example - `import './styles/css'`
+      "side_effect_style",
+
+      // Example - `import 'pkg'`
+      "side_effect",
+
+      // Aliased imports. Example - `import {MyComponent} from '@/components/MyComponent'`
+      "internal",
+
+      // Packages found in node_modules and node:*packages.
+      ["external", "builtin"],
+
+      // Relative imports.
+      ["parent", "sibling", "index"],
+
+      // Everything else.
+      "unknown",
+    ],
+  },
+  "sortPackageJson": false,
+  "sortTailwindcss": {
+    "functions": ["clsx", "cn", "cva", "txMerge"],
+    // "stylesheet": "to/be/determined"
+  },
+  "tabWidth": 2,
+  "trailingComma": "es5",
+  "useTabs": false,
+}

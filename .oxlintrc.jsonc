@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "react"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+  },
+  "rules": {
+    // Not needed with the automatic JSX runtime.
+    "react/react-in-jsx-scope": "off",
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn",
+  },
+  "env": {
+    "browser": true,
+    "node": true,
+  },
+  "ignorePatterns": ["node_modules", "out", "dist", "build"],
+}

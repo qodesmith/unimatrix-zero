@@ -1,0 +1,13 @@
+{
+  // Main + preload processes — run in Electron's built-in Node. Node types,
+  // no DOM types.
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*"],
+  "compilerOptions": {
+    "composite": true,
+    "types": ["electron-vite/node"],
+    // The @electron-toolkit preset sets this to false, quietly weakening `strict`.
+    "noImplicitAny": true,
+    "verbatimModuleSyntax": true
+  }
+}

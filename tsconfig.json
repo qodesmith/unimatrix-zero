@@ -1,0 +1,10 @@
+{
+  // Router config — compiles nothing itself. Points editors and `tsc --build`
+  // at the two real projects below, which target Electron's two different
+  // runtimes.
+  "files": [],
+  "references": [
+    {"path": "./tsconfig.node.json"},
+    {"path": "./tsconfig.web.json"}
+  ]
+}
