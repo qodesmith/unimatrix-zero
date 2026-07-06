@@ -39,11 +39,14 @@
       // Example - `import 'pkg'`
       "side_effect",
 
+      // node_modules
+      "external",
+
       // Aliased imports. Example - `import {MyComponent} from '@/components/MyComponent'`
       "internal",
 
-      // Packages found in node_modules and node:*packages.
-      ["external", "builtin"],
+      // node:*packages
+      "builtin",
 
       // Relative imports.
       ["parent", "sibling", "index"],
