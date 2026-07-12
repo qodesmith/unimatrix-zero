@@ -1,14 +1,13 @@
+import type {
+  ChevronProps,
+  DayButtonProps,
+  RootProps,
+  WeekNumberProps,
+} from 'react-day-picker'
+
 import {ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon} from 'lucide-react'
 import * as React from 'react'
-import {
-  DayPicker,
-  getDefaultClassNames,
-  useDayPicker,
-  type ChevronProps,
-  type DayButtonProps,
-  type RootProps,
-  type WeekNumberProps,
-} from 'react-day-picker'
+import {DayPicker, getDefaultClassNames, useDayPicker} from 'react-day-picker'
 
 import {Button, buttonVariants} from '@/components/ui/button'
 import {cn} from '@/lib/utils'
