@@ -15,7 +15,12 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? {icon} : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
+      // Safety first: the renderer never gets Node access and the preload
+      // runs sandboxed. Loosen individual settings only when a feature
+      // genuinely requires it.
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
     },
   })
 
@@ -26,6 +31,20 @@ function createWindow(): void {
   mainWindow.webContents.setWindowOpenHandler(details => {
     shell.openExternal(details.url)
     return {action: 'deny'}
+  })
+
+  // This app only ever navigates to internal routes. External links must
+  // open in the user's default browser — never inside the Electron window.
+  // (setWindowOpenHandler above covers window.open/target=_blank; this
+  // covers same-window navigation like location.href or plain links.)
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const devServerUrl = process.env['ELECTRON_RENDERER_URL']
+    if (is.dev && devServerUrl && url.startsWith(devServerUrl)) return
+
+    event.preventDefault()
+    if (url.startsWith('http:') || url.startsWith('https:')) {
+      shell.openExternal(url)
+    }
   })
 
   // HMR for renderer base on electron-vite cli.
@@ -42,7 +61,7 @@ function createWindow(): void {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('dev.unimatrixzero')
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
