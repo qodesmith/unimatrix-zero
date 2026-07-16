@@ -52,20 +52,16 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
-      # The tool itself always exits 0; empty output means every class is
-      # already canonical. Only verified (CSS-equivalent) findings produce
-      # output — rejected suggestions alone don't. The job fails on findings
-      # in a later step, after the PR comment is posted.
+      # Exits 1 on verified (CSS-equivalent) findings — rejected suggestions
+      # alone don't count. Capture the status so the PR comment posts before
+      # the job fails in a later step.
       - name: Generate report
         id: report
         run: |
+          set +e
           bun tools/tailwind/canonicalize-classes.ts --markdown \
             > "$RUNNER_TEMP/tailwind-report.md"
-          if [ -s "$RUNNER_TEMP/tailwind-report.md" ]; then
-            echo "has_findings=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_findings=false" >> "$GITHUB_OUTPUT"
-          fi
+          echo "status=$?" >> "$GITHUB_OUTPUT"
 
       # Update-or-create a single marker comment so repeated pushes don't
       # stack duplicates. When findings from an earlier push are resolved,
@@ -75,7 +71,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          HAS_FINDINGS: ${{ steps.report.outputs.has_findings }}
+          REPORT_STATUS: ${{ steps.report.outputs.status }}
         run: |
           marker='<!-- tailwind-canonical-report -->'
 
@@ -84,7 +80,7 @@ jobs:
             --paginate \
             --jq '[.[] | select(.body | startswith("<!-- tailwind-canonical-report -->")) | .id] | first // empty')
 
-          if [ "$HAS_FINDINGS" = 'true' ]; then
+          if [ "$REPORT_STATUS" != '0' ]; then
             {
               echo "$marker"
               cat "$RUNNER_TEMP/tailwind-report.md"
@@ -111,16 +107,16 @@ jobs:
           fi
 
       - name: Fail on findings
-        if: steps.report.outputs.has_findings == 'true'
+        if: steps.report.outputs.status != '0'
         run: |
           echo "Non-canonical Tailwind classes found — see the PR comment."
-          echo "Fix locally: bun tools/tailwind/canonicalize-classes.ts --apply"
+          echo "Fix locally: bun run lint:tailwind:apply"
           exit 1
 
   # The report job above can only see the PR head, where a hand-applied
   # unsafe IDE suggestion (e.g. rounded-[4px] -> rounded-lg under a :root
   # --radius override) already looks canonical. This job inspects the diff
-  # instead and, unlike the report, fails the check when it finds one.
+  # instead and fails the check when it finds one.
   regressions:
     name: Check canonicalization regressions
     runs-on: ubuntu-latest

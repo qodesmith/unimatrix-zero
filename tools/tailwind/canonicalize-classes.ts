@@ -13,46 +13,50 @@
  * 3. `apply.ts` — write the verified replacements in place
  * 4. `report.ts` — text (local) and markdown (CI/PR comment) reports
  *
- * CLI (run from the project root):
- * - `bun tools/tailwind/canonicalize-classes.ts` — dry-run text report
- * - `bun tools/tailwind/canonicalize-classes.ts --apply` — write the fixes
- * - `bun tools/tailwind/canonicalize-classes.ts --markdown` — check-only
- * report for CI/PR comments; prints nothing when everything is canonical.
- * Always exits 0 — the CI workflow fails the check itself when this prints
- * findings, after posting the PR comment.
+ * CLI (see `cli.ts` for the shared flag parsing and exit contract):
+ * - `bun run lint:tailwind` — dry-run text report; exits 1 on verified
+ * findings (rejected suggestions alone are not findings)
+ * - `bun run lint:tailwind:apply` — write the fixes; exits 0 once applied
+ * - `--markdown` — check-only report for CI/PR comments; prints nothing
+ * and exits 0 when everything is canonical, exits 1 on findings
  *
  * Companion guard: `check-regressions.ts` (see `regressions.ts`) inspects a
  * PR's diff for hand-applied engine suggestions that fail CSS-equivalence —
- * regressions this tree-based report can't see — and blocks on them.
+ * regressions this tree-based report can't see.
  */
 import {analyzeTailwindClasses} from './analyze'
 import {applyCanonicalFixes} from './apply'
+import {runCli} from './cli'
 import {formatMarkdownReport, formatTextReport} from './report'
 
-export {analyzeTailwindClasses} from './analyze'
-export {applyCanonicalFixes} from './apply'
-export {formatMarkdownReport, formatTextReport} from './report'
-
 if (import.meta.main) {
-  const apply = Bun.argv.includes('--apply')
-  const markdown = Bun.argv.includes('--markdown')
-  const analysis = await analyzeTailwindClasses()
+  await runCli({
+    flags: {
+      apply: {type: 'boolean', default: false},
+      markdown: {type: 'boolean', default: false},
+    },
+    async run({apply, markdown}) {
+      const analysis = await analyzeTailwindClasses()
+      const hasFindings = analysis.verified.length > 0
 
-  /* oxlint-disable no-console */
-  if (markdown) {
-    const report = formatMarkdownReport(analysis)
-    if (report) console.log(report)
-  } else {
-    console.log(formatTextReport(analysis))
+      if (markdown) {
+        return {report: formatMarkdownReport(analysis), hasFindings}
+      }
 
-    if (apply) {
-      const changedFiles = await applyCanonicalFixes(analysis)
+      const lines = [formatTextReport(analysis)]
 
-      for (const file of changedFiles) console.log(`updated: ${file}`)
-      console.log(`\napplied to ${changedFiles.length} files`)
-    } else {
-      console.log('\n(dry run — pass --apply to write changes)')
-    }
-  }
-  /* oxlint-enable no-console */
+      if (apply) {
+        const changedFiles = await applyCanonicalFixes(analysis)
+
+        for (const file of changedFiles) lines.push(`updated: ${file}`)
+        lines.push(`\napplied to ${changedFiles.length} files`)
+
+        return {report: lines.join('\n'), hasFindings: false}
+      }
+
+      lines.push('\n(dry run — pass --apply to write changes)')
+
+      return {report: lines.join('\n'), hasFindings}
+    },
+  })
 }

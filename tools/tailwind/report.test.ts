@@ -93,9 +93,7 @@ describe('formatMarkdownReport', () => {
     expect(report).toContain(
       '| `w-[16px]` | `w-4` | `src/a.tsx:5`<br>`src/b.tsx:9` |'
     )
-    expect(report).toContain(
-      'Fix locally: `bun tools/tailwind/canonicalize-classes.ts --apply`'
-    )
+    expect(report).toContain('Fix locally: `bun run lint:tailwind:apply`')
   })
 
   it('omits the details block when nothing was rejected', () => {

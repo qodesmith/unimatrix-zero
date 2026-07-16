@@ -3,47 +3,37 @@
  * `canonicalize-classes.ts` that inspects the *diff* rather than the tree
  * (see `regressions.ts` for why the tree alone can't catch these).
  *
- * CLI (run from the project root):
+ * CLI (see `cli.ts` for the shared flag parsing and exit contract):
  *
- * - `bun tools/tailwind/check-regressions.ts` — text report vs origin/main
- * - `bun tools/tailwind/check-regressions.ts --base <ref>` — explicit base
- * - `bun tools/tailwind/check-regressions.ts --markdown` — CI/PR-comment report;
- *   prints nothing when the diff is clean
+ * - `bun run lint:tailwind:regressions` — text report vs origin/main
+ * - `--base <ref>` — explicit base
+ * - `--markdown` — CI/PR-comment report; prints nothing when the diff is clean
  *
- * Exits 1 when regressions are found — blocking by design, unlike the
+ * Exits 1 when regressions are found — the same contract as the
  * canonical-classes report.
  */
+import {runCli} from './cli'
 import {
   findCanonicalRegressions,
   formatRegressionsMarkdown,
   formatRegressionsText,
 } from './regressions'
 
-export {
-  findCanonicalRegressions,
-  formatRegressionsMarkdown,
-  formatRegressionsText,
-} from './regressions'
-
 if (import.meta.main) {
-  const markdown = Bun.argv.includes('--markdown')
-  const baseIndex = Bun.argv.indexOf('--base')
-  const baseRef = baseIndex === -1 ? undefined : Bun.argv[baseIndex + 1]
+  await runCli({
+    flags: {
+      markdown: {type: 'boolean', default: false},
+      base: {type: 'string'},
+    },
+    async run({markdown, base}) {
+      const regressions = await findCanonicalRegressions({baseRef: base})
 
-  if (baseIndex !== -1 && !baseRef) {
-    throw new Error('--base requires a git ref')
-  }
-
-  const regressions = await findCanonicalRegressions({baseRef})
-
-  /* oxlint-disable no-console */
-  if (markdown) {
-    const report = formatRegressionsMarkdown(regressions)
-    if (report) console.log(report)
-  } else {
-    console.log(formatRegressionsText(regressions))
-  }
-  /* oxlint-enable no-console */
-
-  process.exitCode = regressions.length > 0 ? 1 : 0
+      return {
+        report: markdown
+          ? formatRegressionsMarkdown(regressions)
+          : formatRegressionsText(regressions),
+        hasFindings: regressions.length > 0,
+      }
+    },
+  })
 }

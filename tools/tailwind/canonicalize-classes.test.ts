@@ -43,12 +43,12 @@ async function runCli(cwd: string, ...args: string[]) {
 }
 
 describe('canonicalize-classes CLI', () => {
-  it('dry-runs by default: prints the report without touching files', async () => {
+  it('dry-runs by default: prints the report, exits 1, touches nothing', async () => {
     const root = copyFixture()
     const before = await Bun.file(path.join(root, 'src', 'button.tsx')).text()
     const {stdout, exitCode} = await runCli(root)
 
-    expect(exitCode).toBe(0)
+    expect(exitCode).toBe(1)
     expect(stdout).toContain('=== VERIFIED MAPPING (7) ===')
     expect(stdout).toContain('w-[16px] => w-4')
     expect(stdout).toContain('=== REJECTED (1) ===')
@@ -73,11 +73,11 @@ describe('canonicalize-classes CLI', () => {
     expect(button).toContain("cn('flex w-4', active && 'p-2')")
   })
 
-  it('--markdown prints the PR-comment report when fixes exist', async () => {
+  it('--markdown prints the PR-comment report and exits 1 on findings', async () => {
     const root = copyFixture()
     const {stdout, exitCode} = await runCli(root, '--markdown')
 
-    expect(exitCode).toBe(0)
+    expect(exitCode).toBe(1)
     expect(stdout).toContain('### Non-canonical Tailwind classes')
     expect(stdout).toContain('| `w-[16px]` | `w-4` |')
     expect(stdout).toContain('suggestion(s) rejected')
@@ -92,15 +92,12 @@ describe('canonicalize-classes CLI', () => {
     expect(exitCode).toBe(0)
     expect(stdout).toBe('')
   })
-})
 
-describe('module exports', () => {
-  it('re-exports the pipeline API', async () => {
-    const mod = await import('./canonicalize-classes')
+  it('rejects unknown flags as a usage error instead of running', async () => {
+    const root = copyFixture()
+    const {stderr, exitCode} = await runCli(root, '--markdwon')
 
-    expect(typeof mod.analyzeTailwindClasses).toBe('function')
-    expect(typeof mod.applyCanonicalFixes).toBe('function')
-    expect(typeof mod.formatTextReport).toBe('function')
-    expect(typeof mod.formatMarkdownReport).toBe('function')
+    expect(exitCode).toBe(2)
+    expect(stderr).toContain('--markdwon')
   })
 })

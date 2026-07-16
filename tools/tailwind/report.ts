@@ -50,10 +50,7 @@ export function formatMarkdownReport(analysis: TailwindClassAnalysis): string {
     lines.push(`| \`${from}\` | \`${to}\` | ${where} |`)
   }
 
-  lines.push(
-    '',
-    'Fix locally: `bun tools/tailwind/canonicalize-classes.ts --apply`'
-  )
+  lines.push('', 'Fix locally: `bun run lint:tailwind:apply`')
 
   if (analysis.rejected.length > 0) {
     lines.push(
