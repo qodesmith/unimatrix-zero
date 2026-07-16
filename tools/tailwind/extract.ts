@@ -15,6 +15,11 @@ export interface Literal {
 
 const CLASS_FN_RE = /\b(?:cn|cva|clsx|tv|twMerge)\s*\(/g
 
+/** Splits a class string into its whitespace-separated tokens. */
+export function classTokens(text: string): string[] {
+  return text.split(/\s+/).filter(Boolean)
+}
+
 const SOURCE_GLOB = new Bun.Glob('**/*.{ts,tsx}')
 
 export function walk(dir: string): string[] {

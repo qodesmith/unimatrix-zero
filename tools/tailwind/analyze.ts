@@ -9,7 +9,7 @@ import {__unstable__loadDesignSystem} from '@tailwindcss/node'
 
 import path from 'node:path'
 
-import {extractLiterals, walk} from './extract'
+import {classTokens, extractLiterals, walk} from './extract'
 
 type DesignSystem = Awaited<ReturnType<typeof __unstable__loadDesignSystem>>
 
@@ -253,9 +253,7 @@ export async function analyzeTailwindClasses({
 
   const tokens = new Set<string>()
   for (const lit of literals) {
-    for (const token of lit.text.split(/\s+/)) {
-      if (token) tokens.add(token)
-    }
+    for (const token of classTokens(lit.text)) tokens.add(token)
   }
 
   // One token per call keeps the old→new mapping strictly 1:1.

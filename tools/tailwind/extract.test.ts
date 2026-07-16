@@ -4,7 +4,16 @@ import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import {extractLiterals, walk} from './extract'
+import {classTokens, extractLiterals, walk} from './extract'
+
+describe('classTokens', () => {
+  it('splits on any whitespace run and drops empty tokens', () => {
+    expect(classTokens('w-4   flex\n  p-2')).toEqual(['w-4', 'flex', 'p-2'])
+    expect(classTokens('  w-4 ')).toEqual(['w-4'])
+    expect(classTokens('   ')).toEqual([])
+    expect(classTokens('')).toEqual([])
+  })
+})
 
 /** Extracts from an inline source and returns just the literal texts. */
 const texts = (source: string): string[] =>

@@ -14,7 +14,7 @@
 import path from 'node:path'
 
 import {loadClassVerifier} from './analyze'
-import {extractLiterals} from './extract'
+import {classTokens, extractLiterals} from './extract'
 
 export interface RegressionCheckOptions {
   /** Project root containing `components.json`. Defaults to cwd. */
@@ -132,8 +132,8 @@ function tokenCounts(file: string, text: string): Map<string, number> {
   const counts = new Map<string, number>()
 
   for (const lit of extractLiterals(file, text)) {
-    for (const token of lit.text.split(/\s+/)) {
-      if (token) counts.set(token, (counts.get(token) ?? 0) + 1)
+    for (const token of classTokens(lit.text)) {
+      counts.set(token, (counts.get(token) ?? 0) + 1)
     }
   }
 
