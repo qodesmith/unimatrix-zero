@@ -244,7 +244,7 @@ function ChartTooltipContent({
                       !hideIndicator && (
                         <ChartTooltipIndicator
                           className={cn(
-                            'shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)',
+                            'border-border shrink-0 rounded-xs bg-(--color-bg)',
                             {
                               'h-2.5 w-2.5': indicator === 'dot',
                               'w-1': indicator === 'line',
@@ -292,7 +292,7 @@ const ChartLegend = RechartsLegend
 function ChartLegendSwatch({color}: {color?: string}) {
   const style = useMemo(() => ({backgroundColor: color}), [color])
 
-  return <div className="h-2 w-2 shrink-0 rounded-[2px]" style={style} />
+  return <div className="h-2 w-2 shrink-0 rounded-xs" style={style} />
 }
 
 function ChartLegendContent({
