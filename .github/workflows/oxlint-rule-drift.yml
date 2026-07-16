@@ -38,10 +38,16 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           git fetch --depth=1 origin "$BASE_SHA"
-          git checkout "$BASE_SHA" -- \
+          # One checkout per file: a multi-path checkout is all-or-nothing, so
+          # a single script missing at base (introducing PR) would silently
+          # leave *every* trusted script at the PR version.
+          for script in \
             tools/oxlint/check-oxlint-drift.ts \
-            tools/oxlint/get-rule-changes.ts \
-            || echo "Base ref lacks these scripts (introducing PR); using PR copy."
+            tools/oxlint/drift.ts \
+            tools/oxlint/get-rule-changes.ts; do
+            git checkout "$BASE_SHA" -- "$script" \
+              || echo "Base ref lacks $script (introducing PR); using PR copy."
+          done
 
       # Fails nothing yet — just computes whether we've drifted and sets an
       # output. This lets us post the rule-change delta *before* failing.
