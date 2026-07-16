@@ -1,0 +1,91 @@
+name: oxlint Rule Drift
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  drift:
+    name: Check oxlint rule drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.14
+
+      # Run the *executable* tooling from the base ref, never the PR's copy, so
+      # a PR author (same-repo branches get repo secrets on pull_request) can't
+      # rewrite these scripts to exfiltrate CLAUDE_CODE_OAUTH_TOKEN / the write
+      # token. The data files (bun.lock, reviewed-oxlint-version.json) are
+      # left at the PR version on purpose — the drift check must compare those.
+      - name: Restore trusted oxlint tooling from base ref
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --depth=1 origin "$BASE_SHA"
+          git checkout "$BASE_SHA" -- \
+            tools/oxlint/check-oxlint-drift.ts \
+            tools/oxlint/get-rule-changes.ts \
+            || echo "Base ref lacks these scripts (introducing PR); using PR copy."
+
+      # Fails nothing yet — just computes whether we've drifted and sets an
+      # output. This lets us post the rule-change delta *before* failing.
+      - name: Check oxlint version drift
+        id: drift
+        run: bun ./tools/oxlint/check-oxlint-drift.ts
+
+      - name: Install Claude Code CLI
+        if: steps.drift.outputs.should_fail == 'true'
+        run: bun install -g @anthropic-ai/claude-code
+
+      # get-rule-changes.ts spawns `claude -p` (CLAUDE_CODE_OAUTH_TOKEN) and
+      # lets it call gh (GH_TOKEN) + WebFetch. Raw streamed stdout is captured
+      # as-is.
+      #
+      # `--allowedTools` only gates tool *invocation*; it does NOT stop Claude
+      # from loading PR-controlled config in the working tree — `.claude/`
+      # settings hooks (PreToolUse/SessionStart run regardless of allowedTools),
+      # `.mcp.json` servers, and project skills. A branch that trips the drift
+      # check AND ships a malicious hook could run arbitrary code with the
+      # secrets below. So we strip that config and point Claude at an isolated,
+      # empty config dir before launching it.
+      - name: Generate rule-change delta
+        if: steps.drift.outputs.should_fail == 'true'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLAUDE_CONFIG_DIR: ${{ runner.temp }}/claude-config
+        run: |
+          set -o pipefail
+          rm -rf .claude .mcp.json
+          mkdir -p "$CLAUDE_CONFIG_DIR"
+          bun ./tools/oxlint/get-rule-changes.ts | tee "$RUNNER_TEMP/oxlint-delta.md"
+
+      - name: Post PR comment
+        if: steps.drift.outputs.should_fail == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cat "$RUNNER_TEMP/oxlint-drift-reason.md" "$RUNNER_TEMP/oxlint-delta.md" > "$RUNNER_TEMP/oxlint-comment.md"
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file "$RUNNER_TEMP/oxlint-comment.md"
+
+      - name: Fail on drift
+        if: steps.drift.outputs.should_fail == 'true'
+        run: |
+          echo "oxlint rule drift detected — see the PR comment for the delta."
+          exit 1

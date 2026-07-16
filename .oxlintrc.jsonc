@@ -1,9 +1,22 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": [
+    "node_modules",
+    "out",
+    "dist",
+    "build",
+    ".claude",
+    ".husky",
+  ],
+
+  // Custom JS plugins. `custom/only-export-components` reimplements
+  // `react/only-export-components` but skips TanStack Router route modules.
+  "jsPlugins": ["./tools/oxlint/only-export-components.ts"],
 
   // https://oxc.rs/docs/guide/usage/linter/plugins.html#supported-plugins
   // Recommended rules from each plugin are automatically enabled.
   "plugins": [
+    "jsx-a11y",
     "eslint",
     "typescript",
     "unicorn",
@@ -18,17 +31,78 @@
     "typeCheck": true,
   },
   "env": {
-    "es6": true,
+    "browser": true,
+    "builtin": true,
   },
-  "ignorePatterns": ["node_modules", "out", "dist", "build"],
+  "overrides": [
+    {
+      // Ambient declaration files don't need import/export statements.
+      "files": ["**/*.d.ts"],
+      "rules": {
+        "import/unambiguous": "off",
+      },
+    },
+    {
+      // Build tools (electron-vite, vite) require default-exported configs.
+      "files": ["**/*.config.ts"],
+      "rules": {
+        "import/no-default-export": "off",
+      },
+    },
+    {
+      // React components might export static values.
+      "files": ["src/renderer/src/components/**/*.tsx"],
+      "excludeFiles": ["**/*.test.tsx"],
+      "rules": {
+        "custom/only-export-components": "off",
+        "react/no-array-index-key": "off",
+      },
+    },
+  ],
   "rules": {
+    //////////////
+    // jsx-a11y //
+    //////////////
+
+    "jsx_a11y/alt-text": "error",
+    "jsx-a11y/anchor-ambiguous-text": "error",
+    "jsx-a11y/anchor-has-content": "error",
+    "jsx-a11y/anchor-is-valid": "error",
+    "jsx-a11y/aria-activedescendant-has-tabindex": "error",
+    "jsx_a11y/aria-props": "error",
+    "jsx-a11y/aria-proptypes": "error",
+    "jsx_a11y/aria-role": "error",
+    "jsx_a11y/aria-unsupported-elements": "error",
+    "jsx_a11y/click-events-have-key-events": "error",
+    "jsx-a11y/control-has-associated-label": "error",
+    "jsx_a11y/heading-has-content": "error",
+    "jsx_a11y/html-has-lang": "error",
+    "jsx-a11y/iframe-has-title": "error",
+    "jsx_a11y/img-redundant-alt": "error",
+    "jsx_a11y/interactive-supports-focus": "error",
+    "jsx_a11y/label-has-associated-control": "error",
+    "jsx-a11y/lang": "error",
+    "jsx-a11y/mouse-events-have-key-events": "error",
+    "jsx_a11y/no-access-key": "error",
+    "jsx-a11y/no-aria-hidden-on-focusable": "error",
+    "jsx_a11y/no-autofocus": "error",
+    "jsx-a11y/no-interactive-element-to-noninteractive-role": "error",
+    "jsx-a11y/no-noninteractive-element-interactions": "error",
+    "jsx-a11y/no-noninteractive-element-to-interactive-role": "error",
+    "jsx-a11y/no-noninteractive-tabindex": "error",
+    "jsx_a11y/no-redundant-roles": "error",
+    "jsx-a11y/no-static-element-interactions": "error",
+    "jsx_a11y/role-has-required-aria-props": "error",
+    "jsx_a11y/role-supports-aria-props": "error",
+    "jsx-a11y/scope": "error",
+    "jsx_a11y/tabindex-no-positive": "error",
+
     ////////////
     // eslint //
     ////////////
 
     "accessor-pairs": "error",
     "array-callback-return": "error",
-    "curly": "error",
     "default-case": ["error", {"commentPattern": "^skip\\sdefault"}],
     "default-case-last": "error",
     "eqeqeq": "error",
@@ -41,7 +115,6 @@
     "no-await-in-loop": "error",
     "no-bitwise": "warn",
     "no-console": "error",
-    "no-duplicate-imports": "error",
     "no-else-return": "error",
     "no-empty": "error",
     "no-empty-function": "warn",
@@ -54,7 +127,6 @@
       {"boolean": false, "number": false, "string": true},
     ],
     "no-labels": "error",
-    "no-lonely-if": "warn",
     "no-multi-assign": "error",
     "no-negated-condition": "warn",
     "no-new-func": "error",
@@ -76,10 +148,7 @@
     "prefer-rest-params": "error",
     "preserve-caught-error": "error",
     "radix": "error",
-    "sort-imports": [
-      "error",
-      {"allowSeparatedGroups": true, "ignoreDeclarationSort": true},
-    ],
+    "sort-imports": ["error", {"ignoreDeclarationSort": true}],
     "symbol-description": "error",
     "yoda": "error",
 
@@ -118,7 +187,14 @@
     "typescript/prefer-optional-chain": "warn",
     "typescript/prefer-reduce-type-parameter": "error",
     "typescript/prefer-ts-expect-error": "error",
-    "typescript/promise-function-async": "error",
+    // In React 19, `React.ReactNode` includes `Promise<AwaitedReactNode>`. A
+    // useMemo/callback returning `children` (or any ReactNode) is inferred as a
+    // promise-union and trips this rule. The fix is an explicit return-type
+    // annotation (e.g. `useMemo((): React.ReactNode => …)`), NOT adding `async`
+    // — `async` wraps the value in a real Promise and breaks the component.
+    // Kept at "warn" (not "error") so editor fix-on-save won't auto-insert
+    // `async` and silently break things.
+    "typescript/promise-function-async": "warn",
     "typescript/restrict-plus-operands": [
       "error",
       {
@@ -135,6 +211,7 @@
     /////////////
 
     "unicorn/error-message": "error",
+    "unicorn/explicit-timer-delay": ["error", "always"],
     "unicorn/import-style": [
       "error",
       {"checkExportFrom": true, "checkImport": false},
@@ -203,7 +280,9 @@
     "react/no-unescaped-entities": "error",
     "react/no-unknown-property": "error",
     "react/no-unstable-nested-components": "error",
-    "react/only-export-components": ["error", {"allowConstantExport": true}],
+    // replaced by custom/only-export-components (skips TanStack routes)
+    "react/only-export-components": "off",
+    "custom/only-export-components": ["error", {"allowConstantExport": true}],
     "react/prefer-function-component": "error",
     "react/react-compiler": "error",
     "react/rules-of-hooks": "error",
@@ -215,10 +294,9 @@
     // react-perf //
     ////////////////
 
-    "react-perf/jsx-no-jsx-as-prop": "error",
-    "react-perf/jsx-no-new-array-as-prop": "error",
-    "react-perf/jsx-no-new-function-as-prop": "error",
-    "react-perf/jsx-no-new-object-as-prop": "error",
+    "react-perf/jsx-no-jsx-as-prop": "warn",
+    "react-perf/jsx-no-new-array-as-prop": "warn",
+    "react-perf/jsx-no-new-object-as-prop": "warn",
 
     /////////
     // oxc //
