@@ -28,6 +28,30 @@ export interface RegressionCheckOptions {
 
   /** Git ref the working tree is diffed against. */
   baseRef?: string
+
+  /**
+   * Source of diff history. Defaults to reading the git working tree via
+   * `gitHistoryReader`; tests substitute an in-memory reader. When provided,
+   * `srcDirs` and `baseRef` are ignored — they only configure the default
+   * reader.
+   */
+  history?: HistoryReader
+}
+
+/**
+ * What the regression scan asks of version history: which files changed
+ * since base, and what a file's text is at base and at head. Paths are
+ * relative to the project root; deletions are excluded from `changedFiles`
+ * (a removal adds no tokens, so it can't contain an applied suggestion).
+ */
+export interface HistoryReader {
+  changedFiles(): Promise<string[]>
+
+  /** File text at the base ref, or `null` when the file is new in head. */
+  readBaseFile(file: string): Promise<string | null>
+
+  /** File text in the working tree. */
+  readHeadFile(file: string): Promise<string>
 }
 
 export interface CanonicalRegression {
@@ -51,6 +75,58 @@ function git(
   }
 }
 
+/**
+ * Production `HistoryReader`: diffs the working tree against `baseRef` with
+ * the git CLI.
+ */
+export function gitHistoryReader({
+  projectRoot = process.cwd(),
+  srcDirs = ['src'],
+  baseRef = 'origin/main',
+}: Pick<
+  RegressionCheckOptions,
+  'projectRoot' | 'srcDirs' | 'baseRef'
+> = {}): HistoryReader {
+  return {
+    async changedFiles() {
+      // Deleted files are excluded (`--diff-filter=d`). `--relative` keeps
+      // paths cwd-relative when the project root is nested in the repository.
+      const diff = git(
+        [
+          'diff',
+          '--name-only',
+          '--relative',
+          '--diff-filter=d',
+          baseRef,
+          '--',
+          ...srcDirs,
+        ],
+        projectRoot
+      )
+
+      if (!diff.ok) {
+        throw new Error(
+          `git diff against ${baseRef} failed: ${diff.stderr.trim()}`
+        )
+      }
+
+      return diff.stdout.split('\n').filter(Boolean)
+    },
+
+    async readBaseFile(file) {
+      // `./` scopes the path to the cwd instead of the repository root. A
+      // failed show means the file is new in head — no removed tokens.
+      const base = git(['show', `${baseRef}:./${file}`], projectRoot)
+
+      return base.ok ? base.stdout : null
+    },
+
+    async readHeadFile(file) {
+      return Bun.file(path.join(projectRoot, file)).text()
+    },
+  }
+}
+
 /** Counts each class token across a file's extracted literals. */
 function tokenCounts(file: string, text: string): Map<string, number> {
   const counts = new Map<string, number>()
@@ -65,7 +141,7 @@ function tokenCounts(file: string, text: string): Map<string, number> {
 }
 
 /**
- * Diffs the working tree against `baseRef` and reports removed→added token
+ * Diffs head against base via `history` and reports removed→added token
  * pairs that match an engine suggestion but are not CSS-equivalent.
  */
 export async function findCanonicalRegressions({
@@ -73,31 +149,11 @@ export async function findCanonicalRegressions({
   srcDirs = ['src'],
   rem = 16,
   baseRef = 'origin/main',
+  history = gitHistoryReader({projectRoot, srcDirs, baseRef}),
 }: RegressionCheckOptions = {}): Promise<CanonicalRegression[]> {
   const verifier = await loadClassVerifier({projectRoot, rem})
 
-  // Deleted files are excluded (`--diff-filter=d`): a removal adds no
-  // tokens, so it can't contain an applied suggestion. `--relative` keeps
-  // paths cwd-relative when the project root is nested in the repository.
-  const diff = git(
-    [
-      'diff',
-      '--name-only',
-      '--relative',
-      '--diff-filter=d',
-      baseRef,
-      '--',
-      ...srcDirs,
-    ],
-    projectRoot
-  )
-
-  if (!diff.ok) {
-    throw new Error(`git diff against ${baseRef} failed: ${diff.stderr.trim()}`)
-  }
-
-  const changedFiles = diff.stdout
-    .split('\n')
+  const changedFiles = (await history.changedFiles())
     .filter(file => /\.tsx?$/.test(file) && !file.endsWith('.d.ts'))
     .sort((a, b) => a.localeCompare(b))
 
@@ -105,12 +161,9 @@ export async function findCanonicalRegressions({
   // file despite the parallel reads.
   const regressionsPerFile = await Promise.all(
     changedFiles.map(async file => {
-      const headText = await Bun.file(path.join(projectRoot, file)).text()
-
-      // `./` scopes the path to the cwd instead of the repository root. A
-      // failed show means the file is new in head — no removed tokens.
-      const base = git(['show', `${baseRef}:./${file}`], projectRoot)
-      const baseCounts = tokenCounts(file, base.ok ? base.stdout : '')
+      const headText = await history.readHeadFile(file)
+      const baseText = await history.readBaseFile(file)
+      const baseCounts = tokenCounts(file, baseText ?? '')
       const headCounts = tokenCounts(file, headText)
       const regressions: CanonicalRegression[] = []
 

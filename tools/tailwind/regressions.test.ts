@@ -1,4 +1,4 @@
-import type {CanonicalRegression} from './regressions'
+import type {CanonicalRegression, HistoryReader} from './regressions'
 
 import {afterEach, describe, expect, it} from 'vitest'
 
@@ -10,6 +10,7 @@ import {
   findCanonicalRegressions,
   formatRegressionsMarkdown,
   formatRegressionsText,
+  gitHistoryReader,
 } from './regressions'
 
 const fixtureRoot = path.join(import.meta.dirname, 'fixtures', 'radius')
@@ -65,18 +66,44 @@ function editBox(dir: string, from: string, to: string): void {
   writeFileSync(file, readFileSync(file, 'utf8').replace(from, to))
 }
 
-const check = async (dir: string): Promise<CanonicalRegression[]> =>
-  findCanonicalRegressions({projectRoot: dir, baseRef: 'HEAD'})
+const baseBox = readFileSync(path.join(fixtureRoot, 'src', 'box.tsx'), 'utf8')
+
+/**
+ * In-memory HistoryReader: `base` and `head` map project-relative paths to
+ * file text. Changed = present in head with different text (deletions are
+ * excluded, mirroring `--diff-filter=d`).
+ */
+function inMemoryHistory(
+  base: Record<string, string>,
+  head: Record<string, string>
+): HistoryReader {
+  return {
+    changedFiles: async () =>
+      Object.keys(head).filter(file => base[file] !== head[file]),
+    readBaseFile: async file => base[file] ?? null,
+    readHeadFile: async file => head[file] ?? '',
+  }
+}
+
+const checkHistory = async (
+  base: Record<string, string>,
+  head: Record<string, string>
+): Promise<CanonicalRegression[]> =>
+  findCanonicalRegressions({
+    projectRoot: fixtureRoot,
+    history: inMemoryHistory(base, head),
+  })
 
 describe('findCanonicalRegressions', () => {
   it('flags a hand-applied suggestion that regresses at runtime', async () => {
-    const dir = initRepo()
+    const base = {'src/box.tsx': baseBox}
+    const head = {
+      'src/box.tsx': baseBox.replace('rounded-[4px]', 'rounded-lg'),
+    }
 
-    editBox(dir, 'rounded-[4px]', 'rounded-lg')
-
-    expect(await check(dir)).toEqual([
+    expect(await checkHistory(base, head)).toEqual([
       {
-        file: path.join('src', 'box.tsx'),
+        file: 'src/box.tsx',
         from: 'rounded-[4px]',
         to: 'rounded-lg',
         reason:
@@ -88,63 +115,63 @@ describe('findCanonicalRegressions', () => {
   })
 
   it('accepts a hand-applied suggestion that is CSS-equivalent', async () => {
-    const dir = initRepo()
+    const base = {'src/box.tsx': baseBox}
+    const head = {
+      'src/box.tsx': baseBox.replace('rounded-[2px]', 'rounded-xs'),
+    }
 
-    editBox(dir, 'rounded-[2px]', 'rounded-xs')
-
-    expect(await check(dir)).toEqual([])
+    expect(await checkHistory(base, head)).toEqual([])
   })
 
   it('ignores intentional redesigns to unrelated classes', async () => {
-    const dir = initRepo()
+    const base = {'src/box.tsx': baseBox}
+    const head = {'src/box.tsx': baseBox.replace('rounded-[4px]', 'p-2')}
 
-    editBox(dir, 'rounded-[4px]', 'p-2')
-
-    expect(await check(dir)).toEqual([])
+    expect(await checkHistory(base, head)).toEqual([])
   })
 
   it('ignores plain removals', async () => {
-    const dir = initRepo()
+    const base = {'src/box.tsx': baseBox}
+    const head = {
+      'src/box.tsx': baseBox.replace(
+        '<span className="rounded-[4px]">x</span>',
+        ''
+      ),
+    }
 
-    editBox(dir, '<span className="rounded-[4px]">x</span>', '')
-
-    expect(await check(dir)).toEqual([])
+    expect(await checkHistory(base, head)).toEqual([])
   })
 
   it('ignores new files that use the canonical class', async () => {
-    const dir = initRepo()
+    const base = {'src/box.tsx': baseBox}
+    const head = {
+      'src/box.tsx': baseBox,
+      'src/new.tsx':
+        'export const New = () => <div className="rounded-lg" />\n',
+    }
 
-    writeFileSync(
-      path.join(dir, 'src', 'new.tsx'),
-      'export const New = () => <div className="rounded-lg" />\n'
-    )
-
-    expect(await check(dir)).toEqual([])
+    expect(await checkHistory(base, head)).toEqual([])
   })
 
   it('ignores deleted files', async () => {
-    const dir = initRepo()
+    const base = {'src/box.tsx': baseBox}
 
-    rmSync(path.join(dir, 'src', 'box.tsx'))
-
-    expect(await check(dir)).toEqual([])
+    expect(await checkHistory(base, {})).toEqual([])
   })
 
   it('catches a partial swap while other occurrences remain', async () => {
-    const dir = initRepo()
-
-    editBox(
-      dir,
+    const twoSpans = baseBox.replace(
       '<span className="rounded-[4px]">x</span>',
       '<span className="rounded-[4px]">x</span>' +
         '<i className="rounded-[4px]">y</i>'
     )
-    commitAll(dir)
-
     // Only one of the two occurrences gets the unsafe rewrite.
-    editBox(dir, 'rounded-[4px]', 'rounded-lg')
+    const base = {'src/box.tsx': twoSpans}
+    const head = {
+      'src/box.tsx': twoSpans.replace('rounded-[4px]', 'rounded-lg'),
+    }
 
-    const regressions = await check(dir)
+    const regressions = await checkHistory(base, head)
 
     expect(regressions).toHaveLength(1)
     expect(regressions[0].from).toBe('rounded-[4px]')
@@ -152,13 +179,16 @@ describe('findCanonicalRegressions', () => {
   })
 
   it('catches variant-wrapped rewrites', async () => {
-    const dir = initRepo()
+    const hoverBox = baseBox.replace('rounded-[4px]', 'hover:rounded-[4px]')
+    const base = {'src/box.tsx': hoverBox}
+    const head = {
+      'src/box.tsx': hoverBox.replace(
+        'hover:rounded-[4px]',
+        'hover:rounded-lg'
+      ),
+    }
 
-    editBox(dir, 'rounded-[4px]', 'hover:rounded-[4px]')
-    commitAll(dir)
-    editBox(dir, 'hover:rounded-[4px]', 'hover:rounded-lg')
-
-    const regressions = await check(dir)
+    const regressions = await checkHistory(base, head)
 
     expect(regressions).toHaveLength(1)
     expect(regressions[0].from).toBe('hover:rounded-[4px]')
@@ -171,6 +201,38 @@ describe('findCanonicalRegressions', () => {
     await expect(
       findCanonicalRegressions({projectRoot: dir, baseRef: 'no-such-ref'})
     ).rejects.toThrow('git diff against no-such-ref failed')
+  })
+})
+
+// The in-memory fake re-encodes the diff semantics, so the real adapter's
+// git quirks (`--diff-filter=d`, `./`-scoped `git show`) get their own
+// coverage against actual repos.
+describe('gitHistoryReader', () => {
+  it('lists modified and added files but excludes deletions', async () => {
+    const dir = initRepo()
+
+    rmSync(path.join(dir, 'src', 'box.tsx'))
+    writeFileSync(path.join(dir, 'src', 'new.tsx'), 'export const x = 1\n')
+    // Untracked files never show in `git diff`; stage the addition the way a
+    // committed PR head would present it.
+    git(dir, 'add', 'src/new.tsx')
+
+    const history = gitHistoryReader({projectRoot: dir, baseRef: 'HEAD'})
+
+    expect(await history.changedFiles()).toEqual(['src/new.tsx'])
+  })
+
+  it('reads base text, and null for files new in head', async () => {
+    const dir = initRepo()
+    const newText = 'export const x = 1\n'
+
+    writeFileSync(path.join(dir, 'src', 'new.tsx'), newText)
+
+    const history = gitHistoryReader({projectRoot: dir, baseRef: 'HEAD'})
+
+    expect(await history.readBaseFile('src/box.tsx')).toBe(baseBox)
+    expect(await history.readBaseFile('src/new.tsx')).toBeNull()
+    expect(await history.readHeadFile('src/new.tsx')).toBe(newText)
   })
 })
 
