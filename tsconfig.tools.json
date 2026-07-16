@@ -1,0 +1,13 @@
+{
+  // Repo tooling (tools/**) — runs under Bun, not Electron's Node, so it gets
+  // Bun's globals/types instead of the node config's. Everything else is
+  // inherited from tsconfig.node.json.
+  "extends": "./tsconfig.node.json",
+  "include": ["tools/**/*"],
+  // Fixture "projects" are test data scanned by the tailwind tooling's
+  // tests, not code that runs — the tsx has no JSX config here on purpose.
+  "exclude": ["tools/tailwind/fixtures"],
+  "compilerOptions": {
+    "types": ["bun"]
+  }
+}

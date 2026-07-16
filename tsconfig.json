@@ -5,6 +5,19 @@
   "files": [],
   "references": [
     {"path": "./tsconfig.node.json"},
-    {"path": "./tsconfig.web.json"}
-  ]
+    {"path": "./tsconfig.web.json"},
+    {"path": "./tsconfig.tools.json"}
+  ],
+  // This `paths` block is inert for the actual compile/editor/runtime path:
+  // `tsc --build` uses the referenced projects' own configs, the editor's
+  // language server resolves source files via tsconfig.web.json /
+  // tsconfig.node.json, and Vite uses electron.vite.config.ts aliases. It
+  // exists ONLY for CLI tools that naively read the root tsconfig for the `@`
+  // alias — today that's the shadcn CLI, so its installs land in
+  // src/renderer/src. Mirrors the renderer mapping in tsconfig.web.json.
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/renderer/src/*"]
+    }
+  }
 }

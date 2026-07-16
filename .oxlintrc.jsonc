@@ -1,19 +1,354 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "oxc", "react"],
-  "categories": {
-    "correctness": "error",
-    "suspicious": "warn",
-  },
-  "rules": {
-    // Not needed with the automatic JSX runtime.
-    "react/react-in-jsx-scope": "off",
-    "react-hooks/rules-of-hooks": "error",
-    "react-hooks/exhaustive-deps": "warn",
+  "ignorePatterns": [
+    "node_modules",
+    "out",
+    "dist",
+    "build",
+    ".claude",
+    ".husky",
+  ],
+
+  // Custom JS plugins. `custom/only-export-components` reimplements
+  // `react/only-export-components` but skips TanStack Router route modules.
+  "jsPlugins": ["./tools/oxlint/only-export-components.ts"],
+
+  // https://oxc.rs/docs/guide/usage/linter/plugins.html#supported-plugins
+  // Recommended rules from each plugin are automatically enabled.
+  "plugins": [
+    "jsx-a11y",
+    "eslint",
+    "typescript",
+    "unicorn",
+    "react",
+    "react-perf",
+    "oxc",
+    "import",
+    "promise",
+  ],
+  "options": {
+    "typeAware": true,
+    "typeCheck": true,
   },
   "env": {
     "browser": true,
-    "node": true,
+    "builtin": true,
   },
-  "ignorePatterns": ["node_modules", "out", "dist", "build"],
+  "overrides": [
+    {
+      // Ambient declaration files don't need import/export statements.
+      "files": ["**/*.d.ts"],
+      "rules": {
+        "import/unambiguous": "off",
+      },
+    },
+    {
+      // Build tools (electron-vite, vite) require default-exported configs.
+      "files": ["**/*.config.ts"],
+      "rules": {
+        "import/no-default-export": "off",
+      },
+    },
+    {
+      // Test data for the tailwind tooling — deliberately unidiomatic JSX
+      // (untyped buttons, string literals in curly braces) that the tests
+      // assert on byte-for-byte.
+      "files": ["tools/tailwind/fixtures/**"],
+      "rules": {
+        "react/button-has-type": "off",
+        "react/jsx-curly-brace-presence": "off",
+      },
+    },
+    {
+      // React components might export static values.
+      "files": ["src/renderer/src/components/**/*.tsx"],
+      "excludeFiles": ["**/*.test.tsx"],
+      "rules": {
+        "custom/only-export-components": "off",
+        "react/no-array-index-key": "off",
+      },
+    },
+  ],
+  "rules": {
+    //////////////
+    // jsx-a11y //
+    //////////////
+
+    "jsx_a11y/alt-text": "error",
+    "jsx-a11y/anchor-ambiguous-text": "error",
+    "jsx-a11y/anchor-has-content": "error",
+    "jsx-a11y/anchor-is-valid": "error",
+    "jsx-a11y/aria-activedescendant-has-tabindex": "error",
+    "jsx_a11y/aria-props": "error",
+    "jsx-a11y/aria-proptypes": "error",
+    "jsx_a11y/aria-role": "error",
+    "jsx_a11y/aria-unsupported-elements": "error",
+    "jsx_a11y/click-events-have-key-events": "error",
+    "jsx-a11y/control-has-associated-label": "error",
+    "jsx_a11y/heading-has-content": "error",
+    "jsx_a11y/html-has-lang": "error",
+    "jsx-a11y/iframe-has-title": "error",
+    "jsx_a11y/img-redundant-alt": "error",
+    "jsx_a11y/interactive-supports-focus": "error",
+    "jsx_a11y/label-has-associated-control": "error",
+    "jsx-a11y/lang": "error",
+    "jsx-a11y/mouse-events-have-key-events": "error",
+    "jsx_a11y/no-access-key": "error",
+    "jsx-a11y/no-aria-hidden-on-focusable": "error",
+    "jsx_a11y/no-autofocus": "error",
+    "jsx-a11y/no-interactive-element-to-noninteractive-role": "error",
+    "jsx-a11y/no-noninteractive-element-interactions": "error",
+    "jsx-a11y/no-noninteractive-element-to-interactive-role": "error",
+    "jsx-a11y/no-noninteractive-tabindex": "error",
+    "jsx_a11y/no-redundant-roles": "error",
+    "jsx-a11y/no-static-element-interactions": "error",
+    "jsx_a11y/role-has-required-aria-props": "error",
+    "jsx_a11y/role-supports-aria-props": "error",
+    "jsx-a11y/scope": "error",
+    "jsx_a11y/tabindex-no-positive": "error",
+
+    ////////////
+    // eslint //
+    ////////////
+
+    "accessor-pairs": "error",
+    "array-callback-return": "error",
+    "default-case": ["error", {"commentPattern": "^skip\\sdefault"}],
+    "default-case-last": "error",
+    "eqeqeq": "error",
+    "max-lines": [
+      "warn",
+      {"max": 400, "skipBlankLines": true, "skipComments": false},
+    ],
+    "no-alert": "error",
+    "no-array-constructor": "error",
+    "no-await-in-loop": "error",
+    "no-bitwise": "warn",
+    "no-console": "error",
+    "no-else-return": "error",
+    "no-empty": "error",
+    "no-empty-function": "warn",
+    "no-eq-null": "error",
+    "no-extend-native": "error",
+    "no-extra-bind": "error",
+    "no-fallthrough": "error",
+    "no-implicit-coercion": [
+      "error",
+      {"boolean": false, "number": false, "string": true},
+    ],
+    "no-labels": "error",
+    "no-multi-assign": "error",
+    "no-negated-condition": "warn",
+    "no-new-func": "error",
+    "no-object-constructor": "error",
+    "no-promise-executor-return": "error",
+    "no-proto": "error",
+    "no-return-assign": "error",
+    "no-script-url": "error",
+    "no-sequences": "error",
+    "no-shadow": "warn",
+    "no-template-curly-in-string": "warn",
+    "no-unexpected-multiline": "warn",
+    "no-unneeded-ternary": "warn",
+    "no-var": "error",
+    "object-shorthand": "warn",
+    "prefer-const": "warn",
+    "prefer-destructuring": "warn",
+    "prefer-object-has-own": "warn",
+    "prefer-rest-params": "error",
+    "preserve-caught-error": "error",
+    "radix": "error",
+    "sort-imports": ["error", {"ignoreDeclarationSort": true}],
+    "symbol-description": "error",
+    "yoda": "error",
+
+    ////////////////
+    // typescript //
+    ////////////////
+
+    "typescript/adjacent-overload-signatures": "error",
+    "typescript/array-type": [
+      "warn",
+      {"default": "array", "readonly": "array"},
+    ],
+    "typescript/ban-ts-comment": [
+      "error",
+      {
+        "ts-check": false,
+        "ts-nocheck": false,
+        "ts-expect-error": "allow-with-description",
+        "ts-ignore": false,
+      },
+    ],
+    "typescript/consistent-indexed-object-style": ["error", "record"],
+    "typescript/consistent-type-definitions": ["error", "interface"], // https://www.youtube.com/watch?v=e0AIkYrXAYE
+    "typescript/consistent-type-exports": "error",
+    "typescript/dot-notation": "error",
+    "typescript/no-confusing-non-null-assertion": "error",
+    "typescript/no-empty-interface": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": ["error", {"fixToUnknown": true}],
+    "typescript/no-import-type-side-effects": "error",
+    "typescript/no-inferrable-types": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/prefer-for-of": "warn",
+    "typescript/prefer-nullish-coalescing": "warn",
+    "typescript/prefer-optional-chain": "warn",
+    "typescript/prefer-reduce-type-parameter": "error",
+    "typescript/prefer-ts-expect-error": "error",
+    // In React 19, `React.ReactNode` includes `Promise<AwaitedReactNode>`. A
+    // useMemo/callback returning `children` (or any ReactNode) is inferred as a
+    // promise-union and trips this rule. The fix is an explicit return-type
+    // annotation (e.g. `useMemo((): React.ReactNode => …)`), NOT adding `async`
+    // — `async` wraps the value in a real Promise and breaks the component.
+    // Kept at "warn" (not "error") so editor fix-on-save won't auto-insert
+    // `async` and silently break things.
+    "typescript/promise-function-async": "warn",
+    "typescript/restrict-plus-operands": [
+      "error",
+      {
+        "allowBoolean": false,
+        "allowNullish": false,
+        "allowNumberAndString": false,
+        "allowRegExp": false,
+      },
+    ],
+    "typescript/unified-signatures": "error",
+
+    /////////////
+    // unicorn //
+    /////////////
+
+    "unicorn/error-message": "error",
+    "unicorn/explicit-timer-delay": ["error", "always"],
+    "unicorn/import-style": [
+      "error",
+      {"checkExportFrom": true, "checkImport": false},
+    ],
+    "unicorn/new-for-builtins": "error",
+    "unicorn/no-anonymous-default-export": "error",
+    "unicorn/no-array-fill-with-reference-type": "error",
+    "unicorn/no-document-cookie": "error",
+    "unicorn/no-instanceof-array": "error",
+    "unicorn/no-lonely-if": "error",
+    "unicorn/no-new-buffer": "error",
+    "unicorn/no-typeof-undefined": "error",
+    "unicorn/no-useless-iterator-to-array": "error",
+    "unicorn/prefer-array-find": "error",
+    "unicorn/prefer-array-some": "error",
+    "unicorn/prefer-at": "error",
+    "unicorn/prefer-date-now": "error",
+    "unicorn/prefer-default-parameters": "error",
+    "unicorn/prefer-export-from": "error",
+    "unicorn/prefer-global-this": "error",
+    "unicorn/prefer-includes": "error",
+    "unicorn/prefer-keyboard-event-key": "error",
+    "unicorn/prefer-logical-operator-over-ternary": "error",
+    "unicorn/prefer-math-min-max": "error",
+    "unicorn/prefer-node-protocol": "error",
+    "unicorn/prefer-single-call": "error",
+    "unicorn/prefer-string-replace-all": "error",
+    "unicorn/prefer-string-trim-start-end": "error",
+    "unicorn/prefer-ternary": "error",
+    "unicorn/require-number-to-fixed-digits-argument": "error",
+    "unicorn/switch-case-braces": ["error", "avoid"],
+    "unicorn/text-encoding-identifier-case": "error",
+    "unicorn/throw-new-error": "error",
+
+    ///////////
+    // react //
+    ///////////
+
+    "react/button-has-type": "error",
+    "react/checked-requires-onchange-or-readonly": "error",
+    "react/exhaustive-deps": "error",
+    "react/hook-use-state": "error",
+    "react/iframe-missing-sandbox": "error",
+    "react/jsx-boolean-value": ["error", "never"],
+    "react/jsx-curly-brace-presence": [
+      "error",
+      {"propElementValues": "always"},
+    ],
+    "react/jsx-fragments": ["error", "syntax"],
+    "react/jsx-key": "error",
+    "react/jsx-no-comment-textnodes": "error",
+    "react/jsx-no-constructed-context-values": "error",
+    "react/jsx-no-duplicate-props": "error",
+    "react/jsx-no-script-url": "error",
+    "react/jsx-no-target-blank": "error",
+    "react/jsx-no-useless-fragment": "error",
+    "react/jsx-pascal-case": "error",
+    "react/jsx-props-no-spread-multi": "error",
+    "react/no-array-index-key": "warn",
+    "react/no-danger": "error",
+    "react/no-danger-with-children": "error",
+    "react/no-namespace": "error",
+    "react/no-object-type-as-default-prop": "error",
+    "react/no-react-children": "error",
+    "react/no-render-return-value": "error",
+    "react/no-unescaped-entities": "error",
+    "react/no-unknown-property": "error",
+    "react/no-unstable-nested-components": "error",
+    // replaced by custom/only-export-components (skips TanStack routes)
+    "react/only-export-components": "off",
+    "custom/only-export-components": ["error", {"allowConstantExport": true}],
+    "react/prefer-function-component": "error",
+    "react/react-compiler": "error",
+    "react/rules-of-hooks": "error",
+    "react/self-closing-comp": "error",
+    "react/style-prop-object": "error",
+    "react/void-dom-elements-no-children": "error",
+
+    ////////////////
+    // react-perf //
+    ////////////////
+
+    "react-perf/jsx-no-jsx-as-prop": "warn",
+    "react-perf/jsx-no-new-array-as-prop": "warn",
+    "react-perf/jsx-no-new-object-as-prop": "warn",
+
+    /////////
+    // oxc //
+    /////////
+
+    "oxc/branches-sharing-code": "error",
+    "oxc/misrefactored-assign-op": "error",
+    "oxc/no-accumulating-spread": "error",
+    "oxc/no-barrel-file": "error",
+    "oxc/no-const-enum": "error",
+
+    ////////////
+    // import //
+    ////////////
+
+    "import/consistent-type-specifier-style": ["error", "prefer-top-level"],
+    "import/default": "error",
+    "import/export": "error",
+    "import/newline-after-import": "error",
+    "import/no-absolute-path": "error",
+    "import/no-cycle": "error",
+    "import/no-default-export": "error",
+    "import/no-duplicates": "error",
+    "import/no-empty-named-blocks": "error",
+    "import/no-mutable-exports": "error",
+    "import/no-namespace": "error",
+    "import/no-self-import": "error",
+    "import/no-unassigned-import": ["error", {"allow": ["**/*.css"]}],
+    "import/unambiguous": "warn",
+
+    /////////////
+    // promise //
+    /////////////
+
+    "promise/always-return": "warn",
+    "promise/no-multiple-resolved": "error",
+    "promise/no-nesting": "error",
+    "promise/no-new-statics": "error",
+    "promise/no-promise-in-callback": "error",
+    "promise/no-return-in-finally": "error",
+    "promise/no-return-wrap": "error",
+    "promise/param-names": "error",
+    "promise/prefer-catch": "error",
+  },
 }

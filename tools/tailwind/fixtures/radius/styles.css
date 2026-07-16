@@ -1,0 +1,24 @@
+/*
+ * Mirrors this repo's real radius setup, hermetically (no @import).
+ *
+ * The engine (and the Tailwind IntelliSense plugin) resolves
+ * `--radius-lg: var(--radius)` against the theme default `--radius: 0.25rem`
+ * — in the real app that default ships in tailwindcss/theme.css — so it
+ * suggests both `rounded-[2px]` -> `rounded-xs` and `rounded-[4px]` ->
+ * `rounded-lg`. At runtime, though, the `:root` override makes `rounded-lg`
+ * 0.625rem, so applying that second suggestion would be a visual regression.
+ * Only `rounded-xs` (0.125rem, untouched by :root) is genuinely equivalent.
+ */
+@theme inline {
+  --radius-lg: var(--radius);
+}
+
+:root {
+  --radius: 0.625rem;
+}
+
+@theme {
+  --spacing: 0.25rem;
+  --radius-xs: 0.125rem;
+  --radius: 0.25rem;
+}

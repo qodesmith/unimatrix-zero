@@ -1,0 +1,122 @@
+import type {Finding} from '../findings'
+import type {CanonicalPair, TailwindClassAnalysis} from './analyze'
+
+import {describe, expect, it} from 'vitest'
+
+import {formatCanonicalizeReport} from './report'
+
+function makeAnalysis(
+  verified: CanonicalPair[],
+  rejected: Finding[] = []
+): TailwindClassAnalysis {
+  return {
+    projectRoot: '/proj',
+    filesScanned: 3,
+    uniqueTokens: 12,
+    verified,
+    rejected,
+    edits: [],
+  }
+}
+
+const pair: CanonicalPair = {
+  from: 'w-[16px]',
+  to: 'w-4',
+  locations: [
+    {file: 'src/a.tsx', line: 5},
+    {file: 'src/b.tsx', line: 9},
+  ],
+}
+
+const rejectedPair: Finding = {
+  from: 'rounded-[4px]',
+  to: 'rounded-sm',
+  reason: 'css mismatch:\n  OLD: x\n  NEW: y',
+}
+
+describe('formatCanonicalizeReport text', () => {
+  it('lists counts, the mapping, and each location', () => {
+    const {text} = formatCanonicalizeReport(makeAnalysis([pair]))
+
+    expect(text).toBe(
+      [
+        'files scanned: 3, unique tokens: 12',
+        '',
+        '=== NON-CANONICAL TAILWIND CLASSES (1) ===',
+        'w-[16px] => w-4',
+        '  at src/a.tsx:5',
+        '  at src/b.tsx:9',
+      ].join('\n')
+    )
+  })
+
+  it('omits the rejected appendix when nothing was rejected', () => {
+    expect(formatCanonicalizeReport(makeAnalysis([pair])).text).not.toContain(
+      'rejected'
+    )
+  })
+
+  it('appends rejected pairs with their reasons', () => {
+    const {text} = formatCanonicalizeReport(
+      makeAnalysis([pair], [rejectedPair])
+    )
+
+    expect(text).toContain(
+      '1 suggestion(s) rejected by CSS-equivalence verification'
+    )
+    expect(text).toContain('rounded-[4px] => rounded-sm')
+    expect(text).toContain('css mismatch')
+  })
+
+  it('still reports counts when everything is canonical', () => {
+    expect(formatCanonicalizeReport(makeAnalysis([])).text).toBe(
+      [
+        'files scanned: 3, unique tokens: 12',
+        '',
+        'all classes are canonical',
+      ].join('\n')
+    )
+  })
+})
+
+describe('formatCanonicalizeReport markdown', () => {
+  it('returns an empty string when nothing is actionable', () => {
+    expect(formatCanonicalizeReport(makeAnalysis([])).markdown).toBe('')
+
+    // Rejected pairs alone need no action.
+    expect(
+      formatCanonicalizeReport(makeAnalysis([], [rejectedPair])).markdown
+    ).toBe('')
+  })
+
+  it('renders a table row per pair with <br>-joined locations', () => {
+    const {markdown} = formatCanonicalizeReport(makeAnalysis([pair]))
+
+    expect(markdown).toContain('### Non-canonical Tailwind classes')
+    expect(markdown).toContain('1 class(es) can be written in canonical form:')
+    expect(markdown).toContain('| Change | Where |')
+    expect(markdown).toContain(
+      '| `w-[16px]` → `w-4` | `src/a.tsx:5`<br>`src/b.tsx:9` |'
+    )
+    expect(markdown).toContain('Fix locally: `bun run lint:tailwind:apply`')
+  })
+
+  it('omits the details block when nothing was rejected', () => {
+    expect(
+      formatCanonicalizeReport(makeAnalysis([pair])).markdown
+    ).not.toContain('<details>')
+  })
+
+  it('collapses rejected pairs into a details block', () => {
+    const {markdown} = formatCanonicalizeReport(
+      makeAnalysis([pair], [rejectedPair])
+    )
+
+    expect(markdown).toContain('<details>')
+    expect(markdown).toContain(
+      '1 suggestion(s) rejected by CSS-equivalence verification'
+    )
+    expect(markdown).toContain('rounded-[4px] => rounded-sm')
+    expect(markdown).toContain('</details>')
+  })
+})
