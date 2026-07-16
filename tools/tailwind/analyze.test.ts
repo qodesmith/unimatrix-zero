@@ -23,7 +23,7 @@ describe('analyzeTailwindClasses', () => {
       path.join(fixtureRoot, 'src', 'card.tsx'),
       path.join(fixtureRoot, 'src', 'util.ts'),
     ])
-    expect(analysis.uniqueTokens).toBe(10)
+    expect(analysis.uniqueTokens).toBe(11)
   })
 
   it('verifies the expected 1:1 mapping, sorted by old token', () => {
@@ -41,11 +41,46 @@ describe('analyzeTailwindClasses', () => {
   it('reports every location of a token, skipping interpolated templates', () => {
     const pair = analysis.verified.find(p => p.from === 'w-[16px]')
 
-    // card.tsx line 3 uses w-[16px] inside a `${}` template — not listed.
+    // card.tsx line 3 uses w-[16px] inside a `${}` template — not listed;
+    // util.ts line 11 holds two occurrences, each reported.
     expect(pair?.locations).toEqual([
       {file: path.join('src', 'button.tsx'), line: 5},
       {file: path.join('src', 'card.tsx'), line: 4},
+      {file: path.join('src', 'util.ts'), line: 11},
+      {file: path.join('src', 'util.ts'), line: 11},
     ])
+  })
+
+  it('emits one edit per verified occurrence, ordered by file and offset', () => {
+    expect(
+      analysis.edits.map(e => `${e.file}: ${e.original} => ${e.replacement}`)
+    ).toEqual([
+      `${path.join('src', 'button.tsx')}: w-[16px] => w-4`,
+      `${path.join('src', 'button.tsx')}: p-[8px] => p-2`,
+      `${path.join('src', 'button.tsx')}: hover:w-[16px] => hover:w-4`,
+      `${path.join('src', 'card.tsx')}: w-[16px] => w-4`,
+      `${path.join('src', 'card.tsx')}: [display:flex] => flex`,
+      `${path.join('src', 'util.ts')}: mt-[4px] => mt-1`,
+      `${path.join('src', 'util.ts')}: gap-[0.5rem] => gap-2`,
+      `${path.join('src', 'util.ts')}: z-[10] => z-10`,
+      `${path.join('src', 'util.ts')}: w-[16px] => w-4`,
+      `${path.join('src', 'util.ts')}: w-[16px] => w-4`,
+    ])
+  })
+
+  it('emits edit offsets that map 1:1 onto the source text', async () => {
+    await Promise.all(
+      analysis.edits.map(async edit => {
+        const text = await Bun.file(path.join(fixtureRoot, edit.file)).text()
+
+        expect(text.slice(edit.start, edit.end)).toBe(edit.original)
+      })
+    )
+  })
+
+  it('never edits a near-miss token that merely contains a rewritable one', () => {
+    // util.ts places w-[16px]x right next to two real w-[16px] tokens.
+    expect(analysis.edits.some(e => e.original === 'w-[16px]x')).toBe(false)
   })
 
   it('does not pick up tokens outside className attrs and class-fn calls', () => {
@@ -114,12 +149,11 @@ describe('analyzeTailwindClasses (radius fixture)', () => {
   // The fixture mirrors this repo's setup: radius utilities derive from a
   // :root-overridden --radius, so the IDE plugin flags both rounded-[2px]
   // and rounded-[4px] — but only the first suggestion is safe to apply.
+  const radiusRoot = path.join(import.meta.dirname, 'fixtures', 'radius')
   let analysis: TailwindClassAnalysis
 
   beforeAll(async () => {
-    analysis = await analyzeTailwindClasses({
-      projectRoot: path.join(import.meta.dirname, 'fixtures', 'radius'),
-    })
+    analysis = await analyzeTailwindClasses({projectRoot: radiusRoot})
   })
 
   it('verifies rounded-[2px] → rounded-xs (no runtime override)', () => {
@@ -128,6 +162,22 @@ describe('analyzeTailwindClasses (radius fixture)', () => {
         from: 'rounded-[2px]',
         to: 'rounded-xs',
         locations: [{file: path.join('src', 'box.tsx'), line: 3}],
+      },
+    ])
+  })
+
+  it('emits an edit for the verified pair only', async () => {
+    const file = path.join('src', 'box.tsx')
+    const box = await Bun.file(path.join(radiusRoot, file)).text()
+    const start = box.indexOf('rounded-[2px]')
+
+    expect(analysis.edits).toEqual([
+      {
+        file,
+        start,
+        end: start + 'rounded-[2px]'.length,
+        original: 'rounded-[2px]',
+        replacement: 'rounded-xs',
       },
     ])
   })

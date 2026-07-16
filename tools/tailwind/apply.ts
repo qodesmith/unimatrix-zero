@@ -3,6 +3,28 @@ import type {TailwindClassAnalysis} from './analyze'
 import path from 'node:path'
 
 /**
+ * A single token rewrite, produced by analysis. Offsets index into the
+ * file's source text; `original` is the exact text at `[start, end)`,
+ * letting the applier verify the file hasn't drifted since analysis.
+ */
+export interface Edit {
+  /** File path relative to the project root. */
+  file: string
+
+  /** Start offset of the replaced token in the source text. */
+  start: number
+
+  /** End offset (exclusive) of the replaced token. */
+  end: number
+
+  /** The token currently at `[start, end)`. */
+  original: string
+
+  /** The canonical token to write in its place. */
+  replacement: string
+}
+
+/**
  * Applies the verified replacements from an analysis to disk. Returns the
  * changed file paths (relative to the project root).
  */

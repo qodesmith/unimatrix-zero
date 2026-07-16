@@ -42,6 +42,7 @@ function makeAnalysis(
     uniqueTokens: 0,
     verified: verified.map(([from, to]) => ({from, to, locations: []})),
     rejected: [],
+    edits: [],
     literals,
     fileTexts,
   }
@@ -98,7 +99,8 @@ describe('applyCanonicalFixes (analyze integration)', () => {
       ].join('\n')
     )
 
-    // leading-[1.5] has no canonical form; notExtracted is out of scope.
+    // leading-[1.5] has no canonical form; w-[16px]x is not a whole token;
+    // notExtracted is out of scope.
     expect(await Bun.file(path.join(root, 'src', 'util.ts')).text()).toBe(
       [
         'declare function cva(base: string, config: unknown): unknown',
@@ -108,7 +110,11 @@ describe('applyCanonicalFixes (analyze integration)', () => {
         "  variants: {size: {sm: 'gap-2'}},",
         '})',
         '',
-        "export const merged = twMerge('leading-[1.5]', 'z-10')",
+        'export const merged = twMerge(',
+        "  'leading-[1.5]',",
+        "  'z-10',",
+        "  'w-[16px]x w-4 w-4'",
+        ')',
         '',
         '// Outside any className/cn span — never extracted:',
         "export const notExtracted = 'p-[8px] w-[32px]'",

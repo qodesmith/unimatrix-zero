@@ -18,6 +18,7 @@ function makeAnalysis(
     uniqueTokens: 12,
     verified,
     rejected,
+    edits: [],
     literals: [],
     fileTexts: new Map(),
   }

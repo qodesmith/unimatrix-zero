@@ -3,6 +3,7 @@
  * `canonicalizeCandidates` engine, then verify every old→new pair compiles
  * to equivalent CSS. Pure — never writes to disk.
  */
+import type {Edit} from './apply'
 import type {Literal} from './extract'
 
 import {__unstable__loadDesignSystem} from '@tailwindcss/node'
@@ -54,6 +55,12 @@ export interface TailwindClassAnalysis {
 
   /** Engine-suggested pairs that failed CSS-equivalence verification. */
   rejected: RejectedPair[]
+
+  /**
+   * One rewrite per verified token occurrence, ordered by file then start
+   * offset. Pass to `applyCanonicalFixes` to write the changes.
+   */
+  edits: Edit[]
 
   /** Extracted literals and file contents, consumed by applyCanonicalFixes. */
   literals: Literal[]
@@ -276,16 +283,23 @@ export async function analyzeTailwindClasses({
     }
   }
 
-  // Map each rewritable token to the source locations where it appears so
-  // reports can point at exact lines.
+  // Walk each literal's tokens once, emitting for every rewritable
+  // occurrence a human-facing location (for reports) and a machine-facing
+  // edit (for applyCanonicalFixes). Splitting on captured whitespace keeps
+  // `offset` in lockstep with the source text, so edit offsets map 1:1 —
+  // extraction already dropped escape-bearing strings to guarantee this.
   const lineStartsCache = new Map<string, number[]>()
   const locations = new Map<string, TokenLocation[]>()
+  const edits: Edit[] = []
 
   for (const lit of literals) {
+    const relFile = path.relative(projectRoot, lit.file)
     let offset = lit.start
 
     for (const part of lit.text.split(/(\s+)/)) {
-      if (verified.has(part)) {
+      const replacement = verified.get(part)
+
+      if (replacement) {
         let starts = lineStartsCache.get(lit.file)
 
         if (!starts) {
@@ -294,11 +308,16 @@ export async function analyzeTailwindClasses({
         }
 
         const entry = locations.get(part) ?? []
-        entry.push({
-          file: path.relative(projectRoot, lit.file),
-          line: lineAt(starts, offset),
-        })
+        entry.push({file: relFile, line: lineAt(starts, offset)})
         locations.set(part, entry)
+
+        edits.push({
+          file: relFile,
+          start: offset,
+          end: offset + part.length,
+          original: part,
+          replacement,
+        })
       }
 
       offset += part.length
@@ -313,6 +332,7 @@ export async function analyzeTailwindClasses({
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([from, to]) => ({from, to, locations: locations.get(from) ?? []})),
     rejected,
+    edits,
     literals,
     fileTexts,
   }
