@@ -50,6 +50,16 @@
       },
     },
     {
+      // Test data for the tailwind tooling — deliberately unidiomatic JSX
+      // (untyped buttons, string literals in curly braces) that the tests
+      // assert on byte-for-byte.
+      "files": ["tools/tailwind/fixtures/**"],
+      "rules": {
+        "react/button-has-type": "off",
+        "react/jsx-curly-brace-presence": "off",
+      },
+    },
+    {
       // React components might export static values.
       "files": ["src/renderer/src/components/**/*.tsx"],
       "excludeFiles": ["**/*.test.tsx"],

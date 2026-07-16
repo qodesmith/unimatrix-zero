@@ -14,7 +14,14 @@
   },
   "jsxSingleQuote": false,
   "objectWrap": "preserve",
-  "overrides": [],
+  "overrides": [
+    {
+      // Test data — the tests assert on the exact class strings, so don't
+      // let sortTailwindcss reorder them.
+      "files": ["tools/tailwind/fixtures/**"],
+      "options": {"sortTailwindcss": false},
+    },
+  ],
   "printWidth": 80,
   "proseWrap": "preserve",
   "quoteProps": "as-needed",

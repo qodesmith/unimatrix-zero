@@ -1,0 +1,18 @@
+/*
+ * Hermetic design system: an inline @theme instead of `@import 'tailwindcss'`
+ * so the fixture loads from any directory (including temp copies) without
+ * node_modules resolution.
+ *
+ * The `:root` block overrides `--radius-sm` ahead of the theme declaration on
+ * purpose: it makes the engine's `rounded-[4px]` -> `rounded-sm` suggestion
+ * fail CSS-equivalence verification (runtime value is 0.35rem, not the
+ * theme's 0.25rem), exercising the rejection path.
+ */
+:root {
+  --radius-sm: 0.35rem;
+}
+
+@theme {
+  --spacing: 0.25rem;
+  --radius-sm: 0.25rem;
+}

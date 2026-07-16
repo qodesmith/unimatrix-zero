@@ -4,6 +4,9 @@
   // inherited from tsconfig.node.json.
   "extends": "./tsconfig.node.json",
   "include": ["tools/**/*"],
+  // Fixture "projects" are test data scanned by the tailwind tooling's
+  // tests, not code that runs — the tsx has no JSX config here on purpose.
+  "exclude": ["tools/tailwind/fixtures"],
   "compilerOptions": {
     "types": ["bun"]
   }

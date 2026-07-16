@@ -9,6 +9,7 @@
     "format": "oxfmt -c .oxfmtrc.jsonc",
     "format:check": "oxfmt -c .oxfmtrc.jsonc --check",
     "lint": "oxlint -c .oxlintrc.jsonc",
+    "test": "bun --bun vitest run",
     "lint:rule-changes": "bun --bun run ./tools/oxlint/get-rule-changes.ts",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
