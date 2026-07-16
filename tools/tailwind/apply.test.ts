@@ -1,5 +1,4 @@
-import type {TailwindClassAnalysis} from './analyze'
-import type {Literal} from './extract'
+import type {Edit} from './apply'
 
 import {afterEach, describe, expect, it} from 'vitest'
 
@@ -19,41 +18,38 @@ afterEach(() => {
   }
 })
 
-/** Copies a fixture into a fresh temp dir cleaned up after the test. */
-function copyFixture(name = 'basic'): string {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'tw-apply-'))
+function tempDir(prefix = 'tw-apply-'): string {
+  const dir = mkdtempSync(path.join(os.tmpdir(), prefix))
 
   tempDirs.push(dir)
+
+  return dir
+}
+
+/** Copies a fixture into a fresh temp dir cleaned up after the test. */
+function copyFixture(name = 'basic'): string {
+  const dir = tempDir()
+
   cpSync(path.join(fixturesDir, name), dir, {recursive: true})
 
   return dir
 }
 
-/** A minimal analysis for unit tests that bypass the Tailwind engine. */
-function makeAnalysis(
-  projectRoot: string,
-  fileTexts: Map<string, string>,
-  literals: Literal[],
-  verified: [from: string, to: string][]
-): TailwindClassAnalysis {
-  return {
-    projectRoot,
-    filesScanned: fileTexts.size,
-    uniqueTokens: 0,
-    verified: verified.map(([from, to]) => ({from, to, locations: []})),
-    rejected: [],
-    edits: [],
-    literals,
-    fileTexts,
-  }
-}
+/** Builds an edit for the nth occurrence of `original` in `text`. */
+function editAt(
+  file: string,
+  text: string,
+  original: string,
+  replacement: string,
+  nth = 0
+): Edit {
+  let start = -1
 
-function literalAt(file: string, text: string, inner: string): Literal {
-  const start = text.indexOf(inner)
+  for (let i = 0; i <= nth; i++) start = text.indexOf(original, start + 1)
 
-  if (start === -1) throw new Error(`literal not found: ${inner}`)
+  if (start === -1) throw new Error(`token not found: ${original}`)
 
-  return {file, start, end: start + inner.length, text: inner}
+  return {file, start, end: start + original.length, original, replacement}
 }
 
 describe('applyCanonicalFixes (analyze integration)', () => {
@@ -144,105 +140,75 @@ describe('applyCanonicalFixes (analyze integration)', () => {
     const second = await analyzeTailwindClasses({projectRoot: root})
 
     expect(second.verified).toEqual([])
+    expect(second.edits).toEqual([])
     expect(await applyCanonicalFixes(second)).toEqual([])
   })
 })
 
 describe('applyCanonicalFixes (unit)', () => {
-  it('returns no files and writes nothing when the mapping is empty', async () => {
-    const dir = mkdtempSync(path.join(os.tmpdir(), 'tw-apply-'))
-    tempDirs.push(dir)
-
-    const file = path.join(dir, 'a.tsx')
+  it('returns no files and writes nothing when there are no edits', async () => {
+    const dir = tempDir()
     const text = '<div className="w-[16px]" />'
-    await Bun.write(file, text)
+    await Bun.write(path.join(dir, 'a.tsx'), text)
 
-    const analysis = makeAnalysis(
-      dir,
-      new Map([[file, text]]),
-      [literalAt(file, text, 'w-[16px]')],
-      []
-    )
-
-    expect(await applyCanonicalFixes(analysis)).toEqual([])
-    expect(await Bun.file(file).text()).toBe(text)
+    expect(await applyCanonicalFixes({projectRoot: dir, edits: []})).toEqual([])
+    expect(await Bun.file(path.join(dir, 'a.tsx')).text()).toBe(text)
   })
 
-  it('replaces whole tokens only and preserves whitespace exactly', async () => {
-    const dir = mkdtempSync(path.join(os.tmpdir(), 'tw-apply-'))
-    tempDirs.push(dir)
-
-    const file = path.join(dir, 'a.tsx')
-    const inner = 'w-[16px]   flex\n  w-[16px]x w-[16px]'
-    const text = `<div className={\`${inner}\`} />`
-    await Bun.write(file, text)
-
-    const analysis = makeAnalysis(
-      dir,
-      new Map([[file, text]]),
-      [literalAt(file, text, inner)],
-      [['w-[16px]', 'w-4']]
-    )
-
-    expect(await applyCanonicalFixes(analysis)).toEqual(['a.tsx'])
-    expect(await Bun.file(file).text()).toBe(
-      '<div className={`w-4   flex\n  w-[16px]x w-4`} />'
-    )
-  })
-
-  it('keeps offsets valid across multiple literals in one file', async () => {
-    const dir = mkdtempSync(path.join(os.tmpdir(), 'tw-apply-'))
-    tempDirs.push(dir)
-
-    const file = path.join(dir, 'a.tsx')
-    // The first replacement grows the text; the second must still land.
+  it('applies edits end-first so earlier offsets stay valid as text grows', async () => {
+    const dir = tempDir()
+    // The first replacement grows the text; the later edits must still land.
     const text = `cn('mt-[4px]'); cn('mt-[4px] w-[16px]')`
-    await Bun.write(file, text)
+    await Bun.write(path.join(dir, 'a.tsx'), text)
 
-    const analysis = makeAnalysis(
-      dir,
-      new Map([[file, text]]),
-      [
-        {file, start: 4, end: 12, text: 'mt-[4px]'},
-        {file, start: 20, end: 37, text: 'mt-[4px] w-[16px]'},
-      ],
-      [
-        ['mt-[4px]', 'mt-really-long-1'],
-        ['w-[16px]', 'w-4'],
-      ]
-    )
+    const edits = [
+      editAt('a.tsx', text, 'mt-[4px]', 'mt-really-long-1'),
+      editAt('a.tsx', text, 'mt-[4px]', 'mt-really-long-1', 1),
+      editAt('a.tsx', text, 'w-[16px]', 'w-4'),
+    ]
 
-    expect(await applyCanonicalFixes(analysis)).toEqual(['a.tsx'])
-    expect(await Bun.file(file).text()).toBe(
+    expect(await applyCanonicalFixes({projectRoot: dir, edits})).toEqual([
+      'a.tsx',
+    ])
+    expect(await Bun.file(path.join(dir, 'a.tsx')).text()).toBe(
       `cn('mt-really-long-1'); cn('mt-really-long-1 w-4')`
     )
   })
 
-  it('leaves files without matching tokens untouched', async () => {
-    const dir = mkdtempSync(path.join(os.tmpdir(), 'tw-apply-'))
-    tempDirs.push(dir)
+  it('throws on a stale edit and writes nothing at all', async () => {
+    const dir = tempDir()
+    const freshText = `cn('mt-[4px]')`
+    const staleText = `cn('w-[16px]')`
+    await Bun.write(path.join(dir, 'a.tsx'), freshText)
+    await Bun.write(path.join(dir, 'b.tsx'), staleText)
 
-    const changedFile = path.join(dir, 'a.tsx')
-    const cleanFile = path.join(dir, 'b.tsx')
+    const edits = [
+      editAt('a.tsx', freshText, 'mt-[4px]', 'mt-1'),
+      // Offsets computed against text b.tsx no longer contains.
+      editAt('b.tsx', `cn('gap-[8px]')`, 'gap-[8px]', 'gap-2'),
+    ]
+
+    await expect(
+      applyCanonicalFixes({projectRoot: dir, edits})
+    ).rejects.toThrow('the file changed after analysis')
+
+    // The valid a.tsx edit was not applied either — zero writes on throw.
+    expect(await Bun.file(path.join(dir, 'a.tsx')).text()).toBe(freshText)
+    expect(await Bun.file(path.join(dir, 'b.tsx')).text()).toBe(staleText)
+  })
+
+  it('leaves files without edits untouched and unreported', async () => {
+    const dir = tempDir()
     const changedText = `cn('w-[16px]')`
     const cleanText = `cn('flex')`
-    await Bun.write(changedFile, changedText)
-    await Bun.write(cleanFile, cleanText)
+    await Bun.write(path.join(dir, 'a.tsx'), changedText)
+    await Bun.write(path.join(dir, 'b.tsx'), cleanText)
 
-    const analysis = makeAnalysis(
-      dir,
-      new Map([
-        [changedFile, changedText],
-        [cleanFile, cleanText],
-      ]),
-      [
-        literalAt(changedFile, changedText, 'w-[16px]'),
-        literalAt(cleanFile, cleanText, 'flex'),
-      ],
-      [['w-[16px]', 'w-4']]
-    )
+    const edits = [editAt('a.tsx', changedText, 'w-[16px]', 'w-4')]
 
-    expect(await applyCanonicalFixes(analysis)).toEqual(['a.tsx'])
-    expect(await Bun.file(cleanFile).text()).toBe(cleanText)
+    expect(await applyCanonicalFixes({projectRoot: dir, edits})).toEqual([
+      'a.tsx',
+    ])
+    expect(await Bun.file(path.join(dir, 'b.tsx')).text()).toBe(cleanText)
   })
 })

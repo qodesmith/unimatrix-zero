@@ -1,5 +1,3 @@
-import type {TailwindClassAnalysis} from './analyze'
-
 import path from 'node:path'
 
 /**
@@ -25,47 +23,68 @@ export interface Edit {
 }
 
 /**
- * Applies the verified replacements from an analysis to disk. Returns the
- * changed file paths (relative to the project root).
+ * Applies analysis edits to disk. Every edit is validated against the
+ * current file contents before anything is written — a stale edit throws
+ * and no file is touched. Returns the changed file paths (relative to the
+ * project root), sorted.
  */
-export async function applyCanonicalFixes(
-  analysis: TailwindClassAnalysis
-): Promise<string[]> {
-  const replacements = new Map(
-    analysis.verified.map(pair => [pair.from, pair.to])
-  )
-  const changedFiles: string[] = []
+export async function applyCanonicalFixes({
+  projectRoot,
+  edits,
+}: {
+  projectRoot: string
+  edits: Edit[]
+}): Promise<string[]> {
+  const editsByFile = new Map<string, Edit[]>()
 
-  if (replacements.size === 0) return changedFiles
+  for (const edit of edits) {
+    const entry = editsByFile.get(edit.file) ?? []
+
+    entry.push(edit)
+    editsByFile.set(edit.file, entry)
+  }
+
+  const texts = new Map(
+    await Promise.all(
+      [...editsByFile.keys()].map(async file => {
+        const text = await Bun.file(path.join(projectRoot, file)).text()
+
+        return [file, text] as const
+      })
+    )
+  )
+
+  // Validate everything before writing anything: a throw means zero writes.
+  for (const [file, fileEdits] of editsByFile) {
+    const text = texts.get(file) ?? ''
+
+    for (const {start, end, original} of fileEdits) {
+      const actual = text.slice(start, end)
+
+      if (actual !== original) {
+        throw new Error(
+          `${file}:${start}-${end} contains ${JSON.stringify(actual)}, ` +
+            `expected ${JSON.stringify(original)} — the file changed after ` +
+            'analysis; re-run it'
+        )
+      }
+    }
+  }
 
   const writes: Promise<number>[] = []
 
-  for (const [file, originalText] of analysis.fileTexts) {
-    let text = originalText
-    let changed = false
-    const fileLits = analysis.literals
-      .filter(lit => lit.file === file)
-      .sort((a, b) => b.start - a.start) // End-first keeps offsets valid.
+  for (const [file, fileEdits] of editsByFile) {
+    let text = texts.get(file) ?? ''
 
-    for (const lit of fileLits) {
-      const newText = lit.text
-        .split(/(\s+)/)
-        .map(part => replacements.get(part) ?? part)
-        .join('')
-
-      if (newText !== lit.text) {
-        text = text.slice(0, lit.start) + newText + text.slice(lit.end)
-        changed = true
-      }
+    // End-first keeps earlier offsets valid as replacements change length.
+    for (const edit of [...fileEdits].sort((a, b) => b.start - a.start)) {
+      text = text.slice(0, edit.start) + edit.replacement + text.slice(edit.end)
     }
 
-    if (changed) {
-      writes.push(Bun.write(file, text))
-      changedFiles.push(path.relative(analysis.projectRoot, file))
-    }
+    writes.push(Bun.write(path.join(projectRoot, file), text))
   }
 
   await Promise.all(writes)
 
-  return changedFiles
+  return [...editsByFile.keys()].sort((a, b) => a.localeCompare(b))
 }
