@@ -1,5 +1,5 @@
-import {electronApp, optimizer, is} from '@electron-toolkit/utils'
-import {app, shell, BrowserWindow, ipcMain} from 'electron'
+import {electronApp, is, optimizer} from '@electron-toolkit/utils'
+import {BrowserWindow, app, shell} from 'electron'
 
 import {join} from 'node:path'
 
@@ -29,7 +29,7 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler(details => {
-    shell.openExternal(details.url)
+    void shell.openExternal(details.url)
     return {action: 'deny'}
   })
 
@@ -38,28 +38,30 @@ function createWindow(): void {
   // (setWindowOpenHandler above covers window.open/target=_blank; this
   // covers same-window navigation like location.href or plain links.)
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    const devServerUrl = process.env['ELECTRON_RENDERER_URL']
+    const devServerUrl = process.env.ELECTRON_RENDERER_URL
     if (is.dev && devServerUrl && url.startsWith(devServerUrl)) return
 
     event.preventDefault()
     if (url.startsWith('http:') || url.startsWith('https:')) {
-      shell.openExternal(url)
+      void shell.openExternal(url)
     }
   })
 
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  if (is.dev && process.env.ELECTRON_RENDERER_URL) {
+    void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+async function start(): Promise<void> {
+  await app.whenReady()
+
   // Set app user model id for windows
   electronApp.setAppUserModelId('dev.unimatrixzero')
 
@@ -70,9 +72,6 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
-
   createWindow()
 
   app.on('activate', function () {
@@ -80,7 +79,9 @@ app.whenReady().then(() => {
     // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
-})
+}
+
+void start()
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits

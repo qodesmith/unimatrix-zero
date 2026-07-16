@@ -1,11 +1,10 @@
-'use client'
-
-import * as React from 'react'
+import type {ComponentProps} from 'react'
 
 import {cn} from '@/lib/utils'
 
-function Label({className, ...props}: React.ComponentProps<'label'>) {
+function Label({className, ...props}: ComponentProps<'label'>) {
   return (
+    // oxlint-disable-next-line jsx-a11y/label-has-associated-control -- generic shadcn Label primitive: htmlFor or a wrapped control is supplied by consumers via spread props at usage sites
     <label
       data-slot="label"
       className={cn(

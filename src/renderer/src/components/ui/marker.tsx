@@ -1,7 +1,9 @@
+import type {VariantProps} from 'class-variance-authority'
+import type {ComponentProps} from 'react'
+
 import {mergeProps} from '@base-ui/react/merge-props'
 import {useRender} from '@base-ui/react/use-render'
-import {cva, type VariantProps} from 'class-variance-authority'
-import * as React from 'react'
+import {cva} from 'class-variance-authority'
 
 import {cn} from '@/lib/utils'
 
@@ -41,7 +43,7 @@ function Marker({
   })
 }
 
-function MarkerIcon({className, ...props}: React.ComponentProps<'span'>) {
+function MarkerIcon({className, ...props}: ComponentProps<'span'>) {
   return (
     <span
       data-slot="marker-icon"
@@ -55,7 +57,7 @@ function MarkerIcon({className, ...props}: React.ComponentProps<'span'>) {
   )
 }
 
-function MarkerContent({className, ...props}: React.ComponentProps<'span'>) {
+function MarkerContent({className, ...props}: ComponentProps<'span'>) {
   return (
     <span
       data-slot="marker-content"

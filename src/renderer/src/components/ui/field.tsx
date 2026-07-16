@@ -1,6 +1,6 @@
-'use client'
+import type {VariantProps} from 'class-variance-authority'
 
-import {cva, type VariantProps} from 'class-variance-authority'
+import {cva} from 'class-variance-authority'
 import {useMemo} from 'react'
 
 import {Label} from '@/components/ui/label'
@@ -76,6 +76,7 @@ function Field({
 }: React.ComponentProps<'div'> & VariantProps<typeof fieldVariants>) {
   return (
     <div
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- polymorphic shadcn primitive: the div element is part of the public contract (consumers pass div props and style [data-slot=field] divs); fieldset would change layout and semantics
       role="group"
       data-slot="field"
       data-orientation={orientation}
@@ -176,9 +177,9 @@ function FieldError({
   errors,
   ...props
 }: React.ComponentProps<'div'> & {
-  errors?: Array<{message?: string} | undefined>
+  errors?: ({message?: string} | undefined)[]
 }) {
-  const content = useMemo(() => {
+  const content = useMemo((): React.ReactNode => {
     if (children) {
       return children
     }
@@ -191,7 +192,7 @@ function FieldError({
       ...new Map(errors.map(error => [error?.message, error])).values(),
     ]
 
-    if (uniqueErrors?.length == 1) {
+    if (uniqueErrors?.length === 1) {
       return uniqueErrors[0]?.message
     }
 

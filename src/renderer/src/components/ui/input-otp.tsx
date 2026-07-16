@@ -1,14 +1,18 @@
+import type {ComponentProps} from 'react'
+
 import {OTPInput, OTPInputContext} from 'input-otp'
 import {MinusIcon} from 'lucide-react'
-import * as React from 'react'
+import {useContext} from 'react'
 
 import {cn} from '@/lib/utils'
+
+const emptySlot = {}
 
 function InputOTP({
   className,
   containerClassName,
   ...props
-}: React.ComponentProps<typeof OTPInput> & {
+}: ComponentProps<typeof OTPInput> & {
   containerClassName?: string
 }) {
   return (
@@ -25,7 +29,7 @@ function InputOTP({
   )
 }
 
-function InputOTPGroup({className, ...props}: React.ComponentProps<'div'>) {
+function InputOTPGroup({className, ...props}: ComponentProps<'div'>) {
   return (
     <div
       data-slot="input-otp-group"
@@ -42,11 +46,12 @@ function InputOTPSlot({
   index,
   className,
   ...props
-}: React.ComponentProps<'div'> & {
+}: ComponentProps<'div'> & {
   index: number
 }) {
-  const inputOTPContext = React.useContext(OTPInputContext)
-  const {char, hasFakeCaret, isActive} = inputOTPContext?.slots[index] ?? {}
+  const inputOTPContext = useContext(OTPInputContext)
+  const {char, hasFakeCaret, isActive} =
+    inputOTPContext?.slots[index] ?? emptySlot
 
   return (
     <div
@@ -68,11 +73,12 @@ function InputOTPSlot({
   )
 }
 
-function InputOTPSeparator({...props}: React.ComponentProps<'div'>) {
+function InputOTPSeparator({...props}: ComponentProps<'div'>) {
   return (
     <div
       data-slot="input-otp-separator"
       className="flex items-center [&_svg:not([class*='size-'])]:size-4"
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- the separator's visual is a MinusIcon child; hr is a void element and cannot render children, so the visual output cannot be preserved
       role="separator"
       {...props}
     >

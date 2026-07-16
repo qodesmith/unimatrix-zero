@@ -12,11 +12,12 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('api', api)
   } catch (error) {
+    // oxlint-disable-next-line no-console -- surface contextBridge failures; preload has no other reporting channel
     console.error(error)
   }
 } else {
-  // @ts-ignore (define in dts)
-  window.electron = electronAPI
-  // @ts-ignore (define in dts)
-  window.api = api
+  // @ts-expect-error (define in dts)
+  globalThis.electron = electronAPI
+  // @ts-expect-error (define in dts)
+  globalThis.api = api
 }

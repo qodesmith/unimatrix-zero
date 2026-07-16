@@ -1,6 +1,7 @@
+import type {ComponentProps} from 'react'
+
 import {Dialog as SheetPrimitive} from '@base-ui/react/dialog'
 import {XIcon} from 'lucide-react'
-import * as React from 'react'
 
 import {Button} from '@/components/ui/button'
 import {cn} from '@/lib/utils'
@@ -34,6 +35,10 @@ function SheetOverlay({className, ...props}: SheetPrimitive.Backdrop.Props) {
   )
 }
 
+const sheetCloseButton = (
+  <Button variant="ghost" className="absolute top-3 right-3" size="icon-sm" />
+)
+
 function SheetContent({
   className,
   children,
@@ -60,13 +65,7 @@ function SheetContent({
         {showCloseButton && (
           <SheetPrimitive.Close
             data-slot="sheet-close"
-            render={
-              <Button
-                variant="ghost"
-                className="absolute top-3 right-3"
-                size="icon-sm"
-              />
-            }
+            render={sheetCloseButton}
           >
             <XIcon />
             <span className="sr-only">Close</span>
@@ -77,7 +76,7 @@ function SheetContent({
   )
 }
 
-function SheetHeader({className, ...props}: React.ComponentProps<'div'>) {
+function SheetHeader({className, ...props}: ComponentProps<'div'>) {
   return (
     <div
       data-slot="sheet-header"
@@ -87,7 +86,7 @@ function SheetHeader({className, ...props}: React.ComponentProps<'div'>) {
   )
 }
 
-function SheetFooter({className, ...props}: React.ComponentProps<'div'>) {
+function SheetFooter({className, ...props}: ComponentProps<'div'>) {
   return (
     <div
       data-slot="sheet-footer"

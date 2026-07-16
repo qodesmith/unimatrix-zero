@@ -1,18 +1,26 @@
+import type {CSSProperties, ComponentProps} from 'react'
+
+import {useMemo} from 'react'
+
 import {cn} from '@/lib/utils'
 
 function AspectRatio({
   ratio,
   className,
   ...props
-}: React.ComponentProps<'div'> & {ratio: number}) {
+}: ComponentProps<'div'> & {ratio: number}) {
+  const style = useMemo(
+    () =>
+      ({
+        '--ratio': ratio,
+      }) as CSSProperties,
+    [ratio]
+  )
+
   return (
     <div
       data-slot="aspect-ratio"
-      style={
-        {
-          '--ratio': ratio,
-        } as React.CSSProperties
-      }
+      style={style}
       className={cn('relative aspect-(--ratio)', className)}
       {...props}
     />

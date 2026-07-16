@@ -1,8 +1,8 @@
-'use client'
+import type {ComponentPropsWithRef} from 'react'
 
 import {Combobox as ComboboxPrimitive} from '@base-ui/react'
-import {ChevronDownIcon, XIcon, CheckIcon} from 'lucide-react'
-import * as React from 'react'
+import {CheckIcon, ChevronDownIcon, XIcon} from 'lucide-react'
+import {useMemo, useRef} from 'react'
 
 import {Button} from '@/components/ui/button'
 import {
@@ -36,11 +36,13 @@ function ComboboxTrigger({
   )
 }
 
+const clearButtonRender = <InputGroupButton variant="ghost" size="icon-xs" />
+
 function ComboboxClear({className, ...props}: ComboboxPrimitive.Clear.Props) {
   return (
     <ComboboxPrimitive.Clear
       data-slot="combobox-clear"
-      render={<InputGroupButton variant="ghost" size="icon-xs" />}
+      render={clearButtonRender}
       className={cn(className)}
       {...props}
     >
@@ -48,6 +50,8 @@ function ComboboxClear({className, ...props}: ComboboxPrimitive.Clear.Props) {
     </ComboboxPrimitive.Clear>
   )
 }
+
+const triggerRender = <ComboboxTrigger />
 
 function ComboboxInput({
   className,
@@ -60,18 +64,20 @@ function ComboboxInput({
   showTrigger?: boolean
   showClear?: boolean
 }) {
+  const inputRender = useMemo(
+    () => <InputGroupInput disabled={disabled} />,
+    [disabled]
+  )
+
   return (
     <InputGroup className={cn('w-auto', className)}>
-      <ComboboxPrimitive.Input
-        render={<InputGroupInput disabled={disabled} />}
-        {...props}
-      />
+      <ComboboxPrimitive.Input render={inputRender} {...props} />
       <InputGroupAddon align="inline-end">
         {showTrigger && (
           <InputGroupButton
             size="icon-xs"
             variant="ghost"
-            render={<ComboboxTrigger />}
+            render={triggerRender}
             data-slot="input-group-button"
             className="group-has-data-[slot=combobox-clear]/input-group:hidden data-pressed:bg-transparent"
             disabled={disabled}
@@ -134,6 +140,10 @@ function ComboboxList({className, ...props}: ComboboxPrimitive.List.Props) {
   )
 }
 
+const itemIndicatorRender = (
+  <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center" />
+)
+
 function ComboboxItem({
   className,
   children,
@@ -149,11 +159,7 @@ function ComboboxItem({
       {...props}
     >
       {children}
-      <ComboboxPrimitive.ItemIndicator
-        render={
-          <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center" />
-        }
-      >
+      <ComboboxPrimitive.ItemIndicator render={itemIndicatorRender}>
         <CheckIcon className="pointer-events-none" />
       </ComboboxPrimitive.ItemIndicator>
     </ComboboxPrimitive.Item>
@@ -218,7 +224,7 @@ function ComboboxSeparator({
 function ComboboxChips({
   className,
   ...props
-}: React.ComponentPropsWithRef<typeof ComboboxPrimitive.Chips> &
+}: ComponentPropsWithRef<typeof ComboboxPrimitive.Chips> &
   ComboboxPrimitive.Chips.Props) {
   return (
     <ComboboxPrimitive.Chips
@@ -231,6 +237,8 @@ function ComboboxChips({
     />
   )
 }
+
+const chipRemoveButtonRender = <Button variant="ghost" size="icon-xs" />
 
 function ComboboxChip({
   className,
@@ -252,7 +260,7 @@ function ComboboxChip({
       {children}
       {showRemove && (
         <ComboboxPrimitive.ChipRemove
-          render={<Button variant="ghost" size="icon-xs" />}
+          render={chipRemoveButtonRender}
           className="-ml-1 opacity-50 hover:opacity-100"
           data-slot="combobox-chip-remove"
         >
@@ -277,7 +285,7 @@ function ComboboxChipsInput({
 }
 
 function useComboboxAnchor() {
-  return React.useRef<HTMLDivElement | null>(null)
+  return useRef<HTMLDivElement | null>(null)
 }
 
 export {

@@ -1,8 +1,7 @@
-'use client'
+import type {ComponentProps} from 'react'
 
 import {Select as SelectPrimitive} from '@base-ui/react/select'
-import {ChevronDownIcon, CheckIcon, ChevronUpIcon} from 'lucide-react'
-import * as React from 'react'
+import {CheckIcon, ChevronDownIcon, ChevronUpIcon} from 'lucide-react'
 
 import {cn} from '@/lib/utils'
 
@@ -28,6 +27,10 @@ function SelectValue({className, ...props}: SelectPrimitive.Value.Props) {
   )
 }
 
+const triggerIconRender = (
+  <ChevronDownIcon className="text-muted-foreground pointer-events-none size-4" />
+)
+
 function SelectTrigger({
   className,
   size = 'default',
@@ -47,11 +50,7 @@ function SelectTrigger({
       {...props}
     >
       {children}
-      <SelectPrimitive.Icon
-        render={
-          <ChevronDownIcon className="text-muted-foreground pointer-events-none size-4" />
-        }
-      />
+      <SelectPrimitive.Icon render={triggerIconRender} />
     </SelectPrimitive.Trigger>
   )
 }
@@ -108,6 +107,10 @@ function SelectLabel({className, ...props}: SelectPrimitive.GroupLabel.Props) {
   )
 }
 
+const itemIndicatorRender = (
+  <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center" />
+)
+
 function SelectItem({
   className,
   children,
@@ -125,11 +128,7 @@ function SelectItem({
       <SelectPrimitive.ItemText className="flex flex-1 shrink-0 gap-2 whitespace-nowrap">
         {children}
       </SelectPrimitive.ItemText>
-      <SelectPrimitive.ItemIndicator
-        render={
-          <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center" />
-        }
-      >
+      <SelectPrimitive.ItemIndicator render={itemIndicatorRender}>
         <CheckIcon className="pointer-events-none" />
       </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>
@@ -152,7 +151,7 @@ function SelectSeparator({
 function SelectScrollUpButton({
   className,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.ScrollUpArrow>) {
+}: ComponentProps<typeof SelectPrimitive.ScrollUpArrow>) {
   return (
     <SelectPrimitive.ScrollUpArrow
       data-slot="select-scroll-up-button"
@@ -170,7 +169,7 @@ function SelectScrollUpButton({
 function SelectScrollDownButton({
   className,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.ScrollDownArrow>) {
+}: ComponentProps<typeof SelectPrimitive.ScrollDownArrow>) {
   return (
     <SelectPrimitive.ScrollDownArrow
       data-slot="select-scroll-down-button"

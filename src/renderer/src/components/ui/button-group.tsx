@@ -1,6 +1,8 @@
+import type {VariantProps} from 'class-variance-authority'
+
 import {mergeProps} from '@base-ui/react/merge-props'
 import {useRender} from '@base-ui/react/use-render'
-import {cva, type VariantProps} from 'class-variance-authority'
+import {cva} from 'class-variance-authority'
 
 import {Separator} from '@/components/ui/separator'
 import {cn} from '@/lib/utils'
@@ -29,6 +31,7 @@ function ButtonGroup({
 }: React.ComponentProps<'div'> & VariantProps<typeof buttonGroupVariants>) {
   return (
     <div
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- polymorphic shadcn primitive: the div element is part of the public contract (consumers pass div props), and fieldset's UA min-inline-size:min-content is not reset by Tailwind preflight, so swapping would affect layout
       role="group"
       data-slot="button-group"
       data-orientation={orientation}
