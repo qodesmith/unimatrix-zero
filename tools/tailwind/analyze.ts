@@ -3,6 +3,7 @@
  * `canonicalizeCandidates` engine, then verify every old→new pair compiles
  * to equivalent CSS. Pure — never writes to disk.
  */
+import type {Finding} from '../findings'
 import type {Edit} from './apply'
 
 import {__unstable__loadDesignSystem} from '@tailwindcss/node'
@@ -38,12 +39,6 @@ export interface CanonicalPair {
   locations: TokenLocation[]
 }
 
-export interface RejectedPair {
-  from: string
-  to: string
-  reason: string
-}
-
 export interface TailwindClassAnalysis {
   projectRoot: string
   filesScanned: number
@@ -53,7 +48,7 @@ export interface TailwindClassAnalysis {
   verified: CanonicalPair[]
 
   /** Engine-suggested pairs that failed CSS-equivalence verification. */
-  rejected: RejectedPair[]
+  rejected: Finding[]
 
   /**
    * One rewrite per verified token occurrence, ordered by file then start
@@ -266,7 +261,7 @@ export async function analyzeTailwindClasses({
   }
 
   const verified = new Map<string, string>()
-  const rejected: RejectedPair[] = []
+  const rejected: Finding[] = []
 
   for (const [from, to] of mapping) {
     const result = verifier.check(from, to)

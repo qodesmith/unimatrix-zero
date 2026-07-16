@@ -10,7 +10,7 @@ import {$} from 'bun'
 // bun.lock is JSONC (trailing commas), so this relies on Bun's jsonc import
 // support — run this script with `bun`, not `node`.
 import lock from '../../bun.lock' with {type: 'jsonc'}
-import {evaluateDrift, formatDriftMarkdown} from './drift'
+import {evaluateDrift, formatDriftReport} from './drift'
 import reviewedOxlintVersion from './reviewed-oxlint-version.json' with {type: 'json'}
 
 // CI-only: this script writes to RUNNER_TEMP and is meant to run inside the
@@ -31,20 +31,24 @@ if (!installed) {
 
 const latest = (await $`bun info oxlint version`.text()).trim()
 
-const {shouldFail, reasons} = evaluateDrift({
+const {shouldFail, findings} = evaluateDrift({
   installed,
   latest,
   reviewed: reviewedOxlintVersion.version,
 })
 
-const body = formatDriftMarkdown(reasons)
+const report = formatDriftReport(findings)
 
 // Written to RUNNER_TEMP (per-job, isolated, auto-cleaned) so nothing lands in
 // the working tree. The workflow reads this same path and concatenates it onto
-// the generated rule-change delta. Guaranteed set by the CI guard above.
-await Bun.write(`${process.env.RUNNER_TEMP}/oxlint-drift-reason.md`, body)
+// the generated rule-change delta, so a non-empty body must end in a newline.
+// RUNNER_TEMP is guaranteed set by the CI guard above.
+await Bun.write(
+  `${process.env.RUNNER_TEMP}/oxlint-drift-reason.md`,
+  report.markdown && `${report.markdown}\n`
+)
 
-console.log(body || 'oxlint is in sync — no drift detected.')
+console.log(report.markdown || report.text)
 
 if (process.env.GITHUB_OUTPUT) {
   // Must append (>>) — the runner shares this file across all of a job's steps.

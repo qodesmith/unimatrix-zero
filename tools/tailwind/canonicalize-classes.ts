@@ -11,7 +11,8 @@
  * regressions the canonicalizer can suggest, e.g. `rounded-[4px]` →
  * `rounded-lg` when `:root` overrides `--radius` at runtime)
  * 3. `apply.ts` — write the verified replacements in place
- * 4. `report.ts` — text (local) and markdown (CI/PR comment) reports
+ * 4. `report.ts` — text (local) and markdown (CI/PR comment) reports via
+ * the shared findings module (`tools/findings.ts`)
  *
  * CLI (see `cli.ts` for the shared flag parsing and exit contract):
  * - `bun run lint:tailwind` — dry-run text report; exits 1 on verified
@@ -27,7 +28,7 @@
 import {analyzeTailwindClasses} from './analyze'
 import {applyCanonicalFixes} from './apply'
 import {runCli} from './cli'
-import {formatMarkdownReport, formatTextReport} from './report'
+import {formatCanonicalizeReport} from './report'
 
 if (import.meta.main) {
   await runCli({
@@ -37,13 +38,14 @@ if (import.meta.main) {
     },
     async run({apply, markdown}) {
       const analysis = await analyzeTailwindClasses()
+      const report = formatCanonicalizeReport(analysis)
       const hasFindings = analysis.verified.length > 0
 
       if (markdown) {
-        return {report: formatMarkdownReport(analysis), hasFindings}
+        return {report: report.markdown, hasFindings}
       }
 
-      const lines = [formatTextReport(analysis)]
+      const lines = [report.text]
 
       if (apply) {
         const changedFiles = await applyCanonicalFixes(analysis)

@@ -11,8 +11,11 @@
  * are rewrites the IDE suggested but the runtime cascade contradicts — real
  * visual regressions.
  */
+import type {Finding, FindingsReport} from '../findings'
+
 import path from 'node:path'
 
+import {formatFindings} from '../findings'
 import {loadClassVerifier} from './analyze'
 import {classTokens, extractLiterals} from './extract'
 
@@ -52,14 +55,6 @@ export interface HistoryReader {
 
   /** File text in the working tree. */
   readHeadFile(file: string): Promise<string>
-}
-
-export interface CanonicalRegression {
-  /** File path relative to the project root. */
-  file: string
-  from: string
-  to: string
-  reason: string
 }
 
 function git(
@@ -142,7 +137,8 @@ function tokenCounts(file: string, text: string): Map<string, number> {
 
 /**
  * Diffs head against base via `history` and reports removed→added token
- * pairs that match an engine suggestion but are not CSS-equivalent.
+ * pairs that match an engine suggestion but are not CSS-equivalent. Each
+ * finding's `file` is relative to the project root.
  */
 export async function findCanonicalRegressions({
   projectRoot = process.cwd(),
@@ -150,7 +146,7 @@ export async function findCanonicalRegressions({
   rem = 16,
   baseRef = 'origin/main',
   history = gitHistoryReader({projectRoot, srcDirs, baseRef}),
-}: RegressionCheckOptions = {}): Promise<CanonicalRegression[]> {
+}: RegressionCheckOptions = {}): Promise<Finding[]> {
   const verifier = await loadClassVerifier({projectRoot, rem})
 
   const changedFiles = (await history.changedFiles())
@@ -165,7 +161,7 @@ export async function findCanonicalRegressions({
       const baseText = await history.readBaseFile(file)
       const baseCounts = tokenCounts(file, baseText ?? '')
       const headCounts = tokenCounts(file, headText)
-      const regressions: CanonicalRegression[] = []
+      const regressions: Finding[] = []
 
       for (const token of [...baseCounts.keys()].sort()) {
         const removed =
@@ -196,53 +192,23 @@ export async function findCanonicalRegressions({
   return regressionsPerFile.flat()
 }
 
-/** Plain-text report for local runs. */
-export function formatRegressionsText(
-  regressions: CanonicalRegression[]
-): string {
-  if (regressions.length === 0) return 'no canonicalization regressions found'
-
-  const lines = [`${regressions.length} canonicalization regression(s):`, '']
-
-  for (const {file, from, to, reason} of regressions) {
-    lines.push(`${file}: ${from} => ${to}`)
-
-    for (const reasonLine of reason.split('\n')) {
-      lines.push(`  ${reasonLine.trim()}`)
-    }
-  }
-
-  return lines.join('\n')
-}
-
 /**
- * Markdown report for CI/PR comments. Returns an empty string when the diff
- * is clean.
+ * Renders regressions through the shared findings module: text for local
+ * runs, markdown for CI/PR comments (empty when the diff is clean).
  */
-export function formatRegressionsMarkdown(
-  regressions: CanonicalRegression[]
-): string {
-  if (regressions.length === 0) return ''
-
-  const lines = [
-    '### Unsafe Tailwind canonicalizations in this diff',
-    '',
-    `${regressions.length} rewrite(s) match an IDE/engine suggestion that ` +
-      'is **not** CSS-equivalent at runtime (the cascade overrides the ' +
-      'theme value the suggestion was based on). Applying them changes ' +
-      'rendering — revert to the original class:',
-    '',
-    '| File | Applied change | Why it regresses |',
-    '| --- | --- | --- |',
-  ]
-
-  for (const {file, from, to, reason} of regressions) {
-    const why = reason
-      .split('\n')
-      .map(line => `\`${line.trim()}\``)
-      .join('<br>')
-    lines.push(`| \`${file}\` | \`${from}\` → \`${to}\` | ${why} |`)
-  }
-
-  return lines.join('\n')
+export function formatRegressionsReport(
+  regressions: Finding[]
+): FindingsReport {
+  return formatFindings(
+    {
+      title: 'Unsafe Tailwind canonicalizations in this diff',
+      intro: count =>
+        `${count} rewrite(s) match an IDE/engine suggestion that is ` +
+        '**not** CSS-equivalent at runtime (the cascade overrides the ' +
+        'theme value the suggestion was based on). Applying them changes ' +
+        'rendering — revert to the original class:',
+      emptyText: 'no canonicalization regressions found',
+    },
+    regressions
+  )
 }

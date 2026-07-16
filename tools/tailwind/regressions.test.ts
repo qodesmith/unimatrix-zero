@@ -1,4 +1,5 @@
-import type {CanonicalRegression, HistoryReader} from './regressions'
+import type {Finding} from '../findings'
+import type {HistoryReader} from './regressions'
 
 import {afterEach, describe, expect, it} from 'vitest'
 
@@ -8,8 +9,7 @@ import path from 'node:path'
 
 import {
   findCanonicalRegressions,
-  formatRegressionsMarkdown,
-  formatRegressionsText,
+  formatRegressionsReport,
   gitHistoryReader,
 } from './regressions'
 
@@ -88,7 +88,7 @@ function inMemoryHistory(
 const checkHistory = async (
   base: Record<string, string>,
   head: Record<string, string>
-): Promise<CanonicalRegression[]> =>
+): Promise<Finding[]> =>
   findCanonicalRegressions({
     projectRoot: fixtureRoot,
     history: inMemoryHistory(base, head),
@@ -236,8 +236,8 @@ describe('gitHistoryReader', () => {
   })
 })
 
-describe('report formatting', () => {
-  const regression: CanonicalRegression = {
+describe('formatRegressionsReport', () => {
+  const regression: Finding = {
     file: 'src/box.tsx',
     from: 'rounded-[4px]',
     to: 'rounded-lg',
@@ -245,11 +245,11 @@ describe('report formatting', () => {
   }
 
   it('formats a text report', () => {
-    expect(formatRegressionsText([regression])).toBe(
+    expect(formatRegressionsReport([regression]).text).toBe(
       [
-        '1 canonicalization regression(s):',
-        '',
-        'src/box.tsx: rounded-[4px] => rounded-lg',
+        '=== UNSAFE TAILWIND CANONICALIZATIONS IN THIS DIFF (1) ===',
+        'rounded-[4px] => rounded-lg',
+        '  at src/box.tsx',
         '  css mismatch:',
         '  OLD: a',
         '  NEW: b',
@@ -258,24 +258,24 @@ describe('report formatting', () => {
   })
 
   it('reports a clean diff in text mode', () => {
-    expect(formatRegressionsText([])).toBe(
+    expect(formatRegressionsReport([]).text).toBe(
       'no canonicalization regressions found'
     )
   })
 
   it('formats a markdown table row per regression', () => {
-    const report = formatRegressionsMarkdown([regression])
+    const {markdown} = formatRegressionsReport([regression])
 
-    expect(report).toContain('### Unsafe Tailwind canonicalizations')
-    expect(report).toContain('| File | Applied change | Why it regresses |')
-    expect(report).toContain(
-      '| `src/box.tsx` | `rounded-[4px]` → `rounded-lg` | ' +
+    expect(markdown).toContain('### Unsafe Tailwind canonicalizations')
+    expect(markdown).toContain('| Change | Where | Why |')
+    expect(markdown).toContain(
+      '| `rounded-[4px]` → `rounded-lg` | `src/box.tsx` | ' +
         '`css mismatch:`<br>`OLD: a`<br>`NEW: b` |'
     )
   })
 
   it('returns an empty markdown string for a clean diff', () => {
-    expect(formatRegressionsMarkdown([])).toBe('')
+    expect(formatRegressionsReport([]).markdown).toBe('')
   })
 })
 

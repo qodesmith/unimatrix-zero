@@ -13,11 +13,7 @@
  * canonical-classes report.
  */
 import {runCli} from './cli'
-import {
-  findCanonicalRegressions,
-  formatRegressionsMarkdown,
-  formatRegressionsText,
-} from './regressions'
+import {findCanonicalRegressions, formatRegressionsReport} from './regressions'
 
 if (import.meta.main) {
   await runCli({
@@ -27,11 +23,10 @@ if (import.meta.main) {
     },
     async run({markdown, base}) {
       const regressions = await findCanonicalRegressions({baseRef: base})
+      const report = formatRegressionsReport(regressions)
 
       return {
-        report: markdown
-          ? formatRegressionsMarkdown(regressions)
-          : formatRegressionsText(regressions),
+        report: markdown ? report.markdown : report.text,
         hasFindings: regressions.length > 0,
       }
     },

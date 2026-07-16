@@ -49,9 +49,11 @@ describe('canonicalize-classes CLI', () => {
     const {stdout, exitCode} = await runCli(root)
 
     expect(exitCode).toBe(1)
-    expect(stdout).toContain('=== VERIFIED MAPPING (7) ===')
+    expect(stdout).toContain('=== NON-CANONICAL TAILWIND CLASSES (7) ===')
     expect(stdout).toContain('w-[16px] => w-4')
-    expect(stdout).toContain('=== REJECTED (1) ===')
+    expect(stdout).toContain(
+      '1 suggestion(s) rejected by CSS-equivalence verification'
+    )
     expect(stdout).toContain('(dry run — pass --apply to write changes)')
 
     expect(await Bun.file(path.join(root, 'src', 'button.tsx')).text()).toBe(
@@ -79,7 +81,7 @@ describe('canonicalize-classes CLI', () => {
 
     expect(exitCode).toBe(1)
     expect(stdout).toContain('### Non-canonical Tailwind classes')
-    expect(stdout).toContain('| `w-[16px]` | `w-4` |')
+    expect(stdout).toContain('| `w-[16px]` → `w-4` |')
     expect(stdout).toContain('suggestion(s) rejected')
   })
 

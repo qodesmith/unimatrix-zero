@@ -3,6 +3,9 @@
  * in, a verdict out. `check-oxlint-drift.ts` is the CI adapter that gathers
  * the versions and writes the outputs.
  */
+import type {Finding, FindingsReport} from '../findings'
+
+import {formatFindings} from '../findings'
 
 // If the latest published oxlint is this many minor versions (or more) ahead of
 // what we have installed, we're falling behind the ecosystem and CI should fail.
@@ -25,8 +28,8 @@ export interface DriftVersions {
 export interface DriftVerdict {
   shouldFail: boolean
 
-  /** One markdown fragment per failed requirement; empty when in sync. */
-  reasons: string[]
+  /** One finding per failed requirement; empty when in sync. */
+  findings: Finding[]
 }
 
 function parseVersion(version: string) {
@@ -42,49 +45,61 @@ export function evaluateDrift({
   const installedV = parseVersion(installed)
   const latestV = parseVersion(latest)
 
-  const reasons: string[] = []
+  const findings: Finding[] = []
 
   // Req 1: too far behind the latest published release.
   if (latestV.major > installedV.major) {
-    reasons.push(
-      `**oxlint is a major version behind.** Installed \`${installed}\`, latest published \`${latest}\`.`
-    )
+    findings.push({
+      file: 'package.json',
+      from: installed,
+      to: latest,
+      reason: 'oxlint is a major version behind the latest published release',
+    })
   } else if (
     latestV.major === installedV.major &&
     latestV.minor - installedV.minor >= MINOR_DRIFT_THRESHOLD
   ) {
-    reasons.push(
-      `**oxlint is ${latestV.minor - installedV.minor} minor versions behind** (threshold is ${MINOR_DRIFT_THRESHOLD}). Installed \`${installed}\`, latest published \`${latest}\`.`
-    )
+    findings.push({
+      file: 'package.json',
+      from: installed,
+      to: latest,
+      reason:
+        `oxlint is ${latestV.minor - installedV.minor} minor versions ` +
+        `behind (threshold is ${MINOR_DRIFT_THRESHOLD})`,
+    })
   }
 
   // Req 2 (invariant): the installed version must always match the version we've
   // reviewed rule changes for. A bump to either without the other trips this.
   if (installed !== reviewed) {
-    reasons.push(
-      `**Installed oxlint (\`${installed}\`) does not match the reviewed version (\`${reviewed}\`).** Review the rule changes below, then set \`tools/oxlint/reviewed-oxlint-version.json\` to \`${installed}\`.`
-    )
+    findings.push({
+      file: 'tools/oxlint/reviewed-oxlint-version.json',
+      from: reviewed,
+      to: installed,
+      reason:
+        'installed oxlint does not match the reviewed version — review ' +
+        'the rule changes below, then set the reviewed version to ' +
+        `${installed}`,
+    })
   }
 
-  return {shouldFail: reasons.length > 0, reasons}
+  return {shouldFail: findings.length > 0, findings}
 }
 
 /**
- * PR-comment body for a failing verdict. Ends with the rule-changes heading —
- * the workflow concatenates the generated delta directly after it. Returns an
- * empty string when there are no reasons.
+ * Renders the verdict through the shared findings module. The markdown
+ * (the PR-comment body) ends with the rule-changes heading — the workflow
+ * concatenates the generated delta directly after it — and is an empty
+ * string when there are no findings.
  */
-export function formatDriftMarkdown(reasons: string[]): string {
-  if (reasons.length === 0) return ''
-
-  return [
-    '## oxlint rule drift detected',
-    '',
-    ...reasons.map(reason => `- ${reason}`),
-    '',
-    '---',
-    '',
-    '### Rule changes since the last reviewed version',
-    '',
-  ].join('\n')
+export function formatDriftReport(findings: Finding[]): FindingsReport {
+  return formatFindings(
+    {
+      title: 'oxlint rule drift detected',
+      intro: count => `${count} requirement(s) failed:`,
+      emptyText: 'oxlint is in sync — no drift detected.',
+      footer: '---\n\n### Rule changes since the last reviewed version',
+    },
+    findings
+  )
 }
