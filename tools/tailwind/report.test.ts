@@ -19,8 +19,6 @@ function makeAnalysis(
     verified,
     rejected,
     edits: [],
-    literals: [],
-    fileTexts: new Map(),
   }
 }
 

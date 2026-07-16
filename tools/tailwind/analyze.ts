@@ -4,7 +4,6 @@
  * to equivalent CSS. Pure — never writes to disk.
  */
 import type {Edit} from './apply'
-import type {Literal} from './extract'
 
 import {__unstable__loadDesignSystem} from '@tailwindcss/node'
 
@@ -61,10 +60,6 @@ export interface TailwindClassAnalysis {
    * offset. Pass to `applyCanonicalFixes` to write the changes.
    */
   edits: Edit[]
-
-  /** Extracted literals and file contents, consumed by applyCanonicalFixes. */
-  literals: Literal[]
-  fileTexts: Map<string, string>
 }
 
 /**
@@ -333,7 +328,5 @@ export async function analyzeTailwindClasses({
       .map(([from, to]) => ({from, to, locations: locations.get(from) ?? []})),
     rejected,
     edits,
-    literals,
-    fileTexts,
   }
 }

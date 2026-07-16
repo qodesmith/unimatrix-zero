@@ -16,13 +16,9 @@ describe('analyzeTailwindClasses', () => {
   })
 
   it('scans the fixture sources, excluding .d.ts files', () => {
+    // src/ holds three sources plus two .d.ts files (globals, cn).
     expect(analysis.projectRoot).toBe(fixtureRoot)
     expect(analysis.filesScanned).toBe(3)
-    expect([...analysis.fileTexts.keys()]).toEqual([
-      path.join(fixtureRoot, 'src', 'button.tsx'),
-      path.join(fixtureRoot, 'src', 'card.tsx'),
-      path.join(fixtureRoot, 'src', 'util.ts'),
-    ])
     expect(analysis.uniqueTokens).toBe(11)
   })
 
@@ -118,9 +114,18 @@ describe('analyzeTailwindClasses', () => {
   })
 
   it('is pure — never writes to the scanned files', async () => {
+    // A signature non-canonical token per source is still on disk.
+    const stillPresent = [
+      ['button.tsx', 'w-[16px]'],
+      ['card.tsx', 'rounded-[4px] w-[16px]'],
+      ['util.ts', 'mt-[4px]'],
+    ]
+
     await Promise.all(
-      [...analysis.fileTexts].map(async ([file, text]) => {
-        expect(await Bun.file(file).text()).toBe(text)
+      stillPresent.map(async ([file, token]) => {
+        const text = await Bun.file(path.join(fixtureRoot, 'src', file)).text()
+
+        expect(text).toContain(token)
       })
     )
   })
