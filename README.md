@@ -1,15 +1,11 @@
 # unimatrix-zero
 
-To install dependencies:
+A canvas where one collective conversation splits into individual threads.
 
-```bash
-bun install
-```
+## Vocabulary
 
-To run:
-
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.4.0. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+- Canvas = Unimatrix
+- Branch = Adjunct
+- Session/thread = Alcove
+- Run branches in parallel = the Collective
+- Merge (v2) = Assimilate
