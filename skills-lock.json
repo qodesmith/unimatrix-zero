@@ -97,6 +97,18 @@
       "skillPath": "skills/misc/migrate-to-shoehorn/SKILL.md",
       "computedHash": "6397731ced114f3657aa88b55ed13d1344a56d77ca449c568e3200c21740fa99"
     },
+    "nuke-comments": {
+      "source": "qodesmith/skills",
+      "sourceType": "github",
+      "skillPath": "nuke-comments/SKILL.md",
+      "computedHash": "93318736aa621217f7df947aa63078dd3e2270ae23bc2a3389c09fbe9a45868a"
+    },
+    "pr": {
+      "source": "qodesmith/skills",
+      "sourceType": "github",
+      "skillPath": "pr/SKILL.md",
+      "computedHash": "460f99b18c911599bb055871bc31338e38d41e6915d98a6f699d9cf5d751384f"
+    },
     "prototype": {
       "source": "mattpocock/skills",
       "sourceType": "github",
