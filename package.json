@@ -6,7 +6,8 @@
   "scripts": {
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
-    "update:skills": "bunx skills update --project -y"
+    "skills:install": "bun run scripts/install-skills.ts",
+    "skills:update": "bunx skills update --project -y"
   },
   "devDependencies": {
     "@types/bun": "latest",
