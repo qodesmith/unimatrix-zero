@@ -1,0 +1,42 @@
+{
+  /////////////////////
+  // TANSTACK ROUTER //
+  /////////////////////
+
+  "files.watcherExclude": {"**/routeTree.gen.ts": true},
+  "search.exclude": {"**/routeTree.gen.ts": true},
+  "files.readonlyInclude": {"**/routeTree.gen.ts": true},
+
+  ////////////
+  // VSCODE //
+  ////////////
+
+  "files.insertFinalNewline": true,
+  "js/ts.preferences.preferTypeOnlyAutoImports": true,
+  "js/ts.preferences.importModuleSpecifier": "non-relative",
+
+  /////////
+  // OXC //
+  /////////
+
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  "oxc.fmt.configPath": ".oxfmtrc.jsonc",
+  // Controls what's offered in the quickfix menu.
+  "oxc.fixKind": "dangerous_fix_or_suggestion",
+  // Formatting runs via source.format.oxc below.
+  "editor.formatOnSave": false,
+  "editor.codeActionsOnSave": {
+    "source.format.oxc": "always",
+
+    // Oxlint can autofix safe and dangerous fixes. Unfortunately tt will NOT
+    // autofix suggestion fixes, such as react/exhaustive-deps. However, you can
+    // open the quickfix menu (CMD + .) to trigger the fix manually.
+    "source.fixAllDangerous.oxc": "always"
+  },
+
+  //////////////
+  // TAILWIND //
+  //////////////
+
+  "tailwindCSS.classFunctions": ["cva", "cn", "clsx", "twMerge"]
+}

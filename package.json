@@ -4,10 +4,13 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
     "update:skills": "bunx skills update --project -y"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "oxfmt": "^0.70.0"
   },
   "peerDependencies": {
     "typescript": "^7"
