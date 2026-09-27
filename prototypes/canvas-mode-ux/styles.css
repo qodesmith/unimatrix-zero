@@ -1,0 +1,19 @@
+@import 'tailwindcss';
+@import '@xyflow/react/dist/style.css';
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  background: #fafafa;
+}
+
+/* Hovered or focused Turns sit above their neighbours so hover-revealed Inputs aren't covered. */
+.react-flow__node:hover,
+.react-flow__node:focus-within {
+  z-index: 1000 !important;
+}
