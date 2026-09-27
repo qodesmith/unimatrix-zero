@@ -1,0 +1,114 @@
+# Unsigned distribution and updates on Mac, Windows, Linux
+
+Research for [#5](https://github.com/qodesmith/unimatrix-zero/issues/5), part of the v1 spec map [#1](https://github.com/qodesmith/unimatrix-zero/issues/1). Researched 2026-09-27.
+
+**Question:** what's the least-friction way to ship an unsigned Electron app from GitHub Releases (and a personal website) on Mac, Windows and Linux, with no paid Apple or Microsoft developer accounts?
+
+Claims marked **[unverified]** are inferences or come from secondary sources only. Everything else links to the source that owns it.
+
+## Answer in brief
+
+| | Ship | First-run friction | Auto-update |
+|---|---|---|---|
+| **macOS** | Ad-hoc signed (`mac.sign.identity: "-"`) `.dmg` + `.zip`, arm64 and x64 | High. "Not Opened" dialog, then System Settings → Privacy & Security → **Open Anyway** → password. Control-click no longer works. | **No in-place auto-update.** Use "update available → download" instead. |
+| **Windows** | NSIS per-user installer (`.exe`), plus an optional portable `.exe` | Medium. SmartScreen "Windows protected your PC" → **More info** → **Run anyway**. It returns for every new version, since unsigned reputation is per file. Smart App Control blocks it outright. | **Works** with electron-updater's NSIS updater, with a caveat (below). |
+| **Linux** | AppImage (primary), `.deb` and `.rpm` | Low. `chmod +x`, or the file manager's "allow executing". | **Works** for AppImage with electron-updater. `.deb`/`.rpm` updates need sudo/pkexec. |
+
+**Tooling:** electron-builder + electron-updater, built by a GitHub Actions matrix (`macos-latest`, `windows-latest`, `ubuntu-latest`) that publishes to GitHub Releases. electron-builder has a Bun dependency collector. Electron Forge does not support Bun as a package manager, and its update path (update.electronjs.org) needs a signed Mac app.
+
+## macOS
+
+### Current version
+
+macOS 27 "Golden Gate" was released on 14 September 2026 ([MacRumors](https://www.macrumors.com/2026/09/10/macos-27-golden-gate-release-date/), [9to5Mac](https://9to5mac.com/2026/09/09/apple-confirms-macos-27-golden-gate-launch-date-september-14/)). Apple's help page for opening apps from unknown developers now shows macOS 27 as the current version. It describes the same flow that Sequoia (15) introduced ([Apple Support: Open a Mac app from an unknown developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac)). I found no first-party source describing a Gatekeeper change in macOS 27 for non-managed Macs. macOS 27 does add MDM "binary control" for managed fleets ([Stabilise, secondary](https://stabilise.io/blog/macos-27-mdm-binary-control-pppc-replacement-mac-admins)), which doesn't affect home users. **[unverified: no Apple release note for 27 was checked line by line]**
+
+### What users see
+
+- Gatekeeper checks software downloaded from outside the App Store for an identified developer, Apple notarization and tampering. It also asks the user to approve the first launch ([Apple Platform Security: Gatekeeper and runtime protection](https://support.apple.com/guide/security/gatekeeper-and-runtime-protection-sec5599b66df/web)).
+- **Control-click → Open no longer works.** Since Sequoia, "users will no longer be able to Control-click to override Gatekeeper when opening software that isn't signed correctly or notarized. They'll need to visit System Settings > Privacy & Security" ([Apple Developer News, 6 Aug 2024](https://developer.apple.com/news/?id=saqachfa)).
+- **Current flow** ([Apple Support mh40616](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac); [Apple Support 102445](https://support.apple.com/en-us/102445), updated 27 May 2026):
+  1. The user double-clicks the app. macOS refuses to open it and offers only "Done" / "Move to Trash". **[unverified: exact dialog wording; widely reported as "Apple could not verify … is free of malware"]**
+  2. The user opens System Settings → Privacy & Security and scrolls to Security. They click **Open Anyway**. The button is only available "for about an hour after you try to open the app".
+  3. The user confirms and enters their login password.
+  4. After this, the app opens normally.
+- Apple's page warns that overriding security settings "is the most common way that a Mac gets infected with malware". A non-technical user will see that framing.
+
+### Is ad-hoc signing required on Apple Silicon?
+
+In practice, yes.
+
+- Apple Silicon requires all executable code to be signed, and an ad-hoc signature is enough ([Eclectic Light, Jan 2026](https://eclecticlight.co/2026/01/17/whats-happening-with-code-signing-and-future-macos/), secondary but authoritative).
+- Electron's prebuilt frameworks are already signed. Packaging modifies the bundle, so skipping signing leaves a broken signature, and a downloaded app then shows as **"damaged"**. That dialog offers no Open Anyway path. FreeTube, an unsigned open-source Electron app, documents exactly this in its build config: "If we skip signing entirely, macOS says that the application is damaged, which makes users open bug reports. With an ad-hoc signature it still refuses to launch by default but with the reason that it cannot verify the signature" ([FreeTube `_scripts/ebuilder.config.mjs`](https://github.com/FreeTubeApp/FreeTube/blob/development/_scripts/ebuilder.config.mjs)).
+- electron-builder does **not** ad-hoc sign automatically. You opt in with `mac.sign.identity: "-"`. It then applies built-in entitlements (`allow-jit`, `disable-library-validation`) so Electron's frameworks can still load under hardened runtime ([electron-builder `code-signing-mac.md`](https://github.com/electron-userland/electron-builder/blob/master/website/docs/features/code-signing/code-signing-mac.md)).
+- electron-builder's `mac.md` says an ad-hoc signed app "will only run on the machine that built it". FreeTube's shipped builds contradict that: other machines can run them after Open Anyway. Read the docs line as "Gatekeeper won't trust it", not "it can't run".
+- Homebrew maintainers argue that unsigned apps won't run at all after Intel support ends. macOS 26 Tahoe was the last Intel release ([Homebrew discussion #6334](https://github.com/orgs/Homebrew/discussions/6334)). An ad-hoc signature satisfies that "must be signed" rule, and Eclectic Light expects ad-hoc signing to stay "for the foreseeable future".
+
+### Free routes and tricks
+
+- **Homebrew cask: no longer a way around the prompt.** Homebrew 5.0.0 removed `--no-quarantine` and deprecated unsigned casks, planning to "disable all Homebrew/homebrew-cask casks that fail Gatekeeper checks in September 2026" ([Homebrew 5.0.0 release notes](https://brew.sh/2025/11/12/homebrew-5.0.0/); [Homebrew/brew#20755](https://github.com/Homebrew/brew/issues/20755)). FreeTube and LibreWolf are among the casks that were cut ([discussion #6334](https://github.com/orgs/Homebrew/discussions/6334)). A **personal tap** can still ship an unsigned cask ("You are free to make your own tap and put whatever you want in it", [#6334](https://github.com/orgs/Homebrew/discussions/6334); [#7050](https://github.com/orgs/Homebrew/discussions/7050)). But without `--no-quarantine`, users would hit the same Gatekeeper prompt unless the tap runs `xattr` in a postinstall. Maintainers called doing that "on behalf of all their users" something that is "correctly blamed". Homebrew also requires a terminal, which the map rules out for users.
+- **`xattr -dr com.apple.quarantine` / `xattr -cr`**: works, but needs a terminal. Ruled out.
+- **Disabling Gatekeeper ("Anywhere")**: since Sequoia this needs `spctl` in a terminal plus a Settings toggle **[unverified: secondary sources only]**. Ruled out, and it's bad advice to give a child or a parent anyway.
+- **Self-signed certificate (free)**: gives the app a stable identity (`certificate leaf = H"…"`) instead of a per-build hash. It **doesn't** remove the first-launch Gatekeeper prompt, since only Developer ID plus notarization does. It may be what makes in-place updates and TCC permission grants survive across versions. Example: earheart moved from ad-hoc to self-signed so that macOS privacy permissions survive updates ([cleanunicorn/earheart#160](https://github.com/cleanunicorn/earheart/pull/160), merged 16 Sep 2026). **[unverified: that PR's own checklist had not yet confirmed an update across two self-signed versions]**
+
+### Auto-update on macOS: not in place
+
+- Electron's `autoUpdater` says "Your application must be signed for automatic updates on macOS. This is a requirement of `Squirrel.Mac`" ([Electron autoUpdater docs](https://www.electronjs.org/docs/latest/api/auto-updater)). electron-builder says the same: "macOS application must be signed in order for auto updating to work" ([electron-builder `auto-update.md`](https://github.com/electron-userland/electron-builder/blob/master/website/docs/features/auto-update.md)). electron-updater's `MacUpdater` just feeds Electron's native `autoUpdater` (Squirrel.Mac) through a local proxy server ([MacUpdater.ts](https://github.com/electron-userland/electron-builder/blob/master/packages/electron-updater/src/MacUpdater.ts)).
+- Squirrel.Mac validates the downloaded bundle against the **running app's designated requirement** (`SecCodeCopyDesignatedRequirement`, then `SecStaticCodeCheckValidityWithErrors`) ([Squirrel.Mac `SQRLCodeSignature.m`](https://github.com/Squirrel/Squirrel.Mac/blob/master/Squirrel/SQRLCodeSignature.m)).
+- Apple: "Unsigned code has no DR. Ad hoc signed code … has a DR but it's tied to that specific version of the code" ([TN3127: Inside Code Signing: Requirements](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements)). An ad-hoc v1.0.0 can therefore **never** accept v1.0.1, so Squirrel.Mac updates fail for unsigned and ad-hoc apps.
+- `update-electron-app` / update.electronjs.org (Forge's default) also requires signed macOS builds ([electron/update-electron-app](https://github.com/electron/update-electron-app)).
+- Side effect of per-build identity: macOS TCC grants (microphone, accessibility and so on) are tied to the DR, so users are asked again after every update (TN3127; earheart#160). Keychain items created through Electron `safeStorage` may prompt again for the same reason. **[unverified for safeStorage]** This matters if we store provider tokens in the keychain.
+
+**Fallback that works:** check the GitHub Releases API (or `latest-mac.yml`) on launch. When a newer version exists, show "Update available". Then either open the release/website download page, or download the `.dmg` in-app, verify its SHA-512 against the manifest, and reveal it for the user to drag into Applications. FreeTube does the first: it calls `api.github.com/repos/freetubeapp/freetube/releases?per_page=1` and shows a banner, with a setting to turn the check off ([FreeTube `App.vue`](https://github.com/FreeTubeApp/FreeTube/blob/development/src/renderer/App.vue)). The in-app download is described in [jeff-kunkun/multica#305](https://github.com/jeff-kunkun/multica/pull/305).
+
+**[unverified]** A `.dmg` downloaded by the app's own Node code, rather than the browser, probably carries no quarantine attribute. If so, the replaced app would open without another Open Anyway. That gives a smoother update UX, but it also sidesteps Gatekeeper, so decide it deliberately. Also unverified: whether macOS "App Management" protection would prompt if the app tried to replace itself in `/Applications`. Handing the file to the user avoids that question.
+
+## Windows
+
+- SmartScreen checks downloaded apps against a list of "files that are well known and downloaded frequently". If a file isn't on that list, SmartScreen warns ([Microsoft Learn: SmartScreen overview](https://learn.microsoft.com/en-us/windows/security/operating-system-security/virus-and-threat-protection/microsoft-defender-smartscreen/), 2026-04-23).
+- **Unsigned:** "Windows protected your PC". The user must choose **Run anyway** (after clicking "More info") before the app can run. A self-signed certificate behaves the same as no signature. "When a file is not signed, SmartScreen reputation must build for each new version of your files, starting with zero reputation." Reputation "can take several weeks and hundreds of clean installs", and there is no manual submission for consumer reputation ([Microsoft Learn: SmartScreen reputation for Windows app developers](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation), updated 2026-08-17). **In practice, every release's installer starts cold.**
+- **EV certificates no longer bypass SmartScreen** (removed in 2024). Signing builds publisher reputation across versions, but it doesn't give instant trust (same page).
+- **Smart App Control** (Windows 11): in enforcement mode, "unknown, unsigned code are blocked by default", with no per-app override. It's on only for clean installs where Windows judges it a good fit ([Microsoft Learn: Smart App Control](https://learn.microsoft.com/en-us/windows/apps/develop/smart-app-control/overview)). Its signature checks "apply to all executable files, not just those downloaded from the Internet" ([SmartScreen reputation page](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation)). **Users with SAC on can't run an unsigned Unimatrix Zero at all.** Since the April 2026 cumulative update (KB5083769), SAC can be turned off and on again without reinstalling ([secondary: Topedia](https://blog-en.topedia.com/2026/04/smart-app-control-in-windows-11-can-now-be-re-enabled-without-reinstalling/)). Telling a parent to turn off a security feature is still a poor experience.
+- **Free signing that doesn't need a paid account:** [SignPath Foundation](https://signpath.io) signs qualifying open-source projects for free, and Microsoft Learn lists it ([Code signing options](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options), 2026-08-29). That would fix SAC and let reputation carry across versions. Eligibility needs an OSI licence and a public repo; check it. Azure Artifact Signing costs about $9.99/month (individuals: US/Canada only). OV certificates cost $150–300/year. Both are outside the "no paid accounts" rule.
+
+### Installer choice
+
+- **NSIS** is electron-builder's default and its only auto-updatable Windows target. "Squirrel.Windows is not supported" by electron-updater ([auto-update.md](https://github.com/electron-userland/electron-builder/blob/master/website/docs/features/auto-update.md)). The default one-click, per-user NSIS install needs no admin rights, and electron-updater allows install-on-next-launch because per-user installs run "without an elevation prompt" ([NsisUpdater.ts](https://github.com/electron-userland/electron-builder/blob/master/packages/electron-updater/src/NsisUpdater.ts)).
+- **Squirrel.Windows** (Forge's default maker, used by update.electronjs.org) needs its own startup-event handling ([Electron autoUpdater](https://www.electronjs.org/docs/latest/api/auto-updater)). Not worth it here.
+- **MSI** targets admins and per-machine installs, so it adds UAC friction. Skip it.
+- **Portable `.exe`**: no install and no updater. Offer it as a secondary download, as FreeTube does (`nsis`, `zip`, `7z`, `portable`).
+
+### Auto-update on Windows: works, with a caveat
+
+- electron-updater verifies the downloaded installer's Authenticode signature against `publisherName`. When there's no `publisherName` (unsigned build), current releases **skip** verification with a warning. The source also says: "This fail-open behavior is deprecated: electron-builder v28 will treat a missing publisherName as a verification failure (fail-closed)" ([NsisUpdater.ts](https://github.com/electron-userland/electron-builder/blob/master/packages/electron-updater/src/NsisUpdater.ts)). The `verifyUpdateCodeSignature` setter accepts a custom function, so an unsigned app can supply its own check (for example, always pass, or check a hash) to keep working after v28.
+- For integrity without Authenticode, electron-builder is adding **Ed25519-signed update manifests** (`latest*.yml`, verified before download, fail-closed once a key is embedded) ([signed-update-manifests.md](https://github.com/electron-userland/electron-builder/blob/master/website/docs/features/signed-update-manifests.md)). This ships in electron-updater **7.0.0-alpha.8**. It's not in stable yet: npm `latest` is 6.8.9, and electron-builder `latest` is 26.15.3 with `next` at 27.0.0-alpha.9.
+- **[unverified]** Updates downloaded by electron-updater through Node don't get a Mark-of-the-Web, so SmartScreen shouldn't prompt on update installs. Smart App Control would still block them.
+
+## Linux
+
+- electron-builder: AppImage is portable, needs no root, and auto-updates through electron-updater. `.deb`/`.rpm` go through the package manager and need root. Flatpak is sandboxed, but electron-builder only produces single-file bundles and cannot publish to Flathub ([electron-builder `appimage.md`](https://github.com/electron-userland/electron-builder/blob/master/website/docs/appimage.md), [`flatpak.md`](https://github.com/electron-userland/electron-builder/blob/master/website/docs/flatpak.md)). Electron's own `autoUpdater` has no Linux support ([Electron docs](https://www.electronjs.org/docs/latest/api/auto-updater)).
+- **AppImage**: electron-updater replaces the file in place. `AppImageUpdater` uses `$APPIMAGE`, and "replacing the AppImage file needs no elevation" ([AppImageUpdater.ts](https://github.com/electron-userland/electron-builder/blob/master/packages/electron-updater/src/AppImageUpdater.ts)). In electron-builder v27 the default static runtime needs no FUSE2, which old AppImages needed and which is missing on Ubuntu 24.04+. `AppRun` passes `--no-sandbox` only when unprivileged user namespaces are unavailable. FreeTube pins `toolsets.appimage: '1.0.3'`, the static runtime. Downside: no menu entry unless the user has AppImageLauncher or the app integrates itself.
+- **`.deb` / `.rpm`**: electron-updater can update these, but it runs the install through `sudo`/`pkexec`, so the user sees a password prompt ([LinuxUpdater.ts](https://github.com/electron-userland/electron-builder/blob/master/packages/electron-updater/src/LinuxUpdater.ts)). Ubuntu 24.04 may need an AppArmor profile (`appArmorProfile`) ([linux.md](https://github.com/electron-userland/electron-builder/blob/master/website/docs/linux.md)). Their benefit is a proper menu entry and a familiar install.
+- **Flatpak via Flathub**: the best "store-like" experience on Linux, but it means a Flathub submission and a separate manifest repo. That leans toward "app store", and electron-builder can't publish there. Defer it. FreeTube ships `deb`, `rpm`, `AppImage`, `pacman`, `zip` and `7z` itself and leaves Flatpak to Flathub.
+- **Recommendation:** make AppImage the primary Linux download, with auto-update. Offer `.deb`/`.rpm` too, with update-available-then-download (or electron-updater's pkexec flow).
+
+## Tooling
+
+- **electron-builder** has a `BunNodeModulesCollector` that reads `bun.lock` ([source](https://github.com/electron-userland/electron-builder/blob/master/packages/app-builder-lib/src/node-module-collector/bunNodeModulesCollector.ts)). It publishes directly to GitHub Releases, and it generates the `latest*.yml` metadata that electron-updater reads. Its docs include a matrix workflow for `macos-latest` / `windows-latest` / `ubuntu-latest` that publishes on `v*` tags using `GH_TOKEN` ([github-actions.md](https://github.com/electron-userland/electron-builder/blob/master/website/docs/features/github-actions.md)). Swap `setup-node` + `npm ci` for `oven-sh/setup-bun` + `bun install`. **[unverified: not test-built]**
+- **Electron Forge** lists only `'yarn' | 'npm' | 'pnpm'` as supported package managers ([core-utils `package-manager.ts`](https://github.com/electron/forge/blob/main/packages/utils/core-utils/src/package-manager.ts)). Bun support is an open request ([electron/forge#3906](https://github.com/electron/forge/issues/3906)). Forge's updater story is update.electronjs.org plus Squirrel.Windows, which gives nothing on unsigned macOS and nothing on Linux. **Choose electron-builder.**
+- Mac builds: ship separate arm64 and x64 artifacts (or universal). electron-updater prefers arm64 files on Apple Silicon ([MacUpdater.ts](https://github.com/electron-userland/electron-builder/blob/master/packages/electron-updater/src/MacUpdater.ts)). The `.zip` target is still needed for `latest-mac.yml`, which our "update available" check can read.
+- Version note: the electron-builder docs cited here come from `master`, which is v27 (still `next`/alpha). Some details differ in stable v26, such as the AppImage runtime default and signed manifests. Pin a version when the build ticket starts.
+
+## Recommendation
+
+1. electron-builder, with Bun, on a GitHub Actions matrix that publishes to GitHub Releases. The personal website links to the latest release assets.
+2. **macOS:** ad-hoc sign. Ship `.dmg` for humans and `.zip` for metadata. A download page and first-run guide with screenshots of the Privacy & Security → Open Anyway flow. In-app "Update available" that downloads the new `.dmg` (or opens the page). No Squirrel.Mac.
+3. **Windows:** unsigned one-click per-user NSIS with electron-updater auto-update. Override `verifyUpdateCodeSignature` (plus Ed25519 manifests once stable). The download page explains "More info → Run anyway". Note that Smart App Control users are blocked. Separately, apply to SignPath Foundation for free signing.
+4. **Linux:** AppImage with electron-updater auto-update, plus `.deb`/`.rpm`.
+5. The update UX should share one shape across OSes ("Update available → Install/Download"). Only the mechanism differs.
+
+## Implications for the map
+
+- **Homebrew is not a friction-free Mac channel any more.** Unsigned casks are disabled in homebrew-cask from September 2026, and `--no-quarantine` is gone.
+- **Smart App Control blocks unsigned Windows apps with no per-app override.** This is the biggest remaining Windows risk. It's worth a decision: SignPath Foundation (free, needs an OSS licence), or accept the loss.
+- **No macOS auto-update without an Apple Developer ID.** Mac users will re-download each release, and on macOS each manual update may also re-trigger Open Anyway and TCC prompts. This affects release cadence and should feed the Electron security posture and Settings tickets. Also, if provider credentials live in the macOS keychain via `safeStorage`, the per-build identity may cause keychain prompts after every update. That's a question for the storage/provider tickets.
+- The repo/build-toolchain ticket can take "electron-builder + Bun + GH Actions matrix" as a given.
