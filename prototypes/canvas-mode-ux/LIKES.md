@@ -12,3 +12,5 @@ Running list from reviewing the prototype. Feeds the resolution of the Canvas mo
 6. **Fork pill.** A Reply that is a Fork shows a small pill in its top-right corner with its Branch count ("Fork · 5 Branches"), as in variant A.
 7. **Thread path highlighting.** The connections from a Turn back to the root are highlighted. By default that's the active Thread. Hovering any message temporarily switches the highlight to that message's path. Typing into any Input highlights that Input's path, and it wins over hover while the user types.
 8. **Minimap.** Both modes show a minimap of the whole Tree, placed where it doesn't cover content or controls.
+9. **Context size meter, as an option.** A thin bar along a Reply's bottom edge that fills as the Thread's Context size approaches the model's limit (as in variant B). It is a user setting, not always on.
+10. **Visual behaviour is user-configurable.** Scrolling long messages with "Show more" / "Show less" is also a setting, and settings should drive nearly all visuals. Captured in the Settings and user preferences ticket.
