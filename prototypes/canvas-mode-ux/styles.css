@@ -12,6 +12,10 @@ body {
   background: #fafafa;
 }
 
+/* Replies holding a draft keep their Input showing, so they sit above their neighbours too (just below hover). */
+.react-flow__node:has([data-draft]) {
+  z-index: 999 !important;
+}
 /* Hovered or focused Turns sit above their neighbours so hover-revealed Inputs aren't covered. */
 .react-flow__node:hover,
 .react-flow__node:focus-within {

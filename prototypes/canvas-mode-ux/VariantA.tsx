@@ -28,6 +28,7 @@ import {
   ScrollableText,
   StatusBar,
   threadIds,
+  useHasDraft,
   useHighlight,
   useHighlightTarget,
   useReportTyping,
@@ -87,10 +88,12 @@ export function ReplyNode({data, selected}: NodeProps<Node<Data>>) {
   const branches = childrenOf(sim.tree, turn.id).length
   const reportTyping = useReportTyping(turn.id)
   const features = useContext(CanvasFeatures)
+  const hasDraft = useHasDraft(turn.id)
 
   return (
     <div
       className="group relative w-[440px]"
+      data-draft={hasDraft || undefined}
       onMouseLeave={() => setDismissed(false)}
     >
       {handles}
@@ -131,6 +134,7 @@ export function ReplyNode({data, selected}: NodeProps<Node<Data>>) {
         (isActive ? (
           <div className="mt-2">
             <PromptInput
+              draftId={turn.id}
               branching={branches > 0}
               attachable={features.attach}
               onTypingChange={reportTyping}
@@ -142,9 +146,10 @@ export function ReplyNode({data, selected}: NodeProps<Node<Data>>) {
           </div>
         ) : (
           <div
-            className={`absolute inset-x-0 top-full z-10 pt-2 ${dismissed ? 'hidden' : inputFocused ? 'block' : 'hidden group-hover:block'}`}
+            className={`absolute inset-x-0 top-full z-10 pt-2 ${dismissed ? 'hidden' : inputFocused || hasDraft ? 'block' : 'hidden group-hover:block'}`}
           >
             <PromptInput
+              draftId={turn.id}
               branching={branches > 0}
               attachable={features.attach}
               onFocusChange={setInputFocused}

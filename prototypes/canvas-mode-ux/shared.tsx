@@ -132,9 +132,11 @@ export function centerNode(rf: ReactFlowInstance, id: string, offsetX = 0) {
   const w = n.measured?.width ?? 300
   const h = n.measured?.height ?? 80
   const zoom = rf.getZoom()
+  // Linear, because the default smooth interpolation zooms out mid-pan on long pans.
   rf.setCenter(n.position.x + w / 2 + offsetX / zoom, n.position.y + h / 2, {
     zoom,
     duration: 400,
+    interpolate: 'linear',
   })
 }
 
@@ -255,6 +257,51 @@ export const edgeStyle = (hot: boolean) => ({
 
 // ---------- Input ----------
 
+// Per-Reply Input drafts that outlive the Input, e.g. across an orientation switch or a collapse.
+export type Draft = {text: string; files: Attachment[]}
+const EMPTY_DRAFT: Draft = {text: '', files: []}
+const hasContent = (d: Draft | undefined) =>
+  !!d && (d.text !== '' || d.files.length > 0)
+
+type DraftStore = {
+  drafts: Record<string, Draft>
+  setDraft: (id: string, update: SetStateAction<Draft>) => void
+}
+const DraftContext = createContext<DraftStore | null>(null)
+
+export function DraftProvider({
+  keep,
+  children,
+}: {
+  // Drafts for ids this rejects are dropped, e.g. deleted Replies.
+  keep: (id: string) => boolean
+  children: ReactNode
+}) {
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({})
+  const setDraft = useCallback(
+    (id: string, update: SetStateAction<Draft>) =>
+      setDrafts(all => {
+        const cur = all[id] ?? EMPTY_DRAFT
+        const next = typeof update === 'function' ? update(cur) : update
+        const out = {...all, [id]: next}
+        if (!hasContent(next)) delete out[id]
+        return out
+      }),
+    []
+  )
+  useEffect(() => {
+    if (Object.keys(drafts).some(id => !keep(id)))
+      setDrafts(all =>
+        Object.fromEntries(Object.entries(all).filter(([id]) => keep(id)))
+      )
+  })
+  const value = useMemo(() => ({drafts, setDraft}), [drafts, setDraft])
+  return <DraftContext.Provider value={value}>{children}</DraftContext.Provider>
+}
+
+export const useHasDraft = (id: string) =>
+  hasContent(useContext(DraftContext)?.drafts[id])
+
 const toAttachments = (files: FileList | File[]): Attachment[] =>
   Array.from(files).map(f => ({
     name: f.name || 'pasted-image.png',
@@ -275,6 +322,7 @@ export function PromptInput({
   onTypingChange,
   blurOnSend,
   disabled,
+  draftId,
 }: {
   onSubmit: (text: string, attachments: Attachment[]) => void
   autoFocus?: boolean
@@ -291,9 +339,20 @@ export function PromptInput({
   blurOnSend?: boolean
   // Keeps the Input usable for drafting but blocks sending.
   disabled?: boolean
+  // Keeps the draft in the surrounding DraftProvider under this id, so it survives unmounting.
+  draftId?: string
 }) {
-  const [text, setText] = useState('')
-  const [files, setFiles] = useState<Attachment[]>([])
+  const store = useContext(DraftContext)
+  const [localDraft, setLocalDraft] = useState(EMPTY_DRAFT)
+  const stored = draftId && store
+  const {text, files} = stored
+    ? (store.drafts[draftId] ?? EMPTY_DRAFT)
+    : localDraft
+  const setDraft = (update: SetStateAction<Draft>) =>
+    stored ? store.setDraft(draftId, update) : setLocalDraft(update)
+  const setText = (t: string) => setDraft(d => ({...d, text: t}))
+  const setFiles = (f: (prev: Attachment[]) => Attachment[]) =>
+    setDraft(d => ({...d, files: f(d.files)}))
   const [dragOver, setDragOver] = useState(false)
   const [focused, setFocused] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
@@ -316,8 +375,7 @@ export function PromptInput({
   const send = () => {
     if (disabled || (!text.trim() && !files.length)) return
     onSubmit(text.trim(), files)
-    setText('')
-    setFiles([])
+    setDraft(EMPTY_DRAFT)
     if (blurOnSend) ref.current?.blur()
   }
   return (
@@ -509,11 +567,17 @@ export function AttachmentList({
 
 // ---------- Canvas features only variant D turns on ----------
 
-export const CanvasFeatures = createContext({collapse: false, attach: false})
+export const CanvasFeatures = createContext<{
+  collapse: boolean
+  attach: boolean
+  // Replaces the plain collapse toggle, e.g. to keep the toggled Reply still on screen.
+  onToggleCollapse?: (replyId: string) => void
+}>({collapse: false, attach: false})
 
 // Replaces the Fork pill: collapses or expands everything below a Reply.
 export function FoldToggle({reply}: {reply: Turn}) {
   const sim = useSim()
+  const {onToggleCollapse = sim.toggleCollapsed} = useContext(CanvasFeatures)
   const kids = childrenOf(sim.tree, reply.id).length
   if (!kids) return null
   const collapsed = sim.collapsed.includes(reply.id)
@@ -528,7 +592,7 @@ export function FoldToggle({reply}: {reply: Turn}) {
       : '▾'
   return (
     <button
-      onClick={() => sim.toggleCollapsed(reply.id)}
+      onClick={() => onToggleCollapse(reply.id)}
       title={collapsed ? 'Expand' : 'Collapse everything below'}
       aria-expanded={!collapsed}
       className={`nodrag shrink-0 rounded px-1.5 text-[11px] ${

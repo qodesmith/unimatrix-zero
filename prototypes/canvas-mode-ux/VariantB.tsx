@@ -29,6 +29,7 @@ import {
   ScrollableText,
   StatusBar,
   threadIds,
+  useHasDraft,
   useHighlight,
   useHighlightTarget,
   useReportTyping,
@@ -63,10 +64,12 @@ export function ExchangeNode({data, selected}: NodeProps<Node<Data>>) {
   const ctx = contextSize(sim.tree, reply.id)
   const reportTyping = useReportTyping(reply.id)
   const features = useContext(CanvasFeatures)
+  const hasDraft = useHasDraft(reply.id)
 
   return (
     <div
       className="group relative flex items-start gap-2"
+      data-draft={hasDraft || undefined}
       onMouseLeave={() => setDismissed(false)}
     >
       <Handle
@@ -155,12 +158,13 @@ export function ExchangeNode({data, selected}: NodeProps<Node<Data>>) {
                 ? ''
                 : dismissed
                   ? 'hidden'
-                  : inputFocused
+                  : inputFocused || hasDraft
                     ? 'block'
                     : 'hidden group-hover:block'
             }
           >
             <PromptInput
+              draftId={reply.id}
               branching={branches > 0}
               attachable={features.attach}
               onFocusChange={isActive ? undefined : setInputFocused}

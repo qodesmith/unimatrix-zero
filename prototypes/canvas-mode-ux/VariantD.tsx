@@ -26,9 +26,9 @@ import {
   canvasProps,
   centerNode,
   Cursor,
+  DraftProvider,
   edgeStyle,
   FitOnceMeasured,
-  FocusOnSubmit,
   LightboxContext,
   PromptInput,
   StatusBar,
@@ -94,15 +94,27 @@ export function VariantD() {
   const drawerReplyId = threadEnd(sim.tree, selected)
   const drawerOffset = drawerReplyId ? DRAWER_WIDTH / 2 : 0
   const empty = Object.keys(sim.tree).length === 0
+  // Mounting on an empty Tree skips fit-on-load; otherwise React Flow keeps it queued and fits the first sent Turns.
+  const [loadedEmpty] = useState(empty)
 
   useEffect(() => {
     if (selected && !drawerReplyId) setSelected(null)
     if (!drawerReplyId) setFull(false)
   }, [selected, drawerReplyId])
 
-  // A fresh Tree starts at a readable zoom rather than wherever the old one was fitted.
+  // The whole layout is offset so a toggled Reply keeps its canvas position (and so its screen position) while the rest reflows.
+  const shift = useRef<XYPosition>({x: 0, y: 0})
+  const anchor = useRef<{id: string; pos: XYPosition} | null>(null)
+
+  // A fresh Tree starts at a readable zoom, with the first Turn (at the origin) near the middle.
   useEffect(() => {
-    if (empty) rf.zoomTo(1)
+    if (!empty) return
+    shift.current = {x: 0, y: 0}
+    rf.setViewport({
+      x: window.innerWidth / 2 - 220,
+      y: window.innerHeight / 2 - 60,
+      zoom: 1,
+    })
   }, [empty])
 
   // A file dropped beside an Input shouldn't navigate away to it.
@@ -137,9 +149,27 @@ export function VariantD() {
     if (collapseSeen.current === sim.collapsed) return
     collapseSeen.current = sim.collapsed
     setReflowing(true)
-    const t = setTimeout(() => setReflowing(false), SWITCH_MS)
+    const t = setTimeout(() => {
+      setReflowing(false)
+      anchor.current = null
+    }, SWITCH_MS)
     return () => clearTimeout(t)
   }, [sim.collapsed])
+
+  const toggleCollapsed = useRef((_: string) => {})
+  toggleCollapsed.current = replyId => {
+    const id = nodeIdFor(sim.tree, replyId, orientation)
+    const n = rf.getNode(id)
+    anchor.current = n ? {id, pos: n.position} : null
+    sim.toggleCollapsed(replyId)
+  }
+  const features = useMemo(
+    () => ({
+      ...FEATURES,
+      onToggleCollapse: (id: string) => toggleCollapsed.current(id),
+    }),
+    []
+  )
   const {nodes: laid, onNodesChange} = useTreeLayout(
     base as Node[],
     edges,
@@ -148,11 +178,22 @@ export function VariantD() {
   )
 
   const nodes = useMemo(() => {
+    const a = anchor.current
+    const anchored = a && laid.find(n => n.id === a.id)
+    if (anchored)
+      shift.current = {
+        x: a.pos.x - anchored.position.x,
+        y: a.pos.y - anchored.position.y,
+      }
+    const placed = laid.map(n => ({
+      ...n,
+      position: offsetBy(n.position, shift.current),
+    }))
     const selectedNode = selected && nodeIdFor(sim.tree, selected, orientation)
-    let out: Node[] = laid.map(n => ({...n, selected: n.id === selectedNode}))
+    let out: Node[] = placed.map(n => ({...n, selected: n.id === selectedNode}))
     if (switching && !vertical) {
       // Reply boxes glide into their card and fade out.
-      const cards = Object.fromEntries(laid.map(n => [n.id, n.position]))
+      const cards = Object.fromEntries(placed.map(n => [n.id, n.position]))
       for (const t of Object.values(sim.tree)) {
         const card = t.kind === 'reply' && cards[t.parentId!]
         const prev = before.current[t.id]
@@ -186,6 +227,7 @@ export function VariantD() {
     if (o === orientation) return
     localStorage.setItem(ORIENTATION_KEY, o)
     before.current = Object.fromEntries(rf.getNodes().map(n => [n.id, n]))
+    anchor.current = null
     timers.current.forEach(clearTimeout)
     setOrientation(o)
     setSwitching('start')
@@ -201,6 +243,35 @@ export function VariantD() {
     ]
   }
   useEffect(() => () => timers.current.forEach(clearTimeout), [])
+
+  // Pan to each sent Reply at the current zoom. The send that makes the first Branch instead zooms out (never in) to show the whole Tree.
+  const threads = useMemo(() => {
+    const parents = new Set(Object.values(sim.tree).map(t => t.parentId))
+    return Object.keys(sim.tree).filter(id => !parents.has(id)).length
+  }, [sim.tree])
+  const threadsSeen = useRef(threads)
+  const firstBranchAt = useRef<number | null>(null)
+  useEffect(() => {
+    if (threadsSeen.current === 1 && threads >= 2 && sim.focus)
+      firstBranchAt.current = sim.focus.n
+    threadsSeen.current = threads
+  }, [threads])
+  useEffect(() => {
+    if (!sim.focus) return
+    const fit = firstBranchAt.current === sim.focus.n
+    const id = nodeIdFor(sim.tree, sim.focus.id, orientation)
+    const padding = drawerOffset
+      ? {x: 0.15, y: 0.15, right: `${DRAWER_WIDTH + 60}px` as const}
+      : 0.15
+    const t = setTimeout(
+      () =>
+        fit
+          ? rf.fitView({padding, maxZoom: rf.getZoom(), duration: 500})
+          : centerNode(rf, id, drawerOffset),
+      300
+    )
+    return () => clearTimeout(t)
+  }, [sim.focus?.n])
 
   const {setHoverId, setPinnedId} = useHighlight()
   useEffect(() => {
@@ -275,81 +346,77 @@ export function VariantD() {
   }
 
   return (
-    <CanvasFeatures.Provider value={FEATURES}>
-      <LightboxContext.Provider value={setLightbox}>
-        <ReactFlow
-          nodes={nodes}
-          edges={styledEdges}
-          nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
-          {...canvasProps}
-          className={switching || reflowing ? 'canvas-switching' : ''}
-          onNodeClick={openDrawer}
-          onNodeMouseEnter={(_, n) =>
-            setHoverId(n.type === 'exchange' ? threadEnd(sim.tree, n.id) : n.id)
-          }
-          onNodeMouseLeave={() => setHoverId(null)}
-        >
-          <Background gap={24} color="#d4d4d8" />
-          <CanvasControls
-            orientation={orientation}
-            onOrientation={switchTo}
-            streaming={streamingIds.length}
-            failed={failedIds.length}
-            onJumpStreaming={jumpToStreaming}
-            onJumpFailed={jumpToFailed}
-          />
-          <FitOnceMeasured />
-          <FocusOnSubmit
-            focus={
-              sim.focus && {
-                ...sim.focus,
-                id: nodeIdFor(sim.tree, sim.focus.id, orientation),
-              }
+    <CanvasFeatures.Provider value={features}>
+      <DraftProvider keep={id => !!sim.tree[id]}>
+        <LightboxContext.Provider value={setLightbox}>
+          <ReactFlow
+            nodes={nodes}
+            edges={styledEdges}
+            nodeTypes={nodeTypes}
+            onNodesChange={onNodesChange}
+            {...canvasProps}
+            fitView={!loadedEmpty}
+            className={switching || reflowing ? 'canvas-switching' : ''}
+            onNodeClick={openDrawer}
+            onNodeMouseEnter={(_, n) =>
+              setHoverId(
+                n.type === 'exchange' ? threadEnd(sim.tree, n.id) : n.id
+              )
             }
-            offsetX={drawerOffset}
-          />
-        </ReactFlow>
-        {empty && (
-          <div className="pointer-events-none fixed inset-0 z-10 flex items-center justify-center">
-            <div className="pointer-events-auto w-[560px]">
-              <PromptInput
-                large
-                autoFocus
-                attachable
-                branching={false}
-                placeholder="Start a new conversation…"
-                onSubmit={(t, a) => sim.submit(null, t, a)}
-              />
-              <p className="mt-2 text-center text-xs text-zinc-400">
-                Enter to send · attach with 📎, paste or drop files
-              </p>
-            </div>
-          </div>
-        )}
-        {drawerReplyId && (
-          <ChatDrawer
-            replyId={drawerReplyId}
-            full={full}
-            onToggleFull={() => setFull(f => !f)}
-            onClose={() => setSelected(null)}
-            onSent={setSelected}
-          />
-        )}
-        {lightbox && (
-          <div
-            onClick={() => setLightbox(null)}
-            className="fixed inset-0 z-[60] flex cursor-zoom-out flex-col items-center justify-center gap-3 bg-black/80 p-10"
+            onNodeMouseLeave={() => setHoverId(null)}
           >
-            <img
-              src={lightbox.url}
-              alt={lightbox.name}
-              className="max-h-[85vh] max-w-full rounded-lg bg-white shadow-2xl"
+            <Background gap={24} color="#d4d4d8" />
+            <CanvasControls
+              orientation={orientation}
+              onOrientation={switchTo}
+              streaming={streamingIds.length}
+              failed={failedIds.length}
+              onJumpStreaming={jumpToStreaming}
+              onJumpFailed={jumpToFailed}
             />
-            <span className="text-sm text-zinc-300">{lightbox.name}</span>
-          </div>
-        )}
-      </LightboxContext.Provider>
+            {!loadedEmpty && <FitOnceMeasured />}
+          </ReactFlow>
+          {empty && (
+            <div className="pointer-events-none fixed inset-0 z-10 flex items-center justify-center">
+              <div className="pointer-events-auto w-[560px]">
+                <PromptInput
+                  large
+                  autoFocus
+                  attachable
+                  branching={false}
+                  placeholder="Start a new conversation…"
+                  onSubmit={(t, a) => sim.submit(null, t, a)}
+                />
+                <p className="mt-2 text-center text-xs text-zinc-400">
+                  Enter to send · attach with 📎, paste or drop files
+                </p>
+              </div>
+            </div>
+          )}
+          {drawerReplyId && (
+            <ChatDrawer
+              replyId={drawerReplyId}
+              full={full}
+              onToggleFull={() => setFull(f => !f)}
+              onClose={() => setSelected(null)}
+              onSent={setSelected}
+            />
+          )}
+          {lightbox && (
+            <div
+              onClick={() => setLightbox(null)}
+              className="fixed inset-0 z-[60] flex cursor-zoom-out flex-col items-center justify-center gap-3 bg-black/80 p-10"
+            >
+              <img
+                src={lightbox.url}
+                alt={lightbox.name}
+                className="max-h-[85vh] max-w-full rounded-lg bg-white shadow-2xl"
+              />
+              <span className="text-sm text-zinc-300">{lightbox.name}</span>
+            </div>
+          )}
+        </LightboxContext.Provider>
+      </DraftProvider>
     </CanvasFeatures.Provider>
   )
 }
