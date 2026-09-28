@@ -41,9 +41,11 @@ function PromptNode({data}: NodeProps<Node<Data>>) {
   const sim = useSim()
   const {turn} = data
   return (
-    <div className="group relative w-[300px] rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-sm text-sky-950 shadow-sm">
+    <div className="group relative w-[440px] rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-sm text-sky-950 shadow-sm">
       {handles}
-      <div className="line-clamp-4 whitespace-pre-wrap">{turn.text}</div>
+      <div className="nowheel max-h-32 overflow-y-auto whitespace-pre-wrap">
+        {turn.text}
+      </div>
       <div className="absolute -top-2.5 -right-2.5 hidden rounded-full border border-zinc-200 bg-white px-1.5 py-0.5 shadow-sm group-hover:block">
         <DeleteButton
           tree={sim.tree}
