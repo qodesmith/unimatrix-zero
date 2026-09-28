@@ -11,3 +11,4 @@ Running list from reviewing the prototype. Feeds the resolution of the Canvas mo
 5. **Vertical mode: Prompts as wide as Replies.** In top-down mode, Prompt and Reply boxes are the same width; background colour alone tells them apart.
 6. **Fork pill.** A Reply that is a Fork shows a small pill in its top-right corner with its Branch count ("Fork · 5 Branches"), as in variant A.
 7. **Thread path highlighting.** The connections from a Turn back to the root are highlighted. By default that's the active Thread. Hovering any message temporarily switches the highlight to that message's path. Typing into any Input highlights that Input's path, and it wins over hover while the user types.
+8. **Minimap.** Both modes show a minimap of the whole Tree, placed where it doesn't cover content or controls.
