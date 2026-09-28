@@ -7,3 +7,4 @@ Running list from reviewing the prototype. Feeds the resolution of the Canvas mo
 3. **Long messages scroll inside their box.** Long Prompts and long Replies keep a fixed maximum height and scroll within it (as in variant B), rather than collapsing behind "Show more" or growing the layout. Scrolling inside a message scrolls the text, not the canvas.
 4. **Horizontal mode: one card per exchange.** In left-to-right mode, a Prompt and its Reply share a single card (Prompt as header, Reply as body), as in variant B.
 5. **Vertical mode: Prompts as wide as Replies.** In top-down mode, Prompt and Reply boxes are the same width; background colour alone tells them apart.
+6. **Fork pill.** A Reply that is a Fork shows a small pill in its top-right corner with its Branch count ("Fork · 5 Branches"), as in variant A.
