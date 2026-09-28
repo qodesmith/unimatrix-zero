@@ -27,3 +27,6 @@ Running list from reviewing the prototype. Feeds the resolution of the Canvas mo
 21. **Attachments.** The Input has an attach button (plus paste and drop). Images show as thumbnails (click for a larger view); other files show as chips with name and size, both in the Input before sending and on the sent Prompt.
 22. **Chat mode is the slideout.** Canvas mode is the app; the familiar single-Thread chat lives in the slideout, which can expand to full screen. To switch Threads, click another Turn on the canvas. There's no Thread switcher.
 23. **Canvas doesn't follow a growing Reply.** It centres once on submit, then stays put.
+24. **Zoom stays put until the Tree branches.** A new Tree keeps its starting zoom while it's a single Thread. The first Branch zooms out just enough to show the whole Tree; after that, normal center on submit.
+25. **Drafts keep their Input.** A hover-revealed Input holding a draft (attachments or text) stays visible until it's sent or cleared. Drafts survive orientation switches.
+26. **Collapsing doesn't move the canvas.** Toggling a Branch keeps the toggled Reply fixed on screen; the rest of the Tree reflows around it.
