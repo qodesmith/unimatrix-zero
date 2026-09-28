@@ -9,7 +9,7 @@ import {
   type Node,
   type NodeProps,
 } from '@xyflow/react'
-import {useEffect, useMemo, useRef, useState} from 'react'
+import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 
 import {
   canRespond,
@@ -40,12 +40,34 @@ const handles = (
 function PromptNode({data}: NodeProps<Node<Data>>) {
   const sim = useSim()
   const {turn} = data
+  const [expanded, setExpanded] = useState(false)
+  const [overflows, setOverflows] = useState(false)
+  const textRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const el = textRef.current
+    if (el && !expanded) setOverflows(el.scrollHeight > el.clientHeight)
+  }, [turn.text, expanded])
+
   return (
     <div className="group relative w-[440px] rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-sm text-sky-950 shadow-sm">
       {handles}
-      <div className="nowheel max-h-32 overflow-y-auto whitespace-pre-wrap">
+      <div
+        ref={textRef}
+        className={`whitespace-pre-wrap ${expanded ? '' : 'nowheel max-h-32 overflow-y-auto'}`}
+      >
         {turn.text}
       </div>
+      {(overflows || expanded) && (
+        <div className="mt-1 flex justify-end">
+          <button
+            onClick={() => setExpanded(e => !e)}
+            className="nodrag text-[11px] text-violet-700 hover:underline"
+          >
+            {expanded ? 'Show less' : 'Show more'}
+          </button>
+        </div>
+      )}
       <div className="absolute -top-2.5 -right-2.5 hidden rounded-full border border-zinc-200 bg-white px-1.5 py-0.5 shadow-sm group-hover:block">
         <DeleteButton
           tree={sim.tree}
