@@ -62,16 +62,19 @@ function ReplyNode({data}: NodeProps<Node<Data>>) {
   const {turn} = data
   const [expanded, setExpanded] = useState(false)
   const [inputFocused, setInputFocused] = useState(false)
-  // After sending from a hover Input, keep it hidden until the pointer leaves, so only the newest Reply shows one.
+  // After sending, keep the hover Input hidden until the pointer leaves, so only the newest Reply shows one.
   const [dismissed, setDismissed] = useState(false)
   const long = turn.text.length > LONG_CHARS
   const streaming = turn.status === 'streaming'
-  const isLast = turn.id === sim.lastAnsweredId
+  const isActive = turn.id === sim.activeReplyId
   const branches = childrenOf(sim.tree, turn.id).length
   const collapsed = long && !expanded
 
   return (
-    <div className="group relative w-[440px]" onMouseLeave={() => setDismissed(false)}>
+    <div
+      className="group relative w-[440px]"
+      onMouseLeave={() => setDismissed(false)}
+    >
       {handles}
       <div
         className={`rounded-xl border bg-white shadow-sm ${turn.status === 'failed' ? 'border-red-300' : streaming ? 'border-violet-300 ring-2 ring-violet-100' : 'border-zinc-200'}`}
@@ -116,13 +119,16 @@ function ReplyNode({data}: NodeProps<Node<Data>>) {
         </div>
       </div>
 
-      {/* Input: always shown on the last answered Reply; hover-revealed as an overlay elsewhere so the layout doesn't jump. */}
+      {/* Input: always shown on the active Reply; hover-revealed as an overlay elsewhere so the layout doesn't jump. */}
       {canRespond(turn) &&
-        (isLast ? (
+        (isActive ? (
           <div className="mt-2">
             <PromptInput
               branching={branches > 0}
-              onSubmit={t => sim.submit(turn.id, t)}
+              onSubmit={t => {
+                setDismissed(true)
+                sim.submit(turn.id, t)
+              }}
             />
           </div>
         ) : (

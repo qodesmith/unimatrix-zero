@@ -109,7 +109,7 @@ const CANNED = [SHORT, MEDIUM, LONG, MEDIUM, SHORT]
 let seq = 0
 const nextId = (kind: string) => `${kind[0]}${++seq}`
 
-function seed(): {tree: Tree; lastAnsweredId: string} {
+function seed(): {tree: Tree; activeReplyId: string} {
   seq = 0
   const tree: Tree = {}
   let clock = 0
@@ -169,7 +169,7 @@ function seed(): {tree: Tree; lastAnsweredId: string} {
   const p7 = add('prompt', r5, 'Book-ahead or walk-in?')
   const r7 = add('reply', p7, MEDIUM)
 
-  return {tree, lastAnsweredId: r7}
+  return {tree, activeReplyId: r7}
 }
 
 // ---------- simulation hook ----------
@@ -180,7 +180,7 @@ export type TreeSim = ReturnType<typeof useTreeSim>
 
 export function useTreeSim() {
   const [state, setState] = useState(seed)
-  const {tree, lastAnsweredId} = state
+  const {tree, activeReplyId} = state
   const [failNext, setFailNext] = useState(false)
   const [focus, setFocus] = useState<{id: string; n: number} | null>(null)
   const streams = useRef<Record<string, Stream>>({})
@@ -207,7 +207,6 @@ export function useTreeSim() {
       if (!ids.length) return
       setState(s => {
         const tree = {...s.tree}
-        let lastAnsweredId = s.lastAnsweredId
         for (const id of ids) {
           const st = streams.current[id]!
           const turn = tree[id]
@@ -223,12 +222,9 @@ export function useTreeSim() {
           else if (st.i >= st.words.length) status = 'done'
           const text = turn.text + chunk
           tree[id] = {...turn, text, tokens: estimateTokens(text), status}
-          if (status !== 'streaming') {
-            delete streams.current[id]
-            if (status === 'done') lastAnsweredId = id
-          }
+          if (status !== 'streaming') delete streams.current[id]
         }
-        return {tree, lastAnsweredId}
+        return {...s, tree}
       })
     }, 70)
     return () => clearInterval(timer)
@@ -240,7 +236,7 @@ export function useTreeSim() {
       const replyId = nextId('reply')
       const now = Date.now()
       setState(s => ({
-        ...s,
+        activeReplyId: replyId,
         tree: {
           ...s.tree,
           [promptId]: {
@@ -272,8 +268,8 @@ export function useTreeSim() {
   const stop = useCallback((replyId: string) => {
     delete streams.current[replyId]
     setState(s => ({
+      ...s,
       tree: {...s.tree, [replyId]: {...s.tree[replyId]!, status: 'stopped'}},
-      lastAnsweredId: replyId,
     }))
   }, [])
 
@@ -304,18 +300,18 @@ export function useTreeSim() {
         delete tree[id]
         delete streams.current[id]
       }
-      let lastAnsweredId = s.lastAnsweredId
-      if (!tree[lastAnsweredId]) {
+      let activeReplyId = s.activeReplyId
+      if (!tree[activeReplyId]) {
         const replies = Object.values(tree).filter(
           t =>
             t.kind === 'reply' &&
             t.status !== 'failed' &&
             t.status !== 'streaming'
         )
-        lastAnsweredId =
+        activeReplyId =
           replies.sort((a, b) => b.createdAt - a.createdAt)[0]?.id ?? ''
       }
-      return {tree, lastAnsweredId}
+      return {tree, activeReplyId}
     })
   }, [])
 
@@ -326,7 +322,7 @@ export function useTreeSim() {
 
   return {
     tree,
-    lastAnsweredId,
+    activeReplyId,
     failNext,
     setFailNext,
     focus,

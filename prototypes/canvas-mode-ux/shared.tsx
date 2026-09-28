@@ -343,7 +343,7 @@ export const canRespond = (reply: Turn) =>
 export function DebugPanel({sim}: {sim: TreeSim}) {
   const turns = Object.values(sim.tree)
   const streaming = turns.filter(t => t.status === 'streaming').length
-  const last = sim.tree[sim.lastAnsweredId]
+  const active = sim.tree[sim.activeReplyId]
   return (
     <div className="fixed top-3 left-3 z-50 w-64 rounded-lg border border-fuchsia-300 bg-fuchsia-50/95 p-2.5 font-mono text-[11px] text-fuchsia-950 shadow">
       <div className="mb-1 font-bold">PROTOTYPE · Canvas mode UX</div>
@@ -351,8 +351,8 @@ export function DebugPanel({sim}: {sim: TreeSim}) {
         Turns: {turns.length} · streaming: {streaming}
       </div>
       <div className="truncate">
-        Last answered:{' '}
-        {last ? `${last.id} "${last.text.slice(0, 30)}"` : 'none'}
+        Active Reply:{' '}
+        {active ? `${active.id} "${active.text.slice(0, 30)}"` : 'none'}
       </div>
       <label className="mt-1.5 flex items-center gap-1.5">
         <input

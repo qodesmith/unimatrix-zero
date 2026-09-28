@@ -41,14 +41,14 @@ function ExchangeNode({data}: NodeProps<Node<Data>>) {
   const [inputOpen, setInputOpen] = useState(false)
   const streaming = reply.status === 'streaming'
   const branches = childrenOf(sim.tree, reply.id).length
-  const isLast = reply.id === sim.lastAnsweredId
+  const isActive = reply.id === sim.activeReplyId
   const ctx = contextSize(sim.tree, reply.id)
-  const showInput = canRespond(reply) && (isLast || inputOpen)
+  const showInput = canRespond(reply) && (isActive || inputOpen)
 
   return (
     <div
       className="group relative flex items-start gap-2"
-      onMouseLeave={() => !isLast && setInputOpen(false)}
+      onMouseLeave={() => !isActive && setInputOpen(false)}
     >
       <Handle
         type="target"
@@ -109,7 +109,7 @@ function ExchangeNode({data}: NodeProps<Node<Data>>) {
           {showInput ? (
             <PromptInput
               branching={branches > 0}
-              autoFocus={!isLast}
+              autoFocus={!isActive}
               onSubmit={t => {
                 setInputOpen(false)
                 sim.submit(reply.id, t)
