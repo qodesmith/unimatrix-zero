@@ -10,9 +10,11 @@ import {
   type Node,
   type NodeProps,
 } from '@xyflow/react'
-import {useMemo, useState} from 'react'
+import {useContext, useMemo, useState} from 'react'
 
 import {
+  AttachmentList,
+  CanvasFeatures,
   canRespond,
   canvasProps,
   ContextBadge,
@@ -20,6 +22,7 @@ import {
   DeletePill,
   edgeStyle,
   FitOnceMeasured,
+  FoldToggle,
   FocusOnSubmit,
   PromptInput,
   ScrollableText,
@@ -55,7 +58,15 @@ export function PromptNode({data, selected}: NodeProps<Node<Data>>) {
       className={`group relative w-[440px] rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-sm text-sky-950 shadow-sm ${selected ? 'ring-2 ring-sky-500 ring-offset-2' : ''}`}
     >
       {handles}
-      <ScrollableText maxHeightClass="max-h-32">{turn.text}</ScrollableText>
+      {turn.attachments && (
+        <AttachmentList
+          items={turn.attachments}
+          className={turn.text ? 'mb-2' : ''}
+        />
+      )}
+      {turn.text && (
+        <ScrollableText maxHeightClass="max-h-32">{turn.text}</ScrollableText>
+      )}
       <DeletePill
         tree={sim.tree}
         promptId={turn.id}
@@ -75,6 +86,7 @@ export function ReplyNode({data, selected}: NodeProps<Node<Data>>) {
   const isActive = turn.id === sim.activeReplyId
   const branches = childrenOf(sim.tree, turn.id).length
   const reportTyping = useReportTyping(turn.id)
+  const features = useContext(CanvasFeatures)
 
   return (
     <div
@@ -88,10 +100,14 @@ export function ReplyNode({data, selected}: NodeProps<Node<Data>>) {
       >
         <div className="flex items-center justify-between px-3.5 pt-2.5 text-[11px] text-zinc-500">
           <span>{turn.model}</span>
-          {branches >= 2 && (
-            <span className="rounded bg-amber-100 px-1.5 text-amber-800">
-              Fork · {branches} Branches
-            </span>
+          {features.collapse ? (
+            <FoldToggle reply={turn} />
+          ) : (
+            branches >= 2 && (
+              <span className="rounded bg-amber-100 px-1.5 text-amber-800">
+                Fork · {branches} Branches
+              </span>
+            )
           )}
         </div>
         <ScrollableText
@@ -116,10 +132,11 @@ export function ReplyNode({data, selected}: NodeProps<Node<Data>>) {
           <div className="mt-2">
             <PromptInput
               branching={branches > 0}
+              attachable={features.attach}
               onTypingChange={reportTyping}
-              onSubmit={t => {
+              onSubmit={(t, a) => {
                 setDismissed(true)
-                sim.submit(turn.id, t)
+                sim.submit(turn.id, t, a)
               }}
             />
           </div>
@@ -129,12 +146,13 @@ export function ReplyNode({data, selected}: NodeProps<Node<Data>>) {
           >
             <PromptInput
               branching={branches > 0}
+              attachable={features.attach}
               onFocusChange={setInputFocused}
               onTypingChange={reportTyping}
               blurOnSend
-              onSubmit={t => {
+              onSubmit={(t, a) => {
                 setDismissed(true)
-                sim.submit(turn.id, t)
+                sim.submit(turn.id, t, a)
               }}
             />
           </div>

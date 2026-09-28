@@ -20,6 +20,8 @@ import {
 } from 'react'
 
 import {
+  AttachmentList,
+  CanvasFeatures,
   canRespond,
   canvasProps,
   centerNode,
@@ -27,6 +29,7 @@ import {
   edgeStyle,
   FitOnceMeasured,
   FocusOnSubmit,
+  LightboxContext,
   PromptInput,
   StatusBar,
   ThreadContextSize,
@@ -37,7 +40,7 @@ import {
   useSim,
   useTreeLayout,
 } from './shared'
-import {childrenOf, pathTo, type Tree} from './tree'
+import {childrenOf, hiddenIds, pathTo, type Attachment, type Tree} from './tree'
 import {PromptNode, ReplyNode, turnGraph} from './VariantA'
 import {ExchangeNode, exchangeGraph} from './VariantB'
 
@@ -46,11 +49,14 @@ export const name = 'Canvas mode, converged'
 type Orientation = 'vertical' | 'horizontal'
 const ORIENTATION_KEY = 'canvas-mode-orientation'
 const DRAWER_WIDTH = 440
+// Reading width of the chat column in full screen; a no-op inside the narrower drawer.
+const COLUMN = 'w-full max-w-[720px]'
 const SWITCH_MS = 500
 // Where a Reply box sits relative to its card when gliding in or out of it.
 const CARD_BODY = {x: 0, y: 44}
 
 const nodeTypes = {prompt: PromptNode, reply: ReplyNode, exchange: ExchangeNode}
+const FEATURES = {collapse: true, attach: true}
 
 // Horizontal cards are keyed by Prompt id, so a Reply lives in its Prompt's card.
 const nodeIdFor = (tree: Tree, turnId: string, o: Orientation) =>
@@ -83,18 +89,57 @@ export function VariantD() {
   const before = useRef<Record<string, Node>>({})
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
   const [selected, setSelected] = useState<string | null>(null)
+  const [full, setFull] = useState(false)
+  const [lightbox, setLightbox] = useState<Attachment | null>(null)
   const drawerReplyId = threadEnd(sim.tree, selected)
   const drawerOffset = drawerReplyId ? DRAWER_WIDTH / 2 : 0
+  const empty = Object.keys(sim.tree).length === 0
 
   useEffect(() => {
     if (selected && !drawerReplyId) setSelected(null)
+    if (!drawerReplyId) setFull(false)
   }, [selected, drawerReplyId])
 
+  // A fresh Tree starts at a readable zoom rather than wherever the old one was fitted.
+  useEffect(() => {
+    if (empty) rf.zoomTo(1)
+  }, [empty])
+
+  // A file dropped beside an Input shouldn't navigate away to it.
+  useEffect(() => {
+    const block = (e: DragEvent) => e.preventDefault()
+    window.addEventListener('dragover', block)
+    window.addEventListener('drop', block)
+    return () => {
+      window.removeEventListener('dragover', block)
+      window.removeEventListener('drop', block)
+    }
+  }, [])
+
   const vertical = orientation === 'vertical'
-  const {base, edges} = useMemo(
-    () => (vertical ? turnGraph(sim.tree) : exchangeGraph(sim.tree)),
-    [sim.tree, vertical]
+  const hidden = useMemo(
+    () => hiddenIds(sim.tree, sim.collapsed),
+    [sim.tree, sim.collapsed]
   )
+  const {base, edges} = useMemo(() => {
+    const g = vertical ? turnGraph(sim.tree) : exchangeGraph(sim.tree)
+    if (!hidden.size) return g
+    return {
+      base: g.base.filter(n => !hidden.has(n.id)),
+      edges: g.edges.filter(e => !hidden.has(e.target)),
+    }
+  }, [sim.tree, vertical, hidden])
+
+  // Collapsing or expanding glides the remaining Turns to their new spots, reusing the orientation switch's transition.
+  const [reflowing, setReflowing] = useState(false)
+  const collapseSeen = useRef(sim.collapsed)
+  useEffect(() => {
+    if (collapseSeen.current === sim.collapsed) return
+    collapseSeen.current = sim.collapsed
+    setReflowing(true)
+    const t = setTimeout(() => setReflowing(false), SWITCH_MS)
+    return () => clearTimeout(t)
+  }, [sim.collapsed])
   const {nodes: laid, onNodesChange} = useTreeLayout(
     base as Node[],
     edges,
@@ -171,19 +216,53 @@ export function VariantD() {
     }))
   }, [edges, sim.tree, target])
 
-  // Esc, like the Claude CLI: stop the drawer's streaming Reply, else close the drawer, else stop the active Reply.
+  // Esc, like the Claude CLI, innermost first: lightbox, the drawer's streaming Reply, full screen, the drawer, the active Reply.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       const drawerReply = drawerReplyId ? sim.tree[drawerReplyId] : undefined
       const active = sim.tree[sim.activeReplyId]
-      if (drawerReply?.status === 'streaming') sim.stop(drawerReply.id)
+      if (lightbox) setLightbox(null)
+      else if (drawerReply?.status === 'streaming') sim.stop(drawerReply.id)
+      else if (full) setFull(false)
       else if (drawerReply) setSelected(null)
       else if (active?.status === 'streaming') sim.stop(active.id)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [sim, drawerReplyId])
+  }, [sim, drawerReplyId, lightbox, full])
+
+  // Expands collapsed ancestors first, then centers once the reflowed layout has measured.
+  const jumpTo = (turnId: string, offsetX = drawerOffset) => {
+    const wasHidden = hidden.has(turnId)
+    sim.reveal(turnId)
+    const go = () =>
+      centerNode(rf, nodeIdFor(sim.tree, turnId, orientation), offsetX)
+    if (wasHidden) setTimeout(go, 200)
+    else go()
+  }
+
+  const streamingIds = Object.values(sim.tree)
+    .filter(t => t.kind === 'reply' && t.status === 'streaming')
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .map(t => t.id)
+  const failedIds = sim.unseenFailures.filter(
+    id => sim.tree[id]?.status === 'failed'
+  )
+  const lastStreamingJump = useRef<string | null>(null)
+  const jumpToStreaming = () => {
+    const i = streamingIds.indexOf(lastStreamingJump.current ?? '')
+    const id = streamingIds[(i + 1) % streamingIds.length]
+    if (!id) return
+    lastStreamingJump.current = id
+    jumpTo(id)
+  }
+  const jumpToFailed = () => {
+    const id = failedIds[0]
+    if (!id) return
+    sim.dismissFailure(id)
+    jumpTo(id)
+  }
 
   const openDrawer = (e: MouseEvent) => {
     const el = e.target as HTMLElement
@@ -192,45 +271,86 @@ export function VariantD() {
     const turnId = el.closest<HTMLElement>('[data-turn]')?.dataset.turn
     if (!turnId || !sim.tree[turnId]) return
     setSelected(turnId)
-    centerNode(rf, nodeIdFor(sim.tree, turnId, orientation), DRAWER_WIDTH / 2)
+    jumpTo(turnId, DRAWER_WIDTH / 2)
   }
 
   return (
-    <>
-      <ReactFlow
-        nodes={nodes}
-        edges={styledEdges}
-        nodeTypes={nodeTypes}
-        onNodesChange={onNodesChange}
-        {...canvasProps}
-        className={switching ? 'canvas-switching' : ''}
-        onNodeClick={openDrawer}
-        onNodeMouseEnter={(_, n) =>
-          setHoverId(n.type === 'exchange' ? threadEnd(sim.tree, n.id) : n.id)
-        }
-        onNodeMouseLeave={() => setHoverId(null)}
-      >
-        <Background gap={24} color="#d4d4d8" />
-        <CanvasControls orientation={orientation} onOrientation={switchTo} />
-        <FitOnceMeasured />
-        <FocusOnSubmit
-          focus={
-            sim.focus && {
-              ...sim.focus,
-              id: nodeIdFor(sim.tree, sim.focus.id, orientation),
-            }
+    <CanvasFeatures.Provider value={FEATURES}>
+      <LightboxContext.Provider value={setLightbox}>
+        <ReactFlow
+          nodes={nodes}
+          edges={styledEdges}
+          nodeTypes={nodeTypes}
+          onNodesChange={onNodesChange}
+          {...canvasProps}
+          className={switching || reflowing ? 'canvas-switching' : ''}
+          onNodeClick={openDrawer}
+          onNodeMouseEnter={(_, n) =>
+            setHoverId(n.type === 'exchange' ? threadEnd(sim.tree, n.id) : n.id)
           }
-          offsetX={drawerOffset}
-        />
-      </ReactFlow>
-      {drawerReplyId && (
-        <ChatDrawer
-          replyId={drawerReplyId}
-          onClose={() => setSelected(null)}
-          onSent={setSelected}
-        />
-      )}
-    </>
+          onNodeMouseLeave={() => setHoverId(null)}
+        >
+          <Background gap={24} color="#d4d4d8" />
+          <CanvasControls
+            orientation={orientation}
+            onOrientation={switchTo}
+            streaming={streamingIds.length}
+            failed={failedIds.length}
+            onJumpStreaming={jumpToStreaming}
+            onJumpFailed={jumpToFailed}
+          />
+          <FitOnceMeasured />
+          <FocusOnSubmit
+            focus={
+              sim.focus && {
+                ...sim.focus,
+                id: nodeIdFor(sim.tree, sim.focus.id, orientation),
+              }
+            }
+            offsetX={drawerOffset}
+          />
+        </ReactFlow>
+        {empty && (
+          <div className="pointer-events-none fixed inset-0 z-10 flex items-center justify-center">
+            <div className="pointer-events-auto w-[560px]">
+              <PromptInput
+                large
+                autoFocus
+                attachable
+                branching={false}
+                placeholder="Start a new conversation…"
+                onSubmit={(t, a) => sim.submit(null, t, a)}
+              />
+              <p className="mt-2 text-center text-xs text-zinc-400">
+                Enter to send · attach with 📎, paste or drop files
+              </p>
+            </div>
+          </div>
+        )}
+        {drawerReplyId && (
+          <ChatDrawer
+            replyId={drawerReplyId}
+            full={full}
+            onToggleFull={() => setFull(f => !f)}
+            onClose={() => setSelected(null)}
+            onSent={setSelected}
+          />
+        )}
+        {lightbox && (
+          <div
+            onClick={() => setLightbox(null)}
+            className="fixed inset-0 z-[60] flex cursor-zoom-out flex-col items-center justify-center gap-3 bg-black/80 p-10"
+          >
+            <img
+              src={lightbox.url}
+              alt={lightbox.name}
+              className="max-h-[85vh] max-w-full rounded-lg bg-white shadow-2xl"
+            />
+            <span className="text-sm text-zinc-300">{lightbox.name}</span>
+          </div>
+        )}
+      </LightboxContext.Provider>
+    </CanvasFeatures.Provider>
   )
 }
 
@@ -238,9 +358,17 @@ export function VariantD() {
 function CanvasControls({
   orientation,
   onOrientation,
+  streaming,
+  failed,
+  onJumpStreaming,
+  onJumpFailed,
 }: {
   orientation: Orientation
   onOrientation: (o: Orientation) => void
+  streaming: number
+  failed: number
+  onJumpStreaming: () => void
+  onJumpFailed: () => void
 }) {
   const rf = useReactFlow()
   return (
@@ -248,6 +376,33 @@ function CanvasControls({
       position="bottom-left"
       className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-md"
     >
+      {(streaming > 0 || failed > 0) && (
+        <div className="flex items-center gap-1 border-b border-zinc-200 p-1 text-[11px]">
+          {streaming > 0 && (
+            <button
+              onClick={onJumpStreaming}
+              title="Jump to the next streaming Reply"
+              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-violet-700 hover:bg-violet-50"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-violet-500" />
+              </span>
+              {streaming} streaming
+            </button>
+          )}
+          {failed > 0 && (
+            <button
+              onClick={onJumpFailed}
+              title="Jump to the next failed Reply"
+              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-red-700 hover:bg-red-50"
+            >
+              <span className="h-2 w-2 rounded-full bg-red-500" />
+              {failed} failed
+            </button>
+          )}
+        </div>
+      )}
       <MiniMap
         pannable
         zoomable
@@ -312,10 +467,15 @@ function ToolButton({
 
 function ChatDrawer({
   replyId,
+  full,
+  onToggleFull,
   onClose,
   onSent,
 }: {
   replyId: string
+  // Covers the canvas: the familiar full-page chat.
+  full: boolean
+  onToggleFull: () => void
   onClose: () => void
   onSent: (replyId: string) => void
 }) {
@@ -341,20 +501,31 @@ function ChatDrawer({
 
   return (
     <aside
-      style={{width: DRAWER_WIDTH}}
-      className="fixed top-0 right-0 bottom-0 z-40 flex flex-col border-l border-zinc-200 bg-zinc-50 shadow-xl"
+      style={full ? undefined : {width: DRAWER_WIDTH}}
+      className={`fixed top-0 right-0 bottom-0 z-40 flex flex-col bg-zinc-50 ${full ? 'left-0 pb-12' : 'border-l border-zinc-200 shadow-xl'}`}
     >
       <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-2 text-xs text-zinc-500">
         <span>
           Thread · {thread.length} Turns · {last.model}
         </span>
-        <button
-          onClick={onClose}
-          title="Close (Esc)"
-          className="text-zinc-400 hover:text-zinc-900"
-        >
-          ✕
-        </button>
+        <span className="flex items-center gap-3">
+          <button
+            onClick={onToggleFull}
+            title={full ? 'Back to the canvas (Esc)' : 'Full screen'}
+            aria-label={full ? 'Exit full screen' : 'Full screen'}
+            className="text-sm leading-none text-zinc-400 hover:text-zinc-900"
+          >
+            {full ? '⤡' : '⤢'}
+          </button>
+          <button
+            onClick={onClose}
+            title="Close (Esc)"
+            aria-label="Close"
+            className="text-sm leading-none text-zinc-400 hover:text-zinc-900"
+          >
+            ✕
+          </button>
+        </span>
       </div>
       <div
         ref={bodyRef}
@@ -362,43 +533,56 @@ function ChatDrawer({
           const el = e.currentTarget
           pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
         }}
-        className="relative flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
+        className="relative flex-1 overflow-y-auto px-4 py-4"
       >
-        {thread.map((t, i) =>
-          t.kind === 'prompt' ? (
-            <div
-              key={t.id}
-              ref={i === thread.length - 2 ? lastPromptRef : undefined}
-              className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-sky-100 px-3.5 py-2 text-sm whitespace-pre-wrap text-sky-950"
-            >
-              {t.text}
-            </div>
-          ) : (
-            <div key={t.id} className="mr-6">
+        <div className={`mx-auto flex flex-col gap-3 ${COLUMN}`}>
+          {thread.map((t, i) =>
+            t.kind === 'prompt' ? (
               <div
-                className={`rounded-2xl rounded-bl-md border bg-white px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap shadow-sm ${t.status === 'failed' ? 'border-red-300 text-zinc-400' : 'border-zinc-200 text-zinc-800'}`}
+                key={t.id}
+                ref={i === thread.length - 2 ? lastPromptRef : undefined}
+                className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-sky-100 px-3.5 py-2 text-sm whitespace-pre-wrap text-sky-950"
               >
+                {t.attachments && (
+                  <AttachmentList
+                    items={t.attachments}
+                    className={t.text ? 'mb-2' : ''}
+                  />
+                )}
                 {t.text}
-                {t.status === 'streaming' && <Cursor />}
               </div>
-              <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-400">
-                {t.model}
-                <StatusBar reply={t} sim={sim} />
+            ) : (
+              <div key={t.id} className="mr-6">
+                <div
+                  className={`rounded-2xl rounded-bl-md border bg-white px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap shadow-sm ${t.status === 'failed' ? 'border-red-300 text-zinc-400' : 'border-zinc-200 text-zinc-800'}`}
+                >
+                  {t.text}
+                  {t.status === 'streaming' && <Cursor />}
+                </div>
+                <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-400">
+                  {t.model}
+                  <StatusBar reply={t} sim={sim} />
+                </div>
               </div>
-            </div>
-          )
-        )}
+            )
+          )}
+        </div>
       </div>
-      <div className="border-t border-zinc-200 bg-white px-4 pt-3 pb-2">
-        <PromptInput
-          key={replyId}
-          branching={childrenOf(sim.tree, replyId).length > 0}
-          disabled={!canRespond(last)}
-          onTypingChange={reportTyping}
-          onSubmit={t => onSent(sim.submit(replyId, t))}
-        />
+      <div className="border-t border-zinc-200 bg-white">
+        <div className={`mx-auto px-4 pt-3 pb-2 ${COLUMN}`}>
+          <PromptInput
+            key={replyId}
+            attachable
+            branching={childrenOf(sim.tree, replyId).length > 0}
+            disabled={!canRespond(last)}
+            onTypingChange={reportTyping}
+            onSubmit={(t, a) => onSent(sim.submit(replyId, t, a))}
+          />
+        </div>
       </div>
-      <ThreadContextSize thread={thread} />
+      <div className={`mx-auto ${COLUMN}`}>
+        <ThreadContextSize thread={thread} />
+      </div>
     </aside>
   )
 }

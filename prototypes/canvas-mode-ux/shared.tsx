@@ -22,11 +22,13 @@ import {
 } from 'react'
 
 import {
+  childrenOf,
   contextSize,
   formatTokens,
   pathTo,
   spreadReplies,
   subtreeIds,
+  type Attachment,
   type Tree,
   type TreeSim,
   type Turn,
@@ -253,20 +255,36 @@ export const edgeStyle = (hot: boolean) => ({
 
 // ---------- Input ----------
 
+const toAttachments = (files: FileList | File[]): Attachment[] =>
+  Array.from(files).map(f => ({
+    name: f.name || 'pasted-image.png',
+    type: f.type,
+    size: f.size,
+    url: URL.createObjectURL(f),
+  }))
+
 export function PromptInput({
   onSubmit,
   autoFocus,
   branching,
   compact,
+  large,
+  placeholder,
+  attachable,
   onFocusChange,
   onTypingChange,
   blurOnSend,
   disabled,
 }: {
-  onSubmit: (text: string) => void
+  onSubmit: (text: string, attachments: Attachment[]) => void
   autoFocus?: boolean
   branching: boolean
   compact?: boolean
+  // The empty canvas's starting Input.
+  large?: boolean
+  placeholder?: string
+  // 📎 button, paste and drop.
+  attachable?: boolean
   onFocusChange?: (focused: boolean) => void
   // Fires when "focused and non-empty" flips.
   onTypingChange?: (typing: boolean) => void
@@ -275,9 +293,12 @@ export function PromptInput({
   disabled?: boolean
 }) {
   const [text, setText] = useState('')
+  const [files, setFiles] = useState<Attachment[]>([])
+  const [dragOver, setDragOver] = useState(false)
   const [focused, setFocused] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
-  const typing = focused && text !== ''
+  const picker = useRef<HTMLInputElement>(null)
+  const typing = focused && (text !== '' || files.length > 0)
   const report = useRef(onTypingChange)
   report.current = onTypingChange
   useEffect(() => {
@@ -285,54 +306,241 @@ export function PromptInput({
     report.current?.(true)
     return () => report.current?.(false)
   }, [typing])
+  const add = (list: FileList | File[]) => {
+    if (list.length) setFiles(f => [...f, ...toAttachments(list)])
+  }
+  const remove = (a: Attachment) => {
+    URL.revokeObjectURL(a.url)
+    setFiles(f => f.filter(x => x !== a))
+  }
   const send = () => {
-    if (disabled || !text.trim()) return
-    onSubmit(text.trim())
+    if (disabled || (!text.trim() && !files.length)) return
+    onSubmit(text.trim(), files)
     setText('')
+    setFiles([])
     if (blurOnSend) ref.current?.blur()
   }
   return (
-    <div className="nodrag nopan nowheel">
+    <div
+      className="nodrag nopan nowheel"
+      onDragOver={
+        attachable
+          ? e => {
+              e.preventDefault()
+              setDragOver(true)
+            }
+          : undefined
+      }
+      onDragLeave={() => setDragOver(false)}
+      onDrop={
+        attachable
+          ? e => {
+              e.preventDefault()
+              setDragOver(false)
+              add(e.dataTransfer.files)
+            }
+          : undefined
+      }
+    >
       {branching && (
         <div className="mb-1 text-[10px] font-medium tracking-wide text-amber-700 uppercase">
           New Branch
         </div>
       )}
       <div
-        className={`flex items-end gap-1 rounded-xl border bg-white shadow-sm ${branching ? 'border-amber-300' : 'border-zinc-300'}`}
+        className={`rounded-xl border bg-white shadow-sm ${large ? 'rounded-2xl shadow-lg' : ''} ${dragOver ? 'border-violet-400 ring-2 ring-violet-200' : branching ? 'border-amber-300' : 'border-zinc-300'}`}
       >
-        <textarea
-          ref={ref}
-          autoFocus={autoFocus}
-          rows={compact ? 1 : 2}
-          value={text}
-          onFocus={() => {
-            setFocused(true)
-            onFocusChange?.(true)
-          }}
-          onBlur={() => {
-            setFocused(false)
-            onFocusChange?.(false)
-          }}
-          onChange={e => setText(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              send()
+        {files.length > 0 && (
+          <AttachmentList
+            items={files}
+            onRemove={remove}
+            className="px-2 pt-2"
+          />
+        )}
+        <div className="flex items-end gap-1">
+          {attachable && (
+            <>
+              <button
+                onClick={() => picker.current?.click()}
+                title="Attach files"
+                aria-label="Attach files"
+                className="m-1 mr-0 rounded-lg px-1.5 py-1.5 text-xs text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+              >
+                📎
+              </button>
+              <input
+                ref={picker}
+                type="file"
+                multiple
+                hidden
+                onChange={e => {
+                  add(e.target.files ?? [])
+                  e.target.value = ''
+                }}
+              />
+            </>
+          )}
+          <textarea
+            ref={ref}
+            autoFocus={autoFocus}
+            rows={large ? 3 : compact ? 1 : 2}
+            value={text}
+            onFocus={() => {
+              setFocused(true)
+              onFocusChange?.(true)
+            }}
+            onBlur={() => {
+              setFocused(false)
+              onFocusChange?.(false)
+            }}
+            onChange={e => setText(e.target.value)}
+            onPaste={
+              attachable
+                ? e => {
+                    if (!e.clipboardData.files.length) return
+                    e.preventDefault()
+                    add(e.clipboardData.files)
+                  }
+                : undefined
             }
-          }}
-          placeholder={branching ? 'Branch from here…' : 'Reply…'}
-          className="flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none"
-        />
-        <button
-          onClick={send}
-          disabled={disabled}
-          className="m-1 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-xs text-white hover:bg-zinc-700 disabled:bg-zinc-300"
-        >
-          ↑
-        </button>
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                send()
+              }
+            }}
+            placeholder={
+              placeholder ?? (branching ? 'Branch from here…' : 'Reply…')
+            }
+            className={`flex-1 resize-none bg-transparent px-3 py-2 outline-none ${large ? 'text-base' : 'text-sm'}`}
+          />
+          <button
+            onClick={send}
+            disabled={disabled}
+            className="m-1 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-xs text-white hover:bg-zinc-700 disabled:bg-zinc-300"
+          >
+            ↑
+          </button>
+        </div>
       </div>
     </div>
+  )
+}
+
+// ---------- Attachments ----------
+
+export const formatBytes = (n: number) =>
+  n < 1024
+    ? `${n} B`
+    : n < 1024 * 1024
+      ? `${Math.round(n / 1024)} KB`
+      : `${(n / 1024 / 1024).toFixed(1)} MB`
+
+const extensionOf = (name: string) =>
+  name.includes('.') ? name.split('.').pop()!.slice(0, 4).toUpperCase() : 'FILE'
+
+// Opens an image full size. Only provided where the lightbox exists (variant D).
+export const LightboxContext = createContext<((a: Attachment) => void) | null>(
+  null
+)
+
+// Images as uniform thumbnails, everything else as file chips, in one wrapping row.
+export function AttachmentList({
+  items,
+  onRemove,
+  className = '',
+}: {
+  items: Attachment[]
+  onRemove?: (a: Attachment) => void
+  className?: string
+}) {
+  const openImage = useContext(LightboxContext)
+  return (
+    <div className={`flex flex-wrap gap-1.5 ${className}`}>
+      {items.map((a, i) => (
+        <div key={`${a.url}-${i}`} className="group/att relative">
+          {a.type.startsWith('image/') ? (
+            <button
+              onClick={openImage ? () => openImage(a) : undefined}
+              title={a.name}
+              className={`nodrag block h-14 w-14 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100 ${openImage ? 'cursor-zoom-in' : 'cursor-default'}`}
+            >
+              <img
+                src={a.url}
+                alt={a.name}
+                className="h-full w-full object-cover"
+              />
+            </button>
+          ) : (
+            <div
+              title={a.name}
+              className="flex h-14 max-w-[200px] items-center gap-2 rounded-lg border border-zinc-200 bg-white px-2 text-left"
+            >
+              <span
+                className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] font-bold text-white ${a.type === 'application/pdf' ? 'bg-red-500' : 'bg-zinc-500'}`}
+              >
+                {extensionOf(a.name)}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-xs text-zinc-800">
+                  {a.name}
+                </span>
+                <span className="block text-[10px] text-zinc-500">
+                  {formatBytes(a.size)}
+                </span>
+              </span>
+            </div>
+          )}
+          {onRemove && (
+            <button
+              onClick={() => onRemove(a)}
+              title={`Remove ${a.name}`}
+              aria-label={`Remove ${a.name}`}
+              className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-zinc-800 text-[10px] leading-none text-white hover:bg-red-600"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ---------- Canvas features only variant D turns on ----------
+
+export const CanvasFeatures = createContext({collapse: false, attach: false})
+
+// Replaces the Fork pill: collapses or expands everything below a Reply.
+export function FoldToggle({reply}: {reply: Turn}) {
+  const sim = useSim()
+  const kids = childrenOf(sim.tree, reply.id).length
+  if (!kids) return null
+  const collapsed = sim.collapsed.includes(reply.id)
+  const hidden = subtreeIds(sim.tree, reply.id).length - 1
+  const fork = kids >= 2
+  const label = collapsed
+    ? fork
+      ? `▸ ${kids} Branches hidden · ${hidden} Turns`
+      : `▸ ${hidden} Turns hidden`
+    : fork
+      ? `▾ Fork · ${kids} Branches`
+      : '▾'
+  return (
+    <button
+      onClick={() => sim.toggleCollapsed(reply.id)}
+      title={collapsed ? 'Expand' : 'Collapse everything below'}
+      aria-expanded={!collapsed}
+      className={`nodrag shrink-0 rounded px-1.5 text-[11px] ${
+        fork
+          ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+          : collapsed
+            ? 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+            : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700'
+      }`}
+    >
+      {label}
+    </button>
   )
 }
 
@@ -546,6 +754,7 @@ export function DebugPanel({sim}: {sim: TreeSim}) {
   const turns = Object.values(sim.tree)
   const streaming = turns.filter(t => t.status === 'streaming').length
   const active = sim.tree[sim.activeReplyId]
+  const spread = spreadReplies(sim.tree, 3)
   return (
     <div className="fixed top-3 left-3 z-50 w-64 rounded-lg border border-fuchsia-300 bg-fuchsia-50/95 p-2.5 font-mono text-[11px] text-fuchsia-950 shadow">
       <div className="mb-1 font-bold">PROTOTYPE · Canvas mode UX</div>
@@ -580,19 +789,27 @@ export function DebugPanel({sim}: {sim: TreeSim}) {
       </div>
       <button
         onClick={() => {
-          for (const id of spreadReplies(sim.tree, 3))
-            sim.submit(id, 'Quick one: anything to add?')
+          for (const id of spread) sim.submit(id, 'Quick one: anything to add?')
         }}
-        className="mt-1.5 block rounded border border-fuchsia-400 px-2 py-0.5 hover:bg-fuchsia-100"
+        disabled={!spread.length}
+        className="mt-1.5 block rounded border border-fuchsia-400 px-2 py-0.5 hover:bg-fuchsia-100 disabled:opacity-40 disabled:hover:bg-transparent"
       >
         Start 3 Replies at once
       </button>
-      <button
-        onClick={sim.reset}
-        className="mt-1.5 block rounded border border-fuchsia-400 px-2 py-0.5 hover:bg-fuchsia-100"
-      >
-        Reset Tree
-      </button>
+      <div className="mt-1.5 flex gap-1.5">
+        <button
+          onClick={sim.reset}
+          className="rounded border border-fuchsia-400 px-2 py-0.5 hover:bg-fuchsia-100"
+        >
+          Reset Tree
+        </button>
+        <button
+          onClick={sim.clear}
+          className="rounded border border-fuchsia-400 px-2 py-0.5 hover:bg-fuchsia-100"
+        >
+          Clear canvas
+        </button>
+      </div>
       <div className="mt-1.5 text-fuchsia-700">
         Scroll = pan · pinch/⌘-scroll = zoom
       </div>

@@ -11,9 +11,11 @@ import {
   type Node,
   type NodeProps,
 } from '@xyflow/react'
-import {useMemo, useState} from 'react'
+import {useContext, useMemo, useState} from 'react'
 
 import {
+  AttachmentList,
+  CanvasFeatures,
   canRespond,
   canvasProps,
   ContextBadge,
@@ -22,6 +24,7 @@ import {
   edgeStyle,
   FitOnceMeasured,
   FocusOnSubmit,
+  FoldToggle,
   PromptInput,
   ScrollableText,
   StatusBar,
@@ -59,6 +62,7 @@ export function ExchangeNode({data, selected}: NodeProps<Node<Data>>) {
   const isActive = reply.id === sim.activeReplyId
   const ctx = contextSize(sim.tree, reply.id)
   const reportTyping = useReportTyping(reply.id)
+  const features = useContext(CanvasFeatures)
 
   return (
     <div
@@ -83,16 +87,27 @@ export function ExchangeNode({data, selected}: NodeProps<Node<Data>>) {
             <span className="mt-0.5 text-[10px] font-semibold text-sky-500 uppercase">
               You
             </span>
-            <ScrollableText
-              maxHeightClass="max-h-32"
-              className="min-w-0 flex-1"
-            >
-              {prompt.text}
-            </ScrollableText>
-            {branches >= 2 && (
-              <span className="shrink-0 rounded bg-amber-100 px-1.5 text-[11px] text-amber-800">
-                Fork · {branches} Branches
-              </span>
+            <div className="min-w-0 flex-1">
+              {prompt.attachments && (
+                <AttachmentList
+                  items={prompt.attachments}
+                  className={prompt.text ? 'mb-2' : ''}
+                />
+              )}
+              {prompt.text && (
+                <ScrollableText maxHeightClass="max-h-32">
+                  {prompt.text}
+                </ScrollableText>
+              )}
+            </div>
+            {features.collapse ? (
+              <FoldToggle reply={reply} />
+            ) : (
+              branches >= 2 && (
+                <span className="shrink-0 rounded bg-amber-100 px-1.5 text-[11px] text-amber-800">
+                  Fork · {branches} Branches
+                </span>
+              )
             )}
           </div>
 
@@ -147,12 +162,13 @@ export function ExchangeNode({data, selected}: NodeProps<Node<Data>>) {
           >
             <PromptInput
               branching={branches > 0}
+              attachable={features.attach}
               onFocusChange={isActive ? undefined : setInputFocused}
               onTypingChange={reportTyping}
               blurOnSend={!isActive}
-              onSubmit={t => {
+              onSubmit={(t, a) => {
                 setDismissed(true)
-                sim.submit(reply.id, t)
+                sim.submit(reply.id, t, a)
               }}
             />
           </div>

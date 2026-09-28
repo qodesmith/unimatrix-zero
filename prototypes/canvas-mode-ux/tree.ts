@@ -3,6 +3,8 @@ import {useCallback, useEffect, useRef, useState} from 'react'
 
 export type Status = 'streaming' | 'done' | 'stopped' | 'failed'
 
+export type Attachment = {name: string; type: string; size: number; url: string}
+
 export type Turn = {
   id: string
   kind: 'prompt' | 'reply'
@@ -11,6 +13,7 @@ export type Turn = {
   tokens: number
   status?: Status
   model?: string
+  attachments?: Attachment[]
   createdAt: number
 }
 
@@ -18,6 +21,20 @@ export type Tree = Record<string, Turn>
 
 export const estimateTokens = (text: string) =>
   Math.max(1, Math.round(text.split(/\s+/).filter(Boolean).length * 1.3))
+
+const isTextFile = (a: Attachment) =>
+  a.type.startsWith('text/') ||
+  /\.(md|txt|csv|json|ts|tsx|js|py|html|css|ya?ml)$/i.test(a.name)
+
+// Rough: a flat cost per image, ~4 bytes per token for text, and binaries like PDFs mostly aren't text.
+export const attachmentTokens = (a: Attachment) =>
+  a.type.startsWith('image/')
+    ? 1500
+    : Math.ceil(a.size / (isTextFile(a) ? 4 : 16))
+
+export const promptTokens = (text: string, attachments: Attachment[] = []) =>
+  (text.trim() ? estimateTokens(text) : 0) +
+  attachments.reduce((sum, a) => sum + attachmentTokens(a), 0)
 
 export const childrenOf = (tree: Tree, id: string | null) =>
   Object.values(tree)
@@ -44,6 +61,16 @@ export const subtreeIds = (tree: Tree, id: string): string[] => [
 
 export const isFork = (tree: Tree, replyId: string) =>
   childrenOf(tree, replyId).length >= 2
+
+// Every Turn below a collapsed Reply.
+export const hiddenIds = (tree: Tree, collapsed: string[]) => {
+  const hidden = new Set<string>()
+  for (const id of collapsed)
+    if (tree[id])
+      for (const c of childrenOf(tree, id))
+        for (const d of subtreeIds(tree, c.id)) hidden.add(d)
+  return hidden
+}
 
 export const formatTokens = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`
@@ -130,10 +157,44 @@ const CANNED = [SHORT, MEDIUM, LONG, MEDIUM, SHORT]
 
 // ---------- seed Tree ----------
 
+const SEED_PHOTO = `data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420">
+<defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fcd9b8"/><stop offset="1" stop-color="#f6a57a"/></linearGradient></defs>
+<rect width="640" height="420" fill="url(#s)"/><circle cx="470" cy="150" r="52" fill="#fff4e0"/>
+<path d="M0 300 L120 190 L230 280 L340 170 L470 290 L640 200 L640 420 L0 420Z" fill="#b5562f" opacity=".55"/>
+<path d="M0 340 L160 260 L300 330 L450 250 L640 330 L640 420 L0 420Z" fill="#7a2f1d"/>
+<g fill="#c8211b"><rect x="220" y="150" width="200" height="16" rx="4"/><rect x="232" y="180" width="176" height="10"/><rect x="250" y="160" width="16" height="200"/><rect x="374" y="160" width="16" height="200"/></g>
+</svg>`
+)}`
+
+const SEED_ATTACHMENTS: Attachment[] = [
+  {
+    name: 'ryokan-room.svg',
+    type: 'image/svg+xml',
+    size: 1_180,
+    url: SEED_PHOTO,
+  },
+  {
+    name: 'booking-confirmation.pdf',
+    type: 'application/pdf',
+    size: 38_400,
+    url: '',
+  },
+]
+
 let seq = 0
 const nextId = (kind: string) => `${kind[0]}${++seq}`
 
-function seed(): {tree: Tree; activeReplyId: string} {
+type SimState = {
+  tree: Tree
+  activeReplyId: string
+  // Replies whose descendants are hidden on the canvas.
+  collapsed: string[]
+  // Replies that failed this session and haven't been retried or jumped to yet.
+  unseenFailures: string[]
+}
+
+function seed(): SimState {
   seq = 0
   const tree: Tree = {}
   let clock = 0
@@ -149,7 +210,7 @@ function seed(): {tree: Tree; activeReplyId: string} {
       kind,
       parentId,
       text,
-      tokens: estimateTokens(text),
+      tokens: promptTokens(text, extra.attachments),
       createdAt: ++clock,
       ...(kind === 'reply'
         ? {status: 'done' as const, model: 'Claude Sonnet 5'}
@@ -217,11 +278,37 @@ Getting around: taxis are fine for short hops, but we'd prefer buses or trains w
   add('reply', p6, 'About 45 minutes on the Kintetsu', {status: 'failed'})
   const p7 = add('prompt', r5, 'Book-ahead or walk-in?')
   const r7 = add('reply', p7, MEDIUM)
+  const p9 = add(
+    'prompt',
+    r7,
+    "Here's the room we're looking at and the booking confirmation. Will this work for mum?",
+    {attachments: SEED_ATTACHMENTS}
+  )
+  const r9 = add('reply', p9, SHORT)
 
-  return {tree, activeReplyId: r7}
+  return {tree, activeReplyId: r9, collapsed: [], unseenFailures: []}
 }
 
+const empty = (): SimState => ({
+  tree: {},
+  activeReplyId: '',
+  collapsed: [],
+  unseenFailures: [],
+})
+
 // ---------- simulation hook ----------
+
+// Keeps the same array when nothing is removed, so unchanged collapse state doesn't re-trigger effects.
+const without = (list: string[], remove: string[]) => {
+  const out = list.filter(id => !remove.includes(id))
+  return out.length === list.length ? list : out
+}
+
+// Strict ancestors, root first.
+const ancestorsOf = (tree: Tree, id: string) =>
+  pathTo(tree, id)
+    .slice(0, -1)
+    .map(t => t.id)
 
 type Stream = {
   words: string[]
@@ -243,7 +330,7 @@ export type TreeSim = ReturnType<typeof useTreeSim>
 
 export function useTreeSim() {
   const [state, setState] = useState(seed)
-  const {tree, activeReplyId} = state
+  const {tree, activeReplyId, collapsed, unseenFailures} = state
   const [failNext, setFailNext] = useState(false)
   const [focus, setFocus] = useState<{id: string; n: number} | null>(null)
   const [speed, setSpeed] = useState<Speed>('slow')
@@ -275,6 +362,7 @@ export function useTreeSim() {
       const perTick = (WORDS_PER_SECOND[speedRef.current] * TICK_MS) / 1000
       setState(s => {
         const tree = {...s.tree}
+        const failed: string[] = []
         let changed = false
         for (const id of ids) {
           const st = streams.current[id]!
@@ -296,21 +384,42 @@ export function useTreeSim() {
           const text = turn.text + chunk
           tree[id] = {...turn, text, tokens: estimateTokens(text), status}
           changed = true
+          if (status === 'failed') failed.push(id)
           if (status !== 'streaming') delete streams.current[id]
         }
-        return changed ? {...s, tree} : s
+        if (!changed) return s
+        return {
+          ...s,
+          tree,
+          unseenFailures: failed.length
+            ? [...s.unseenFailures, ...failed]
+            : s.unseenFailures,
+        }
       })
     }, TICK_MS)
     return () => clearInterval(timer)
   }, [])
 
+  // A null parent starts the Tree with a root Prompt.
   const submit = useCallback(
-    (parentReplyId: string, text: string) => {
+    (
+      parentReplyId: string | null,
+      text: string,
+      attachments: Attachment[] = []
+    ) => {
       const promptId = nextId('prompt')
       const replyId = nextId('reply')
       const now = Date.now()
       setState(s => ({
+        ...s,
         activeReplyId: replyId,
+        // Sending from inside a collapsed Branch reveals it.
+        collapsed: parentReplyId
+          ? without(
+              s.collapsed,
+              pathTo(s.tree, parentReplyId).map(t => t.id)
+            )
+          : s.collapsed,
         tree: {
           ...s.tree,
           [promptId]: {
@@ -318,7 +427,8 @@ export function useTreeSim() {
             kind: 'prompt',
             parentId: parentReplyId,
             text,
-            tokens: estimateTokens(text),
+            tokens: promptTokens(text, attachments),
+            ...(attachments.length ? {attachments} : {}),
             createdAt: now,
           },
           [replyId]: {
@@ -328,7 +438,9 @@ export function useTreeSim() {
             text: '',
             tokens: 0,
             status: 'streaming',
-            model: s.tree[parentReplyId]?.model ?? 'Claude Sonnet 5',
+            model:
+              (parentReplyId && s.tree[parentReplyId]?.model) ||
+              'Claude Sonnet 5',
             createdAt: now + 1,
           },
         },
@@ -352,6 +464,7 @@ export function useTreeSim() {
     (replyId: string) => {
       setState(s => ({
         ...s,
+        unseenFailures: without(s.unseenFailures, [replyId]),
         tree: {
           ...s.tree,
           [replyId]: {
@@ -386,13 +499,44 @@ export function useTreeSim() {
         activeReplyId =
           replies.sort((a, b) => b.createdAt - a.createdAt)[0]?.id ?? ''
       }
-      return {tree, activeReplyId}
+      return {...s, tree, activeReplyId}
     })
   }, [])
 
   const reset = useCallback(() => {
     streams.current = {}
     setState(seed())
+  }, [])
+
+  const clear = useCallback(() => {
+    streams.current = {}
+    setState(empty())
+  }, [])
+
+  const toggleCollapsed = useCallback((replyId: string) => {
+    setState(s => ({
+      ...s,
+      collapsed: s.collapsed.includes(replyId)
+        ? without(s.collapsed, [replyId])
+        : [...s.collapsed, replyId],
+    }))
+  }, [])
+
+  // Expands every collapsed Reply above a Turn so it's on the canvas.
+  const reveal = useCallback((turnId: string) => {
+    setState(s => {
+      const up = ancestorsOf(s.tree, turnId)
+      return s.collapsed.some(id => up.includes(id))
+        ? {...s, collapsed: without(s.collapsed, up)}
+        : s
+    })
+  }, [])
+
+  const dismissFailure = useCallback((replyId: string) => {
+    setState(s => ({
+      ...s,
+      unseenFailures: without(s.unseenFailures, [replyId]),
+    }))
   }, [])
 
   return {
@@ -408,5 +552,11 @@ export function useTreeSim() {
     retry,
     deleteFrom,
     reset,
+    clear,
+    collapsed,
+    toggleCollapsed,
+    reveal,
+    unseenFailures,
+    dismissFailure,
   }
 }
