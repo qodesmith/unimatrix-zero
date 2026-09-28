@@ -4,6 +4,7 @@ import {
   type Edge,
   type Node,
   type NodeChange,
+  type ReactFlowInstance,
 } from '@xyflow/react'
 import {
   createContext,
@@ -24,6 +25,7 @@ import {
   contextSize,
   formatTokens,
   pathTo,
+  spreadReplies,
   subtreeIds,
   type Tree,
   type TreeSim,
@@ -38,20 +40,26 @@ export function useTreeLayout(
   dir: 'TB' | 'LR',
   gap = {rank: 48, node: 32}
 ) {
-  const sizes = useRef<Record<string, {width: number; height: number}>>({})
+  // Sizes per direction: the same id can be a different node in each (a Prompt box vs an exchange card).
+  const allSizes = useRef<
+    Record<string, Record<string, {width: number; height: number}>>
+  >({})
+  const dirRef = useRef(dir)
+  dirRef.current = dir
   const [version, bump] = useReducer((x: number) => x + 1, 0)
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
+    const sizes = (allSizes.current[dirRef.current] ??= {})
     let changed = false
     for (const c of changes) {
       if (c.type !== 'dimensions' || !c.dimensions) continue
-      const prev = sizes.current[c.id]
+      const prev = sizes[c.id]
       if (
         !prev ||
         prev.width !== c.dimensions.width ||
         prev.height !== c.dimensions.height
       ) {
-        sizes.current[c.id] = c.dimensions
+        sizes[c.id] = c.dimensions
         changed = true
       }
     }
@@ -59,8 +67,9 @@ export function useTreeLayout(
   }, [])
 
   const nodes = useMemo(() => {
+    const sizes = (allSizes.current[dir] ??= {})
     // Tidy tree: each subtree gets the cross-axis room it needs; Branches keep creation order.
-    const size = (id: string) => sizes.current[id] ?? {width: 300, height: 80}
+    const size = (id: string) => sizes[id] ?? {width: 300, height: 80}
     const main = (id: string) =>
       dir === 'TB' ? size(id).height : size(id).width
     const cross = (id: string) =>
@@ -101,7 +110,7 @@ export function useTreeLayout(
       offset += span[n.id]! + gap.node
     }
     return base.map(n => {
-      const s = sizes.current[n.id]
+      const s = sizes[n.id]
       return {
         ...n,
         position: pos[n.id] ?? {x: 0, y: 0},
@@ -114,21 +123,31 @@ export function useTreeLayout(
   return {nodes, onNodesChange}
 }
 
+// Smoothly center a node at the current zoom. offsetX (screen px) shifts it left, e.g. to clear a drawer.
+export function centerNode(rf: ReactFlowInstance, id: string, offsetX = 0) {
+  const n = rf.getNode(id)
+  if (!n) return
+  const w = n.measured?.width ?? 300
+  const h = n.measured?.height ?? 80
+  const zoom = rf.getZoom()
+  rf.setCenter(n.position.x + w / 2 + offsetX / zoom, n.position.y + h / 2, {
+    zoom,
+    duration: 400,
+  })
+}
+
 // Pan to a freshly created Reply so the user sees it stream.
-export function FocusOnSubmit({focus}: {focus: TreeSim['focus']}) {
+export function FocusOnSubmit({
+  focus,
+  offsetX = 0,
+}: {
+  focus: TreeSim['focus']
+  offsetX?: number
+}) {
   const rf = useReactFlow()
   useEffect(() => {
     if (!focus) return
-    const t = setTimeout(() => {
-      const n = rf.getNode(focus.id)
-      if (!n) return
-      const w = n.measured?.width ?? 300
-      const h = n.measured?.height ?? 80
-      rf.setCenter(n.position.x + w / 2, n.position.y + h / 2, {
-        zoom: rf.getZoom(),
-        duration: 400,
-      })
-    }, 300)
+    const t = setTimeout(() => centerNode(rf, focus.id, offsetX), 300)
     return () => clearTimeout(t)
   }, [focus?.n])
   return null
@@ -170,22 +189,32 @@ export const canvasProps = {
 export const threadIds = (tree: Tree, id: string | null) =>
   new Set(id && tree[id] ? pathTo(tree, id).map(t => t.id) : [])
 
-// ---------- Thread highlight: typing > hover > active ----------
+// ---------- Thread highlight: typing > hover > pinned (open drawer) > active ----------
 
 type Highlight = {
   hoverId: string | null
   setHoverId: (id: string | null) => void
   typingReplyId: string | null
   setTypingReplyId: Dispatch<SetStateAction<string | null>>
+  pinnedId: string | null
+  setPinnedId: (id: string | null) => void
 }
 const HighlightContext = createContext<Highlight | null>(null)
 
 export function HighlightProvider({children}: {children: ReactNode}) {
   const [hoverId, setHoverId] = useState<string | null>(null)
   const [typingReplyId, setTypingReplyId] = useState<string | null>(null)
+  const [pinnedId, setPinnedId] = useState<string | null>(null)
   const value = useMemo(
-    () => ({hoverId, setHoverId, typingReplyId, setTypingReplyId}),
-    [hoverId, typingReplyId]
+    () => ({
+      hoverId,
+      setHoverId,
+      typingReplyId,
+      setTypingReplyId,
+      pinnedId,
+      setPinnedId,
+    }),
+    [hoverId, typingReplyId, pinnedId]
   )
   return (
     <HighlightContext.Provider value={value}>
@@ -199,8 +228,8 @@ export const useHighlight = () => useContext(HighlightContext)!
 // The Turn whose Thread gets highlighted edges.
 export function useHighlightTarget() {
   const sim = useSim()
-  const {hoverId, typingReplyId} = useHighlight()
-  return typingReplyId ?? hoverId ?? sim.activeReplyId
+  const {hoverId, typingReplyId, pinnedId} = useHighlight()
+  return typingReplyId ?? hoverId ?? pinnedId ?? sim.activeReplyId
 }
 
 // For PromptInput's onTypingChange: claims the typing highlight for this Reply, releases only its own claim.
@@ -232,6 +261,7 @@ export function PromptInput({
   onFocusChange,
   onTypingChange,
   blurOnSend,
+  disabled,
 }: {
   onSubmit: (text: string) => void
   autoFocus?: boolean
@@ -241,6 +271,8 @@ export function PromptInput({
   // Fires when "focused and non-empty" flips.
   onTypingChange?: (typing: boolean) => void
   blurOnSend?: boolean
+  // Keeps the Input usable for drafting but blocks sending.
+  disabled?: boolean
 }) {
   const [text, setText] = useState('')
   const [focused, setFocused] = useState(false)
@@ -254,7 +286,7 @@ export function PromptInput({
     return () => report.current?.(false)
   }, [typing])
   const send = () => {
-    if (!text.trim()) return
+    if (disabled || !text.trim()) return
     onSubmit(text.trim())
     setText('')
     if (blurOnSend) ref.current?.blur()
@@ -294,7 +326,8 @@ export function PromptInput({
         />
         <button
           onClick={send}
-          className="m-1 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-xs text-white hover:bg-zinc-700"
+          disabled={disabled}
+          className="m-1 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-xs text-white hover:bg-zinc-700 disabled:bg-zinc-300"
         >
           ↑
         </button>
@@ -428,6 +461,24 @@ export function DeleteButton({
   )
 }
 
+// Hover-revealed overlay on the box's top-right corner, so neither the 🗑 nor its armed state shifts layout.
+// Needs a `relative` parent inside a `group`.
+export function DeletePill({
+  tree,
+  promptId,
+  onDelete,
+}: {
+  tree: Tree
+  promptId: string
+  onDelete: () => void
+}) {
+  return (
+    <div className="absolute -top-2.5 -right-2.5 z-10 hidden rounded-full border border-zinc-200 bg-white px-1.5 py-0.5 whitespace-nowrap shadow-sm group-hover:block">
+      <DeleteButton tree={tree} promptId={promptId} onDelete={onDelete} />
+    </div>
+  )
+}
+
 // ---------- Status controls ----------
 
 export function StatusBar({reply, sim}: {reply: Turn; sim: TreeSim}) {
@@ -461,6 +512,27 @@ export function StatusBar({reply, sim}: {reply: Turn; sim: TreeSim}) {
   return null
 }
 
+// What the AI carries if you continue from the end of this Thread.
+export function ThreadContextSize({thread}: {thread: Turn[]}) {
+  return (
+    <div className="border-t border-zinc-100 px-4 py-2 text-[11px] text-zinc-500">
+      <div className="mb-1 font-medium text-zinc-700">
+        Context size: {formatTokens(thread.reduce((s, t) => s + t.tokens, 0))}
+      </div>
+      <div className="flex h-2 overflow-hidden rounded bg-zinc-100">
+        {thread.map(t => (
+          <div
+            key={t.id}
+            title={`${t.kind === 'prompt' ? 'Prompt' : 'Reply'}: ${formatTokens(t.tokens)}`}
+            className={`h-full border-r border-white ${t.kind === 'prompt' ? 'bg-sky-300' : 'bg-violet-400'}`}
+            style={{flexGrow: t.tokens}}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export const Cursor = () => (
   <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-zinc-800 align-middle" />
 )
@@ -492,9 +564,32 @@ export function DebugPanel({sim}: {sim: TreeSim}) {
         />
         Fail the next Reply mid-stream
       </label>
+      <div className="mt-1.5 flex items-center gap-1.5">
+        Speed
+        <div className="flex overflow-hidden rounded border border-fuchsia-400">
+          {(['slow', 'normal', 'fast'] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => sim.setSpeed(s)}
+              className={`px-1.5 py-0.5 capitalize ${sim.speed === s ? 'bg-fuchsia-700 text-white' : 'hover:bg-fuchsia-100'}`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+      <button
+        onClick={() => {
+          for (const id of spreadReplies(sim.tree, 3))
+            sim.submit(id, 'Quick one: anything to add?')
+        }}
+        className="mt-1.5 block rounded border border-fuchsia-400 px-2 py-0.5 hover:bg-fuchsia-100"
+      >
+        Start 3 Replies at once
+      </button>
       <button
         onClick={sim.reset}
-        className="mt-1.5 rounded border border-fuchsia-400 px-2 py-0.5 hover:bg-fuchsia-100"
+        className="mt-1.5 block rounded border border-fuchsia-400 px-2 py-0.5 hover:bg-fuchsia-100"
       >
         Reset Tree
       </button>

@@ -48,6 +48,30 @@ export const isFork = (tree: Tree, replyId: string) =>
 export const formatTokens = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`
 
+const respondable = (t: Turn) =>
+  t.kind === 'reply' && (t.status === 'done' || t.status === 'stopped')
+
+// Up to n respondable Replies, none on another's Thread, so each lands in its own Branch. Leaves first.
+export const spreadReplies = (tree: Tree, n: number) => {
+  const picked: string[] = []
+  const candidates = Object.values(tree)
+    .filter(respondable)
+    .sort(
+      (a, b) =>
+        childrenOf(tree, a.id).length - childrenOf(tree, b.id).length ||
+        b.createdAt - a.createdAt
+    )
+  for (const c of candidates) {
+    if (picked.length === n) break
+    const onPath = new Set(pathTo(tree, c.id).map(t => t.id))
+    const related = picked.some(
+      id => onPath.has(id) || pathTo(tree, id).some(t => t.id === c.id)
+    )
+    if (!related) picked.push(c.id)
+  }
+  return picked
+}
+
 // ---------- canned text ----------
 
 const SHORT =
@@ -199,7 +223,21 @@ Getting around: taxis are fine for short hops, but we'd prefer buses or trains w
 
 // ---------- simulation hook ----------
 
-type Stream = {words: string[]; i: number; failAt: number | null}
+type Stream = {
+  words: string[]
+  i: number
+  failAt: number | null
+  // Fractional words owed to this stream; lets slow speeds emit less than one word per tick.
+  owed: number
+}
+
+export type Speed = 'slow' | 'normal' | 'fast'
+const WORDS_PER_SECOND: Record<Speed, number> = {
+  slow: 10,
+  normal: 30,
+  fast: 120,
+}
+const TICK_MS = 50
 
 export type TreeSim = ReturnType<typeof useTreeSim>
 
@@ -208,6 +246,9 @@ export function useTreeSim() {
   const {tree, activeReplyId} = state
   const [failNext, setFailNext] = useState(false)
   const [focus, setFocus] = useState<{id: string; n: number} | null>(null)
+  const [speed, setSpeed] = useState<Speed>('slow')
+  const speedRef = useRef(speed)
+  speedRef.current = speed
   const streams = useRef<Record<string, Stream>>({})
 
   const startStream = useCallback(
@@ -217,6 +258,7 @@ export function useTreeSim() {
       streams.current[replyId] = {
         words,
         i: 0,
+        owed: 0,
         failAt: failNext
           ? Math.floor(words.length * (0.2 + Math.random() * 0.5))
           : null,
@@ -230,8 +272,10 @@ export function useTreeSim() {
     const timer = setInterval(() => {
       const ids = Object.keys(streams.current)
       if (!ids.length) return
+      const perTick = (WORDS_PER_SECOND[speedRef.current] * TICK_MS) / 1000
       setState(s => {
         const tree = {...s.tree}
+        let changed = false
         for (const id of ids) {
           const st = streams.current[id]!
           const turn = tree[id]
@@ -239,19 +283,24 @@ export function useTreeSim() {
             delete streams.current[id]
             continue
           }
-          const step = 2 + Math.floor(Math.random() * 5)
-          const chunk = st.words.slice(st.i, st.i + step).join('')
-          st.i += step
+          st.owed += perTick * (0.5 + Math.random())
+          const n = Math.floor(st.owed)
+          if (!n) continue
+          st.owed -= n
+          // words alternates word / whitespace, so n words is 2n entries.
+          const chunk = st.words.slice(st.i, st.i + 2 * n).join('')
+          st.i += 2 * n
           let status: Status = 'streaming'
           if (st.failAt !== null && st.i >= st.failAt) status = 'failed'
           else if (st.i >= st.words.length) status = 'done'
           const text = turn.text + chunk
           tree[id] = {...turn, text, tokens: estimateTokens(text), status}
+          changed = true
           if (status !== 'streaming') delete streams.current[id]
         }
-        return {...s, tree}
+        return changed ? {...s, tree} : s
       })
-    }, 70)
+    }, TICK_MS)
     return () => clearInterval(timer)
   }, [])
 
@@ -286,6 +335,7 @@ export function useTreeSim() {
       }))
       startStream(replyId)
       setFocus(f => ({id: replyId, n: (f?.n ?? 0) + 1}))
+      return replyId
     },
     [startStream]
   )
@@ -350,6 +400,8 @@ export function useTreeSim() {
     activeReplyId,
     failNext,
     setFailNext,
+    speed,
+    setSpeed,
     focus,
     submit,
     stop,

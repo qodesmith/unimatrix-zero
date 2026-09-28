@@ -17,7 +17,7 @@ import {
   canvasProps,
   ContextBadge,
   Cursor,
-  DeleteButton,
+  DeletePill,
   edgeStyle,
   FitOnceMeasured,
   FocusOnSubmit,
@@ -31,7 +31,7 @@ import {
   useTreeLayout,
   useSim,
 } from './shared'
-import {childrenOf, type Turn} from './tree'
+import {childrenOf, type Tree, type Turn} from './tree'
 
 export const name = 'Turn boxes, top-down, collapsible'
 
@@ -44,26 +44,28 @@ const handles = (
   </>
 )
 
-function PromptNode({data}: NodeProps<Node<Data>>) {
+// `selected` and `data-turn` are only used by variant D (drawer selection and click targets).
+export function PromptNode({data, selected}: NodeProps<Node<Data>>) {
   const sim = useSim()
   const {turn} = data
 
   return (
-    <div className="group relative w-[440px] rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-sm text-sky-950 shadow-sm">
+    <div
+      data-turn={turn.id}
+      className={`group relative w-[440px] rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-sm text-sky-950 shadow-sm ${selected ? 'ring-2 ring-sky-500 ring-offset-2' : ''}`}
+    >
       {handles}
       <ScrollableText maxHeightClass="max-h-32">{turn.text}</ScrollableText>
-      <div className="absolute -top-2.5 -right-2.5 hidden rounded-full border border-zinc-200 bg-white px-1.5 py-0.5 shadow-sm group-hover:block">
-        <DeleteButton
-          tree={sim.tree}
-          promptId={turn.id}
-          onDelete={() => sim.deleteFrom(turn.id)}
-        />
-      </div>
+      <DeletePill
+        tree={sim.tree}
+        promptId={turn.id}
+        onDelete={() => sim.deleteFrom(turn.id)}
+      />
     </div>
   )
 }
 
-function ReplyNode({data}: NodeProps<Node<Data>>) {
+export function ReplyNode({data, selected}: NodeProps<Node<Data>>) {
   const sim = useSim()
   const {turn} = data
   const [inputFocused, setInputFocused] = useState(false)
@@ -81,7 +83,8 @@ function ReplyNode({data}: NodeProps<Node<Data>>) {
     >
       {handles}
       <div
-        className={`rounded-xl border bg-white shadow-sm ${turn.status === 'failed' ? 'border-red-300' : streaming ? 'border-violet-300 ring-2 ring-violet-100' : 'border-zinc-200'}`}
+        data-turn={turn.id}
+        className={`rounded-xl border bg-white shadow-sm ${selected ? 'border-violet-400 ring-2 ring-violet-500 ring-offset-2' : turn.status === 'failed' ? 'border-red-300' : streaming ? 'border-violet-300 ring-2 ring-violet-100' : 'border-zinc-200'}`}
       >
         <div className="flex items-center justify-between px-3.5 pt-2.5 text-[11px] text-zinc-500">
           <span>{turn.model}</span>
@@ -142,28 +145,29 @@ function ReplyNode({data}: NodeProps<Node<Data>>) {
 
 const nodeTypes = {prompt: PromptNode, reply: ReplyNode}
 
+// One node per Turn, keyed by Turn id.
+export function turnGraph(tree: Tree) {
+  const turns = Object.values(tree).sort((a, b) => a.createdAt - b.createdAt)
+  const base: Node<Data>[] = turns.map(t => ({
+    id: t.id,
+    type: t.kind,
+    position: {x: 0, y: 0},
+    data: {turn: t},
+  }))
+  const edges: Edge[] = turns
+    .filter(t => t.parentId)
+    .map(t => ({
+      id: `${t.parentId}-${t.id}`,
+      source: t.parentId!,
+      target: t.id,
+      type: 'smoothstep',
+    }))
+  return {base, edges}
+}
+
 export function VariantA() {
   const sim = useSim()
-  const {base, edges} = useMemo(() => {
-    const turns = Object.values(sim.tree).sort(
-      (a, b) => a.createdAt - b.createdAt
-    )
-    const base: Node<Data>[] = turns.map(t => ({
-      id: t.id,
-      type: t.kind,
-      position: {x: 0, y: 0},
-      data: {turn: t},
-    }))
-    const edges: Edge[] = turns
-      .filter(t => t.parentId)
-      .map(t => ({
-        id: `${t.parentId}-${t.id}`,
-        source: t.parentId!,
-        target: t.id,
-        type: 'smoothstep',
-      }))
-    return {base, edges}
-  }, [sim.tree])
+  const {base, edges} = useMemo(() => turnGraph(sim.tree), [sim.tree])
   const {nodes, onNodesChange} = useTreeLayout(base, edges, 'TB', {
     rank: 40,
     node: 36,

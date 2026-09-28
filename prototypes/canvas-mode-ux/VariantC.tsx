@@ -23,11 +23,12 @@ import {
   FocusOnSubmit,
   PromptInput,
   StatusBar,
+  ThreadContextSize,
   threadIds,
   useTreeLayout,
   useSim,
 } from './shared'
-import {childrenOf, formatTokens, pathTo, type Turn} from './tree'
+import {childrenOf, pathTo, type Turn} from './tree'
 
 export const name = 'Compact map + reader drawer'
 
@@ -178,22 +179,7 @@ function Drawer({id, onClose}: {id: string; onClose: () => void}) {
           </div>
         )}
       </div>
-      {/* Context size breakdown: what the AI carries if you continue from here */}
-      <div className="border-t border-zinc-100 px-4 py-2 text-[11px] text-zinc-500">
-        <div className="mb-1 font-medium text-zinc-700">
-          Context size: {formatTokens(thread.reduce((s, t) => s + t.tokens, 0))}
-        </div>
-        <div className="flex h-2 overflow-hidden rounded bg-zinc-100">
-          {thread.map(t => (
-            <div
-              key={t.id}
-              title={`${t.kind === 'prompt' ? 'Prompt' : 'Reply'}: ${formatTokens(t.tokens)}`}
-              className={`h-full border-r border-white ${t.kind === 'prompt' ? 'bg-sky-300' : 'bg-violet-400'}`}
-              style={{flexGrow: t.tokens}}
-            />
-          ))}
-        </div>
-      </div>
+      <ThreadContextSize thread={thread} />
     </aside>
   )
 }

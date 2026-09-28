@@ -17,3 +17,22 @@ body {
 .react-flow__node:focus-within {
   z-index: 1000 !important;
 }
+
+/* Variant D orientation switch: Turns glide to their new spots. Only on during the switch, so streaming growth stays snappy. */
+.canvas-switching .react-flow__node {
+  transition:
+    transform 400ms ease,
+    opacity 400ms ease;
+}
+.react-flow__node.turn-exit,
+.react-flow__node.turn-enter {
+  opacity: 0;
+  pointer-events: none !important;
+}
+/* Edges jump straight to the new layout, so hide them while nodes are still travelling. */
+.react-flow__edges {
+  transition: opacity 200ms ease;
+}
+.canvas-switching .react-flow__edges {
+  opacity: 0;
+}

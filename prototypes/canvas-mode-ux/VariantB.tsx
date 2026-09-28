@@ -18,7 +18,7 @@ import {
   canvasProps,
   ContextBadge,
   Cursor,
-  DeleteButton,
+  DeletePill,
   edgeStyle,
   FitOnceMeasured,
   FocusOnSubmit,
@@ -32,7 +32,13 @@ import {
   useTreeLayout,
   useSim,
 } from './shared'
-import {childrenOf, contextSize, formatTokens, type Turn} from './tree'
+import {
+  childrenOf,
+  contextSize,
+  formatTokens,
+  type Tree,
+  type Turn,
+} from './tree'
 
 export const name = 'Exchange cards, left-to-right, scrolling'
 
@@ -41,7 +47,8 @@ const WINDOW = 10_000
 
 type Data = {prompt: Turn; reply: Turn}
 
-function ExchangeNode({data}: NodeProps<Node<Data>>) {
+// `selected` and `data-turn` are only used by variant D (drawer selection and click targets).
+export function ExchangeNode({data, selected}: NodeProps<Node<Data>>) {
   const sim = useSim()
   const {prompt, reply} = data
   const [inputFocused, setInputFocused] = useState(false)
@@ -63,58 +70,65 @@ function ExchangeNode({data}: NodeProps<Node<Data>>) {
         position={Position.Left}
         className="!top-6 !opacity-0"
       />
-      <div
-        className={`w-[440px] overflow-hidden rounded-xl border bg-white shadow-sm ${reply.status === 'failed' ? 'border-red-300' : streaming ? 'border-violet-300 ring-2 ring-violet-100' : 'border-zinc-200'}`}
-      >
-        {/* Prompt as the card's header */}
-        <div className="flex items-start gap-2 border-b border-sky-100 bg-sky-50 px-3 py-2 text-sm text-sky-950">
-          <span className="mt-0.5 text-[10px] font-semibold text-sky-500 uppercase">
-            You
-          </span>
-          <ScrollableText maxHeightClass="max-h-32" className="min-w-0 flex-1">
-            {prompt.text}
-          </ScrollableText>
-          {branches >= 2 && (
-            <span className="shrink-0 rounded bg-amber-100 px-1.5 text-[11px] text-amber-800">
-              Fork · {branches} Branches
-            </span>
-          )}
-          <span className="hidden group-hover:inline">
-            <DeleteButton
-              tree={sim.tree}
-              promptId={prompt.id}
-              onDelete={() => sim.deleteFrom(prompt.id)}
-            />
-          </span>
-        </div>
-
-        <ScrollableText
-          maxHeightClass="max-h-72"
-          streaming={streaming}
-          className={`px-3 py-2 text-sm leading-relaxed ${reply.status === 'failed' ? 'text-zinc-400' : 'text-zinc-800'}`}
-        >
-          {reply.text}
-          {streaming && <Cursor />}
-        </ScrollableText>
-
-        <div className="flex items-center gap-2 border-t border-zinc-100 px-3 py-1.5 text-[11px] text-zinc-500">
-          <span>{reply.model}</span>
-          <StatusBar reply={reply} sim={sim} />
-          <span className="flex-1" />
-          {reply.status !== 'failed' && (
-            <ContextBadge tree={sim.tree} reply={reply} />
-          )}
-        </div>
-        {/* Context size as a meter across the bottom edge */}
+      <div className="relative w-[440px]">
         <div
-          className="h-1 bg-zinc-100"
-          title={`${formatTokens(ctx)} of ${formatTokens(WINDOW)}`}
+          data-turn={reply.id}
+          className={`overflow-hidden rounded-xl border bg-white shadow-sm ${selected ? 'border-violet-400 ring-2 ring-violet-500 ring-offset-2' : reply.status === 'failed' ? 'border-red-300' : streaming ? 'border-violet-300 ring-2 ring-violet-100' : 'border-zinc-200'}`}
         >
+          {/* Prompt as the card's header */}
           <div
-            className="h-full bg-violet-400"
-            style={{width: `${Math.min(100, (ctx / WINDOW) * 100)}%`}}
-          />
+            data-turn={prompt.id}
+            className="flex items-start gap-2 border-b border-sky-100 bg-sky-50 px-3 py-2 text-sm text-sky-950"
+          >
+            <span className="mt-0.5 text-[10px] font-semibold text-sky-500 uppercase">
+              You
+            </span>
+            <ScrollableText
+              maxHeightClass="max-h-32"
+              className="min-w-0 flex-1"
+            >
+              {prompt.text}
+            </ScrollableText>
+            {branches >= 2 && (
+              <span className="shrink-0 rounded bg-amber-100 px-1.5 text-[11px] text-amber-800">
+                Fork · {branches} Branches
+              </span>
+            )}
+          </div>
+
+          <ScrollableText
+            maxHeightClass="max-h-72"
+            streaming={streaming}
+            className={`px-3 py-2 text-sm leading-relaxed ${reply.status === 'failed' ? 'text-zinc-400' : 'text-zinc-800'}`}
+          >
+            {reply.text}
+            {streaming && <Cursor />}
+          </ScrollableText>
+
+          <div className="flex items-center gap-2 border-t border-zinc-100 px-3 py-1.5 text-[11px] text-zinc-500">
+            <span>{reply.model}</span>
+            <StatusBar reply={reply} sim={sim} />
+            <span className="flex-1" />
+            {reply.status !== 'failed' && (
+              <ContextBadge tree={sim.tree} reply={reply} />
+            )}
+          </div>
+          {/* Context size as a meter across the bottom edge */}
+          <div
+            className="h-1 bg-zinc-100"
+            title={`${formatTokens(ctx)} of ${formatTokens(WINDOW)}`}
+          >
+            <div
+              className="h-full bg-violet-400"
+              style={{width: `${Math.min(100, (ctx / WINDOW) * 100)}%`}}
+            />
+          </div>
         </div>
+        <DeletePill
+          tree={sim.tree}
+          promptId={prompt.id}
+          onDelete={() => sim.deleteFrom(prompt.id)}
+        />
       </div>
 
       {/* Input docks to the right edge, where the next exchange will appear. The column is always reserved so hover doesn't shift the layout. */}
@@ -155,31 +169,34 @@ function ExchangeNode({data}: NodeProps<Node<Data>>) {
 
 const nodeTypes = {exchange: ExchangeNode}
 
+// One card per exchange, keyed by Prompt id.
+export function exchangeGraph(tree: Tree) {
+  const replies = Object.values(tree)
+    .filter(t => t.kind === 'reply')
+    .sort((a, b) => a.createdAt - b.createdAt)
+  const base: Node<Data>[] = replies.map(r => ({
+    id: r.parentId!,
+    type: 'exchange',
+    position: {x: 0, y: 0},
+    data: {prompt: tree[r.parentId!]!, reply: r},
+  }))
+  const edges: Edge[] = base
+    .filter(n => n.data.prompt.parentId)
+    .map(n => {
+      const parentPrompt = tree[n.data.prompt.parentId!]!.parentId!
+      return {
+        id: `${parentPrompt}-${n.id}`,
+        source: parentPrompt,
+        target: n.id,
+        type: 'smoothstep',
+      }
+    })
+  return {base, edges}
+}
+
 export function VariantB() {
   const sim = useSim()
-  const {base, edges} = useMemo(() => {
-    const replies = Object.values(sim.tree)
-      .filter(t => t.kind === 'reply')
-      .sort((a, b) => a.createdAt - b.createdAt)
-    const base: Node<Data>[] = replies.map(r => ({
-      id: r.parentId!,
-      type: 'exchange',
-      position: {x: 0, y: 0},
-      data: {prompt: sim.tree[r.parentId!]!, reply: r},
-    }))
-    const edges: Edge[] = base
-      .filter(n => n.data.prompt.parentId)
-      .map(n => {
-        const parentPrompt = sim.tree[n.data.prompt.parentId!]!.parentId!
-        return {
-          id: `${parentPrompt}-${n.id}`,
-          source: parentPrompt,
-          target: n.id,
-          type: 'smoothstep',
-        }
-      })
-    return {base, edges}
-  }, [sim.tree])
+  const {base, edges} = useMemo(() => exchangeGraph(sim.tree), [sim.tree])
   const {nodes, onNodesChange} = useTreeLayout(base, edges, 'LR', {
     rank: 30,
     node: 28,
