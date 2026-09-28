@@ -206,7 +206,7 @@ export function VariantB() {
       onNodeMouseLeave={() => setHoverId(null)}
     >
       <Background gap={24} color="#d4d4d8" />
-      <MiniMap pannable zoomable position="top-right" />
+      <MiniMap pannable zoomable position="bottom-left" />
       <Controls showInteractive={false} position="bottom-right" />
       <FitOnceMeasured />
       <FocusOnSubmit

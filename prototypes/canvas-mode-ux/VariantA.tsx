@@ -3,6 +3,7 @@ import {
   Background,
   Controls,
   Handle,
+  MiniMap,
   Position,
   ReactFlow,
   type Edge,
@@ -188,6 +189,7 @@ export function VariantA() {
       onNodeMouseLeave={() => setHoverId(null)}
     >
       <Background gap={24} color="#d4d4d8" />
+      <MiniMap pannable zoomable position="bottom-left" />
       <Controls showInteractive={false} position="bottom-right" />
       <FitOnceMeasured />
       <FocusOnSubmit focus={sim.focus} />
