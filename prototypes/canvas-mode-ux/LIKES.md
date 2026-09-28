@@ -21,3 +21,9 @@ Running list from reviewing the prototype. Feeds the resolution of the Canvas mo
 15. **Canvas feel.** Scroll pans; pinch or ⌘-scroll zooms. Turns can't be dragged, because the layout comes from the Tree. Branches read oldest-first.
 16. **Chat slideout.** Clicking any message opens a right-side slideout showing that Thread as a normal chat, with an Input to continue from its last Reply (branching if needed) and Context size in its footer. The canvas pans so the clicked Turn stays visible, and the slideout's Thread is highlighted.
 17. **Grouped canvas controls.** The minimap, zoom controls and orientation toggle sit together as one control. Orientation defaults to vertical, is global (not per Tree), and will be a Settings option.
+18. **Starting a new Tree.** An empty canvas shows one centred Input; sending it creates the root Prompt.
+19. **Attention indicator.** The grouped controls show "N streaming" and flag new failures; clicking cycles through them, panning to each.
+20. **Collapse a Branch (v1).** Any Reply with responses can be folded to hide everything below it and unfolded again. On a Fork, the Fork pill is the toggle.
+21. **Attachments.** The Input has an attach button (plus paste and drop). Images show as thumbnails (click for a larger view); other files show as chips with name and size, both in the Input before sending and on the sent Prompt.
+22. **Chat mode is the slideout.** Canvas mode is the app; the familiar single-Thread chat lives in the slideout, which can expand to full screen. To switch Threads, click another Turn on the canvas. There's no Thread switcher.
+23. **Canvas doesn't follow a growing Reply.** It centres once on submit, then stays put.
