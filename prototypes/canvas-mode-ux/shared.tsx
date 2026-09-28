@@ -8,7 +8,9 @@ import {
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  type ReactNode,
   useReducer,
   useRef,
   useState,
@@ -223,6 +225,60 @@ export function PromptInput({
           ↑
         </button>
       </div>
+    </div>
+  )
+}
+
+// ---------- Long text: scrolls in place, Show more expands it ----------
+
+export function ScrollableText({
+  maxHeightClass,
+  streaming = false,
+  className = '',
+  children,
+}: {
+  maxHeightClass: string
+  streaming?: boolean
+  className?: string
+  children: ReactNode
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [overflows, setOverflows] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  // Stays true until the user scrolls up, so streaming only follows new text while they're at the bottom.
+  const pinnedRef = useRef(true)
+
+  // No deps: streamed text grows every render, so re-measure every time.
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el || expanded) return
+    setOverflows(el.scrollHeight > el.clientHeight)
+    if (streaming && pinnedRef.current) el.scrollTop = el.scrollHeight
+  })
+
+  return (
+    <div className={className}>
+      <div
+        ref={ref}
+        onScroll={e => {
+          const el = e.currentTarget
+          pinnedRef.current =
+            el.scrollHeight - el.scrollTop - el.clientHeight < 24
+        }}
+        className={`whitespace-pre-wrap ${expanded ? '' : `nowheel ${maxHeightClass} overflow-y-auto`}`}
+      >
+        {children}
+      </div>
+      {(overflows || expanded) && (
+        <div className="mt-1 flex justify-end">
+          <button
+            onClick={() => setExpanded(e => !e)}
+            className="nodrag text-[11px] text-violet-700 hover:underline"
+          >
+            {expanded ? 'Show less' : 'Show more'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

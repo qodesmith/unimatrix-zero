@@ -9,7 +9,7 @@ import {
   type Node,
   type NodeProps,
 } from '@xyflow/react'
-import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
+import {useMemo, useState} from 'react'
 
 import {
   canRespond,
@@ -20,6 +20,7 @@ import {
   FitOnceMeasured,
   FocusOnSubmit,
   PromptInput,
+  ScrollableText,
   StatusBar,
   useTreeLayout,
   useSim,
@@ -40,34 +41,11 @@ const handles = (
 function PromptNode({data}: NodeProps<Node<Data>>) {
   const sim = useSim()
   const {turn} = data
-  const [expanded, setExpanded] = useState(false)
-  const [overflows, setOverflows] = useState(false)
-  const textRef = useRef<HTMLDivElement>(null)
-
-  useLayoutEffect(() => {
-    const el = textRef.current
-    if (el && !expanded) setOverflows(el.scrollHeight > el.clientHeight)
-  }, [turn.text, expanded])
 
   return (
     <div className="group relative w-[440px] rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-sm text-sky-950 shadow-sm">
       {handles}
-      <div
-        ref={textRef}
-        className={`whitespace-pre-wrap ${expanded ? '' : 'nowheel max-h-32 overflow-y-auto'}`}
-      >
-        {turn.text}
-      </div>
-      {(overflows || expanded) && (
-        <div className="mt-1 flex justify-end">
-          <button
-            onClick={() => setExpanded(e => !e)}
-            className="nodrag text-[11px] text-violet-700 hover:underline"
-          >
-            {expanded ? 'Show less' : 'Show more'}
-          </button>
-        </div>
-      )}
+      <ScrollableText maxHeightClass="max-h-32">{turn.text}</ScrollableText>
       <div className="absolute -top-2.5 -right-2.5 hidden rounded-full border border-zinc-200 bg-white px-1.5 py-0.5 shadow-sm group-hover:block">
         <DeleteButton
           tree={sim.tree}
@@ -79,30 +57,15 @@ function PromptNode({data}: NodeProps<Node<Data>>) {
   )
 }
 
-const LONG_CHARS = 420
-
 function ReplyNode({data}: NodeProps<Node<Data>>) {
   const sim = useSim()
   const {turn} = data
-  const [expanded, setExpanded] = useState(false)
   const [inputFocused, setInputFocused] = useState(false)
   // After sending, keep the hover Input hidden until the pointer leaves, so only the newest Reply shows one.
   const [dismissed, setDismissed] = useState(false)
-  const long = turn.text.length > LONG_CHARS
   const streaming = turn.status === 'streaming'
   const isActive = turn.id === sim.activeReplyId
   const branches = childrenOf(sim.tree, turn.id).length
-  const collapsed = long && !expanded
-  const bodyRef = useRef<HTMLDivElement>(null)
-  // Stays true until the user scrolls up, so streaming only follows new text while they're at the bottom.
-  const pinnedRef = useRef(true)
-
-  useEffect(() => {
-    const el = bodyRef.current
-    if (el && collapsed && streaming && pinnedRef.current) {
-      el.scrollTop = el.scrollHeight
-    }
-  }, [turn.text, collapsed, streaming])
 
   return (
     <div
@@ -121,36 +84,19 @@ function ReplyNode({data}: NodeProps<Node<Data>>) {
             </span>
           )}
         </div>
-        <div
-          ref={bodyRef}
-          onScroll={e => {
-            const el = e.currentTarget
-            pinnedRef.current =
-              el.scrollHeight - el.scrollTop - el.clientHeight < 24
-          }}
-          className={`px-3.5 py-2 text-sm leading-relaxed text-zinc-800 ${collapsed ? 'nowheel max-h-72 overflow-y-auto' : ''}`}
+        <ScrollableText
+          maxHeightClass="max-h-72"
+          streaming={streaming}
+          className={`px-3.5 py-2 text-sm leading-relaxed ${turn.status === 'failed' ? 'text-zinc-400' : 'text-zinc-800'}`}
         >
-          <div
-            className={`whitespace-pre-wrap ${turn.status === 'failed' ? 'text-zinc-400' : ''}`}
-          >
-            {turn.text}
-            {streaming && <Cursor />}
-          </div>
-        </div>
+          {turn.text}
+          {streaming && <Cursor />}
+        </ScrollableText>
         <div className="flex items-center gap-2 border-t border-zinc-100 px-3.5 py-1.5">
           {turn.status !== 'failed' && (
             <ContextBadge tree={sim.tree} reply={turn} />
           )}
           <StatusBar reply={turn} sim={sim} />
-          <span className="flex-1" />
-          {long && (
-            <button
-              onClick={() => setExpanded(e => !e)}
-              className="nodrag text-[11px] text-violet-700 hover:underline"
-            >
-              {expanded ? 'Show less' : 'Show more'}
-            </button>
-          )}
         </div>
       </div>
 

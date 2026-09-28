@@ -22,6 +22,7 @@ import {
   FitOnceMeasured,
   FocusOnSubmit,
   PromptInput,
+  ScrollableText,
   StatusBar,
   useTreeLayout,
   useSim,
@@ -38,17 +39,18 @@ type Data = {prompt: Turn; reply: Turn}
 function ExchangeNode({data}: NodeProps<Node<Data>>) {
   const sim = useSim()
   const {prompt, reply} = data
-  const [inputOpen, setInputOpen] = useState(false)
+  const [inputFocused, setInputFocused] = useState(false)
+  // After sending, keep the hover Input hidden until the pointer leaves, so only the newest Reply shows one.
+  const [dismissed, setDismissed] = useState(false)
   const streaming = reply.status === 'streaming'
   const branches = childrenOf(sim.tree, reply.id).length
   const isActive = reply.id === sim.activeReplyId
   const ctx = contextSize(sim.tree, reply.id)
-  const showInput = canRespond(reply) && (isActive || inputOpen)
 
   return (
     <div
       className="group relative flex items-start gap-2"
-      onMouseLeave={() => !isActive && setInputOpen(false)}
+      onMouseLeave={() => setDismissed(false)}
     >
       <Handle
         type="target"
@@ -56,16 +58,21 @@ function ExchangeNode({data}: NodeProps<Node<Data>>) {
         className="!top-6 !opacity-0"
       />
       <div
-        className={`w-[400px] overflow-hidden rounded-xl border bg-white shadow-sm ${reply.status === 'failed' ? 'border-red-300' : streaming ? 'border-violet-300 ring-2 ring-violet-100' : 'border-zinc-200'}`}
+        className={`w-[440px] overflow-hidden rounded-xl border bg-white shadow-sm ${reply.status === 'failed' ? 'border-red-300' : streaming ? 'border-violet-300 ring-2 ring-violet-100' : 'border-zinc-200'}`}
       >
         {/* Prompt as the card's header */}
         <div className="flex items-start gap-2 border-b border-sky-100 bg-sky-50 px-3 py-2 text-sm text-sky-950">
           <span className="mt-0.5 text-[10px] font-semibold text-sky-500 uppercase">
             You
           </span>
-          <span className="nowheel max-h-32 flex-1 overflow-y-auto whitespace-pre-wrap">
+          <ScrollableText maxHeightClass="max-h-32" className="min-w-0 flex-1">
             {prompt.text}
-          </span>
+          </ScrollableText>
+          {branches >= 2 && (
+            <span className="shrink-0 rounded bg-amber-100 px-1.5 text-[11px] text-amber-800">
+              Fork · {branches} Branches
+            </span>
+          )}
           <span className="hidden group-hover:inline">
             <DeleteButton
               tree={sim.tree}
@@ -75,13 +82,14 @@ function ExchangeNode({data}: NodeProps<Node<Data>>) {
           </span>
         </div>
 
-        {/* Reply body scrolls inside the card; nowheel stops the canvas from panning while you read. */}
-        <div className="nowheel max-h-72 overflow-y-auto px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap text-zinc-800">
-          <span className={reply.status === 'failed' ? 'text-zinc-400' : ''}>
-            {reply.text}
-          </span>
+        <ScrollableText
+          maxHeightClass="max-h-72"
+          streaming={streaming}
+          className={`px-3 py-2 text-sm leading-relaxed ${reply.status === 'failed' ? 'text-zinc-400' : 'text-zinc-800'}`}
+        >
+          {reply.text}
           {streaming && <Cursor />}
-        </div>
+        </ScrollableText>
 
         <div className="flex items-center gap-2 border-t border-zinc-100 px-3 py-1.5 text-[11px] text-zinc-500">
           <span>{reply.model}</span>
@@ -103,26 +111,30 @@ function ExchangeNode({data}: NodeProps<Node<Data>>) {
         </div>
       </div>
 
-      {/* Input docks to the right edge, where the next exchange will appear */}
+      {/* Input docks to the right edge, where the next exchange will appear. The column is always reserved so hover doesn't shift the layout. */}
       {canRespond(reply) && (
         <div className="w-[280px] pt-1">
-          {showInput ? (
+          <div
+            className={
+              isActive
+                ? ''
+                : dismissed
+                  ? 'hidden'
+                  : inputFocused
+                    ? 'block'
+                    : 'hidden group-hover:block'
+            }
+          >
             <PromptInput
               branching={branches > 0}
-              autoFocus={!isActive}
+              onFocusChange={isActive ? undefined : setInputFocused}
+              blurOnSend={!isActive}
               onSubmit={t => {
-                setInputOpen(false)
+                setDismissed(true)
                 sim.submit(reply.id, t)
               }}
             />
-          ) : (
-            <button
-              onClick={() => setInputOpen(true)}
-              className="nodrag hidden rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-xs text-zinc-600 shadow-sm group-hover:inline-block hover:bg-zinc-50"
-            >
-              {branches > 0 ? '+ Branch' : '+ Reply'}
-            </button>
-          )}
+          </div>
         </div>
       )}
       <Handle
