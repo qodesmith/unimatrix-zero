@@ -14,3 +14,4 @@ Running list from reviewing the prototype. Feeds the resolution of the Canvas mo
 8. **Minimap.** Both modes show a minimap of the whole Tree, placed where it doesn't cover content or controls.
 9. **Context size meter, as an option.** A thin bar along a Reply's bottom edge that fills as the Thread's Context size approaches the model's limit (as in variant B). It is a user setting, not always on.
 10. **Visual behaviour is user-configurable.** Scrolling long messages with "Show more" / "Show less" is also a setting, and settings should drive nearly all visuals. Captured in the Settings and user preferences ticket.
+11. **Center on submit.** Submitting a Prompt from any Input smoothly pans the canvas to center the new message, keeping the current zoom.
