@@ -17,11 +17,16 @@ import {
   ContextBadge,
   Cursor,
   DeleteButton,
+  edgeStyle,
   FitOnceMeasured,
   FocusOnSubmit,
   PromptInput,
   ScrollableText,
   StatusBar,
+  threadIds,
+  useHighlight,
+  useHighlightTarget,
+  useReportTyping,
   useTreeLayout,
   useSim,
 } from './shared'
@@ -66,6 +71,7 @@ function ReplyNode({data}: NodeProps<Node<Data>>) {
   const streaming = turn.status === 'streaming'
   const isActive = turn.id === sim.activeReplyId
   const branches = childrenOf(sim.tree, turn.id).length
+  const reportTyping = useReportTyping(turn.id)
 
   return (
     <div
@@ -106,6 +112,7 @@ function ReplyNode({data}: NodeProps<Node<Data>>) {
           <div className="mt-2">
             <PromptInput
               branching={branches > 0}
+              onTypingChange={reportTyping}
               onSubmit={t => {
                 setDismissed(true)
                 sim.submit(turn.id, t)
@@ -119,6 +126,7 @@ function ReplyNode({data}: NodeProps<Node<Data>>) {
             <PromptInput
               branching={branches > 0}
               onFocusChange={setInputFocused}
+              onTypingChange={reportTyping}
               blurOnSend
               onSubmit={t => {
                 setDismissed(true)
@@ -152,7 +160,6 @@ export function VariantA() {
         source: t.parentId!,
         target: t.id,
         type: 'smoothstep',
-        style: {stroke: '#a1a1aa'},
       }))
     return {base, edges}
   }, [sim.tree])
@@ -160,14 +167,25 @@ export function VariantA() {
     rank: 40,
     node: 36,
   })
+  const {setHoverId} = useHighlight()
+  const target = useHighlightTarget()
+  const styledEdges = useMemo(() => {
+    const thread = threadIds(sim.tree, target)
+    return edges.map(e => ({
+      ...e,
+      ...edgeStyle(thread.has(e.source) && thread.has(e.target)),
+    }))
+  }, [edges, sim.tree, target])
 
   return (
     <ReactFlow
       nodes={nodes}
-      edges={edges}
+      edges={styledEdges}
       nodeTypes={nodeTypes}
       onNodesChange={onNodesChange}
       {...canvasProps}
+      onNodeMouseEnter={(_, n) => setHoverId(n.id)}
+      onNodeMouseLeave={() => setHoverId(null)}
     >
       <Background gap={24} color="#d4d4d8" />
       <Controls showInteractive={false} position="bottom-right" />

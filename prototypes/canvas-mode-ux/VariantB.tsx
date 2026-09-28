@@ -19,11 +19,16 @@ import {
   ContextBadge,
   Cursor,
   DeleteButton,
+  edgeStyle,
   FitOnceMeasured,
   FocusOnSubmit,
   PromptInput,
   ScrollableText,
   StatusBar,
+  threadIds,
+  useHighlight,
+  useHighlightTarget,
+  useReportTyping,
   useTreeLayout,
   useSim,
 } from './shared'
@@ -46,6 +51,7 @@ function ExchangeNode({data}: NodeProps<Node<Data>>) {
   const branches = childrenOf(sim.tree, reply.id).length
   const isActive = reply.id === sim.activeReplyId
   const ctx = contextSize(sim.tree, reply.id)
+  const reportTyping = useReportTyping(reply.id)
 
   return (
     <div
@@ -128,6 +134,7 @@ function ExchangeNode({data}: NodeProps<Node<Data>>) {
             <PromptInput
               branching={branches > 0}
               onFocusChange={isActive ? undefined : setInputFocused}
+              onTypingChange={reportTyping}
               blurOnSend={!isActive}
               onSubmit={t => {
                 setDismissed(true)
@@ -169,7 +176,6 @@ export function VariantB() {
           source: parentPrompt,
           target: n.id,
           type: 'smoothstep',
-          style: {stroke: '#a1a1aa'},
         }
       })
     return {base, edges}
@@ -178,14 +184,26 @@ export function VariantB() {
     rank: 30,
     node: 28,
   })
+  const {setHoverId} = useHighlight()
+  const target = useHighlightTarget()
+  // Exchange nodes are keyed by Prompt id, and every Prompt is on its Reply's Thread.
+  const styledEdges = useMemo(() => {
+    const thread = threadIds(sim.tree, target)
+    return edges.map(e => ({
+      ...e,
+      ...edgeStyle(thread.has(e.source) && thread.has(e.target)),
+    }))
+  }, [edges, sim.tree, target])
 
   return (
     <ReactFlow
       nodes={nodes}
-      edges={edges}
+      edges={styledEdges}
       nodeTypes={nodeTypes}
       onNodesChange={onNodesChange}
       {...canvasProps}
+      onNodeMouseEnter={(_, n) => setHoverId((n.data as Data).reply.id)}
+      onNodeMouseLeave={() => setHoverId(null)}
     >
       <Background gap={24} color="#d4d4d8" />
       <MiniMap pannable zoomable position="top-right" />

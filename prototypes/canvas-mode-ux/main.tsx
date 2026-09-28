@@ -3,7 +3,12 @@ import {ReactFlowProvider} from '@xyflow/react'
 import {useState} from 'react'
 import {createRoot} from 'react-dom/client'
 
-import {DebugPanel, PrototypeSwitcher, SimContext} from './shared'
+import {
+  DebugPanel,
+  HighlightProvider,
+  PrototypeSwitcher,
+  SimContext,
+} from './shared'
 import {useTreeSim} from './tree'
 import * as A from './VariantA'
 import * as B from './VariantB'
@@ -31,9 +36,11 @@ function App() {
 
   return (
     <SimContext.Provider value={sim}>
-      <ReactFlowProvider key={variant}>
-        <Current />
-      </ReactFlowProvider>
+      <HighlightProvider key={variant}>
+        <ReactFlowProvider>
+          <Current />
+        </ReactFlowProvider>
+      </HighlightProvider>
       <DebugPanel sim={sim} />
       {process.env.NODE_ENV !== 'production' && (
         <PrototypeSwitcher

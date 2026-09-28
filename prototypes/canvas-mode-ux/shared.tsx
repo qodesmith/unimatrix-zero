@@ -6,7 +6,9 @@ import {
   type NodeChange,
 } from '@xyflow/react'
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -14,6 +16,8 @@ import {
   useReducer,
   useRef,
   useState,
+  type Dispatch,
+  type SetStateAction,
 } from 'react'
 
 import {
@@ -166,6 +170,58 @@ export const canvasProps = {
 export const threadIds = (tree: Tree, id: string | null) =>
   new Set(id && tree[id] ? pathTo(tree, id).map(t => t.id) : [])
 
+// ---------- Thread highlight: typing > hover > active ----------
+
+type Highlight = {
+  hoverId: string | null
+  setHoverId: (id: string | null) => void
+  typingReplyId: string | null
+  setTypingReplyId: Dispatch<SetStateAction<string | null>>
+}
+const HighlightContext = createContext<Highlight | null>(null)
+
+export function HighlightProvider({children}: {children: ReactNode}) {
+  const [hoverId, setHoverId] = useState<string | null>(null)
+  const [typingReplyId, setTypingReplyId] = useState<string | null>(null)
+  const value = useMemo(
+    () => ({hoverId, setHoverId, typingReplyId, setTypingReplyId}),
+    [hoverId, typingReplyId]
+  )
+  return (
+    <HighlightContext.Provider value={value}>
+      {children}
+    </HighlightContext.Provider>
+  )
+}
+
+export const useHighlight = () => useContext(HighlightContext)!
+
+// The Turn whose Thread gets highlighted edges.
+export function useHighlightTarget() {
+  const sim = useSim()
+  const {hoverId, typingReplyId} = useHighlight()
+  return typingReplyId ?? hoverId ?? sim.activeReplyId
+}
+
+// For PromptInput's onTypingChange: claims the typing highlight for this Reply, releases only its own claim.
+export function useReportTyping(replyId: string) {
+  const {setTypingReplyId} = useHighlight()
+  return useCallback(
+    (typing: boolean) =>
+      setTypingReplyId(cur =>
+        typing ? replyId : cur === replyId ? null : cur
+      ),
+    [replyId, setTypingReplyId]
+  )
+}
+
+export const edgeStyle = (hot: boolean) => ({
+  zIndex: hot ? 1 : 0,
+  style: hot
+    ? {stroke: '#8b5cf6', strokeWidth: 2.5}
+    : {stroke: '#a1a1aa', strokeWidth: 1},
+})
+
 // ---------- Input ----------
 
 export function PromptInput({
@@ -174,6 +230,7 @@ export function PromptInput({
   branching,
   compact,
   onFocusChange,
+  onTypingChange,
   blurOnSend,
 }: {
   onSubmit: (text: string) => void
@@ -181,10 +238,21 @@ export function PromptInput({
   branching: boolean
   compact?: boolean
   onFocusChange?: (focused: boolean) => void
+  // Fires when "focused and non-empty" flips.
+  onTypingChange?: (typing: boolean) => void
   blurOnSend?: boolean
 }) {
   const [text, setText] = useState('')
+  const [focused, setFocused] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
+  const typing = focused && text !== ''
+  const report = useRef(onTypingChange)
+  report.current = onTypingChange
+  useEffect(() => {
+    if (!typing) return
+    report.current?.(true)
+    return () => report.current?.(false)
+  }, [typing])
   const send = () => {
     if (!text.trim()) return
     onSubmit(text.trim())
@@ -206,8 +274,14 @@ export function PromptInput({
           autoFocus={autoFocus}
           rows={compact ? 1 : 2}
           value={text}
-          onFocus={() => onFocusChange?.(true)}
-          onBlur={() => onFocusChange?.(false)}
+          onFocus={() => {
+            setFocused(true)
+            onFocusChange?.(true)
+          }}
+          onBlur={() => {
+            setFocused(false)
+            onFocusChange?.(false)
+          }}
           onChange={e => setText(e.target.value)}
           onKeyDown={e => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -482,6 +556,5 @@ export function PrototypeSwitcher({
 }
 
 // Node components read the sim from context so node data stays small.
-import {createContext, useContext} from 'react'
 export const SimContext = createContext<TreeSim | null>(null)
 export const useSim = () => useContext(SimContext)!
