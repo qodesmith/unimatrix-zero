@@ -1,4 +1,4 @@
-// PROTOTYPE variant A: every Turn is its own box, Tree grows top-down, long Replies collapse. Throw away.
+// PROTOTYPE variant A: every Turn is its own box, Tree grows top-down, long Replies scroll. Throw away.
 import {
   Background,
   Controls,
@@ -9,7 +9,7 @@ import {
   type Node,
   type NodeProps,
 } from '@xyflow/react'
-import {useMemo, useState} from 'react'
+import {useEffect, useMemo, useRef, useState} from 'react'
 
 import {
   canRespond,
@@ -71,6 +71,16 @@ function ReplyNode({data}: NodeProps<Node<Data>>) {
   const isActive = turn.id === sim.activeReplyId
   const branches = childrenOf(sim.tree, turn.id).length
   const collapsed = long && !expanded
+  const bodyRef = useRef<HTMLDivElement>(null)
+  // Stays true until the user scrolls up, so streaming only follows new text while they're at the bottom.
+  const pinnedRef = useRef(true)
+
+  useEffect(() => {
+    const el = bodyRef.current
+    if (el && collapsed && streaming && pinnedRef.current) {
+      el.scrollTop = el.scrollHeight
+    }
+  }, [turn.text, collapsed, streaming])
 
   return (
     <div
@@ -90,7 +100,13 @@ function ReplyNode({data}: NodeProps<Node<Data>>) {
           )}
         </div>
         <div
-          className={`relative px-3.5 py-2 text-sm leading-relaxed text-zinc-800 ${collapsed ? 'flex max-h-52 flex-col overflow-hidden' : ''} ${collapsed && streaming ? 'justify-end' : ''}`}
+          ref={bodyRef}
+          onScroll={e => {
+            const el = e.currentTarget
+            pinnedRef.current =
+              el.scrollHeight - el.scrollTop - el.clientHeight < 24
+          }}
+          className={`px-3.5 py-2 text-sm leading-relaxed text-zinc-800 ${collapsed ? 'nowheel max-h-72 overflow-y-auto' : ''}`}
         >
           <div
             className={`whitespace-pre-wrap ${turn.status === 'failed' ? 'text-zinc-400' : ''}`}
@@ -98,11 +114,6 @@ function ReplyNode({data}: NodeProps<Node<Data>>) {
             {turn.text}
             {streaming && <Cursor />}
           </div>
-          {collapsed && (
-            <div
-              className={`pointer-events-none absolute inset-x-0 h-12 from-white to-transparent ${streaming ? 'top-0 bg-gradient-to-b' : 'bottom-0 bg-gradient-to-t'}`}
-            />
-          )}
         </div>
         <div className="flex items-center gap-2 border-t border-zinc-100 px-3.5 py-1.5">
           {turn.status !== 'failed' && (
