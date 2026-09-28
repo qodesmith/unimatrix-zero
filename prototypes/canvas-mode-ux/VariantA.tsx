@@ -62,6 +62,8 @@ function ReplyNode({data}: NodeProps<Node<Data>>) {
   const {turn} = data
   const [expanded, setExpanded] = useState(false)
   const [inputFocused, setInputFocused] = useState(false)
+  // After sending from a hover Input, keep it hidden until the pointer leaves, so only the newest Reply shows one.
+  const [dismissed, setDismissed] = useState(false)
   const long = turn.text.length > LONG_CHARS
   const streaming = turn.status === 'streaming'
   const isLast = turn.id === sim.lastAnsweredId
@@ -69,7 +71,7 @@ function ReplyNode({data}: NodeProps<Node<Data>>) {
   const collapsed = long && !expanded
 
   return (
-    <div className="group relative w-[440px]">
+    <div className="group relative w-[440px]" onMouseLeave={() => setDismissed(false)}>
       {handles}
       <div
         className={`rounded-xl border bg-white shadow-sm ${turn.status === 'failed' ? 'border-red-300' : streaming ? 'border-violet-300 ring-2 ring-violet-100' : 'border-zinc-200'}`}
@@ -125,12 +127,16 @@ function ReplyNode({data}: NodeProps<Node<Data>>) {
           </div>
         ) : (
           <div
-            className={`absolute inset-x-0 top-full z-10 pt-2 ${inputFocused ? 'block' : 'hidden group-hover:block'}`}
+            className={`absolute inset-x-0 top-full z-10 pt-2 ${dismissed ? 'hidden' : inputFocused ? 'block' : 'hidden group-hover:block'}`}
           >
             <PromptInput
               branching={branches > 0}
               onFocusChange={setInputFocused}
-              onSubmit={t => sim.submit(turn.id, t)}
+              blurOnSend
+              onSubmit={t => {
+                setDismissed(true)
+                sim.submit(turn.id, t)
+              }}
             />
           </div>
         ))}

@@ -110,7 +110,10 @@ function ExchangeNode({data}: NodeProps<Node<Data>>) {
             <PromptInput
               branching={branches > 0}
               autoFocus={!isLast}
-              onSubmit={t => sim.submit(reply.id, t)}
+              onSubmit={t => {
+                setInputOpen(false)
+                sim.submit(reply.id, t)
+              }}
             />
           ) : (
             <button

@@ -172,18 +172,22 @@ export function PromptInput({
   branching,
   compact,
   onFocusChange,
+  blurOnSend,
 }: {
   onSubmit: (text: string) => void
   autoFocus?: boolean
   branching: boolean
   compact?: boolean
   onFocusChange?: (focused: boolean) => void
+  blurOnSend?: boolean
 }) {
   const [text, setText] = useState('')
+  const ref = useRef<HTMLTextAreaElement>(null)
   const send = () => {
     if (!text.trim()) return
     onSubmit(text.trim())
     setText('')
+    if (blurOnSend) ref.current?.blur()
   }
   return (
     <div className="nodrag nopan nowheel">
@@ -196,6 +200,7 @@ export function PromptInput({
         className={`flex items-end gap-1 rounded-xl border bg-white shadow-sm ${branching ? 'border-amber-300' : 'border-zinc-300'}`}
       >
         <textarea
+          ref={ref}
           autoFocus={autoFocus}
           rows={compact ? 1 : 2}
           value={text}

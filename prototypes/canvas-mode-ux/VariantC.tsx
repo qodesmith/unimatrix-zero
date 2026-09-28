@@ -62,12 +62,14 @@ function ReplyChip({data}: NodeProps<Node<Data>>) {
   const sim = useSim()
   const {turn, selected, onThread, select} = data
   const [inputFocused, setInputFocused] = useState(false)
+  // After sending from a hover Input, keep it hidden until the pointer leaves, so only the newest Reply shows one.
+  const [dismissed, setDismissed] = useState(false)
   const streaming = turn.status === 'streaming'
   const isLast = turn.id === sim.lastAnsweredId
   const branches = childrenOf(sim.tree, turn.id).length
 
   return (
-    <div className="group relative w-[240px]">
+    <div className="group relative w-[240px]" onMouseLeave={() => setDismissed(false)}>
       {handles}
       <div
         onClick={() => select(turn.id)}
@@ -107,14 +109,18 @@ function ReplyChip({data}: NodeProps<Node<Data>>) {
           className={
             isLast
               ? 'mt-1.5'
-              : `absolute inset-x-0 top-full z-10 pt-1.5 ${inputFocused ? 'block' : 'hidden group-hover:block'}`
+              : `absolute inset-x-0 top-full z-10 pt-1.5 ${dismissed ? 'hidden' : inputFocused ? 'block' : 'hidden group-hover:block'}`
           }
         >
           <PromptInput
             compact
             branching={branches > 0}
             onFocusChange={setInputFocused}
-            onSubmit={t => sim.submit(turn.id, t)}
+            blurOnSend={!isLast}
+            onSubmit={t => {
+              if (!isLast) setDismissed(true)
+              sim.submit(turn.id, t)
+            }}
           />
         </div>
       )}
