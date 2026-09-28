@@ -150,6 +150,31 @@ function seed(): {tree: Tree; activeReplyId: string} {
   const p4 = add('prompt', r1, 'What changes if we go in winter instead?')
   const r4 = add('reply', p4, MEDIUM.slice(0, 180), {status: 'stopped'})
 
+  // A long pasted Prompt, to show the Prompt header scrolling.
+  const p8 = add(
+    'prompt',
+    r1,
+    `Before you rework the plan, here's everything we care about. Please keep all of it in mind.
+
+Who's going: two adults and my mum, who's 72. She walks fine but can't do more than about 8,000 steps a day, and steep stairs are hard for her. No hikes up Fushimi Inari past the first few gates.
+
+Budget: roughly $250 a day for the three of us, not counting the hotel. We'd rather spend on one great dinner than three okay ones.
+
+Food: I'm vegetarian, my partner eats anything, and mum doesn't like spicy food. We'd love at least one shojin ryori temple meal.
+
+Pace:
+- Nothing before 9am, we're not early people
+- A proper rest back at the hotel mid-afternoon
+- No more than two big sights per day
+
+Must-sees: Kiyomizu-dera, the autumn leaves somewhere quieter than Arashiyama, and a tea ceremony that isn't a tourist trap.
+
+Skip: Nishiki Market (we went last time), anything with long queues, and the Golden Pavilion.
+
+Getting around: taxis are fine for short hops, but we'd prefer buses or trains where it's easy. We land at Kansai at 2pm on day 1, so that day is light.`
+  )
+  add('reply', p8, MEDIUM)
+
   // A wide Fork: five quick Branches.
   const p5 = add('prompt', r2, 'Which hostel would you pick?')
   const r5 = add('reply', p5, SHORT)

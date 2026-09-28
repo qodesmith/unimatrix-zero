@@ -63,7 +63,7 @@ function ExchangeNode({data}: NodeProps<Node<Data>>) {
           <span className="mt-0.5 text-[10px] font-semibold text-sky-500 uppercase">
             You
           </span>
-          <span className="line-clamp-3 flex-1 whitespace-pre-wrap">
+          <span className="nowheel max-h-32 flex-1 overflow-y-auto whitespace-pre-wrap">
             {prompt.text}
           </span>
           <span className="hidden group-hover:inline">
