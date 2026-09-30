@@ -10,6 +10,14 @@ A desktop control surface for a user's existing AI subscriptions (Claude, ChatGP
 An AI service the user connects through their own subscription (Claude, ChatGPT). A Tree may involve several Providers. Users _connect_ a Provider; _sign in_ refers only to the Provider's own sign-in page.
 _Avoid_: Vendor, backend, service
 
+**System prompt**:
+The standing instructions the AI follows in a Tree. Each Tree has one, filled in from a global default and changeable at any time. A change applies to Replies generated afterwards, and each Reply records the System prompt it ran under. A _preset_ is a read-only System prompt that ships with the app.
+_Avoid_: Instructions, persona, custom instructions
+
+**Workspace**:
+An optional property of a Tree: a set of files the AI can create and edit as part of the conversation. Each Reply has the files as they stood when it finished. The files live either in the app (_app-owned_) or in a folder of the user's (_linked folder_). A Tree without a Workspace is a _plain_ Tree: it has no files, though it may still use tools such as web search.
+_Avoid_: Project, folder, agent mode, dev mode
+
 ### Conversation structure
 
 **Tree**:
