@@ -14,6 +14,10 @@ _Avoid_: Vendor, backend, service
 A specific AI offered by a Provider (e.g. Claude Opus, GPT-5.1). Chosen per Prompt: the Input defaults to the Model of the Reply it's attached to, and each Reply records the Model that wrote it. One Thread may pass through several Models and Providers.
 _Avoid_: Engine, bot, assistant
 
+**Provider session**:
+The Provider's own record of one Thread, which it uses to continue the conversation. It is a disposable copy: the Tree is the truth, and a Provider session can be rebuilt from its Thread.
+_Avoid_: Thread (Codex's word for it), conversation
+
 **System prompt**:
 The standing instructions the AI follows in a Tree. Each Tree has one, filled in from a global default and changeable at any time. A change applies to Replies generated afterwards, and each Reply records the System prompt it ran under. A _preset_ is a read-only System prompt that ships with the app.
 _Avoid_: Instructions, persona, custom instructions

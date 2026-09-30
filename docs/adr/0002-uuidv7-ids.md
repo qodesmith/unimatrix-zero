@@ -1,0 +1,3 @@
+# UUIDv7 ids everywhere, not SQLite integers
+
+Every table uses UUIDv7 primary keys instead of SQLite's auto-incrementing integers. Ids are used outside the database (hidden git refs for Reply snapshots, working-copy folders, attachment references, UI state), and the database can be restored from a pre-migration backup, which rolls an integer counter back. A reused integer would then silently match an old git ref or folder belonging to a different Turn, mixing up files between Branches. Random ids make that impossible; the size and speed cost is negligible at this scale, and v7 keeps them time-ordered. Provider ids are stored only as references, never as keys.
