@@ -10,6 +10,10 @@ A desktop control surface for a user's existing AI subscriptions (Claude, ChatGP
 An AI service the user connects through their own subscription (Claude, ChatGPT). A Tree may involve several Providers. Users _connect_ a Provider; _sign in_ refers only to the Provider's own sign-in page.
 _Avoid_: Vendor, backend, service
 
+**Model**:
+A specific AI offered by a Provider (e.g. Claude Opus, GPT-5.1). Chosen per Prompt: the Input defaults to the Model of the Reply it's attached to, and each Reply records the Model that wrote it. One Thread may pass through several Models and Providers.
+_Avoid_: Engine, bot, assistant
+
 **System prompt**:
 The standing instructions the AI follows in a Tree. Each Tree has one, filled in from a global default and changeable at any time. A change applies to Replies generated afterwards, and each Reply records the System prompt it ran under. A _preset_ is a read-only System prompt that ships with the app.
 _Avoid_: Instructions, persona, custom instructions
