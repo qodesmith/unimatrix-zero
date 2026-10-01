@@ -1,0 +1,14 @@
+# Thin shell with signed app bundles
+
+On every OS the installed app is a small Electron shell whose loader runs the app code (main, preload, renderer) from a versioned, Ed25519-signed **app bundle** in `userData`, listed in a signed manifest on GitHub Pages. We chose this over replacing the whole `.app` because, under ad-hoc signing ([ADR 0006](./0006-unsigned-distribution.md)), every new Mac build resets privacy grants, so Workspaces in Documents or Desktop would prompt again after every update; a shell whose `cdhash` doesn't change keeps them across app-code updates. Doing it on all OSes keeps one app layout and one update channel, and app-code updates are a few MB instead of a full Electron download. Findings: [Distribution and update strategy](https://github.com/qodesmith/unimatrix-zero/issues/13).
+
+## Consequences
+
+- **Two kinds of release.** App bundles ship often; the shell ships only for high/critical Electron/Chromium security fixes, to stay on a supported Electron major, or when a bundle needs a newer shell, with reasons combined. Mac shells replace their own `.app`; Windows (NSIS) and Linux (AppImage) shells install through electron-updater. Every download is checked against the signed manifest.
+- **The manifest maps each bundle to the oldest shell it runs on.** A bundle can't use a new Electron or preload API until a shell with it has shipped; native code (other than Electron's built-in `node:sqlite`) lives in the shell.
+- **The loader verifies the signature on every launch**, because `userData` is writable by anything running as the user and Electron's asar integrity only covers the shell. It falls back from the newest compatible bundle to the last known good one, then to the copy built into the shell.
+- **A bundle is "good" once the database has opened, migrations have run and the window has rendered.** If it never gets there, the loader rolls back to the previous bundle and restores the pre-migration backup from [ADR 0003](./0003-migration-foreign-key-guard.md). After "good" there's no automatic rollback; the fix is a newer bundle.
+- **Code is never swapped mid-session**: updates ask first ("Update available"), then apply on "Restart to update". The one exception is first launch, which fetches the latest compatible bundle before showing the UI (about 5 s, then the bundled copy).
+- **One signing key, kept only in Bitwarden, never on disk.** CI uploads unsigned drafts and the maintainer signs locally, so a compromised GitHub account can't push code to existing installs. A leaked key is rotated by an update signed with the old key; a lost key means a new key and every user reinstalls once.
+- **A bundle that fails verification shows "This update couldn't be verified. Reinstall from [download page]."** Accepted risk: with a compromised GitHub account, that page is the attacker's.
+- Vendor program versions can use the same signed manifest.
