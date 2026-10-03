@@ -15,13 +15,18 @@ export function VariantC() {
 
   const first = where === 'hub'
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-8 bg-slate-50 p-8">
+    <div className="flex min-h-full flex-col items-center justify-center gap-8 bg-slate-50 p-8">
       {!first && (
         <button className="absolute top-4 left-4 text-sm text-slate-500" onClick={() => setWhere('app')}>
           ← Back to your Tree
         </button>
       )}
-      <div className="text-center">
+      <div className="max-w-xl text-center">
+        {first && (
+          <p className="mb-4 text-lg text-slate-600">
+            Talk with Claude or ChatGPT, and branch any conversation into as many directions as you like. It uses the plan you already pay for.
+          </p>
+        )}
         <h1 className="text-3xl font-bold">{first ? 'Connect the AI you already pay for' : 'Connections'}</h1>
         <p className="mt-2 text-slate-600">{first ? 'One is enough to start. You can connect the other any time.' : 'Connect, reconnect or disconnect your AI accounts.'}</p>
       </div>
@@ -63,6 +68,9 @@ function Card({p}: {p: ProviderId}) {
   const [lastIdx, setLastIdx] = useState(0)
   if (curIdx >= 0 && curIdx !== 99 && curIdx !== lastIdx) setLastIdx(curIdx)
   const failedIdx = st.kind === 'error' ? lastIdx : -1
+  // One connect at a time: the other card waits until this one finishes, fails or is cancelled.
+  const other = PROVIDERS.find(o => o !== p)!
+  const locked = isBusy(state.status[other])
 
   return (
     <div
@@ -121,7 +129,12 @@ function Card({p}: {p: ProviderId}) {
       )}
       <div className="mt-auto">
         {st.kind === 'idle' && (
-          <button className="w-full rounded-xl py-3 font-medium text-white" style={{background: INFO[p].color}} onClick={() => dispatch({type: 'connect', p})}>
+          <button
+            disabled={locked}
+            className="w-full rounded-xl py-3 font-medium text-white disabled:opacity-30"
+            style={{background: INFO[p].color}}
+            onClick={() => dispatch({type: 'connect', p})}
+          >
             Connect {n}
           </button>
         )}
@@ -131,9 +144,16 @@ function Card({p}: {p: ProviderId}) {
           </button>
         )}
         {st.kind === 'error' && (
-          <button className="w-full rounded-xl bg-slate-900 py-3 font-medium text-white" onClick={() => dispatch({type: 'connect', p})}>
+          <button
+            disabled={locked}
+            className="w-full rounded-xl bg-slate-900 py-3 font-medium text-white disabled:opacity-30"
+            onClick={() => dispatch({type: 'connect', p})}
+          >
             {errorAction(st.reason)}
           </button>
+        )}
+        {locked && (st.kind === 'idle' || st.kind === 'error') && (
+          <div className="mt-2 text-center text-xs text-slate-500">You can connect {n} once {INFO[other].name} is done.</div>
         )}
         {st.kind === 'connected' && (
           <button className="w-full py-2 text-sm text-slate-500 underline" onClick={() => dispatch({type: 'disconnect', p})}>
