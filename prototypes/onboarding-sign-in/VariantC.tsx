@@ -114,7 +114,10 @@ function Card({p}: {p: ProviderId}) {
                 </div>
                 {now && st.kind === 'downloading' && <Progress pct={st.pct} color={INFO[p].color} />}
                 {now && st.kind === 'waiting' && (
-                  <div className="pl-7">
+                  <div className="flex flex-col items-start gap-1 pl-7">
+                    <span className="text-xs text-slate-500">
+                      {n}'s page may say “{p === 'claude' ? 'Claude Code' : 'Codex'}”. That's normal.
+                    </span>
                     <ReopenLink p={p} />
                   </div>
                 )}
