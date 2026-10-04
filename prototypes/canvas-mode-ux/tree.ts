@@ -5,6 +5,25 @@ export type Status = 'streaming' | 'done' | 'stopped' | 'failed'
 
 export type Attachment = {name: string; type: string; size: number; url: string}
 
+export type FileOp = 'added' | 'modified' | 'deleted'
+// One file the AI (on a Reply) or the user (on a Prompt, between Turns) touched. Content is the file after the change.
+export type FileChange = {
+  path: string
+  op: FileOp
+  content?: string
+  // Character offset into the Reply text where the change happened, for interleaved rendering.
+  at?: number
+  // Still being written while the Reply streams.
+  writing?: boolean
+}
+
+export type Workspace =
+  | {kind: 'app'}
+  // `base`: what was already in the folder when it was linked, path → content.
+  | {kind: 'linked'; path: string; base?: Record<string, string>}
+
+export type Command = {cmd: string; result: string}
+
 export type Turn = {
   id: string
   kind: 'prompt' | 'reply'
@@ -14,6 +33,10 @@ export type Turn = {
   status?: Status
   model?: string
   attachments?: Attachment[]
+  // Reply: what the AI changed. Prompt: what the user changed in the folder since the previous Turn.
+  files?: FileChange[]
+  // Shell commands a Reply ran (Workspaces with the shell on).
+  commands?: Command[]
   createdAt: number
 }
 
@@ -185,25 +208,35 @@ const SEED_ATTACHMENTS: Attachment[] = [
 let seq = 0
 const nextId = (kind: string) => `${kind[0]}${++seq}`
 
-type SimState = {
+export type SimState = {
   tree: Tree
   activeReplyId: string
   // Replies whose descendants are hidden on the canvas.
   collapsed: string[]
   // Replies that failed this session and haven't been retried or jumped to yet.
   unseenFailures: string[]
+  workspace: Workspace | null
+  // The AI may also run commands, not just write files.
+  shell: boolean
+  // User edits made in a Thread's folder since its leaf Reply, keyed by that Reply.
+  pendingEdits: Record<string, FileChange[]>
 }
 
-function seed(): SimState {
-  seq = 0
+export type AddTurn = (
+  kind: Turn['kind'],
+  parentId: string | null,
+  text: string,
+  extra?: Partial<Turn>
+) => string
+
+// Builds a seed Tree; `build` adds Turns and returns the active Reply's id.
+export function buildSeed(
+  build: (add: AddTurn) => string,
+  extra: Partial<SimState> = {}
+): SimState {
   const tree: Tree = {}
   let clock = 0
-  const add = (
-    kind: Turn['kind'],
-    parentId: string | null,
-    text: string,
-    extra: Partial<Turn> = {}
-  ) => {
+  const add: AddTurn = (kind, parentId, text, extra = {}) => {
     const id = nextId(kind)
     tree[id] = {
       id,
@@ -219,7 +252,26 @@ function seed(): SimState {
     }
     return id
   }
+  const activeReplyId = build(add)
+  return {
+    tree,
+    activeReplyId,
+    collapsed: [],
+    unseenFailures: [],
+    workspace: null,
+    shell: false,
+    pendingEdits: {},
+    ...extra,
+  }
+}
 
+export const CANNED_REPLIES = {SHORT, MEDIUM, LONG}
+
+function seed(): SimState {
+  return buildSeed(seedKyoto)
+}
+
+export function seedKyoto(add: AddTurn) {
   const p1 = add(
     'prompt',
     null,
@@ -284,17 +336,61 @@ Getting around: taxis are fine for short hops, but we'd prefer buses or trains w
     "Here's the room we're looking at and the booking confirmation. Will this work for mum?",
     {attachments: SEED_ATTACHMENTS}
   )
-  const r9 = add('reply', p9, SHORT)
-
-  return {tree, activeReplyId: r9, collapsed: [], unseenFailures: []}
+  return add('reply', p9, SHORT)
 }
 
-const empty = (): SimState => ({
+export const emptySim = (): SimState => ({
   tree: {},
   activeReplyId: '',
   collapsed: [],
   unseenFailures: [],
+  workspace: null,
+  shell: false,
+  pendingEdits: {},
 })
+
+// ---------- per-Tree state cache, so switching Trees keeps each one ----------
+
+const cache = new Map<string, SimState>()
+const cacheListeners = new Set<() => void>()
+let cacheVersion = 0
+export const simCache = {
+  get: (key: string) => cache.get(key),
+  set(key: string, s: SimState) {
+    cache.set(key, s)
+    cacheVersion++
+    cacheListeners.forEach(l => l())
+  },
+  subscribe(l: () => void) {
+    cacheListeners.add(l)
+    return () => {
+      cacheListeners.delete(l)
+    }
+  },
+  version: () => cacheVersion,
+}
+
+// A planned file change: applied once the stream reaches `atFraction` of its words.
+export type PlannedChange = {
+  atFraction: number
+  make: (tree: Tree, replyId: string) => FileChange
+}
+
+export type SimOptions = {
+  // Keys the cache; omit for a throwaway sim.
+  key?: string
+  init?: () => SimState
+  // Decides which files a new Reply touches.
+  planFiles?: (s: SimState, replyId: string) => PlannedChange[]
+}
+
+// How long a change shows as "writing" after it starts, in stream entries (word + whitespace).
+const WRITING_ENTRIES = 30
+
+const doneWriting = (turn: Turn): Turn =>
+  turn.files?.some(f => f.writing)
+    ? {...turn, files: turn.files.map(f => ({...f, writing: false}))}
+    : turn
 
 // ---------- simulation hook ----------
 
@@ -316,6 +412,10 @@ type Stream = {
   failAt: number | null
   // Fractional words owed to this stream; lets slow speeds emit less than one word per tick.
   owed: number
+  // File changes still to apply, by stream entry index.
+  planned: {at: number; make: PlannedChange['make']}[]
+  // Entry index at which each applied change stops "writing", by path.
+  writingUntil: Record<string, number>
 }
 
 export type Speed = 'slow' | 'normal' | 'fast'
@@ -328,9 +428,38 @@ const TICK_MS = 50
 
 export type TreeSim = ReturnType<typeof useTreeSim>
 
-export function useTreeSim() {
-  const [state, setState] = useState(seed)
-  const {tree, activeReplyId, collapsed, unseenFailures} = state
+export function useTreeSim(options: SimOptions = {}) {
+  const {key, init = seed, planFiles} = options
+  const [state, setState] = useState(() => (key && cache.get(key)) || init())
+  const {
+    tree,
+    activeReplyId,
+    collapsed,
+    unseenFailures,
+    workspace,
+    shell,
+    pendingEdits,
+  } = state
+  const stateRef = useRef(state)
+  stateRef.current = state
+  const planRef = useRef(planFiles)
+  planRef.current = planFiles
+  useEffect(() => {
+    if (key) simCache.set(key, state)
+  }, [key, state])
+  // Streams don't survive a Tree switch, so leave them stopped in the cache.
+  useEffect(
+    () => () => {
+      const s = key && cache.get(key)
+      if (!s) return
+      const tree = {...s.tree}
+      for (const id of Object.keys(streams.current))
+        if (tree[id]) tree[id] = doneWriting({...tree[id]!, status: 'stopped'})
+      streams.current = {}
+      simCache.set(key, {...s, tree})
+    },
+    [key]
+  )
   const [failNext, setFailNext] = useState(false)
   const [focus, setFocus] = useState<{id: string; n: number} | null>(null)
   const [speed, setSpeed] = useState<Speed>('slow')
@@ -342,6 +471,13 @@ export function useTreeSim() {
     (replyId: string) => {
       const text = CANNED[Math.floor(Math.random() * CANNED.length)]!
       const words = text.split(/(\s+)/)
+      const s = stateRef.current
+      const planned = (
+        s.workspace && planRef.current ? planRef.current(s, replyId) : []
+      ).map(p => ({
+        at: Math.max(2, Math.floor((words.length * p.atFraction) / 2) * 2),
+        make: p.make,
+      }))
       streams.current[replyId] = {
         words,
         i: 0,
@@ -349,6 +485,8 @@ export function useTreeSim() {
         failAt: failNext
           ? Math.floor(words.length * (0.2 + Math.random() * 0.5))
           : null,
+        planned,
+        writingUntil: {},
       }
       if (failNext) setFailNext(false)
     },
@@ -382,7 +520,28 @@ export function useTreeSim() {
           if (st.failAt !== null && st.i >= st.failAt) status = 'failed'
           else if (st.i >= st.words.length) status = 'done'
           const text = turn.text + chunk
-          tree[id] = {...turn, text, tokens: estimateTokens(text), status}
+          let files = turn.files
+          for (const p of st.planned.filter(p => p.at <= st.i)) {
+            const change = p.make(tree, id)
+            st.writingUntil[change.path] = st.i + WRITING_ENTRIES
+            files = [
+              ...(files ?? []).filter(f => f.path !== change.path),
+              {...change, at: text.length, writing: true},
+            ]
+          }
+          st.planned = st.planned.filter(p => p.at > st.i)
+          if (files?.some(f => f.writing && st.writingUntil[f.path]! <= st.i))
+            files = files.map(f =>
+              st.writingUntil[f.path]! <= st.i ? {...f, writing: false} : f
+            )
+          tree[id] = {
+            ...turn,
+            text,
+            tokens: estimateTokens(text),
+            status,
+            ...(files ? {files} : {}),
+          }
+          if (status !== 'streaming') tree[id] = doneWriting(tree[id]!)
           changed = true
           if (status === 'failed') failed.push(id)
           if (status !== 'streaming') delete streams.current[id]
@@ -413,6 +572,13 @@ export function useTreeSim() {
       setState(s => ({
         ...s,
         activeReplyId: replyId,
+        pendingEdits: parentReplyId
+          ? Object.fromEntries(
+              Object.entries(s.pendingEdits).filter(
+                ([id]) => id !== parentReplyId
+              )
+            )
+          : s.pendingEdits,
         // Sending from inside a collapsed Branch reveals it.
         collapsed: parentReplyId
           ? without(
@@ -429,6 +595,9 @@ export function useTreeSim() {
             text,
             tokens: promptTokens(text, attachments),
             ...(attachments.length ? {attachments} : {}),
+            ...(parentReplyId && s.pendingEdits[parentReplyId]
+              ? {files: s.pendingEdits[parentReplyId]}
+              : {}),
             createdAt: now,
           },
           [replyId]: {
@@ -456,7 +625,10 @@ export function useTreeSim() {
     delete streams.current[replyId]
     setState(s => ({
       ...s,
-      tree: {...s.tree, [replyId]: {...s.tree[replyId]!, status: 'stopped'}},
+      tree: {
+        ...s.tree,
+        [replyId]: doneWriting({...s.tree[replyId]!, status: 'stopped'}),
+      },
     }))
   }, [])
 
@@ -472,6 +644,7 @@ export function useTreeSim() {
             text: '',
             tokens: 0,
             status: 'streaming',
+            files: undefined,
           },
         },
       }))
@@ -505,12 +678,34 @@ export function useTreeSim() {
 
   const reset = useCallback(() => {
     streams.current = {}
-    setState(seed())
-  }, [])
+    setState(init())
+  }, [init])
 
   const clear = useCallback(() => {
     streams.current = {}
-    setState(empty())
+    setState(s => ({...emptySim(), workspace: s.workspace, shell: s.shell}))
+  }, [])
+
+  const setWorkspace = useCallback(
+    (workspace: Workspace | null, shell = false) =>
+      setState(s => ({...s, workspace, shell})),
+    []
+  )
+
+  // Simulates the user changing files in a Thread's folder between Turns; the next Prompt from that Reply records it.
+  const userEdit = useCallback((replyId: string, change: FileChange) => {
+    setState(s => ({
+      ...s,
+      pendingEdits: {
+        ...s.pendingEdits,
+        [replyId]: [
+          ...(s.pendingEdits[replyId] ?? []).filter(
+            f => f.path !== change.path
+          ),
+          change,
+        ],
+      },
+    }))
   }, [])
 
   const toggleCollapsed = useCallback((replyId: string) => {
@@ -558,5 +753,10 @@ export function useTreeSim() {
     reveal,
     unseenFailures,
     dismissFailure,
+    workspace,
+    shell,
+    setWorkspace,
+    pendingEdits,
+    userEdit,
   }
 }

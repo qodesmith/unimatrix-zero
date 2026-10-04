@@ -33,6 +33,7 @@ import {
   useHighlight,
   useHighlightTarget,
   useReportTyping,
+  useDecor,
   useTreeLayout,
   useSim,
 } from './shared'
@@ -65,6 +66,7 @@ export function ExchangeNode({data, selected}: NodeProps<Node<Data>>) {
   const reportTyping = useReportTyping(reply.id)
   const features = useContext(CanvasFeatures)
   const hasDraft = useHasDraft(reply.id)
+  const decor = useDecor()
 
   return (
     <div
@@ -102,6 +104,7 @@ export function ExchangeNode({data, selected}: NodeProps<Node<Data>>) {
                   {prompt.text}
                 </ScrollableText>
               )}
+              {decor.prompt?.(prompt)}
             </div>
             {features.collapse ? (
               <FoldToggle reply={reply} />
@@ -114,18 +117,21 @@ export function ExchangeNode({data, selected}: NodeProps<Node<Data>>) {
             )}
           </div>
 
+          {decor.replyTop?.(reply, 'canvas')}
           <ScrollableText
             maxHeightClass="max-h-72"
             streaming={streaming}
             className={`px-3 py-2 text-sm leading-relaxed ${reply.status === 'failed' ? 'text-zinc-400' : 'text-zinc-800'}`}
           >
-            {reply.text}
+            {decor.replyBody?.(reply, 'canvas') ?? reply.text}
             {streaming && <Cursor />}
           </ScrollableText>
+          {decor.replyBottom?.(reply, 'canvas')}
 
           <div className="flex items-center gap-2 border-t border-zinc-100 px-3 py-1.5 text-[11px] text-zinc-500">
             <span>{reply.model}</span>
             <StatusBar reply={reply} sim={sim} />
+            {decor.replyFooter?.(reply, 'canvas')}
             <span className="flex-1" />
             {reply.status !== 'failed' && (
               <ContextBadge tree={sim.tree} reply={reply} />
@@ -147,6 +153,7 @@ export function ExchangeNode({data, selected}: NodeProps<Node<Data>>) {
           promptId={prompt.id}
           onDelete={() => sim.deleteFrom(prompt.id)}
         />
+        {decor.replyOverlay?.(reply)}
       </div>
 
       {/* Input docks to the right edge, where the next exchange will appear. The column is always reserved so hover doesn't shift the layout. */}

@@ -32,6 +32,7 @@ import {
   useHighlight,
   useHighlightTarget,
   useReportTyping,
+  useDecor,
   useTreeLayout,
   useSim,
 } from './shared'
@@ -51,6 +52,7 @@ const handles = (
 // `selected` and `data-turn` are only used by variant D (drawer selection and click targets).
 export function PromptNode({data, selected}: NodeProps<Node<Data>>) {
   const sim = useSim()
+  const decor = useDecor()
   const {turn} = data
 
   return (
@@ -68,6 +70,7 @@ export function PromptNode({data, selected}: NodeProps<Node<Data>>) {
       {turn.text && (
         <ScrollableText maxHeightClass="max-h-32">{turn.text}</ScrollableText>
       )}
+      {decor.prompt?.(turn)}
       <DeletePill
         tree={sim.tree}
         promptId={turn.id}
@@ -89,6 +92,7 @@ export function ReplyNode({data, selected}: NodeProps<Node<Data>>) {
   const reportTyping = useReportTyping(turn.id)
   const features = useContext(CanvasFeatures)
   const hasDraft = useHasDraft(turn.id)
+  const decor = useDecor()
 
   return (
     <div
@@ -113,20 +117,24 @@ export function ReplyNode({data, selected}: NodeProps<Node<Data>>) {
             )
           )}
         </div>
+        {decor.replyTop?.(turn, 'canvas')}
         <ScrollableText
           maxHeightClass="max-h-72"
           streaming={streaming}
           className={`px-3.5 py-2 text-sm leading-relaxed ${turn.status === 'failed' ? 'text-zinc-400' : 'text-zinc-800'}`}
         >
-          {turn.text}
+          {decor.replyBody?.(turn, 'canvas') ?? turn.text}
           {streaming && <Cursor />}
         </ScrollableText>
+        {decor.replyBottom?.(turn, 'canvas')}
         <div className="flex items-center gap-2 border-t border-zinc-100 px-3.5 py-1.5">
           {turn.status !== 'failed' && (
             <ContextBadge tree={sim.tree} reply={turn} />
           )}
           <StatusBar reply={turn} sim={sim} />
+          {decor.replyFooter?.(turn, 'canvas')}
         </div>
+        {decor.replyOverlay?.(turn)}
       </div>
 
       {/* Input: always shown on the active Reply; hover-revealed as an overlay elsewhere so the layout doesn't jump. */}

@@ -4,6 +4,7 @@ import {
   type Edge,
   type Node,
   type NodeChange,
+  type NodeTypes,
   type ReactFlowInstance,
 } from '@xyflow/react'
 import {
@@ -18,6 +19,7 @@ import {
   useRef,
   useState,
   type Dispatch,
+  type RefObject,
   type SetStateAction,
 } from 'react'
 
@@ -48,6 +50,9 @@ export function useTreeLayout(
   >({})
   const dirRef = useRef(dir)
   dirRef.current = dir
+  // Only Turns drive layout; host-added nodes (e.g. Segment bands) are sized from it.
+  const baseIds = useRef(new Set<string>())
+  baseIds.current = new Set(base.map(n => n.id))
   const [version, bump] = useReducer((x: number) => x + 1, 0)
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
@@ -55,6 +60,7 @@ export function useTreeLayout(
     let changed = false
     for (const c of changes) {
       if (c.type !== 'dimensions' || !c.dimensions) continue
+      if (!baseIds.current.has(c.id)) continue
       const prev = sizes[c.id]
       if (
         !prev ||
@@ -934,3 +940,37 @@ export function PrototypeSwitcher({
 // Node components read the sim from context so node data stays small.
 export const SimContext = createContext<TreeSim | null>(null)
 export const useSim = () => useContext(SimContext)!
+
+// ---------- Workspace prototype: what a host page can inject into the canvas ----------
+
+export type HostApi = {
+  // Opens the slideout on a Turn (null closes it).
+  select: (turnId: string | null) => void
+  jumpTo: (turnId: string) => void
+  // Opens the slideout on a Turn at its Files tab, where the host provides one.
+  openFiles: (turnId: string) => void
+}
+
+export type Decor = {
+  // Canvas Reply boxes (both orientations) and the slideout's Replies.
+  replyTop?: (reply: Turn, where: 'canvas' | 'drawer') => ReactNode
+  replyFooter?: (reply: Turn, where: 'canvas' | 'drawer') => ReactNode
+  // Absolute overlay on the Reply box; needs no layout room.
+  replyOverlay?: (reply: Turn) => ReactNode
+  // Between the Reply text and its footer.
+  replyBottom?: (reply: Turn, where: 'canvas' | 'drawer') => ReactNode
+  // Replaces the plain Reply text, e.g. to interleave file changes.
+  replyBody?: (reply: Turn, where: 'canvas' | 'drawer') => ReactNode
+  prompt?: (prompt: Turn) => ReactNode
+  // Variant D host hooks.
+  onFocusReply?: (replyId: string | null) => void
+  hostApi?: RefObject<HostApi | null>
+  extraNodes?: (nodes: Node[], tree: Tree) => Node[]
+  extraNodeTypes?: NodeTypes
+  drawerFiles?: (replyId: string) => ReactNode
+  emptyExtra?: ReactNode
+  // Room the host keeps on the left (a sidebar), so full screen doesn't cover it.
+  leftInset?: number
+}
+export const DecorContext = createContext<Decor>({})
+export const useDecor = () => useContext(DecorContext)

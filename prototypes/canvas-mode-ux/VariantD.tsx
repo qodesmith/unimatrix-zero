@@ -38,6 +38,7 @@ import {
   useHighlightTarget,
   useReportTyping,
   useSim,
+  useDecor,
   useTreeLayout,
 } from './shared'
 import {childrenOf, hiddenIds, pathTo, type Attachment, type Tree} from './tree'
@@ -79,6 +80,12 @@ const offsetBy = (p: XYPosition, d: XYPosition) => ({
 export function VariantD() {
   const sim = useSim()
   const rf = useReactFlow()
+  const decor = useDecor()
+  const allNodeTypes = useMemo(
+    () => ({...nodeTypes, ...decor.extraNodeTypes}),
+    [decor.extraNodeTypes]
+  )
+  const [drawerTab, setDrawerTab] = useState<'chat' | 'files'>('chat')
   const [orientation, setOrientation] = useState<Orientation>(() =>
     localStorage.getItem(ORIENTATION_KEY) === 'horizontal'
       ? 'horizontal'
@@ -101,6 +108,9 @@ export function VariantD() {
     if (selected && !drawerReplyId) setSelected(null)
     if (!drawerReplyId) setFull(false)
   }, [selected, drawerReplyId])
+  useEffect(() => {
+    decor.onFocusReply?.(drawerReplyId)
+  }, [drawerReplyId])
 
   // The whole layout is offset so a toggled Reply keeps its canvas position (and so its screen position) while the rest reflows.
   const shift = useRef<XYPosition>({x: 0, y: 0})
@@ -220,8 +230,9 @@ export function VariantD() {
     }
     // Same DOM order in both orientations, so React never moves a node mid-transition.
     const order = (id: string) => sim.tree[id]?.createdAt ?? 0
-    return out.sort((a, b) => order(a.id) - order(b.id))
-  }, [laid, switching, vertical, selected, sim.tree, orientation])
+    out.sort((a, b) => order(a.id) - order(b.id))
+    return decor.extraNodes ? [...decor.extraNodes(out, sim.tree), ...out] : out
+  }, [laid, switching, vertical, selected, sim.tree, orientation, decor])
 
   const switchTo = (o: Orientation) => {
     if (o === orientation) return
@@ -335,6 +346,20 @@ export function VariantD() {
     jumpTo(id)
   }
 
+  if (decor.hostApi)
+    decor.hostApi.current = {
+      select: turnId => {
+        setSelected(turnId)
+        if (turnId) jumpTo(turnId, DRAWER_WIDTH / 2)
+      },
+      jumpTo: turnId => jumpTo(turnId),
+      openFiles: turnId => {
+        setSelected(turnId)
+        setDrawerTab('files')
+        jumpTo(turnId, DRAWER_WIDTH / 2)
+      },
+    }
+
   const openDrawer = (e: MouseEvent) => {
     const el = e.target as HTMLElement
     if (el.closest('button, input, textarea, .nodrag')) return
@@ -352,7 +377,7 @@ export function VariantD() {
           <ReactFlow
             nodes={nodes}
             edges={styledEdges}
-            nodeTypes={nodeTypes}
+            nodeTypes={allNodeTypes}
             onNodesChange={onNodesChange}
             {...canvasProps}
             fitView={!loadedEmpty}
@@ -377,7 +402,7 @@ export function VariantD() {
             {!loadedEmpty && <FitOnceMeasured />}
           </ReactFlow>
           {empty && (
-            <div className="pointer-events-none fixed inset-0 z-10 flex items-center justify-center">
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
               <div className="pointer-events-auto w-[560px]">
                 <PromptInput
                   large
@@ -390,6 +415,7 @@ export function VariantD() {
                 <p className="mt-2 text-center text-xs text-zinc-400">
                   Enter to send · attach with 📎, paste or drop files
                 </p>
+                {decor.emptyExtra}
               </div>
             </div>
           )}
@@ -400,6 +426,8 @@ export function VariantD() {
               onToggleFull={() => setFull(f => !f)}
               onClose={() => setSelected(null)}
               onSent={setSelected}
+              tab={decor.drawerFiles ? drawerTab : 'chat'}
+              onTab={setDrawerTab}
             />
           )}
           {lightbox && (
@@ -538,7 +566,11 @@ function ChatDrawer({
   onToggleFull,
   onClose,
   onSent,
+  tab,
+  onTab,
 }: {
+  tab: 'chat' | 'files'
+  onTab: (t: 'chat' | 'files') => void
   replyId: string
   // Covers the canvas: the familiar full-page chat.
   full: boolean
@@ -547,6 +579,7 @@ function ChatDrawer({
   onSent: (replyId: string) => void
 }) {
   const sim = useSim()
+  const decor = useDecor()
   const thread = pathTo(sim.tree, replyId)
   const last = sim.tree[replyId]!
   const reportTyping = useReportTyping(replyId)
@@ -568,13 +601,34 @@ function ChatDrawer({
 
   return (
     <aside
-      style={full ? undefined : {width: DRAWER_WIDTH}}
-      className={`fixed top-0 right-0 bottom-0 z-40 flex flex-col bg-zinc-50 ${full ? 'left-0 pb-12' : 'border-l border-zinc-200 shadow-xl'}`}
+      style={
+        full
+          ? {left: decor.leftInset ?? 0}
+          : {width: decor.drawerFiles && tab === 'files' ? 760 : DRAWER_WIDTH}
+      }
+      className={`fixed top-0 right-0 bottom-0 z-40 flex flex-col bg-zinc-50 ${full ? 'pb-12' : 'border-l border-zinc-200 shadow-xl'}`}
     >
       <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-2 text-xs text-zinc-500">
-        <span>
-          Thread · {thread.length} Turns · {last.model}
-        </span>
+        {decor.drawerFiles ? (
+          <span className="flex items-center gap-1">
+            {(['chat', 'files'] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => onTab(t)}
+                className={`rounded-md px-2 py-1 capitalize ${tab === t ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'}`}
+              >
+                {t}
+              </button>
+            ))}
+            <span className="ml-2">
+              {thread.length} Turns · {last.model}
+            </span>
+          </span>
+        ) : (
+          <span>
+            Thread · {thread.length} Turns · {last.model}
+          </span>
+        )}
         <span className="flex items-center gap-3">
           <button
             onClick={onToggleFull}
@@ -594,47 +648,56 @@ function ChatDrawer({
           </button>
         </span>
       </div>
-      <div
-        ref={bodyRef}
-        onScroll={e => {
-          const el = e.currentTarget
-          pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
-        }}
-        className="relative flex-1 overflow-y-auto px-4 py-4"
-      >
-        <div className={`mx-auto flex flex-col gap-3 ${COLUMN}`}>
-          {thread.map((t, i) =>
-            t.kind === 'prompt' ? (
-              <div
-                key={t.id}
-                ref={i === thread.length - 2 ? lastPromptRef : undefined}
-                className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-sky-100 px-3.5 py-2 text-sm whitespace-pre-wrap text-sky-950"
-              >
-                {t.attachments && (
-                  <AttachmentList
-                    items={t.attachments}
-                    className={t.text ? 'mb-2' : ''}
-                  />
-                )}
-                {t.text}
-              </div>
-            ) : (
-              <div key={t.id} className="mr-6">
+      {tab === 'files' && decor.drawerFiles ? (
+        <div className="min-h-0 flex-1">{decor.drawerFiles(replyId)}</div>
+      ) : (
+        <div
+          ref={bodyRef}
+          onScroll={e => {
+            const el = e.currentTarget
+            pinned.current =
+              el.scrollHeight - el.scrollTop - el.clientHeight < 24
+          }}
+          className="relative flex-1 overflow-y-auto px-4 py-4"
+        >
+          <div className={`mx-auto flex flex-col gap-3 ${COLUMN}`}>
+            {thread.map((t, i) =>
+              t.kind === 'prompt' ? (
                 <div
-                  className={`rounded-2xl rounded-bl-md border bg-white px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap shadow-sm ${t.status === 'failed' ? 'border-red-300 text-zinc-400' : 'border-zinc-200 text-zinc-800'}`}
+                  key={t.id}
+                  ref={i === thread.length - 2 ? lastPromptRef : undefined}
+                  className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-sky-100 px-3.5 py-2 text-sm whitespace-pre-wrap text-sky-950"
                 >
+                  {t.attachments && (
+                    <AttachmentList
+                      items={t.attachments}
+                      className={t.text ? 'mb-2' : ''}
+                    />
+                  )}
                   {t.text}
-                  {t.status === 'streaming' && <Cursor />}
+                  {decor.prompt?.(t)}
                 </div>
-                <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-400">
-                  {t.model}
-                  <StatusBar reply={t} sim={sim} />
+              ) : (
+                <div key={t.id} className="mr-6">
+                  <div
+                    className={`rounded-2xl rounded-bl-md border bg-white px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap shadow-sm ${t.status === 'failed' ? 'border-red-300 text-zinc-400' : 'border-zinc-200 text-zinc-800'}`}
+                  >
+                    {decor.replyTop?.(t, 'drawer')}
+                    {decor.replyBody?.(t, 'drawer') ?? t.text}
+                    {t.status === 'streaming' && <Cursor />}
+                    {decor.replyBottom?.(t, 'drawer')}
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-400">
+                    {t.model}
+                    <StatusBar reply={t} sim={sim} />
+                    {decor.replyFooter?.(t, 'drawer')}
+                  </div>
                 </div>
-              </div>
-            )
-          )}
+              )
+            )}
+          </div>
         </div>
-      </div>
+      )}
       <div className="border-t border-zinc-200 bg-white">
         <div className={`mx-auto px-4 pt-3 pb-2 ${COLUMN}`}>
           <PromptInput
