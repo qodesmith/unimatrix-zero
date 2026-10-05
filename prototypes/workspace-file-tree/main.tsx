@@ -32,10 +32,15 @@ const VARIANTS: {
   {key: 'C', name: C.name, Component: C.VariantC},
 ]
 
-// Benign: React Flow re-measures nodes in the same frame. Keeps Bun's error overlay quiet.
-window.addEventListener('error', e => {
-  if (e.message?.includes('ResizeObserver')) e.stopImmediatePropagation()
-})
+// Benign: React Flow re-measures nodes in the same frame. Keeps Bun's error overlay quiet. Capture phase, because
+// Bun's own window listener is registered before this module runs.
+window.addEventListener(
+  'error',
+  e => {
+    if (e.message?.includes('ResizeObserver')) e.stopImmediatePropagation()
+  },
+  {capture: true}
+)
 
 for (const t of TREES) simCache.set(t.key, t.init())
 

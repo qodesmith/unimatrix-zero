@@ -45,14 +45,17 @@ const BAND_COLORS = ['#f5f3ff', '#ecfeff', '#fef9c3', '#fce7f3', '#ecfccb']
 
 type Band = {w: number; h: number; label: string; color: string}
 
+// The band hangs off a fixed 1px box, so React Flow's ResizeObserver never sees it grow when a Turn grows.
 function BandNode({data}: NodeProps<Node<Band>>) {
   return (
-    <div
-      style={{width: data.w, height: data.h, background: data.color}}
-      className="rounded-3xl border border-black/5"
-    >
-      <div className="absolute -top-5 left-3 text-[11px] font-medium whitespace-nowrap text-zinc-500">
-        {data.label}
+    <div className="h-px w-px">
+      <div
+        style={{width: data.w, height: data.h, background: data.color}}
+        className="absolute top-0 left-0 rounded-3xl border border-black/5"
+      >
+        <div className="absolute -top-5 left-3 text-[11px] font-medium whitespace-nowrap text-zinc-500">
+          {data.label}
+        </div>
       </div>
     </div>
   )
@@ -251,13 +254,18 @@ function bandNodes(nodes: Node[], tree: Tree): Node[] {
     )
     const files = segmentChanges(tree, seg).size
     const turns = seg.turnIds.length
+    const w = box.x2 - box.x1 + BAND_PAD * 2
+    const h = box.y2 - box.y1 + BAND_PAD * 2
     out.push({
       id: `band-${seg.id}`,
       type: 'band',
       position: {x: box.x1 - BAND_PAD, y: box.y1 - BAND_PAD},
+      // Without `measured`, React Flow treats each rebuilt band as new and re-measures it, tripping a ResizeObserver
+      // loop whenever a Turn resizes. Also keeps fitView and the minimap using the band's real box.
+      measured: {width: w, height: h},
       data: {
-        w: box.x2 - box.x1 + BAND_PAD * 2,
-        h: box.y2 - box.y1 + BAND_PAD * 2,
+        w,
+        h,
         label: `Segment ${i + 1} · ${turns / 2} Turn${turns === 2 ? '' : 's'}${files ? ` · ${files} file${files === 1 ? '' : 's'} changed` : ''}`,
         color: BAND_COLORS[i % BAND_COLORS.length]!,
       } satisfies Band,
