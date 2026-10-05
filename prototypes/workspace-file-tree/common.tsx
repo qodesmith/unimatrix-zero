@@ -83,10 +83,11 @@ function FilesTreeInner({
   const sel = useFileTreeSelection(model)
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
+  // Keyed on the path, not the array: useFileTreeSelection returns a new array every render.
+  const picked = sel[0]
   useEffect(() => {
-    const p = sel[0]
-    if (p && p !== selected) onSelectRef.current(p)
-  }, [sel])
+    if (picked && picked !== selected) onSelectRef.current(picked)
+  }, [picked])
   return (
     <FileTree model={model} style={{height: '100%', colorScheme: 'light'}} />
   )
