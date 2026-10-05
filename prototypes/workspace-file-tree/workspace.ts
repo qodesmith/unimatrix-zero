@@ -14,6 +14,9 @@ import {
   type Turn,
   type Workspace,
 } from '../canvas-mode-ux/tree'
+import CLIP_MP4 from './media/bamboo-grove.mp4'
+import READ_ALOUD_M4A from './media/mum-questions.m4a'
+import RAIL_PASS_PDF from './media/rail-pass.pdf'
 
 const {SHORT, MEDIUM, LONG} = CANNED_REPLIES
 
@@ -22,6 +25,7 @@ const {SHORT, MEDIUM, LONG} = CANNED_REPLIES
 export type FileState = {
   path: string
   content: string
+  size: number
   // The Turn that last changed it; null for files already in a linked folder.
   changedBy: string | null
 }
@@ -37,7 +41,7 @@ export function snapshotAt(
   const files = new Map<string, FileState>()
   if (workspace?.kind === 'linked')
     for (const [path, content] of Object.entries(workspace.base ?? {}))
-      files.set(path, {path, content, changedBy: null})
+      files.set(path, {path, content, size: sizeOf({content}), changedBy: null})
   if (!tree[turnId]) return files
   for (const t of pathTo(tree, turnId))
     for (const f of t.files ?? [])
@@ -46,6 +50,7 @@ export function snapshotAt(
         files.set(f.path, {
           path: f.path,
           content: f.content ?? '',
+          size: sizeOf(f),
           changedBy: t.id,
         })
   for (const f of pending)
@@ -54,6 +59,7 @@ export function snapshotAt(
       files.set(f.path, {
         path: f.path,
         content: f.content ?? '',
+        size: sizeOf(f),
         changedBy: 'you',
       })
   return files
@@ -99,17 +105,116 @@ export const OP_STYLE: Record<
   deleted: {sign: '−', text: 'text-red-700', bg: 'bg-red-500', verb: 'Deleted'},
 }
 
-export type FileKind = 'md' | 'csv' | 'image' | 'pdf' | 'code' | 'text'
-export function fileKind(path: string): FileKind {
-  const ext = path.split('.').pop()?.toLowerCase() ?? ''
+export type FileKind =
+  | 'md'
+  | 'csv'
+  | 'image'
+  | 'audio'
+  | 'video'
+  | 'pdf'
+  | 'office'
+  | 'code'
+  | 'text'
+  | 'binary'
+
+const EXT_KIND: Record<string, FileKind> = {}
+for (const [kind, exts] of [
+  ['image', 'svg png jpg jpeg gif webp'],
+  ['audio', 'mp3 wav ogg opus flac m4a aac'],
+  ['video', 'mp4 webm mov m4v'],
+  ['pdf', 'pdf'],
+  ['office', 'docx xlsx pptx key pages numbers psd sketch fig'],
+  ['code', 'ts tsx js json css html py'],
+  ['text', 'txt log'],
+] as const)
+  for (const ext of exts.split(' ')) EXT_KIND[ext] = kind
+
+export const extOf = (path: string) =>
+  path.includes('.') ? path.split('.').pop()!.toLowerCase() : ''
+
+// Unknown extensions count as text only if the content looks like text.
+export function fileKind(path: string, content?: string): FileKind {
+  const ext = extOf(path)
   if (ext === 'md') return 'md'
   if (ext === 'csv') return 'csv'
-  if (['svg', 'png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) return 'image'
-  if (ext === 'pdf') return 'pdf'
-  if (['ts', 'tsx', 'js', 'json', 'css', 'html', 'py'].includes(ext))
-    return 'code'
-  return 'text'
+  const known = EXT_KIND[ext]
+  if (known) return known
+  return content && !isUrl(content) && !content.includes('\0')
+    ? 'text'
+    : 'binary'
 }
+
+export const isMedia = (kind: FileKind) =>
+  ['image', 'audio', 'video', 'pdf', 'office', 'binary'].includes(kind)
+
+// Media content is a URL (bundled asset or data URI); SVGs written by the AI are raw markup.
+export const isUrl = (content: string) =>
+  /^(data:|blob:|https?:\/\/|\.{0,2}\/)\S*$/.test(content)
+
+export const mediaSrc = (content: string) =>
+  isUrl(content) ? content : `data:image/svg+xml,${encodeURIComponent(content)}`
+
+export const sizeOf = (f: {content?: string; size?: number}) =>
+  f.size ?? new Blob([f.content ?? '']).size
+
+export function formatSize(bytes: number) {
+  const units = ['B', 'KB', 'MB', 'GB']
+  let n = bytes
+  let i = 0
+  while (n >= 1000 && i < units.length - 1) {
+    n /= 1000
+    i++
+  }
+  return `${i === 0 || n >= 10 ? Math.round(n) : n.toFixed(1)} ${units[i]}`
+}
+
+// Text past this previews truncated.
+export const TEXT_PREVIEW_CAP = 1_000_000
+// Binaries past this don't preview in the app.
+export const MEDIA_PREVIEW_CAP = 500_000_000
+// Binaries past this aren't snapshotted, so earlier Turns can't show them.
+export const KEEP_VERSION_CAP = 100_000_000
+
+const TYPE_NAMES: Record<string, string> = {
+  docx: 'Word document',
+  xlsx: 'Excel spreadsheet',
+  pptx: 'PowerPoint presentation',
+  key: 'Keynote presentation',
+  pages: 'Pages document',
+  numbers: 'Numbers spreadsheet',
+  psd: 'Photoshop image',
+  sketch: 'Sketch file',
+  fig: 'Figma file',
+  pdf: 'PDF document',
+  mov: 'QuickTime movie',
+  mp4: 'MPEG-4 video',
+  m4a: 'MPEG-4 audio',
+  pkpass: 'Wallet pass',
+  log: 'Log file',
+}
+export const typeName = (path: string) => {
+  const ext = extOf(path)
+  return TYPE_NAMES[ext] ?? (ext ? `${ext.toUpperCase()} file` : 'File')
+}
+
+export const KIND_ICON: Record<FileKind, string> = {
+  md: '📄',
+  csv: '📊',
+  image: '🖼',
+  audio: '🎵',
+  video: '🎬',
+  pdf: '📕',
+  office: '📎',
+  code: '⌨',
+  text: '📄',
+  binary: '📦',
+}
+
+// Seed Turns have a counter for createdAt; spread them over a morning so they read as times.
+export const modifiedLabel = (createdAt: number) =>
+  new Date(
+    createdAt < 1e9 ? Date.UTC(2026, 9, 2, 9) + createdAt * 360_000 : createdAt
+  ).toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'})
 
 export const baseName = (path: string) => path.split('/').pop() ?? path
 
@@ -249,6 +354,17 @@ const ROOM_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="42
 <rect x="360" y="60" width="200" height="180" fill="#f8f3e6" stroke="#8a6d3b" stroke-width="6"/>
 <rect x="200" y="300" width="240" height="40" rx="6" fill="#6b4f2a"/></svg>`
 
+const HOSTELS = ['Len Kyoto', 'Piece Hostel Sanjo', "K's House"]
+// The start of a 12 MB log: enough to preview, the rest is only "on disk".
+const PRICE_LOG = Array.from({length: 600}, (_, i) => {
+  const t = new Date(Date.UTC(2026, 9, 1) + i * 37_000).toISOString()
+  const h = HOSTELS[i % 3]
+  return `${t} INFO  ${h} 2026-11-${24 + (i % 3)} beds=${(i * 7) % 5} price=¥${3200 + ((i * 131) % 900)}`
+}).join('\n')
+
+// Just a QuickTime header: the browser can't decode it, like an HEVC clip on a machine without the codec.
+const HEVC_MOV = 'data:video/quicktime;base64,AAAAFGZ0eXBxdCAgAAAAAHF0ICA='
+
 export function seedWorkspaceKyoto(): SimState {
   return buildSeed(
     add => {
@@ -261,6 +377,14 @@ export function seedWorkspaceKyoto(): SimState {
         files: [
           {path: 'itinerary.md', op: 'added', content: ITINERARY, at: 60},
           {path: 'packing-list.md', op: 'added', content: PACKING, at: 1900},
+          {
+            path: 'rail-pass.pdf',
+            op: 'added',
+            content: RAIL_PASS_PDF,
+            size: 1023,
+            at: 1950,
+          },
+          {path: 'itinerary.docx', op: 'added', size: 46_200, at: 2000},
         ],
       })
       const p2 = add('prompt', r1, "Make it cheaper. We're on a tight budget.")
@@ -273,6 +397,13 @@ export function seedWorkspaceKyoto(): SimState {
             at: 120,
           },
           {path: 'budget.csv', op: 'added', content: BUDGET, at: 300},
+          {
+            path: 'audio/itinerary-read-aloud.m4a',
+            op: 'added',
+            content: READ_ALOUD_M4A,
+            size: 13_097,
+            at: 330,
+          },
         ],
       })
       const p3 = add('prompt', r1, 'Swap day 3 for a day trip to Nara.')
@@ -331,6 +462,12 @@ export function seedWorkspaceKyoto(): SimState {
             op: 'added',
             content: 'len kyoto? piece? check lifts',
             at: 90,
+          },
+          {
+            path: 'hostels/piece-room-tour.mov',
+            op: 'added',
+            size: 2_140_000_000,
+            at: 120,
           },
         ],
       })
@@ -417,6 +554,34 @@ export function seedWorkspaceKyoto(): SimState {
             op: 'modified',
             content: `${ITINERARY_CHEAP}\n\n## Where we stay\nPiece Hostel Sanjo, family room (lift, no stairs).`,
             at: 80,
+          },
+          {
+            path: 'clips/bamboo-grove.mp4',
+            op: 'added',
+            content: CLIP_MP4,
+            size: 49_058,
+            at: 100,
+          },
+          {
+            path: 'clips/iphone-grove.mov',
+            op: 'added',
+            content: HEVC_MOV,
+            size: 38_400_000,
+            at: 110,
+          },
+          {
+            path: 'photos/ryokan-floorplan.psd',
+            op: 'added',
+            size: 8_700_000,
+            at: 120,
+          },
+          {path: 'tickets/ryokan.pkpass', op: 'added', size: 61_300, at: 130},
+          {
+            path: 'logs/price-check.log',
+            op: 'added',
+            content: PRICE_LOG,
+            size: 12_400_000,
+            at: 140,
           },
         ],
       })

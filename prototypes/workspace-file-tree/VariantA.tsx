@@ -23,7 +23,14 @@ import {
   UserEdits,
   WorkspaceChip,
 } from './common'
-import {baseName, isLeaf, OP_STYLE, snapshotAt} from './workspace'
+import {
+  baseName,
+  formatSize,
+  isLeaf,
+  OP_STYLE,
+  sizeOf,
+  snapshotAt,
+} from './workspace'
 
 export const name = 'Sidebar: Trees above, files below'
 
@@ -210,7 +217,11 @@ function FilesPanel({
             onSelect={p =>
               snap.has(p) || deleted.includes(p) ? onOpen(p) : undefined
             }
-            decorate={p => (pending.some(f => f.path === p) ? 'you' : null)}
+            decorate={p => {
+              if (pending.some(f => f.path === p)) return 'you'
+              const size = snap.get(p)?.size ?? 0
+              return size >= 1_000_000 ? formatSize(size) : null
+            }}
           />
         ) : (
           <p className="px-4 py-6 text-center text-xs text-zinc-500">
@@ -288,6 +299,11 @@ function FileActivity({
                 {f.writing ? 'Writing' : OP_STYLE[f.op].verb}
               </span>
               <span className="truncate font-mono text-zinc-800">{f.path}</span>
+              {f.op !== 'deleted' && !f.writing && (
+                <span className="ml-auto shrink-0 text-zinc-400">
+                  {formatSize(sizeOf(f))}
+                </span>
+              )}
             </button>
           ))}
           {commands.map((c, i) => (

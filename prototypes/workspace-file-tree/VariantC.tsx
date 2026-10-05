@@ -25,9 +25,14 @@ import {
 } from './common'
 import {
   baseName,
+  extOf,
   fileKind,
+  formatSize,
+  KIND_ICON,
+  mediaSrc,
   OP_STYLE,
   segmentsOf,
+  sizeOf,
   snapshotAt,
   type Segment,
 } from './workspace'
@@ -299,7 +304,7 @@ function FileChips({
 
 function Chip({change, onClick}: {change: FileChange; onClick: () => void}) {
   const s = OP_STYLE[change.op]
-  const image = fileKind(change.path) === 'image' && change.content
+  const kind = fileKind(change.path, change.content)
   return (
     <button
       onClick={onClick}
@@ -307,17 +312,33 @@ function Chip({change, onClick}: {change: FileChange; onClick: () => void}) {
       className={`nodrag relative flex h-10 max-w-[190px] items-center gap-1.5 overflow-hidden rounded-lg border bg-white pr-2 text-left ${change.op === 'deleted' ? 'border-red-200 opacity-60' : 'border-zinc-200 hover:border-violet-300'}`}
     >
       <span className={`h-full w-1 shrink-0 ${s.bg}`} />
-      {image ? (
+      {change.writing ? (
+        <Spinner />
+      ) : kind === 'image' && change.content ? (
         <img
-          src={`data:image/svg+xml,${encodeURIComponent(change.content!)}`}
+          src={mediaSrc(change.content)}
           alt=""
           className="h-8 w-8 rounded object-cover"
         />
-      ) : change.writing ? (
-        <Spinner />
+      ) : kind === 'video' ? (
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-zinc-800 text-[10px] text-white">
+          ▶
+        </span>
+      ) : ['audio', 'pdf', 'office', 'binary'].includes(kind) ? (
+        <span
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded text-sm ${kind === 'pdf' ? 'bg-red-50' : kind === 'audio' ? 'bg-violet-50' : 'bg-zinc-100'}`}
+        >
+          {kind === 'office' ? (
+            <span className="font-mono text-[8px] font-bold text-zinc-600">
+              {extOf(change.path).toUpperCase()}
+            </span>
+          ) : (
+            KIND_ICON[kind]
+          )}
+        </span>
       ) : (
         <span className="font-mono text-[9px] font-bold text-zinc-500">
-          {change.path.split('.').pop()?.toUpperCase().slice(0, 4)}
+          {extOf(change.path).toUpperCase().slice(0, 4)}
         </span>
       )}
       <span className="min-w-0">
@@ -327,7 +348,9 @@ function Chip({change, onClick}: {change: FileChange; onClick: () => void}) {
           {baseName(change.path)}
         </span>
         <span className={`block text-[10px] ${s.text}`}>
-          {change.writing ? 'writing…' : s.verb.toLowerCase()}
+          {change.writing
+            ? 'writing…'
+            : `${s.verb.toLowerCase()}${change.op === 'deleted' ? '' : ` · ${formatSize(sizeOf(change))}`}`}
         </span>
       </span>
     </button>

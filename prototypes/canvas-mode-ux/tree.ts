@@ -11,6 +11,8 @@ export type FileChange = {
   path: string
   op: FileOp
   content?: string
+  // Bytes. Defaults to the content's length; set for binaries whose content is a URL or isn't kept.
+  size?: number
   // Character offset into the Reply text where the change happened, for interleaved rendering.
   at?: number
   // Still being written while the Reply streams.

@@ -23,11 +23,23 @@ import {
   baseName,
   contentBefore,
   countOps,
+  extOf,
   fileKind,
+  formatSize,
   isLeaf,
+  isMedia,
+  KEEP_VERSION_CAP,
+  KIND_ICON,
+  MEDIA_PREVIEW_CAP,
+  mediaSrc,
+  modifiedLabel,
   OP_STYLE,
   PICKED_FOLDER,
+  sizeOf,
   snapshotAt,
+  TEXT_PREVIEW_CAP,
+  typeName,
+  type FileKind,
   type TreeEntry,
 } from './workspace'
 
@@ -164,32 +176,241 @@ function Csv({text}: {text: string}) {
   )
 }
 
-export function FileBody({path, content}: {path: string; content: string}) {
-  const kind = fileKind(path)
-  if (kind === 'md') return <Markdown text={content} />
-  if (kind === 'csv') return <Csv text={content} />
+const TRUNCATE_AT = 4000
+
+export function FileBody({
+  path,
+  content,
+  size = sizeOf({content}),
+  modified,
+  notKept,
+}: {
+  path: string
+  content: string
+  size?: number
+  modified?: string
+  // A large binary at an earlier Turn: no snapshot of it exists.
+  notKept?: boolean
+}) {
+  const toast = useToast()
+  const [broken, setBroken] = useState(false)
+  const [zoom, setZoom] = useState(false)
+  const kind = fileKind(path, content)
+  const card = (note?: string) => (
+    <FileCard
+      path={path}
+      kind={kind}
+      size={size}
+      modified={modified}
+      note={note}
+    />
+  )
+  if (notKept) return card('Files this big only keep their latest version.')
+  if (isMedia(kind) && size > MEDIA_PREVIEW_CAP)
+    return card(
+      `Too big to preview here (over ${formatSize(MEDIA_PREVIEW_CAP)}).`
+    )
+  if (kind === 'office' || (kind !== 'binary' && isMedia(kind) && !content))
+    return (
+      <OsPreviewCard path={path} kind={kind} size={size} modified={modified} />
+    )
+  if (kind === 'binary') return card('The app can’t preview this type of file.')
   if (kind === 'image')
     return (
-      <img
-        src={
-          content.startsWith('data:')
-            ? content
-            : `data:image/svg+xml,${encodeURIComponent(content)}`
-        }
-        alt={path}
-        className="max-h-[50vh] rounded-lg border border-zinc-200 bg-white"
+      <div>
+        <button
+          onClick={() => setZoom(z => !z)}
+          className="mb-1.5 text-[11px] text-violet-700 hover:underline"
+        >
+          {zoom ? 'Fit to window' : 'Actual size'}
+        </button>
+        <img
+          src={mediaSrc(content)}
+          alt={path}
+          onClick={() => setZoom(z => !z)}
+          className={`rounded-lg border border-zinc-200 bg-white ${zoom ? 'max-w-none cursor-zoom-out' : 'max-h-[50vh] max-w-full cursor-zoom-in'}`}
+        />
+      </div>
+    )
+  if (kind === 'audio' || kind === 'video') {
+    if (broken)
+      return card(
+        kind === 'video'
+          ? 'This video’s codec can’t play here.'
+          : 'This audio format can’t play here.'
+      )
+    return kind === 'audio' ? (
+      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm text-zinc-700">
+          <span className="text-xl">{KIND_ICON.audio}</span>
+          {typeName(path)} · {formatSize(size)}
+        </div>
+        <audio
+          controls
+          src={content}
+          onError={() => setBroken(true)}
+          className="w-full"
+        />
+      </div>
+    ) : (
+      <video
+        controls
+        src={content}
+        onError={() => setBroken(true)}
+        className="max-h-[50vh] w-full rounded-lg bg-black"
       />
     )
+  }
   if (kind === 'pdf')
     return (
-      <p className="text-sm text-zinc-500">
-        No preview for PDFs yet. Open it in your default app.
-      </p>
+      <iframe
+        src={content}
+        title={path}
+        className="h-[60vh] w-full rounded-lg border border-zinc-200"
+      />
     )
+  const truncated = size > TEXT_PREVIEW_CAP
+  const text = truncated
+    ? content.slice(0, content.lastIndexOf('\n', TRUNCATE_AT))
+    : content
+  const body =
+    kind === 'md' ? (
+      <Markdown text={text} />
+    ) : kind === 'csv' ? (
+      <Csv text={text} />
+    ) : (
+      <pre className="overflow-x-auto rounded-lg bg-zinc-50 p-3 font-mono text-xs leading-relaxed text-zinc-800">
+        {text}
+      </pre>
+    )
+  if (!truncated) return body
   return (
-    <pre className="overflow-x-auto rounded-lg bg-zinc-50 p-3 font-mono text-xs leading-relaxed text-zinc-800">
-      {content}
-    </pre>
+    <>
+      <div className="mb-2 flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+        Showing the first {formatSize(text.length)} of {formatSize(size)}.
+        <ActionButton
+          onClick={() => toast(`Opens ${baseName(path)} in its default app`)}
+        >
+          Open to see the rest
+        </ActionButton>
+      </div>
+      {body}
+    </>
+  )
+}
+
+const OFFICE_TINT: Record<string, string> = {
+  docx: 'bg-blue-600',
+  pages: 'bg-orange-500',
+  xlsx: 'bg-emerald-600',
+  numbers: 'bg-emerald-500',
+  pptx: 'bg-orange-600',
+  key: 'bg-sky-500',
+  psd: 'bg-indigo-900',
+  sketch: 'bg-amber-400',
+  fig: 'bg-zinc-900',
+}
+
+function FileFacts({
+  path,
+  size,
+  modified,
+}: {
+  path: string
+  size: number
+  modified?: string
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="truncate text-sm font-medium text-zinc-900">
+        {baseName(path)}
+      </div>
+      <div className="text-xs text-zinc-500">
+        {typeName(path)} · {formatSize(size)}
+      </div>
+      {modified && (
+        <div className="text-xs text-zinc-500">Modified {modified}</div>
+      )}
+    </div>
+  )
+}
+
+// Formats macOS can show but the app can't: a thumbnail (from the OS in the real app) and Quick Look.
+function OsPreviewCard({
+  path,
+  kind,
+  size,
+  modified,
+}: {
+  path: string
+  kind: FileKind
+  size: number
+  modified?: string
+}) {
+  const toast = useToast()
+  const ext = extOf(path)
+  return (
+    <div className="flex items-start gap-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+      <div className="relative flex h-36 w-28 shrink-0 flex-col overflow-hidden rounded-md border border-zinc-200 bg-white shadow-sm">
+        <div className="flex-1 space-y-1.5 p-2.5">
+          {[90, 70, 85, 60, 75, 40].map((w, i) => (
+            <div
+              key={i}
+              style={{width: `${w}%`}}
+              className="h-1 rounded bg-zinc-200"
+            />
+          ))}
+        </div>
+        <div
+          className={`py-1 text-center font-mono text-[10px] font-bold text-white ${OFFICE_TINT[ext] ?? 'bg-zinc-500'}`}
+        >
+          {ext.toUpperCase() || KIND_ICON[kind]}
+        </div>
+      </div>
+      <div className="flex min-w-0 flex-col gap-2">
+        <FileFacts path={path} size={size} modified={modified} />
+        <p className="text-xs text-zinc-500">
+          The app can’t show this file, but macOS can.
+        </p>
+        <div>
+          <ActionButton
+            onClick={() =>
+              toast(
+                `Opens ${baseName(path)} in macOS Quick Look (Electron’s previewFile)`
+              )
+            }
+          >
+            Quick Look
+          </ActionButton>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FileCard({
+  path,
+  kind,
+  size,
+  modified,
+  note,
+}: {
+  path: string
+  kind: FileKind
+  size: number
+  modified?: string
+  note?: string
+}) {
+  return (
+    <div className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-white text-3xl shadow-sm">
+        {KIND_ICON[kind]}
+      </div>
+      <div className="min-w-0">
+        <FileFacts path={path} size={size} modified={modified} />
+        {note && <p className="mt-1.5 text-xs text-amber-800">{note}</p>}
+      </div>
+    </div>
   )
 }
 
@@ -227,6 +448,9 @@ export function FilePreview({
       : 'the app’s Workspace folder'
   const changedBy = file?.changedBy ? sim.tree[file.changedBy] : undefined
   const pendingEdit = file?.changedBy === 'you'
+  const size = file?.size ?? sizeOf({content})
+  const notKept =
+    !live && isMedia(fileKind(path, content)) && size > KEEP_VERSION_CAP
   return (
     <div className={`flex min-h-0 flex-col bg-white ${className}`}>
       <div className="flex items-start gap-2 border-b border-zinc-200 px-4 py-2.5">
@@ -236,6 +460,7 @@ export function FilePreview({
           </div>
           <div className="truncate text-[11px] text-zinc-500">
             {path}
+            {content !== undefined && ` · ${formatSize(size)}`}
             {change ? (
               <span className={`ml-2 ${OP_STYLE[change.op].text}`}>
                 · {OP_STYLE[change.op].verb} in this{' '}
@@ -269,7 +494,7 @@ export function FilePreview({
           </button>
         )}
       </div>
-      {!live && !deleted && (
+      {!live && !deleted && !notKept && (
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-[11px] text-amber-900">
           How this file looked at this Turn. Later Turns in this Thread may have
           changed it.
@@ -283,7 +508,16 @@ export function FilePreview({
             Not in the Workspace at this Turn.
           </p>
         ) : (
-          <FileBody path={path} content={content} />
+          <FileBody
+            key={`${turnId}:${path}`}
+            path={path}
+            content={content}
+            size={size}
+            modified={
+              changedBy ? modifiedLabel(changedBy.createdAt) : undefined
+            }
+            notKept={notKept}
+          />
         )}
       </div>
       {!deleted && content !== undefined && (
@@ -307,6 +541,11 @@ export function FilePreview({
                 Reveal in Finder
               </ActionButton>
             </>
+          ) : notKept ? (
+            <span className="text-zinc-500">
+              No earlier version kept (over the {formatSize(KEEP_VERSION_CAP)}{' '}
+              limit)
+            </span>
           ) : (
             <>
               <ActionButton
