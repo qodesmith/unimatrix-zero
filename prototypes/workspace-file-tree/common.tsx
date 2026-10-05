@@ -17,6 +17,7 @@ import {
   simCache,
   type FileChange,
   type Tree,
+  type Turn,
   type Workspace,
 } from '../canvas-mode-ux/tree'
 import {
@@ -654,6 +655,93 @@ export function UserEdits({prompt}: {prompt: {files?: FileChange[]}}) {
         </span>
       ))}
     </div>
+  )
+}
+
+// Files as chips under the Reply text, like attachments on a Prompt.
+export function FileChips({
+  reply,
+  onOpen,
+}: {
+  reply: Turn
+  onOpen: (path: string) => void
+}) {
+  const files = reply.files ?? []
+  if (!files.length && !reply.commands?.length) return null
+  return (
+    <div className="flex flex-wrap gap-1.5 px-3.5 pb-2 whitespace-normal">
+      {files.map(f => (
+        <Chip key={f.path} change={f} onClick={() => onOpen(f.path)} />
+      ))}
+      {reply.commands?.map((c, i) => (
+        <span
+          key={i}
+          className="flex h-10 items-center rounded-lg border border-zinc-200 bg-zinc-900 px-2 font-mono text-[10px] text-zinc-100"
+        >
+          $ {c.cmd}{' '}
+          <span
+            className={`ml-1.5 ${c.result.includes('failed') ? 'text-red-300' : 'text-emerald-300'}`}
+          >
+            {c.result}
+          </span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function Chip({change, onClick}: {change: FileChange; onClick: () => void}) {
+  const s = OP_STYLE[change.op]
+  const kind = fileKind(change.path, change.content)
+  return (
+    <button
+      onClick={onClick}
+      title={`${s.verb} ${change.path}`}
+      className={`nodrag relative flex h-10 max-w-[190px] items-center gap-1.5 overflow-hidden rounded-lg border bg-white pr-2 text-left ${change.op === 'deleted' ? 'border-red-200 opacity-60' : 'border-zinc-200 hover:border-violet-300'}`}
+    >
+      <span className={`h-full w-1 shrink-0 ${s.bg}`} />
+      {change.writing ? (
+        <Spinner />
+      ) : kind === 'image' && change.content ? (
+        <img
+          src={mediaSrc(change.content)}
+          alt=""
+          className="h-8 w-8 rounded object-cover"
+        />
+      ) : kind === 'video' ? (
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-zinc-800 text-[10px] text-white">
+          ▶
+        </span>
+      ) : ['audio', 'pdf', 'office', 'binary'].includes(kind) ? (
+        <span
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded text-sm ${kind === 'pdf' ? 'bg-red-50' : kind === 'audio' ? 'bg-violet-50' : 'bg-zinc-100'}`}
+        >
+          {kind === 'office' ? (
+            <span className="font-mono text-[8px] font-bold text-zinc-600">
+              {extOf(change.path).toUpperCase()}
+            </span>
+          ) : (
+            KIND_ICON[kind]
+          )}
+        </span>
+      ) : (
+        <span className="font-mono text-[9px] font-bold text-zinc-500">
+          {extOf(change.path).toUpperCase().slice(0, 4)}
+        </span>
+      )}
+      <span className="min-w-0">
+        <span
+          className={`block truncate text-xs text-zinc-800 ${change.op === 'deleted' ? 'line-through' : ''}`}
+        >
+          {baseName(change.path)}
+        </span>
+        <span className={`block text-[10px] ${s.text}`}>
+          {change.writing
+            ? 'writing…'
+            : `${s.verb.toLowerCase()}${change.op === 'deleted' ? '' : ` · ${formatSize(sizeOf(change))}`}`}
+        </span>
+      </span>
+    </button>
   )
 }
 

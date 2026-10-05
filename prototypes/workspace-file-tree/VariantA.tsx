@@ -2,7 +2,7 @@ import type {Turn} from '../canvas-mode-ux/tree'
 import type {Nav} from './main'
 
 // PROTOTYPE variant A: one sidebar, Trees above and the Workspace's files below. The file tree follows the Turn
-// selected on the canvas. Canvas Replies get a compact files badge; the chat slideout lists every file change. Throw away.
+// selected on the canvas. Canvas Replies list their files as chips; the chat slideout lists every file change. Throw away.
 import {useMemo, useRef, useState} from 'react'
 
 import {
@@ -14,6 +14,7 @@ import {
 import {VariantD} from '../canvas-mode-ux/VariantD'
 import {
   AddWorkspaceDialog,
+  FileChips,
   FilePreview,
   FilesTree,
   gitStatusFor,
@@ -23,14 +24,7 @@ import {
   UserEdits,
   WorkspaceChip,
 } from './common'
-import {
-  baseName,
-  formatSize,
-  isLeaf,
-  OP_STYLE,
-  sizeOf,
-  snapshotAt,
-} from './workspace'
+import {formatSize, isLeaf, OP_STYLE, sizeOf, snapshotAt} from './workspace'
 
 export const name = 'Sidebar: Trees above, files below'
 
@@ -52,9 +46,12 @@ export function VariantA({nav}: {nav: Nav}) {
       onFocusReply: setDrawerReply,
       hostApi: host,
       leftInset: SIDEBAR,
-      replyFooter: (r, where) =>
+      replyBottom: (r, where) =>
         where === 'canvas' ? (
-          <FilesBadge reply={r} onClick={() => host.current?.select(r.id)} />
+          <FileChips
+            reply={r}
+            onOpen={path => setPreview({path, turnId: r.id})}
+          />
         ) : null,
       replyTop: (r, where) =>
         where === 'drawer' ? (
@@ -230,29 +227,6 @@ function FilesPanel({
         )}
       </div>
     </>
-  )
-}
-
-// Canvas: one compact line in the Reply footer. Click to select the Turn; the sidebar follows.
-function FilesBadge({reply, onClick}: {reply: Turn; onClick: () => void}) {
-  const files = reply.files ?? []
-  if (!files.length && !reply.commands?.length) return null
-  const writing = files.find(f => f.writing)
-  return (
-    <button
-      onClick={onClick}
-      title={files.map(f => `${OP_STYLE[f.op].verb} ${f.path}`).join('\n')}
-      className="nodrag ml-auto flex items-center gap-1.5 rounded-md border border-zinc-200 px-1.5 py-0.5 text-[11px] text-zinc-600 hover:bg-zinc-50"
-    >
-      {writing ? <Spinner /> : '📄'}
-      {writing
-        ? `Writing ${baseName(writing.path)}…`
-        : `${files.length} file${files.length === 1 ? '' : 's'}`}
-      <OpCounts files={files} />
-      {reply.commands?.length ? (
-        <span className="text-zinc-400">· ▶ {reply.commands.length}</span>
-      ) : null}
-    </button>
   )
 }
 
