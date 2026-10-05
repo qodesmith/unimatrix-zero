@@ -254,6 +254,19 @@ export function useReportTyping(replyId: string) {
   )
 }
 
+// For a leaf Reply's Input: focus claims the highlight (like typing) and makes its Thread active.
+export function useLeafFocus(replyId: string) {
+  const {activate} = useSim()
+  const report = useReportTyping(replyId)
+  return useCallback(
+    (focused: boolean) => {
+      report(focused)
+      if (focused) activate(replyId)
+    },
+    [replyId, report, activate]
+  )
+}
+
 export const edgeStyle = (hot: boolean) => ({
   zIndex: hot ? 1 : 0,
   style: hot

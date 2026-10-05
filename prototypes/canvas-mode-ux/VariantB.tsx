@@ -32,6 +32,7 @@ import {
   useHasDraft,
   useHighlight,
   useHighlightTarget,
+  useLeafFocus,
   useReportTyping,
   useDecor,
   useTreeLayout,
@@ -64,6 +65,7 @@ export function ExchangeNode({data, selected}: NodeProps<Node<Data>>) {
   const isActive = reply.id === sim.activeReplyId
   const ctx = contextSize(sim.tree, reply.id)
   const reportTyping = useReportTyping(reply.id)
+  const leafFocus = useLeafFocus(reply.id)
   const features = useContext(CanvasFeatures)
   const hasDraft = useHasDraft(reply.id)
   const decor = useDecor()
@@ -174,9 +176,12 @@ export function ExchangeNode({data, selected}: NodeProps<Node<Data>>) {
               draftId={reply.id}
               branching={branches > 0}
               attachable={features.attach}
-              onFocusChange={isActive ? undefined : setInputFocused}
-              onTypingChange={reportTyping}
-              blurOnSend={!isActive}
+              onFocusChange={f => {
+                setInputFocused(f)
+                if (branches === 0) leafFocus(f)
+              }}
+              onTypingChange={branches === 0 ? undefined : reportTyping}
+              blurOnSend
               onSubmit={(t, a) => {
                 setDismissed(true)
                 sim.submit(reply.id, t, a)

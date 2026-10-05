@@ -31,6 +31,7 @@ import {
   useHasDraft,
   useHighlight,
   useHighlightTarget,
+  useLeafFocus,
   useReportTyping,
   useDecor,
   useTreeLayout,
@@ -90,6 +91,7 @@ export function ReplyNode({data, selected}: NodeProps<Node<Data>>) {
   const isActive = turn.id === sim.activeReplyId
   const branches = childrenOf(sim.tree, turn.id).length
   const reportTyping = useReportTyping(turn.id)
+  const leafFocus = useLeafFocus(turn.id)
   const features = useContext(CanvasFeatures)
   const hasDraft = useHasDraft(turn.id)
   const decor = useDecor()
@@ -137,39 +139,32 @@ export function ReplyNode({data, selected}: NodeProps<Node<Data>>) {
         {decor.replyOverlay?.(turn)}
       </div>
 
-      {/* Input: always shown on the active Reply; hover-revealed as an overlay elsewhere so the layout doesn't jump. */}
-      {canRespond(turn) &&
-        (isActive ? (
-          <div className="mt-2">
-            <PromptInput
-              draftId={turn.id}
-              branching={branches > 0}
-              attachable={features.attach}
-              onTypingChange={reportTyping}
-              onSubmit={(t, a) => {
-                setDismissed(true)
-                sim.submit(turn.id, t, a)
-              }}
-            />
-          </div>
-        ) : (
-          <div
-            className={`absolute inset-x-0 top-full z-10 pt-2 ${dismissed ? 'hidden' : inputFocused || hasDraft ? 'block' : 'hidden group-hover:block'}`}
-          >
-            <PromptInput
-              draftId={turn.id}
-              branching={branches > 0}
-              attachable={features.attach}
-              onFocusChange={setInputFocused}
-              onTypingChange={reportTyping}
-              blurOnSend
-              onSubmit={(t, a) => {
-                setDismissed(true)
-                sim.submit(turn.id, t, a)
-              }}
-            />
-          </div>
-        ))}
+      {/* Input: always shown on the active Reply; hover-revealed as an overlay elsewhere so the layout doesn't jump. One element either way, so focus survives becoming active. */}
+      {canRespond(turn) && (
+        <div
+          className={
+            isActive
+              ? 'mt-2'
+              : `absolute inset-x-0 top-full z-10 pt-2 ${dismissed ? 'hidden' : inputFocused || hasDraft ? 'block' : 'hidden group-hover:block'}`
+          }
+        >
+          <PromptInput
+            draftId={turn.id}
+            branching={branches > 0}
+            attachable={features.attach}
+            onFocusChange={f => {
+              setInputFocused(f)
+              if (branches === 0) leafFocus(f)
+            }}
+            onTypingChange={branches === 0 ? undefined : reportTyping}
+            blurOnSend
+            onSubmit={(t, a) => {
+              setDismissed(true)
+              sim.submit(turn.id, t, a)
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }

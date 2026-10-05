@@ -36,6 +36,7 @@ import {
   threadIds,
   useHighlight,
   useHighlightTarget,
+  useLeafFocus,
   useReportTyping,
   useSim,
   useDecor,
@@ -583,6 +584,8 @@ function ChatDrawer({
   const thread = pathTo(sim.tree, replyId)
   const last = sim.tree[replyId]!
   const reportTyping = useReportTyping(replyId)
+  const leafFocus = useLeafFocus(replyId)
+  const leaf = childrenOf(sim.tree, replyId).length === 0
   const bodyRef = useRef<HTMLDivElement>(null)
   const lastPromptRef = useRef<HTMLDivElement>(null)
   const pinned = useRef(false)
@@ -703,9 +706,10 @@ function ChatDrawer({
           <PromptInput
             key={replyId}
             attachable
-            branching={childrenOf(sim.tree, replyId).length > 0}
+            branching={!leaf}
             disabled={!canRespond(last)}
-            onTypingChange={reportTyping}
+            onFocusChange={leaf ? leafFocus : undefined}
+            onTypingChange={leaf ? undefined : reportTyping}
             onSubmit={(t, a) => onSent(sim.submit(replyId, t, a))}
           />
         </div>

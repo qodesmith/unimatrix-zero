@@ -729,6 +729,13 @@ export function useTreeSim(options: SimOptions = {}) {
     })
   }, [])
 
+  // Makes a Thread active without sending, so the canvas stays put.
+  const activate = useCallback((replyId: string) => {
+    setState(s =>
+      s.activeReplyId === replyId ? s : {...s, activeReplyId: replyId}
+    )
+  }, [])
+
   const dismissFailure = useCallback((replyId: string) => {
     setState(s => ({
       ...s,
@@ -745,6 +752,7 @@ export function useTreeSim(options: SimOptions = {}) {
     setSpeed,
     focus,
     submit,
+    activate,
     stop,
     retry,
     deleteFrom,
