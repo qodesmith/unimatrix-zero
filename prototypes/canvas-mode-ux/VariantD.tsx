@@ -10,6 +10,7 @@ import {
   type XYPosition,
 } from '@xyflow/react'
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -29,6 +30,7 @@ import {
   DraftProvider,
   edgeStyle,
   FitOnceMeasured,
+  LeafFocusContext,
   LightboxContext,
   PromptInput,
   StatusBar,
@@ -361,6 +363,14 @@ export function VariantD() {
       },
     }
 
+  // Focusing another Thread's leaf Input hands everything to that Thread: the selection drops and the slideout closes, without panning.
+  const onLeafFocus = useCallback(
+    (replyId: string) => {
+      if (drawerReplyId && replyId !== drawerReplyId) setSelected(null)
+    },
+    [drawerReplyId]
+  )
+
   const openDrawer = (e: MouseEvent) => {
     const el = e.target as HTMLElement
     if (el.closest('button, input, textarea, .nodrag')) return
@@ -373,79 +383,81 @@ export function VariantD() {
 
   return (
     <CanvasFeatures.Provider value={features}>
-      <DraftProvider keep={id => !!sim.tree[id]}>
-        <LightboxContext.Provider value={setLightbox}>
-          <ReactFlow
-            nodes={nodes}
-            edges={styledEdges}
-            nodeTypes={allNodeTypes}
-            onNodesChange={onNodesChange}
-            {...canvasProps}
-            fitView={!loadedEmpty}
-            className={switching || reflowing ? 'canvas-switching' : ''}
-            onNodeClick={openDrawer}
-            onNodeMouseEnter={(_, n) =>
-              setHoverId(
-                n.type === 'exchange' ? threadEnd(sim.tree, n.id) : n.id
-              )
-            }
-            onNodeMouseLeave={() => setHoverId(null)}
-          >
-            <Background gap={24} color="#d4d4d8" />
-            <CanvasControls
-              orientation={orientation}
-              onOrientation={switchTo}
-              streaming={streamingIds.length}
-              failed={failedIds.length}
-              onJumpStreaming={jumpToStreaming}
-              onJumpFailed={jumpToFailed}
-            />
-            {!loadedEmpty && <FitOnceMeasured />}
-          </ReactFlow>
-          {empty && (
-            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-              <div className="pointer-events-auto w-[560px]">
-                <PromptInput
-                  large
-                  autoFocus
-                  attachable
-                  branching={false}
-                  placeholder="Start a new conversation…"
-                  onSubmit={(t, a) => sim.submit(null, t, a)}
-                />
-                <p className="mt-2 text-center text-xs text-zinc-400">
-                  Enter to send · attach with 📎, paste or drop files
-                </p>
-                {decor.emptyExtra}
-              </div>
-            </div>
-          )}
-          {drawerReplyId && (
-            <ChatDrawer
-              replyId={drawerReplyId}
-              full={full}
-              onToggleFull={() => setFull(f => !f)}
-              onClose={() => setSelected(null)}
-              onSent={setSelected}
-              tab={decor.drawerFiles ? drawerTab : 'chat'}
-              onTab={setDrawerTab}
-            />
-          )}
-          {lightbox && (
-            <div
-              onClick={() => setLightbox(null)}
-              className="fixed inset-0 z-[60] flex cursor-zoom-out flex-col items-center justify-center gap-3 bg-black/80 p-10"
+      <LeafFocusContext.Provider value={onLeafFocus}>
+        <DraftProvider keep={id => !!sim.tree[id]}>
+          <LightboxContext.Provider value={setLightbox}>
+            <ReactFlow
+              nodes={nodes}
+              edges={styledEdges}
+              nodeTypes={allNodeTypes}
+              onNodesChange={onNodesChange}
+              {...canvasProps}
+              fitView={!loadedEmpty}
+              className={switching || reflowing ? 'canvas-switching' : ''}
+              onNodeClick={openDrawer}
+              onNodeMouseEnter={(_, n) =>
+                setHoverId(
+                  n.type === 'exchange' ? threadEnd(sim.tree, n.id) : n.id
+                )
+              }
+              onNodeMouseLeave={() => setHoverId(null)}
             >
-              <img
-                src={lightbox.url}
-                alt={lightbox.name}
-                className="max-h-[85vh] max-w-full rounded-lg bg-white shadow-2xl"
+              <Background gap={24} color="#d4d4d8" />
+              <CanvasControls
+                orientation={orientation}
+                onOrientation={switchTo}
+                streaming={streamingIds.length}
+                failed={failedIds.length}
+                onJumpStreaming={jumpToStreaming}
+                onJumpFailed={jumpToFailed}
               />
-              <span className="text-sm text-zinc-300">{lightbox.name}</span>
-            </div>
-          )}
-        </LightboxContext.Provider>
-      </DraftProvider>
+              {!loadedEmpty && <FitOnceMeasured />}
+            </ReactFlow>
+            {empty && (
+              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                <div className="pointer-events-auto w-[560px]">
+                  <PromptInput
+                    large
+                    autoFocus
+                    attachable
+                    branching={false}
+                    placeholder="Start a new conversation…"
+                    onSubmit={(t, a) => sim.submit(null, t, a)}
+                  />
+                  <p className="mt-2 text-center text-xs text-zinc-400">
+                    Enter to send · attach with 📎, paste or drop files
+                  </p>
+                  {decor.emptyExtra}
+                </div>
+              </div>
+            )}
+            {drawerReplyId && (
+              <ChatDrawer
+                replyId={drawerReplyId}
+                full={full}
+                onToggleFull={() => setFull(f => !f)}
+                onClose={() => setSelected(null)}
+                onSent={setSelected}
+                tab={decor.drawerFiles ? drawerTab : 'chat'}
+                onTab={setDrawerTab}
+              />
+            )}
+            {lightbox && (
+              <div
+                onClick={() => setLightbox(null)}
+                className="fixed inset-0 z-[60] flex cursor-zoom-out flex-col items-center justify-center gap-3 bg-black/80 p-10"
+              >
+                <img
+                  src={lightbox.url}
+                  alt={lightbox.name}
+                  className="max-h-[85vh] max-w-full rounded-lg bg-white shadow-2xl"
+                />
+                <span className="text-sm text-zinc-300">{lightbox.name}</span>
+              </div>
+            )}
+          </LightboxContext.Provider>
+        </DraftProvider>
+      </LeafFocusContext.Provider>
     </CanvasFeatures.Provider>
   )
 }

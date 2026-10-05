@@ -254,16 +254,24 @@ export function useReportTyping(replyId: string) {
   )
 }
 
+// Lets the host react when a leaf Input makes its Thread active, e.g. by dropping a selection on another Thread.
+export const LeafFocusContext = createContext<(replyId: string) => void>(
+  () => {}
+)
+
 // For a leaf Reply's Input: focus claims the highlight (like typing) and makes its Thread active.
 export function useLeafFocus(replyId: string) {
   const {activate} = useSim()
   const report = useReportTyping(replyId)
+  const onLeafFocus = useContext(LeafFocusContext)
   return useCallback(
     (focused: boolean) => {
       report(focused)
-      if (focused) activate(replyId)
+      if (!focused) return
+      activate(replyId)
+      onLeafFocus(replyId)
     },
-    [replyId, report, activate]
+    [replyId, report, activate, onLeafFocus]
   )
 }
 
