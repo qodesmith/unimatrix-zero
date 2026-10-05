@@ -19,7 +19,7 @@ The Provider's own record of one Thread, which it uses to continue the conversat
 _Avoid_: Thread (Codex's word for it), conversation
 
 **System prompt**:
-The standing instructions the AI follows in a Tree. Each Tree has one, filled in from a global default and changeable at any time. A change applies to Replies generated afterwards, and each Reply records the System prompt it ran under. A _preset_ is a read-only System prompt that ships with the app.
+The standing instructions the AI follows in a Tree. Each Tree has one, filled in from a global default and changeable at any time. A change applies to Replies generated afterwards, and each Reply records the System prompt it ran under. A _preset_ is a read-only System prompt that ships with the app; presets and the user's own System prompts make up the _library_. A Tree holds its own copy, so editing a library entry never changes an existing Tree.
 _Avoid_: Instructions, persona, custom instructions
 
 **Workspace**:
@@ -76,3 +76,13 @@ _Avoid_: Drawer, chat view
 **Input**:
 The place the user types the next Prompt, always attached to a Reply, except on an empty Tree, where a single Input creates the root Prompt. Chat mode has exactly one, at the end of the shown Thread. In canvas mode every Reply can have one: it is always shown on the active Thread and revealed on hover elsewhere, and submitting into a Reply that already has a response branches.
 _Avoid_: Composer, prompt box, head
+
+### App
+
+**Settings**:
+The single place for the user's global preferences: how the app looks and behaves, and the defaults new Trees start from. Settings never changes an existing Tree; anything that shapes what the AI does in one Tree belongs to that Tree.
+_Avoid_: Preferences, options, config
+
+**Theme**:
+A named set of visual values (colours, radius, code highlighting, font) with a light version, a dark version, or both. The _mode_ (light, dark or system) picks which version of the current Theme is shown; it is not itself a Theme.
+_Avoid_: Skin, colour scheme, palette
