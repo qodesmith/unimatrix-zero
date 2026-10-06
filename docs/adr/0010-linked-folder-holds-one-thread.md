@@ -1,0 +1,16 @@
+# A linked folder holds one Thread; every Workspace has its own hidden store
+
+A linked folder is the working copy of exactly one Thread at a time; other Threads run in working copies in `userData`, and the folder changes Threads only when the user presses "Put this Thread in the folder" (or turns on the per-Workspace "Keep the folder in sync with the selected Thread", off by default). Every Workspace, linked or app-owned, git repo or not, snapshots into its own hidden git store in `userData` with one index per working copy, never into the user's `.git`. Linking should feel like `cd project && claude` (dev servers, `node_modules`, `.env` and uncommitted work just work), while branching still gives each Thread coherent files and nothing in the user's repo changes. Findings: [Workspaces](https://github.com/qodesmith/unimatrix-zero/issues/24), [Workspaces: snapshots, working copies and linked folders](https://github.com/qodesmith/unimatrix-zero/issues/25).
+
+## Considered Options
+
+- **Always a working copy; the real folder is untouched until the user applies a Branch.** Rejected: every Branch pays for building its folder and bringing in ignored files, and "apply" becomes the main workflow, close to the merge UI we excluded.
+- **Real folder until the first Fork, then working copies.** Rejected: the same costs paid later, plus a mode change that surprises users mid-Tree.
+- **Snapshots as hidden refs in the user's `.git`, with `git worktree` for extra Branches** (T3 Code's approach). Rejected: refs and worktrees show up in `git log --all`, `git worktree list` and git GUIs, and non-git folders would need a second code path.
+
+## Consequences
+
+- **Swaps snapshot first and replace, never merge.** Uncaptured hand edits become a User edit on the outgoing Thread. With sync on, the folder never swaps mid-Reply; it catches up when the Reply finishes.
+- **The store reads the project's ignore rules itself** (every nested `.gitignore` plus `.git/info/exclude`), since its git dir is separate, plus default excludes such as `node_modules`. Files of 100 MB or more are recorded by name, size and hash only, so they have no earlier versions.
+- **Working copies don't contain ignored files from the store.** They get them from a copy-on-write clone of the folder where the filesystem allows it, otherwise a capped copy of small ignored files, plus an optional per-Workspace Setup command when commands are allowed.
+- **Exposing Branches as real git branches is out of scope for v1.**

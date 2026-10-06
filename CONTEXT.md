@@ -23,8 +23,20 @@ The standing instructions the AI follows in a Tree. Each Tree has one, filled in
 _Avoid_: Instructions, persona, custom instructions
 
 **Workspace**:
-An optional property of a Tree: a set of files the AI can create and edit as part of the conversation. Each Reply has the files as they stood when it finished. The files live either in the app (_app-owned_) or in a folder of the user's (_linked folder_). A Tree without a Workspace is a _plain_ Tree: it has no files, though it may still use tools such as web search.
+An optional property of a Tree: a set of files the AI can create and edit as part of the conversation. Each Reply has the files as they stood when it finished. The files live either in the app (_app-owned_) or in a folder of the user's (_linked folder_). A Tree without a Workspace is a _plain_ Tree: it has no files, though it may still use tools such as web search. A Workspace lets the AI either _write files_ or _write files and run commands_.
 _Avoid_: Project, folder, agent mode, dev mode
+
+**Snapshot**:
+A Workspace's files as they stood when one Reply finished, or when a User edit was recorded.
+_Avoid_: Checkpoint, commit, version
+
+**Working copy**:
+A folder on disk holding one Thread's current files, where the AI works for that Thread. A linked folder is always the working copy of exactly one Thread, called "the Thread in the folder".
+_Avoid_: Worktree, sandbox
+
+**User edit**:
+Changes the user made by hand to a Workspace's files between Replies, recorded as their own Snapshot.
+_Avoid_: Manual change, local change
 
 ### Conversation structure
 
