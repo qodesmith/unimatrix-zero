@@ -95,6 +95,14 @@ _Avoid_: Composer, prompt box, head
 The single place for the user's global preferences: how the app looks and behaves, and the defaults new Trees start from. Settings never changes an existing Tree; anything that shapes what the AI does in one Tree belongs to that Tree.
 _Avoid_: Preferences, options, config
 
+**Export**:
+A one-way, human-readable copy of a Thread or a Tree, written as Markdown. An Export can never be restored.
+_Avoid_: Backup, save
+
+**Archive**:
+A single file holding one or more complete Trees that the app can _restore_, on the same computer or another one. With no sync, it is the user's only backup and only way to move computers. Always made by the user; the app never archives on its own.
+_Avoid_: Backup (reserved for the app's own pre-migration database copies), project file, export
+
 **Theme**:
 A named set of visual values (colours, radius, code highlighting, font) with a light version, a dark version, or both. The _mode_ (light, dark or system) picks which version of the current Theme is shown; it is not itself a Theme.
 _Avoid_: Skin, colour scheme, palette
