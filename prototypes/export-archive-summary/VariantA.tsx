@@ -5,6 +5,7 @@ import type {Nav} from './main'
 // PROTOTYPE variant A: menus. A ⋯ menu on every Tree row and every Reply (canvas and chat slideout), modal dialogs, a
 // Summary that floats bottom-right without blocking anything, and Archive & restore as its own Settings section. Throw away.
 import {useMemo, useRef, useState} from 'react'
+import {createPortal} from 'react-dom'
 
 import {
   ArchiveDialog,
@@ -130,7 +131,8 @@ function TreeMenu({
   active: boolean
   f: Flows
 }) {
-  const [open, setOpen] = useState(false)
+  // Fixed at the button's screen position, so the menu floats over everything instead of scrolling the Tree list.
+  const [open, setOpen] = useState<DOMRect | null>(null)
   const has = f.hasTurns(treeKey)
   const items: MenuItem[] = [
     {label: 'Rename', onClick: () => {}, disabled: true},
@@ -154,19 +156,31 @@ function TreeMenu({
   return (
     <>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={e => {
+          const r = (
+            e.currentTarget.closest('[data-tree]') ?? e.currentTarget
+          ).getBoundingClientRect()
+          setOpen(o => (o ? null : r))
+        }}
         className={`px-1 ${open ? 'block' : 'hidden group-hover/row:block'} ${active ? 'text-zinc-300 hover:text-white' : 'text-zinc-400 hover:text-zinc-900'}`}
         title="More"
       >
         ⋯
       </button>
-      {open && (
-        <Menu
-          items={items}
-          onClose={() => setOpen(false)}
-          className="absolute top-full right-0 mt-1 text-zinc-800"
-        />
-      )}
+      {open &&
+        createPortal(
+          <Menu
+            items={items}
+            onClose={() => setOpen(null)}
+            style={{
+              position: 'fixed',
+              top: open.bottom + 4,
+              left: open.right - 208,
+            }}
+            className="text-zinc-800"
+          />,
+          document.body
+        )}
     </>
   )
 }
