@@ -117,7 +117,7 @@ export function VariantA({nav}: {nav: Nav}) {
   )
 }
 
-function FilesPanel({
+export function FilesPanel({
   focus,
   following,
   onBackToLatest,
