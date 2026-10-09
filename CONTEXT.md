@@ -99,6 +99,14 @@ _Avoid_: Preferences, options, config
 A one-way, human-readable copy of a Thread or a Tree, written as Markdown. An Export can never be restored.
 _Avoid_: Backup, save
 
+**Summary**:
+AI-written prose about a conversation, made on request outside the Tree: it adds no Turn and the AI never sees it in later Replies. A _Thread summary_ covers the path from the root to one Reply; a _Tree summary_ covers the whole Tree, including how its Threads relate. A Summary is not kept; the user copies or saves it.
+_Avoid_: Recap, digest, Export
+
+**Summary prompt**:
+The app-owned instructions used to write a Summary, one for Thread summaries and one for Tree summaries. The user can read and edit both, and reset either to its default.
+_Avoid_: System prompt (that is standing instructions inside a Tree)
+
 **Archive**:
 A single file holding one or more complete Trees that the app can _restore_, on the same computer or another one. With no sync, it is the user's only backup and only way to move computers. Always made by the user; the app never archives on its own.
 _Avoid_: Backup (reserved for the app's own pre-migration database copies), project file, export
