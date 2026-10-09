@@ -56,6 +56,10 @@ _Avoid_: User message, question
 The AI's Turn in response to one Prompt, however many internal messages, tool calls, or thinking blocks it contains.
 _Avoid_: Response, answer, completion
 
+**Subagent**:
+A helper the AI starts during a Reply to work on part of the task; several can run at once. A Subagent can do exactly what its Tree allows, no more. Its work belongs to the Reply that started it: it is not a Turn, and it never outlives that Reply.
+_Avoid_: Helper, agent, worker, child thread
+
 **Thread**:
 One path from the Tree's root to a leaf: the complete, linear conversation the AI sees when continuing from that leaf. A Tree with no Forks has exactly one Thread; there is no "main" Thread.
 _Avoid_: Conversation (ambiguous between Tree and Thread), main thread, trunk
@@ -73,7 +77,7 @@ A Prompt together with its Reply. In horizontal canvas mode, each Exchange is dr
 _Avoid_: Card, pair, round
 
 **Context size**:
-The cumulative tokens along a Thread up to a given Reply: what the AI carries if the conversation continues from there.
+The cumulative tokens along a Thread up to a given Reply: what the AI carries if the conversation continues from there. A Subagent's own tokens are not part of it.
 _Avoid_: Token count (ambiguous with the Turn's own size)
 
 ### Views
