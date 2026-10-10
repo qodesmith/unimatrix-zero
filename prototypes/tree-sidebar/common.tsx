@@ -24,7 +24,6 @@ import {
   FilePreview,
   UserEdits,
   useToast,
-  WorkspaceChip,
 } from '../workspace-file-tree/common'
 import {FilesPanel} from '../workspace-file-tree/VariantA'
 import {formatSize} from '../workspace-file-tree/workspace'
@@ -233,8 +232,11 @@ export function Shell({
             <SplitSections
               trees={trees}
               filesHeader={
-                sim.workspace && (
-                  <WorkspaceChip workspace={sim.workspace} shell={sim.shell} />
+                // Says only where the files live; kept in the app is the default, so it's unlabelled.
+                sim.workspace?.kind === 'linked' && (
+                  <span className="truncate rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-800">
+                    🔗 {sim.workspace.path}
+                  </span>
                 )
               }
               files={
