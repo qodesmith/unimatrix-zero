@@ -349,6 +349,13 @@ export type UsageUi = {
   LimitStatus?: ComponentType<{reply: Turn; sim: TreeSim}>
   // App shell slots.
   SidebarFooter?: ComponentType
+  // A third sidebar section under Files, collapsible and resizable like it. `Badge` shows in its header while collapsed.
+  SidebarSection?: {
+    title: string
+    Body: ComponentType
+    Badge?: ComponentType
+    Actions?: ComponentType
+  }
   Banner?: ComponentType
   openSettings?: () => void
 }

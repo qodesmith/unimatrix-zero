@@ -80,7 +80,7 @@ function UsageChip() {
   )
 }
 
-function Toolbar() {
+export function Toolbar() {
   return (
     <>
       <ModelPill />
@@ -90,7 +90,7 @@ function Toolbar() {
 }
 
 // Stands in for the Input while its Model is limited; the draft is kept underneath.
-function Above() {
+export function Above() {
   const s = useUsage()
   const blocked = blockedFor(s, s.model)
   if (!blocked) return null
@@ -122,7 +122,7 @@ function Above() {
   )
 }
 
-function LimitStatus({reply, sim}: {reply: Turn; sim: TreeSim}) {
+export function LimitStatus({reply, sim}: {reply: Turn; sim: TreeSim}) {
   const s = useUsage()
   const still = blockedFor(s, reply.model!)
   const alt = alternative(s, reply.model!)

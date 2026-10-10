@@ -15,6 +15,7 @@ import {
   DecorContext,
   UsageUiContext,
   useSim,
+  type UsageUi,
   type Decor,
   type HostApi,
 } from '../canvas-mode-ux/shared'
@@ -291,6 +292,27 @@ export function Shell({
           </div>
           {treesFill ? (
             <div className="flex min-h-0 flex-1 flex-col">{trees}</div>
+          ) : usage.SidebarSection ? (
+            <StackSections
+              trees={trees}
+              filesHeader={
+                sim.workspace?.kind === 'linked' && (
+                  <LinkedFolderBadge path={sim.workspace.path} />
+                )
+              }
+              files={
+                <FilesPanel
+                  titleRow={false}
+                  focus={focus}
+                  following={!drawerReply}
+                  onBackToLatest={() => host.current?.select(null)}
+                  onOpen={path => setPreview({path, turnId: null})}
+                  selected={preview?.turnId === null ? preview.path : null}
+                  onAdd={() => {}}
+                />
+              }
+              extra={usage.SidebarSection}
+            />
           ) : (
             <SplitSections
               trees={trees}
@@ -460,6 +482,165 @@ function SplitSections({
           {open && filesHeader}
         </div>
         {open && <div className="flex min-h-0 flex-1 flex-col">{files}</div>}
+      </div>
+    </div>
+  )
+}
+
+// Usage prototype: Trees, Files and one more section, like VS Code's Explorer. Trees takes what's left; each other open
+// section has its own height, and a divider moves the boundary with the nearest open section above it.
+const MIN_EXTRA = 90
+const stack = {files: 260, extra: 150, filesOpen: true, extraOpen: true}
+const STACK_DEFAULT = {...stack}
+
+function StackSections({
+  trees,
+  files,
+  filesHeader,
+  extra,
+}: {
+  trees: ReactNode
+  files: ReactNode
+  filesHeader: ReactNode
+  extra: NonNullable<UsageUi['SidebarSection']>
+}) {
+  const [, rerender] = useState(0)
+  const set = (patch: Partial<typeof stack>) => {
+    Object.assign(stack, patch)
+    rerender(n => n + 1)
+  }
+  const body = useRef<HTMLDivElement>(null)
+  const treesRef = useRef<HTMLDivElement>(null)
+  const [dragging, setDragging] = useState<'files' | 'extra' | null>(null)
+  const startY = useRef(0)
+  const start = useRef({files: 0, extra: 0, trees: 0})
+
+  const drag = (y: number) => {
+    const d = startY.current - y
+    const s = start.current
+    if (dragging === 'files') {
+      // Trees ⇄ Files.
+      const max = s.files + s.trees - MIN_TREES
+      set({files: Math.min(Math.max(s.files + d, MIN_FILES), max)})
+    } else if (dragging === 'extra') {
+      if (stack.filesOpen) {
+        // Files ⇄ Usage.
+        const total = s.files + s.extra
+        const extraH = Math.min(
+          Math.max(s.extra + d, MIN_EXTRA),
+          total - MIN_FILES
+        )
+        set({extra: extraH, files: total - extraH})
+      } else {
+        // Trees ⇄ Usage.
+        set({
+          extra: Math.min(
+            Math.max(s.extra + d, MIN_EXTRA),
+            s.extra + s.trees - MIN_TREES
+          ),
+        })
+      }
+    }
+  }
+  const handle = (which: 'files' | 'extra', active: boolean) => (
+    <div className="relative h-px shrink-0 bg-zinc-200">
+      {active && (
+        <div
+          onPointerDown={e => {
+            e.preventDefault()
+            e.currentTarget.setPointerCapture(e.pointerId)
+            startY.current = e.clientY
+            start.current = {
+              files: stack.files,
+              extra: stack.extra,
+              trees: treesRef.current!.getBoundingClientRect().height,
+            }
+            setDragging(which)
+          }}
+          onPointerMove={e => dragging === which && drag(e.clientY)}
+          onPointerUp={() => setDragging(null)}
+          onPointerCancel={() => setDragging(null)}
+          onDoubleClick={() =>
+            set(
+              which === 'files'
+                ? {files: STACK_DEFAULT.files}
+                : {extra: STACK_DEFAULT.extra, files: STACK_DEFAULT.files}
+            )
+          }
+          title="Drag to resize · double-click to reset"
+          className="group absolute inset-x-0 -top-1 z-10 h-[9px] cursor-row-resize"
+        >
+          <div
+            className={`mt-[3px] h-[3px] ${dragging === which ? 'bg-sky-500' : 'group-hover:bg-sky-500'}`}
+          />
+        </div>
+      )}
+    </div>
+  )
+  const header = (
+    title: string,
+    open: boolean,
+    toggle: () => void,
+    right: ReactNode
+  ) => (
+    <div className="flex shrink-0 items-center justify-between gap-2 pr-3">
+      <button
+        onClick={toggle}
+        className="flex shrink-0 grow items-center gap-1 py-1.5 pl-2 text-[11px] font-semibold tracking-wide text-zinc-500 uppercase hover:text-zinc-900"
+      >
+        <span className="w-3 text-center">{open ? '▾' : '▸'}</span>
+        {title}
+      </button>
+      {right}
+    </div>
+  )
+  const {filesOpen, extraOpen} = stack
+  return (
+    <div ref={body} className="flex min-h-0 flex-1 flex-col">
+      <div
+        ref={treesRef}
+        style={{minHeight: MIN_TREES}}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        {trees}
+      </div>
+      {handle('files', filesOpen)}
+      <div
+        style={
+          filesOpen ? {height: stack.files, minHeight: MIN_FILES} : undefined
+        }
+        className="flex shrink-0 flex-col"
+      >
+        {header(
+          'Files',
+          filesOpen,
+          () => set({filesOpen: !filesOpen}),
+          filesOpen && filesHeader
+        )}
+        {filesOpen && (
+          <div className="flex min-h-0 flex-1 flex-col">{files}</div>
+        )}
+      </div>
+      {handle('extra', extraOpen)}
+      <div
+        style={
+          extraOpen ? {height: stack.extra, minHeight: MIN_EXTRA} : undefined
+        }
+        className="flex shrink-0 flex-col"
+      >
+        {header(
+          extra.title,
+          extraOpen,
+          () => set({extraOpen: !extraOpen}),
+          extraOpen
+            ? extra.Actions && <extra.Actions />
+            : extra.Badge && <extra.Badge />
+        )}
+        {extraOpen && (
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2">
+            <extra.Body />
+          </div>
+        )}
       </div>
     </div>
   )

@@ -20,20 +20,12 @@ import {
 
 export const name = 'Sidebar meter'
 
-function SidebarFooter() {
+// Each connected Provider with every window it reports. Also the body of variant D's Usage section.
+export function UsageList() {
   const s = useUsage()
   const live = PROVIDERS.filter(p => connected(s, p))
   return (
-    <div className="border-t border-zinc-200 px-3 py-2">
-      <div className="mb-1 flex items-center justify-between text-[10px] font-medium tracking-wide text-zinc-400 uppercase">
-        Usage
-        <button
-          onClick={usage.openSettings}
-          className="tracking-normal normal-case hover:text-zinc-900"
-        >
-          Details
-        </button>
-      </div>
+    <>
       {live.map(p => {
         const model = MODELS.find(m => m.provider === p)!.name
         const blocked = blockedFor(s, model)
@@ -88,6 +80,23 @@ function SidebarFooter() {
       {!live.length && (
         <div className="text-[11px] text-zinc-400">No Provider connected</div>
       )}
+    </>
+  )
+}
+
+function SidebarFooter() {
+  return (
+    <div className="border-t border-zinc-200 px-3 py-2">
+      <div className="mb-1 flex items-center justify-between text-[10px] font-medium tracking-wide text-zinc-400 uppercase">
+        Usage
+        <button
+          onClick={usage.openSettings}
+          className="tracking-normal normal-case hover:text-zinc-900"
+        >
+          Details
+        </button>
+      </div>
+      <UsageList />
     </div>
   )
 }

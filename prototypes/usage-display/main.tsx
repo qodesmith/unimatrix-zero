@@ -1,4 +1,4 @@
-// PROTOTYPE: Usage and limit display (#36). Three variants switchable via ?variant=A|B|C, hosted on the Tree sidebar
+// PROTOTYPE: Usage and limit display (#36). Variants switchable via ?variant=A|B|C|D (D combines A and B, the pick), hosted on the Tree sidebar
 // prototype's app (its variant B, the winner). The usage store is account-wide and survives switching variants and
 // Trees. Throw away.
 import {ReactFlowProvider} from '@xyflow/react'
@@ -20,11 +20,13 @@ import {SettingsModal, UsageDebug} from './common'
 import * as A from './VariantA'
 import * as B from './VariantB'
 import * as C from './VariantC'
+import * as D from './VariantD'
 
 const VARIANTS = [
   {key: 'A', name: A.name, useUi: A.useUi},
   {key: 'B', name: B.name, useUi: B.useUi},
   {key: 'C', name: C.name, useUi: C.useUi},
+  {key: 'D', name: D.name, useUi: D.useUi},
 ]
 
 const QUESTION =
