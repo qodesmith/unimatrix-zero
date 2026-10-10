@@ -628,6 +628,8 @@ export function WorkspaceChip({
         Plain chat
       </span>
     )
+  // Files kept in the app are the default, so only a linked folder gets a label.
+  if (workspace.kind === 'app' && !shell) return null
   return (
     <span
       className="inline-flex items-center gap-1 rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-800"
@@ -637,7 +639,7 @@ export function WorkspaceChip({
           : 'The AI can write files'
       }
     >
-      {workspace.kind === 'app' ? 'Files in the app' : `🔗 ${workspace.path}`}
+      {workspace.kind === 'linked' && `🔗 ${workspace.path}`}
       {shell && <span className="rounded bg-violet-200 px-1">shell</span>}
     </span>
   )
