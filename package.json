@@ -11,7 +11,8 @@
     "prototype:canvas": "bun prototypes/canvas-mode-ux/index.html",
     "prototype:workspace": "bun prototypes/workspace-file-tree/index.html",
     "prototype:export": "bun prototypes/export-archive-summary/index.html",
-    "prototype:sidebar": "bun prototypes/tree-sidebar/index.html"
+    "prototype:sidebar": "bun prototypes/tree-sidebar/index.html",
+    "prototype:usage": "bun prototypes/usage-display/index.html"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",

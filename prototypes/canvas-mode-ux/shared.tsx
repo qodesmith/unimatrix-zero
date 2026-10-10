@@ -14,6 +14,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  type ComponentType,
   type ReactNode,
   useReducer,
   useRef,
@@ -337,6 +338,22 @@ const toAttachments = (files: FileList | File[]): Attachment[] =>
     url: URL.createObjectURL(f),
   }))
 
+// Usage prototype: what the host adds to every Input and to a Reply refused by a usage limit. Throw away.
+export type UsageUi = {
+  Toolbar?: ComponentType
+  // Above the Input box; may replace it when it returns `replace`.
+  Above?: ComponentType
+  blocked?: boolean
+  // Hides the Input box entirely (Above stands in for it).
+  replaced?: boolean
+  LimitStatus?: ComponentType<{reply: Turn; sim: TreeSim}>
+  // App shell slots.
+  SidebarFooter?: ComponentType
+  Banner?: ComponentType
+  openSettings?: () => void
+}
+export const UsageUiContext = createContext<UsageUi>({})
+
 export function PromptInput({
   onSubmit,
   autoFocus,
@@ -369,6 +386,8 @@ export function PromptInput({
   // Keeps the draft in the surrounding DraftProvider under this id, so it survives unmounting.
   draftId?: string
 }) {
+  const usage = useContext(UsageUiContext)
+  disabled = disabled || usage.blocked
   const store = useContext(DraftContext)
   const [localDraft, setLocalDraft] = useState(EMPTY_DRAFT)
   const stored = draftId && store
@@ -432,7 +451,9 @@ export function PromptInput({
           New Branch
         </div>
       )}
+      {usage.Above && <usage.Above />}
       <div
+        hidden={usage.replaced}
         className={`rounded-xl border bg-white shadow-sm ${large ? 'rounded-2xl shadow-lg' : ''} ${dragOver ? 'border-violet-400 ring-2 ring-violet-200' : branching ? 'border-amber-300' : 'border-zinc-300'}`}
       >
         {files.length > 0 && (
@@ -507,6 +528,11 @@ export function PromptInput({
             ↑
           </button>
         </div>
+        {usage.Toolbar && (
+          <div className="flex items-center gap-1.5 border-t border-zinc-100 px-2 py-1">
+            <usage.Toolbar />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -781,6 +807,9 @@ export function DeletePill({
 // ---------- Status controls ----------
 
 export function StatusBar({reply, sim}: {reply: Turn; sim: TreeSim}) {
+  const usage = useContext(UsageUiContext)
+  if (reply.limit && reply.status === 'failed' && usage.LimitStatus)
+    return <usage.LimitStatus reply={reply} sim={sim} />
   if (reply.status === 'streaming')
     return (
       <button

@@ -1,6 +1,7 @@
 // PROTOTYPE: shared pieces for the Tree sidebar variants: library state, the app around the sidebar, row menu, inline
 // rename, delete confirmation. Throw away.
 import {
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -12,6 +13,7 @@ import {createPortal} from 'react-dom'
 
 import {
   DecorContext,
+  UsageUiContext,
   useSim,
   type Decor,
   type HostApi,
@@ -191,6 +193,7 @@ export function Shell({
   children?: ReactNode
 }) {
   const sim = useSim()
+  const usage = useContext(UsageUiContext)
   const host = useRef<HostApi | null>(null)
   const [drawerReply, setDrawerReply] = useState<string | null>(null)
   const [preview, setPreview] = useState<{
@@ -280,6 +283,7 @@ export function Shell({
             )}
             <button
               title="Settings"
+              onClick={usage.openSettings}
               className="text-zinc-400 hover:text-zinc-900"
             >
               ⚙
@@ -309,8 +313,10 @@ export function Shell({
               }
             />
           )}
+          {usage.SidebarFooter && <usage.SidebarFooter />}
         </aside>
         <div className="relative flex min-w-0 flex-1 flex-col">
+          {usage.Banner && <usage.Banner />}
           <div className="relative min-h-0 flex-1">
             <VariantD />
             {preview && sim.tree[preview.turnId ?? focus] && (

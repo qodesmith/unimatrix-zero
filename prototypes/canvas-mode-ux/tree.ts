@@ -40,7 +40,26 @@ export type Turn = {
   // Shell commands a Reply ran (Workspaces with the shell on).
   commands?: Command[]
   createdAt: number
+  // Usage prototype: the Reply was refused because the Provider's usage limit was reached.
+  limit?: LimitInfo
 }
+
+export type LimitInfo = {provider: string; window: string; until: number}
+
+// Usage prototype hooks, set by the host app. Throw away.
+export const usageHooks: {
+  // The Model the next Prompt goes to; null keeps the parent's.
+  model: string | null
+  // A limit that refuses a new Reply on this Model, if any.
+  gate: (model: string) => LimitInfo | null
+  // A Reply's first request got through.
+  started: (model: string) => void
+  // The live sim, so a limit reached elsewhere can fail its running Replies.
+  sim: {
+    failRunning: (match: (t: Turn) => boolean, info: LimitInfo) => number
+    streamingModels: () => string[]
+  } | null
+} = {model: null, gate: () => null, started: () => {}, sim: null}
 
 export type Tree = Record<string, Turn>
 
@@ -571,6 +590,11 @@ export function useTreeSim(options: SimOptions = {}) {
       const promptId = nextId('prompt')
       const replyId = nextId('reply')
       const now = Date.now()
+      const model =
+        usageHooks.model ||
+        (parentReplyId && stateRef.current.tree[parentReplyId]?.model) ||
+        'Claude Sonnet 5'
+      const limit = usageHooks.gate(model)
       setState(s => ({
         ...s,
         activeReplyId: replyId,
@@ -609,14 +633,19 @@ export function useTreeSim(options: SimOptions = {}) {
             text: '',
             tokens: 0,
             status: 'streaming',
-            model:
-              (parentReplyId && s.tree[parentReplyId]?.model) ||
-              'Claude Sonnet 5',
+            model,
             createdAt: now + 1,
+            ...(limit ? {status: 'failed' as const, limit} : {}),
           },
         },
+        unseenFailures: limit
+          ? [...s.unseenFailures, replyId]
+          : s.unseenFailures,
       }))
-      startStream(replyId)
+      if (!limit) {
+        usageHooks.started(model)
+        startStream(replyId)
+      }
       setFocus(f => ({id: replyId, n: (f?.n ?? 0) + 1}))
       return replyId
     },
@@ -635,7 +664,10 @@ export function useTreeSim(options: SimOptions = {}) {
   }, [])
 
   const retry = useCallback(
-    (replyId: string) => {
+    (replyId: string, newModel?: string) => {
+      const model = newModel ?? stateRef.current.tree[replyId]!.model!
+      const limit = usageHooks.gate(model)
+      if (!limit) usageHooks.started(model)
       setState(s => ({
         ...s,
         unseenFailures: without(s.unseenFailures, [replyId]),
@@ -645,15 +677,50 @@ export function useTreeSim(options: SimOptions = {}) {
             ...s.tree[replyId]!,
             text: '',
             tokens: 0,
-            status: 'streaming',
+            status: limit ? 'failed' : 'streaming',
             files: undefined,
+            model,
+            limit: limit ?? undefined,
           },
         },
       }))
-      startStream(replyId)
+      if (!limit) startStream(replyId)
     },
     [startStream]
   )
+
+  // Usage prototype: a limit reached by another Reply refuses these Replies' next request; the text shown so far stays.
+  useEffect(() => {
+    const api = {
+      failRunning: (match: (t: Turn) => boolean, info: LimitInfo) => {
+        const ids = Object.keys(streams.current).filter(id => {
+          const t = stateRef.current.tree[id]
+          return t && match(t)
+        })
+        for (const id of ids) delete streams.current[id]
+        if (ids.length)
+          setState(s => {
+            const tree = {...s.tree}
+            for (const id of ids)
+              tree[id] = doneWriting({
+                ...tree[id]!,
+                status: 'failed',
+                limit: info,
+              })
+            return {...s, tree, unseenFailures: [...s.unseenFailures, ...ids]}
+          })
+        return ids.length
+      },
+      streamingModels: () =>
+        Object.keys(streams.current).map(
+          id => stateRef.current.tree[id]?.model ?? ''
+        ),
+    }
+    usageHooks.sim = api
+    return () => {
+      if (usageHooks.sim === api) usageHooks.sim = null
+    }
+  }, [])
 
   const deleteFrom = useCallback((promptId: string) => {
     setState(s => {
