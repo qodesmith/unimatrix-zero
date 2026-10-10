@@ -41,7 +41,7 @@ import {
 } from './library'
 
 export const SIDEBAR = 290
-const MIN_SIDEBAR = 220
+const MIN_SIDEBAR = SIDEBAR
 const MAX_SIDEBAR = 640
 
 // Sidebar layout outlives the Shell, which remounts on every Tree switch.
@@ -197,6 +197,19 @@ export function Shell({
   const focus = drawerReply ?? sim.activeReplyId
   const [width, setWidth] = useLayout('width')
   const [resizing, setResizing] = useState(false)
+  // Pointer moves land several times a frame; apply only the latest, once per frame.
+  const nextWidth = useRef<number | null>(null)
+  const resizeTo = (x: number) => {
+    const pending = nextWidth.current !== null
+    nextWidth.current = Math.round(
+      Math.min(Math.max(x, MIN_SIDEBAR), MAX_SIDEBAR)
+    )
+    if (pending) return
+    requestAnimationFrame(() => {
+      setWidth(nextWidth.current!)
+      nextWidth.current = null
+    })
+  }
 
   useEffect(() => {
     if (!lib.pendingTurn) return
@@ -239,14 +252,7 @@ export function Shell({
               e.currentTarget.setPointerCapture(e.pointerId)
               setResizing(true)
             }}
-            onPointerMove={e =>
-              resizing &&
-              setWidth(
-                Math.round(
-                  Math.min(Math.max(e.clientX, MIN_SIDEBAR), MAX_SIDEBAR)
-                )
-              )
-            }
+            onPointerMove={e => resizing && resizeTo(e.clientX)}
             onPointerUp={() => setResizing(false)}
             onPointerCancel={() => setResizing(false)}
             onDoubleClick={() => setWidth(SIDEBAR)}

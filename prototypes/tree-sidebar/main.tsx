@@ -27,6 +27,17 @@ const VARIANTS: {
   {key: 'C', name: C.name, Component: C.VariantC},
 ]
 
+// Size watchers (React Flow's, the file tree's, ours) run on the next frame, so a callback that changes layout can't
+// re-trigger itself in the same frame, which is what the "ResizeObserver loop" error reports.
+const NativeResizeObserver = window.ResizeObserver
+window.ResizeObserver = class extends NativeResizeObserver {
+  constructor(callback: ResizeObserverCallback) {
+    super((entries, observer) =>
+      requestAnimationFrame(() => callback(entries, observer))
+    )
+  }
+}
+
 window.addEventListener(
   'error',
   e => {
