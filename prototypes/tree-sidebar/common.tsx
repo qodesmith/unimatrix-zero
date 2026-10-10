@@ -41,6 +41,21 @@ import {
 } from './library'
 
 export const SIDEBAR = 290
+const MIN_SIDEBAR = 220
+const MAX_SIDEBAR = 640
+
+// Sidebar layout outlives the Shell, which remounts on every Tree switch.
+const layout = {width: SIDEBAR, split: 0.55, filesOpen: true}
+function useLayout<K extends keyof typeof layout>(k: K) {
+  const [v, setV] = useState(layout[k])
+  return [
+    v,
+    (next: (typeof layout)[K]) => {
+      layout[k] = next
+      setV(next)
+    },
+  ] as const
+}
 
 // ---------- library state, shared by every variant ----------
 
@@ -180,6 +195,8 @@ export function Shell({
     turnId: string | null
   } | null>(null)
   const focus = drawerReply ?? sim.activeReplyId
+  const [width, setWidth] = useLayout('width')
+  const [resizing, setResizing] = useState(false)
 
   useEffect(() => {
     if (!lib.pendingTurn) return
@@ -194,7 +211,7 @@ export function Shell({
   const decor = useMemo<Decor>(
     () => ({
       hostApi: host,
-      leftInset: SIDEBAR,
+      leftInset: width,
       replyBottom: (r, where) =>
         where === 'canvas' ? (
           <FileChips
@@ -205,20 +222,53 @@ export function Shell({
       prompt: p => <UserEdits prompt={p} />,
       onFocusReply: id => setDrawerReply(id),
     }),
-    []
+    [width]
   )
 
   return (
     <DecorContext.Provider value={decor}>
       <div className="flex h-full">
         <aside
-          style={{width: SIDEBAR}}
-          className="flex shrink-0 flex-col border-r border-zinc-200 bg-white"
+          style={{width}}
+          className="relative flex shrink-0 flex-col border-r border-zinc-200 bg-white"
         >
-          <div className="flex items-center justify-between px-3 pt-3 pb-2">
-            <span className="text-sm font-semibold text-zinc-900">
+          <div
+            title="Drag to resize · double-click to reset"
+            onPointerDown={e => {
+              e.preventDefault()
+              e.currentTarget.setPointerCapture(e.pointerId)
+              setResizing(true)
+            }}
+            onPointerMove={e =>
+              resizing &&
+              setWidth(
+                Math.round(
+                  Math.min(Math.max(e.clientX, MIN_SIDEBAR), MAX_SIDEBAR)
+                )
+              )
+            }
+            onPointerUp={() => setResizing(false)}
+            onPointerCancel={() => setResizing(false)}
+            onDoubleClick={() => setWidth(SIDEBAR)}
+            className="group absolute inset-y-0 -right-[5px] z-20 w-[9px] cursor-col-resize"
+          >
+            <div
+              className={`mx-auto h-full w-[3px] ${resizing ? 'bg-sky-500' : 'group-hover:bg-sky-500'}`}
+            />
+          </div>
+          <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+            <span className="flex-1 truncate text-sm font-semibold text-zinc-900">
               Unimatrix Zero
             </span>
+            {width !== SIDEBAR && (
+              <button
+                title="Reset sidebar width"
+                onClick={() => setWidth(SIDEBAR)}
+                className="text-xs text-zinc-400 hover:text-zinc-900"
+              >
+                ⇤⇥
+              </button>
+            )}
             <button
               title="Settings"
               className="text-zinc-400 hover:text-zinc-900"
@@ -294,7 +344,7 @@ function LinkedFolderBadge({path}: {path: string}) {
           cut && setTip(e.currentTarget.getBoundingClientRect())
         }
         onMouseLeave={() => setTip(null)}
-        className="max-w-[170px] min-w-0 truncate rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-800"
+        className="max-w-[60%] min-w-0 truncate rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-800"
       >
         🔗 {path}
       </span>
@@ -336,8 +386,8 @@ function SplitSections({
 }) {
   const body = useRef<HTMLDivElement>(null)
   // The Trees section's share of the sidebar body, so it survives window resizes.
-  const [split, setSplit] = useState(0.55)
-  const [open, setOpen] = useState(true)
+  const [split, setSplit] = useLayout('split')
+  const [open, setOpen] = useLayout('filesOpen')
   const [dragging, setDragging] = useState(false)
 
   const drag = (clientY: number) => {
@@ -384,7 +434,7 @@ function SplitSections({
       >
         <div className="flex items-center justify-between gap-2 pr-3">
           <button
-            onClick={() => setOpen(o => !o)}
+            onClick={() => setOpen(!open)}
             className="flex shrink-0 grow items-center gap-1 py-1.5 pl-2 text-[11px] font-semibold tracking-wide text-zinc-500 uppercase hover:text-zinc-900"
           >
             <span className="w-3 text-center">{open ? '▾' : '▸'}</span>
