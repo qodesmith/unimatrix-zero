@@ -1,4 +1,4 @@
-// PROTOTYPE variant B: folders, like Finder or VS Code. One level of folders you make yourself, drag Trees in, a sort
+// PROTOTYPE variant B: Collections, like folders in Finder or VS Code. One level of Collections you make yourself, drag Trees in, a sort
 // menu, ⌘/Shift-click to select several, and full-text search in a ⌘K palette instead of the sidebar. No pins. Throw away.
 import {useEffect, useMemo, useState} from 'react'
 
@@ -16,7 +16,7 @@ import {
 } from './common'
 import {displayTitle, relTime, search, type Entry} from './library'
 
-export const name = 'Folders and ⌘K'
+export const name = 'Collections and ⌘K'
 
 type Sort = 'active' | 'created' | 'name'
 const SORTS: Record<Sort, string> = {
@@ -30,7 +30,9 @@ export function VariantB({lib}: {lib: Lib}) {
   const [sortOpen, setSortOpen] = useState(false)
   const [closed, setClosed] = useState<string[]>([])
   const [renaming, setRenaming] = useState<string | null>(null)
-  const [renamingFolder, setRenamingFolder] = useState<string | null>(null)
+  const [renamingCollection, setRenamingCollection] = useState<string | null>(
+    null
+  )
   const [selected, setSelected] = useState<string[]>([])
   const [anchor, setAnchor] = useState<string | null>(null)
   const [dropOn, setDropOn] = useState<string | null>(null)
@@ -62,10 +64,12 @@ export function VariantB({lib}: {lib: Lib}) {
     )
   // Visible order, for Shift-click ranges.
   const flat = [
-    ...lib.folders.flatMap(f =>
-      closed.includes(f) ? [] : order(lib.entries.filter(e => e.folder === f))
+    ...lib.collections.flatMap(c =>
+      closed.includes(c)
+        ? []
+        : order(lib.entries.filter(e => e.collection === c))
     ),
-    ...order(lib.entries.filter(e => !e.folder)),
+    ...order(lib.entries.filter(e => !e.collection)),
   ]
 
   const click = (e: React.MouseEvent, entry: Entry) => {
@@ -91,28 +95,28 @@ export function VariantB({lib}: {lib: Lib}) {
     lib.pick(entry.key)
   }
 
-  const drop = (folder: string | null) => (e: React.DragEvent) => {
+  const drop = (collection: string | null) => (e: React.DragEvent) => {
     e.preventDefault()
     const key = e.dataTransfer.getData('text/tree')
-    lib.moveTo(selected.includes(key) ? selected : [key], folder)
+    lib.moveTo(selected.includes(key) ? selected : [key], collection)
     setDropOn(null)
     setSelected([])
   }
-  const dropTarget = (id: string, folder: string | null) => ({
+  const dropTarget = (id: string, collection: string | null) => ({
     onDragOver: (e: React.DragEvent) => {
       e.preventDefault()
       setDropOn(id)
     },
     onDragLeave: () => setDropOn(d => (d === id ? null : d)),
-    onDrop: drop(folder),
+    onDrop: drop(collection),
   })
 
-  const row = (e: Entry, inFolder: boolean) => (
+  const row = (e: Entry, inCollection: boolean) => (
     <Row
       key={e.key}
       lib={lib}
       entry={e}
-      inFolder={inFolder}
+      inCollection={inCollection}
       sort={sort}
       selected={selected.includes(e.key)}
       renaming={renaming === e.key}
@@ -135,13 +139,13 @@ export function VariantB({lib}: {lib: Lib}) {
               ＋ New Tree
             </button>
             <button
-              title="New folder"
+              title="New Collection"
               onClick={() => {
-                let n = 'New folder'
-                for (let i = 2; lib.folders.includes(n); i++)
-                  n = `New folder ${i}`
-                lib.addFolder(n)
-                setRenamingFolder(n)
+                let n = 'New Collection'
+                for (let i = 2; lib.collections.includes(n); i++)
+                  n = `New Collection ${i}`
+                lib.addCollection(n)
+                setRenamingCollection(n)
               }}
               className="rounded-lg px-2 py-1.5 text-xs text-zinc-500 hover:bg-zinc-100"
             >
@@ -175,42 +179,42 @@ export function VariantB({lib}: {lib: Lib}) {
             <kbd className="text-[10px]">⌘K</kbd>
           </button>
           <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-            {lib.folders.map(f => {
-              const inside = order(lib.entries.filter(e => e.folder === f))
-              const isClosed = closed.includes(f)
+            {lib.collections.map(c => {
+              const inside = order(lib.entries.filter(e => e.collection === c))
+              const isClosed = closed.includes(c)
               return (
-                <div key={f} className="mb-0.5">
+                <div key={c} className="mb-0.5">
                   <div
-                    {...dropTarget(`f:${f}`, f)}
+                    {...dropTarget(`c:${c}`, c)}
                     onClick={() =>
-                      setClosed(c =>
-                        isClosed ? c.filter(x => x !== f) : [...c, f]
+                      setClosed(cs =>
+                        isClosed ? cs.filter(x => x !== c) : [...cs, c]
                       )
                     }
-                    onDoubleClick={() => setRenamingFolder(f)}
-                    className={`group/row flex cursor-default items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-zinc-600 ${dropOn === `f:${f}` ? 'bg-sky-100 ring-1 ring-sky-400' : 'hover:bg-zinc-100'}`}
+                    onDoubleClick={() => setRenamingCollection(c)}
+                    className={`group/row flex cursor-default items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-zinc-600 ${dropOn === `c:${c}` ? 'bg-sky-100 ring-1 ring-sky-400' : 'hover:bg-zinc-100'}`}
                   >
                     <span className="w-3 text-[10px] text-zinc-400">
                       {isClosed ? '▸' : '▾'}
                     </span>
                     <span className="text-xs">📁</span>
-                    {renamingFolder === f ? (
+                    {renamingCollection === c ? (
                       <RenameInput
-                        initial={f}
+                        initial={c}
                         onDone={v => {
-                          if (v !== null) lib.renameFolder(f, v)
-                          setRenamingFolder(null)
+                          if (v !== null) lib.renameCollection(c, v)
+                          setRenamingCollection(null)
                         }}
                       />
                     ) : (
-                      <span className="min-w-0 flex-1 truncate">{f}</span>
+                      <span className="min-w-0 flex-1 truncate">{c}</span>
                     )}
                     <span className="text-[11px] font-normal text-zinc-400 group-hover/row:hidden">
                       {inside.length}
                     </span>
-                    <FolderMenu
-                      onRename={() => setRenamingFolder(f)}
-                      onDelete={() => lib.removeFolder(f)}
+                    <CollectionMenu
+                      onRename={() => setRenamingCollection(c)}
+                      onDelete={() => lib.removeCollection(c)}
                     />
                   </div>
                   {!isClosed && inside.map(e => row(e, true))}
@@ -221,7 +225,7 @@ export function VariantB({lib}: {lib: Lib}) {
               {...dropTarget('top', null)}
               className={`mt-1 min-h-8 rounded-lg ${dropOn === 'top' ? 'bg-sky-50 ring-1 ring-sky-300' : ''}`}
             >
-              {order(lib.entries.filter(e => !e.folder)).map(e =>
+              {order(lib.entries.filter(e => !e.collection)).map(e =>
                 row(e, false)
               )}
             </div>
@@ -262,16 +266,16 @@ export function VariantB({lib}: {lib: Lib}) {
             left: moving.at.right + 4,
           }}
           items={[
-            ...lib.folders.map(f => ({
-              label: `📁 ${f}`,
+            ...lib.collections.map(c => ({
+              label: `📁 ${c}`,
               onClick: () => {
-                lib.moveTo(moving.keys, f)
+                lib.moveTo(moving.keys, c)
                 setSelected([])
               },
             })),
             'sep' as const,
             {
-              label: 'Not in a folder',
+              label: 'Not in a Collection',
               onClick: () => {
                 lib.moveTo(moving.keys, null)
                 setSelected([])
@@ -288,7 +292,7 @@ export function VariantB({lib}: {lib: Lib}) {
 function Row({
   lib,
   entry,
-  inFolder,
+  inCollection,
   sort,
   selected,
   renaming,
@@ -298,7 +302,7 @@ function Row({
 }: {
   lib: Lib
   entry: Entry
-  inFolder: boolean
+  inCollection: boolean
   sort: Sort
   selected: boolean
   renaming: boolean
@@ -309,7 +313,7 @@ function Row({
   const active = entry.key === lib.current
   const extra: MenuItem[] = [
     {
-      label: 'Move to folder…',
+      label: 'Move to Collection…',
       onClick: () =>
         onMove(
           document
@@ -325,7 +329,7 @@ function Row({
       onDragStart={e => e.dataTransfer.setData('text/tree', entry.key)}
       onClick={onClick}
       onDoubleClick={() => setRenaming(entry.key)}
-      className={`group/row flex cursor-default items-center gap-2 rounded-lg py-1.5 pr-2 text-sm ${inFolder ? 'pl-7' : 'pl-2'} ${active ? 'bg-zinc-900 text-white' : selected ? 'bg-sky-100 text-zinc-900' : 'text-zinc-700 hover:bg-zinc-100'}`}
+      className={`group/row flex cursor-default items-center gap-2 rounded-lg py-1.5 pr-2 text-sm ${inCollection ? 'pl-7' : 'pl-2'} ${active ? 'bg-zinc-900 text-white' : selected ? 'bg-sky-100 text-zinc-900' : 'text-zinc-700 hover:bg-zinc-100'}`}
     >
       <TreeIcon entry={entry} />
       {renaming ? (
@@ -357,7 +361,7 @@ function Row({
   )
 }
 
-function FolderMenu({
+function CollectionMenu({
   onRename,
   onDelete,
 }: {
@@ -378,9 +382,9 @@ function FolderMenu({
           onClose={() => setOpen(false)}
           className="absolute top-full right-0 mt-1 font-normal"
           items={[
-            {label: 'Rename folder', onClick: onRename},
+            {label: 'Rename Collection', onClick: onRename},
             {
-              label: 'Delete folder',
+              label: 'Delete Collection',
               hint: 'keeps its Trees',
               danger: true,
               onClick: onDelete,
@@ -457,8 +461,8 @@ function Palette({lib, onClose}: {lib: Lib; onClose: () => void}) {
               <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-zinc-500">
                 <TreeIcon entry={g.entry} />
                 <span className="truncate">{displayTitle(g.entry)}</span>
-                {g.entry.folder && (
-                  <span className="text-zinc-400">📁 {g.entry.folder}</span>
+                {g.entry.collection && (
+                  <span className="text-zinc-400">📁 {g.entry.collection}</span>
                 )}
                 {g.hits.length > 3 && (
                   <span className="ml-auto text-zinc-400">

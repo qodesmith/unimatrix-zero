@@ -1,4 +1,4 @@
-// PROTOTYPE: fake Tree library for the Tree sidebar ticket: metadata (pins, folders, title source, activity), filler
+// PROTOTYPE: fake Tree library for the Tree sidebar ticket: metadata (pins, Collections, title source, activity), filler
 // Trees with searchable text, auto-titles and full-text search. Throw away.
 import {
   buildSeed,
@@ -21,7 +21,7 @@ export type Entry = {
   created: number
   lastActive: number
   pinned: boolean
-  folder: string | null
+  collection: string | null
 }
 
 const DAY = 86_400_000
@@ -32,7 +32,7 @@ type Filler = {
   title: string
   days: number
   turns: [prompt: string, reply: string, model?: string][]
-  folder?: string
+  collection?: string
   pinned?: boolean
   renamed?: boolean
 }
@@ -41,7 +41,7 @@ const FILLER: Filler[] = [
   {
     title: 'Fractions homework help',
     days: 0.1,
-    folder: 'School',
+    collection: 'School',
     turns: [
       [
         'Why is 1/2 bigger than 1/3 if 3 is bigger than 2?',
@@ -68,7 +68,7 @@ const FILLER: Filler[] = [
   {
     title: 'Postgres connection pool exhaustion',
     days: 0.6,
-    folder: 'Work',
+    collection: 'Work',
     turns: [
       [
         'Our API pods hit "remaining connection slots are reserved" under load. 12 pods, pool size 20, max_connections 200.',
@@ -94,7 +94,7 @@ const FILLER: Filler[] = [
   {
     title: 'Learn Spanish: week 3',
     days: 1.6,
-    folder: 'Learning',
+    collection: 'Learning',
     turns: [
       [
         'Quiz me on ser vs estar, 10 sentences.',
@@ -109,7 +109,7 @@ const FILLER: Filler[] = [
   {
     title: 'Refactor billing service',
     days: 2.4,
-    folder: 'Work',
+    collection: 'Work',
     renamed: true,
     turns: [
       [
@@ -156,7 +156,7 @@ const FILLER: Filler[] = [
   {
     title: 'React Flow edge routing',
     days: 6,
-    folder: 'Work',
+    collection: 'Work',
     turns: [
       [
         'Edges overlap when a Fork has 8 children. Smoothstep or bezier?',
@@ -177,7 +177,7 @@ const FILLER: Filler[] = [
   {
     title: 'Volcano science project',
     days: 12,
-    folder: 'School',
+    collection: 'School',
     turns: [
       [
         'My son needs a volcano project that is more than baking soda.',
@@ -188,7 +188,7 @@ const FILLER: Filler[] = [
   {
     title: 'Kubernetes liveness probe flapping',
     days: 15,
-    folder: 'Work',
+    collection: 'Work',
     turns: [
       [
         'Pods restart every few minutes. Liveness probe hits /health with a 1s timeout.',
@@ -219,7 +219,7 @@ const FILLER: Filler[] = [
   {
     title: 'Japanese pitch accent',
     days: 33,
-    folder: 'Learning',
+    collection: 'Learning',
     turns: [
       [
         'Is pitch accent worth learning as a beginner?',
@@ -240,7 +240,7 @@ const FILLER: Filler[] = [
   {
     title: 'Design doc: offline sync',
     days: 58,
-    folder: 'Work',
+    collection: 'Work',
     renamed: true,
     turns: [
       [
@@ -262,7 +262,7 @@ const FILLER: Filler[] = [
   {
     title: 'Solar system quiz',
     days: 96,
-    folder: 'School',
+    collection: 'School',
     turns: [
       [
         'Make a solar system quiz for a 9 year old',
@@ -273,7 +273,7 @@ const FILLER: Filler[] = [
   {
     title: 'Rust lifetimes explained',
     days: 130,
-    folder: 'Learning',
+    collection: 'Learning',
     turns: [
       [
         "I don't get 'a in fn longest<'a>(x: &'a str, y: &'a str) -> &'a str",
@@ -313,7 +313,7 @@ const SEEDED: Entry[] = TREES.map((t, i) => ({
   created: ago(4 + i * 7),
   lastActive: ago(0, 1 + i * 30),
   pinned: false,
-  folder: t.key === 'recipes' ? 'Work' : null,
+  collection: t.key === 'recipes' ? 'Work' : null,
 }))
 
 // A linked folder deep in the user's disk, to see how a long path fits the Files badge.
@@ -334,7 +334,7 @@ const LONG_PATH: Entry = {
   created: ago(8),
   lastActive: ago(0, 5),
   pinned: false,
-  folder: 'Work',
+  collection: 'Work',
 }
 
 export const INITIAL: Entry[] = [
@@ -348,11 +348,11 @@ export const INITIAL: Entry[] = [
     created: ago(f.days + 2),
     lastActive: ago(f.days),
     pinned: !!f.pinned,
-    folder: f.folder ?? null,
+    collection: f.collection ?? null,
   })),
 ]
 
-export const INITIAL_FOLDERS = ['Work', 'School', 'Learning']
+export const INITIAL_COLLECTIONS = ['Work', 'School', 'Learning']
 
 for (const e of INITIAL) simCache.set(e.key, e.init())
 
@@ -365,7 +365,7 @@ export const newEntry = (): Entry => ({
   created: Date.now(),
   lastActive: Date.now(),
   pinned: false,
-  folder: null,
+  collection: null,
 })
 
 // ---------- facts ----------

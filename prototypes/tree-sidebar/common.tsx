@@ -33,7 +33,7 @@ import {
   firstReplyDone,
   freesBytes,
   INITIAL,
-  INITIAL_FOLDERS,
+  INITIAL_COLLECTIONS,
   newEntry,
   rootPrompt,
   stats,
@@ -44,8 +44,11 @@ export const SIDEBAR = 290
 const MIN_SIDEBAR = SIDEBAR
 const MAX_SIDEBAR = 640
 
+// The Trees section's default share of the sidebar body.
+const SPLIT = 0.55
+
 // Sidebar layout outlives the Shell, which remounts on every Tree switch.
-const layout = {width: SIDEBAR, split: 0.55, filesOpen: true}
+const layout = {width: SIDEBAR, split: SPLIT, filesOpen: true}
 function useLayout<K extends keyof typeof layout>(k: K) {
   const [v, setV] = useState(layout[k])
   return [
@@ -63,7 +66,7 @@ export type Lib = ReturnType<typeof useLibrary>
 
 export function useLibrary() {
   const [entries, setEntries] = useState<Entry[]>(INITIAL)
-  const [folders, setFolders] = useState<string[]>(INITIAL_FOLDERS)
+  const [collections, setCollections] = useState<string[]>(INITIAL_COLLECTIONS)
   const [current, setCurrent] = useState(INITIAL[0]!.key)
   // A Turn to open in the slideout once the picked Tree has mounted (search results).
   const [pendingTurn, setPendingTurn] = useState<string | null>(null)
@@ -102,7 +105,7 @@ export function useLibrary() {
 
   return {
     entries,
-    folders,
+    collections,
     current,
     pendingTurn,
     justTitled,
@@ -127,28 +130,28 @@ export function useLibrary() {
       setEntries(list =>
         list.map(e => (e.key === key ? {...e, pinned: !e.pinned} : e))
       ),
-    moveTo: (keys: string[], folder: string | null) =>
+    moveTo: (keys: string[], collection: string | null) =>
       setEntries(list =>
-        list.map(e => (keys.includes(e.key) ? {...e, folder} : e))
+        list.map(e => (keys.includes(e.key) ? {...e, collection} : e))
       ),
-    addFolder: (name: string) => {
+    addCollection: (name: string) => {
       const n = name.trim()
-      if (n && !folders.includes(n)) setFolders(f => [...f, n])
+      if (n && !collections.includes(n)) setCollections(f => [...f, n])
       return n
     },
-    renameFolder: (from: string, to: string) => {
+    renameCollection: (from: string, to: string) => {
       const n = to.trim()
-      if (!n || folders.includes(n)) return
-      setFolders(f => f.map(x => (x === from ? n : x)))
+      if (!n || collections.includes(n)) return
+      setCollections(f => f.map(x => (x === from ? n : x)))
       setEntries(list =>
-        list.map(e => (e.folder === from ? {...e, folder: n} : e))
+        list.map(e => (e.collection === from ? {...e, collection: n} : e))
       )
     },
-    // Deleting a folder never deletes its Trees; they go back to the top level.
-    removeFolder: (name: string) => {
-      setFolders(f => f.filter(x => x !== name))
+    // Deleting a Collection never deletes its Trees; they go back to the top level.
+    removeCollection: (name: string) => {
+      setCollections(f => f.filter(x => x !== name))
       setEntries(list =>
-        list.map(e => (e.folder === name ? {...e, folder: null} : e))
+        list.map(e => (e.collection === name ? {...e, collection: null} : e))
       )
     },
     askDelete: (keys: string[]) => setDeleting(keys),
@@ -426,6 +429,8 @@ function SplitSections({
             onPointerMove={e => dragging && drag(e.clientY)}
             onPointerUp={() => setDragging(false)}
             onPointerCancel={() => setDragging(false)}
+            onDoubleClick={() => setSplit(SPLIT)}
+            title="Drag to resize · double-click to reset"
             className="group absolute inset-x-0 -top-1 z-10 h-[9px] cursor-row-resize"
           >
             <div
