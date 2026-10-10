@@ -273,19 +273,49 @@ export function Shell({
   )
 }
 
-// The full path shows on hover only when it's cut off.
+// The full path shows on hover only when it's cut off. A drawn tooltip, not `title`, so it always appears.
 function LinkedFolderBadge({path}: {path: string}) {
+  const ref = useRef<HTMLSpanElement>(null)
   const [cut, setCut] = useState(false)
+  const [tip, setTip] = useState<DOMRect | null>(null)
+  useEffect(() => {
+    const el = ref.current!
+    const check = () => setCut(el.scrollWidth > el.clientWidth)
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [path])
   return (
-    <span
-      title={cut ? path : undefined}
-      onMouseEnter={e =>
-        setCut(e.currentTarget.scrollWidth > e.currentTarget.clientWidth)
-      }
-      className="max-w-[170px] min-w-0 truncate rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-800"
-    >
-      🔗 {path}
-    </span>
+    <>
+      <span
+        ref={ref}
+        onMouseEnter={e =>
+          cut && setTip(e.currentTarget.getBoundingClientRect())
+        }
+        onMouseLeave={() => setTip(null)}
+        className="max-w-[170px] min-w-0 truncate rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-800"
+      >
+        🔗 {path}
+      </span>
+      {tip &&
+        createPortal(
+          <div
+            role="tooltip"
+            style={{position: 'fixed', top: tip.bottom + 6, left: tip.left}}
+            className="pointer-events-none z-[80] max-w-[420px] rounded-md bg-zinc-900 px-2 py-1 text-[11px] text-white shadow-lg"
+          >
+            {path.split('/').map((part, i) => (
+              <span key={i}>
+                {i > 0 && '/'}
+                {i > 0 && <wbr />}
+                <span className="whitespace-nowrap">{part}</span>
+              </span>
+            ))}
+          </div>,
+          document.body
+        )}
+    </>
   )
 }
 
