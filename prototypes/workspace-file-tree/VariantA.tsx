@@ -124,6 +124,7 @@ export function FilesPanel({
   onOpen,
   selected,
   onAdd,
+  titleRow = true,
 }: {
   focus: string
   following: boolean
@@ -131,6 +132,8 @@ export function FilesPanel({
   onOpen: (path: string) => void
   selected: string | null
   onAdd: () => void
+  // Off when the host draws its own "Files" header (the Tree sidebar's collapsible section).
+  titleRow?: boolean
 }) {
   const sim = useSim()
   if (!sim.workspace)
@@ -163,15 +166,19 @@ export function FilesPanel({
   const prompt = reply?.parentId ? sim.tree[reply.parentId] : undefined
   return (
     <>
-      <div className="px-3 pt-2.5 pb-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-semibold tracking-wide text-zinc-500 uppercase">
-            Files
-          </span>
-          <WorkspaceChip workspace={sim.workspace} shell={sim.shell} />
-        </div>
+      <div className={`px-3 pb-2 ${titleRow ? 'pt-2.5' : ''}`}>
+        {titleRow && (
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold tracking-wide text-zinc-500 uppercase">
+              Files
+            </span>
+            <WorkspaceChip workspace={sim.workspace} shell={sim.shell} />
+          </div>
+        )}
         {reply && (
-          <div className="mt-1.5 rounded-lg bg-zinc-50 px-2 py-1.5 text-[11px] text-zinc-600">
+          <div
+            className={`rounded-lg bg-zinc-50 px-2 py-1.5 text-[11px] text-zinc-600 ${titleRow ? 'mt-1.5' : ''}`}
+          >
             <div className="flex items-center gap-1.5">
               <span
                 className={`h-1.5 w-1.5 rounded-full ${live ? 'bg-emerald-500' : 'bg-amber-500'}`}

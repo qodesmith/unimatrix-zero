@@ -24,6 +24,7 @@ import {
   FilePreview,
   UserEdits,
   useToast,
+  WorkspaceChip,
 } from '../workspace-file-tree/common'
 import {FilesPanel} from '../workspace-file-tree/VariantA'
 import {formatSize} from '../workspace-file-tree/workspace'
@@ -226,22 +227,28 @@ export function Shell({
               ⚙
             </button>
           </div>
-          <div
-            className={`flex min-h-0 flex-col ${treesFill ? 'flex-1' : 'max-h-[55%]'}`}
-          >
-            {trees}
-          </div>
-          {!treesFill && (
-            <div className="mt-2 flex min-h-0 flex-1 flex-col border-t border-zinc-200">
-              <FilesPanel
-                focus={focus}
-                following={!drawerReply}
-                onBackToLatest={() => host.current?.select(null)}
-                onOpen={path => setPreview({path, turnId: null})}
-                selected={preview?.turnId === null ? preview.path : null}
-                onAdd={() => {}}
-              />
-            </div>
+          {treesFill ? (
+            <div className="flex min-h-0 flex-1 flex-col">{trees}</div>
+          ) : (
+            <SplitSections
+              trees={trees}
+              filesHeader={
+                sim.workspace && (
+                  <WorkspaceChip workspace={sim.workspace} shell={sim.shell} />
+                )
+              }
+              files={
+                <FilesPanel
+                  titleRow={false}
+                  focus={focus}
+                  following={!drawerReply}
+                  onBackToLatest={() => host.current?.select(null)}
+                  onOpen={path => setPreview({path, turnId: null})}
+                  selected={preview?.turnId === null ? preview.path : null}
+                  onAdd={() => {}}
+                />
+              }
+            />
           )}
         </aside>
         <div className="relative flex min-w-0 flex-1 flex-col">
@@ -263,6 +270,85 @@ export function Shell({
       {lib.deleting && <DeleteDialog lib={lib} keys={lib.deleting} />}
       {children}
     </DecorContext.Provider>
+  )
+}
+
+// ---------- Trees above Files, split like VS Code's Explorer ----------
+
+const MIN_TREES = 120
+// The Files header, the status box and a few rows.
+const MIN_FILES = 180
+
+function SplitSections({
+  trees,
+  files,
+  filesHeader,
+}: {
+  trees: ReactNode
+  files: ReactNode
+  filesHeader: ReactNode
+}) {
+  const body = useRef<HTMLDivElement>(null)
+  // The Trees section's share of the sidebar body, so it survives window resizes.
+  const [split, setSplit] = useState(0.55)
+  const [open, setOpen] = useState(true)
+  const [dragging, setDragging] = useState(false)
+
+  const drag = (clientY: number) => {
+    const r = body.current!.getBoundingClientRect()
+    const y = Math.min(
+      Math.max(clientY - r.top, MIN_TREES),
+      r.height - MIN_FILES
+    )
+    setSplit(y / r.height)
+  }
+
+  return (
+    <div ref={body} className="flex min-h-0 flex-1 flex-col">
+      <div
+        style={
+          open ? {height: `${split * 100}%`, minHeight: MIN_TREES} : undefined
+        }
+        className={`flex min-h-0 flex-col ${open ? '' : 'flex-1'}`}
+      >
+        {trees}
+      </div>
+      <div className="relative h-px shrink-0 bg-zinc-200">
+        {open && (
+          <div
+            onPointerDown={e => {
+              e.preventDefault()
+              e.currentTarget.setPointerCapture(e.pointerId)
+              setDragging(true)
+            }}
+            onPointerMove={e => dragging && drag(e.clientY)}
+            onPointerUp={() => setDragging(false)}
+            onPointerCancel={() => setDragging(false)}
+            className="group absolute inset-x-0 -top-1 z-10 h-[9px] cursor-row-resize"
+          >
+            <div
+              className={`mt-[3px] h-[3px] ${dragging ? 'bg-sky-500' : 'group-hover:bg-sky-500'}`}
+            />
+          </div>
+        )}
+      </div>
+      <div
+        style={open ? {minHeight: MIN_FILES} : undefined}
+        className={`flex flex-col ${open ? 'min-h-0 flex-1' : 'shrink-0'}`}
+      >
+        <div className="flex items-center justify-between pr-3">
+          <button
+            onClick={() => setOpen(o => !o)}
+            className="flex flex-1 items-center gap-1 py-1.5 pl-2 text-[11px] font-semibold tracking-wide text-zinc-500 uppercase hover:text-zinc-900"
+          >
+            <span className="w-3 text-center">{open ? '▾' : '▸'}</span>
+            Files
+          </button>
+          {open && filesHeader}
+        </div>
+        {open && <div className="flex min-h-0 flex-1 flex-col">{files}</div>}
+      </div>
+    </div>
   )
 }
 
