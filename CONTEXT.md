@@ -23,7 +23,7 @@ The standing instructions the AI follows in a Tree. Each Tree has one, filled in
 _Avoid_: Instructions, persona, custom instructions
 
 **Workspace**:
-An optional property of a Tree: a set of files the AI can create and edit as part of the conversation. Each Reply has the files as they stood when it finished. The files live either in the app (_app-owned_) or in a folder of the user's (_linked folder_). A Tree without a Workspace is a _plain_ Tree: it has no files, though it may still use tools such as web search. A Workspace lets the AI either _write files_ or _write files and run commands_.
+An optional property of a Tree: a set of files the AI can create and edit as part of the conversation. Each Reply has the files as they stood when it finished. The files live either in the app (_app-owned_) or in a folder of the user's (_linked folder_). A Tree without a Workspace is a _plain_ Tree: it has no files, though it may still use tools such as web search. A Workspace lets the AI either _write files_ or _write files and run commands_. A _folder_, on its own, always means a real folder on the user's disk; the sidebar's groups of Trees are Collections.
 _Avoid_: Project, folder, agent mode, dev mode
 
 **Snapshot**:
@@ -94,6 +94,10 @@ The place the user types the next Prompt, always attached to a Reply, except on 
 _Avoid_: Composer, prompt box, head
 
 ### App
+
+**Collection**:
+A named group of Trees in the sidebar, made by the user. A Tree is in at most one Collection, Collections don't nest, and deleting a Collection never deletes its Trees. Drawn with a folder icon, because people expect it to expand and collapse, but never called a folder.
+_Avoid_: Folder, project, group
 
 **Settings**:
 The single place for the user's global preferences: how the app looks and behaves, and the defaults new Trees start from. Settings never changes an existing Tree; anything that shapes what the AI does in one Tree belongs to that Tree.
