@@ -8,7 +8,7 @@ import {
   type Tree,
   type Turn,
 } from '../canvas-mode-ux/tree'
-import {TREES} from '../workspace-file-tree/workspace'
+import {seedLinkedRecipes, TREES} from '../workspace-file-tree/workspace'
 
 export type TitleSource = 'prompt' | 'ai' | 'user'
 
@@ -316,8 +316,30 @@ const SEEDED: Entry[] = TREES.map((t, i) => ({
   folder: t.key === 'recipes' ? 'Work' : null,
 }))
 
+// A linked folder deep in the user's disk, to see how a long path fits the Files badge.
+const LONG_PATH: Entry = {
+  key: 'long-path',
+  init: () => {
+    const s = seedLinkedRecipes()
+    return {
+      ...s,
+      workspace: {
+        ...(s.workspace as Extract<typeof s.workspace, {kind: 'linked'}>),
+        path: '~/Documents/Clients/Hillside Primary School/2026 autumn term/website-rebuild',
+      },
+    }
+  },
+  title: 'School website rebuild',
+  titleSource: 'ai',
+  created: ago(8),
+  lastActive: ago(0, 5),
+  pinned: false,
+  folder: 'Work',
+}
+
 export const INITIAL: Entry[] = [
   ...SEEDED,
+  LONG_PATH,
   ...FILLER.map((f, i) => ({
     key: `filler-${i}`,
     init: fillerSeed(f),

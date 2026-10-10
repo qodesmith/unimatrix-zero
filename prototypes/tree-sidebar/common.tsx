@@ -234,9 +234,7 @@ export function Shell({
               filesHeader={
                 // Says only where the files live; kept in the app is the default, so it's unlabelled.
                 sim.workspace?.kind === 'linked' && (
-                  <span className="truncate rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-800">
-                    🔗 {sim.workspace.path}
-                  </span>
+                  <LinkedFolderBadge path={sim.workspace.path} />
                 )
               }
               files={
@@ -272,6 +270,22 @@ export function Shell({
       {lib.deleting && <DeleteDialog lib={lib} keys={lib.deleting} />}
       {children}
     </DecorContext.Provider>
+  )
+}
+
+// The full path shows on hover only when it's cut off.
+function LinkedFolderBadge({path}: {path: string}) {
+  const [cut, setCut] = useState(false)
+  return (
+    <span
+      title={cut ? path : undefined}
+      onMouseEnter={e =>
+        setCut(e.currentTarget.scrollWidth > e.currentTarget.clientWidth)
+      }
+      className="max-w-[170px] min-w-0 truncate rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-800"
+    >
+      🔗 {path}
+    </span>
   )
 }
 
@@ -338,10 +352,10 @@ function SplitSections({
         style={open ? {minHeight: MIN_FILES} : undefined}
         className={`flex flex-col ${open ? 'min-h-0 flex-1' : 'shrink-0'}`}
       >
-        <div className="flex items-center justify-between pr-3">
+        <div className="flex items-center justify-between gap-2 pr-3">
           <button
             onClick={() => setOpen(o => !o)}
-            className="flex flex-1 items-center gap-1 py-1.5 pl-2 text-[11px] font-semibold tracking-wide text-zinc-500 uppercase hover:text-zinc-900"
+            className="flex shrink-0 grow items-center gap-1 py-1.5 pl-2 text-[11px] font-semibold tracking-wide text-zinc-500 uppercase hover:text-zinc-900"
           >
             <span className="w-3 text-center">{open ? '▾' : '▸'}</span>
             Files
