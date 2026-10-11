@@ -1,0 +1,14 @@
+# Usage and limit display: what the user likes
+
+Feeds the resolution of the Usage and limit display ticket (#36).
+
+**Verdict: variant D (A's sidebar plus B's Input), as built, with the choices below.** Variants A (sidebar footer only), B (Input only) and C (bands only, quiet until it matters) are dropped.
+
+1. **Usage is a third sidebar section, under Files,** VS Code Explorer style: a ▾/▸ header, collapsible, with a draggable divider above it (Files ⇄ Usage, or Trees ⇄ Usage while Files is collapsed), double-click to reset. Minimums: Trees 120px, Files 180px, Usage 90px. Its height and collapsed state are remembered between launches, like Files.
+2. **The section lists each connected Provider with every window it reports,** named from the window's length (5-hour, Weekly, ...) plus per-model weeklies (Claude Max's Fable weekly), each with a bar, a percent and the reset time on hover. A Provider reporting no windows says "No limits reported". The header has Details (→ Settings → Connections); collapsed, it shows one ring per Provider for its fullest window, red when limited.
+3. **Each Provider row shows how fresh the figure is** ("Updated 2 min ago", ⟳ Refresh). Reads happen when the app opens, when a Provider connects, every 5 minutes, after each Turn (the in-Turn pushes) and from Refresh; the figure is marked stale after 10 minutes. Offline: "Couldn't refresh · updated X ago". Without Claude's experimental read: "From your last Reply, X ago", and per-model weeklies can't be shown.
+4. **The Input has a ring next to the Model pill** for the tightest window that limits the picked Model (a per-model weekly counts only when that Model is picked). Click → popover with that Model's windows, freshness and "All usage". At 80% (both Providers) it spells out "82% of 5-hour · resets 6:20pm".
+5. **At the limit the Input becomes a card:** "Claude's 5-hour limit is reached. It resets at 12:40pm (in 2 h 10 min). Your draft is kept." with Continue with <a Model on the other Provider> and the Model pill. The normal Input returns with the draft once the limit resets or another Model is picked.
+6. **A limit is per account,** so every Thread on that Provider waits. Running Claude Replies that make another request (tools, Subagents) are refused and keep their partial text; Codex lets a running Turn finish. A refused Reply says "Limit reached · back at 12:40pm" with Retry with <other Provider's Model>, then a plain Retry after the reset.
+7. **Usage credits:** Claude's "On usage credits" state shows (sidebar row and ring). ChatGPT shows plan windows only in v1; its credits and "Full reset" credits aren't shown.
+8. **Settings → Connections** shows the same per-Provider detail in full: every window with reset time and countdown, the limit-reached and on-credits notes, and freshness.
