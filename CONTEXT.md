@@ -22,6 +22,18 @@ _Avoid_: Thread (Codex's word for it), conversation
 The standing instructions the AI follows in a Tree. Each Tree has one, filled in from a global default and changeable at any time. A change applies to Replies generated afterwards, and each Reply records the System prompt it ran under. A _preset_ is a read-only System prompt that ships with the app; presets and the user's own System prompts make up the _library_. A Tree holds its own copy, so editing a library entry never changes an existing Tree.
 _Avoid_: Instructions, persona, custom instructions
 
+**Skill**:
+A folder of instructions (and sometimes files or scripts) the AI can load when a task calls for it. The app reads skills from folders the user adds in Settings; each Tree chooses which of them are on.
+_Avoid_: Command, prompt, ability
+
+**MCP server**:
+An outside program or service that gives the AI extra tools, such as reading a calendar. The app keeps one list of them in Settings; each Tree chooses which are on. Some need the user to sign in to the service first.
+_Avoid_: Integration, extension, connector (reserved for claude.ai's own connectors)
+
+**Plugin**:
+A folder bundling Skills and MCP servers, added in Settings. The app uses only those parts: its Skills and MCP servers appear under the Plugin and can be switched on and off together or one by one, and anything else it contains is not supported.
+_Avoid_: Extension, add-on, package
+
 **Workspace**:
 An optional property of a Tree: a set of files the AI can create and edit as part of the conversation. Each Reply has the files as they stood when it finished. The files live either in the app (_app-owned_) or in a folder of the user's (_linked folder_). A Tree without a Workspace is a _plain_ Tree: it has no files, though it may still use tools such as web search. A Workspace lets the AI either _write files_ or _write files and run commands_. A _folder_, on its own, always means a real folder on the user's disk; the sidebar's groups of Trees are Collections.
 _Avoid_: Project, folder, agent mode, dev mode
