@@ -19,7 +19,7 @@ import {Above, LimitStatus, Toolbar} from './VariantB'
 export const name = 'Sidebar section + Input ring'
 
 // While collapsed: one ring per Provider for its fullest window, red when it's limited.
-function Badge() {
+export function Badge() {
   const s = useUsage()
   return (
     <div className="flex items-center gap-2 text-[10px] text-zinc-500">

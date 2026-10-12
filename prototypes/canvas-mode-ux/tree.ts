@@ -42,7 +42,34 @@ export type Turn = {
   createdAt: number
   // Usage prototype: the Reply was refused because the Provider's usage limit was reached.
   limit?: LimitInfo
+  // Error-states prototype: the Reply was refused or cut off by something outside it (sign-in, connection, program).
+  issue?: Issue
+  // Error-states prototype: streaming but paused. `reconnecting`: the vendor program is retrying a lost connection;
+  // `queued`: sent while offline, starts once the connection is back.
+  waiting?: 'reconnecting' | 'queued'
 }
+
+export type IssueKind =
+  | 'signin'
+  | 'signedOut'
+  | 'offline'
+  | 'crash'
+  | 'wontStart'
+  | 'outage'
+export type Issue = {kind: IssueKind; provider: string}
+
+// Error-states prototype hooks, set by the host app. Throw away.
+export const issueHooks: {
+  // Refuses a new Reply before it starts; 'queue' starts it paused until the connection is back.
+  gate: (model: string) => Issue | 'queue' | null
+  // Checked every tick for each running Reply: pause it, cut it off with an Issue, or let it run.
+  check: (t: Turn) => 'pause' | Issue | null
+  sim: {
+    failRunning: (match: (t: Turn) => boolean, issue: Issue) => number
+    retryWhere: (match: (t: Turn) => boolean) => number
+    running: () => Turn[]
+  } | null
+} = {gate: () => null, check: () => null, sim: null}
 
 export type LimitInfo = {provider: string; window: string; until: number}
 
@@ -530,6 +557,30 @@ export function useTreeSim(options: SimOptions = {}) {
             delete streams.current[id]
             continue
           }
+          const verdict = issueHooks.check(turn)
+          if (verdict === 'pause') {
+            if (!turn.waiting) {
+              tree[id] = {...turn, waiting: 'reconnecting'}
+              changed = true
+            }
+            continue
+          }
+          if (verdict) {
+            tree[id] = doneWriting({
+              ...turn,
+              status: 'failed',
+              issue: verdict,
+              waiting: undefined,
+            })
+            delete streams.current[id]
+            failed.push(id)
+            changed = true
+            continue
+          }
+          if (turn.waiting) {
+            tree[id] = {...turn, waiting: undefined}
+            changed = true
+          }
           st.owed += perTick * (0.5 + Math.random())
           const n = Math.floor(st.owed)
           if (!n) continue
@@ -556,7 +607,7 @@ export function useTreeSim(options: SimOptions = {}) {
               st.writingUntil[f.path]! <= st.i ? {...f, writing: false} : f
             )
           tree[id] = {
-            ...turn,
+            ...tree[id]!,
             text,
             tokens: estimateTokens(text),
             status,
@@ -594,7 +645,10 @@ export function useTreeSim(options: SimOptions = {}) {
         usageHooks.model ||
         (parentReplyId && stateRef.current.tree[parentReplyId]?.model) ||
         'Claude Sonnet 5'
-      const limit = usageHooks.gate(model)
+      const gate = issueHooks.gate(model)
+      const issue = gate === 'queue' ? null : gate
+      const limit = issue ? null : usageHooks.gate(model)
+      const refused = !!(issue || limit)
       setState(s => ({
         ...s,
         activeReplyId: replyId,
@@ -636,13 +690,15 @@ export function useTreeSim(options: SimOptions = {}) {
             model,
             createdAt: now + 1,
             ...(limit ? {status: 'failed' as const, limit} : {}),
+            ...(issue ? {status: 'failed' as const, issue} : {}),
+            ...(gate === 'queue' ? {waiting: 'queued' as const} : {}),
           },
         },
-        unseenFailures: limit
+        unseenFailures: refused
           ? [...s.unseenFailures, replyId]
           : s.unseenFailures,
       }))
-      if (!limit) {
+      if (!refused) {
         usageHooks.started(model)
         startStream(replyId)
       }
@@ -658,7 +714,11 @@ export function useTreeSim(options: SimOptions = {}) {
       ...s,
       tree: {
         ...s.tree,
-        [replyId]: doneWriting({...s.tree[replyId]!, status: 'stopped'}),
+        [replyId]: doneWriting({
+          ...s.tree[replyId]!,
+          status: 'stopped',
+          waiting: undefined,
+        }),
       },
     }))
   }, [])
@@ -666,8 +726,11 @@ export function useTreeSim(options: SimOptions = {}) {
   const retry = useCallback(
     (replyId: string, newModel?: string) => {
       const model = newModel ?? stateRef.current.tree[replyId]!.model!
-      const limit = usageHooks.gate(model)
-      if (!limit) usageHooks.started(model)
+      const gate = issueHooks.gate(model)
+      const issue = gate === 'queue' ? null : gate
+      const limit = issue ? null : usageHooks.gate(model)
+      const refused = !!(issue || limit)
+      if (!refused) usageHooks.started(model)
       setState(s => ({
         ...s,
         unseenFailures: without(s.unseenFailures, [replyId]),
@@ -677,14 +740,16 @@ export function useTreeSim(options: SimOptions = {}) {
             ...s.tree[replyId]!,
             text: '',
             tokens: 0,
-            status: limit ? 'failed' : 'streaming',
+            status: refused ? 'failed' : 'streaming',
             files: undefined,
             model,
             limit: limit ?? undefined,
+            issue: issue ?? undefined,
+            waiting: gate === 'queue' ? 'queued' : undefined,
           },
         },
       }))
-      if (!limit) startStream(replyId)
+      if (!refused) startStream(replyId)
     },
     [startStream]
   )
@@ -721,6 +786,50 @@ export function useTreeSim(options: SimOptions = {}) {
       if (usageHooks.sim === api) usageHooks.sim = null
     }
   }, [])
+
+  // Error-states prototype: the host cuts off running Replies (a crash, a sign-out) or retries refused ones.
+  const retryRef = useRef<(id: string) => void>(() => {})
+  useEffect(() => {
+    const api = {
+      failRunning: (match: (t: Turn) => boolean, issue: Issue) => {
+        const ids = Object.keys(streams.current).filter(id => {
+          const t = stateRef.current.tree[id]
+          return t && match(t)
+        })
+        for (const id of ids) delete streams.current[id]
+        if (ids.length)
+          setState(s => {
+            const tree = {...s.tree}
+            for (const id of ids)
+              tree[id] = doneWriting({
+                ...tree[id]!,
+                status: 'failed',
+                issue,
+                waiting: undefined,
+              })
+            return {...s, tree, unseenFailures: [...s.unseenFailures, ...ids]}
+          })
+        return ids.length
+      },
+      retryWhere: (match: (t: Turn) => boolean) => {
+        const ids = Object.values(stateRef.current.tree)
+          .filter(t => t.status === 'failed' && match(t))
+          .map(t => t.id)
+        for (const id of ids) retryRef.current(id)
+        return ids.length
+      },
+      running: () =>
+        Object.keys(streams.current)
+          .map(id => stateRef.current.tree[id])
+          .filter((t): t is Turn => !!t),
+    }
+    issueHooks.sim = api
+    return () => {
+      if (issueHooks.sim === api) issueHooks.sim = null
+    }
+  }, [])
+
+  retryRef.current = retry
 
   const deleteFrom = useCallback((promptId: string) => {
     setState(s => {

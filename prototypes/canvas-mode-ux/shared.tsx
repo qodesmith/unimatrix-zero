@@ -347,6 +347,8 @@ export type UsageUi = {
   // Hides the Input box entirely (Above stands in for it).
   replaced?: boolean
   LimitStatus?: ComponentType<{reply: Turn; sim: TreeSim}>
+  // Error-states prototype: a Reply cut off or refused by sign-in, connection or program trouble, or paused.
+  IssueStatus?: ComponentType<{reply: Turn; sim: TreeSim}>
   // App shell slots.
   SidebarFooter?: ComponentType
   // A third sidebar section under Files, collapsible and resizable like it. `Badge` shows in its header while collapsed.
@@ -817,6 +819,12 @@ export function StatusBar({reply, sim}: {reply: Turn; sim: TreeSim}) {
   const usage = useContext(UsageUiContext)
   if (reply.limit && reply.status === 'failed' && usage.LimitStatus)
     return <usage.LimitStatus reply={reply} sim={sim} />
+  if (
+    usage.IssueStatus &&
+    ((reply.issue && reply.status === 'failed') ||
+      (reply.waiting && reply.status === 'streaming'))
+  )
+    return <usage.IssueStatus reply={reply} sim={sim} />
   if (reply.status === 'streaming')
     return (
       <button
