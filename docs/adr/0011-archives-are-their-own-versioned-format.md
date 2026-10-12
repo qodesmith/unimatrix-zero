@@ -8,7 +8,7 @@ An Archive is a zip of our own documented JSON documents (a manifest, one docume
 
 ## Consequences
 
-- **Archives contain everything.** Every Turn, every version of every Workspace file (large files included, per [ADR 0010](0010-linked-folder-holds-one-thread.md)), and Provider session data, so restored Trees continue exactly. Never sign-ins: the app keeps no secrets of its own. Ignored files such as `.env` and `node_modules` aren't in the store, so they aren't archived.
+- **Archives contain everything.** Every Turn, every version of every Workspace file (large files included, per [ADR 0010](0010-linked-folder-holds-one-thread.md)), and Provider session data, so restored Trees continue exactly. Never sign-ins or user-supplied values such as MCP tokens ([ADR 0006](0006-unsigned-distribution.md), amended). Ignored files such as `.env` and `node_modules` aren't in the store, so they aren't archived.
 - **Restore is either/or per Tree.** New Trees are added; identical Trees are skipped; for a Tree that differs the user picks Keep mine or Use archived, shown with the Turn counts each choice discards. Use archived is a user deletion of the local-only Turns, with the same confirmation. No merging and no keeping both: both would need id remapping ([ADR 0002](0002-uuidv7-ids.md)) and would let two Trees share one Provider session. Merging can be added later without changing the format.
 - **Ids are kept on restore**, since a restored Tree is never a second copy of a Tree already present.
 - **Building an Archive always re-hashes Workspace files** rather than trusting size and modified time.
