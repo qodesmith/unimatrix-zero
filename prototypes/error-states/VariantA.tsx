@@ -23,7 +23,7 @@ function Banner() {
   const showUpdate = u.phase !== 'none' && u.phase !== 'failed'
   if (!list.length && !showUpdate) return null
   return (
-    <div className="z-10 flex flex-col">
+    <div className="absolute inset-x-0 top-0 z-40 flex flex-col shadow-sm">
       {list.map(p => (
         <div
           key={p.id}
