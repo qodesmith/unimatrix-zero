@@ -7,8 +7,8 @@ A desktop control surface for a user's existing AI subscriptions (Claude, ChatGP
 ### Providers
 
 **Provider**:
-An AI service the user connects through their own subscription (Claude, ChatGPT). A Tree may involve several Providers. Users _connect_ a Provider; _sign in_ refers only to the Provider's own sign-in page.
-_Avoid_: Vendor, backend, service
+An AI service the user connects through their own subscription (Claude, ChatGPT). A Tree may involve several Providers. Users _connect_ a Provider and _remove_ it, the opposite of connecting; _sign in_ refers only to the Provider's own sign-in page.
+_Avoid_: Vendor, backend, service, disconnect
 
 **Model**:
 A specific AI offered by a Provider (e.g. Claude Opus, GPT-5.1). Chosen per Prompt: the Input defaults to the Model of the Reply it's attached to, and each Reply records the Model that wrote it. One Thread may pass through several Models and Providers.
