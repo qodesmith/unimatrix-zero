@@ -69,7 +69,14 @@ export const issueHooks: {
     failRunning: (match: (t: Turn) => boolean, issue: Issue) => number
     running: () => Turn[]
   } | null
-} = {preflight: () => null, check: () => null, sim: null}
+  // Called after every change to the Tree, so the host can watch which Replies are running.
+  changed: () => void
+} = {
+  preflight: () => null,
+  check: () => null,
+  sim: null,
+  changed: () => {},
+}
 
 export type LimitInfo = {provider: string; window: string; until: number}
 
@@ -833,6 +840,7 @@ export function useTreeSim(options: SimOptions = {}) {
       if (issueHooks.sim === api) issueHooks.sim = null
     }
   }, [])
+  useEffect(() => issueHooks.changed(), [state.tree])
 
   const deleteFrom = useCallback((promptId: string) => {
     setState(s => {

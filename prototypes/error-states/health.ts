@@ -272,8 +272,27 @@ const failRunning = (p: Provider, issue: Issue) =>
 const runningOn = (p: Provider) =>
   issueHooks.sim?.running().filter(t => providerOf(t.model) === p) ?? []
 
+// How many Replies are running on a Provider, kept current as they start and finish.
+const treeListeners = new Set<() => void>()
+issueHooks.changed = () => {
+  for (const l of treeListeners) l()
+}
+export const useRunningOn = (p: Provider) =>
+  useSyncExternalStore(
+    l => {
+      treeListeners.add(l)
+      return () => treeListeners.delete(l)
+    },
+    () => runningOn(p).length
+  )
+
 let updateTimer: ReturnType<typeof setInterval> | null = null
-let repairTimer: ReturnType<typeof setInterval> | null = null
+const repairTimers: Partial<Record<Provider, ReturnType<typeof setInterval>>> =
+  {}
+const stopRepair = (p: Provider) => {
+  clearInterval(repairTimers[p])
+  delete repairTimers[p]
+}
 
 export const health = {
   set: (patch: Partial<Health>) => update(s => ({...s, ...patch})),
@@ -303,6 +322,8 @@ export const health = {
   },
   remove: (p: Provider) => {
     const stopped = failRunning(p, {kind: 'removed', provider: p})
+    const downloading = state.providers[p].program === 'downloading'
+    stopRepair(p)
     usage.setPlan(p, 'none')
     patchProvider(p, {
       signIn: 'ok',
@@ -311,9 +332,10 @@ export const health = {
       crashed: null,
       crashNext: false,
     })
-    log(`Removed ${p}${stopped ? `; ${stopped} running Replies stopped` : ''}`)
+    log(
+      `Removed ${p}${stopped ? `; ${stopped} running Replies stopped` : ''}${downloading ? '; its download was cancelled' : ''}`
+    )
   },
-  runningOn,
 
   crash: (p: Provider) => {
     const stopped = failRunning(p, {kind: 'crash', provider: p})
@@ -334,12 +356,11 @@ export const health = {
       return
     }
     patchProvider(p, {program: 'downloading', repair: 0})
-    if (repairTimer) clearInterval(repairTimer)
-    repairTimer = setInterval(() => {
+    stopRepair(p)
+    repairTimers[p] = setInterval(() => {
       const r = state.providers[p].repair + 12
       if (r < 100) return patchProvider(p, {repair: r})
-      clearInterval(repairTimer!)
-      repairTimer = null
+      stopRepair(p)
       if (state.repairFails) {
         patchProvider(p, {program: 'wontStart', repair: 0})
         log(`${p} downloaded again but still won't start`)
@@ -423,6 +444,9 @@ issueHooks.preflight = (model, retrying) => {
   const known = blockerFor(s, p)
   if (known) return known
   const ph = s.providers[p]
+  const kept = retrying
+    ? 'Retry refused; the Reply keeps its text'
+    : 'the Prompt stays in the Input'
   if (ph.crashNext) {
     patchProvider(p, {
       crashNext: false,
@@ -433,20 +457,18 @@ issueHooks.preflight = (model, retrying) => {
       },
     })
     log(
-      retrying
-        ? `${p} program crashed while retrying`
-        : `${p} program crashed while sending; the Prompt stays in the Input`
+      `${p} program crashed while ${retrying ? 'retrying' : 'sending'}; ${kept}`
     )
     return {kind: 'crash', provider: p}
   }
   if (ph.program === 'broken') {
     patchProvider(p, {program: 'wontStart'})
-    log(`${p} program wouldn't start; the Prompt stays in the Input`)
+    log(`${p} program wouldn't start; ${kept}`)
     return {kind: 'wontStart', provider: p}
   }
   if (ph.signIn === 'lapsed') {
     patchProvider(p, {signIn: 'expired'})
-    log(`${p} said "login expired"; the Prompt stays in the Input`)
+    log(`${p} said "login expired"; ${kept}`)
     return {kind: 'signin', provider: p}
   }
   if (ph.outage) {
@@ -454,11 +476,7 @@ issueHooks.preflight = (model, retrying) => {
       outageSeen: true,
       ...(retrying ? {} : {outageRefused: Date.now()}),
     })
-    log(
-      retrying
-        ? `${p} refused the retry: trouble on its end`
-        : `${p} refused the Prompt: trouble on its end; it stays in the Input`
-    )
+    log(`${p} had trouble on its end; ${kept}`)
     return {kind: 'outage', provider: p}
   }
   if (retrying) return null

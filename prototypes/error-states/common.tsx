@@ -24,6 +24,7 @@ import {
   problems,
   RECONNECT_FOR,
   useHealth,
+  useRunningOn,
   VERSION,
   type Problem,
 } from './health'
@@ -492,27 +493,32 @@ export function ProviderStatus({p, compact}: {p: Provider; compact?: boolean}) {
   )
 }
 
+// "1 Reply is still running on Claude", worded for either count.
+const runningText = (n: number, p: Provider, after: (one: boolean) => string) =>
+  `${n} ${n === 1 ? 'Reply is' : 'Replies are'} still running on ${p}${after(n === 1)}`
+
 function SignOutButton({p}: {p: Provider}) {
   const h = useHealth()
-  const [confirm, setConfirm] = useState<number | null>(null)
+  const running = useRunningOn(p)
+  const [confirm, setConfirm] = useState(false)
   if (h.providers[p].signIn === 'signedOut') return null
-  if (confirm !== null)
+  if (confirm)
     return (
       <div className="rounded-md bg-zinc-50 p-2 text-[11px] text-zinc-700">
-        {confirm} {confirm === 1 ? 'Reply is' : 'Replies are'} still running on{' '}
-        {p}. Signing out stops {confirm === 1 ? 'it' : 'them'} and keeps what{' '}
-        {confirm === 1 ? 'it has' : 'they have'} written.
+        Sign out of {p}?
+        {running > 0 &&
+          ` ${runningText(running, p, one => `. Signing out stops ${one ? 'it' : 'them'} and keeps what ${one ? 'it has' : 'they have'} written.`)}`}
         <div className="mt-1.5 flex gap-2">
           <button
             onClick={() => {
               health.signOut(p)
-              setConfirm(null)
+              setConfirm(false)
             }}
             className={btnDark}
           >
             Sign out
           </button>
-          <button onClick={() => setConfirm(null)} className={btnGhost}>
+          <button onClick={() => setConfirm(false)} className={btnGhost}>
             Cancel
           </button>
         </div>
@@ -522,8 +528,7 @@ function SignOutButton({p}: {p: Provider}) {
     <div>
       <button
         onClick={() => {
-          const n = health.runningOn(p).length
-          if (n) setConfirm(n)
+          if (running) setConfirm(true)
           else health.signOut(p)
         }}
         className={btnGhost}
@@ -539,25 +544,26 @@ function SignOutButton({p}: {p: Provider}) {
 }
 
 function RemoveButton({p}: {p: Provider}) {
-  const [confirm, setConfirm] = useState<number | null>(null)
-  if (confirm !== null)
+  const running = useRunningOn(p)
+  const [confirm, setConfirm] = useState(false)
+  if (confirm)
     return (
       <div className="rounded-md bg-red-50 p-2 text-[11px] text-red-900">
         Remove {p}? Its downloaded program and sign-in are deleted from this
         app. Your Trees stay.
-        {confirm > 0 &&
-          ` ${confirm} ${confirm === 1 ? 'Reply is' : 'Replies are'} still running on ${p}; ${confirm === 1 ? 'it' : 'they'}’ll stop and keep what ${confirm === 1 ? 'it has' : 'they have'} written so far.`}
+        {running > 0 &&
+          ` ${runningText(running, p, one => `; ${one ? 'it' : 'they'}’ll stop and keep what ${one ? 'it has' : 'they have'} written so far.`)}`}
         <div className="mt-1.5 flex gap-2">
           <button
             onClick={() => {
               health.remove(p)
-              setConfirm(null)
+              setConfirm(false)
             }}
             className={`${btnRed} text-xs`}
           >
             Remove
           </button>
-          <button onClick={() => setConfirm(null)} className={btnGhost}>
+          <button onClick={() => setConfirm(false)} className={btnGhost}>
             Cancel
           </button>
         </div>
@@ -565,10 +571,7 @@ function RemoveButton({p}: {p: Provider}) {
     )
   return (
     <div>
-      <button
-        onClick={() => setConfirm(health.runningOn(p).length)}
-        className={btnGhostRed}
-      >
+      <button onClick={() => setConfirm(true)} className={btnGhostRed}>
         Remove {p}…
       </button>
       <p className="mt-1 text-[11px] text-zinc-500">
