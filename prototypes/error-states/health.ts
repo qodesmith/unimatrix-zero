@@ -171,7 +171,7 @@ export function problems(s: Health): Problem[] {
       tone: 'zinc',
       text: "You're offline.",
       detail:
-        'Browsing, search, Exports and Archives still work. Sending and deleting wait for the connection.',
+        'Browsing, search, Exports and Archives still work. Sending waits for the connection.',
     })
   for (const p of PROVIDERS) {
     const ph = s.providers[p]

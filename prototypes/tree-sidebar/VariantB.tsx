@@ -1,8 +1,7 @@
 // PROTOTYPE variant B: Collections, like folders in Finder or VS Code. One level of Collections you make yourself, drag Trees in, a sort
 // menu, ⌘/Shift-click to select several, and full-text search in a ⌘K palette instead of the sidebar. No pins. Throw away.
-import {useContext, useEffect, useMemo, useState} from 'react'
+import {useEffect, useMemo, useState} from 'react'
 
-import {UsageUiContext} from '../canvas-mode-ux/shared'
 import {Menu, type MenuItem} from '../export-archive-summary/common'
 import {
   RenameInput,
@@ -27,7 +26,6 @@ const SORTS: Record<Sort, string> = {
 }
 
 export function VariantB({lib}: {lib: Lib}) {
-  const {noDelete} = useContext(UsageUiContext)
   const [sort, setSort] = useState<Sort>('active')
   const [sortOpen, setSortOpen] = useState(false)
   const [closed, setClosed] = useState<string[]>([])
@@ -250,9 +248,7 @@ export function VariantB({lib}: {lib: Lib}) {
               </button>
               <button
                 onClick={() => lib.askDelete(selected)}
-                disabled={!!noDelete}
-                title={noDelete}
-                className="rounded px-2 py-1 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-zinc-300 disabled:hover:bg-transparent"
+                className="rounded px-2 py-1 text-red-600 hover:bg-red-50"
               >
                 Delete…
               </button>

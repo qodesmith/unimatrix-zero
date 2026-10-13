@@ -351,8 +351,6 @@ export type UsageUi = {
   LimitStatus?: ComponentType<{reply: Turn; sim: TreeSim}>
   // Error-states prototype: a Reply cut off or refused by sign-in, connection or program trouble, or paused.
   IssueStatus?: ComponentType<{reply: Turn; sim: TreeSim}>
-  // Error-states prototype: why deleting Turns and Trees is off right now, if it is.
-  noDelete?: string
   // App shell slots.
   SidebarFooter?: ComponentType
   // A third sidebar section under Files, collapsible and resizable like it. `Badge` shows in its header while collapsed.
@@ -772,17 +770,7 @@ export function DeleteButton({
   className?: string
 }) {
   const [armed, setArmed] = useState(false)
-  const {noDelete} = useContext(UsageUiContext)
   const count = subtreeIds(tree, promptId).length
-  if (noDelete)
-    return (
-      <span
-        title={noDelete}
-        className={`nodrag cursor-not-allowed text-zinc-300 ${className}`}
-      >
-        🗑
-      </span>
-    )
   if (armed)
     return (
       <span
