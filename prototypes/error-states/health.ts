@@ -28,8 +28,10 @@ type ProviderHealth = {
   // The app has seen the outage fail a request since it started.
   outageSeen: boolean
   email: string
-  // A crash the user hasn't dismissed: how many Replies it stopped.
-  crashed: {at: number; stopped: number} | null
+  // A crash the user hasn't dismissed: how many Replies it stopped, and whether it took a Prompt being sent.
+  crashed: {at: number; stopped: number; unsent?: boolean} | null
+  // The program crashes as the next Prompt is sent.
+  crashNext: boolean
 }
 
 export type UpdateState =
@@ -44,8 +46,6 @@ export type HealthEvent = {id: number; at: number; text: string}
 export type Health = {
   offline: boolean
   offlineSince: number
-  // Sending while offline: false refuses (draft kept), true starts the Reply paused until the connection is back.
-  queueOffline: boolean
   // Replies cut off by an expired sign-in retry by themselves once you sign in again.
   autoRetry: boolean
   // The next sign-in comes back as a different account.
@@ -76,12 +76,12 @@ const providerHealth = (email: string): ProviderHealth => ({
   outageSeen: false,
   email,
   crashed: null,
+  crashNext: false,
 })
 
 let state: Health = {
   offline: false,
   offlineSince: 0,
-  queueOffline: false,
   autoRetry: true,
   otherAccount: false,
   updateFailsCheck: false,
@@ -131,7 +131,7 @@ const patchProvider = (p: Provider, patch: Partial<ProviderHealth>) =>
 export const blockerFor = (s: Health, p: Provider): Issue | null => {
   const ph = s.providers[p]
   if (!connected(getUsage(), p)) return null
-  if (s.offline && !s.queueOffline) return {kind: 'offline', provider: p}
+  if (s.offline) return {kind: 'offline', provider: p}
   if (ph.program === 'wontStart' || ph.program === 'repairing')
     return {kind: 'wontStart', provider: p}
   if (ph.signIn === 'signedOut') return {kind: 'signedOut', provider: p}
@@ -170,9 +170,8 @@ export function problems(s: Health): Problem[] {
       id: 'offline',
       tone: 'zinc',
       text: "You're offline.",
-      detail: s.queueOffline
-        ? 'Browsing, search, Exports and Archives still work. New Prompts send when the connection is back.'
-        : 'Browsing, search, Exports and Archives still work. Sending waits for the connection.',
+      detail:
+        'Browsing, search, Exports and Archives still work. Sending and deleting wait for the connection.',
     })
   for (const p of PROVIDERS) {
     const ph = s.providers[p]
@@ -238,9 +237,11 @@ export function problems(s: Health): Problem[] {
         tone: 'zinc',
         provider: p,
         text: `${p} stopped unexpectedly and was restarted.`,
-        detail: ph.crashed.stopped
-          ? `${ph.crashed.stopped} running ${ph.crashed.stopped === 1 ? 'Reply was' : 'Replies were'} stopped; what they wrote is kept.`
-          : undefined,
+        detail: ph.crashed.unsent
+          ? 'Your Prompt wasn\u2019t sent; it\u2019s still in the Input.'
+          : ph.crashed.stopped
+            ? `${ph.crashed.stopped} running ${ph.crashed.stopped === 1 ? 'Reply was' : 'Replies were'} stopped; what they wrote is kept.`
+            : undefined,
         dismiss: () => patchProvider(p, {crashed: null}),
       })
   }
@@ -303,6 +304,10 @@ export const health = {
     const stopped = failRunning(p, {kind: 'crash', provider: p})
     patchProvider(p, {crashed: {at: Date.now(), stopped}})
     log(`${p} program crashed; ${stopped} running Replies stopped`)
+  },
+  crashOnSend: (p: Provider) => {
+    patchProvider(p, {crashNext: true})
+    log(`${p} program will crash on the next send`)
   },
   breakProgram: (p: Provider) => {
     patchProvider(p, {program: 'broken'})
@@ -400,31 +405,49 @@ export const health = {
 
 // ---------- wiring into the Tree sim ----------
 
-// A new Prompt: refused up front if the app already knows it can't go through; otherwise its first request finds out.
-issueHooks.gate = model => {
+// A Prompt the Provider refuses before anything happens (offline, sign-in, the program) never joins the Tree: the
+// Input keeps it and the app shows why. The app only finds out about a lapsed sign-in or a broken program here.
+issueHooks.preflight = model => {
   const p = providerOf(model)
   const s = state
   if (!connected(getUsage(), p)) return null
-  if (s.offline)
-    return s.queueOffline ? 'queue' : {kind: 'offline', provider: p}
   const known = blockerFor(s, p)
   if (known) return known
   const ph = s.providers[p]
+  if (ph.crashNext) {
+    patchProvider(p, {
+      crashNext: false,
+      crashed: {
+        at: Date.now(),
+        stopped: failRunning(p, {kind: 'crash', provider: p}),
+        unsent: true,
+      },
+    })
+    log(`${p} program crashed while sending; the Prompt stays in the Input`)
+    return {kind: 'crash', provider: p}
+  }
   if (ph.program === 'broken') {
     patchProvider(p, {program: 'wontStart'})
-    log(`${p} program wouldn't start`)
+    log(`${p} program wouldn't start; the Prompt stays in the Input`)
     return {kind: 'wontStart', provider: p}
   }
   if (ph.signIn === 'lapsed') {
     patchProvider(p, {signIn: 'expired'})
-    log(`${p} said "login expired"; the app now knows`)
+    log(`${p} said "login expired"; the Prompt stays in the Input`)
     return {kind: 'signin', provider: p}
   }
-  if (ph.outage) {
-    patchProvider(p, {outageSeen: true})
-    return {kind: 'outage', provider: p}
-  }
+  // The Prompt a crash held back has now gone through.
+  if (ph.crashed?.unsent) patchProvider(p, {crashed: null})
   return null
+}
+
+// A Prompt that went through but whose Reply the vendor's servers refuse.
+issueHooks.gate = model => {
+  const p = providerOf(model)
+  const ph = state.providers[p]
+  if (!connected(getUsage(), p) || !ph.outage) return null
+  patchProvider(p, {outageSeen: true})
+  return {kind: 'outage', provider: p}
 }
 
 // Running Replies: a lost connection pauses them while the vendor program retries, then fails them; an expired
@@ -434,7 +457,6 @@ issueHooks.check = (t: Turn) => {
   const p = providerOf(t.model)
   const s = state
   if (s.offline) {
-    if (t.waiting === 'queued') return 'pause'
     const since = (pausedAt[t.id] ??= Date.now())
     if (Date.now() - since < RECONNECT_FOR) return 'pause'
     delete pausedAt[t.id]

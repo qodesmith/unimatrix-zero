@@ -754,6 +754,7 @@ export function RowMenu({
   pin?: boolean
 }) {
   const toast = useToast()
+  const {noDelete} = useContext(UsageUiContext)
   const [open, setOpen] = useState<DOMRect | null>(null)
   const elsewhere = () => toast('Decided in Export, Archive and Summary')
   const items: MenuItem[] = [
@@ -773,7 +774,12 @@ export function RowMenu({
     {label: 'Export Tree…', hint: 'Markdown', onClick: elsewhere},
     {label: 'Archive…', onClick: elsewhere},
     'sep',
-    {label: 'Delete…', danger: true, onClick: () => lib.askDelete([entry.key])},
+    {
+      label: 'Delete…',
+      danger: true,
+      onClick: () => lib.askDelete([entry.key]),
+      ...(noDelete ? {disabled: true, hint: 'Offline'} : {}),
+    },
   ]
   return (
     <>
@@ -812,6 +818,7 @@ export function RowMenu({
 
 function DeleteDialog({lib, keys}: {lib: Lib; keys: string[]}) {
   const toast = useToast()
+  const {noDelete} = useContext(UsageUiContext)
   const picked = lib.entries.filter(e => keys.includes(e.key))
   const turns = picked.reduce((n, e) => n + stats(e.key).turns, 0)
   const bytes = picked.reduce((n, e) => n + freesBytes(e.key), 0)
@@ -852,12 +859,17 @@ function DeleteDialog({lib, keys}: {lib: Lib; keys: string[]}) {
         This can't be undone. To keep a copy, Archive {one ? 'it' : 'them'}{' '}
         first.
       </p>
+      {noDelete && (
+        <p className="mb-4 rounded-md bg-zinc-100 px-2 py-1.5 text-xs text-zinc-700">
+          {noDelete}
+        </p>
+      )}
       <div className="flex justify-end gap-2">
         <Btn onClick={lib.cancelDelete}>Cancel</Btn>
         <Btn onClick={() => toast('Decided in Export, Archive and Summary')}>
           Archive first…
         </Btn>
-        <Btn danger onClick={lib.confirmDelete}>
+        <Btn danger disabled={!!noDelete} onClick={lib.confirmDelete}>
           Delete{one ? '' : ` ${picked.length} Trees`}
         </Btn>
       </div>

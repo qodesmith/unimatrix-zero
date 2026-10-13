@@ -146,6 +146,9 @@ export function useUi(): UsageUi {
     Above: LimitCard,
     blocked: base.blocked || blocker,
     IssueStatus,
+    noDelete: h.offline
+      ? "You're offline. Deleting waits for the connection."
+      : undefined,
     SidebarSection: {title: 'Connections', Body, Badge, Actions},
     openSettings: () => health.openSettings(),
   }

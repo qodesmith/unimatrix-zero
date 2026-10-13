@@ -74,6 +74,9 @@ export function useUi(): UsageUi {
     Above,
     blocked: base.blocked || !!blocker,
     IssueStatus,
+    noDelete: h.offline
+      ? "You're offline. Deleting waits for the connection."
+      : undefined,
     Banner,
     openSettings: () => health.openSettings(),
   }

@@ -50,6 +50,9 @@ export function useUi(): UsageUi {
     // Offline still lets you write a draft; the card sits above the Input instead of replacing it.
     replaced: base.replaced || (!!blocker && blocker.kind !== 'offline'),
     IssueStatus,
+    noDelete: h.offline
+      ? "You're offline. Deleting waits for the connection."
+      : undefined,
     SidebarFooter,
     openSettings: () => health.openSettings(),
   }

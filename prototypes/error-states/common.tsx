@@ -43,19 +43,10 @@ export function IssueStatus({reply, sim}: {reply: Turn; sim: TreeSim}) {
   if (reply.status === 'streaming' && reply.waiting)
     return (
       <span className="flex flex-wrap items-center gap-2 text-[11px] text-amber-700">
-        {reply.waiting === 'queued' ? (
-          <>
-            <span className="size-1.5 rounded-full bg-zinc-400" />
-            Waiting for a connection · sends when you're back online
-          </>
-        ) : (
-          <>
-            <span className="size-1.5 animate-pulse rounded-full bg-amber-500" />
-            Connection lost · reconnecting…
-          </>
-        )}
+        <span className="size-1.5 animate-pulse rounded-full bg-amber-500" />
+        Connection lost · reconnecting…
         <button onClick={() => sim.stop(reply.id)} className={btnGhost}>
-          {reply.waiting === 'queued' ? 'Cancel' : '■ Stop'}
+          ■ Stop
         </button>
       </span>
     )
@@ -799,11 +790,6 @@ export function HealthDebug({question}: {question: string}) {
                 {h.offline ? 'Back online' : 'Go offline'}
               </button>
             </div>
-            {toggle(
-              'Sending while offline queues the Prompt',
-              h.queueOffline,
-              v => health.set({queueOffline: v})
-            )}
             <div className="text-fuchsia-700">
               Running Replies reconnect for {RECONNECT_FOR / 1000}s, then fail.
             </div>
@@ -822,7 +808,14 @@ export function HealthDebug({question}: {question: string}) {
                     Sign-in expires
                   </button>
                   <button className={btn} onClick={() => health.crash(p)}>
-                    Program crashes
+                    Crashes now
+                  </button>
+                  <button
+                    className={btn}
+                    disabled={ph.crashNext}
+                    onClick={() => health.crashOnSend(p)}
+                  >
+                    Crashes on next send
                   </button>
                   <button
                     className={btn}

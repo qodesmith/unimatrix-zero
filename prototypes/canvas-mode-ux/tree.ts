@@ -44,9 +44,8 @@ export type Turn = {
   limit?: LimitInfo
   // Error-states prototype: the Reply was refused or cut off by something outside it (sign-in, connection, program).
   issue?: Issue
-  // Error-states prototype: streaming but paused. `reconnecting`: the vendor program is retrying a lost connection;
-  // `queued`: sent while offline, starts once the connection is back.
-  waiting?: 'reconnecting' | 'queued'
+  // Error-states prototype: streaming but paused while the vendor program retries a lost connection.
+  waiting?: 'reconnecting'
 }
 
 export type IssueKind =
@@ -60,8 +59,10 @@ export type Issue = {kind: IssueKind; provider: string}
 
 // Error-states prototype hooks, set by the host app. Throw away.
 export const issueHooks: {
-  // Refuses a new Reply before it starts; 'queue' starts it paused until the connection is back.
-  gate: (model: string) => Issue | 'queue' | null
+  // Refuses a Prompt outright: nothing is added to the Tree and the Input keeps the draft.
+  preflight: (model: string) => Issue | null
+  // Refuses a new Reply after its Prompt is added, leaving a failed Reply.
+  gate: (model: string) => Issue | null
   // Checked every tick for each running Reply: pause it, cut it off with an Issue, or let it run.
   check: (t: Turn) => 'pause' | Issue | null
   sim: {
@@ -69,7 +70,7 @@ export const issueHooks: {
     retryWhere: (match: (t: Turn) => boolean) => number
     running: () => Turn[]
   } | null
-} = {gate: () => null, check: () => null, sim: null}
+} = {preflight: () => null, gate: () => null, check: () => null, sim: null}
 
 export type LimitInfo = {provider: string; window: string; until: number}
 
@@ -645,8 +646,8 @@ export function useTreeSim(options: SimOptions = {}) {
         usageHooks.model ||
         (parentReplyId && stateRef.current.tree[parentReplyId]?.model) ||
         'Claude Sonnet 5'
-      const gate = issueHooks.gate(model)
-      const issue = gate === 'queue' ? null : gate
+      if (issueHooks.preflight(model)) return null
+      const issue = issueHooks.gate(model)
       const limit = issue ? null : usageHooks.gate(model)
       const refused = !!(issue || limit)
       setState(s => ({
@@ -691,7 +692,6 @@ export function useTreeSim(options: SimOptions = {}) {
             createdAt: now + 1,
             ...(limit ? {status: 'failed' as const, limit} : {}),
             ...(issue ? {status: 'failed' as const, issue} : {}),
-            ...(gate === 'queue' ? {waiting: 'queued' as const} : {}),
           },
         },
         unseenFailures: refused
@@ -726,8 +726,7 @@ export function useTreeSim(options: SimOptions = {}) {
   const retry = useCallback(
     (replyId: string, newModel?: string) => {
       const model = newModel ?? stateRef.current.tree[replyId]!.model!
-      const gate = issueHooks.gate(model)
-      const issue = gate === 'queue' ? null : gate
+      const issue = issueHooks.preflight(model) ?? issueHooks.gate(model)
       const limit = issue ? null : usageHooks.gate(model)
       const refused = !!(issue || limit)
       if (!refused) usageHooks.started(model)
@@ -745,7 +744,7 @@ export function useTreeSim(options: SimOptions = {}) {
             model,
             limit: limit ?? undefined,
             issue: issue ?? undefined,
-            waiting: gate === 'queue' ? 'queued' : undefined,
+            waiting: undefined,
           },
         },
       }))

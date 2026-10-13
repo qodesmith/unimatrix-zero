@@ -722,7 +722,10 @@ function ChatDrawer({
             disabled={!canRespond(last)}
             onFocusChange={leaf ? leafFocus : undefined}
             onTypingChange={leaf ? undefined : reportTyping}
-            onSubmit={(t, a) => onSent(sim.submit(replyId, t, a))}
+            onSubmit={(t, a) => {
+              const id = sim.submit(replyId, t, a)
+              if (id) onSent(id)
+            }}
           />
         </div>
       </div>

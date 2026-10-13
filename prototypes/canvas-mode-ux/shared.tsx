@@ -28,6 +28,7 @@ import {
   childrenOf,
   contextSize,
   formatTokens,
+  issueHooks,
   pathTo,
   spreadReplies,
   subtreeIds,
@@ -35,6 +36,7 @@ import {
   type Tree,
   type TreeSim,
   type Turn,
+  usageHooks,
 } from './tree'
 
 // ---------- layout: data decides position, React Flow measures size ----------
@@ -349,6 +351,8 @@ export type UsageUi = {
   LimitStatus?: ComponentType<{reply: Turn; sim: TreeSim}>
   // Error-states prototype: a Reply cut off or refused by sign-in, connection or program trouble, or paused.
   IssueStatus?: ComponentType<{reply: Turn; sim: TreeSim}>
+  // Error-states prototype: why deleting Turns and Trees is off right now, if it is.
+  noDelete?: string
   // App shell slots.
   SidebarFooter?: ComponentType
   // A third sidebar section under Files, collapsible and resizable like it. `Badge` shows in its header while collapsed.
@@ -429,6 +433,8 @@ export function PromptInput({
   }
   const send = () => {
     if (disabled || (!text.trim() && !files.length)) return
+    // Error-states prototype: a send the Provider refuses up front leaves the draft in place.
+    if (issueHooks.preflight(usageHooks.model ?? '')) return
     onSubmit(text.trim(), files)
     setDraft(EMPTY_DRAFT)
     if (blurOnSend) ref.current?.blur()
@@ -766,7 +772,17 @@ export function DeleteButton({
   className?: string
 }) {
   const [armed, setArmed] = useState(false)
+  const {noDelete} = useContext(UsageUiContext)
   const count = subtreeIds(tree, promptId).length
+  if (noDelete)
+    return (
+      <span
+        title={noDelete}
+        className={`nodrag cursor-not-allowed text-zinc-300 ${className}`}
+      >
+        🗑
+      </span>
+    )
   if (armed)
     return (
       <span
