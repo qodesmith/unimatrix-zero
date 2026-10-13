@@ -55,6 +55,7 @@ export type IssueKind =
   | 'crash'
   | 'wontStart'
   | 'outage'
+  | 'removed'
 export type Issue = {kind: IssueKind; provider: string}
 
 // Error-states prototype hooks, set by the host app. Throw away.

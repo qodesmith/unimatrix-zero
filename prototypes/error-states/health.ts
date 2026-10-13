@@ -301,6 +301,18 @@ export const health = {
       `Signed out of ${p}${stopped ? `; ${stopped} running Replies stopped` : ''}`
     )
   },
+  remove: (p: Provider) => {
+    const stopped = failRunning(p, {kind: 'removed', provider: p})
+    usage.setPlan(p, 'none')
+    patchProvider(p, {
+      signIn: 'ok',
+      program: 'ok',
+      repair: 0,
+      crashed: null,
+      crashNext: false,
+    })
+    log(`Removed ${p}${stopped ? `; ${stopped} running Replies stopped` : ''}`)
+  },
   runningOn,
 
   crash: (p: Provider) => {

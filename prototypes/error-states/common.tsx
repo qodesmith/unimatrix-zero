@@ -34,12 +34,15 @@ const btnDark =
   'nodrag rounded-md bg-zinc-900 px-2 py-0.5 text-xs text-white hover:bg-zinc-700 disabled:bg-zinc-300'
 const btnGhost =
   'nodrag rounded-md border border-zinc-300 px-2 py-0.5 text-xs text-zinc-700 hover:bg-zinc-100'
+const btnGhostRed =
+  'nodrag rounded-md border border-red-200 px-2 py-0.5 text-xs text-red-700 hover:bg-red-50'
 
 // ---------- a Reply that was cut off or refused ----------
 
 // One line under the Reply: what happened in plain words, and one thing to do about it.
 export function IssueStatus({reply, sim}: {reply: Turn; sim: TreeSim}) {
   const h = useHealth()
+  const u = useUsage()
   const p = providerOf(reply.model)
   if (reply.status === 'streaming' && reply.waiting)
     return (
@@ -84,8 +87,9 @@ export function IssueStatus({reply, sim}: {reply: Turn; sim: TreeSim}) {
       )}
     </>
   )
+  const alt = alternativeTo(h, reply.model!)
   let what: string
-  let action = retry
+  let action: React.ReactNode = retry
   switch (issue.kind) {
     case 'signin':
     case 'signedOut':
@@ -117,8 +121,16 @@ export function IssueStatus({reply, sim}: {reply: Turn; sim: TreeSim}) {
     case 'outage':
       what = `${p} is having trouble on its end`
       break
+    case 'removed':
+      what = `Stopped: you removed ${p}`
+      if (!connected(u, p))
+        action = alt && (
+          <button onClick={() => sim.retry(reply.id, alt)} className={btnRed}>
+            ↻ Retry with {alt}
+          </button>
+        )
+      break
   }
-  const alt = alternativeTo(h, reply.model!)
   const offerAlt =
     alt &&
     (issue.kind === 'outage' ||
@@ -486,7 +498,7 @@ function SignOutButton({p}: {p: Provider}) {
   if (h.providers[p].signIn === 'signedOut') return null
   if (confirm !== null)
     return (
-      <div className="mt-2 rounded-md bg-zinc-50 p-2 text-[11px] text-zinc-700">
+      <div className="rounded-md bg-zinc-50 p-2 text-[11px] text-zinc-700">
         {confirm} {confirm === 1 ? 'Reply is' : 'Replies are'} still running on{' '}
         {p}. Signing out stops {confirm === 1 ? 'it' : 'them'} and keeps what{' '}
         {confirm === 1 ? 'it has' : 'they have'} written.
@@ -507,16 +519,62 @@ function SignOutButton({p}: {p: Provider}) {
       </div>
     )
   return (
-    <button
-      onClick={() => {
-        const n = health.runningOn(p).length
-        if (n) setConfirm(n)
-        else health.signOut(p)
-      }}
-      className="text-[11px] text-zinc-500 underline"
-    >
-      Sign out
-    </button>
+    <div>
+      <button
+        onClick={() => {
+          const n = health.runningOn(p).length
+          if (n) setConfirm(n)
+          else health.signOut(p)
+        }}
+        className={btnGhost}
+      >
+        Sign out
+      </button>
+      <p className="mt-1 text-[11px] text-zinc-500">
+        Ends your sign-in. {p} stays set up; sign in again to pick up where you
+        left off.
+      </p>
+    </div>
+  )
+}
+
+function RemoveButton({p}: {p: Provider}) {
+  const [confirm, setConfirm] = useState<number | null>(null)
+  if (confirm !== null)
+    return (
+      <div className="rounded-md bg-red-50 p-2 text-[11px] text-red-900">
+        Remove {p}? Its downloaded program and sign-in are deleted from this
+        app. Your Trees stay.
+        {confirm > 0 &&
+          ` ${confirm} ${confirm === 1 ? 'Reply is' : 'Replies are'} still running on ${p}; ${confirm === 1 ? 'it' : 'they'}’ll stop and keep what ${confirm === 1 ? 'it has' : 'they have'} written so far.`}
+        <div className="mt-1.5 flex gap-2">
+          <button
+            onClick={() => {
+              health.remove(p)
+              setConfirm(null)
+            }}
+            className={`${btnRed} text-xs`}
+          >
+            Remove
+          </button>
+          <button onClick={() => setConfirm(null)} className={btnGhost}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    )
+  return (
+    <div>
+      <button
+        onClick={() => setConfirm(health.runningOn(p).length)}
+        className={btnGhostRed}
+      >
+        Remove {p}…
+      </button>
+      <p className="mt-1 text-[11px] text-zinc-500">
+        Removes {p} and its downloaded program from this app. Your Trees stay.
+      </p>
+    </div>
   )
 }
 
@@ -671,14 +729,9 @@ export function SettingsModal() {
                         <ProviderStatus p={p} />
                       </div>
                       <UsageDetails p={p} />
-                      <div className="mt-3 flex items-center gap-3">
+                      <div className="mt-3 flex flex-col gap-3 border-t border-zinc-100 pt-3">
                         <SignOutButton p={p} />
-                        <button
-                          onClick={() => usage.setPlan(p, 'none')}
-                          className="text-[11px] text-zinc-500 underline"
-                        >
-                          Disconnect…
-                        </button>
+                        <RemoveButton p={p} />
                       </div>
                     </>
                   ) : (
