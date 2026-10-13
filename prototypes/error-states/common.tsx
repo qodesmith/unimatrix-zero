@@ -572,7 +572,8 @@ function RemoveButton({p}: {p: Provider}) {
         Remove {p}…
       </button>
       <p className="mt-1 text-[11px] text-zinc-500">
-        Removes {p} and its downloaded program from this app. Your Trees stay.
+        Removes {p} from this app. Your Trees stay. You can download {p} again
+        later.
       </p>
     </div>
   )
