@@ -127,7 +127,7 @@ function Toolbar() {
           className="ml-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-900 hover:bg-amber-200"
         >
           {b.kind === 'wontStart'
-            ? `${p} couldn't start · Repair`
+            ? `${p} couldn't start · Download again`
             : `Sign in to ${p}`}
         </button>
       )}

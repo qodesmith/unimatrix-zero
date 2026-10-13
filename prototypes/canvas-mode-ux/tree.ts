@@ -59,18 +59,16 @@ export type Issue = {kind: IssueKind; provider: string}
 
 // Error-states prototype hooks, set by the host app. Throw away.
 export const issueHooks: {
-  // Refuses a Prompt outright: nothing is added to the Tree and the Input keeps the draft.
-  preflight: (model: string) => Issue | null
-  // Refuses a new Reply after its Prompt is added, leaving a failed Reply.
-  gate: (model: string) => Issue | null
+  // Refuses a Prompt outright: nothing is added to the Tree and the Input keeps the draft. A refused retry keeps what
+  // the Reply wrote.
+  preflight: (model: string, retrying?: boolean) => Issue | null
   // Checked every tick for each running Reply: pause it, cut it off with an Issue, or let it run.
   check: (t: Turn) => 'pause' | Issue | null
   sim: {
     failRunning: (match: (t: Turn) => boolean, issue: Issue) => number
-    retryWhere: (match: (t: Turn) => boolean) => number
     running: () => Turn[]
   } | null
-} = {preflight: () => null, gate: () => null, check: () => null, sim: null}
+} = {preflight: () => null, check: () => null, sim: null}
 
 export type LimitInfo = {provider: string; window: string; until: number}
 
@@ -647,9 +645,8 @@ export function useTreeSim(options: SimOptions = {}) {
         (parentReplyId && stateRef.current.tree[parentReplyId]?.model) ||
         'Claude Sonnet 5'
       if (issueHooks.preflight(model)) return null
-      const issue = issueHooks.gate(model)
-      const limit = issue ? null : usageHooks.gate(model)
-      const refused = !!(issue || limit)
+      const limit = usageHooks.gate(model)
+      const refused = !!limit
       setState(s => ({
         ...s,
         activeReplyId: replyId,
@@ -691,7 +688,6 @@ export function useTreeSim(options: SimOptions = {}) {
             model,
             createdAt: now + 1,
             ...(limit ? {status: 'failed' as const, limit} : {}),
-            ...(issue ? {status: 'failed' as const, issue} : {}),
           },
         },
         unseenFailures: refused
@@ -726,9 +722,26 @@ export function useTreeSim(options: SimOptions = {}) {
   const retry = useCallback(
     (replyId: string, newModel?: string) => {
       const model = newModel ?? stateRef.current.tree[replyId]!.model!
-      const issue = issueHooks.preflight(model) ?? issueHooks.gate(model)
-      const limit = issue ? null : usageHooks.gate(model)
-      const refused = !!(issue || limit)
+      const issue = issueHooks.preflight(model, true)
+      if (issue) {
+        setState(s => ({
+          ...s,
+          unseenFailures: without(s.unseenFailures, [replyId]),
+          tree: {
+            ...s.tree,
+            [replyId]: {
+              ...s.tree[replyId]!,
+              status: 'failed',
+              model,
+              limit: undefined,
+              issue,
+            },
+          },
+        }))
+        return
+      }
+      const limit = usageHooks.gate(model)
+      const refused = !!limit
       if (!refused) usageHooks.started(model)
       setState(s => ({
         ...s,
@@ -743,7 +756,7 @@ export function useTreeSim(options: SimOptions = {}) {
             files: undefined,
             model,
             limit: limit ?? undefined,
-            issue: issue ?? undefined,
+            issue: undefined,
             waiting: undefined,
           },
         },
@@ -786,8 +799,7 @@ export function useTreeSim(options: SimOptions = {}) {
     }
   }, [])
 
-  // Error-states prototype: the host cuts off running Replies (a crash, a sign-out) or retries refused ones.
-  const retryRef = useRef<(id: string) => void>(() => {})
+  // Error-states prototype: the host cuts off running Replies (a crash, a sign-out).
   useEffect(() => {
     const api = {
       failRunning: (match: (t: Turn) => boolean, issue: Issue) => {
@@ -810,13 +822,6 @@ export function useTreeSim(options: SimOptions = {}) {
           })
         return ids.length
       },
-      retryWhere: (match: (t: Turn) => boolean) => {
-        const ids = Object.values(stateRef.current.tree)
-          .filter(t => t.status === 'failed' && match(t))
-          .map(t => t.id)
-        for (const id of ids) retryRef.current(id)
-        return ids.length
-      },
       running: () =>
         Object.keys(streams.current)
           .map(id => stateRef.current.tree[id])
@@ -827,8 +832,6 @@ export function useTreeSim(options: SimOptions = {}) {
       if (issueHooks.sim === api) issueHooks.sim = null
     }
   }, [])
-
-  retryRef.current = retry
 
   const deleteFrom = useCallback((promptId: string) => {
     setState(s => {

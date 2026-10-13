@@ -17,7 +17,7 @@ import {
 // `lapsed` until a request fails, and only then `expired`.
 export type SignIn = 'ok' | 'lapsed' | 'expired' | 'signedOut'
 // The vendor program: `broken` won't start, but the app only learns that when it next tries to start it.
-export type Program = 'ok' | 'broken' | 'wontStart' | 'repairing'
+export type Program = 'ok' | 'broken' | 'wontStart' | 'downloading'
 
 type ProviderHealth = {
   signIn: SignIn
@@ -27,6 +27,8 @@ type ProviderHealth = {
   outage: boolean
   // The app has seen the outage fail a request since it started.
   outageSeen: boolean
+  // When the outage last refused a Prompt, which is still in the Input.
+  outageRefused: number | null
   email: string
   // A crash the user hasn't dismissed: how many Replies it stopped, and whether it took a Prompt being sent.
   crashed: {at: number; stopped: number; unsent?: boolean} | null
@@ -46,13 +48,11 @@ export type HealthEvent = {id: number; at: number; text: string}
 export type Health = {
   offline: boolean
   offlineSince: number
-  // Replies cut off by an expired sign-in retry by themselves once you sign in again.
-  autoRetry: boolean
   // The next sign-in comes back as a different account.
   otherAccount: boolean
   // The next update download fails its signature check.
   updateFailsCheck: boolean
-  // The next repair fails too.
+  // Downloading the program again doesn't fix it.
   repairFails: boolean
   providers: Record<Provider, ProviderHealth>
   update: UpdateState
@@ -74,6 +74,7 @@ const providerHealth = (email: string): ProviderHealth => ({
   repair: 0,
   outage: false,
   outageSeen: false,
+  outageRefused: null,
   email,
   crashed: null,
   crashNext: false,
@@ -82,7 +83,6 @@ const providerHealth = (email: string): ProviderHealth => ({
 let state: Health = {
   offline: false,
   offlineSince: 0,
-  autoRetry: true,
   otherAccount: false,
   updateFailsCheck: false,
   repairFails: false,
@@ -126,13 +126,13 @@ const patchProvider = (p: Provider, patch: Partial<ProviderHealth>) =>
 
 // ---------- derived ----------
 
-// What stops a new Prompt to this Provider before it's sent, as far as the app knows. Lapsed sign-ins, broken
-// programs and outages aren't known yet, so they don't block: the Prompt is sent and its Reply is what fails.
+// What stops a new Prompt to this Provider before it's sent, as far as the app knows. Lapsed sign-ins and broken
+// programs aren't known until a send finds them, and an outage may be over by the next send, so they don't block.
 export const blockerFor = (s: Health, p: Provider): Issue | null => {
   const ph = s.providers[p]
   if (!connected(getUsage(), p)) return null
   if (s.offline) return {kind: 'offline', provider: p}
-  if (ph.program === 'wontStart' || ph.program === 'repairing')
+  if (ph.program === 'wontStart' || ph.program === 'downloading')
     return {kind: 'wontStart', provider: p}
   if (ph.signIn === 'signedOut') return {kind: 'signedOut', provider: p}
   if (ph.signIn === 'expired') return {kind: 'signin', provider: p}
@@ -185,21 +185,21 @@ export function problems(s: Health): Problem[] {
           ? `${p} still won't start on this computer.`
           : `${p} couldn't start on this computer.`,
         detail: s.repairFails
-          ? 'Repairing didn’t help. Something on this computer may be blocking it, such as antivirus software.'
-          : 'Repairing downloads a fresh copy of the program. Your Trees aren’t touched.',
+          ? 'Downloading it again didn’t help. Something on this computer may be blocking it, such as antivirus software.'
+          : 'Downloading it again gets a fresh copy of the program. Your Trees aren’t touched.',
         action: s.repairFails
           ? {
               label: 'Report a problem…',
               run: () => log('Report a problem (see the bug-reporting ticket)'),
             }
-          : {label: `Repair ${p}`, run: () => health.repair(p)},
+          : {label: `Download ${p} again`, run: () => health.repair(p)},
       })
-    if (ph.program === 'repairing')
+    if (ph.program === 'downloading')
       out.push({
         id: `${p}-program`,
         tone: 'sky',
         provider: p,
-        text: `Repairing ${p}… ${Math.round(ph.repair)}%`,
+        text: `Downloading ${p}… ${Math.round(ph.repair)}%`,
       })
     if (ph.signIn === 'expired')
       out.push({
@@ -220,12 +220,15 @@ export function problems(s: Health): Problem[] {
       })
     if (ph.outage && ph.outageSeen)
       out.push({
-        id: `${p}-outage`,
+        id: ph.outageRefused
+          ? `${p}-outage-${ph.outageRefused}`
+          : `${p}-outage`,
         tone: 'amber',
         provider: p,
         text: `${p} is having trouble on its end.`,
-        detail:
-          'It isn’t your connection or your account. Replies may fail until it recovers.',
+        detail: ph.outageRefused
+          ? 'It isn’t your connection or your account. Your Prompt wasn’t sent; it’s still in the Input.'
+          : 'It isn’t your connection or your account. Replies may fail until it recovers.',
         action: {
           label: 'Status page ↗',
           run: () => log(`Opened ${p}'s status page in the browser`),
@@ -315,10 +318,10 @@ export const health = {
   },
   repair: (p: Provider) => {
     if (state.offline) {
-      log('Repair needs a connection')
+      log(`Downloading ${p} again needs a connection`)
       return
     }
-    patchProvider(p, {program: 'repairing', repair: 0})
+    patchProvider(p, {program: 'downloading', repair: 0})
     if (repairTimer) clearInterval(repairTimer)
     repairTimer = setInterval(() => {
       const r = state.providers[p].repair + 12
@@ -327,16 +330,19 @@ export const health = {
       repairTimer = null
       if (state.repairFails) {
         patchProvider(p, {program: 'wontStart', repair: 0})
-        log(`Repair of ${p} didn't help`)
+        log(`${p} downloaded again but still won't start`)
       } else {
         patchProvider(p, {program: 'ok', repair: 0})
-        log(`${p} repaired`)
+        log(`${p} downloaded again and starts`)
       }
     }, 300)
   },
 
   setOutage: (p: Provider, outage: boolean) =>
-    patchProvider(p, outage ? {outage} : {outage, outageSeen: false}),
+    patchProvider(
+      p,
+      outage ? {outage} : {outage, outageSeen: false, outageRefused: null}
+    ),
 
   openReconnect: (p: Provider) => update(s => ({...s, reconnect: p})),
   closeReconnect: () => update(s => ({...s, reconnect: null})),
@@ -351,15 +357,6 @@ export const health = {
     })
     update(s => ({...s, reconnect: null, otherAccount: false}))
     log(`Signed in to ${p}${other ? ' as a different account' : ''}`)
-    if (state.autoRetry) {
-      const n =
-        issueHooks.sim?.retryWhere(
-          t =>
-            providerOf(t.model) === p &&
-            (t.issue?.kind === 'signin' || t.issue?.kind === 'signedOut')
-        ) ?? 0
-      if (n) log(`Retried ${n} Replies that hit the expired sign-in`)
-    }
   },
 
   openSettings: (section: Health['settings'] = 'Connections') =>
@@ -405,9 +402,9 @@ export const health = {
 
 // ---------- wiring into the Tree sim ----------
 
-// A Prompt the Provider refuses before anything happens (offline, sign-in, the program) never joins the Tree: the
-// Input keeps it and the app shows why. The app only finds out about a lapsed sign-in or a broken program here.
-issueHooks.preflight = model => {
+// A Prompt the Provider refuses before anything happens (offline, sign-in, the program, an outage) never joins the
+// Tree: the Input keeps it and the app shows why. The app only finds out about a lapsed sign-in or a broken program here.
+issueHooks.preflight = (model, retrying) => {
   const p = providerOf(model)
   const s = state
   if (!connected(getUsage(), p)) return null
@@ -420,10 +417,14 @@ issueHooks.preflight = model => {
       crashed: {
         at: Date.now(),
         stopped: failRunning(p, {kind: 'crash', provider: p}),
-        unsent: true,
+        unsent: !retrying,
       },
     })
-    log(`${p} program crashed while sending; the Prompt stays in the Input`)
+    log(
+      retrying
+        ? `${p} program crashed while retrying`
+        : `${p} program crashed while sending; the Prompt stays in the Input`
+    )
     return {kind: 'crash', provider: p}
   }
   if (ph.program === 'broken') {
@@ -436,18 +437,26 @@ issueHooks.preflight = model => {
     log(`${p} said "login expired"; the Prompt stays in the Input`)
     return {kind: 'signin', provider: p}
   }
-  // The Prompt a crash held back has now gone through.
-  if (ph.crashed?.unsent) patchProvider(p, {crashed: null})
+  if (ph.outage) {
+    patchProvider(p, {
+      outageSeen: true,
+      ...(retrying ? {} : {outageRefused: Date.now()}),
+    })
+    log(
+      retrying
+        ? `${p} refused the retry: trouble on its end`
+        : `${p} refused the Prompt: trouble on its end; it stays in the Input`
+    )
+    return {kind: 'outage', provider: p}
+  }
+  if (retrying) return null
+  // The Prompt a crash or an outage held back has now gone through.
+  for (const q of PROVIDERS) {
+    const qh = state.providers[q]
+    if (qh.crashed?.unsent) patchProvider(q, {crashed: null})
+    if (qh.outageRefused) patchProvider(q, {outageRefused: null})
+  }
   return null
-}
-
-// A Prompt that went through but whose Reply the vendor's servers refuse.
-issueHooks.gate = model => {
-  const p = providerOf(model)
-  const ph = state.providers[p]
-  if (!connected(getUsage(), p) || !ph.outage) return null
-  patchProvider(p, {outageSeen: true})
-  return {kind: 'outage', provider: p}
 }
 
 // Running Replies: a lost connection pauses them while the vendor program retries, then fails them; an expired

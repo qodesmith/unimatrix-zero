@@ -14,7 +14,13 @@ export const name = 'Where it bites (Input card)'
 function Above() {
   const h = useHealth()
   const u = useUsage()
-  useProblemToasts(p => (p.id.endsWith('-crash') ? p.text : null))
+  useProblemToasts(p =>
+    p.id.endsWith('-crash')
+      ? p.text
+      : p.id.includes('-outage-')
+        ? `${p.text} ${p.detail}`
+        : null
+  )
   return blockerFor(h, providerOf(u.model)) ? <InputBlock /> : <LimitCard />
 }
 

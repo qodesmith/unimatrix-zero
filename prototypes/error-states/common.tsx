@@ -19,6 +19,7 @@ import {
   alternativeTo,
   blockerFor,
   health,
+  needsSignIn,
   NEXT_VERSION,
   problems,
   RECONNECT_FOR,
@@ -51,12 +52,38 @@ export function IssueStatus({reply, sim}: {reply: Turn; sim: TreeSim}) {
       </span>
     )
   const issue = reply.issue!
-  const retry = (
-    <button onClick={() => sim.retry(reply.id)} className={btnRed}>
-      ↻ Retry
-    </button>
-  )
   const ph = h.providers[p]
+  const signIn = needsSignIn(h, p)
+  const retry = (
+    <>
+      <button
+        disabled={h.offline || signIn}
+        title={
+          h.offline
+            ? 'Retry when you’re back online'
+            : signIn
+              ? `Sign in to ${p} to retry`
+              : undefined
+        }
+        onClick={() => sim.retry(reply.id)}
+        className={btnRed}
+      >
+        ↻ Retry
+      </button>
+      {h.offline ? (
+        <span className="text-zinc-500">Retry when you’re back online</span>
+      ) : (
+        signIn && (
+          <button
+            onClick={() => health.openReconnect(p)}
+            className="nodrag text-zinc-500 underline hover:text-zinc-900"
+          >
+            Sign in to {p} to retry
+          </button>
+        )
+      )}
+    </>
+  )
   let what: string
   let action = retry
   switch (issue.kind) {
@@ -66,26 +93,9 @@ export function IssueStatus({reply, sim}: {reply: Turn; sim: TreeSim}) {
         issue.kind === 'signin'
           ? `${p} sign-in expired`
           : `Stopped: you signed out of ${p}`
-      if (ph.signIn !== 'ok')
-        action = (
-          <button onClick={() => health.openReconnect(p)} className={btnDark}>
-            Sign in again
-          </button>
-        )
       break
     case 'offline':
-      what = h.offline
-        ? 'Connection lost · Retry once you’re back online'
-        : 'Connection lost'
-      action = (
-        <button
-          disabled={h.offline}
-          onClick={() => sim.retry(reply.id)}
-          className={btnRed}
-        >
-          ↻ Retry
-        </button>
-      )
+      what = 'Connection lost'
       break
     case 'crash':
       what = `${p} stopped unexpectedly`
@@ -94,13 +104,13 @@ export function IssueStatus({reply, sim}: {reply: Turn; sim: TreeSim}) {
       what = `${p} couldn't start`
       if (ph.program !== 'ok')
         action =
-          ph.program === 'repairing' ? (
+          ph.program === 'downloading' ? (
             <span className="text-sky-700">
-              Repairing… {Math.round(ph.repair)}%
+              Downloading… {Math.round(ph.repair)}%
             </span>
           ) : (
             <button onClick={() => health.repair(p)} className={btnDark}>
-              Repair {p}
+              Download {p} again
             </button>
           )
       break
@@ -156,9 +166,9 @@ export function InputBlock({slim}: {slim?: boolean}) {
         {b.kind === 'signin' ? 'Sign in again' : 'Sign in'}
       </button>
     ) : b.kind === 'wontStart' ? (
-      ph.program === 'repairing' ? (
+      ph.program === 'downloading' ? (
         <span className="text-sky-700">
-          Repairing… {Math.round(ph.repair)}%
+          Downloading… {Math.round(ph.repair)}%
         </span>
       ) : h.repairFails ? (
         <button
@@ -169,7 +179,7 @@ export function InputBlock({slim}: {slim?: boolean}) {
         </button>
       ) : (
         <button onClick={() => health.repair(p)} className={btnDark}>
-          Repair {p}
+          Download {p} again
         </button>
       )
     ) : null
@@ -200,8 +210,8 @@ export function InputBlock({slim}: {slim?: boolean}) {
       </div>
       {b.kind === 'signin' && (
         <div className="mt-0.5 text-amber-800">
-          Sign-ins expire every few weeks. Anything that was cut off picks up
-          again afterwards.
+          Sign-ins expire every few weeks. Anything that was cut off waits for
+          you to retry it.
         </div>
       )}
       {b.kind === 'offline' && (
@@ -418,8 +428,8 @@ export function ProviderStatus({p, compact}: {p: Provider; compact?: boolean}) {
       {action}
     </div>
   )
-  if (ph.program === 'repairing')
-    return line('text-sky-700', `Repairing… ${Math.round(ph.repair)}%`)
+  if (ph.program === 'downloading')
+    return line('text-sky-700', `Downloading… ${Math.round(ph.repair)}%`)
   if (ph.program === 'wontStart')
     return line(
       'text-red-700',
@@ -433,7 +443,7 @@ export function ProviderStatus({p, compact}: {p: Provider; compact?: boolean}) {
         </button>
       ) : (
         <button onClick={() => health.repair(p)} className={btnDark}>
-          Repair
+          Download again
         </button>
       )
     )
@@ -853,12 +863,9 @@ export function HealthDebug({question}: {question: string}) {
           </div>
           <div className="space-y-1 border-t border-fuchsia-200 pt-1.5">
             {toggle(
-              'Cut-off Replies retry by themselves after signing in',
-              h.autoRetry,
-              v => health.set({autoRetry: v})
-            )}
-            {toggle('Repair fails too', h.repairFails, v =>
-              health.set({repairFails: v})
+              "Downloading the program again doesn't fix it",
+              h.repairFails,
+              v => health.set({repairFails: v})
             )}
           </div>
           <div className="border-t border-fuchsia-200 pt-1.5">
