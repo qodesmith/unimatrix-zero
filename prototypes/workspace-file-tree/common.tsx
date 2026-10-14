@@ -102,7 +102,10 @@ function FilesTreeInner({
     if (picked && picked !== selected) onSelectRef.current(picked)
   }, [picked])
   return (
-    <FileTree model={model} style={{height: '100%', colorScheme: 'light'}} />
+    <FileTree
+      model={model}
+      style={{height: '100%', colorScheme: 'var(--uz-scheme, light)'}}
+    />
   )
 }
 

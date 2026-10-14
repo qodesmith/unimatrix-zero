@@ -402,7 +402,7 @@ export function VariantD() {
               }
               onNodeMouseLeave={() => setHoverId(null)}
             >
-              <Background gap={24} color="#d4d4d8" />
+              <Background gap={24} color="var(--color-zinc-300)" />
               <CanvasControls
                 orientation={orientation}
                 onOrientation={switchTo}

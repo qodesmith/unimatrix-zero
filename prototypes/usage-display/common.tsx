@@ -63,9 +63,11 @@ export function Bar({
 export function Ring({percent, size = 14}: {percent: number; size?: number}) {
   const r = 5
   const c = 2 * Math.PI * r
-  const color = {ok: '#71717a', warn: '#d97706', limit: '#dc2626'}[
-    level(percent)
-  ]
+  const color = {
+    ok: 'var(--color-zinc-500)',
+    warn: 'var(--color-amber-600)',
+    limit: 'var(--color-red-600)',
+  }[level(percent)]
   return (
     <svg width={size} height={size} viewBox="0 0 14 14" className="shrink-0">
       <circle
@@ -73,7 +75,7 @@ export function Ring({percent, size = 14}: {percent: number; size?: number}) {
         cy="7"
         r={r}
         fill="none"
-        stroke="#e4e4e7"
+        stroke="var(--color-zinc-200)"
         strokeWidth="2.5"
       />
       <circle

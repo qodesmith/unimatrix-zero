@@ -281,8 +281,8 @@ export function useLeafFocus(replyId: string) {
 export const edgeStyle = (hot: boolean) => ({
   zIndex: hot ? 1 : 0,
   style: hot
-    ? {stroke: '#8b5cf6', strokeWidth: 2.5}
-    : {stroke: '#a1a1aa', strokeWidth: 1},
+    ? {stroke: 'var(--color-violet-500)', strokeWidth: 2.5}
+    : {stroke: 'var(--color-zinc-400)', strokeWidth: 1},
 })
 
 // ---------- Input ----------

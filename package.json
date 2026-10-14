@@ -13,7 +13,8 @@
     "prototype:export": "bun prototypes/export-archive-summary/index.html",
     "prototype:sidebar": "bun prototypes/tree-sidebar/index.html",
     "prototype:usage": "bun prototypes/usage-display/index.html",
-    "prototype:errors": "bun prototypes/error-states/index.html"
+    "prototype:errors": "bun prototypes/error-states/index.html",
+    "prototype:identity": "bun prototypes/visual-identity/index.html"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",

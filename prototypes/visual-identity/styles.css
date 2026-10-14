@@ -1,0 +1,60 @@
+@import '../canvas-mode-ux/styles.css';
+@source '../canvas-mode-ux';
+@source '../workspace-file-tree';
+@source '../export-archive-summary';
+@source '../tree-sidebar';
+@source '../usage-display';
+@source '../error-states';
+@source '.';
+
+/* PROTOTYPE: unlayered, so these beat the Tailwind utilities the earlier prototypes hard-coded. Throw away. */
+body {
+  font-family: var(--font-sans);
+  background: var(--canvas-background);
+  color: var(--foreground);
+  font-weight: var(--uz-weight, 400);
+}
+.react-flow__background {
+  background: var(--canvas-background);
+}
+.react-flow__background-pattern {
+  fill: var(--canvas-dots) !important;
+  stroke: var(--canvas-dots) !important;
+}
+.rounded {
+  border-radius: var(--radius-sm);
+}
+/* Dark buttons and chips in the earlier prototypes become the Theme's primary. */
+.bg-zinc-900 {
+  background-color: var(--primary);
+}
+.bg-zinc-900.text-white,
+.bg-zinc-900 .text-white {
+  color: var(--primary-foreground);
+}
+.bg-zinc-900:not(:disabled):hover {
+  background-color: color-mix(in oklab, var(--primary) 86%, var(--background));
+}
+.bg-zinc-900:disabled {
+  background-color: var(--color-zinc-300);
+}
+/* Playful: chunkier type throughout. */
+[data-direction='C'] .font-medium {
+  font-weight: 700;
+}
+[data-direction='C'] .font-semibold {
+  font-weight: 800;
+}
+/* Borg: the active Thread glows. */
+[data-direction='D'] .react-flow__edge-path[style*='violet'] {
+  filter: drop-shadow(0 0 3px var(--thread-highlight));
+}
+[data-direction='D'][data-mode='dark'] .border-violet-500,
+[data-direction='D'][data-mode='dark'] .ring-violet-500 {
+  box-shadow: 0 0 10px -2px var(--thread-highlight);
+}
+/* Prototype chrome keeps its own look in every Theme. */
+.uz-chrome {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 400;
+}
