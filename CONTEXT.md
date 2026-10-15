@@ -134,3 +134,11 @@ _Avoid_: Backup (reserved for the app's own pre-migration database copies), proj
 **Theme**:
 A named set of visual values (colours, radius, code highlighting, font) with a light version, a dark version, or both. The _mode_ (light, dark or system) picks which version of the current Theme is shown; it is not itself a Theme.
 _Avoid_: Skin, colour scheme, palette
+
+**Report**:
+What the user previews and sends about a problem in the app. It becomes a GitHub issue and holds only versions, choices from fixed lists, counts and stack frames from the app's own code, plus an optional description the user writes. Nothing from a conversation, file or Setting is ever in it.
+_Avoid_: Crash report, bug report, telemetry, feedback
+
+**Diagnostics**:
+The app's own record, on the user's computer, of recent errors, kept in the same form as a Report and trimmed after a while. The user can copy it, export it or clear it; Reports are built from it.
+_Avoid_: Logs, debug log
