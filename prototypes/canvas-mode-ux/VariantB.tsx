@@ -103,7 +103,7 @@ export function ExchangeNode({data, selected}: NodeProps<Node<Data>>) {
               )}
               {prompt.text && (
                 <ScrollableText maxHeightClass="max-h-32">
-                  {prompt.text}
+                  {decor.promptBody?.(prompt, 'canvas') ?? prompt.text}
                 </ScrollableText>
               )}
               {decor.prompt?.(prompt)}

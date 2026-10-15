@@ -69,7 +69,9 @@ export function PromptNode({data, selected}: NodeProps<Node<Data>>) {
         />
       )}
       {turn.text && (
-        <ScrollableText maxHeightClass="max-h-32">{turn.text}</ScrollableText>
+        <ScrollableText maxHeightClass="max-h-32">
+          {decor.promptBody?.(turn, 'canvas') ?? turn.text}
+        </ScrollableText>
       )}
       {decor.prompt?.(turn)}
       <DeletePill

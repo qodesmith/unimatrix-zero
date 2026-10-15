@@ -689,7 +689,7 @@ function ChatDrawer({
                       className={t.text ? 'mb-2' : ''}
                     />
                   )}
-                  {t.text}
+                  {decor.promptBody?.(t, 'drawer') ?? t.text}
                   {decor.prompt?.(t)}
                 </div>
               ) : (

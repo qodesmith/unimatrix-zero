@@ -1,6 +1,6 @@
 // PROTOTYPE variant B: Collections, like folders in Finder or VS Code. One level of Collections you make yourself, drag Trees in, a sort
 // menu, ⌘/Shift-click to select several, and full-text search in a ⌘K palette instead of the sidebar. No pins. Throw away.
-import {useEffect, useMemo, useState} from 'react'
+import {createContext, useContext, useEffect, useMemo, useState} from 'react'
 
 import {Menu, type MenuItem} from '../export-archive-summary/common'
 import {
@@ -17,6 +17,9 @@ import {
 import {displayTitle, relTime, search, type Entry} from './library'
 
 export const name = 'Collections and ⌘K'
+
+// Later prototypes swap in their own palette, rendered outside the Tree so it survives switching Trees.
+export const PaletteContext = createContext<{toggle: () => void} | null>(null)
 
 type Sort = 'active' | 'created' | 'name'
 const SORTS: Record<Sort, string> = {
@@ -36,7 +39,11 @@ export function VariantB({lib}: {lib: Lib}) {
   const [selected, setSelected] = useState<string[]>([])
   const [anchor, setAnchor] = useState<string | null>(null)
   const [dropOn, setDropOn] = useState<string | null>(null)
-  const [palette, setPalette] = useState(false)
+  const [ownPalette, setOwnPalette] = useState(false)
+  const external = useContext(PaletteContext)
+  const palette = !external && ownPalette
+  const setPalette = (v: boolean | ((p: boolean) => boolean)) =>
+    external ? external.toggle() : setOwnPalette(v)
   const [moving, setMoving] = useState<{keys: string[]; at: DOMRect} | null>(
     null
   )

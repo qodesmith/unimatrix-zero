@@ -1031,6 +1031,8 @@ export type Decor = {
   // Replaces the plain Reply text, e.g. to interleave file changes.
   replyBody?: (reply: Turn, where: 'canvas' | 'drawer') => ReactNode
   prompt?: (prompt: Turn) => ReactNode
+  // Replaces the plain Prompt text (search marks).
+  promptBody?: (prompt: Turn, where: 'canvas' | 'drawer') => ReactNode
   // Variant D host hooks.
   onFocusReply?: (replyId: string | null) => void
   hostApi?: RefObject<HostApi | null>

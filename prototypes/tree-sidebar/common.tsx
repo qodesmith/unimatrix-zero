@@ -1,6 +1,7 @@
 // PROTOTYPE: shared pieces for the Tree sidebar variants: library state, the app around the sidebar, row menu, inline
 // rename, delete confirmation. Throw away.
 import {
+  createContext,
   useContext,
   useEffect,
   useMemo,
@@ -66,6 +67,9 @@ function useLayout<K extends keyof typeof layout>(k: K) {
 // ---------- library state, shared by every variant ----------
 
 export type Lib = ReturnType<typeof useLibrary>
+
+// pick(key, CLOSE_SLIDEOUT) switches to a Tree with the slideout closed (search preview restoring where you were).
+export const CLOSE_SLIDEOUT = '__close'
 
 export function useLibrary() {
   const [entries, setEntries] = useState<Entry[]>(INITIAL)
@@ -181,6 +185,9 @@ export function useLibrary() {
 
 // ---------- the app around the sidebar ----------
 
+// Later prototypes add canvas and slideout decor (search marks) without forking the Shell.
+export const ExtraDecorContext = createContext<Decor>({})
+
 export function Shell({
   lib,
   trees,
@@ -195,6 +202,7 @@ export function Shell({
 }) {
   const sim = useSim()
   const usage = useContext(UsageUiContext)
+  const extraDecor = useContext(ExtraDecorContext)
   const host = useRef<HostApi | null>(null)
   const [drawerReply, setDrawerReply] = useState<string | null>(null)
   const [preview, setPreview] = useState<{
@@ -222,7 +230,7 @@ export function Shell({
     if (!lib.pendingTurn) return
     const id = lib.pendingTurn
     const t = setTimeout(() => {
-      host.current?.select(id)
+      host.current?.select(id === CLOSE_SLIDEOUT ? null : id)
       lib.clearPending()
     }, 350)
     return () => clearTimeout(t)
@@ -241,8 +249,9 @@ export function Shell({
         ) : null,
       prompt: p => <UserEdits prompt={p} />,
       onFocusReply: id => setDrawerReply(id),
+      ...extraDecor,
     }),
-    [width]
+    [width, extraDecor]
   )
 
   return (
