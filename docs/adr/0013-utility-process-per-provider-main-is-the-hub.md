@@ -11,5 +11,5 @@ Each connected Provider's driver runs in its own Electron utility process (a Pro
 ## Consequences
 
 - **The renderer never talks to a Provider host.** On connect or reload it gets a `SNAPSHOT` from main (Provider statuses, account, usage, MCP server statuses, and any in-progress Reply as displayed), then the live events, with no gap and no duplicates.
-- **Main owns crash handling.** On `child-process-gone` it saves the in-flight Reply as failed with the text it last displayed, restarts that host with backoff (1 s, 5 s, 30 s, then manual Reconnect), and holds new Prompts for that Provider until it reports ready.
+- **Main owns crash handling.** On `child-process-gone` it saves the in-flight Reply as failed with the text it last displayed, restarts that host with backoff (1 s, 5 s, 30 s, then manual Reconnect), and holds new Prompts for that Provider until it reports ready. Amended: main holds nothing; while the host restarts, Send is off and the draft stays in the Input, and the user sends it once the host reports ready, the same as offline ([#38](https://github.com/qodesmith/unimatrix-zero/issues/38), amendment).
 - **A crashed Reply never re-runs on its own**: a re-run could repeat tool actions or loop on a Prompt that crashes the vendor program.

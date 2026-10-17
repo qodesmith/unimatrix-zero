@@ -1,0 +1,13 @@
+# 11. Subagents
+
+Source: [Subagents on both Providers](https://github.com/qodesmith/unimatrix-zero/issues/31), [Subagents in every Tree](https://github.com/qodesmith/unimatrix-zero/issues/32).
+
+- **On by default in every Tree**, as a Tools-panel entry with a global default. Off means no `Agent` tool on Claude and `agents.enabled = false` on Codex. One line of help: "Subagents can use your plan's limits faster."
+- **A Subagent can do exactly what its Tree allows**: in a plain Tree web search plus the MCP servers, connectors and Skills that are on; in a Workspace the Workspace level too, with several Subagents allowed to write to the working copy at once (the subagent section asks the AI to split work by file). Approvals use the same card, naming the Subagent. Provider defaults for concurrency (Claude 20 at once, 3 deep; Codex 3 at once); the AI may pick each Subagent's Model.
+- **Subagent work stays inside one Reply.** Claude Subagents run in the foreground (`CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`) with the built-in agent types off; one app-written general Subagent runs under the Tree's System prompt plus a short subagent section. Codex children carry the Tree's System prompt plus Codex's own multi-agent text. A Reply finishes only when the parent and every Subagent have finished; Stop interrupts all of them; the Snapshot is taken after.
+- **Display.** On the canvas a Reply shows "3 subagents · 2 running", then a "3 subagents" chip; clicking opens chat mode at that Reply with the block expanded. In chat mode a collapsible "Subagents" block, collapsed by default: one row per Subagent (task line, or "Subagent N" on Codex where the task text is encrypted; Model pill; status; tokens), expanding to the final result, with "Show steps" for tool calls and messages; nested Subagents indented. A failed Subagent does not fail the Reply. Subagent tokens are shown per row and never added to Context size.
+- **Storage and Exports.** Each Reply stores the row data; the live progress stream is not stored. Subagent transcripts are part of the Provider session copy, so they go into Archives and are deleted with their Reply. Forking at a Reply that used Subagents uses the native fork; the Branch remembers results but cannot resume them. Replay to another Provider includes final results as plain text. Exports get one `<details>` block per Subagent under its Reply.
+
+## Verify while building
+
+- The exact Plus usage cost of Codex children; whether models spawn Subagents unprompted; several Subagents writing to one working copy at once; whether Glob/Grep can leak into a Claude Subagent on macOS ([#31](https://github.com/qodesmith/unimatrix-zero/issues/31)).

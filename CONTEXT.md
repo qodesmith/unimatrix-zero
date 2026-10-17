@@ -8,7 +8,11 @@ A desktop control surface for a user's existing AI subscriptions (Claude, ChatGP
 
 **Provider**:
 An AI service the user connects through their own subscription (Claude, ChatGPT). A Tree may involve several Providers. Users _connect_ a Provider and _remove_ it, the opposite of connecting; _sign in_ refers only to the Provider's own sign-in page.
-_Avoid_: Vendor, backend, service, disconnect
+_Avoid_: Vendor (the company behind a Provider; only its downloaded build is a _vendor program_), backend, service, disconnect
+
+**Vendor program**:
+The exact, unmodified `claude` or `codex` build the app downloads for a Provider and runs on the user's behalf, with its own configuration folder. It owns the Provider's sign-in; the app never sees the credentials.
+_Avoid_: CLI, binary, the user's installed copy
 
 **Model**:
 A specific AI offered by a Provider (e.g. Claude Opus, GPT-5.1). Chosen per Prompt: the Input defaults to the Model of the Reply it's attached to, and each Reply records the Model that wrote it. One Thread may pass through several Models and Providers.
@@ -118,6 +122,14 @@ _Avoid_: Folder, project, group
 **Settings**:
 The single place for the user's global preferences: how the app looks and behaves, and the defaults new Trees start from. Settings never changes an existing Tree; anything that shapes what the AI does in one Tree belongs to that Tree.
 _Avoid_: Preferences, options, config
+
+**Tools panel**:
+A Tree's own list of what the AI may use there: web search, Subagents, each MCP server, Skill and Plugin, and the Workspace's permission level. New Trees start from the defaults in Settings; changing the panel changes only that Tree.
+_Avoid_: Tool settings, capabilities, permissions panel
+
+**Approval card**:
+The question the AI's Reply pauses on when it wants to do something the Tree does not let it do on its own, such as run a command, write outside the Workspace, or reach a host. Answered with Allow once, Always allow in this Tree, or Deny, and kept in the Reply as a record of the answer. Approvals belong to the Tree, so every Branch shares them.
+_Avoid_: Permission prompt, confirmation dialog, tool approval
 
 **YOLO**:
 A global Setting, off by default, for users who take the AI's risks on themselves: the app stops asking for approval and removes the Sandbox. It never changes what a Tree can do: tools that are off stay off, a write files Workspace still runs no commands, and a plain Tree stays plain.
