@@ -10,6 +10,6 @@ Canvas mode is the app: the whole Tree laid out from its structure by React Flow
 
 ## Consequences
 
-- The Tree's layout is a pure function of its structure; there is no saved position per Turn.
-- Orientation is a global Setting, not a per-Tree property, since both orientations show the same Tree.
-- Opening a Tree at a Turn (from search, or from a Reply's chip) means opening the slideout on that Turn's Thread, never a different screen.
+- **Layout is a pure function of the Tree's structure.** There is no saved position per Turn.
+- **Orientation is a global Setting**, not a per-Tree property, since both orientations show the same Tree.
+- **Opening a Tree at a Turn** (from search, or from a Reply's Subagent chip) means opening the slideout on that Turn's Thread, never a different screen.
