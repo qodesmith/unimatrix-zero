@@ -50,6 +50,10 @@ _Avoid_: Worktree, sandbox
 Changes the user made by hand to a Workspace's files between Replies, recorded as their own Snapshot.
 _Avoid_: Manual change, local change
 
+**Sandbox**:
+The boundary the Provider's program puts around every command the AI runs in a Workspace: it can write only in the working copy, cannot read the user's credentials, and cannot reach the internet without the user's approval. It holds whether or not the user approved the command; the approval card decides if a command runs, the Sandbox decides what it can reach. Only YOLO removes it.
+_Avoid_: Fence, jail, container, VM, working copy
+
 ### Conversation structure
 
 **Tree**:
@@ -114,6 +118,10 @@ _Avoid_: Folder, project, group
 **Settings**:
 The single place for the user's global preferences: how the app looks and behaves, and the defaults new Trees start from. Settings never changes an existing Tree; anything that shapes what the AI does in one Tree belongs to that Tree.
 _Avoid_: Preferences, options, config
+
+**YOLO**:
+A global Setting, off by default, for users who take the AI's risks on themselves: the app stops asking for approval and removes the Sandbox. It never changes what a Tree can do: tools that are off stay off, a write files Workspace still runs no commands, and a plain Tree stays plain.
+_Avoid_: Bypass permissions, full access, auto mode
 
 **Export**:
 A one-way, human-readable copy of a Thread or a Tree, written as Markdown. An Export can never be restored.
