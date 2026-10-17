@@ -124,11 +124,11 @@ The single place for the user's global preferences: how the app looks and behave
 _Avoid_: Preferences, options, config
 
 **Tools panel**:
-A Tree's own list of what the AI may use there: web search, Subagents, each MCP server, Skill and Plugin, and the Workspace's permission level. New Trees start from the defaults in Settings; changing the panel changes only that Tree.
+A Tree's own list of what the AI may use there: web search, Subagents, each MCP server, Skill and Plugin, the Provider's own built-in tools and account connectors, and the Workspace's permission level. New Trees start from the defaults in Settings; changing the panel changes only that Tree.
 _Avoid_: Tool settings, capabilities, permissions panel
 
 **Approval card**:
-The question the AI's Reply pauses on when it wants to do something the Tree does not let it do on its own, such as run a command, write outside the Workspace, or reach a host. Answered with Allow once, Always allow in this Tree, or Deny, and kept in the Reply as a record of the answer. Approvals belong to the Tree, so every Branch shares them.
+The question a Reply pauses on when the AI wants to do something the Tree does not let it do on its own, such as run a command, write outside the Workspace, or reach a host. Its answer (Allow once, Always allow in this Tree, or Deny) stays in the Reply as a record and, being the Tree's, is shared by every Branch.
 _Avoid_: Permission prompt, confirmation dialog, tool approval
 
 **YOLO**:
