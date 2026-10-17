@@ -62,7 +62,7 @@ Each section is its own file, sized to be read alone by whoever works one implem
 
 Decisions deliberately left without an ADR, because they sit behind one function or are cheap to reverse: the replay mechanism (#10), Summaries (#28), disk usage (#29), the subscription-terms posture (#21).
 
-**Prototypes** (each on its `prototype/<name>` branch with a `LIKES.md` verdict): canvas-mode-ux (#14), onboarding-sign-in (#16), workspace-file-tree (#26), export-archive-summary (#30), tree-sidebar (#34), usage-display (#36), error-states (#40), visual-identity (#42), search-palette (#44).
+**Prototypes** (each on its `prototype/<name>` branch with a `LIKES.md` verdict): canvas-mode-ux (#14, also answers #15), onboarding-sign-in (#16), workspace-file-tree (#26), export-archive-summary (#30), tree-sidebar (#34), usage-display (#36), error-states (#40), visual-identity (#42), search-palette (#44).
 
 **Research** (each on its `research/<name>` branch under `docs/research/`): subscription-session-capabilities (#2), t3code-conversation-storage (#3), hidden-sign-in (#4), unsigned-distribution (#5), ai-library-landscape (#6), cross-provider-continuation (#7), sqlite-in-electron (#8), stop-reply-upstream (#23), workspaces-mechanics (#25), provider-session-backup (#11), subagents (#31), usage-data (#35), provider-sdk-options (#37), claude-setup-token (#40), full-text-search (#43), subscription-terms (#21), vendor-sandboxing (#49), sandbox-live-tests (#53).
 

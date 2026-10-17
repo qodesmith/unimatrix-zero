@@ -1,6 +1,6 @@
 # 5. Canvas mode and chat mode
 
-Source: [Canvas mode UX](https://github.com/qodesmith/unimatrix-zero/issues/14) (prototype, variant D), [Canvas engine](https://github.com/qodesmith/unimatrix-zero/issues/19), [ADR 0019](../../adr/0019-canvas-is-a-display-for-the-tree.md).
+Source: [Canvas mode UX](https://github.com/qodesmith/unimatrix-zero/issues/14) (prototype, variant D), [Chat mode Thread navigation and switching between modes](https://github.com/qodesmith/unimatrix-zero/issues/15) (answered by #14), [Canvas engine](https://github.com/qodesmith/unimatrix-zero/issues/19), [ADR 0019](../../adr/0019-canvas-is-a-display-for-the-tree.md).
 
 - **Canvas mode is the app.** One canvas holds exactly one Tree, rendered with React Flow. Two orientations share every feature: **vertical** (top-down, the default; Prompt and Reply as separate equal-width boxes) and **horizontal** (left-to-right; one card per **Exchange**, Prompt as header, Reply as body). The toggle animates Turns to their new positions. Orientation is a global Setting; the canvas toggle is a shortcut to it.
 - **Chat mode is a slideout** on the right that opens on the Thread of any clicked Turn, can expand to full screen, and has exactly one Input at the end of the shown Thread. To switch Threads, click another Turn on the canvas; there is no Thread switcher. Sending from the slideout into a Reply that already has a response branches, and the slideout follows the new Branch.
