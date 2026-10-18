@@ -11,5 +11,5 @@ Source: [Canvas mode UX](https://github.com/qodesmith/unimatrix-zero/issues/14),
 
 ## Verify while building
 
-- How the ChatGPT desktop app handles a PDF the user attaches in Codex mode (the app-server protocol has no PDF input, so it most likely places the file in the working folder for the model's file tools); match it in Workspace Trees if so.
+- How the ChatGPT desktop app handles a PDF the user attaches in Codex mode (the app-server protocol has no PDF input, so it most likely places the file in the working copy for the Model's file tools); confirm the copy the app writes into the working copy lands where Codex's file tools look.
 - Claude's exact limit weighting for cached tokens, which the re-read note's wording assumes ([#7](https://github.com/qodesmith/unimatrix-zero/issues/7)).
