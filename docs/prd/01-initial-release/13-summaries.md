@@ -1,0 +1,9 @@
+# 13. Summaries
+
+Source: [Summaries](https://github.com/qodesmith/unimatrix-zero/issues/28), [Export, Archive and Summary entry points](https://github.com/qodesmith/unimatrix-zero/issues/30).
+
+- **Made outside the Tree:** no Turn, no Fork, never seen by the AI later. **Thread summary** covers the root to any Reply ("Summarize up to here…" in the Reply ⋯ menu, canvas and chat mode, not on streaming or failed Replies). **Tree summary** covers the whole Tree ("Summarize this Tree…" in the Tree menu). Throwaway: Copy or Save as Markdown (with a header: Tree title, Model, date, the Reply covered); never stored or archived; not an Export.
+- **Two Summary prompts** (Thread, Tree) in Settings → Chat, editable with Reset to default; not in the System prompt library.
+- **How it runs.** A Thread summary defaults to the Reply's Model and forks that Reply's Provider session (cached prefix, sees attachments and tool results), then discards the fork; another Model falls back to sending the Thread as text with the re-read note. A Tree summary is a fresh tool-free session, defaulting to the last-used Model, fed the outline Export ([§14](./14-export-archive-and-restore.md)).
+- **Big Trees** are split by the app in the main process, cut at Forks: the root run first, each child run with its parent's summary as context, runs at the same depth in parallel (at most 3 at a time), every Turn read exactly once, then a combining pass in Tree order. A Thread summary sent as text to a smaller-window Model is chunked in order. The start dialog says "Reads ~N tokens, in M parts". A failed piece stops the run with Retry and no partial Summary.
+- **The panel** is non-modal, floating bottom-right over the canvas: title and Model, progress ("3 of 7 parts read, 3 at a time", "Combining parts…"), the text streaming in, Stop (Esc) while running, Copy and Save as Markdown… after. Close asks "Discard this summary?" only if it was neither copied nor saved.
