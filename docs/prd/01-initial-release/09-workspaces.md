@@ -15,7 +15,7 @@ Source: [Workspaces](https://github.com/qodesmith/unimatrix-zero/issues/24), [Wo
 
 ## Verify while building
 
-- Blocking Claude's parent-folder search for `CLAUDE.md` in linked folders ([#24](https://github.com/qodesmith/unimatrix-zero/issues/24)).
+- Stopping Codex's `AGENTS.md` walk up through a linked folder's parents, and confirming that Claude under `settingSources: []` reads no `CLAUDE.md` from the folder or its parents, so the one the app passes in is the only one ([#24](https://github.com/qodesmith/unimatrix-zero/issues/24)).
 - Copy-on-write clones on Linux and Windows filesystems; Windows and Linux snapshot and watcher performance; Linux inotify watch limits ([#25](https://github.com/qodesmith/unimatrix-zero/issues/25)).
 - Electron's bundled codecs (H.264, AAC), whether its PDF viewer is on by default (it is turned off), and calling `previewFile()` from the renderer ([#26](https://github.com/qodesmith/unimatrix-zero/issues/26)).
 - Whether Windows `createThumbnailFromPath` loads shell thumbnail handlers in-process; if so, use only our own thumbnails and icons ([#39](https://github.com/qodesmith/unimatrix-zero/issues/39)).

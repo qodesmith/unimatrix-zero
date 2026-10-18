@@ -128,7 +128,7 @@ A Tree's own list of what the AI may use there: web search, Subagents, each MCP 
 _Avoid_: Tool settings, capabilities, permissions panel
 
 **Approval card**:
-The question a Reply pauses on when the AI wants to do something the Tree does not let it do on its own, such as run a command, write outside the Workspace, or reach a host. Its answer (Allow once, Always allow in this Tree, or Deny) stays in the Reply as a record and, being the Tree's, is shared by every Branch.
+The question a Reply pauses on when the AI wants to do something the Tree does not let it do on its own, such as run a command, write outside the Workspace, or reach a host. Once answered (Allow once, Always allow in this Tree, or Deny) it collapses into a chip with the outcome; approval history is not stored, and an Always allow holds for every Branch of the Tree.
 _Avoid_: Permission prompt, confirmation dialog, tool approval
 
 **YOLO**:

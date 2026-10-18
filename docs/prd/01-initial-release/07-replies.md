@@ -7,7 +7,7 @@ Source: [Canvas mode UX](https://github.com/qodesmith/unimatrix-zero/issues/14),
 - **Failure** keeps the text the Reply had written and says why on its own line: connection lost, limit reached (with the reset time), the vendor program crashed, disk full. The app never retries on its own. **Retry** rewinds the Provider session to before the failed Turn and runs the Prompt again; it is off, with the reason, when the app is offline or the Provider is signed out. A Provider host crash is one of these failures: the Reply is saved as `failed` with the text it last displayed ([ADR 0013](../../adr/0013-utility-process-per-provider-main-is-the-hub.md)). Only when the app itself quits mid-stream is a Reply left `streaming`; at the next launch it becomes `interrupted` and behaves like a stopped one ([#11](https://github.com/qodesmith/unimatrix-zero/issues/11)).
 - **Saved as it goes.** The Reply row is written at start, per finished part, about every second for partial text, and at the end (`complete` / `stopped` / `failed`; `interrupted` is set at launch, above). A Claude stream that breaks and is silently re-sent replaces the streamed text (`TEXT_REPLACE`) rather than appending.
 - **Automatic title.** Written once, after the first Reply finishes, by the smallest Model the first Reply's Provider offers on the user's plan, as a tiny tool-free request outside the Tree. Never regenerated; renaming is final.
-- **Not stored, display only:** thinking summaries, durations and timings, "files changed" summaries (computed from Snapshots).
+- **Not stored, display only:** thinking summaries, durations and timings, approval history, "files changed" summaries (computed from Snapshots).
 
 ## Verify while building
 
