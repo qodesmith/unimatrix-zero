@@ -1,0 +1,5 @@
+interface:
+  display_name: "Implement next"
+  short_description: "Claim the next frontier ticket, implement it, open a PR"
+policy:
+  allow_implicit_invocation: false
