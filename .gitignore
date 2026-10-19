@@ -34,3 +34,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .DS_Store
 
 .claude/worktrees
+
+# TypeScript project-reference output
+.tsout
+
+# Vitest browser-mode attachments
+.vitest

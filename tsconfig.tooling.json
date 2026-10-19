@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["bun", "node"]
+  },
+  "include": [
+    "scripts",
+    "tooling",
+    "vitest.config.ts",
+    "shell/vite.config.ts",
+    "app/*/vite.config.ts",
+    "electron-runtime.json"
+  ]
+}

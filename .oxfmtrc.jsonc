@@ -6,7 +6,14 @@
   "embeddedLanguageFormatting": "auto",
   "endOfLine": "lf",
   "htmlWhitespaceSensitivity": "css",
-  "ignorePatterns": [".agents", ".claude"],
+  "ignorePatterns": [
+    ".agents",
+    ".claude",
+    "**/dist",
+    "**/.tsout",
+    "skills-lock.json",
+    "bun.lock",
+  ],
   "insertFinalNewline": true,
   "jsdoc": {
     "lineWrappingStyle": "balance",
@@ -27,7 +34,7 @@
     "newlinesBetween": true,
     "order": "asc",
     "sortSideEffects": false,
-    "internalPattern": ["@/"],
+    "internalPattern": ["^#"],
     "customGroups": [],
     "groups": [
       // All type imports are always at the top.
@@ -55,7 +62,7 @@
   "sortPackageJson": false,
   "sortTailwindcss": {
     "functions": ["clsx", "cn", "cva", "twMerge"],
-    // "stylesheet": "to/be/determined.css",
+    "stylesheet": "app/renderer/src/styles.css",
   },
   "tabWidth": 2,
   "trailingComma": "es5",

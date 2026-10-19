@@ -1,0 +1,134 @@
+/**
+ * `bun run dev`: the renderer through Vite's dev server (reached by the window
+ * as `app-dev://`), watch builds for the shell, main, preload and Provider
+ * hosts, and Electron restarted whenever main, preload or the shell rebuild.
+ * Ports and the data folder are per worktree, so two checkouts run side by
+ * side.
+ */
+import type {RolldownWatcher} from 'rolldown'
+
+import {createHash, randomBytes} from 'node:crypto'
+import {createRequire} from 'node:module'
+import path from 'node:path'
+import {build, createServer} from 'vite'
+
+const electronPath = createRequire(import.meta.url)('electron') as string
+const root = path.resolve(import.meta.dirname, '..')
+const fakeDriver = process.argv.includes('--fake')
+
+const worktree = createHash('sha256').update(root).digest('hex').slice(0, 8)
+const vitePort = 5173 + (parseInt(worktree, 16) % 2000)
+const dataFolder = `unimatrix-zero-dev-${worktree}`
+const scriptNonce = randomBytes(16).toString('base64')
+
+const pkg = (name: string) => path.join(root, name)
+
+async function watchBundle(dir: string): Promise<RolldownWatcher> {
+  const watcher = await build({
+    configFile: path.join(dir, 'vite.config.ts'),
+    mode: 'development',
+    logLevel: 'warn',
+    build: {watch: {}},
+  })
+  if (!('on' in watcher)) throw new Error(`${dir}: expected a watcher`)
+  return watcher
+}
+
+const firstBuild = (watcher: RolldownWatcher) =>
+  new Promise<void>(resolve => {
+    watcher.on('event', event => {
+      if (event.code === 'BUNDLE_END') resolve()
+      if (event.code === 'ERROR') console.error(event.error)
+    })
+  })
+
+const vite = await createServer({
+  configFile: pkg('app/renderer/vite.config.ts'),
+  mode: 'development',
+  logLevel: 'warn',
+  server: {
+    host: 'localhost',
+    port: vitePort,
+    strictPort: true,
+    hmr: {host: 'localhost', port: vitePort},
+  },
+  html: {cspNonce: scriptNonce},
+})
+await vite.listen()
+
+const bundles = {
+  shell: await watchBundle(pkg('shell')),
+  main: await watchBundle(pkg('app/main')),
+  preload: await watchBundle(pkg('app/preload')),
+  hosts: await watchBundle(pkg('app/provider-host')),
+}
+await Promise.all(Object.values(bundles).map(firstBuild))
+
+let electron: ReturnType<typeof Bun.spawn> | null = null
+let stopping = false
+
+function startElectron() {
+  electron = Bun.spawn([electronPath, pkg('shell/dist/index.cjs')], {
+    stdio: ['ignore', 'inherit', 'inherit'],
+    env: {
+      ...process.env,
+      UZ_DEV: '1',
+      UZ_DEV_VITE_PORT: String(vitePort),
+      UZ_DEV_NONCE: scriptNonce,
+      UZ_DEV_DATA_FOLDER: dataFolder,
+      UZ_FAKE_DRIVER: fakeDriver ? '1' : '0',
+    },
+    onExit: (_proc, code) => {
+      if (stopping || restarting) return
+      console.log(`Electron exited (${code}); stopping dev.`)
+      void shutdown()
+    },
+  })
+}
+
+let restarting = false
+async function restartElectron(reason: string) {
+  console.log(`${reason} rebuilt; restarting Electron.`)
+  restarting = true
+  electron?.kill()
+  await electron?.exited
+  restarting = false
+  startElectron()
+}
+
+let restartTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleRestart(reason: string) {
+  if (restartTimer) clearTimeout(restartTimer)
+  restartTimer = setTimeout(() => {
+    restartTimer = null
+    void restartElectron(reason)
+  }, 300)
+}
+
+for (const [name, watcher] of Object.entries(bundles)) {
+  watcher.on('event', event => {
+    if (event.code !== 'BUNDLE_END') return
+    if (name === 'hosts') {
+      console.log(
+        'Provider hosts rebuilt; a running host restarts once ADR 0013 lands.'
+      )
+      return
+    }
+    scheduleRestart(name)
+  })
+}
+
+async function shutdown() {
+  stopping = true
+  electron?.kill()
+  await Promise.all(Object.values(bundles).map(watcher => watcher.close()))
+  await vite.close()
+  process.exit(0)
+}
+process.on('SIGINT', () => void shutdown())
+process.on('SIGTERM', () => void shutdown())
+
+console.log(
+  `Unimatrix Zero dev: renderer on app-dev:// (Vite :${vitePort}), data in ${dataFolder}${fakeDriver ? ', fake driver' : ''}`
+)
+startElectron()

@@ -1,0 +1,13 @@
+{
+  "name": "@uz/contract",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./commands": "./src/modules/commands/main.ts",
+    "./events": "./src/modules/events/main.ts",
+    "./bridge": "./src/modules/bridge/main.ts"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  }
+}

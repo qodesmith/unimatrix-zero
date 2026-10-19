@@ -1,3 +1,4 @@
+import {$} from 'bun'
 /**
  * Lists the skills a repo exposes as JSON: `{name, description, path}[]`,
  * where `path` is the skill's directory relative to the repo root.
@@ -6,12 +7,11 @@
  * plugin-manifest handling.
  *
  * Usage:
- *   bun scripts/list-skills.ts <owner/repo | git URL | local path> [--full-depth]
+ * bun scripts/list-skills.ts <owner/repo | git URL | local path> [--full-depth]
  */
 import {mkdtemp, readdir, readFile, rm, stat} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {basename, join, relative, sep} from 'node:path'
-import {$} from 'bun'
 
 type Skill = {name: string; description: string; path: string}
 
@@ -82,7 +82,7 @@ async function parseSkillMd(skillDir: string): Promise<Skill | null> {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
   if (match) {
     try {
-      data = (Bun.YAML.parse(match[1]!) as Record<string, unknown>) ?? {}
+      data = Bun.YAML.parse(match[1]!) as Record<string, unknown>
     } catch (err) {
       warn(`YAML parse error: ${(err as Error).message}`)
       return null
@@ -100,7 +100,7 @@ async function parseSkillMd(skillDir: string): Promise<Skill | null> {
 
   const metadata = data.metadata as Record<string, unknown> | undefined
   const includeInternal = ['1', 'true'].includes(
-    process.env.INSTALL_INTERNAL_SKILLS ?? '',
+    process.env.INSTALL_INTERNAL_SKILLS ?? ''
   )
   if (metadata?.internal === true && !includeInternal) return null
 
@@ -114,7 +114,7 @@ async function parseSkillMd(skillDir: string): Promise<Skill | null> {
 async function readLockedSkillNames(basePath: string): Promise<Set<string>> {
   try {
     const lock = JSON.parse(
-      await readFile(join(basePath, 'skills-lock.json'), 'utf-8'),
+      await readFile(join(basePath, 'skills-lock.json'), 'utf-8')
     ) as {skills?: Record<string, unknown>}
     return new Set(Object.keys(lock.skills ?? {}).map(normalizeSkillName))
   } catch {
@@ -132,7 +132,7 @@ async function findSkillDirs(dir: string, depth = 0): Promise<string[]> {
   const subDirResults = await Promise.all(
     entries
       .filter(entry => entry.isDirectory() && !SKIP_DIRS.includes(entry.name))
-      .map(entry => findSkillDirs(join(dir, entry.name), depth + 1)),
+      .map(entry => findSkillDirs(join(dir, entry.name), depth + 1))
   )
 
   return [...(hasSkill ? [dir] : []), ...subDirResults.flat()]
@@ -140,7 +140,7 @@ async function findSkillDirs(dir: string, depth = 0): Promise<string[]> {
 
 export async function discoverSkills(
   basePath: string,
-  {fullDepth = false} = {},
+  {fullDepth = false} = {}
 ): Promise<Skill[]> {
   const skills: Skill[] = []
   const seenNames = new Set<string>()
@@ -153,7 +153,7 @@ export async function discoverSkills(
     if (lockedSkillNames.size === 0) return false
     const relativeDir = relative(basePath, skill.path).split(sep).join('/')
     const isAgentSkillPath = AGENT_PROJECT_SKILL_DIRS.some(
-      dir => relativeDir === dir || relativeDir.startsWith(`${dir}/`),
+      dir => relativeDir === dir || relativeDir.startsWith(`${dir}/`)
     )
     return (
       isAgentSkillPath &&
@@ -227,7 +227,7 @@ export async function discoverSkills(
 }
 
 async function resolveSource(
-  source: string,
+  source: string
 ): Promise<{path: string; cleanup?: () => Promise<void>}> {
   if (await stat(source).catch(() => null)) return {path: source}
 
@@ -244,7 +244,7 @@ if (import.meta.main) {
   const source = args.find(arg => !arg.startsWith('--'))
   if (!source) {
     console.error(
-      'Usage: bun scripts/list-skills.ts <owner/repo | git URL | local path> [--full-depth]',
+      'Usage: bun scripts/list-skills.ts <owner/repo | git URL | local path> [--full-depth]'
     )
     process.exit(1)
   }
@@ -262,8 +262,8 @@ if (import.meta.main) {
           path: relative(path, skill.path).split(sep).join('/') || '.',
         })),
         null,
-        2,
-      ),
+        2
+      )
     )
   } finally {
     await cleanup?.()

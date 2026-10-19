@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Format, lint, typecheck, knip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: bun install --frozen-lockfile
+      - run: bun run fmt:check
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun run knip
+
+  unit:
+    name: Unit tests (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: mac-arm64, os: macos-15}
+          - {name: mac-x64, os: macos-15-intel}
+          - {name: windows-x64, os: windows-latest}
+          - {name: linux-x64, os: ubuntu-latest}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bunx playwright install chromium ${{ runner.os == 'Linux' && '--with-deps' || '' }}
+      - run: bun run test
+
+  ci:
+    name: CI
+    if: always()
+    needs: [checks, unit]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "checks: ${{ needs.checks.result }}"
+          echo "unit: ${{ needs.unit.result }}"
+          test "${{ needs.checks.result }}" = success && test "${{ needs.unit.result }}" = success
