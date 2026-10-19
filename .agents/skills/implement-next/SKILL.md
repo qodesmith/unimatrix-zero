@@ -1,6 +1,6 @@
 ---
 name: implement-next
-description: "Claim the next ticket on the frontier, implement it with /implement, and open a PR that closes it."
+description: "Claim the next ticket on the frontier, implement it by following the implement skill, and open a PR that closes it."
 disable-model-invocation: true
 argument-hint: "An issue number to take instead of the frontier's first, or nothing"
 ---
@@ -22,6 +22,6 @@ Work one ticket from the **frontier**: the open `ready-for-agent` issues with no
 
 3. **Branch.** Ensure that there are no changes on the current branch. If they are, guide the user towards handling that so nothing is lost. Then, from a fresh `main` (`git switch main && git pull --ff-only`), create the `<n>-<slug>` branch where the slug is the first few words of the title. Switch to the newly created branch.
 
-4. **Implement.** Invoke the `implement` skill with the ticket as the spec - `/implement GitHub issue #<n>` and let that skill take it from there. A ticket asks for two things: criteria to meet and (potentially) questions to answer. Those answers, and answers to questions that come up while building, go in one comment on the issue so they outlive the session.
+4. **Implement.** Read `.agents/skills/implement/SKILL.md` and follow it with issue #<n> as the spec. A ticket asks for two things: criteria to meet and (potentially) questions to answer. Those answers, and answers to questions that come up while building, go in one comment on the issue so they outlive the session.
 
 5. **Open the PR.** Push the branch and open the PR with the `pr` skill's template, first line `Closes #<n>`. Merging it closes the issue and unblocks the tickets behind it.
