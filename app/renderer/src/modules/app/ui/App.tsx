@@ -1,8 +1,10 @@
+import type {CommandResult} from '@uz/contract/commands'
+
 import {bridge} from '#modules/bridge/main'
 import {Button} from '#modules/shadcn/main'
 import {useState} from 'react'
 
-type Pong = {nonce: string; receivedAt: string}
+type Pong = CommandResult<'app.ping'>
 
 export function App() {
   const [pong, setPong] = useState<Pong | null>(null)

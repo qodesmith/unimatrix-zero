@@ -1,5 +1,5 @@
-import type {Command, CommandOutcome} from '../commands/main'
-import type {AppEvent} from '../events/main'
+import type {Command, CommandOutcome} from '#modules/commands/main'
+import type {AppEvent} from '#modules/events/main'
 
 import {z} from 'zod'
 
@@ -15,15 +15,16 @@ export const DroppedFileRegistration = z.strictObject({
   path: z.string(),
 })
 
+export const DroppedFileErrorSchema = z.strictObject({
+  code: z.enum(['no-path', 'untrusted-sender']),
+  message: z.string(),
+})
+
+export type DroppedFileError = z.infer<typeof DroppedFileErrorSchema>
+
 export const DroppedFileOutcome = z.union([
   z.strictObject({ok: z.literal(true), id: z.uuid()}),
-  z.strictObject({
-    ok: z.literal(false),
-    error: z.strictObject({
-      code: z.enum(['no-path', 'untrusted-sender']),
-      message: z.string(),
-    }),
-  }),
+  z.strictObject({ok: z.literal(false), error: DroppedFileErrorSchema}),
 ])
 
 export type DroppedFileOutcome = z.infer<typeof DroppedFileOutcome>

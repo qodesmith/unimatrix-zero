@@ -2,6 +2,9 @@
   "name": "@uz/contract",
   "private": true,
   "type": "module",
+  "imports": {
+    "#modules/*": "./src/modules/*.ts"
+  },
   "exports": {
     "./commands": "./src/modules/commands/main.ts",
     "./events": "./src/modules/events/main.ts",

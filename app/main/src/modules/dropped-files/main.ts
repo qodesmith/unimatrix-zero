@@ -1,11 +1,11 @@
-import type {DroppedFileOutcome} from '@uz/contract/bridge'
+import type {DroppedFileError, DroppedFileOutcome} from '@uz/contract/bridge'
 import type {IpcMain, IpcMainInvokeEvent} from 'electron'
 
 import {BRIDGE_CHANNELS, DroppedFileRegistration} from '@uz/contract/bridge'
 import {randomUUID} from 'node:crypto'
 
 const refused = (
-  code: 'no-path' | 'untrusted-sender',
+  code: DroppedFileError['code'],
   message: string
 ): DroppedFileOutcome => ({ok: false, error: {code, message}})
 

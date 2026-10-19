@@ -38,7 +38,7 @@ Inside a package, code lives in deep modules: `src/modules/<name>/main.ts` is th
 
 ### Colours
 
-Every colour, radius and font in the UI is a Theme token (ADR 0009): the Hearth light and dark sets in `app/renderer/src/modules/theme/hearth.ts`, applied as CSS variables and mapped into Tailwind in `styles.css`. `uz/no-hardcoded-colors` and `scripts/check-css-tokens.ts` fail the build on a palette class or a colour literal.
+Every colour, radius and font in the UI is a Theme token (ADR 0009): the Hearth light and dark sets in `app/renderer/src/modules/theme/hearth.ts`, applied as CSS variables and mapped into Tailwind in `styles.css`. `uz/no-hardcoded-colors` fails the build on a palette class or a colour literal anywhere under `app/renderer/src` except the `theme` module, which is where the token values live; `scripts/check-css-tokens.ts` does the same for CSS.
 
 ## Tests
 
