@@ -1,12 +1,6 @@
-/**
- * Repo-specific lint rules, loaded by oxlint as a JS plugin:
- *
- * - Module-boundaries: a module is entered only through
- *   `src/modules/<name>/main.ts`
- * - Tsx-under-ui: `.tsx` files live under a `ui/` folder
- * - No-hardcoded-colors: the UI uses Theme tokens, never a palette colour
- */
 import path from 'node:path'
+
+import {colorLiteral, paletteClass} from '../theme-tokens.ts'
 
 type Node = {
   type: string
@@ -89,15 +83,6 @@ const tsxUnderUi = {
     }
   },
 }
-
-const palette =
-  'slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black'
-const utilities =
-  'bg|text|border|ring|fill|stroke|from|via|to|outline|decoration|accent|caret|divide|placeholder|shadow|inset-ring|inset-shadow'
-const paletteClass = new RegExp(
-  `(?:^|\\s|:)(?:${utilities})-(?:${palette})(?:-\\d{2,3})?(?:/\\d+)?(?=\\s|$)`
-)
-const colorLiteral = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab)\(/
 
 const noHardcodedColors = {
   meta: {

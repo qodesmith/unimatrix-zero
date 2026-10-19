@@ -7,7 +7,7 @@ export const AppPingCommand = z.strictObject({
 
 export const AppPingResult = z.strictObject({
   nonce: z.string(),
-  repliedAt: z.iso.datetime(),
+  receivedAt: z.iso.datetime(),
 })
 
 export const CommandSchema = z.discriminatedUnion('type', [AppPingCommand])
@@ -30,6 +30,6 @@ export const CommandErrorSchema = z.strictObject({
 
 export type CommandError = z.infer<typeof CommandErrorSchema>
 
-export type CommandReply<T extends CommandType> =
+export type CommandOutcome<T extends CommandType> =
   | {ok: true; value: CommandResult<T>}
   | {ok: false; error: CommandError}

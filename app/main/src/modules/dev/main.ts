@@ -1,7 +1,6 @@
 export type DevRun = {
   vitePort: number
   scriptNonce: string
-  fakeDriver: boolean
 }
 
 /** The dev script sets these; a packaged build sees none of them. */
@@ -12,9 +11,5 @@ export function readDevRun(env: NodeJS.ProcessEnv): DevRun | null {
   if (!vitePort || !scriptNonce) {
     throw new Error('UZ_DEV=1 needs UZ_DEV_VITE_PORT and UZ_DEV_NONCE')
   }
-  return {
-    vitePort,
-    scriptNonce,
-    fakeDriver: env.UZ_FAKE_DRIVER === '1',
-  }
+  return {vitePort, scriptNonce}
 }

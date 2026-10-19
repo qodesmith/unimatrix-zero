@@ -6,8 +6,8 @@ import {readFile} from 'node:fs/promises'
 import {resolveBundleFile} from './bundle-file'
 import {renderCsp} from './csp'
 
-export const APP_SCHEME = 'app'
-export const APP_DEV_SCHEME = 'app-dev'
+const APP_SCHEME = 'app'
+const APP_DEV_SCHEME = 'app-dev'
 const APP_HOST = 'unimatrix-zero'
 
 /** Must run before `app.whenReady()`. */

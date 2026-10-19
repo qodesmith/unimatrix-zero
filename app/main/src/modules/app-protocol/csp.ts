@@ -1,7 +1,5 @@
 type CspOptions = {
-  /** The nonce Vite stamps on the scripts it injects in dev. */
   scriptNonce?: string
-  /** Extra `connect-src` entries; dev adds the HMR socket. */
   connectSources?: string[]
 }
 

@@ -1,5 +1,7 @@
-import type {Command, CommandReply} from '../commands/main'
+import type {Command, CommandOutcome} from '../commands/main'
 import type {AppEvent} from '../events/main'
+
+import {z} from 'zod'
 
 export const BRIDGE_CHANNELS = {
   command: 'uz:command',
@@ -8,18 +10,30 @@ export const BRIDGE_CHANNELS = {
   droppedFile: 'uz:dropped-file',
 } as const
 
-export type DroppedFileId = string
+/** What the preload hands main for a dropped file. The page never sees the path. */
+export const DroppedFileRegistration = z.strictObject({
+  path: z.string(),
+})
 
-export type DroppedFileReply =
-  | {ok: true; id: DroppedFileId}
-  | {ok: false; error: {code: 'no-path'; message: string}}
+export const DroppedFileOutcome = z.union([
+  z.strictObject({ok: z.literal(true), id: z.uuid()}),
+  z.strictObject({
+    ok: z.literal(false),
+    error: z.strictObject({
+      code: z.enum(['no-path', 'untrusted-sender']),
+      message: z.string(),
+    }),
+  }),
+])
+
+export type DroppedFileOutcome = z.infer<typeof DroppedFileOutcome>
 
 /**
  * `window.uz`. These three members are the whole surface, and it never grows
  * per feature.
  */
 export type Bridge = {
-  send<C extends Command>(command: C): Promise<CommandReply<C['type']>>
+  send<C extends Command>(command: C): Promise<CommandOutcome<C['type']>>
   subscribe(listener: (event: AppEvent) => void): () => void
-  registerDroppedFile(file: File): Promise<DroppedFileReply>
+  registerDroppedFile(file: File): Promise<DroppedFileOutcome>
 }

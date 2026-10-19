@@ -1,4 +1,4 @@
-import type {Command, CommandReply, CommandType} from '@uz/contract/commands'
+import type {Command, CommandOutcome, CommandType} from '@uz/contract/commands'
 import type {IpcMain, IpcMainInvokeEvent} from 'electron'
 
 import {BRIDGE_CHANNELS} from '@uz/contract/bridge'
@@ -18,7 +18,7 @@ export async function dispatchCommand(
   raw: unknown,
   sender: Sender,
   deps: HandlerDeps = defaultDeps
-): Promise<CommandReply<CommandType>> {
+): Promise<CommandOutcome<CommandType>> {
   if (!sender.isTopLevelAppFrame) {
     return {
       ok: false,

@@ -1,18 +1,11 @@
-/**
- * `bun run dev`: the renderer through Vite's dev server (reached by the window
- * as `app-dev://`), watch builds for the shell, main, preload and Provider
- * hosts, and Electron restarted whenever main, preload or the shell rebuild.
- * Ports and the data folder are per worktree, so two checkouts run side by
- * side.
- */
 import type {RolldownWatcher} from 'rolldown'
 
 import {createHash, randomBytes} from 'node:crypto'
-import {createRequire} from 'node:module'
 import path from 'node:path'
 import {build, createServer} from 'vite'
 
-const electronPath = createRequire(import.meta.url)('electron') as string
+import {electronPath} from './electron-as-node'
+
 const root = path.resolve(import.meta.dirname, '..')
 const fakeDriver = process.argv.includes('--fake')
 
@@ -21,7 +14,7 @@ const vitePort = 5173 + (parseInt(worktree, 16) % 2000)
 const dataFolder = `unimatrix-zero-dev-${worktree}`
 const scriptNonce = randomBytes(16).toString('base64')
 
-const pkg = (name: string) => path.join(root, name)
+const fromRoot = (relative: string) => path.join(root, relative)
 
 async function watchBundle(dir: string): Promise<RolldownWatcher> {
   const watcher = await build({
@@ -43,7 +36,7 @@ const firstBuild = (watcher: RolldownWatcher) =>
   })
 
 const vite = await createServer({
-  configFile: pkg('app/renderer/vite.config.ts'),
+  configFile: fromRoot('app/renderer/vite.config.ts'),
   mode: 'development',
   logLevel: 'warn',
   server: {
@@ -57,10 +50,10 @@ const vite = await createServer({
 await vite.listen()
 
 const bundles = {
-  shell: await watchBundle(pkg('shell')),
-  main: await watchBundle(pkg('app/main')),
-  preload: await watchBundle(pkg('app/preload')),
-  hosts: await watchBundle(pkg('app/provider-host')),
+  shell: await watchBundle(fromRoot('shell')),
+  main: await watchBundle(fromRoot('app/main')),
+  preload: await watchBundle(fromRoot('app/preload')),
+  hosts: await watchBundle(fromRoot('app/provider-host')),
 }
 await Promise.all(Object.values(bundles).map(firstBuild))
 
@@ -68,7 +61,7 @@ let electron: ReturnType<typeof Bun.spawn> | null = null
 let stopping = false
 
 function startElectron() {
-  electron = Bun.spawn([electronPath, pkg('shell/dist/index.cjs')], {
+  electron = Bun.spawn([electronPath, fromRoot('shell/dist/index.cjs')], {
     stdio: ['ignore', 'inherit', 'inherit'],
     env: {
       ...process.env,
@@ -109,9 +102,7 @@ for (const [name, watcher] of Object.entries(bundles)) {
   watcher.on('event', event => {
     if (event.code !== 'BUNDLE_END') return
     if (name === 'hosts') {
-      console.log(
-        'Provider hosts rebuilt; a running host restarts once ADR 0013 lands.'
-      )
+      console.log('Provider hosts rebuilt.')
       return
     }
     scheduleRestart(name)

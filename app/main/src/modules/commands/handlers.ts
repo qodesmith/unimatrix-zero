@@ -10,5 +10,5 @@ type Handler<T extends CommandType> = (
 ) => Promise<CommandResult<T>> | CommandResult<T>
 
 export const handlers: {[T in CommandType]: Handler<T>} = {
-  'app.ping': ({nonce}, {now}) => ({nonce, repliedAt: now().toISOString()}),
+  'app.ping': ({nonce}, {now}) => ({nonce, receivedAt: now().toISOString()}),
 }

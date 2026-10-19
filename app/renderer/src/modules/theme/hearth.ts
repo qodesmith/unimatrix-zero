@@ -1,4 +1,4 @@
-import type {Theme} from './theme'
+import type {Theme} from '@uz/contract/theme'
 
 const font = "'Figtree Variable', ui-sans-serif, system-ui, sans-serif"
 

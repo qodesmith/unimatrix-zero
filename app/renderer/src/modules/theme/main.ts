@@ -1,17 +1,14 @@
-import type {Mode, Theme, ThemeSet} from './theme'
+import type {Mode, Theme, ThemeSet} from '@uz/contract/theme'
 
 import {hearth} from './hearth'
-import {setForMode} from './theme'
 
-export type {Mode, Theme, ThemeSet} from './theme'
-export {hearth}
+function setForMode(theme: Theme, mode: Mode): ThemeSet {
+  const set = theme[mode] ?? theme.light ?? theme.dark
+  if (!set) throw new Error(`Theme "${theme.name}" has no token set`)
+  return set
+}
 
-/** Writes one token set onto `:root` as CSS variables and marks the mode. */
-export function applyThemeSet(
-  set: ThemeSet,
-  mode: Mode,
-  root = document.documentElement
-) {
+function applyThemeSet(set: ThemeSet, mode: Mode, root: HTMLElement) {
   for (const [token, value] of Object.entries(set)) {
     root.style.setProperty(`--${token}`, value)
   }
@@ -19,7 +16,10 @@ export function applyThemeSet(
   root.style.colorScheme = mode
 }
 
-/** Applies the Theme in the system's mode and keeps following the system. */
+/**
+ * Writes the Theme's tokens onto `:root` for the system's mode and keeps
+ * following the system.
+ */
 export function followSystemMode(
   theme: Theme = hearth,
   window: Window = globalThis.window

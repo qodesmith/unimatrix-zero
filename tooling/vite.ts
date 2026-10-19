@@ -9,7 +9,6 @@ const nodeBuiltins = [
 ]
 
 type NodeBundleOptions = {
-  /** The package root: the folder holding `package.json`, `src` and `dist`. */
   root: string
   entry: Record<string, string>
   format: 'es' | 'cjs'

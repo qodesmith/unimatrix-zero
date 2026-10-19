@@ -9,13 +9,13 @@ import {App} from './App'
 const fakeBridge: Bridge = {
   send: (async command => ({
     ok: true,
-    value: {nonce: command.nonce, repliedAt: '2026-10-19T12:00:00.000Z'},
+    value: {nonce: command.nonce, receivedAt: '2026-10-19T12:00:00.000Z'},
   })) as Bridge['send'],
   subscribe: () => () => {},
-  registerDroppedFile: async () => ({ok: true, id: 'file-1'}),
+  registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
 }
 
-it('shows the pong main replies with', async () => {
+it('shows the pong main sends back', async () => {
   window.uz = fakeBridge
   await render(<App />)
   await page.getByRole('button', {name: 'Ping main'}).click()

@@ -2,22 +2,22 @@ import {bridge} from '#modules/bridge/main'
 import {Button} from '#modules/shadcn/main'
 import {useState} from 'react'
 
-type Pong = {nonce: string; repliedAt: string}
+type Pong = {nonce: string; receivedAt: string}
 
 export function App() {
   const [pong, setPong] = useState<Pong | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const ping = async () => {
-    const reply = await bridge().send({
+    const outcome = await bridge().send({
       type: 'app.ping',
       nonce: crypto.randomUUID(),
     })
-    if (reply.ok) {
-      setPong(reply.value)
+    if (outcome.ok) {
+      setPong(outcome.value)
       setError(null)
     } else {
-      setError(reply.error.message)
+      setError(outcome.error.message)
     }
   }
 
@@ -31,7 +31,7 @@ export function App() {
         <Button onClick={() => void ping()}>Ping main</Button>
         {pong && (
           <p className="rounded-lg bg-prompt px-3 py-2 text-sm text-prompt-foreground">
-            pong · {pong.nonce} · {pong.repliedAt}
+            pong · {pong.nonce} · {pong.receivedAt}
           </p>
         )}
         {error && <p className="text-sm text-destructive">{error}</p>}

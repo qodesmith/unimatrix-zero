@@ -1,8 +1,7 @@
-import type {IpcMainInvokeEvent} from 'electron'
+import type {AppEvent} from '@uz/contract/events'
+import type {WebContents, WebFrameMain} from 'electron'
 
 import {
-  APP_DEV_SCHEME,
-  APP_SCHEME,
   hmrOrigin,
   proxyDevServer,
   registerAppSchemes,
@@ -26,10 +25,6 @@ const rendererDist = path.join(import.meta.dirname, '../../renderer/dist')
 app.setName('Unimatrix Zero')
 registerAppSchemes()
 
-app.on('web-contents-created', (_event, contents) => {
-  contents.on('will-attach-webview', event => event.preventDefault())
-})
-
 void app.whenReady().then(() => {
   const windowSession = session.defaultSession
   hardenSession(windowSession, dev ? [hmrOrigin({port: dev.vitePort})] : [])
@@ -42,13 +37,15 @@ void app.whenReady().then(() => {
     : serveBundle(protocol, rendererDist)
 
   const appOrigin = new URL(url).origin
-  const isTopLevelAppFrame = (event: IpcMainInvokeEvent) => {
+  const isTopLevelAppFrame = (event: {
+    senderFrame: WebFrameMain | null
+    sender: WebContents
+  }) => {
     const frame = event.senderFrame
-    if (!frame || frame !== event.sender.mainFrame) return false
-    const origin = new URL(frame.url).origin
     return (
-      origin === appOrigin &&
-      [APP_SCHEME, APP_DEV_SCHEME].includes(frame.url.split(':')[0] ?? '')
+      frame !== null &&
+      frame === event.sender.mainFrame &&
+      new URL(frame.url).origin === appOrigin
     )
   }
 
@@ -57,11 +54,12 @@ void app.whenReady().then(() => {
   }))
   createDroppedFiles().listen(ipcMain, isTopLevelAppFrame)
   ipcMain.on(BRIDGE_CHANNELS.subscribe, event => {
-    if (event.senderFrame !== event.sender.mainFrame) return
-    event.sender.send(BRIDGE_CHANNELS.event, {
+    if (!isTopLevelAppFrame(event)) return
+    const snapshot: AppEvent = {
       type: 'SNAPSHOT',
       app: {version: app.getVersion()},
-    })
+    }
+    event.sender.send(BRIDGE_CHANNELS.event, snapshot)
   })
 
   createWindow({

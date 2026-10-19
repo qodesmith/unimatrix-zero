@@ -5,19 +5,17 @@
 import {Glob} from 'bun'
 import path from 'node:path'
 
+import {colorLiteral, paletteClass} from '../tooling/theme-tokens.ts'
+
 const root = path.resolve(import.meta.dirname, '..')
 const rendererSrc = path.join(root, 'app/renderer/src')
-const literal = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab)\(/
-const palette =
-  /\b(?:bg|text|border|ring|fill|stroke|from|via|to|outline|decoration|accent|caret|divide|placeholder|shadow)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black)(?:-\d{2,3})?\b/
-
 const problems: string[] = []
 for await (const file of new Glob('**/*.css').scan(rendererSrc)) {
   const lines = (await Bun.file(path.join(rendererSrc, file)).text()).split(
     '\n'
   )
   lines.forEach((line, index) => {
-    if (literal.test(line) || palette.test(line)) {
+    if (colorLiteral.test(line) || paletteClass.test(line)) {
       problems.push(`app/renderer/src/${file}:${index + 1}: ${line.trim()}`)
     }
   })
