@@ -1,14 +1,18 @@
-import type {Mode, Theme, ThemeSet} from '@uz/contract/theme'
+import type {ResolvedThemeMode, Theme, ThemeSet} from '@uz/contract/theme'
 
 import {hearth} from './hearth'
 
-function setForMode(theme: Theme, mode: Mode): ThemeSet {
+function setForMode(theme: Theme, mode: ResolvedThemeMode): ThemeSet {
   const set = theme[mode] ?? theme.light ?? theme.dark
   if (!set) throw new Error(`Theme "${theme.name}" has no token set`)
   return set
 }
 
-function applyThemeSet(set: ThemeSet, mode: Mode, root: HTMLElement) {
+function applyThemeSet(
+  set: ThemeSet,
+  mode: ResolvedThemeMode,
+  root: HTMLElement
+) {
   for (const [token, value] of Object.entries(set)) {
     root.style.setProperty(`--${token}`, value)
   }
@@ -26,7 +30,7 @@ export function followSystemMode(
 ) {
   const query = window.matchMedia('(prefers-color-scheme: dark)')
   const apply = () => {
-    const mode: Mode = query.matches ? 'dark' : 'light'
+    const mode: ResolvedThemeMode = query.matches ? 'dark' : 'light'
     applyThemeSet(
       setForMode(theme, mode),
       mode,

@@ -2,7 +2,10 @@ import type {Session, WebContents} from 'electron'
 
 import {BrowserWindow, shell} from 'electron'
 
+import {isAppUrl} from './app-url'
 import {isOpenableExternally} from './link-rule'
+
+export {isTopLevelAppFrame} from './app-url'
 
 type WindowOptions = {
   session: Session
@@ -55,18 +58,8 @@ export function createWindow({
 }
 
 function lockNavigation(contents: WebContents, appUrl: string) {
-  const appOrigin = new URL(appUrl).origin
-
-  const stays = (target: string) => {
-    try {
-      return new URL(target).origin === appOrigin
-    } catch {
-      return false
-    }
-  }
-
   const divert = (details: {preventDefault: () => void}, target: string) => {
-    if (stays(target)) return
+    if (isAppUrl(target, appUrl)) return
     details.preventDefault()
     openLink(target)
   }

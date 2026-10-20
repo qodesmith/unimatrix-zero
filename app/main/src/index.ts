@@ -1,5 +1,4 @@
 import type {AppEvent} from '@uz/contract/events'
-import type {WebContents, WebFrameMain} from 'electron'
 
 import {
   hmrOrigin,
@@ -10,7 +9,11 @@ import {
 import {registerCommandChannel} from '#modules/commands/main'
 import {readDevRun} from '#modules/dev/main'
 import {createDroppedFiles} from '#modules/dropped-files/main'
-import {createWindow, hardenSession} from '#modules/window/main'
+import {
+  createWindow,
+  hardenSession,
+  isTopLevelAppFrame,
+} from '#modules/window/main'
 import {BRIDGE_CHANNELS} from '@uz/contract/bridge'
 import {app, ipcMain, protocol, session} from 'electron'
 import path from 'node:path'
@@ -36,25 +39,15 @@ void app.whenReady().then(() => {
       })
     : serveBundle(protocol, rendererDist)
 
-  const appOrigin = new URL(url).origin
-  const isTopLevelAppFrame = (event: {
-    senderFrame: WebFrameMain | null
-    sender: WebContents
-  }) => {
-    const frame = event.senderFrame
-    return (
-      frame !== null &&
-      frame === event.sender.mainFrame &&
-      new URL(frame.url).origin === appOrigin
-    )
-  }
+  const fromAppWindow = (event: Parameters<typeof isTopLevelAppFrame>[0]) =>
+    isTopLevelAppFrame(event, url)
 
   registerCommandChannel(ipcMain, event => ({
-    isTopLevelAppFrame: isTopLevelAppFrame(event),
+    isTopLevelAppFrame: fromAppWindow(event),
   }))
-  createDroppedFiles().listen(ipcMain, isTopLevelAppFrame)
+  createDroppedFiles().listen(ipcMain, fromAppWindow)
   ipcMain.on(BRIDGE_CHANNELS.subscribe, event => {
-    if (!isTopLevelAppFrame(event)) return
+    if (!fromAppWindow(event)) return
     const snapshot: AppEvent = {
       type: 'SNAPSHOT',
       app: {version: app.getVersion()},

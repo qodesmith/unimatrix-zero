@@ -82,7 +82,7 @@ async function parseSkillMd(skillDir: string): Promise<Skill | null> {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
   if (match) {
     try {
-      data = Bun.YAML.parse(match[1]!) as Record<string, unknown>
+      data = (Bun.YAML.parse(match[1]!) as Record<string, unknown> | null) ?? {}
     } catch (err) {
       warn(`YAML parse error: ${(err as Error).message}`)
       return null

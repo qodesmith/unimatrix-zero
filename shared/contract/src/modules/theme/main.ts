@@ -54,5 +54,5 @@ export const ThemeSchema = z
 
 export type ThemeSet = z.infer<typeof ThemeSetSchema>
 export type Theme = z.infer<typeof ThemeSchema>
-export const ModeSchema = z.enum(['light', 'dark'])
-export type Mode = z.infer<typeof ModeSchema>
+export const ResolvedThemeModeSchema = z.enum(['light', 'dark'])
+export type ResolvedThemeMode = z.infer<typeof ResolvedThemeModeSchema>

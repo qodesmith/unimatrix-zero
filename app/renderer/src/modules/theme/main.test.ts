@@ -1,4 +1,4 @@
-import type {Mode} from '@uz/contract/theme'
+import type {ResolvedThemeMode} from '@uz/contract/theme'
 
 import {expect, it} from 'vitest'
 
@@ -21,7 +21,7 @@ function fakeWindow(prefersDark: boolean) {
   return {
     window,
     root,
-    switchTo: (mode: Mode) => {
+    switchTo: (mode: ResolvedThemeMode) => {
       query.matches = mode === 'dark'
       for (const listener of listeners) listener()
     },
