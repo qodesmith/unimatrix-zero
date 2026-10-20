@@ -9,7 +9,6 @@ Needs [Bun](https://bun.sh) at the version in `.bun-version` and Node at the ver
 ```sh
 bun install          # isolated installs: a package can import only what it declares
 bun run dev          # the window, served through app-dev://, rebuilding on change
-bun run dev --fake   # passes UZ_FAKE_DRIVER=1 through for the fake Provider driver (a later ticket)
 bun run check        # format, lint, typecheck, knip and tests: what CI runs
 ```
 

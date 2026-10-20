@@ -7,5 +7,6 @@ export default defineConfig(({mode}) =>
     entry: {main: 'src/index.ts'},
     format: 'es',
     mode,
+    define: {__UZ_DEV__: mode === 'production' ? 'false' : 'true'},
   })
 )

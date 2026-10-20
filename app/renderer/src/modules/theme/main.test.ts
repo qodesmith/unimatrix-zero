@@ -1,3 +1,5 @@
+import type {Mode} from '@uz/contract/theme'
+
 import {expect, it} from 'vitest'
 
 import {followSystemMode} from './main'
@@ -19,7 +21,7 @@ function fakeWindow(prefersDark: boolean) {
   return {
     window,
     root,
-    switchTo: (mode: 'light' | 'dark') => {
+    switchTo: (mode: Mode) => {
       query.matches = mode === 'dark'
       for (const listener of listeners) listener()
     },

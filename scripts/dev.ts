@@ -7,7 +7,6 @@ import {build, createServer} from 'vite'
 import {electronPath} from './electron-as-node'
 
 const root = path.resolve(import.meta.dirname, '..')
-const fakeDriver = process.argv.includes('--fake')
 
 const worktree = createHash('sha256').update(root).digest('hex').slice(0, 8)
 const vitePort = 5173 + (parseInt(worktree, 16) % 2000)
@@ -69,7 +68,6 @@ function startElectron() {
       UZ_DEV_VITE_PORT: String(vitePort),
       UZ_DEV_NONCE: scriptNonce,
       UZ_DEV_DATA_FOLDER: dataFolder,
-      UZ_FAKE_DRIVER: fakeDriver ? '1' : '0',
     },
     onExit: (_proc, code) => {
       if (stopping || restarting) return
@@ -120,6 +118,6 @@ process.on('SIGINT', () => void shutdown())
 process.on('SIGTERM', () => void shutdown())
 
 console.log(
-  `Unimatrix Zero dev: renderer on app-dev:// (Vite :${vitePort}), data in ${dataFolder}${fakeDriver ? ', fake driver' : ''}`
+  `Unimatrix Zero dev: renderer on app-dev:// (Vite :${vitePort}), data in ${dataFolder}`
 )
 startElectron()
