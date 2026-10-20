@@ -15,6 +15,18 @@ const scriptNonce = randomBytes(16).toString('base64')
 
 const fromRoot = (relative: string) => path.join(root, relative)
 
+const firstBuild = (watcher: RolldownWatcher) =>
+  new Promise<void>(resolve => {
+    watcher.on('event', event => {
+      if (event.code === 'BUNDLE_END') resolve()
+      if (event.code === 'ERROR') console.error(event.error)
+    })
+  })
+
+// Listen as soon as each watcher exists: a bundle can finish before the next
+// watcher is created, and a late listener misses its BUNDLE_END.
+const firstBuilds: Promise<void>[] = []
+
 async function watchBundle(dir: string): Promise<RolldownWatcher> {
   const watcher = await build({
     configFile: path.join(dir, 'vite.config.ts'),
@@ -23,16 +35,9 @@ async function watchBundle(dir: string): Promise<RolldownWatcher> {
     build: {watch: {}},
   })
   if (!('on' in watcher)) throw new Error(`${dir}: expected a watcher`)
+  firstBuilds.push(firstBuild(watcher))
   return watcher
 }
-
-const firstBuild = (watcher: RolldownWatcher) =>
-  new Promise<void>(resolve => {
-    watcher.on('event', event => {
-      if (event.code === 'BUNDLE_END') resolve()
-      if (event.code === 'ERROR') console.error(event.error)
-    })
-  })
 
 const vite = await createServer({
   configFile: fromRoot('app/renderer/vite.config.ts'),
@@ -54,7 +59,7 @@ const bundles = {
   preload: await watchBundle(fromRoot('app/preload')),
   hosts: await watchBundle(fromRoot('app/provider-host')),
 }
-await Promise.all(Object.values(bundles).map(firstBuild))
+await Promise.all(firstBuilds)
 
 let electron: ReturnType<typeof Bun.spawn> | null = null
 let stopping = false
