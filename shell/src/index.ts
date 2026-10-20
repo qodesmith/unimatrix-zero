@@ -4,7 +4,9 @@ import {pathToFileURL} from 'node:url'
 
 declare const __UZ_DEV_MAIN_BUNDLE__: string | null
 
-const devDataFolder = process.env.UZ_DEV_DATA_FOLDER
+const devDataFolder = __UZ_DEV_MAIN_BUNDLE__
+  ? process.env.UZ_DEV_DATA_FOLDER
+  : undefined
 if (devDataFolder) {
   app.setPath('userData', path.join(app.getPath('appData'), devDataFolder))
 }
