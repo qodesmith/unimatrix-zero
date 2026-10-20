@@ -1,0 +1,12 @@
+{
+  "name": "@uz/tooling",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./vite": "./vite.ts",
+    "./oxlint-plugin": "./oxlint/plugin.ts"
+  },
+  "devDependencies": {
+    "vite": "^8.3.4"
+  }
+}

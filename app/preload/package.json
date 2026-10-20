@@ -1,0 +1,19 @@
+{
+  "name": "@uz/preload",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#modules/*": "./src/modules/*.ts"
+  },
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@uz/contract": "workspace:*"
+  },
+  "devDependencies": {
+    "@uz/tooling": "workspace:*",
+    "electron": "^44.9.0",
+    "vite": "^8.3.4"
+  }
+}

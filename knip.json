@@ -1,0 +1,32 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.ts"],
+      "project": ["scripts/**/*.ts"]
+    },
+    "tooling": {
+      "project": ["**/*.ts"]
+    },
+    "shared/contract": {
+      "entry": ["src/modules/*/main.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "app/main": {
+      "project": ["src/**/*.ts"]
+    },
+    "app/preload": {
+      "project": ["src/**/*.ts"]
+    },
+    "app/renderer": {
+      "project": ["src/**/*.{ts,tsx,css}"]
+    },
+    "app/provider-host": {
+      "project": ["src/**/*.ts"]
+    },
+    "shell": {
+      "project": ["src/**/*.ts"]
+    }
+  },
+  "ignoreDependencies": ["electron"]
+}

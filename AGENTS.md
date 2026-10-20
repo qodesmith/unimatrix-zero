@@ -11,3 +11,7 @@ Uses the default labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready
 ### Domain docs
 
 Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Repo layout and module boundaries
+
+Packages are deep modules: read [README.md](./README.md) (Layout, Modules, Colours) before adding a package, importing across modules, or writing a colour.
