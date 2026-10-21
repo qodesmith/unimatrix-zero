@@ -1,3 +1,4 @@
+import {TREE_TITLE_MAX_LENGTH, TreeSchema} from '#modules/trees/main'
 import {z} from 'zod'
 
 export const AppPingCommand = z.strictObject({
@@ -10,7 +11,36 @@ export const AppPingResult = z.strictObject({
   receivedAt: z.iso.datetime(),
 })
 
-export const CommandSchema = z.discriminatedUnion('type', [AppPingCommand])
+export const TreeCreateCommand = z.strictObject({
+  type: z.literal('tree.create'),
+})
+
+export const TreeListCommand = z.strictObject({
+  type: z.literal('tree.list'),
+})
+
+export const TreeListResult = z.strictObject({
+  trees: z.array(TreeSchema),
+})
+
+export const TreeOpenCommand = z.strictObject({
+  type: z.literal('tree.open'),
+  treeId: z.uuid(),
+})
+
+export const TreeRenameCommand = z.strictObject({
+  type: z.literal('tree.rename'),
+  treeId: z.uuid(),
+  title: z.string().trim().min(1).max(TREE_TITLE_MAX_LENGTH),
+})
+
+export const CommandSchema = z.discriminatedUnion('type', [
+  AppPingCommand,
+  TreeCreateCommand,
+  TreeListCommand,
+  TreeOpenCommand,
+  TreeRenameCommand,
+])
 
 export type Command = z.infer<typeof CommandSchema>
 
@@ -18,6 +48,10 @@ export type CommandType = Command['type']
 
 const resultSchemas = {
   'app.ping': AppPingResult,
+  'tree.create': TreeSchema,
+  'tree.list': TreeListResult,
+  'tree.open': TreeSchema,
+  'tree.rename': TreeSchema,
 } as const satisfies Record<CommandType, z.ZodType>
 
 export type CommandResult<T extends CommandType> = z.infer<
@@ -25,7 +59,12 @@ export type CommandResult<T extends CommandType> = z.infer<
 >
 
 export const CommandErrorSchema = z.strictObject({
-  code: z.enum(['invalid-command', 'untrusted-sender', 'handler-failed']),
+  code: z.enum([
+    'invalid-command',
+    'untrusted-sender',
+    'not-found',
+    'handler-failed',
+  ]),
   message: z.string(),
 })
 
