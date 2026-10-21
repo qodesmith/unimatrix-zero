@@ -26,7 +26,7 @@
     "build": "bun run --filter '@uz/*' build",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
-    "lint": "oxlint && bun run scripts/check-oxlint-version.ts && bun run scripts/check-css-tokens.ts && bun run scripts/check-us-english.ts",
+    "lint": "bun run scripts/check-oxlint-version.ts && oxlint && bun run scripts/check-css-tokens.ts && bun run scripts/check-us-english.ts",
     "lint:fix": "oxlint --fix",
     "typecheck": "tsc -b",
     "knip": "knip",
