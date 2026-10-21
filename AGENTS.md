@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Issues are tracked in GitHub Issues (`qodesmith/unimatrix-zero`) via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues are tracked in GitHub Issues (`qodesmith/unimatrix-zero`) via the `gh` CLI, including where research findings go. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
