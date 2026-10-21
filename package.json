@@ -2,6 +2,7 @@
   "name": "unimatrix-zero",
   "private": true,
   "type": "module",
+  "reviewed-oxlint-version": "1.89.0",
   "workspaces": [
     "shell",
     "app/*",
@@ -25,7 +26,8 @@
     "build": "bun run --filter '@uz/*' build",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
-    "lint": "oxlint --type-aware --max-warnings=0 && bun run scripts/check-css-tokens.ts",
+    "lint": "bun run scripts/check-oxlint-version.ts && oxlint && bun run scripts/check-css-tokens.ts && bun run scripts/check-us-english.ts",
+    "lint:fix": "oxlint --fix",
     "typecheck": "tsc -b",
     "knip": "knip",
     "test": "bun run scripts/vitest.ts run",
@@ -49,6 +51,7 @@
     "rolldown": "^1.2.14",
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "zod": "^4.6.7"
   }
 }

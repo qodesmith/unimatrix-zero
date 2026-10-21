@@ -13,6 +13,7 @@ it.each([
   'file:///etc/passwd',
   'vscode://file/x',
   'ms-msdt:/id',
+  // oxlint-disable-next-line no-script-url -- the rule under test must refuse it
   'javascript:alert(1)',
   'not a url',
 ])('never hands %s to the OS', url => {

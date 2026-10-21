@@ -1,5 +1,6 @@
 import type {ResolvedThemeMode} from '@uz/contract/theme'
 
+import {fromPartial} from '@total-typescript/shoehorn'
 import {expect, it} from 'vitest'
 
 import {followSystemMode} from './main'
@@ -7,6 +8,7 @@ import {followSystemMode} from './main'
 function fakeWindow(prefersDark: boolean) {
   const root = document.createElement('html')
   const listeners = new Set<() => void>()
+
   const query = {
     matches: prefersDark,
     addEventListener: (_type: string, listener: () => void) =>
@@ -14,15 +16,18 @@ function fakeWindow(prefersDark: boolean) {
     removeEventListener: (_type: string, listener: () => void) =>
       listeners.delete(listener),
   }
-  const window = {
-    matchMedia: () => query,
+
+  const window = fromPartial<Window>({
+    matchMedia: () => fromPartial<MediaQueryList>(query),
     document: {documentElement: root},
-  } as unknown as Window
+  })
+
   return {
     window,
     root,
-    switchTo: (mode: ResolvedThemeMode) => {
+    switchTo(mode: ResolvedThemeMode) {
       query.matches = mode === 'dark'
+
       for (const listener of listeners) listener()
     },
   }

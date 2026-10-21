@@ -20,7 +20,7 @@ Work one ticket from the **frontier**: the open `ready-for-agent` issues with no
 
 2. **Claim.** Run `gh issue edit <n> --add-assignee @me` - If the issue already has an assignee, it is someone else's lock: stop and say so.
 
-3. **Branch.** Ensure that there are no changes on the current branch. If they are, guide the user towards handling that so nothing is lost. Then, from a fresh `main` (`git switch main && git pull --ff-only`), create the `<n>-<slug>` branch where the slug is the first few words of the title. Switch to the newly created branch.
+3. **Branch.** Ensure that there are no changes on the current branch. If they are, guide the user toward handling that so nothing is lost. Then, from a fresh `main` (`git switch main && git pull --ff-only`), create the `<n>-<slug>` branch where the slug is the first few words of the title. Switch to the newly created branch.
 
 4. **Implement.** Read `.agents/skills/implement/SKILL.md` and follow it with issue #<n> as the spec. Build only what the ticket's acceptance criteria name. Anything the PR adds that nothing in the same PR reads or calls is anticipating a later ticket; it belongs to the ticket that needs it, even when the PRD mentions it. A ticket asks for two things: criteria to meet and (potentially) questions to answer. Those answers, and answers to questions that come up while building, go in one comment on the issue so they outlive the session.
 

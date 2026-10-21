@@ -13,5 +13,5 @@ Source: [Vendor sandboxing for commands the AI runs](https://github.com/qodesmit
 
 ## Verify while building
 
-- Windows: whether `app-server` honours `prefer_mxc` from our config folder on the pinned Codex, how MXC availability surfaces beyond the `MXC availability` log line, and what the `InitializeDefaultDrives` noise on every PowerShell command means for our output ([#58](https://github.com/qodesmith/unimatrix-zero/issues/58)).
+- Windows: whether `app-server` honors `prefer_mxc` from our config folder on the pinned Codex, how MXC availability surfaces beyond the `MXC availability` log line, and what the `InitializeDefaultDrives` noise on every PowerShell command means for our output ([#58](https://github.com/qodesmith/unimatrix-zero/issues/58)).
 - `bypassPermissions` plus the ask rule; Codex `writable_roots` with `~/.bun`; the Ubuntu 24.04 AppArmor case on real hardware ([#53](https://github.com/qodesmith/unimatrix-zero/issues/53)).

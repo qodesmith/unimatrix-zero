@@ -23,7 +23,7 @@ The Provider's own record of one Thread, which it uses to continue the conversat
 _Avoid_: Thread (Codex's word for it), conversation
 
 **System prompt**:
-The standing instructions the AI follows in a Tree. Each Tree has one, filled in from a global default and changeable at any time. A change applies to Replies generated afterwards, and each Reply records the System prompt it ran under. A _preset_ is a read-only System prompt that ships with the app; presets and the user's own System prompts make up the _library_. A Tree holds its own copy, so editing a library entry never changes an existing Tree.
+The standing instructions the AI follows in a Tree. Each Tree has one, filled in from a global default and changeable at any time. A change applies to Replies generated afterward, and each Reply records the System prompt it ran under. A _preset_ is a read-only System prompt that ships with the app; presets and the user's own System prompts make up the _library_. A Tree holds its own copy, so editing a library entry never changes an existing Tree.
 _Avoid_: Instructions, persona, custom instructions
 
 **Skill**:
@@ -152,8 +152,8 @@ A single file holding one or more complete Trees that the app can _restore_, on 
 _Avoid_: Backup (reserved for the app's own pre-migration database copies), project file, export
 
 **Theme**:
-A named set of visual values (colours, radius, code highlighting, font) with a light version, a dark version, or both. The _mode_ (light, dark or system) picks which version of the current Theme is shown; it is not itself a Theme.
-_Avoid_: Skin, colour scheme, palette
+A named set of visual values (colors, radius, code highlighting, font) with a light version, a dark version, or both. The _mode_ (light, dark or system) picks which version of the current Theme is shown; it is not itself a Theme.
+_Avoid_: Skin, color scheme, palette
 
 **Report**:
 What the user previews and sends about a problem in the app. It becomes a GitHub issue and holds only versions, choices from fixed lists, counts and stack frames from the app's own code, plus an optional description the user writes. Nothing from a conversation, file or Setting is ever in it.

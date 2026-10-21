@@ -4,7 +4,9 @@ import {hearth} from './hearth'
 
 function setForMode(theme: Theme, mode: ResolvedThemeMode): ThemeSet {
   const set = theme[mode] ?? theme.light ?? theme.dark
+
   if (!set) throw new Error(`Theme "${theme.name}" has no token set`)
+
   return set
 }
 
@@ -16,6 +18,7 @@ function applyThemeSet(
   for (const [token, value] of Object.entries(set)) {
     root.style.setProperty(`--${token}`, value)
   }
+
   root.dataset.mode = mode
   root.style.colorScheme = mode
 }
@@ -29,7 +32,8 @@ export function followSystemMode(
   window: Window = globalThis.window
 ) {
   const query = window.matchMedia('(prefers-color-scheme: dark)')
-  const apply = () => {
+
+  function apply() {
     const mode: ResolvedThemeMode = query.matches ? 'dark' : 'light'
     applyThemeSet(
       setForMode(theme, mode),
@@ -37,7 +41,9 @@ export function followSystemMode(
       window.document.documentElement
     )
   }
+
   apply()
   query.addEventListener('change', apply)
+
   return () => query.removeEventListener('change', apply)
 }

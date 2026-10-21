@@ -12,5 +12,6 @@ it('runs with the SQLite that Electron ships', () => {
   const row = new DatabaseSync(':memory:')
     .prepare('select sqlite_version() as version')
     .get() as {version: string}
+
   expect(row.version).toBe(runtime.sqlite)
 })

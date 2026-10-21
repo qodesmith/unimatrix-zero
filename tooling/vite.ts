@@ -8,7 +8,7 @@ const nodeBuiltins = [
   ...builtinModules.map(name => `node:${name}`),
 ]
 
-type NodeBundleOptions = {
+interface NodeBundleOptions {
   root: string
   entry: Record<string, string>
   format: 'es' | 'cjs'
@@ -30,6 +30,7 @@ export function nodeBundle({
   plugins = [],
 }: NodeBundleOptions): UserConfig {
   const ext = format === 'es' ? 'mjs' : 'cjs'
+
   return {
     root,
     mode,
@@ -75,12 +76,15 @@ export function selfContainedPreload(): Plugin {
     generateBundle(_options, bundle) {
       for (const [fileName, chunk] of Object.entries(bundle)) {
         if (chunk.type !== 'chunk') continue
-        const requires = [
-          ...chunk.code.matchAll(/\brequire\(\s*(['"])([^'"]+)\1\s*\)/g),
-        ]
+
+        const requires = chunk.code
+          .matchAll(/\brequire\(\s*(['"])([^'"]+)\1\s*\)/g)
           .map(match => match[2])
           .filter(id => id !== 'electron')
+          .toArray()
+
         const dynamicImports = chunk.code.match(/\bimport\(/g) ?? []
+
         if (requires.length > 0 || dynamicImports.length > 0) {
           this.error(
             `${fileName} is not self-contained: ` +

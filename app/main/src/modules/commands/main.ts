@@ -1,12 +1,13 @@
+import type {HandlerDeps} from './handlers'
 import type {Command, CommandOutcome, CommandType} from '@uz/contract/commands'
 import type {IpcMain, IpcMainInvokeEvent} from 'electron'
 
 import {BRIDGE_CHANNELS} from '@uz/contract/bridge'
 import {CommandSchema} from '@uz/contract/commands'
 
-import {handlers, type HandlerDeps} from './handlers'
+import {handlers} from './handlers'
 
-export type Sender = {
+export interface Sender {
   isTopLevelAppFrame: boolean
 }
 
@@ -15,6 +16,7 @@ const defaultDeps: HandlerDeps = {
 }
 
 export async function dispatchCommand(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the IPC boundary: CommandSchema parses it below
   raw: unknown,
   sender: Sender,
   deps: HandlerDeps = defaultDeps
@@ -28,13 +30,16 @@ export async function dispatchCommand(
       },
     }
   }
+
   const parsed = CommandSchema.safeParse(raw)
+
   if (!parsed.success) {
     return {
       ok: false,
       error: {code: 'invalid-command', message: parsed.error.message},
     }
   }
+
   try {
     return {ok: true, value: await runHandler(parsed.data, deps)}
   } catch (cause) {
@@ -48,7 +53,7 @@ export async function dispatchCommand(
   }
 }
 
-function runHandler<T extends CommandType>(
+async function runHandler<T extends CommandType>(
   command: Extract<Command, {type: T}>,
   deps: HandlerDeps
 ) {
@@ -59,7 +64,7 @@ export function registerCommandChannel(
   ipcMain: IpcMain,
   senderOf: (event: IpcMainInvokeEvent) => Sender
 ) {
-  ipcMain.handle(BRIDGE_CHANNELS.command, (event, raw: unknown) =>
+  ipcMain.handle(BRIDGE_CHANNELS.command, async (event, raw) =>
     dispatchCommand(raw, senderOf(event))
   )
 }

@@ -6,6 +6,7 @@
       "project": ["scripts/**/*.ts"]
     },
     "tooling": {
+      "ignore": ["oxlint/anti-slop/**"],
       "project": ["**/*.ts"]
     },
     "shared/contract": {

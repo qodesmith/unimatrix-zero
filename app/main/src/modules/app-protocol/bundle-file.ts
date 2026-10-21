@@ -1,21 +1,24 @@
 import path from 'node:path'
 
-const mimeTypes: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.webp': 'image/webp',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-  '.map': 'application/json',
-}
+const mimeTypes = new Map([
+  ['.html', 'text/html; charset=utf-8'],
+  ['.js', 'text/javascript; charset=utf-8'],
+  ['.mjs', 'text/javascript; charset=utf-8'],
+  ['.css', 'text/css; charset=utf-8'],
+  ['.json', 'application/json; charset=utf-8'],
+  ['.svg', 'image/svg+xml'],
+  ['.png', 'image/png'],
+  ['.jpg', 'image/jpeg'],
+  ['.webp', 'image/webp'],
+  ['.woff', 'font/woff'],
+  ['.woff2', 'font/woff2'],
+  ['.map', 'application/json'],
+])
 
-export type BundleFile = {filePath: string; mimeType: string}
+export interface BundleFile {
+  filePath: string
+  mimeType: string
+}
 
 /**
  * Maps a request path onto a file inside the bundle folder, or nothing. The SPA
@@ -26,11 +29,13 @@ export function resolveBundleFile(
   pathname: string
 ): BundleFile | null {
   let decoded: string
+
   try {
     decoded = decodeURIComponent(pathname)
   } catch {
     return null
   }
+
   if (decoded.includes('\0') || decoded.split('/').includes('..')) return null
 
   const relative = decoded.replace(/^\/+/, '')
@@ -38,8 +43,10 @@ export function resolveBundleFile(
   const target = ext === '' ? 'index.html' : relative
   const filePath = path.resolve(bundleDir, target)
   const root = path.resolve(bundleDir)
+
   if (filePath !== root && !filePath.startsWith(root + path.sep)) return null
 
-  const mimeType = mimeTypes[path.extname(filePath)]
+  const mimeType = mimeTypes.get(path.extname(filePath))
+
   return mimeType ? {filePath, mimeType} : null
 }

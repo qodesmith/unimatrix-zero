@@ -33,7 +33,7 @@ export type DroppedFileOutcome = z.infer<typeof DroppedFileOutcome>
  * `window.uz`. These three members are the whole surface, and it never grows
  * per feature.
  */
-export type Bridge = {
+export interface Bridge {
   send<C extends Command>(command: C): Promise<CommandOutcome<C['type']>>
   subscribe(listener: (event: AppEvent) => void): () => void
   registerDroppedFile(file: File): Promise<DroppedFileOutcome>
