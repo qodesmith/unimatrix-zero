@@ -36,7 +36,7 @@ jobs:
           - {name: mac-arm64, os: macos-15}
           - {name: mac-x64, os: macos-15-intel}
           - {name: windows-x64, os: windows-latest}
-          - {name: linux-x64, os: ubuntu-latest}
+          - {name: linux-x64, os: ubuntu-latest, renderer: true}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -48,8 +48,9 @@ jobs:
           node-version-file: .node-version
       - run: bun install --frozen-lockfile
       - run: bun run build
-      - run: bunx playwright install chromium ${{ runner.os == 'Linux' && '--with-deps' || '' }}
-      - run: bun run test
+      - if: matrix.renderer
+        run: bunx playwright install chromium --only-shell --with-deps
+      - run: bun run ${{ matrix.renderer && 'test' || 'test:node' }}
 
   ci:
     name: CI
