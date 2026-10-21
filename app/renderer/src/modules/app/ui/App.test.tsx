@@ -11,9 +11,13 @@ import {App} from './App'
 
 const receivedAt = '2026-10-19T12:00:00.000Z'
 
-/** Main as the window sees it: answers commands and sends what it saved. */
-function fakeMain(saved: Tree[] = []): Bridge {
+/**
+ * Main as the window sees it: answers commands, sends what it saved, and keeps
+ * every command it was sent.
+ */
+function fakeMain(saved: Tree[] = []): Bridge & {sent: Command[]} {
   const trees = [...saved]
+  const sent: Command[] = []
   const listeners = new Set<(event: AppEvent) => void>()
 
   function publish(event: AppEvent) {
@@ -53,7 +57,12 @@ function fakeMain(saved: Tree[] = []): Bridge {
   }
 
   return {
-    send: (async (command: Command) => answer(command)) as Bridge['send'],
+    sent,
+    send: (async (command: Command) => {
+      sent.push(command)
+
+      return answer(command)
+    }) as Bridge['send'],
     subscribe: listener => {
       listeners.add(listener)
       listener({type: 'SNAPSHOT', app: {version: '0.0.0'}})
@@ -115,9 +124,11 @@ it('renames a Tree by double-clicking it', async () => {
 })
 
 it('leaves the name alone when renaming is abandoned', async () => {
-  globalThis.window.uz = fakeMain([
+  const main = fakeMain([
     {id: crypto.randomUUID(), title: 'Draft', createdAt: receivedAt},
   ])
+
+  globalThis.window.uz = main
   await render(<App />)
 
   await page.getByRole('button', {name: 'Draft'}).click()
@@ -126,4 +137,5 @@ it('leaves the name alone when renaming is abandoned', async () => {
   await userEvent.keyboard('{Escape}')
 
   await expect.element(page.getByRole('button', {name: 'Draft'})).toBeVisible()
+  expect(main.sent.map(command => command.type)).not.toContain('tree.rename')
 })
