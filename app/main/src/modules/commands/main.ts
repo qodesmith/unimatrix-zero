@@ -5,21 +5,17 @@ import type {IpcMain, IpcMainInvokeEvent} from 'electron'
 import {BRIDGE_CHANNELS} from '@uz/contract/bridge'
 import {CommandSchema} from '@uz/contract/commands'
 
-import {handlers} from './handlers'
+import {NotFoundError, handlers} from './handlers'
 
 export interface Sender {
   isTopLevelAppFrame: boolean
-}
-
-const defaultDeps: HandlerDeps = {
-  now: () => new Date(),
 }
 
 export async function dispatchCommand(
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the IPC boundary: CommandSchema parses it below
   raw: unknown,
   sender: Sender,
-  deps: HandlerDeps = defaultDeps
+  deps: HandlerDeps
 ): Promise<CommandOutcome<CommandType>> {
   if (!sender.isTopLevelAppFrame) {
     return {
@@ -43,6 +39,10 @@ export async function dispatchCommand(
   try {
     return {ok: true, value: await runHandler(parsed.data, deps)}
   } catch (cause) {
+    if (cause instanceof NotFoundError) {
+      return {ok: false, error: {code: 'not-found', message: cause.message}}
+    }
+
     return {
       ok: false,
       error: {
@@ -62,9 +62,10 @@ async function runHandler<T extends CommandType>(
 
 export function registerCommandChannel(
   ipcMain: IpcMain,
-  senderOf: (event: IpcMainInvokeEvent) => Sender
+  senderOf: (event: IpcMainInvokeEvent) => Sender,
+  deps: HandlerDeps
 ) {
   ipcMain.handle(BRIDGE_CHANNELS.command, async (event, raw) =>
-    dispatchCommand(raw, senderOf(event))
+    dispatchCommand(raw, senderOf(event), deps)
   )
 }

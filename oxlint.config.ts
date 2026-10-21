@@ -134,6 +134,7 @@ const config: OxlintConfig = {
       // Each of these tools reads its config or plugin from the default export.
       files: [
         '**/vite.config.ts',
+        '**/drizzle.config.ts',
         'oxlint.config.ts',
         'vitest.config.ts',
         'tooling/oxlint/uz/index.ts',

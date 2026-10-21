@@ -29,6 +29,8 @@ tooling/            the shared Vite build helper and the repo's own lint rules
 scripts/            dev loop, test runner, runtime pinning
 ```
 
+Main's SQLite schema lives in `app/main/src/modules/database/schema.ts`. After changing it, run `bun run --filter @uz/main db:generate` and commit the new folder under `app/main/drizzle/`; the app applies it on the next start, behind a backup and the foreign-key guard (ADR 0003).
+
 `tsc -b` project references keep main, the Provider hosts and the renderer from importing each other: only `@uz/contract` is shared.
 
 ### Modules
