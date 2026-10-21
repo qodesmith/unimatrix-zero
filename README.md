@@ -49,6 +49,6 @@ oxlint ships new rules most weeks. `reviewed-oxlint-version` in `package.json` n
 
 ## Tests
 
-Vitest runs in two projects: `node` (contract, main, hosts, shell, scripts) and `renderer` (browser mode in Chromium). `bun run test` runs both under Electron's own Node, and `scripts/runtime-match.test.ts` fails if the Node or SQLite version differs from `electron-runtime.json`. After bumping Electron, run `bun run electron-runtime` to regenerate that file and `.node-version`.
+Vitest runs in two projects: `node` (contract, main, hosts, shell, scripts, tooling) and `renderer` (browser mode in Chromium). `bun run test` runs both under Electron's own Node, and `scripts/runtime-match.test.ts` fails if the Node or SQLite version differs from `electron-runtime.json`. After bumping Electron, run `bun run electron-runtime` to regenerate that file and `.node-version`.
 
 CI runs the checks on Linux and the tests on Mac arm64, Mac x64, Windows x64 and Linux x64. There are no git hooks.

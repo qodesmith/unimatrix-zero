@@ -14,7 +14,7 @@ Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/age
 
 ### Spelling
 
-US English (color, behavior, labeled, organize) everywhere you write: code, docs, commits, issues and PRs. Installed skills under `.agents/skills/` keep their authors' spelling; `bun run lint` checks everything else.
+US English (color, behavior, labeled, organize) everywhere you write: code, docs, commits, issues and PRs. Installed skills under `.agents/skills/` and the vendored `tooling/oxlint/anti-slop/` keep their authors' spelling; `bun run lint` checks everything else.
 
 ### Repo layout and module boundaries
 

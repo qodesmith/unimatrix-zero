@@ -1,6 +1,7 @@
 /**
  * Every file in the repo is written in US English, except the skills installed
- * from `skills-lock.json`, which keep their authors' spelling.
+ * from `skills-lock.json` and the vendored anti-slop plugin, which keep their
+ * authors' spelling.
  */
 import {$} from 'bun'
 import path from 'node:path'
@@ -133,6 +134,7 @@ function skipped(file: string) {
   return (
     file === self ||
     file === 'bun.lock' ||
+    file.startsWith('tooling/oxlint/anti-slop/') ||
     installedSkills.some(dir => file === dir || file.startsWith(`${dir}/`))
   )
 }

@@ -143,12 +143,6 @@ const config: OxlintConfig = {
       },
     },
     {
-      files: ['**/*.d.ts'],
-      rules: {
-        'import/unambiguous': 'off',
-      },
-    },
-    {
       // Command-line tools: their output is the console.
       files: ['scripts/**', 'tooling/**'],
       rules: {
