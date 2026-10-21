@@ -1,3 +1,5 @@
+import type {Database} from './main'
+
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -11,6 +13,7 @@ const shippedMigrations = path.resolve(import.meta.dirname, '../../../drizzle')
 let folder: string
 let migrationsFolder: string
 let file: string
+let opened: Database[] = []
 
 beforeEach(() => {
   folder = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-database-'))
@@ -20,6 +23,9 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  // Windows can't remove a folder while a database in it is still open.
+  for (const db of opened) if (db.$client.isOpen) db.$client.close()
+  opened = []
   fs.rmSync(folder, {recursive: true, force: true})
 })
 
@@ -30,7 +36,10 @@ function addMigration(name: string, sql: string) {
 }
 
 function open() {
-  return openDatabase({file, migrationsFolder})
+  const db = openDatabase({file, migrationsFolder})
+  opened.push(db)
+
+  return db
 }
 
 function withTreeAndPrompt() {
