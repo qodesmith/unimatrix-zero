@@ -35,6 +35,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 .claude/worktrees
 
+# implement-next's ticket worktrees at the repo root
+/[0-9]*-*/
+
 # TypeScript project-reference output
 .tsout
 

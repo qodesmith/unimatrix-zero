@@ -26,10 +26,11 @@ Work one ticket from the **frontier**: the open `ready-for-agent` issues with no
    dirname "$(git rev-parse --path-format=absolute --git-common-dir)"   # prints <root>
    git fetch origin main
    git worktree add --no-track -b <n>-<slug> <root>/<n>-<slug> origin/main
-   cd <root>/<n>-<slug> && bun install
    ```
 
-   Write `<root>` as the literal absolute path, not a shell variable: a hook checks the `worktree add` path before the command runs, and sees an unexpanded variable as the wrong location.
+   Write `<root>` as the literal absolute path: a hook re-parses the `worktree add` command in its own shell, where your variables don't exist.
+
+   Switch the session into the worktree with the `EnterWorktree` tool, `path` set to `<root>/<n>-<slug>`, then run `bun install`. A plain `cd` doesn't hold when the session started in another worktree: the shell resets to its starting folder. If `EnterWorktree` refuses the path, start every later command with `cd <root>/<n>-<slug> &&`, and confirm `git branch --show-current` prints `<n>-<slug>` before each commit.
 
    Every later step runs inside the worktree, so the checkout you started in stays untouched. If the branch or folder already exists, stop and say so.
 
