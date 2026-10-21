@@ -115,6 +115,27 @@ describe('opening', () => {
     expect(open).toThrow(DatabaseOpenError)
     expect(open).toThrow(/newer version/)
   })
+
+  it('leaves a refused database as it found it', () => {
+    open().$client.close()
+    const client = new DatabaseSync(file)
+    client.exec('PRAGMA journal_mode = DELETE')
+    client
+      .prepare(
+        'INSERT INTO __drizzle_migrations (hash, created_at, name) VALUES (?, ?, ?)'
+      )
+      .run('future', 0, '29991231000000_future')
+    client.close()
+
+    expect(open).toThrow(DatabaseOpenError)
+
+    const after = new DatabaseSync(file)
+
+    expect(after.prepare('PRAGMA journal_mode').get()).toEqual({
+      journal_mode: 'delete',
+    })
+    after.close()
+  })
 })
 
 describe('migrating', () => {

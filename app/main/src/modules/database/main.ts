@@ -37,7 +37,6 @@ export function openDatabase({file, migrationsFolder}: OpenOptions): Database {
   if (onDisk) fs.mkdirSync(path.dirname(file), {recursive: true, mode: 0o700})
 
   const client = new DatabaseSync(file)
-  client.exec('PRAGMA journal_mode = WAL')
   client.exec('PRAGMA busy_timeout = 5000')
 
   const known = new Set(
@@ -53,6 +52,7 @@ export function openDatabase({file, migrationsFolder}: OpenOptions): Database {
     )
   }
 
+  client.exec('PRAGMA journal_mode = WAL')
   const db = drizzle({client})
 
   if (known.size > applied.length) {
