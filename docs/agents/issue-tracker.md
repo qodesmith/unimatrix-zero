@@ -43,3 +43,4 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
 - **Frontier query**: list the map's open children (`gh issue list --state open`, scoped to the map's sub-issues / task list), drop any with an open blocker (`issue_dependencies_summary.blocked_by > 0`, or an open issue in the `Blocked by` line) or an assignee; first in map order wins.
 - **Claim**: `gh issue edit <n> --add-assignee @me`, the session's first write.
 - **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.
+- **Research findings**: post the write-up in full as comments on the ticket that asked for it, split at headings into as many comments as GitHub's 65,536-character limit needs, marked `(1/3)`, `(2/3)`, and so on. The `research/*` branch is scratch and gets deleted once its findings are posted.
