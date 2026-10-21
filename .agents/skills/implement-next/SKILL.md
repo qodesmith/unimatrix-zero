@@ -23,11 +23,13 @@ Work one ticket from the **frontier**: the open `ready-for-agent` issues with no
 3. **Worktree.** Name it `<n>-<slug>`, the slug being the first few words of the title. Create the branch and a worktree of that same name in the repo's root folder (the main checkout), based on a fresh `origin/main`:
 
    ```sh
-   root="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+   dirname "$(git rev-parse --path-format=absolute --git-common-dir)"   # prints <root>
    git fetch origin main
-   git worktree add --no-track -b <n>-<slug> "$root/<n>-<slug>" origin/main
-   cd "$root/<n>-<slug>" && bun install
+   git worktree add --no-track -b <n>-<slug> <root>/<n>-<slug> origin/main
+   cd <root>/<n>-<slug> && bun install
    ```
+
+   Write `<root>` as the literal absolute path, not a shell variable: a hook checks the `worktree add` path before the command runs, and sees an unexpanded variable as the wrong location.
 
    Every later step runs inside the worktree, so the checkout you started in stays untouched. If the branch or folder already exists, stop and say so.
 
