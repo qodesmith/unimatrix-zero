@@ -14,4 +14,4 @@ Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/age
 
 ### Repo layout and module boundaries
 
-Packages are deep modules: read [README.md](./README.md) (Layout, Modules, Colours) before adding a package, importing across modules, or writing a colour.
+Packages are deep modules: read [README.md](./README.md) (Layout, Modules, Colors) before adding a package, importing across modules, or writing a color.

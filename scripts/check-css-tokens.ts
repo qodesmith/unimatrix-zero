@@ -1,5 +1,5 @@
 /**
- * Oxlint covers TS and TSX; this covers the stylesheets: every colour in the
+ * Oxlint covers TS and TSX; this covers the stylesheets: every color in the
  * renderer's CSS has to be a Theme token, never a literal or a palette class.
  */
 import {Glob} from 'bun'
@@ -23,7 +23,7 @@ for await (const file of new Glob('**/*.css').scan(rendererSrc)) {
 
 if (problems.length > 0) {
   console.error(
-    'Hard-coded colours in CSS (use Theme tokens):\n' + problems.join('\n')
+    'Hard-coded colors in CSS (use Theme tokens):\n' + problems.join('\n')
   )
   process.exit(1)
 }

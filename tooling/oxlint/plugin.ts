@@ -89,7 +89,7 @@ const noHardcodedColors = {
     type: 'problem',
     docs: {
       description:
-        'Colours come from Theme tokens, never a palette or a literal',
+        'Colors come from Theme tokens, never a palette or a literal',
     },
   },
   create(context: Context) {
@@ -98,7 +98,7 @@ const noHardcodedColors = {
         context.report({
           node,
           message:
-            'Use a Theme token (bg-primary, text-muted-foreground, …), not a hard-coded colour',
+            'Use a Theme token (bg-primary, text-muted-foreground, …), not a hard-coded color',
         })
       }
     }

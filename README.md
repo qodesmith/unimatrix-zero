@@ -35,9 +35,9 @@ scripts/            dev loop, test runner, runtime pinning
 
 Inside a package, code lives in deep modules: `src/modules/<name>/main.ts` is the only file another module may import, written as `#modules/<name>/main`. Everything else in the folder is private, tests sit beside their unit, and `.tsx` files live under a `ui/` folder. The `uz/module-boundaries` and `uz/tsx-under-ui` lint rules in `tooling/oxlint/plugin.ts` enforce this.
 
-### Colours
+### Colors
 
-Every colour, radius and font in the UI is a Theme token (ADR 0009): the Hearth light and dark sets in `app/renderer/src/modules/theme/hearth.ts`, applied as CSS variables and mapped into Tailwind in `styles.css`. `uz/no-hardcoded-colors` fails the build on a palette class or a colour literal anywhere under `app/renderer/src` except the `theme` module, which is where the token values live; `scripts/check-css-tokens.ts` does the same for CSS.
+Every color, radius and font in the UI is a Theme token (ADR 0009): the Hearth light and dark sets in `app/renderer/src/modules/theme/hearth.ts`, applied as CSS variables and mapped into Tailwind in `styles.css`. `uz/no-hardcoded-colors` fails the build on a palette class or a color literal anywhere under `app/renderer/src` except the `theme` module, which is where the token values live; `scripts/check-css-tokens.ts` does the same for CSS.
 
 ## Tests
 

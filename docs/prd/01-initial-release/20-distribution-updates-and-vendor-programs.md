@@ -14,7 +14,7 @@ Source: [Distribution and update strategy](https://github.com/qodesmith/unimatri
 
 - Whether the standalone `codex-app-server` build covers sign-in, the Sandbox and Workspace tools, or the full `codex` folder is needed ([#20](https://github.com/qodesmith/unimatrix-zero/issues/20), [#41](https://github.com/qodesmith/unimatrix-zero/issues/41)).
 - Whether Codex's model list exposes the minimum Codex version for gated models; else catch the error and show "Needs an app update" on the Reply ([#20](https://github.com/qodesmith/unimatrix-zero/issues/20)).
-- Quarantine, translocation and privacy-grant behaviour on macOS 27 (experiments ran on 26.6) ([#13](https://github.com/qodesmith/unimatrix-zero/issues/13)).
+- Quarantine, translocation and privacy-grant behavior on macOS 27 (experiments ran on 26.6) ([#13](https://github.com/qodesmith/unimatrix-zero/issues/13)).
 - Whether PowerShell downloads avoid SmartScreen, deciding `install.ps1`; Smart App Control re-enable wording against Microsoft's current docs ([#13](https://github.com/qodesmith/unimatrix-zero/issues/13)).
 - The loader never requires an unverified bundle, including last-known-good and the built-in copy ([#39](https://github.com/qodesmith/unimatrix-zero/issues/39)).
 - Where each vendor stores MCP OAuth tokens under our config folders, and that an app update after an MCP sign-in causes no Keychain prompt ([ADR 0006](../../adr/0006-unsigned-distribution.md)).
