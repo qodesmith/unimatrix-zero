@@ -44,7 +44,9 @@ function openData(): Database | null {
   } catch (error) {
     dialog.showErrorBox(
       'Unimatrix Zero can’t open your data',
-      error instanceof DatabaseOpenError ? error.message : String(error)
+      error instanceof DatabaseOpenError
+        ? error.message
+        : `Something unexpected went wrong while opening it (${String(error)}).`
     )
 
     return null

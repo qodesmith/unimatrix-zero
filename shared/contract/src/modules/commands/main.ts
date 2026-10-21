@@ -1,4 +1,4 @@
-import {TreeSchema} from '#modules/trees/main'
+import {TREE_TITLE_MAX_LENGTH, TreeSchema} from '#modules/trees/main'
 import {z} from 'zod'
 
 export const AppPingCommand = z.strictObject({
@@ -31,7 +31,7 @@ export const TreeOpenCommand = z.strictObject({
 export const TreeRenameCommand = z.strictObject({
   type: z.literal('tree.rename'),
   treeId: z.uuid(),
-  title: z.string().trim().min(1).max(200),
+  title: z.string().trim().min(1).max(TREE_TITLE_MAX_LENGTH),
 })
 
 export const CommandSchema = z.discriminatedUnion('type', [

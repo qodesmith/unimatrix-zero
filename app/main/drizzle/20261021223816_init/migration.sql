@@ -18,7 +18,7 @@ CREATE TABLE `replies` (
 	`content` text NOT NULL,
 	`system_prompt_id` text NOT NULL,
 	`session_id` text,
-	`session_turn_id` text,
+	`session_message_id` text,
 	`context_size` integer,
 	`created_at` integer NOT NULL,
 	CONSTRAINT `fk_replies_tree_id_trees_id_fk` FOREIGN KEY (`tree_id`) REFERENCES `trees`(`id`) ON DELETE CASCADE,

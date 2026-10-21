@@ -2,6 +2,7 @@ import type {Tree} from '@uz/contract/trees'
 import type {KeyboardEvent} from 'react'
 
 import {Button} from '#modules/shadcn/main'
+import {TREE_TITLE_MAX_LENGTH} from '@uz/contract/trees'
 import {useRef, useState} from 'react'
 
 interface TreeListProps {
@@ -48,7 +49,7 @@ export function TreeList({
                   }}
                 />
               ) : (
-                <TreeRow
+                <TreeButton
                   tree={tree}
                   isOpen={tree.id === openTreeId}
                   onOpen={() => onOpen(tree.id)}
@@ -67,14 +68,14 @@ export function TreeTitle({tree}: {tree: Tree}) {
   return tree.title ?? <span className="italic">Untitled Tree</span>
 }
 
-interface TreeRowProps {
+interface TreeButtonProps {
   tree: Tree
   isOpen: boolean
   onOpen: () => void
   onRename: () => void
 }
 
-function TreeRow({tree, isOpen, onOpen, onRename}: TreeRowProps) {
+function TreeButton({tree, isOpen, onOpen, onRename}: TreeButtonProps) {
   function onKeyDown(event: KeyboardEvent) {
     if (event.key === 'F2') onRename()
   }
@@ -125,7 +126,7 @@ function RenameInput({tree, onDone}: RenameInputProps) {
     <input
       aria-label="Tree name"
       autoFocus
-      maxLength={200}
+      maxLength={TREE_TITLE_MAX_LENGTH}
       className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
       value={title}
       onChange={event => setTitle(event.target.value)}

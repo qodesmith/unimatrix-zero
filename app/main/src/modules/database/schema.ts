@@ -65,7 +65,7 @@ export const replies = sqliteTable(
       .notNull()
       .references(() => systemPrompts.id),
     sessionId: text('session_id'),
-    sessionTurnId: text('session_turn_id'),
+    sessionMessageId: text('session_message_id'),
     contextSize: integer('context_size'),
     createdAt: createdAt(),
   },

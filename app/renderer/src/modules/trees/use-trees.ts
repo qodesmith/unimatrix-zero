@@ -1,3 +1,4 @@
+import type {Command} from '@uz/contract/commands'
 import type {Tree} from '@uz/contract/trees'
 
 import {bridge} from '#modules/bridge/main'
@@ -32,24 +33,28 @@ export function useTrees() {
     return unsubscribe
   }, [])
 
-  async function open(treeId: string) {
-    const outcome = await bridge().send({type: 'tree.open', treeId})
+  /** Sends a command, shows its error if it fails, and returns its value. */
+  async function run<C extends Command>(command: C) {
+    const outcome = await bridge().send(command)
+    setError(outcome.ok ? null : outcome.error.message)
 
-    if (outcome.ok) setOpenTreeId(outcome.value.id)
-    else setError(outcome.error.message)
+    return outcome.ok ? outcome.value : null
+  }
+
+  async function open(treeId: string) {
+    const tree = await run({type: 'tree.open', treeId})
+
+    if (tree) setOpenTreeId(tree.id)
   }
 
   async function create() {
-    const outcome = await bridge().send({type: 'tree.create'})
+    const tree = await run({type: 'tree.create'})
 
-    if (outcome.ok) setOpenTreeId(outcome.value.id)
-    else setError(outcome.error.message)
+    if (tree) setOpenTreeId(tree.id)
   }
 
   async function rename(treeId: string, title: string) {
-    const outcome = await bridge().send({type: 'tree.rename', treeId, title})
-
-    if (!outcome.ok) setError(outcome.error.message)
+    await run({type: 'tree.rename', treeId, title})
   }
 
   return {

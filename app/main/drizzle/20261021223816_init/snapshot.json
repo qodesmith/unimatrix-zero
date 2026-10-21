@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "f529fa63-9e41-4acf-9d77-52a534243c1f",
+  "id": "95776578-bc20-4bcd-96d7-89d3934f0a06",
   "prevIds": ["00000000-0000-0000-0000-000000000000"],
   "ddl": [
     {
@@ -170,7 +170,7 @@
     },
     {
       "table": "replies",
-      "name": "session_turn_id",
+      "name": "session_message_id",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
