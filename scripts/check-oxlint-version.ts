@@ -6,6 +6,8 @@
 import path from 'node:path'
 import {z} from 'zod'
 
+import {finishCheck} from './finish-check.ts'
+
 const root = path.resolve(import.meta.dirname, '..')
 
 const Versioned = z.looseObject({version: z.string()})
@@ -44,9 +46,8 @@ if (plugins !== installed) {
   )
 }
 
-if (problems.length > 0) {
-  console.error(problems.join('\n'))
-  process.exit(1)
-}
-
-console.log(`oxlint ${installed} is the reviewed version.`)
+finishCheck(
+  problems,
+  'oxlint is not the reviewed version:',
+  `oxlint ${installed} is the reviewed version.`
+)

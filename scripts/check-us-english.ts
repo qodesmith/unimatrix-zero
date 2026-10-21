@@ -4,7 +4,9 @@
  */
 import {$} from 'bun'
 import path from 'node:path'
-import {z} from 'zod'
+
+import {finishCheck} from './finish-check.ts'
+import {lockedSkillNames} from './skills-lock.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const self = path.relative(root, import.meta.path)
@@ -122,15 +124,7 @@ const RULES: Rule[] = [
   [/\bdraught(s?)\b/gi, 'draft$1'],
 ]
 
-const SkillsLock = z.looseObject({
-  skills: z.record(z.string(), z.looseObject({})),
-})
-
-const lock = SkillsLock.parse(
-  await Bun.file(path.join(root, 'skills-lock.json')).json()
-)
-
-const installedSkills = Object.keys(lock.skills).flatMap(name => [
+const installedSkills = (await lockedSkillNames(root)).flatMap(name => [
   `.agents/skills/${name}`,
   `.claude/skills/${name}`,
 ])
@@ -166,9 +160,8 @@ for (const file of files) {
   })
 }
 
-if (problems.length > 0) {
-  console.error('UK spellings (use US English):\n' + problems.join('\n'))
-  process.exit(1)
-}
-
-console.log('Spelling is US English.')
+finishCheck(
+  problems,
+  'UK spellings (use US English):',
+  'Spelling is US English.'
+)

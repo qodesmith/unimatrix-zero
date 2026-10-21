@@ -6,6 +6,7 @@ import {Glob} from 'bun'
 import path from 'node:path'
 
 import {colorLiteral, paletteClass} from '../tooling/theme-tokens.ts'
+import {finishCheck} from './finish-check.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const rendererSrc = path.join(root, 'app/renderer/src')
@@ -23,11 +24,8 @@ for await (const file of new Glob('**/*.css').scan(rendererSrc)) {
   })
 }
 
-if (problems.length > 0) {
-  console.error(
-    'Hard-coded colors in CSS (use Theme tokens):\n' + problems.join('\n')
-  )
-  process.exit(1)
-}
-
-console.log('CSS uses Theme tokens only.')
+finishCheck(
+  problems,
+  'Hard-coded colors in CSS (use Theme tokens):',
+  'CSS uses Theme tokens only.'
+)

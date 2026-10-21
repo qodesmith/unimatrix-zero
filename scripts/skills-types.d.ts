@@ -51,34 +51,3 @@ export type SkillsAddJsonResult =
 
   // the whole command failed, e.g. clone error or missing -y
   | {status: 'failed'; error: string}
-
-export interface SkillsLock {
-  version: number // currently 1
-  skills: Record<string, SkillsLockEntry> // keyed by skill name, written sorted by name
-}
-
-export type SkillsLockEntry =
-  // installed with `skills add <repo or path>`
-  | {
-      source: string // e.g. "qodesmith/skills"; a relative path like "./my-skills" for local sources
-      sourceType: 'github' | 'gitlab' | 'git' | 'local'
-      sourceUrl?: string
-      ref?: string // omitted when no branch/tag was given
-      skillPath?: string // e.g. "pr/SKILL.md"
-      computedHash: string // sha256 of the skill folder's files
-      subagents?: string[] // Eve only
-    }
-  // installed from a well-known source like `notion`
-  | {
-      source: string
-      sourceType: 'well-known'
-      sourceUrl: string
-      computedHash: string
-      wellKnownDigest: string
-    }
-  // added by `skills experimental_sync` from node_modules
-  | {
-      source: string // the npm package name
-      sourceType: 'node_modules'
-      computedHash: string
-    }

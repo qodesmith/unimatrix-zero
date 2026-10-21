@@ -14,6 +14,8 @@ import {tmpdir} from 'node:os'
 import {basename, join, relative, sep} from 'node:path'
 import {z} from 'zod'
 
+import {lockedSkillNames} from './skills-lock.ts'
+
 interface Skill {
   name: string
   description: string
@@ -61,10 +63,6 @@ const Frontmatter = z.looseObject({
   name: z.string().min(1),
   description: z.string().min(1),
   metadata: z.looseObject({internal: z.unknown()}).optional(),
-})
-
-const SkillsLock = z.looseObject({
-  skills: z.record(z.string(), z.looseObject({})).optional(),
 })
 
 function normalizeSkillName(name: string) {
@@ -145,11 +143,7 @@ async function parseSkillMd(skillDir: string): Promise<Skill | null> {
 
 async function readLockedSkillNames(basePath: string): Promise<Set<string>> {
   try {
-    const lock = SkillsLock.parse(
-      JSON.parse(await readFile(join(basePath, 'skills-lock.json'), 'utf8'))
-    )
-
-    return new Set(Object.keys(lock.skills ?? {}).map(normalizeSkillName))
+    return new Set((await lockedSkillNames(basePath)).map(normalizeSkillName))
   } catch {
     return new Set()
   }
@@ -179,12 +173,12 @@ export async function discoverSkills(
   const skills: Skill[] = []
   const seenNames = new Set<string>()
   const parsedDirs = new Set<string>()
-  const lockedSkillNames = await readLockedSkillNames(basePath)
+  const lockedNames = await readLockedSkillNames(basePath)
 
   // Skills already installed into this repo (tracked by skills-lock.json) are
   // not the repo's own source skills.
   function isInstalledProjectSkill(skill: Skill) {
-    if (lockedSkillNames.size === 0) return false
+    if (lockedNames.size === 0) return false
     const relativeDir = relative(basePath, skill.path).split(sep).join('/')
 
     const isAgentSkillPath = AGENT_PROJECT_SKILL_DIRS.some(
@@ -193,8 +187,8 @@ export async function discoverSkills(
 
     return (
       isAgentSkillPath &&
-      (lockedSkillNames.has(normalizeSkillName(skill.name)) ||
-        lockedSkillNames.has(normalizeSkillName(basename(skill.path))))
+      (lockedNames.has(normalizeSkillName(skill.name)) ||
+        lockedNames.has(normalizeSkillName(basename(skill.path))))
     )
   }
 
