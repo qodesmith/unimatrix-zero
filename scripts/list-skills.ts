@@ -62,7 +62,7 @@ const AGENT_PROJECT_SKILL_DIRS = [
 const Frontmatter = z.looseObject({
   name: z.string().min(1),
   description: z.string().min(1),
-  metadata: z.looseObject({internal: z.unknown()}).optional(),
+  metadata: z.looseObject({internal: z.unknown().optional()}).optional(),
 })
 
 function normalizeSkillName(name: string) {
