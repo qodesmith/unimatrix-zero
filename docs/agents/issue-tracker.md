@@ -44,3 +44,4 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
 - **Claim**: `gh issue edit <n> --add-assignee @me`, the session's first write.
 - **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.
 - **Research findings**: post the write-up in full as comments on the ticket that asked for it, split at headings into as many comments as GitHub's 65,536-character limit needs, marked `(1/3)`, `(2/3)`, and so on. The `research/*` branch is scratch and gets deleted once its findings are posted.
+- **Agent worktrees**: when an agent's work ran in its own worktree, clean up as soon as the work is captured. Research: right after its findings are posted, remove the worktree and delete its `research/*` branch (locally and on GitHub) and its `worktree-agent-*` branch. Prototypes: the same, when the `prototype/*` branch is deleted.
