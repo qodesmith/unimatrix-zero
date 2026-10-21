@@ -8,5 +8,5 @@ declare global {
 
 /** The preload's `window.uz`: the renderer's only way to reach main. */
 export function bridge(): Bridge {
-  return window.uz
+  return globalThis.window.uz
 }

@@ -4,6 +4,7 @@
  */
 import {$} from 'bun'
 import path from 'node:path'
+import {z} from 'zod'
 
 const root = path.resolve(import.meta.dirname, '..')
 const self = path.relative(root, import.meta.path)
@@ -83,7 +84,8 @@ const RULES: Rule[] = [
   [
     /\b(\w+)is(e|es|ed|ing|ation|ations|er|ers)\b/gi,
     '$1iz$2',
-    ([, stem]) => US_ISE.has(`${stem}ise`.toLowerCase()) || /w$/i.test(stem!),
+    ([, stem = '']) =>
+      US_ISE.has(`${stem}ise`.toLowerCase()) || /w$/i.test(stem),
   ],
   [/\b(analy|paraly|cataly|dialy|electroly|hydroly)s(e|ed|ing)\b/gi, '$1z$2'],
   [
@@ -120,25 +122,36 @@ const RULES: Rule[] = [
   [/\bdraught(s?)\b/gi, 'draft$1'],
 ]
 
-const lock: {skills: Record<string, unknown>} = await Bun.file(
-  path.join(root, 'skills-lock.json')
-).json()
+const SkillsLock = z.looseObject({
+  skills: z.record(z.string(), z.looseObject({})),
+})
+
+const lock = SkillsLock.parse(
+  await Bun.file(path.join(root, 'skills-lock.json')).json()
+)
+
 const installedSkills = Object.keys(lock.skills).flatMap(name => [
   `.agents/skills/${name}`,
   `.claude/skills/${name}`,
 ])
-const skipped = (file: string) =>
-  file === self ||
-  file === 'bun.lock' ||
-  installedSkills.some(dir => file === dir || file.startsWith(`${dir}/`))
+
+function skipped(file: string) {
+  return (
+    file === self ||
+    file === 'bun.lock' ||
+    installedSkills.some(dir => file === dir || file.startsWith(`${dir}/`))
+  )
+}
 
 const files = (await $`git ls-files -co --exclude-standard`.cwd(root).text())
   .split('\n')
   .filter(file => file && !skipped(file))
 
 const problems: string[] = []
+
 for (const file of files) {
   const handle = Bun.file(path.join(root, file))
+
   if (!(await handle.exists())) continue
   const lines = (await handle.text()).split('\n')
   lines.forEach((line, index) => {
@@ -157,4 +170,5 @@ if (problems.length > 0) {
   console.error('UK spellings (use US English):\n' + problems.join('\n'))
   process.exit(1)
 }
+
 console.log('Spelling is US English.')

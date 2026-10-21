@@ -9,4 +9,5 @@ const result = runElectronAsNode([vitest, ...process.argv.slice(2)], {
   cwd: root,
   stdio: 'inherit',
 })
+
 process.exit(result.status ?? 1)

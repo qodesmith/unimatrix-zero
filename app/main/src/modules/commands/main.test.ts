@@ -12,6 +12,7 @@ describe('app.ping', () => {
       trusted,
       clock
     )
+
     expect(outcome).toEqual({
       ok: true,
       value: {nonce: 'n-1', receivedAt: '2026-10-19T12:00:00.000Z'},
@@ -24,6 +25,7 @@ describe('app.ping', () => {
       trusted,
       clock
     )
+
     expect(outcome).toMatchObject({ok: false, error: {code: 'invalid-command'}})
   })
 
@@ -38,6 +40,7 @@ describe('app.ping', () => {
       {isTopLevelAppFrame: false},
       clock
     )
+
     expect(outcome).toMatchObject({
       ok: false,
       error: {code: 'untrusted-sender'},

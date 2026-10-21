@@ -52,7 +52,7 @@ export type SkillsAddJsonResult =
   // the whole command failed, e.g. clone error or missing -y
   | {status: 'failed'; error: string}
 
-export type SkillsLock = {
+export interface SkillsLock {
   version: number // currently 1
   skills: Record<string, SkillsLockEntry> // keyed by skill name, written sorted by name
 }

@@ -10,11 +10,12 @@ export function App() {
   const [pong, setPong] = useState<Pong | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const ping = async () => {
+  async function ping() {
     const outcome = await bridge().send({
       type: 'app.ping',
       nonce: crypto.randomUUID(),
     })
+
     if (outcome.ok) {
       setPong(outcome.value)
       setError(null)

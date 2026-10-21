@@ -29,23 +29,30 @@ export function registerAppSchemes() {
   ])
 }
 
-const securityHeaders = (csp: string) => ({
-  'Content-Security-Policy': csp,
-  'X-Content-Type-Options': 'nosniff',
-})
+function securityHeaders(csp: string) {
+  return {
+    'Content-Security-Policy': csp,
+    'X-Content-Type-Options': 'nosniff',
+  }
+}
 
 /** `app://` serves only files from the built bundle folder. */
 export function serveBundle(target: Protocol, bundleDir: string) {
   const csp = renderCsp()
   target.handle(APP_SCHEME, async request => {
     const url = new URL(request.url)
+
     if (url.host !== APP_HOST || !['GET', 'HEAD'].includes(request.method)) {
       return new Response(null, {status: 403})
     }
+
     const file = resolveBundleFile(bundleDir, url.pathname)
+
     if (!file) return new Response(null, {status: 404})
+
     try {
       const body = await readFile(file.filePath)
+
       return new Response(body, {
         headers: {...securityHeaders(csp), 'Content-Type': file.mimeType},
       })
@@ -53,10 +60,11 @@ export function serveBundle(target: Protocol, bundleDir: string) {
       return new Response(null, {status: 404})
     }
   })
+
   return `${APP_SCHEME}://${APP_HOST}/`
 }
 
-type DevServer = {
+interface DevServer {
   port: number
   scriptNonce: string
 }
@@ -68,22 +76,30 @@ type DevServer = {
  */
 export function proxyDevServer(target: Protocol, dev: DevServer) {
   const upstream = `http://localhost:${dev.port}`
+
   const csp = renderCsp({
     scriptNonce: dev.scriptNonce,
     connectSources: [hmrOrigin(dev)],
   })
+
   target.handle(APP_DEV_SCHEME, async request => {
     const url = new URL(request.url)
+
     if (url.host !== APP_HOST) return new Response(null, {status: 403})
+
     const response = await fetch(`${upstream}${url.pathname}${url.search}`, {
       method: request.method,
       headers: {accept: request.headers.get('accept') ?? '*/*'},
     })
+
     const headers = new Headers(securityHeaders(csp))
     const contentType = response.headers.get('content-type')
+
     if (contentType) headers.set('Content-Type', contentType)
+
     return new Response(response.body, {status: response.status, headers})
   })
+
   return `${APP_DEV_SCHEME}://${APP_HOST}/`
 }
 

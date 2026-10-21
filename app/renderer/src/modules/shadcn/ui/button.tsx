@@ -1,4 +1,6 @@
-import {cva, type VariantProps} from 'class-variance-authority'
+import type {VariantProps} from 'class-variance-authority'
+
+import {cva} from 'class-variance-authority'
 import * as React from 'react'
 
 import {cn} from '../lib/utils'
@@ -37,11 +39,14 @@ function Button({
   className,
   variant,
   size,
+  type = 'button',
   ...props
 }: React.ComponentProps<'button'> & VariantProps<typeof buttonVariants>) {
   return (
     <button
       data-slot="button"
+      // oxlint-disable-next-line react/button-has-type -- defaults to "button"; a form's submit button passes "submit"
+      type={type}
       className={cn(buttonVariants({variant, size, className}))}
       {...props}
     />

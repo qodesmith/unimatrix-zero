@@ -16,7 +16,7 @@ const fakeBridge: Bridge = {
 }
 
 it('shows the pong main sends back', async () => {
-  window.uz = fakeBridge
+  globalThis.window.uz = fakeBridge
   await render(<App />)
   await page.getByRole('button', {name: 'Ping main'}).click()
   await expect

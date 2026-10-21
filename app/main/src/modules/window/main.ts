@@ -7,7 +7,7 @@ import {isOpenableExternally} from './link-rule'
 
 export {isTopLevelAppFrame} from './app-url'
 
-type WindowOptions = {
+interface WindowOptions {
   session: Session
   preloadPath: string
   url: string
@@ -54,19 +54,22 @@ export function createWindow({
   lockNavigation(window.webContents, url)
   window.once('ready-to-show', () => window.show())
   void window.loadURL(url)
+
   return window
 }
 
 function lockNavigation(contents: WebContents, appUrl: string) {
-  const divert = (details: {preventDefault: () => void}, target: string) => {
+  function divert(details: {preventDefault: () => void}, target: string) {
     if (isAppUrl(target, appUrl)) return
     details.preventDefault()
     openLink(target)
   }
+
   contents.on('will-navigate', divert)
   contents.on('will-redirect', divert)
   contents.setWindowOpenHandler(({url}) => {
     openLink(url)
+
     return {action: 'deny'}
   })
   contents.on('will-attach-webview', event => event.preventDefault())

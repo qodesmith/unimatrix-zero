@@ -6,9 +6,12 @@
   "include": [
     "scripts",
     "tooling",
+    "oxlint.config.ts",
     "vitest.config.ts",
     "shell/vite.config.ts",
     "app/*/vite.config.ts",
     "electron-runtime.json"
-  ]
+  ],
+  // Vendored, type-checked upstream under its own settings
+  "exclude": ["tooling/oxlint/anti-slop"]
 }

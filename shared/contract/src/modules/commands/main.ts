@@ -13,6 +13,7 @@ export const AppPingResult = z.strictObject({
 export const CommandSchema = z.discriminatedUnion('type', [AppPingCommand])
 
 export type Command = z.infer<typeof CommandSchema>
+
 export type CommandType = Command['type']
 
 const resultSchemas = {

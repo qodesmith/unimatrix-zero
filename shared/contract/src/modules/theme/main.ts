@@ -48,11 +48,14 @@ export const ThemeSchema = z
     dark: ThemeSetSchema.optional(),
   })
   .refine(
-    theme => theme.light || theme.dark,
+    theme => theme.light !== undefined || theme.dark !== undefined,
     'A Theme needs a light set, a dark set, or both'
   )
 
 export type ThemeSet = z.infer<typeof ThemeSetSchema>
+
 export type Theme = z.infer<typeof ThemeSchema>
+
 export const ResolvedThemeModeSchema = z.enum(['light', 'dark'])
+
 export type ResolvedThemeMode = z.infer<typeof ResolvedThemeModeSchema>

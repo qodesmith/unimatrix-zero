@@ -13,15 +13,19 @@ const vitePort = 5173 + (parseInt(worktree, 16) % 2000)
 const dataFolder = `unimatrix-zero-dev-${worktree}`
 const scriptNonce = randomBytes(16).toString('base64')
 
-const fromRoot = (relative: string) => path.join(root, relative)
+function fromRoot(relative: string) {
+  return path.join(root, relative)
+}
 
-const firstBuild = (watcher: RolldownWatcher) =>
-  new Promise<void>(resolve => {
+async function firstBuild(watcher: RolldownWatcher) {
+  return new Promise<void>(resolve => {
     watcher.on('event', event => {
       if (event.code === 'BUNDLE_END') resolve()
+
       if (event.code === 'ERROR') console.error(event.error)
     })
   })
+}
 
 // Listen as soon as each watcher exists: a bundle can finish before the next
 // watcher is created, and a late listener misses its BUNDLE_END.
@@ -34,8 +38,10 @@ async function watchBundle(dir: string): Promise<RolldownWatcher> {
     logLevel: 'warn',
     build: {watch: {}},
   })
+
   if (!('on' in watcher)) throw new Error(`${dir}: expected a watcher`)
   firstBuilds.push(firstBuild(watcher))
+
   return watcher
 }
 
@@ -51,6 +57,7 @@ const vite = await createServer({
   },
   html: {cspNonce: scriptNonce},
 })
+
 await vite.listen()
 
 const bundles = {
@@ -59,6 +66,7 @@ const bundles = {
   preload: await watchBundle(fromRoot('app/preload')),
   hosts: await watchBundle(fromRoot('app/provider-host')),
 }
+
 await Promise.all(firstBuilds)
 
 let electron: ReturnType<typeof Bun.spawn> | null = null
@@ -83,6 +91,7 @@ function startElectron() {
 }
 
 let restarting = false
+
 async function restartElectron(reason: string) {
   console.log(`${reason} rebuilt; restarting Electron.`)
   restarting = true
@@ -93,6 +102,7 @@ async function restartElectron(reason: string) {
 }
 
 let restartTimer: ReturnType<typeof setTimeout> | null = null
+
 function scheduleRestart(reason: string) {
   if (restartTimer) clearTimeout(restartTimer)
   restartTimer = setTimeout(() => {
@@ -104,10 +114,13 @@ function scheduleRestart(reason: string) {
 for (const [name, watcher] of Object.entries(bundles)) {
   watcher.on('event', event => {
     if (event.code !== 'BUNDLE_END') return
+
     if (name === 'hosts') {
       console.log('Provider hosts rebuilt.')
+
       return
     }
+
     scheduleRestart(name)
   })
 }
@@ -115,14 +128,19 @@ for (const [name, watcher] of Object.entries(bundles)) {
 async function shutdown() {
   stopping = true
   electron?.kill()
-  await Promise.all(Object.values(bundles).map(watcher => watcher.close()))
+  await Promise.all(
+    Object.values(bundles).map(async watcher => watcher.close())
+  )
   await vite.close()
   process.exit(0)
 }
+
 process.on('SIGINT', () => void shutdown())
+
 process.on('SIGTERM', () => void shutdown())
 
 console.log(
   `Unimatrix Zero dev: renderer on app-dev:// (Vite :${vitePort}), data in ${dataFolder}`
 )
+
 startElectron()

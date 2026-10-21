@@ -1,4 +1,4 @@
-type CspOptions = {
+interface CspOptions {
   scriptNonce?: string
   connectSources?: string[]
 }
@@ -8,7 +8,9 @@ export function renderCsp({
   connectSources = [],
 }: CspOptions = {}): string {
   const script = ["'self'"]
+
   if (scriptNonce) script.push(`'nonce-${scriptNonce}'`)
+
   return [
     "default-src 'none'",
     `script-src ${script.join(' ')}`,

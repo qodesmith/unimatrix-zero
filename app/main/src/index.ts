@@ -19,16 +19,19 @@ import {app, ipcMain, protocol, session} from 'electron'
 import path from 'node:path'
 
 const dev = readDevRun(process.env)
+
 const preloadPath = path.join(
   import.meta.dirname,
   '../../preload/dist/preload.cjs'
 )
+
 const rendererDist = path.join(import.meta.dirname, '../../renderer/dist')
 
 app.setName('Unimatrix Zero')
+
 registerAppSchemes()
 
-void app.whenReady().then(() => {
+function openWindow() {
   const windowSession = session.defaultSession
   hardenSession(windowSession, dev ? [hmrOrigin({port: dev.vitePort})] : [])
 
@@ -39,8 +42,9 @@ void app.whenReady().then(() => {
       })
     : serveBundle(protocol, rendererDist)
 
-  const fromAppWindow = (event: Parameters<typeof isTopLevelAppFrame>[0]) =>
-    isTopLevelAppFrame(event, url)
+  function fromAppWindow(event: Parameters<typeof isTopLevelAppFrame>[0]) {
+    return isTopLevelAppFrame(event, url)
+  }
 
   registerCommandChannel(ipcMain, event => ({
     isTopLevelAppFrame: fromAppWindow(event),
@@ -48,10 +52,12 @@ void app.whenReady().then(() => {
   createDroppedFiles().listen(ipcMain, fromAppWindow)
   ipcMain.on(BRIDGE_CHANNELS.subscribe, event => {
     if (!fromAppWindow(event)) return
+
     const snapshot: AppEvent = {
       type: 'SNAPSHOT',
       app: {version: app.getVersion()},
     }
+
     event.sender.send(BRIDGE_CHANNELS.event, snapshot)
   })
 
@@ -61,6 +67,8 @@ void app.whenReady().then(() => {
     url,
     packaged: app.isPackaged,
   })
-})
+}
+
+void app.whenReady().then(openWindow)
 
 app.on('window-all-closed', () => app.quit())
