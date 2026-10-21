@@ -18,7 +18,6 @@
   "rules": {
     "uz/module-boundaries": "error",
     "uz/tsx-under-ui": "error",
-    "uz/no-hardcoded-colors": "off",
     "typescript/no-floating-promises": "error",
     "typescript/no-misused-promises": "error",
     "typescript/no-unnecessary-condition": "error",
