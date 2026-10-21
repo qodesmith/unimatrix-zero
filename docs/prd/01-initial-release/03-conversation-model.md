@@ -1,6 +1,6 @@
 # 3. Conversation model
 
-Canonical in `CONTEXT.md`. The points everything else builds on ([Conversation model and v1 scope](https://github.com/qodesmith/unimatrix-zero/issues/18)):
+Canonical in `GLOSSARY.md`. The points everything else builds on ([Conversation model and v1 scope](https://github.com/qodesmith/unimatrix-zero/issues/18)):
 
 - A **Tree** is made of **Turns**: a **Prompt** (exactly one message) or a **Reply** (the AI's whole turn, however many tool calls, Subagents or thinking blocks it contains). A Prompt always follows a Reply except the root, and has at most one Reply.
 - **Forks happen only at Replies.** A **Branch** is one direction taken from a Fork. There is no "main" Thread. A **Thread** is one root-to-leaf path: what the AI sees when continuing from that leaf.

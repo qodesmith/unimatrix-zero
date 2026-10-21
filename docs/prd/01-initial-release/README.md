@@ -2,7 +2,7 @@
 
 Unimatrix Zero is a free desktop app (Electron; Mac, Windows, Linux) that drives the user's existing Claude and ChatGPT subscriptions. Every conversation is a **Tree** that branches at any Reply, shown either as a whole on a canvas or one Thread at a time as a chat.
 
-This document is the v1 spec, assembled from the decisions on the [Unimatrix Zero v1 spec](https://github.com/qodesmith/unimatrix-zero/issues/1) map. It is an index with detail: each section states what was decided and links the ticket that holds the full reasoning. The vocabulary is [`CONTEXT.md`](../../../CONTEXT.md); the hard-to-reverse choices are in [`docs/adr/`](../../adr/). Where this document, a ticket and an ADR disagree, the ADR wins, then the ticket's latest resolution or amendment, then this document.
+This document is the v1 spec, assembled from the decisions on the [Unimatrix Zero v1 spec](https://github.com/qodesmith/unimatrix-zero/issues/1) map. It is an index with detail: each section states what was decided and links the ticket that holds the full reasoning. The vocabulary is [`GLOSSARY.md`](../../../GLOSSARY.md); the hard-to-reverse choices are in [`docs/adr/`](../../adr/). Where this document, a ticket and an ADR disagree, the ADR wins, then the ticket's latest resolution or amendment, then this document.
 
 **Status:** complete. The last live check, native Windows ([#58](https://github.com/qodesmith/unimatrix-zero/issues/58)), corrected ADR 0018's Codex-on-Windows line ([PR #61](https://github.com/qodesmith/unimatrix-zero/pull/61)).
 
