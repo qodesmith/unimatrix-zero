@@ -14,6 +14,7 @@ import {createDroppedFiles} from '#modules/dropped-files/main'
 import {utilityHost} from '#modules/host-process/main'
 import {createHub, registerSubscribeChannel} from '#modules/hub/main'
 import {createProviderHosts} from '#modules/provider-hosts/main'
+import {createRemoteImages} from '#modules/remote-images/main'
 import {createSessions} from '#modules/sessions/main'
 import {createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
@@ -143,6 +144,7 @@ function openWindow(db: Database) {
       hosts,
       connections,
       vendorProgramFor: provider => signInRequestFor(provider, machine),
+      images: createRemoteImages(globalThis.fetch),
       publish: hub.publish,
     }
   )

@@ -1,5 +1,6 @@
 import type {Connections} from '#modules/connections/main'
 import type {ProviderHosts} from '#modules/provider-hosts/main'
+import type {RemoteImages} from '#modules/remote-images/main'
 import type {Trees} from '#modules/trees/main'
 import type {Turns} from '#modules/turns/main'
 import type {Command, CommandResult, CommandType} from '@uz/contract/commands'
@@ -21,6 +22,7 @@ export interface HandlerDeps {
   >
   /** The vendor program and configuration folder a Provider's Replies use. */
   vendorProgramFor: (provider: ProviderId) => SignInRequest
+  images: RemoteImages
   publish: (event: AppEvent) => void
 }
 
@@ -153,4 +155,6 @@ export const handlers: Handlers = {
 
     return {}
   },
+
+  'image.load': async ({url}, {images}) => images.load(url),
 }
