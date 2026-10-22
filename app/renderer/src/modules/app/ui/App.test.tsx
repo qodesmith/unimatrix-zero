@@ -457,6 +457,43 @@ describe('connecting a Provider', () => {
     expect(main.sent.map(command => command.type)).toContain('tree.create')
   })
 
+  it('waits for the new page after Claude refuses a code', async () => {
+    const main = fakeMain({firstLaunch: true})
+    globalThis.window.uz = main
+    await render(<App />)
+
+    await page.getByRole('button', {name: 'Connect Claude'}).click()
+    main.publish({
+      type: 'SIGN_IN_STEP',
+      provider: 'claude',
+      step: 'paste-code',
+      wrongCode: true,
+    })
+    await claudeCard().getByRole('textbox', {name: 'Code'}).fill('another')
+
+    await expect
+      .element(claudeCard().getByRole('button', {name: 'Connect', exact: true}))
+      .toBeDisabled()
+    await expect
+      .element(
+        claudeCard().getByRole('button', {
+          name: 'Don’t see the page? Open it again',
+        })
+      )
+      .not.toBeInTheDocument()
+
+    main.publish({
+      type: 'SIGN_IN_STEP',
+      provider: 'claude',
+      step: 'paste-code',
+      url,
+      wrongCode: true,
+    })
+    await expect
+      .element(claudeCard().getByRole('button', {name: 'Connect', exact: true}))
+      .toBeEnabled()
+  })
+
   it('cancels connecting from the card', async () => {
     const main = fakeMain({firstLaunch: true})
     globalThis.window.uz = main

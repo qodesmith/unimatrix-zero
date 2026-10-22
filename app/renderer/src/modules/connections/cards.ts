@@ -96,7 +96,7 @@ export function applyConnectionEvent(
   if (event.type === 'SIGN_IN_FINISHED') {
     const finished = {...state, signIn: null, pasting: false}
 
-    return event.failure
+    return event.outcome === 'failed'
       ? withFailure(finished, event.provider, event.failure)
       : finished
   }

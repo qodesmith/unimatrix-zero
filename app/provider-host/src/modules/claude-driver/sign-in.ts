@@ -1,11 +1,12 @@
-import type {Inbox} from '#modules/inbox/main'
+import type {Attempt, UserInput} from '#modules/sign-in/main'
 import type {ClaudeCommand, Login, LoginEvents} from './login'
 import type {DownloadProgress, ProgramTarget} from './program'
 import type {AccountInfo} from '@anthropic-ai/claude-agent-sdk'
 import type {SignInRequest} from '@uz/contract/host'
-import type {SignInFailure, SignInUpdate} from '@uz/contract/providers'
+import type {SignInFinished, SignInUpdate} from '@uz/contract/providers'
 
-import {createInbox} from '#modules/inbox/main'
+import {createSignIn} from '#modules/sign-in/main'
+import {SIGN_IN_CANCELED, signInFailed} from '@uz/contract/providers'
 
 import {planOf} from './account'
 import {claudeEnvironment} from './environment'
@@ -16,9 +17,6 @@ export const SIGN_IN_TIMEOUT_MS = 15 * 60 * 1000
 type Input =
   | {kind: 'url'; run: number; url: string}
   | {kind: 'exit'; run: number; code: number | null; output: string}
-  | {kind: 'page-opened'}
-  | {kind: 'code'; code: string}
-  | {kind: 'cancel'}
   | {kind: 'no-answer'}
 
 type PageStep = Extract<SignInUpdate, {type: 'SIGN_IN_STEP'}>
@@ -38,13 +36,7 @@ interface Page {
 /** What one input does: an update to show, or the end of signing in. */
 interface Reaction {
   update?: SignInUpdate
-  end?: SignInUpdate | 'signed-in'
-}
-
-/** One go at connecting, from Connect to its end. */
-interface Attempt {
-  inbox: Inbox<Input>
-  abort: AbortController
+  end?: SignInFinished | 'signed-in'
 }
 
 export interface ClaudeSignInDeps {
@@ -72,19 +64,6 @@ export interface ClaudeSignInDeps {
   timeoutMs: number
 }
 
-const canceled: SignInUpdate = {type: 'SIGN_IN_FINISHED', outcome: 'canceled'}
-
-function failed(
-  reason: SignInFailure['reason'],
-  message: string
-): SignInUpdate {
-  return {
-    type: 'SIGN_IN_FINISHED',
-    outcome: 'failed',
-    failure: {reason, message},
-  }
-}
-
 /**
  * Whether a pasted code belongs to this sign-in: Claude's page shows the code
  * followed by `#` and the state in the page's own link.
@@ -99,17 +78,21 @@ function belongsTo(code: string, url: string) {
   )
 }
 
-/** The step the sign-in page is at, for the card. */
-function pageStep(page: Page, url: string): PageStep {
-  if (page.refused) {
-    return {type: 'SIGN_IN_STEP', step: 'paste-code', url, wrongCode: true}
+/**
+ * The step the sign-in page is at, for the card; without a link while a new
+ * login replaces one whose code Claude refused.
+ */
+function pageStep({url, opened, refused}: Page): PageStep {
+  const step: PageStep = {
+    type: 'SIGN_IN_STEP',
+    step: opened || refused ? 'paste-code' : 'sign-in-page',
   }
 
-  return {
-    type: 'SIGN_IN_STEP',
-    step: page.opened ? 'paste-code' : 'sign-in-page',
-    url,
-  }
+  if (url) step.url = url
+
+  if (refused) step.wrongCode = true
+
+  return step
 }
 
 /**
@@ -119,17 +102,15 @@ function pageStep(page: Page, url: string): PageStep {
  * again, so trying again can use a different one.
  */
 export function createClaudeSignIn(deps: ClaudeSignInDeps) {
-  let attempt: Attempt | null = null
-
   /**
    * Runs `claude auth login` until it signs in; the update to end with if it
    * doesn't.
    */
   async function* signInOnPage(
-    {inbox}: Attempt,
+    {inbox}: Attempt<Input>,
     command: ClaudeCommand,
     env: Record<string, string>
-  ): AsyncGenerator<SignInUpdate, SignInUpdate | null> {
+  ): AsyncGenerator<SignInUpdate, SignInFinished | null> {
     const page: Page = {
       run: 0,
       url: null,
@@ -156,7 +137,7 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
       page.opened = true
       page.refused = false
 
-      return {update: pageStep(page, page.url)}
+      return {update: pageStep(page)}
     }
 
     function onCode(pasted: string): Reaction {
@@ -165,7 +146,7 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
       if (!page.url) return {}
 
       if (!belongsTo(code, page.url)) {
-        return {update: {...pageStep(page, page.url), wrongCode: true}}
+        return {update: {...pageStep(page), wrongCode: true}}
       }
 
       page.pasted = true
@@ -179,7 +160,7 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
 
       if (!page.pasted) {
         return {
-          end: failed(
+          end: signInFailed(
             'no-answer',
             output || 'Sign-in ended before Claude’s page answered.'
           ),
@@ -187,18 +168,19 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
       }
 
       // Claude refused the code, and this login can't take another: a new
-      // one opens its own page and prints a new one.
+      // one opens its own page and prints a new one. The old page is dead
+      // from here, so the card loses its link until then.
       Object.assign(page, {pasted: false, refused: true, url: null})
       login = start()
 
-      return {}
+      return {update: pageStep(page)}
     }
 
-    function react(input: Input): Reaction {
+    function react(input: Input | UserInput): Reaction {
       if (input.kind === 'url') {
         page.url = input.url
 
-        return {update: pageStep(page, input.url)}
+        return {update: pageStep(page)}
       }
 
       if (input.kind === 'page-opened') return onPageOpened()
@@ -213,8 +195,8 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
       return {
         end:
           input.kind === 'cancel'
-            ? canceled
-            : failed('no-answer', 'Claude’s page did not answer.'),
+            ? SIGN_IN_CANCELED
+            : signInFailed('no-answer', 'Claude’s page did not answer.'),
       }
     }
 
@@ -241,111 +223,96 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
     }
   }
 
-  async function* signIn(request: SignInRequest): AsyncGenerator<SignInUpdate> {
+  async function* connect(
+    attempt: Attempt<Input>,
+    request: SignInRequest
+  ): AsyncGenerator<SignInUpdate> {
     const {program, configDir} = request
 
     if (!program) throw new Error('The manifest names no Claude program.')
 
-    const current: Attempt = {
-      inbox: createInbox<Input>(),
-      abort: new AbortController(),
-    }
-
-    const {signal} = current.abort
-
-    function wasCanceled() {
-      return signal.aborted
-    }
-
-    attempt = current
+    yield {type: 'SIGN_IN_STEP', step: 'get-ready'}
 
     try {
-      yield {type: 'SIGN_IN_STEP', step: 'get-ready'}
-
-      try {
-        for await (const progress of deps.getProgramReady(program, {signal})) {
-          yield {type: 'SIGN_IN_STEP', step: 'get-ready', progress}
-        }
-      } catch (error) {
-        if (wasCanceled()) {
-          yield canceled
-
-          return
-        }
-
-        yield failed(
-          'download-failed',
-          error instanceof Error ? error.message : String(error)
-        )
+      for await (const progress of deps.getProgramReady(program, {
+        signal: attempt.signal,
+      })) {
+        yield {type: 'SIGN_IN_STEP', step: 'get-ready', progress}
+      }
+    } catch (error) {
+      if (attempt.canceled()) {
+        yield SIGN_IN_CANCELED
 
         return
       }
 
-      if (wasCanceled()) {
-        yield canceled
+      yield signInFailed(
+        'download-failed',
+        error instanceof Error ? error.message : String(error)
+      )
 
-        return
-      }
+      return
+    }
 
-      const env = claudeEnvironment(deps.env, configDir)
-      const command = deps.commandFor(program.path)
-      const ended = yield* signInOnPage(current, command, env)
+    if (attempt.canceled()) {
+      yield SIGN_IN_CANCELED
 
-      if (ended) {
-        yield ended
+      return
+    }
 
-        return
-      }
+    const env = claudeEnvironment(deps.env, configDir)
+    const command = deps.commandFor(program.path)
+    const ended = yield* signInOnPage(attempt, command, env)
 
-      yield {type: 'SIGN_IN_STEP', step: 'check-plan'}
+    if (ended) {
+      yield ended
 
-      const account = await deps
-        .readAccount({program: program.path, env, cwd: configDir})
-        .catch(() => null)
+      return
+    }
 
-      // Canceled while the plan was read, which is never cut short.
-      if (wasCanceled()) {
-        yield canceled
+    yield {type: 'SIGN_IN_STEP', step: 'check-plan'}
 
-        return
-      }
+    const account = await deps
+      .readAccount({program: program.path, env, cwd: configDir})
+      .catch(() => null)
 
-      // No plan at all, not even "Claude API", means it wasn't read.
-      if (account?.subscriptionType === undefined) {
-        yield failed('failed', 'Couldn’t check your Claude plan. Try again.')
+    // Canceled while the plan was read, which is never cut short.
+    if (attempt.canceled()) {
+      yield SIGN_IN_CANCELED
 
-        return
-      }
+      return
+    }
 
-      const plan = planOf(account.subscriptionType)
+    // No plan at all, not even "Claude API", means it wasn't read.
+    if (account?.subscriptionType === undefined) {
+      yield signInFailed(
+        'failed',
+        'Couldn’t check your Claude plan. Try again.'
+      )
 
-      if (!plan) {
-        // Signed out so another account can be used; if that fails, the
-        // next sign-in replaces this one anyway.
-        await deps.signOut(command, env).catch(() => undefined)
-        yield failed('free-plan', 'This Claude account has no Pro or Max plan.')
+      return
+    }
 
-        return
-      }
+    const plan = planOf(account.subscriptionType)
 
-      yield {
-        type: 'SIGN_IN_FINISHED',
-        outcome: 'connected',
-        account: {email: account.email ?? '', plan},
-      }
-    } finally {
-      if (attempt === current) attempt = null
+    if (!plan) {
+      // Signed out so another account can be used; if that fails, the
+      // next sign-in replaces this one anyway.
+      await deps.signOut(command, env).catch(() => undefined)
+      yield signInFailed(
+        'free-plan',
+        'This Claude account has no Pro or Max plan.'
+      )
+
+      return
+    }
+
+    yield {
+      type: 'SIGN_IN_FINISHED',
+      outcome: 'connected',
+      account: {email: account.email ?? '', plan},
     }
   }
 
-  return {
-    signIn,
-    signInPageOpened: () => attempt?.inbox.push({kind: 'page-opened'}),
-    submitSignInCode: (code: string) =>
-      attempt?.inbox.push({kind: 'code', code}),
-    cancelSignIn: () => {
-      attempt?.abort.abort()
-      attempt?.inbox.push({kind: 'cancel'})
-    },
-  }
+  return createSignIn(connect)
 }

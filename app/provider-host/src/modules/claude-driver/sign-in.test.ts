@@ -178,7 +178,12 @@ it('starts a new sign-in when Claude refuses the code', async () => {
   const updates = await connect(signIn, update => {
     if (isStep(update, 'sign-in-page')) signIn.signInPageOpened()
 
-    if (isStep(update, 'paste-code')) {
+    // The card takes a code only while it has a page.
+    if (
+      update.type === 'SIGN_IN_STEP' &&
+      update.url &&
+      isStep(update, 'paste-code')
+    ) {
       pasted += 1
       signIn.submitSignInCode(
         pasted === 1 ? `expired#${FAKE_STATE}` : FAKE_CODE
@@ -187,12 +192,16 @@ it('starts a new sign-in when Claude refuses the code', async () => {
   })
 
   expect(used.startLogin).toHaveBeenCalledTimes(2)
-  expect(updates.findLast(update => isStep(update, 'paste-code'))).toEqual({
-    type: 'SIGN_IN_STEP',
-    step: 'paste-code',
-    url: FAKE_CODE_PAGE,
-    wrongCode: true,
-  })
+  expect(updates.filter(update => isStep(update, 'paste-code'))).toEqual([
+    {type: 'SIGN_IN_STEP', step: 'paste-code', url: FAKE_CODE_PAGE},
+    {type: 'SIGN_IN_STEP', step: 'paste-code', wrongCode: true},
+    {
+      type: 'SIGN_IN_STEP',
+      step: 'paste-code',
+      url: FAKE_CODE_PAGE,
+      wrongCode: true,
+    },
+  ])
   expect(updates.at(-1)).toMatchObject({outcome: 'connected'})
 })
 

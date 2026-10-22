@@ -120,14 +120,46 @@ export const SignInFailureSchema = z.strictObject({
 
 export type SignInFailure = z.infer<typeof SignInFailureSchema>
 
-export const SignInFinishedUpdate = z.strictObject({
+const SignInConnected = z.strictObject({
   type: z.literal('SIGN_IN_FINISHED'),
-  outcome: z.enum(['connected', 'canceled', 'failed']),
-  /** Set when `connected`. */
-  account: AccountSchema.optional(),
-  /** Set when `failed`. */
-  failure: SignInFailureSchema.optional(),
+  outcome: z.literal('connected'),
+  account: AccountSchema,
 })
+
+const SignInCanceled = z.strictObject({
+  type: z.literal('SIGN_IN_FINISHED'),
+  outcome: z.literal('canceled'),
+})
+
+const SignInFailed = z.strictObject({
+  type: z.literal('SIGN_IN_FINISHED'),
+  outcome: z.literal('failed'),
+  failure: SignInFailureSchema,
+})
+
+export const SignInFinishedUpdate = z.discriminatedUnion('outcome', [
+  SignInConnected,
+  SignInCanceled,
+  SignInFailed,
+])
+
+export type SignInFinished = z.infer<typeof SignInFinishedUpdate>
+
+export const SIGN_IN_CANCELED: SignInFinished = {
+  type: 'SIGN_IN_FINISHED',
+  outcome: 'canceled',
+}
+
+export function signInFailed(
+  reason: SignInFailure['reason'],
+  message: string
+): SignInFinished {
+  return {
+    type: 'SIGN_IN_FINISHED',
+    outcome: 'failed',
+    failure: {reason, message},
+  }
+}
 
 export const SignInUpdateSchema = z.discriminatedUnion('type', [
   SignInStepUpdate,
@@ -142,9 +174,11 @@ export const SignInStepEvent = SignInStepUpdate.extend({
 
 export type SignInStep = z.infer<typeof SignInStepEvent>
 
-export const SignInFinishedEvent = SignInFinishedUpdate.extend({
-  provider: ProviderIdSchema,
-})
+export const SignInFinishedEvent = z.discriminatedUnion('outcome', [
+  SignInConnected.extend({provider: ProviderIdSchema}),
+  SignInCanceled.extend({provider: ProviderIdSchema}),
+  SignInFailed.extend({provider: ProviderIdSchema}),
+])
 
 export const ProviderEventSchema = z.discriminatedUnion('type', [
   ProviderStatusEvent,

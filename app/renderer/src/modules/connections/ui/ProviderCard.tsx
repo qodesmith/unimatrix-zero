@@ -4,9 +4,10 @@ import type {
   SignInFailure,
   SignInStep,
 } from '@uz/contract/providers'
+import type {ReactNode} from 'react'
 
 import {Button} from '#modules/shadcn/main'
-import {PROVIDER_NAMES} from '@uz/contract/providers'
+import {PROVIDER_NAMES, SignInStepEvent} from '@uz/contract/providers'
 import {useState} from 'react'
 
 const ABOUT: Record<
@@ -145,56 +146,55 @@ function Checklist({
   const name = PROVIDER_NAMES[provider]
   const {step} = card
 
-  const steps: {step: Step; label: string}[] = [
-    {step: 'get-ready', label: `Get ${name} ready`},
-    {step: 'sign-in-page', label: `Sign in on ${name}’s page`},
-    ...(card.pasting
-      ? [{step: 'paste-code' as const, label: 'Paste the code'}]
-      : []),
-    {step: 'check-plan', label: 'Check your plan'},
-  ]
+  const steps = SignInStepEvent.shape.step.options.filter(
+    item => item !== 'paste-code' || card.pasting
+  )
 
-  const current = steps.findIndex(item => item.step === step.step)
+  const current = steps.indexOf(step.step)
 
   return (
     <div className="flex flex-col gap-3">
       <ol className="flex flex-col gap-3">
-        {steps.map((item, index) => (
-          <li
-            key={item.step}
-            aria-current={index === current ? 'step' : undefined}
-            className="flex flex-col gap-1.5"
-          >
-            <span
-              className={`flex items-center gap-2 text-sm ${index === current ? 'font-medium' : 'text-muted-foreground'}`}
+        {steps.map((item, index) => {
+          const {label, Detail} = STEPS[item]
+
+          return (
+            <li
+              key={item}
+              aria-current={index === current ? 'step' : undefined}
+              className="flex flex-col gap-1.5"
             >
               <span
-                aria-hidden
-                className={`flex size-5 items-center justify-center rounded-full text-[11px] ${
-                  index < current
-                    ? 'bg-success text-primary-foreground'
-                    : index === current
-                      ? 'animate-pulse bg-primary text-primary-foreground'
-                      : 'bg-muted'
-                }`}
+                className={`flex items-center gap-2 text-sm ${index === current ? 'font-medium' : 'text-muted-foreground'}`}
               >
-                {index < current ? '✓' : ''}
+                <span
+                  aria-hidden
+                  className={`flex size-5 items-center justify-center rounded-full text-[11px] ${
+                    index < current
+                      ? 'bg-success text-primary-foreground'
+                      : index === current
+                        ? 'animate-pulse bg-primary text-primary-foreground'
+                        : 'bg-muted'
+                  }`}
+                >
+                  {index < current ? '✓' : ''}
+                </span>
+                {label(name)}
               </span>
-              {item.label}
-            </span>
-            {index === current && (
-              <StepDetail
-                provider={provider}
-                step={step}
-                openPage={openPage}
-                submitCode={submitCode}
-              />
-            )}
-          </li>
-        ))}
+              {index === current && Detail && (
+                <Detail
+                  provider={provider}
+                  step={step}
+                  openPage={openPage}
+                  submitCode={submitCode}
+                />
+              )}
+            </li>
+          )
+        })}
       </ol>
       <p className="text-sm text-muted-foreground">
-        {STATUS_LINES[step.step](PROVIDER_NAMES[provider], step)}
+        {STEPS[step.step].status(name, step)}
       </p>
     </div>
   )
@@ -204,80 +204,84 @@ function megabytes(bytes: number) {
   return Math.round(bytes / 1_000_000)
 }
 
-function StepDetail({
-  provider,
-  step,
-  openPage,
-  submitCode,
-}: {
+interface StepDetailProps {
   provider: ProviderId
   step: SignInStep
   openPage: () => void
   submitCode: (code: string) => void
-}) {
-  const name = PROVIDER_NAMES[provider]
-
-  if (step.step === 'get-ready' && step.progress) {
-    const {receivedBytes, totalBytes} = step.progress
-
-    return (
-      <div
-        role="progressbar"
-        aria-label={`Getting ${name} ready`}
-        aria-valuemin={0}
-        aria-valuemax={totalBytes}
-        aria-valuenow={receivedBytes}
-        className="ml-7 h-1.5 overflow-hidden rounded-full bg-muted"
-      >
-        <div
-          className="h-full bg-primary transition-all"
-          style={{
-            width: `${totalBytes ? (receivedBytes / totalBytes) * 100 : 0}%`,
-          }}
-        />
-      </div>
-    )
-  }
-
-  if (step.step === 'sign-in-page') {
-    return (
-      <div className="ml-7 flex flex-col items-start gap-1">
-        <span className="text-xs text-muted-foreground">
-          {name}’s page may say “{ABOUT[provider].program}”. That’s normal.
-        </span>
-        <OpenAgain openPage={openPage} />
-      </div>
-    )
-  }
-
-  if (step.step === 'paste-code') {
-    return (
-      <div className="ml-7 flex flex-col gap-2">
-        <CodeEntry
-          provider={provider}
-          wrongCode={step.wrongCode === true}
-          submitCode={submitCode}
-        />
-        {step.url && (
-          <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-            {name}’s page
-            <input
-              readOnly
-              value={step.url}
-              onFocus={event => event.target.select()}
-              className="truncate rounded-md border border-input bg-background px-2 py-1"
-            />
-          </label>
-        )}
-        <OpenAgain openPage={openPage} />
-      </div>
-    )
-  }
-
-  return null
 }
 
-function OpenAgain({openPage}: {openPage: () => void}) {
+function DownloadProgress({provider, step}: StepDetailProps) {
+  if (!step.progress) return null
+
+  const {receivedBytes, totalBytes} = step.progress
+
+  return (
+    <div
+      role="progressbar"
+      aria-label={`Getting ${PROVIDER_NAMES[provider]} ready`}
+      aria-valuemin={0}
+      aria-valuemax={totalBytes}
+      aria-valuenow={receivedBytes}
+      className="ml-7 h-1.5 overflow-hidden rounded-full bg-muted"
+    >
+      <div
+        className="h-full bg-primary transition-all"
+        style={{
+          width: `${totalBytes ? (receivedBytes / totalBytes) * 100 : 0}%`,
+        }}
+      />
+    </div>
+  )
+}
+
+function PageNote({provider, step, openPage}: StepDetailProps) {
+  return (
+    <div className="ml-7 flex flex-col items-start gap-1">
+      <span className="text-xs text-muted-foreground">
+        {PROVIDER_NAMES[provider]}’s page may say “{ABOUT[provider].program}”.
+        That’s normal.
+      </span>
+      <OpenAgain url={step.url} openPage={openPage} />
+    </div>
+  )
+}
+
+/** Without a link while a new page replaces one whose code was refused. */
+function PasteCode({provider, step, openPage, submitCode}: StepDetailProps) {
+  return (
+    <div className="ml-7 flex flex-col gap-2">
+      <CodeEntry
+        provider={provider}
+        wrongCode={step.wrongCode === true}
+        disabled={!step.url}
+        submitCode={submitCode}
+      />
+      {step.url && (
+        <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+          {PROVIDER_NAMES[provider]}’s page
+          <input
+            readOnly
+            value={step.url}
+            onFocus={event => event.target.select()}
+            className="truncate rounded-md border border-input bg-background px-2 py-1"
+          />
+        </label>
+      )}
+      <OpenAgain url={step.url} openPage={openPage} />
+    </div>
+  )
+}
+
+function OpenAgain({
+  url,
+  openPage,
+}: {
+  url: string | undefined
+  openPage: () => void
+}) {
+  if (!url) return null
+
   return (
     <button
       type="button"
@@ -292,10 +296,12 @@ function OpenAgain({openPage}: {openPage: () => void}) {
 function CodeEntry({
   provider,
   wrongCode,
+  disabled,
   submitCode,
 }: {
   provider: ProviderId
   wrongCode: boolean
+  disabled: boolean
   submitCode: (code: string) => void
 }) {
   const [code, setCode] = useState('')
@@ -306,7 +312,7 @@ function CodeEntry({
       onSubmit={event => {
         event.preventDefault()
 
-        if (code.trim() !== '') submitCode(code)
+        if (!disabled && code.trim() !== '') submitCode(code)
       }}
     >
       <div className="flex gap-2">
@@ -319,7 +325,11 @@ function CodeEntry({
           onChange={event => setCode(event.target.value)}
           className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-1.5 font-mono text-sm aria-invalid:border-destructive"
         />
-        <Button type="submit" size="sm" disabled={code.trim() === ''}>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={disabled || code.trim() === ''}
+        >
           Connect
         </Button>
       </div>
@@ -367,16 +377,40 @@ function CardAction({
   )
 }
 
-const STATUS_LINES: Record<Step, (name: string, step: SignInStep) => string> = {
-  'get-ready': (name, {progress}) =>
-    progress
-      ? `Getting ${name} ready… ${megabytes(progress.receivedBytes)} of ${megabytes(progress.totalBytes)} MB`
-      : `Getting ${name} ready…`,
-  'sign-in-page': name =>
-    `Finish signing in on ${name}’s page in your browser.`,
-  'paste-code': name =>
-    `${name}’s page shows a code. Copy it and paste it here.`,
-  'check-plan': () => 'Checking your plan…',
+/**
+ * Each step of connecting: its label in the checklist, the line under it, and
+ * what shows below the label while it is the current step.
+ */
+const STEPS: Record<
+  Step,
+  {
+    label: (name: string) => string
+    status: (name: string, step: SignInStep) => string
+    Detail?: (props: StepDetailProps) => ReactNode
+  }
+> = {
+  'get-ready': {
+    label: name => `Get ${name} ready`,
+    status: (name, {progress}) =>
+      progress
+        ? `Getting ${name} ready… ${megabytes(progress.receivedBytes)} of ${megabytes(progress.totalBytes)} MB`
+        : `Getting ${name} ready…`,
+    Detail: DownloadProgress,
+  },
+  'sign-in-page': {
+    label: name => `Sign in on ${name}’s page`,
+    status: name => `Finish signing in on ${name}’s page in your browser.`,
+    Detail: PageNote,
+  },
+  'paste-code': {
+    label: () => 'Paste the code',
+    status: name => `${name}’s page shows a code. Copy it and paste it here.`,
+    Detail: PasteCode,
+  },
+  'check-plan': {
+    label: () => 'Check your plan',
+    status: () => 'Checking your plan…',
+  },
 }
 
 const FAILURE_LINES: Record<

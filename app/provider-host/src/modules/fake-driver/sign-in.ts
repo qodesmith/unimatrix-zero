@@ -1,7 +1,8 @@
-import type {Inbox} from '#modules/inbox/main'
+import type {Attempt} from '#modules/sign-in/main'
 import type {SignInUpdate} from '@uz/contract/providers'
 
-import {createInbox} from '#modules/inbox/main'
+import {createSignIn} from '#modules/sign-in/main'
+import {SIGN_IN_CANCELED, signInFailed} from '@uz/contract/providers'
 
 /** The size the fake vendor program pretends to download. */
 const PROGRAM_BYTES = 100_000_000
@@ -17,16 +18,9 @@ export const FAKE_FREE_CODE = 'fake-free'
 
 export const FAKE_ACCOUNT = {email: 'fake@example.com', plan: 'Max'}
 
-type Input =
-  | {kind: 'page-opened'}
-  | {kind: 'code'; code: string}
-  | {kind: 'answered'}
-  | {kind: 'cancel'}
-
-/** One go at connecting, from Connect to its end. */
-interface Attempt {
-  inbox: Inbox<Input>
-  canceled: boolean
+/** The page answering by itself. */
+interface Input {
+  kind: 'answered'
 }
 
 export interface FakeSignInOptions {
@@ -46,13 +40,6 @@ async function pause(ms: number) {
   })
 }
 
-/** Read after a pause, during which a cancel may have arrived. */
-function isCanceled(attempt: Attempt) {
-  return attempt.canceled
-}
-
-const canceled: SignInUpdate = {type: 'SIGN_IN_FINISHED', outcome: 'canceled'}
-
 /**
  * Connecting with no vendor behind it: a fake download, then a sign-in page
  * that answers by itself after a while, or takes a code once it is opened
@@ -60,23 +47,21 @@ const canceled: SignInUpdate = {type: 'SIGN_IN_FINISHED', outcome: 'canceled'}
  * any other code is wrong.
  */
 export function createFakeSignIn({delayMs, answerMs}: FakeSignInOptions) {
-  let attempt: Attempt | null = null
-
   /**
    * Waits for the page or the user; the plan they signed in on, or null if
    * canceled.
    */
-  async function* signInOnPage(
-    current: Attempt
-  ): AsyncGenerator<SignInUpdate, string | null> {
+  async function* signInOnPage({
+    inbox,
+  }: Attempt<Input>): AsyncGenerator<SignInUpdate, string | null> {
     const timer =
       answerMs === null
         ? undefined
-        : setTimeout(() => current.inbox.push({kind: 'answered'}), answerMs)
+        : setTimeout(() => inbox.push({kind: 'answered'}), answerMs)
 
     try {
       for (;;) {
-        const input = await current.inbox.next()
+        const input = await inbox.next()
 
         if (input.kind === 'cancel') return null
 
@@ -107,87 +92,64 @@ export function createFakeSignIn({delayMs, answerMs}: FakeSignInOptions) {
     }
   }
 
-  async function* signIn(): AsyncGenerator<SignInUpdate> {
-    const current: Attempt = {inbox: createInbox<Input>(), canceled: false}
-    attempt = current
-
-    try {
-      for (let step = 0; step <= DOWNLOAD_STEPS; step++) {
-        if (current.canceled) {
-          yield canceled
-
-          return
-        }
-
-        yield {
-          type: 'SIGN_IN_STEP',
-          step: 'get-ready',
-          progress: {
-            receivedBytes: (PROGRAM_BYTES / DOWNLOAD_STEPS) * step,
-            totalBytes: PROGRAM_BYTES,
-          },
-        }
-        await pause(delayMs)
-      }
-
-      if (current.canceled) {
-        yield canceled
-
-        return
-      }
-
-      yield {type: 'SIGN_IN_STEP', step: 'sign-in-page', url: FAKE_SIGN_IN_URL}
-
-      const plan = yield* signInOnPage(current)
-
-      if (plan === null) {
-        yield canceled
-
-        return
-      }
-
-      yield {type: 'SIGN_IN_STEP', step: 'check-plan'}
-      await pause(delayMs * 10)
-
-      if (isCanceled(current)) {
-        yield canceled
-
-        return
-      }
-
-      if (plan === 'Free') {
-        yield {
-          type: 'SIGN_IN_FINISHED',
-          outcome: 'failed',
-          failure: {
-            reason: 'free-plan',
-            message: 'The fake account is on a free plan.',
-          },
-        }
+  async function* connect(
+    attempt: Attempt<Input>
+  ): AsyncGenerator<SignInUpdate> {
+    for (let step = 0; step <= DOWNLOAD_STEPS; step++) {
+      if (attempt.canceled()) {
+        yield SIGN_IN_CANCELED
 
         return
       }
 
       yield {
-        type: 'SIGN_IN_FINISHED',
-        outcome: 'connected',
-        account: FAKE_ACCOUNT,
+        type: 'SIGN_IN_STEP',
+        step: 'get-ready',
+        progress: {
+          receivedBytes: (PROGRAM_BYTES / DOWNLOAD_STEPS) * step,
+          totalBytes: PROGRAM_BYTES,
+        },
       }
-    } finally {
-      if (attempt === current) attempt = null
+      await pause(delayMs)
+    }
+
+    if (attempt.canceled()) {
+      yield SIGN_IN_CANCELED
+
+      return
+    }
+
+    yield {type: 'SIGN_IN_STEP', step: 'sign-in-page', url: FAKE_SIGN_IN_URL}
+
+    const plan = yield* signInOnPage(attempt)
+
+    if (plan === null) {
+      yield SIGN_IN_CANCELED
+
+      return
+    }
+
+    yield {type: 'SIGN_IN_STEP', step: 'check-plan'}
+    await pause(delayMs * 10)
+
+    if (attempt.canceled()) {
+      yield SIGN_IN_CANCELED
+
+      return
+    }
+
+    if (plan === 'Free') {
+      yield signInFailed('free-plan', 'The fake account is on a free plan.')
+
+      return
+    }
+
+    yield {
+      type: 'SIGN_IN_FINISHED',
+      outcome: 'connected',
+      account: FAKE_ACCOUNT,
     }
   }
 
-  return {
-    signIn,
-    signInPageOpened: () => attempt?.inbox.push({kind: 'page-opened'}),
-    submitSignInCode: (code: string) =>
-      attempt?.inbox.push({kind: 'code', code}),
-    cancelSignIn: () => {
-      if (!attempt) return
-
-      attempt.canceled = true
-      attempt.inbox.push({kind: 'cancel'})
-    },
-  }
+  return createSignIn(connect)
 }

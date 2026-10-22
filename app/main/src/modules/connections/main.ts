@@ -6,12 +6,17 @@ import type {
   Account,
   ProviderId,
   ProviderStatus,
+  SignInFinished,
   SignInStep,
   SignInUpdate,
 } from '@uz/contract/providers'
 
 import {schema} from '#modules/database/main'
-import {PROVIDER_NAMES, ProviderIdSchema} from '@uz/contract/providers'
+import {
+  PROVIDER_NAMES,
+  ProviderIdSchema,
+  signInFailed,
+} from '@uz/contract/providers'
 import {eq} from 'drizzle-orm'
 
 interface ConnectionsOptions {
@@ -85,13 +90,10 @@ export function createConnections({
   }
 
   /** Ends connecting; a host that has nothing connected is stopped. */
-  function finish(
-    provider: ProviderId,
-    update: Extract<SignInUpdate, {type: 'SIGN_IN_FINISHED'}>
-  ) {
+  function finish(provider: ProviderId, update: SignInFinished) {
     signIn = null
 
-    if (update.outcome === 'connected' && update.account) {
+    if (update.outcome === 'connected') {
       save(provider, update.account)
     } else if (!accountOf(provider)) {
       hosts.stop(provider)
@@ -194,14 +196,13 @@ export function createConnections({
     hostCrashed(provider: ProviderId) {
       if (signIn?.provider !== provider) return
 
-      finish(provider, {
-        type: 'SIGN_IN_FINISHED',
-        outcome: 'failed',
-        failure: {
-          reason: 'failed',
-          message: `${PROVIDER_NAMES[provider]} stopped unexpectedly.`,
-        },
-      })
+      finish(
+        provider,
+        signInFailed(
+          'failed',
+          `${PROVIDER_NAMES[provider]} stopped unexpectedly.`
+        )
+      )
     },
   }
 }

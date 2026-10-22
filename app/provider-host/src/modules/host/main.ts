@@ -10,6 +10,7 @@ import type {ProviderId} from '@uz/contract/providers'
 import {createClaudeDriver} from '#modules/claude-driver/main'
 import {createFakeDriver} from '#modules/fake-driver/main'
 import {HostCommandSchema} from '@uz/contract/host'
+import {signInFailed} from '@uz/contract/providers'
 
 /** The host's side of its link to main: Electron's `process.parentPort`. */
 export interface HostPort {
@@ -50,14 +51,12 @@ export async function runHost(port: HostPort, driver: ProviderDriver) {
         port.postMessage(update)
       }
     } catch (error) {
-      port.postMessage({
-        type: 'SIGN_IN_FINISHED',
-        outcome: 'failed',
-        failure: {
-          reason: 'failed',
-          message: error instanceof Error ? error.message : String(error),
-        },
-      })
+      port.postMessage(
+        signInFailed(
+          'failed',
+          error instanceof Error ? error.message : String(error)
+        )
+      )
     }
   }
 

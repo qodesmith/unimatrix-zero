@@ -4,6 +4,7 @@ import type {HostCommand} from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
 
 import {openDatabase} from '#modules/database/main'
+import {SIGN_IN_CANCELED, signInFailed} from '@uz/contract/providers'
 import path from 'node:path'
 import {beforeEach, expect, it} from 'vitest'
 
@@ -164,13 +165,12 @@ it('stops the host again when connecting fails or is canceled', () => {
     const connections = setUp()
     connections.connect('claude')
 
-    connections.applySignInUpdate('claude', {
-      type: 'SIGN_IN_FINISHED',
-      outcome,
-      ...(outcome === 'failed' && {
-        failure: {reason: 'free-plan', message: 'No Pro or Max plan.'},
-      }),
-    })
+    connections.applySignInUpdate(
+      'claude',
+      outcome === 'failed'
+        ? signInFailed('free-plan', 'No Pro or Max plan.')
+        : SIGN_IN_CANCELED
+    )
 
     expect(running.size).toBe(0)
     expect(connections.snapshot().signIn).toBeNull()
