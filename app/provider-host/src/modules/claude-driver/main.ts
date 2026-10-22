@@ -1,12 +1,12 @@
 import type {ClaudeRepliesDeps} from './streaming'
 import type {ProviderDriver} from '@uz/contract/host'
 
+import {getProgramReady} from '#modules/vendor-program/main'
 import {query} from '@anthropic-ai/claude-agent-sdk'
 import {spawn} from 'node:child_process'
 
 import {readAccount} from './account'
 import {signOut, startLogin} from './login'
-import {getProgramReady} from './program'
 import {SIGN_IN_TIMEOUT_MS, createClaudeSignIn} from './sign-in'
 import {DEFAULT_MODEL, createClaudeReplies} from './streaming'
 import {IDLE_CLOSE_MS, MAX_WARM} from './warm'

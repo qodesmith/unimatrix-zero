@@ -1,6 +1,9 @@
 import type {Attempt, UserInput} from '#modules/sign-in/main'
+import type {
+  DownloadProgress,
+  ProgramTarget,
+} from '#modules/vendor-program/main'
 import type {ClaudeCommand, Login, LoginEvents} from './login'
-import type {DownloadProgress, ProgramTarget} from './program'
 import type {AccountInfo} from '@anthropic-ai/claude-agent-sdk'
 import type {SignInRequest} from '@uz/contract/host'
 import type {SignInFinished, SignInUpdate} from '@uz/contract/providers'

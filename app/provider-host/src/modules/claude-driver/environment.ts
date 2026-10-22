@@ -1,8 +1,4 @@
-/**
- * Variables that would make a vendor program answer to something other than
- * the connected subscription, or read the user's own setup (ADR 0014).
- */
-const STRIPPED_PREFIXES = ['ANTHROPIC_', 'CLAUDE_', 'OPENAI_', 'CODEX_']
+import {vendorEnvironment} from '#modules/vendor-environment/main'
 
 /**
  * The environment `claude` runs in: the host's, minus anything that could
@@ -12,16 +8,8 @@ const STRIPPED_PREFIXES = ['ANTHROPIC_', 'CLAUDE_', 'OPENAI_', 'CODEX_']
  * for the sign-in under the temporary folder and isn't signed in.
  */
 export function claudeEnvironment(base: NodeJS.ProcessEnv, configDir: string) {
-  const kept = Object.entries(base).filter(
-    (entry): entry is [string, string] =>
-      entry[1] !== undefined &&
-      !STRIPPED_PREFIXES.some(prefix =>
-        entry[0].toUpperCase().startsWith(prefix)
-      )
-  )
-
   return {
-    ...Object.fromEntries(kept),
+    ...vendorEnvironment(base),
     CLAUDE_CONFIG_DIR: configDir,
     CLAUDE_SECURESTORAGE_CONFIG_DIR: configDir,
     DISABLE_UPDATES: '1',

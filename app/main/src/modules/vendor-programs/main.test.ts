@@ -54,11 +54,35 @@ it('has no program for a machine the manifest does not name', () => {
   ).toBeNull()
 })
 
-it('has no program for ChatGPT yet', () => {
-  expect(
-    signInRequestFor('chatgpt', {userData, platform: 'darwin', arch: 'arm64'})
-  ).toEqual({
-    program: null,
+it('names one Codex folder for each OS and arch, run from its app-server', () => {
+  const {builds} = DEV_MANIFEST.vendorPrograms.codex
+
+  expect(Object.keys(builds).toSorted()).toEqual(
+    Object.keys(DEV_MANIFEST.vendorPrograms.claude.builds).toSorted()
+  )
+
+  for (const [platform, build] of Object.entries(builds)) {
+    const exe = platform.startsWith('win32') ? '.exe' : ''
+
+    expect(build.archive).toEqual({
+      format: 'tar.gz',
+      entrypoint: `bin/codex-app-server${exe}`,
+    })
+  }
+})
+
+it('puts the Codex folder for ChatGPT under userData, beside its own configuration', () => {
+  const request = signInRequestFor('chatgpt', {
+    userData,
+    platform: 'linux',
+    arch: 'x64',
+  })
+
+  expect(request).toEqual({
+    program: {
+      path: path.join(userData, 'vendor', 'chatgpt', '0.163.0'),
+      build: DEV_MANIFEST.vendorPrograms.codex.builds['linux-x64'],
+    },
     configDir: path.join(userData, 'providers', 'chatgpt'),
   })
 })
