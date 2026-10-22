@@ -34,6 +34,65 @@
           "size": 297079456
         }
       }
+    },
+    "codex": {
+      "version": "0.163.0",
+      "builds": {
+        "darwin-arm64": {
+          "url": "https://github.com/openai/codex/releases/download/rust-v0.163.0/codex-app-server-package-aarch64-apple-darwin.tar.gz",
+          "sha256": "c64323d8d51933c3fe50489e841f3a9ebbce971d9e06dc3d734ac2f3c7ddb2cf",
+          "size": 101989246,
+          "archive": {
+            "format": "tar.gz",
+            "entrypoint": "bin/codex-app-server"
+          }
+        },
+        "darwin-x64": {
+          "url": "https://github.com/openai/codex/releases/download/rust-v0.163.0/codex-app-server-package-x86_64-apple-darwin.tar.gz",
+          "sha256": "5f5099e28a3ee3bc4d9fbe1611bc3244fda930a51a24c0f4f258b09c3e0f33f9",
+          "size": 110580175,
+          "archive": {
+            "format": "tar.gz",
+            "entrypoint": "bin/codex-app-server"
+          }
+        },
+        "linux-arm64": {
+          "url": "https://github.com/openai/codex/releases/download/rust-v0.163.0/codex-app-server-package-aarch64-unknown-linux-musl.tar.gz",
+          "sha256": "9749a312a24db3c8a24683785595b5e556916694a648259fc3742a118f46a28c",
+          "size": 109259793,
+          "archive": {
+            "format": "tar.gz",
+            "entrypoint": "bin/codex-app-server"
+          }
+        },
+        "linux-x64": {
+          "url": "https://github.com/openai/codex/releases/download/rust-v0.163.0/codex-app-server-package-x86_64-unknown-linux-musl.tar.gz",
+          "sha256": "cce5802264a44d082da894ff2f2ba695a6ade722bc62a1ad0902153667063401",
+          "size": 116958460,
+          "archive": {
+            "format": "tar.gz",
+            "entrypoint": "bin/codex-app-server"
+          }
+        },
+        "win32-arm64": {
+          "url": "https://github.com/openai/codex/releases/download/rust-v0.163.0/codex-app-server-package-aarch64-pc-windows-msvc.tar.gz",
+          "sha256": "574251c91f4fc58c564902d5f6b82e74a5862874bc0757b506a6550ca80dfd34",
+          "size": 118083212,
+          "archive": {
+            "format": "tar.gz",
+            "entrypoint": "bin/codex-app-server.exe"
+          }
+        },
+        "win32-x64": {
+          "url": "https://github.com/openai/codex/releases/download/rust-v0.163.0/codex-app-server-package-x86_64-pc-windows-msvc.tar.gz",
+          "sha256": "abee5d71e80c4707b26f4c3c7b65b0f736ed3b7e7918b4f9b14a94ad89ff781c",
+          "size": 127258175,
+          "archive": {
+            "format": "tar.gz",
+            "entrypoint": "bin/codex-app-server.exe"
+          }
+        }
+      }
     }
   }
 }

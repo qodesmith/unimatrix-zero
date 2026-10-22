@@ -35,6 +35,7 @@
     "test:renderer": "bun run scripts/vitest.ts run --project renderer",
     "check": "bun run fmt:check && bun run lint && bun run typecheck && bun run knip && bun run test",
     "electron-runtime": "bun run scripts/electron-runtime.ts",
+    "codex-protocol": "bun run scripts/codex-protocol.ts",
     "skills:install": "bun run scripts/install-skills.ts",
     "skills:update": "bunx skills update --project -y"
   },

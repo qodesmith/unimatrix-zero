@@ -111,10 +111,15 @@ export const SignInStepUpdate = z.strictObject({
     .optional(),
   /** The pasted code was not the one the sign-in page showed. */
   wrongCode: z.literal(true).optional(),
+  /**
+   * Main opens `url` in the browser now, because the vendor program doesn't
+   * open it itself. Main doesn't pass it on to the window.
+   */
+  openPage: z.literal(true).optional(),
 })
 
 export const SignInFailureSchema = z.strictObject({
-  reason: z.enum(['download-failed', 'no-answer', 'free-plan', 'failed']),
+  reason: z.enum(['download-failed', 'no-answer', 'plan-refused', 'failed']),
   message: z.string(),
 })
 

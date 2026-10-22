@@ -3,6 +3,7 @@ import type {SDKPartialAssistantMessage} from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRecorded, ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {fakeStore} from '#modules/test-store/main'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -11,7 +12,6 @@ import {afterEach, expect, it, vi} from 'vitest'
 
 import {createClaudeDriver} from './main'
 import {RECORDINGS, RecordedLineSchema, replayClaude} from './replay'
-import {fakeStore} from './test-store'
 import {projectKeyOf} from './transcripts'
 
 /** As `warm.ndjson` and `resumed.ndjson` recorded them. */
@@ -43,12 +43,14 @@ interface Report {
 const cleanUps: (() => Promise<void>)[] = []
 
 afterEach(async () => {
-  for (const cleanUp of cleanUps.splice(0)) await cleanUp()
+  for (const cleanUp of cleanUps.splice(0).toReversed()) await cleanUp()
 })
 
 function folder(prefix: string) {
   const made = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)))
-  cleanUps.push(async () => fs.rmSync(made, {recursive: true, force: true}))
+  cleanUps.push(async () =>
+    fs.rmSync(made, {recursive: true, force: true, maxRetries: 10})
+  )
 
   return made
 }
@@ -137,6 +139,9 @@ async function setUp(recordings: string[], env: Record<string, string> = {}) {
       {timeout: 5000}
     )
   }
+
+  // Windows can't remove a folder while a `claude` still runs in it.
+  cleanUps.push(allClosed)
 
   return {
     configDir,

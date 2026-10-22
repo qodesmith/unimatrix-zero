@@ -1,8 +1,10 @@
 import type {Inbox} from '#modules/inbox/main'
+import type {DownloadProgress} from '#modules/vendor-program/main'
 import type {SignInRequest} from '@uz/contract/host'
-import type {SignInUpdate} from '@uz/contract/providers'
+import type {SignInFinished, SignInUpdate} from '@uz/contract/providers'
 
 import {createInbox} from '#modules/inbox/main'
+import {SIGN_IN_CANCELED, signInFailed} from '@uz/contract/providers'
 
 /** What the user does while connecting, as main passes it on. */
 export type UserInput =
@@ -18,6 +20,33 @@ export interface Attempt<Input extends object> {
   signal: AbortSignal
   /** A function so it is read afresh after each wait. */
   canceled: () => boolean
+}
+
+/**
+ * The `get-ready` step: puts the vendor program in place, passing its
+ * download's progress on. The update to end with when that failed or the
+ * user canceled; null once the program is ready.
+ */
+export async function* getReady(
+  attempt: Pick<Attempt<object>, 'canceled'>,
+  download: AsyncIterable<DownloadProgress>
+): AsyncGenerator<SignInUpdate, SignInFinished | null> {
+  yield {type: 'SIGN_IN_STEP', step: 'get-ready'}
+
+  try {
+    for await (const progress of download) {
+      yield {type: 'SIGN_IN_STEP', step: 'get-ready', progress}
+    }
+  } catch (error) {
+    if (attempt.canceled()) return SIGN_IN_CANCELED
+
+    return signInFailed(
+      'download-failed',
+      error instanceof Error ? error.message : String(error)
+    )
+  }
+
+  return attempt.canceled() ? SIGN_IN_CANCELED : null
 }
 
 /**

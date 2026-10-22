@@ -168,7 +168,7 @@ it('stops the host again when connecting fails or is canceled', () => {
     connections.applySignInUpdate(
       'claude',
       outcome === 'failed'
-        ? signInFailed('free-plan', 'No Pro or Max plan.')
+        ? signInFailed('plan-refused', 'No Pro or Max plan.')
         : SIGN_IN_CANCELED
     )
 
@@ -176,6 +176,18 @@ it('stops the host again when connecting fails or is canceled', () => {
     expect(connections.snapshot().signIn).toBeNull()
     expect(published.at(-1)).toMatchObject({type: 'SIGN_IN_FINISHED', outcome})
   }
+})
+
+it('opens the sign-in page itself when the host asks, once', () => {
+  const connections = setUp()
+  connections.connect('claude')
+
+  const step = {type: 'SIGN_IN_STEP', step: 'sign-in-page', url} as const
+  connections.applySignInUpdate('claude', {...step, openPage: true})
+
+  expect(opened).toEqual([url])
+  expect(published.at(-1)).toEqual({...step, provider: 'claude'})
+  expect(connections.snapshot().signIn).toEqual({...step, provider: 'claude'})
 })
 
 it('opens the sign-in page again and tells the host, which then takes a code', () => {

@@ -11,6 +11,7 @@
  */
 import type {ReplyRecorded, ReplyRequest} from '@uz/contract/host'
 
+import {fakeStore} from '#modules/test-store/main'
 import {spawn} from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -19,7 +20,6 @@ import {describe, expect, it} from 'vitest'
 import {createClaudeDriver} from './main'
 import {createRecorder} from './recording'
 import {RECORDINGS} from './replay'
-import {fakeStore} from './test-store'
 import {projectKeyOf} from './transcripts'
 
 const program = process.env.UZ_LIVE_CLAUDE_PROGRAM

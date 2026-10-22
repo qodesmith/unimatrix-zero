@@ -12,6 +12,7 @@
     "**/dist",
     "**/.tsout",
     "skills-lock.json",
+    "app/provider-host/src/modules/codex-driver/protocol",
     "bun.lock",
   ],
   "insertFinalNewline": true,

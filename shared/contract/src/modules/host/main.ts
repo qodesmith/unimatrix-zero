@@ -30,8 +30,9 @@ export type SessionRef = z.infer<typeof SessionRefSchema>
 /** What a driver needs to connect its Provider. */
 export const SignInRequestSchema = z.strictObject({
   /**
-   * Where the vendor program goes and what to download. Null when the
-   * manifest names none for the Provider, which only the fake driver accepts.
+   * Where the vendor program goes, the folder for an archive, and what to
+   * download. Null when the manifest names none for the Provider, which only
+   * the fake driver accepts.
    */
   program: z
     .strictObject({path: z.string().min(1), build: VendorBuildSchema})

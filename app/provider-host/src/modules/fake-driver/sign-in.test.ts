@@ -97,7 +97,7 @@ it('refuses an account on a free plan', async () => {
   expect(updates.at(-1)).toMatchObject({
     type: 'SIGN_IN_FINISHED',
     outcome: 'failed',
-    failure: {reason: 'free-plan'},
+    failure: {reason: 'plan-refused'},
   })
 })
 

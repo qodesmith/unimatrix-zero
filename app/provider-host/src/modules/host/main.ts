@@ -9,6 +9,7 @@ import type {
 import type {ProviderId} from '@uz/contract/providers'
 
 import {createClaudeDriver} from '#modules/claude-driver/main'
+import {createCodexDriver} from '#modules/codex-driver/main'
 import {createFakeDriver} from '#modules/fake-driver/main'
 import {createSessionStoreClient} from '#modules/session-store/main'
 import {HostCommandSchema} from '@uz/contract/host'
@@ -104,9 +105,9 @@ export async function runHost(
 function driverFor(provider: ProviderId, store: SessionStoreClient) {
   if (process.argv.includes('--fake')) return createFakeDriver()
 
-  if (provider === 'claude') return createClaudeDriver({store})
-
-  throw new Error(`There is no ${provider} driver yet; start with --fake.`)
+  return provider === 'claude'
+    ? createClaudeDriver({store})
+    : createCodexDriver({store})
 }
 
 export function startHost(provider: ProviderId) {

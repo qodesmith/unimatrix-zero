@@ -23,6 +23,7 @@
       "project": ["src/**/*.{ts,tsx,css}"]
     },
     "app/provider-host": {
+      "ignore": ["src/modules/codex-driver/protocol/**"],
       "project": ["src/**/*.ts"]
     },
     "shell": {
