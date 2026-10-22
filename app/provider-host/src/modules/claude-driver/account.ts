@@ -3,6 +3,10 @@ import type {AccountInfo, SDKUserMessage} from '@anthropic-ai/claude-agent-sdk'
 import {query} from '@anthropic-ai/claude-agent-sdk'
 import {spawn} from 'node:child_process'
 import {once} from 'node:events'
+import {setTimeout as delay} from 'node:timers/promises'
+
+/** Far longer than a token refresh; a `claude` still running then is stuck. */
+const EXIT_TIMEOUT_MS = 30_000
 
 const PREFIX = 'Claude '
 
@@ -14,8 +18,8 @@ const PREFIX = 'Claude '
 const NO_PLAN = 'Claude API'
 
 /** The plan's name, or null when the account has no paid plan. */
-export function planOf(subscriptionType: string | undefined): string | null {
-  if (!subscriptionType?.startsWith(PREFIX) || subscriptionType === NO_PLAN) {
+export function planOf(subscriptionType: string): string | null {
+  if (!subscriptionType.startsWith(PREFIX) || subscriptionType === NO_PLAN) {
     return null
   }
 
@@ -54,8 +58,7 @@ export async function readAccount({
       cwd,
       settingSources: [],
       settings: {autoMemoryEnabled: false},
-      // The SDK's own spawn stops waiting for the exit after 2 s; this one
-      // keeps the process, so closing waits as long as `claude` takes.
+      // Spawned here only to know when `claude` has exited.
       spawnClaudeCodeProcess: ({
         command,
         args,
@@ -81,8 +84,16 @@ export async function readAccount({
   try {
     return await session.accountInfo()
   } finally {
+    // The SDK ends `claude`'s input once the Prompts run out, but closing the
+    // session kills `claude` 2 s later, so it closes only once `claude` has
+    // exited, or is stuck.
     input.resolve()
+    const stuck = new AbortController()
+    await Promise.race([
+      exited,
+      delay(EXIT_TIMEOUT_MS, undefined, {signal: stuck.signal}),
+    ]).catch(() => undefined)
+    stuck.abort()
     await session.return()
-    await exited.catch(() => undefined)
   }
 }

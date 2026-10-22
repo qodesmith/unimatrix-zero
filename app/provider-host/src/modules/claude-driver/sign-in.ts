@@ -303,7 +303,15 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
         .readAccount({program: program.path, env, cwd: configDir})
         .catch(() => null)
 
-      if (!account) {
+      // Canceled while the plan was read, which is never cut short.
+      if (wasCanceled()) {
+        yield canceled
+
+        return
+      }
+
+      // No plan at all, not even "Claude API", means it wasn't read.
+      if (account?.subscriptionType === undefined) {
         yield failed('failed', 'Couldn’t check your Claude plan. Try again.')
 
         return
@@ -316,13 +324,6 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
         // next sign-in replaces this one anyway.
         await deps.signOut(command, env).catch(() => undefined)
         yield failed('free-plan', 'This Claude account has no Pro or Max plan.')
-
-        return
-      }
-
-      // Canceled while the plan was read, which is never cut short.
-      if (wasCanceled()) {
-        yield canceled
 
         return
       }

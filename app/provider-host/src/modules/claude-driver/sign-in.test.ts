@@ -254,6 +254,29 @@ it('cancels on the sign-in page, ending claude auth login', async () => {
   })
 })
 
+it('cancels while the plan is read, even for a free account', async () => {
+  const used = deps({
+    env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
+    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () => ({
+      email: 'sam@example.com',
+      subscriptionType: 'Claude API',
+    })),
+  })
+
+  const signIn = createClaudeSignIn(used)
+
+  const updates = await connect(signIn, update => {
+    if (isStep(update, 'check-plan')) signIn.cancelSignIn()
+  })
+
+  expect(used.readAccount).toHaveBeenCalledOnce()
+  expect(used.signOut).not.toHaveBeenCalled()
+  expect(updates.at(-1)).toEqual({
+    type: 'SIGN_IN_FINISHED',
+    outcome: 'canceled',
+  })
+})
+
 it('fails when Claude’s page is declined', async () => {
   const used = deps({env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'no'}})
 
@@ -296,7 +319,9 @@ it('signs a free account out again and refuses it', async () => {
 it('still refuses a free account when signing it out fails', async () => {
   const used = deps({
     env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
-    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () => ({})),
+    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () => ({
+      subscriptionType: 'Claude API',
+    })),
     signOut: vi.fn<ClaudeSignInDeps['signOut']>(async () => {
       throw new Error('claude auth logout exited with 1')
     }),
@@ -305,6 +330,26 @@ it('still refuses a free account when signing it out fails', async () => {
   const updates = await connect(createClaudeSignIn(used))
 
   expect(updates.at(-1)).toMatchObject({failure: {reason: 'free-plan'}})
+})
+
+it('keeps an account whose plan isn’t reported, saying it wasn’t read', async () => {
+  const used = deps({
+    env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
+    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () => ({
+      email: 'sam@example.com',
+    })),
+  })
+
+  const updates = await connect(createClaudeSignIn(used))
+
+  expect(used.signOut).not.toHaveBeenCalled()
+  expect(updates.at(-1)).toMatchObject({
+    outcome: 'failed',
+    failure: {
+      reason: 'failed',
+      message: 'Couldn’t check your Claude plan. Try again.',
+    },
+  })
 })
 
 it('says so in plain words when the plan can’t be read', async () => {
