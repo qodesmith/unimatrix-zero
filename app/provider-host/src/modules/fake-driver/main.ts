@@ -3,6 +3,8 @@ import type {ReplyEvent} from '@uz/contract/turns'
 
 import {randomUUID} from 'node:crypto'
 
+import {createFakeSignIn} from './sign-in'
+
 const OPENING = `Here is a **canned** Reply from the fake Provider. It streams word by word, the way a real one would, so the whole path from the Provider host to the window can be tried without an account.
 
 Let me look something up first.
@@ -61,17 +63,21 @@ function behaviorOf(prompt: string): Behavior {
 }
 
 interface FakeDriverOptions {
-  /** The pause before each word. */
+  /** The pause before each word, and between connect steps. */
   delayMs?: number
+  /** When the fake sign-in page answers by itself; null: never. */
+  signInAnswerMs?: number | null
 }
 
 /**
  * A driver with no vendor behind it: canned Markdown with a tool call in the
  * middle, streamed with delays. A Prompt containing `/fail` or `/hang` makes
- * the Reply fail or go quiet partway through.
+ * the Reply fail or go quiet partway through. Connecting goes through every
+ * step without an account.
  */
 export function createFakeDriver({
   delayMs = 40,
+  signInAnswerMs = 3000,
 }: FakeDriverOptions = {}): ProviderDriver {
   const running = new Map<string, AbortController>()
 
@@ -137,9 +143,11 @@ export function createFakeDriver({
       }
 
       if (behavior === 'hang') {
-        await new Promise(resolve => {
-          signal.addEventListener('abort', resolve, {once: true})
-        })
+        if (!signal.aborted) {
+          await new Promise(resolve => {
+            signal.addEventListener('abort', resolve, {once: true})
+          })
+        }
 
         yield stopped()
 
@@ -198,6 +206,7 @@ export function createFakeDriver({
     }),
     listModels: async () => [{id: 'fake', name: 'Fake model'}],
     readUsage: async () => ({windows: []}),
+    ...createFakeSignIn({delayMs, answerMs: signInAnswerMs}),
     startReply,
     stop: async replyId => {
       running.get(replyId)?.abort()

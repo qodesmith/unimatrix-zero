@@ -1,3 +1,4 @@
+import {ProviderIdSchema} from '#modules/providers/main'
 import {TREE_TITLE_MAX_LENGTH, TreeSchema} from '#modules/trees/main'
 import {PromptSchema, ReplySchema} from '#modules/turns/main'
 import {z} from 'zod'
@@ -57,6 +58,31 @@ export const PromptSendResult = z.strictObject({
   reply: ReplySchema,
 })
 
+/** Starts connecting a Provider; `SIGN_IN_STEP` and `SIGN_IN_FINISHED` follow. */
+export const ProviderConnectCommand = z.strictObject({
+  type: z.literal('provider.connect'),
+  provider: ProviderIdSchema,
+})
+
+/** Opens the connecting Provider's sign-in page again, which shows a code. */
+export const SignInOpenPageCommand = z.strictObject({
+  type: z.literal('sign-in.open-page'),
+  provider: ProviderIdSchema,
+})
+
+export const SignInCodeCommand = z.strictObject({
+  type: z.literal('sign-in.code'),
+  provider: ProviderIdSchema,
+  code: z.string().trim().min(1),
+})
+
+export const SignInCancelCommand = z.strictObject({
+  type: z.literal('sign-in.cancel'),
+  provider: ProviderIdSchema,
+})
+
+const Done = z.strictObject({})
+
 export const CommandSchema = z.discriminatedUnion('type', [
   AppPingCommand,
   TreeCreateCommand,
@@ -65,6 +91,10 @@ export const CommandSchema = z.discriminatedUnion('type', [
   TreeRenameCommand,
   TreeTurnsCommand,
   PromptSendCommand,
+  ProviderConnectCommand,
+  SignInOpenPageCommand,
+  SignInCodeCommand,
+  SignInCancelCommand,
 ])
 
 export type Command = z.infer<typeof CommandSchema>
@@ -79,6 +109,10 @@ const resultSchemas = {
   'tree.rename': TreeSchema,
   'tree.turns': TreeTurnsResult,
   'prompt.send': PromptSendResult,
+  'provider.connect': Done,
+  'sign-in.open-page': Done,
+  'sign-in.code': Done,
+  'sign-in.cancel': Done,
 } as const satisfies Record<CommandType, z.ZodType>
 
 export type CommandResult<T extends CommandType> = z.infer<

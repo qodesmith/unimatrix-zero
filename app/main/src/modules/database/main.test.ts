@@ -79,6 +79,7 @@ describe('opening', () => {
 
     expect(tables).toEqual([
       'prompts',
+      'providers',
       'replies',
       'settings',
       'system_prompts',
@@ -204,6 +205,7 @@ describe('migrating', () => {
 
   it('restores the backup when the foreign-key check fails', () => {
     withTreeAndPrompt()
+    const applied = count('__drizzle_migrations')
     addMigration(
       '29990101000000_orphan',
       "INSERT INTO `prompts` (`id`, `tree_id`, `text`, `created_at`) VALUES ('orphan', 'no-such-tree', 'Lost', 0);"
@@ -211,6 +213,6 @@ describe('migrating', () => {
 
     expect(open).toThrow(/left as it was/)
     expect(count('prompts')).toBe(1)
-    expect(count('__drizzle_migrations')).toBe(1)
+    expect(count('__drizzle_migrations')).toBe(applied)
   })
 })

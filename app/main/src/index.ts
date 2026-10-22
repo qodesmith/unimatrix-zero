@@ -7,6 +7,7 @@ import {
   serveBundle,
 } from '#modules/app-protocol/main'
 import {registerCommandChannel} from '#modules/commands/main'
+import {createConnections} from '#modules/connections/main'
 import {DatabaseOpenError, openDatabase} from '#modules/database/main'
 import {readDevRun} from '#modules/dev/main'
 import {createDroppedFiles} from '#modules/dropped-files/main'
@@ -15,10 +16,12 @@ import {createHub, registerSubscribeChannel} from '#modules/hub/main'
 import {createProviderHosts} from '#modules/provider-hosts/main'
 import {createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
+import {signInRequestFor} from '#modules/vendor-programs/main'
 import {
   createWindow,
   hardenSession,
   isTopLevelAppFrame,
+  openLink,
 } from '#modules/window/main'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {app, dialog, ipcMain, protocol, session} from 'electron'
@@ -78,6 +81,7 @@ function openWindow(db: Database) {
     type: 'SNAPSHOT',
     app: {version: app.getVersion()},
     replies: turns.streaming(),
+    ...connections.snapshot(),
   }))
 
   const turns = createTurns(db, hub.publish)
@@ -85,11 +89,37 @@ function openWindow(db: Database) {
   const hosts = createProviderHosts({
     spawn: utilityHost(hostsDist, dev?.fakeProvider ? ['--fake'] : []),
     onReplyEvent: turns.apply,
-    onCrash: provider =>
+    onSignInUpdate: (provider, update) =>
+      connections.applySignInUpdate(provider, update),
+    onStatus: (provider, status) =>
+      connections.applyHostStatus(provider, status),
+    onCrash: provider => {
       turns.failAll(provider, {
         code: 'host-crashed',
         message: `${PROVIDER_NAMES[provider]} stopped unexpectedly.`,
-      }),
+      })
+      connections.hostCrashed(provider)
+    },
+  })
+
+  const machine = {
+    userData: app.getPath('userData'),
+    platform: process.platform,
+    arch: process.arch,
+  }
+
+  const connections = createConnections({
+    db,
+    hosts,
+    publish: hub.publish,
+    // The fake driver connects without a vendor program.
+    requestFor: provider => {
+      const request = signInRequestFor(provider, machine)
+
+      return request.program || dev?.fakeProvider ? request : null
+    },
+    openExternal: openLink,
+    now: () => new Date(),
   })
 
   app.on('will-quit', () => {
@@ -97,9 +127,7 @@ function openWindow(db: Database) {
     turns.saveAll()
   })
 
-  // Connecting a Provider comes with the Connections screen; until then only
-  // the fake one connects.
-  if (dev?.fakeProvider) hosts.connect('claude')
+  connections.startConnected()
 
   registerCommandChannel(
     ipcMain,
@@ -109,6 +137,7 @@ function openWindow(db: Database) {
       trees: createTrees(db),
       turns,
       hosts,
+      connections,
       publish: hub.publish,
     }
   )

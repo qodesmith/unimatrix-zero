@@ -10,6 +10,7 @@
     "./events": "./src/modules/events/main.ts",
     "./bridge": "./src/modules/bridge/main.ts",
     "./host": "./src/modules/host/main.ts",
+    "./manifest": "./src/modules/manifest/main.ts",
     "./providers": "./src/modules/providers/main.ts",
     "./theme": "./src/modules/theme/main.ts",
     "./trees": "./src/modules/trees/main.ts",

@@ -2,11 +2,13 @@ import type {
   Capabilities,
   Connection,
   Model,
+  SignInUpdate,
   Usage,
 } from '#modules/providers/main'
 import type {ApprovalAnswer, ReplyEvent} from '#modules/turns/main'
 
-import {ModelSchema} from '#modules/providers/main'
+import {VendorBuildSchema} from '#modules/manifest/main'
+import {ModelSchema, SignInUpdateSchema} from '#modules/providers/main'
 import {ReplyEventSchema, ReplyPartSchema} from '#modules/turns/main'
 import {z} from 'zod'
 
@@ -28,6 +30,21 @@ export const SessionRefSchema = z.strictObject({
 
 export type SessionRef = z.infer<typeof SessionRefSchema>
 
+/** What a driver needs to connect its Provider. */
+export const SignInRequestSchema = z.strictObject({
+  /**
+   * Where the vendor program goes and what to download. Null when the
+   * manifest names none for the Provider, which only the fake driver accepts.
+   */
+  program: z
+    .strictObject({path: z.string().min(1), build: VendorBuildSchema})
+    .nullable(),
+  /** The vendor program's own configuration folder, which holds its sign-in. */
+  configDir: z.string().min(1),
+})
+
+export type SignInRequest = z.infer<typeof SignInRequestSchema>
+
 /** A Thread as any Provider can take it: each Prompt and the Reply to it. */
 export const ThreadSchema = z.array(
   z.strictObject({prompt: z.string(), reply: z.array(ReplyPartSchema)})
@@ -43,6 +60,15 @@ export type Thread = z.infer<typeof ThreadSchema>
 export interface ProviderDriver {
   readonly capabilities: Capabilities
   readConnection(): Promise<Connection>
+  /**
+   * Gets the vendor program ready, signs in and checks the plan. Ends with
+   * `SIGN_IN_FINISHED`, including after `cancelSignIn`.
+   */
+  signIn(request: SignInRequest): AsyncIterable<SignInUpdate>
+  /** The app opened the sign-in page again; that page shows a code. */
+  signInPageOpened(): void
+  submitSignInCode(code: string): void
+  cancelSignIn(): void
   listModels(): Promise<Model[]>
   readUsage(): Promise<Usage>
   /** Ends with `RUN_FINISHED`, including after `stop`. */
@@ -66,19 +92,28 @@ export interface ProviderDriver {
 /** Main → Provider host. */
 export const HostCommandSchema = z.discriminatedUnion('type', [
   z.strictObject({type: z.literal('reply.start'), request: ReplyRequestSchema}),
+  z.strictObject({
+    type: z.literal('sign-in.start'),
+    request: SignInRequestSchema,
+  }),
+  z.strictObject({type: z.literal('sign-in.page-opened')}),
+  z.strictObject({type: z.literal('sign-in.code'), code: z.string()}),
+  z.strictObject({type: z.literal('sign-in.cancel')}),
 ])
 
 export type HostCommand = z.infer<typeof HostCommandSchema>
 
 export const HostReadyMessage = z.strictObject({
   type: z.literal('HOST_READY'),
-  models: z.array(ModelSchema).min(1),
+  /** Empty until the driver can write Replies. */
+  models: z.array(ModelSchema),
 })
 
 /** Provider host → main. */
 export const HostMessageSchema = z.discriminatedUnion('type', [
   HostReadyMessage,
   ReplyEventSchema,
+  SignInUpdateSchema,
 ])
 
 export type HostMessage = z.infer<typeof HostMessageSchema>

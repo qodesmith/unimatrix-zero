@@ -1,3 +1,4 @@
+import type {Connections} from '#modules/connections/main'
 import type {ProviderHosts} from '#modules/provider-hosts/main'
 import type {Trees} from '#modules/trees/main'
 import type {Turns} from '#modules/turns/main'
@@ -12,6 +13,10 @@ export interface HandlerDeps {
   trees: Trees
   turns: Turns
   hosts: Pick<ProviderHosts, 'ready' | 'send'>
+  connections: Pick<
+    Connections,
+    'connect' | 'openPage' | 'submitCode' | 'cancel'
+  >
   publish: (event: AppEvent) => void
 }
 
@@ -99,5 +104,29 @@ export const handlers: Handlers = {
     }
 
     return sent
+  },
+
+  'provider.connect': ({provider}, {connections}) => {
+    connections.connect(provider)
+
+    return {}
+  },
+
+  'sign-in.open-page': ({provider}, {connections}) => {
+    connections.openPage(provider)
+
+    return {}
+  },
+
+  'sign-in.code': ({provider, code}, {connections}) => {
+    connections.submitCode(provider, code)
+
+    return {}
+  },
+
+  'sign-in.cancel': ({provider}, {connections}) => {
+    connections.cancel(provider)
+
+    return {}
   },
 }

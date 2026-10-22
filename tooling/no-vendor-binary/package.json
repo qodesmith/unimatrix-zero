@@ -1,0 +1,6 @@
+{
+  "name": "no-vendor-binary",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Stands in for the Agent SDK's per-platform claude binaries: the app downloads its own (ADR 0008)."
+}

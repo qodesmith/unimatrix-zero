@@ -72,6 +72,19 @@ export const replies = sqliteTable(
   table => [uniqueIndex('replies_prompt_id').on(table.promptId)]
 )
 
+/** A connected Provider and the account its vendor program signed in with. */
+export const providers = sqliteTable(
+  'providers',
+  {
+    id: id(),
+    provider: text('provider', {enum: ['claude', 'chatgpt']}).notNull(),
+    email: text('email').notNull(),
+    plan: text('plan').notNull(),
+    connectedAt: integer('connected_at', {mode: 'timestamp_ms'}).notNull(),
+  },
+  table => [uniqueIndex('providers_provider').on(table.provider)]
+)
+
 export const settings = sqliteTable(
   'settings',
   {

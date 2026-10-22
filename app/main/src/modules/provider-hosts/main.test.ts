@@ -1,6 +1,6 @@
-import type {HostProcess} from './main'
+import type {HostProcess, HostStatus} from './main'
 import type {HostCommand} from '@uz/contract/host'
-import type {ProviderId} from '@uz/contract/providers'
+import type {ProviderId, SignInUpdate} from '@uz/contract/providers'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {afterEach, beforeEach, expect, it, vi} from 'vitest'
@@ -48,6 +48,8 @@ function fakeProcess() {
 
 let spawned: ReturnType<typeof fakeProcess>[]
 let events: ReplyEvent[]
+let signInUpdates: SignInUpdate[]
+let statuses: HostStatus[]
 let crashes: ProviderId[]
 
 function setUp() {
@@ -59,6 +61,8 @@ function setUp() {
       return child.process
     },
     onReplyEvent: (_provider, event) => events.push(event),
+    onSignInUpdate: (_provider, update) => signInUpdates.push(update),
+    onStatus: (_provider, status) => statuses.push(status),
     onCrash: provider => crashes.push(provider),
   })
 }
@@ -75,6 +79,8 @@ beforeEach(() => {
   vi.useFakeTimers()
   spawned = []
   events = []
+  signInUpdates = []
+  statuses = []
   crashes = []
 })
 
@@ -211,4 +217,83 @@ it('stops every host without counting it as a crash', () => {
   expect(latest().isKilled()).toBe(true)
   expect(crashes).toEqual([])
   expect(spawned).toHaveLength(1)
+})
+
+it('reports where the host stands as it starts, crashes and gives up', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+  latest().say({type: 'HOST_READY', models})
+
+  for (const delay of RESTART_DELAYS_MS) {
+    latest().crash()
+    vi.advanceTimersByTime(delay)
+  }
+
+  latest().crash()
+
+  expect(statuses).toEqual([
+    'starting',
+    'ready',
+    ...RESTART_DELAYS_MS.flatMap(() => ['restarting', 'starting'] as const),
+    'failed',
+  ])
+})
+
+it('passes on each step of connecting', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+
+  const step = {type: 'SIGN_IN_STEP', step: 'check-plan'} as const
+  latest().say(step)
+  latest().say({type: 'SIGN_IN_FINISHED', outcome: 'canceled'})
+
+  expect(signInUpdates).toEqual([
+    step,
+    {type: 'SIGN_IN_FINISHED', outcome: 'canceled'},
+  ])
+  expect(events).toEqual([])
+})
+
+it('stops one host without counting it as a crash, and can start it again', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+  hosts.connect('chatgpt')
+  const [claude] = spawned
+
+  hosts.stop('claude')
+  vi.advanceTimersByTime(60 * 60_000)
+
+  expect(claude?.isKilled()).toBe(true)
+  expect(crashes).toEqual([])
+  expect(() => hosts.send('claude', {type: 'sign-in.cancel'})).toThrow(
+    'not running'
+  )
+
+  hosts.connect('claude')
+
+  expect(spawned).toHaveLength(3)
+})
+
+it('does not restart a host that was stopped while its crash was handled', () => {
+  let hosts: ReturnType<typeof createProviderHosts> | null = null
+
+  hosts = createProviderHosts({
+    spawn: () => {
+      const child = fakeProcess()
+      spawned.push(child)
+
+      return child.process
+    },
+    onReplyEvent: () => undefined,
+    onSignInUpdate: () => undefined,
+    onStatus: (_provider, status) => statuses.push(status),
+    onCrash: provider => hosts?.stop(provider),
+  })
+  hosts.connect('claude')
+
+  latest().crash()
+  vi.advanceTimersByTime(60 * 60_000)
+
+  expect(spawned).toHaveLength(1)
+  expect(statuses).toEqual(['starting'])
 })

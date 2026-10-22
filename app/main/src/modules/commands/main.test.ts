@@ -2,6 +2,7 @@ import type {Command} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {HostCommand} from '@uz/contract/host'
 
+import {createConnections} from '#modules/connections/main'
 import {openDatabase} from '#modules/database/main'
 import {createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
@@ -14,6 +15,10 @@ import {dispatchCommand} from './main'
 
 const migrationsFolder = path.resolve(import.meta.dirname, '../../../drizzle')
 const trusted = {isTopLevelAppFrame: true}
+
+function now() {
+  return new Date('2026-10-19T12:00:00.000Z')
+}
 
 let published: AppEvent[]
 let hostCommands: HostCommand[]
@@ -30,8 +35,12 @@ beforeEach(() => {
     published.push(event)
   }
 
+  function sendToHost(_provider: string, command: HostCommand) {
+    hostCommands.push(command)
+  }
+
   deps = {
-    now: () => new Date('2026-10-19T12:00:00.000Z'),
+    now,
     trees: createTrees(db),
     turns: createTurns(db, publish),
     hosts: {
@@ -39,8 +48,21 @@ beforeEach(() => {
         hostReady
           ? {provider: 'claude', model: {id: 'fake', name: 'Fake model'}}
           : null,
-      send: (_provider, command) => hostCommands.push(command),
+      send: sendToHost,
     },
+    connections: createConnections({
+      db,
+      hosts: {
+        connect: () => undefined,
+        send: sendToHost,
+        stop: () => undefined,
+      },
+      publish,
+      requestFor: provider =>
+        provider === 'claude' ? {program: null, configDir: '/claude'} : null,
+      openExternal: () => undefined,
+      now,
+    }),
     publish,
   }
 })
@@ -269,5 +291,40 @@ describe('the root Prompt', () => {
       error: {message: 'This Tree already has its first Prompt.'},
     })
     expect(hostCommands).toHaveLength(1)
+  })
+})
+
+describe('connecting a Provider', () => {
+  it('asks the Provider’s host to connect, then passes on what the user does', async () => {
+    expect(await send({type: 'provider.connect', provider: 'claude'})).toEqual({
+      ok: true,
+      value: {},
+    })
+    await send({type: 'sign-in.code', provider: 'claude', code: ' code#s '})
+    await send({type: 'sign-in.cancel', provider: 'claude'})
+
+    expect(hostCommands).toEqual([
+      {type: 'sign-in.start', request: {program: null, configDir: '/claude'}},
+      {type: 'sign-in.code', code: 'code#s'},
+      {type: 'sign-in.cancel'},
+    ])
+  })
+
+  it('answers with why a Provider can’t be connected', async () => {
+    expect(await send({type: 'provider.connect', provider: 'chatgpt'})).toEqual(
+      {
+        ok: false,
+        error: {
+          code: 'handler-failed',
+          message: 'ChatGPT can’t be connected in this version yet.',
+        },
+      }
+    )
+  })
+
+  it('refuses an empty code', async () => {
+    expect(
+      await send({type: 'sign-in.code', provider: 'claude', code: '  '})
+    ).toMatchObject({ok: false, error: {code: 'invalid-command'}})
   })
 })

@@ -1,5 +1,10 @@
 import type {HostCommand} from '@uz/contract/host'
-import type {Model, ProviderId} from '@uz/contract/providers'
+import type {
+  Model,
+  ProviderId,
+  ProviderStatus,
+  SignInUpdate,
+} from '@uz/contract/providers'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {HostMessageSchema} from '@uz/contract/host'
@@ -27,9 +32,16 @@ interface Host {
   timers: Set<ReturnType<typeof setTimeout>>
 }
 
+export type HostStatus = Extract<
+  ProviderStatus['status'],
+  'starting' | 'ready' | 'restarting' | 'failed'
+>
+
 interface ProviderHostsOptions {
   spawn: (provider: ProviderId) => HostProcess
   onReplyEvent: (provider: ProviderId, event: ReplyEvent) => void
+  onSignInUpdate: (provider: ProviderId, update: SignInUpdate) => void
+  onStatus: (provider: ProviderId, status: HostStatus) => void
   /** The host died without main asking it to. */
   onCrash: (provider: ProviderId) => void
 }
@@ -44,6 +56,8 @@ export type ProviderHosts = ReturnType<typeof createProviderHosts>
 export function createProviderHosts({
   spawn,
   onReplyEvent,
+  onSignInUpdate,
+  onStatus,
   onCrash,
 }: ProviderHostsOptions) {
   const hosts = new Map<ProviderId, Host>()
@@ -66,6 +80,7 @@ export function createProviderHosts({
     const child = spawn(provider)
     host.process = child
     host.models = null
+    onStatus(provider, 'starting')
 
     child.onMessage(raw => {
       const parsed = HostMessageSchema.safeParse(raw)
@@ -79,6 +94,12 @@ export function createProviderHosts({
         later(host, STABLE_AFTER_MS, () => {
           host.restarts = 0
         })
+        onStatus(provider, 'ready')
+      } else if (
+        message.type === 'SIGN_IN_STEP' ||
+        message.type === 'SIGN_IN_FINISHED'
+      ) {
+        onSignInUpdate(provider, message)
       } else {
         onReplyEvent(provider, message)
       }
@@ -92,13 +113,34 @@ export function createProviderHosts({
       clearTimers(host)
       onCrash(provider)
 
+      // Main may have stopped it while handling the crash.
+      if (hosts.get(provider) !== host) return
+
       const delay = RESTART_DELAYS_MS[host.restarts]
 
-      if (delay === undefined) return
+      if (delay === undefined) {
+        onStatus(provider, 'failed')
+
+        return
+      }
 
       host.restarts += 1
+      onStatus(provider, 'restarting')
       later(host, delay, () => start(provider, host))
     })
+  }
+
+  /** Stops the Provider's host on purpose, so it doesn't count as a crash. */
+  function stop(provider: ProviderId) {
+    const host = hosts.get(provider)
+
+    if (!host) return
+
+    hosts.delete(provider)
+    clearTimers(host)
+    const child = host.process
+    host.process = null
+    child?.kill()
   }
 
   return {
@@ -136,16 +178,11 @@ export function createProviderHosts({
       child.post(command)
     },
 
+    stop,
+
     /** Stops every host on purpose, so none of them counts as a crash. */
     stopAll() {
-      for (const host of hosts.values()) {
-        clearTimers(host)
-        const child = host.process
-        host.process = null
-        child?.kill()
-      }
-
-      hosts.clear()
+      for (const provider of hosts.keys()) stop(provider)
     },
   }
 }

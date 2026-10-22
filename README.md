@@ -12,7 +12,7 @@ bun run dev          # the window, served through app-dev://, rebuilding on chan
 bun run check        # format, lint, typecheck, knip and tests: what CI runs
 ```
 
-Each worktree gets its own ports and data folder (`unimatrix-zero-dev-<hash>` under the OS app-data folder), so two checkouts run side by side and sign in separately.
+Each worktree gets its own ports and data folder (`unimatrix-zero-dev-<hash>` under the OS app-data folder), so two checkouts run side by side and sign in separately. `bun run dev --fake` connects every Provider through the fake driver and keeps its data in `unimatrix-zero-dev-<hash>-fake`.
 
 ## Layout
 
