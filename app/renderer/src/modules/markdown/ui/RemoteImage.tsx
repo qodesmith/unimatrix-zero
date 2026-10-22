@@ -11,10 +11,9 @@ type LoadState =
   | {state: 'loaded'; dataUrl: string}
   | {state: 'failed'; message: string}
 
-const BUTTON_LABELS: Record<LoadState['state'], string> = {
+const BUTTON_LABELS: Record<Exclude<LoadState['state'], 'loaded'>, string> = {
   unloaded: 'Load',
   loading: 'Loading…',
-  loaded: 'Load',
   failed: 'Try again',
 }
 

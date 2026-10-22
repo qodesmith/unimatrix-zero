@@ -1,11 +1,15 @@
 import type {ReplyEvent} from '@uz/contract/turns'
 
-import {createFakeDriver} from '#modules/fake-driver/main'
+import path from 'node:path'
+
+import {createFakeDriver} from '../app/provider-host/src/modules/fake-driver/main.ts'
+
+const root = path.resolve(import.meta.dirname, '..')
 
 /** The fake Reply's events, kept where the window's tests replay them. */
-export const FAKE_REPLY_RECORDING = new URL(
-  '../../../../renderer/src/modules/turns/fake-reply.json',
-  import.meta.url
+export const FAKE_REPLY_RECORDING = path.join(
+  root,
+  'app/renderer/src/modules/turns/fake-reply.json'
 )
 
 const RECORDED_IDS = {
