@@ -81,6 +81,8 @@ describe('opening', () => {
       'prompts',
       'providers',
       'replies',
+      'session_entries',
+      'session_files',
       'settings',
       'system_prompts',
       'themes',

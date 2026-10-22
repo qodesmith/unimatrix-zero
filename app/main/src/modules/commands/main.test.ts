@@ -25,6 +25,8 @@ let hostCommands: HostCommand[]
 let hostReady: boolean
 let deps: Parameters<typeof dispatchCommand>[2]
 
+const vendor = {program: null, configDir: '/claude'}
+
 beforeEach(() => {
   const db = openDatabase({file: ':memory:', migrationsFolder})
   published = []
@@ -44,8 +46,8 @@ beforeEach(() => {
     trees: createTrees(db),
     turns: createTurns(db, publish),
     hosts: {
-      ready: () =>
-        hostReady
+      ready: only =>
+        hostReady && (only ?? 'claude') === 'claude'
           ? {provider: 'claude', model: {id: 'fake', name: 'Fake model'}}
           : null,
       send: sendToHost,
@@ -63,6 +65,7 @@ beforeEach(() => {
       openExternal: () => undefined,
       now,
     }),
+    vendorFor: () => vendor,
     publish,
   }
 })
@@ -198,6 +201,7 @@ describe('the root Prompt', () => {
     const outcome = await send({
       type: 'prompt.send',
       treeId: tree.id,
+      parentReplyId: null,
       text: ' Hello ',
     })
 
@@ -226,6 +230,8 @@ describe('the root Prompt', () => {
           model: 'fake',
           systemPrompt: '',
           prompt: {text: 'Hello'},
+          vendor,
+          session: null,
         },
       },
     ])
@@ -242,6 +248,7 @@ describe('the root Prompt', () => {
     const outcome = await send({
       type: 'prompt.send',
       treeId: tree.id,
+      parentReplyId: null,
       text: 'Hi',
     })
 
@@ -263,7 +270,12 @@ describe('the root Prompt', () => {
     }
 
     expect(
-      await send({type: 'prompt.send', treeId: tree.id, text: 'Hi'})
+      await send({
+        type: 'prompt.send',
+        treeId: tree.id,
+        parentReplyId: null,
+        text: 'Hi',
+      })
     ).toMatchObject({ok: true, value: {reply: {status: 'failed'}}})
     expect(await send({type: 'tree.turns', treeId: tree.id})).toMatchObject({
       ok: true,
@@ -278,11 +290,17 @@ describe('the root Prompt', () => {
 
   it('is refused once the Tree has one', async () => {
     const tree = await createTree()
-    await send({type: 'prompt.send', treeId: tree.id, text: 'Hi'})
+    await send({
+      type: 'prompt.send',
+      treeId: tree.id,
+      parentReplyId: null,
+      text: 'Hi',
+    })
 
     const outcome = await send({
       type: 'prompt.send',
       treeId: tree.id,
+      parentReplyId: null,
       text: 'Again',
     })
 
@@ -291,6 +309,161 @@ describe('the root Prompt', () => {
       error: {message: 'This Tree already has its first Prompt.'},
     })
     expect(hostCommands).toHaveLength(1)
+  })
+})
+
+/** A Tree with its root Prompt, its Reply still streaming. */
+async function sendRoot() {
+  const tree = await createTree()
+
+  const outcome = await send({
+    type: 'prompt.send',
+    treeId: tree.id,
+    parentReplyId: null,
+    text: 'Hi',
+  })
+
+  if (!outcome.ok) throw new Error(outcome.error.message)
+
+  const {reply} = PromptSendResult.parse(outcome.value)
+  hostCommands = []
+
+  return {treeId: tree.id, replyId: reply.id}
+}
+
+function finish(treeId: string, replyId: string) {
+  deps.turns.apply('claude', {
+    type: 'RUN_FINISHED',
+    treeId,
+    replyId,
+    status: 'complete',
+  })
+}
+
+function record(treeId: string, replyId: string) {
+  deps.turns.record('claude', {
+    type: 'REPLY_RECORDED',
+    treeId,
+    replyId,
+    model: 'claude-haiku-5-5',
+    session: {sessionId: 's1', messageId: 'm1'},
+  })
+}
+
+describe('a Prompt at the end of a Thread', () => {
+  it('continues the Reply’s Provider session from that Reply', async () => {
+    const {treeId, replyId} = await sendRoot()
+    record(treeId, replyId)
+    finish(treeId, replyId)
+
+    const outcome = await send({
+      type: 'prompt.send',
+      treeId,
+      parentReplyId: replyId,
+      text: 'And then?',
+    })
+
+    if (!outcome.ok) throw new Error(outcome.error.message)
+
+    const {prompt, reply} = PromptSendResult.parse(outcome.value)
+
+    expect(prompt).toMatchObject({parentReplyId: replyId, text: 'And then?'})
+    expect(hostCommands).toEqual([
+      {
+        type: 'reply.start',
+        request: {
+          treeId,
+          replyId: reply.id,
+          model: 'fake',
+          systemPrompt: '',
+          prompt: {text: 'And then?'},
+          vendor,
+          session: {sessionId: 's1', messageId: 'm1'},
+        },
+      },
+    ])
+    expect(await send({type: 'tree.turns', treeId})).toMatchObject({
+      ok: true,
+      value: {replies: [{model: 'claude-haiku-5-5'}, {model: 'fake'}]},
+    })
+  })
+
+  it.each([
+    [
+      'still streaming',
+      (treeId: string, replyId: string) => record(treeId, replyId),
+      'Wait for this Reply to finish before continuing.',
+    ],
+    [
+      'never saved by its Provider',
+      (treeId: string, replyId: string) => finish(treeId, replyId),
+      'This Reply can’t be continued: its Provider never saved it.',
+    ],
+  ])('is refused from a Reply %s', async (_case, setUp, message) => {
+    const {treeId, replyId} = await sendRoot()
+    setUp(treeId, replyId)
+
+    expect(
+      await send({
+        type: 'prompt.send',
+        treeId,
+        parentReplyId: replyId,
+        text: 'More',
+      })
+    ).toMatchObject({ok: false, error: {message}})
+    expect(hostCommands).toEqual([])
+  })
+
+  it('is refused from a Reply that already has a Prompt after it', async () => {
+    const {treeId, replyId} = await sendRoot()
+    record(treeId, replyId)
+    finish(treeId, replyId)
+
+    const next = {
+      type: 'prompt.send',
+      treeId,
+      parentReplyId: replyId,
+      text: 'More',
+    } as const
+
+    await send(next)
+
+    expect(await send(next)).toMatchObject({
+      ok: false,
+      error: {message: 'This Reply already has a Prompt after it.'},
+    })
+  })
+
+  it('answers not-found for a Reply the Tree doesn’t have', async () => {
+    const {treeId} = await sendRoot()
+
+    expect(
+      await send({
+        type: 'prompt.send',
+        treeId,
+        parentReplyId: crypto.randomUUID(),
+        text: 'More',
+      })
+    ).toMatchObject({ok: false, error: {code: 'not-found'}})
+  })
+
+  it('is refused when the Reply’s Provider isn’t ready', async () => {
+    const {treeId, replyId} = await sendRoot()
+    record(treeId, replyId)
+    finish(treeId, replyId)
+    hostReady = false
+
+    expect(
+      await send({
+        type: 'prompt.send',
+        treeId,
+        parentReplyId: replyId,
+        text: 'More',
+      })
+    ).toMatchObject({
+      ok: false,
+      error: {message: 'Connect Claude to continue this Thread.'},
+    })
   })
 })
 

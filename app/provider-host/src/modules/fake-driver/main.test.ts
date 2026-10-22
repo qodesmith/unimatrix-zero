@@ -1,3 +1,4 @@
+import type {ReplyRecorded} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
@@ -10,14 +11,19 @@ const request = {
   replyId: '01a16096-00ae-7d3b-8205-6b76ddc26ce0',
   model: 'fake',
   systemPrompt: '',
+  vendor: {program: null, configDir: '/claude'},
+  session: null,
 }
 
-async function collect(events: AsyncIterable<ReplyEvent>) {
+type Streamed = ReplyEvent | ReplyRecorded
+
+async function collect(events: AsyncIterable<Streamed>) {
   return Array.fromAsync(events)
 }
 
-function textOf(events: ReplyEvent[]) {
+function textOf(events: Streamed[]) {
   return events
+    .flatMap(event => (event.type === 'REPLY_RECORDED' ? [] : [event]))
     .reduce(foldReplyEvent, NEW_REPLY)
     .content.flatMap(part => (part.type === 'text' ? [part.text] : []))
     .join('')
@@ -34,7 +40,7 @@ it('streams canned Markdown word by word around a tool call, then tokens', async
   expect(types[0]).toBe('RUN_STARTED')
   expect(types.filter(type => type === 'TEXT_DELTA').length).toBeGreaterThan(20)
   expect(types).toContain('TOOL_RESULT')
-  expect(types.slice(-2)).toEqual(['TOKENS', 'RUN_FINISHED'])
+  expect(types.slice(-3)).toEqual(['TOKENS', 'REPLY_RECORDED', 'RUN_FINISHED'])
   expect(events.at(-1)).toMatchObject({status: 'complete'})
   expect(textOf(events)).toContain("That's the end of the fake Reply.")
 })
@@ -56,7 +62,7 @@ it('fails partway when the Prompt asks it to', async () => {
 
 it('hangs partway when the Prompt asks it to, until stopped', async () => {
   const driver = createFakeDriver({delayMs: 0})
-  const events: ReplyEvent[] = []
+  const events: Streamed[] = []
 
   const done = (async () => {
     for await (const event of driver.startReply({
@@ -83,7 +89,7 @@ it('hangs partway when the Prompt asks it to, until stopped', async () => {
 
 it('stops a hanging Reply that was stopped on its last word', async () => {
   const driver = createFakeDriver({delayMs: 0})
-  const events: ReplyEvent[] = []
+  const events: Streamed[] = []
 
   for await (const event of driver.startReply({
     ...request,
@@ -101,3 +107,31 @@ it('stops a hanging Reply that was stopped on its last word', async () => {
     status: 'stopped',
   })
 }, 1000)
+
+it('records each Reply in the session it continues, or a new one', async () => {
+  const driver = createFakeDriver({delayMs: 0})
+  const prompt = {text: 'Hi'}
+
+  const first = await collect(driver.startReply({...request, prompt}))
+  const recorded = first.find(event => event.type === 'REPLY_RECORDED')
+
+  if (!recorded) throw new Error('The Reply was not recorded')
+
+  const next = await collect(
+    driver.startReply({
+      ...request,
+      prompt,
+      session: {...recorded.session},
+    })
+  )
+
+  expect(next).toContainEqual(
+    expect.objectContaining({
+      type: 'REPLY_RECORDED',
+      session: {
+        sessionId: recorded.session.sessionId,
+        messageId: expect.not.stringMatching(recorded.session.messageId),
+      },
+    })
+  )
+})

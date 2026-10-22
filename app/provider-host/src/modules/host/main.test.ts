@@ -12,6 +12,8 @@ const request = {
   model: 'fake',
   systemPrompt: '',
   prompt: {text: 'Hi'},
+  vendor: {program: null, configDir: '/claude'},
+  session: null,
 }
 
 /** Main as the host sees it: sends commands and keeps what it was sent. */
@@ -46,7 +48,7 @@ async function finished(sent: HostMessage[]) {
 
 it('says it is ready with the driver’s Models', async () => {
   const main = fakeMain()
-  await runHost(main.port, createFakeDriver({delayMs: 0}))
+  await runHost(main.port, () => createFakeDriver({delayMs: 0}))
 
   expect(main.sent).toEqual([
     {type: 'HOST_READY', models: [{id: 'fake', name: 'Fake model'}]},
@@ -55,7 +57,7 @@ it('says it is ready with the driver’s Models', async () => {
 
 it('streams a requested Reply back to main', async () => {
   const main = fakeMain()
-  await runHost(main.port, createFakeDriver({delayMs: 0}))
+  await runHost(main.port, () => createFakeDriver({delayMs: 0}))
 
   main.command({type: 'reply.start', request})
   await finished(main.sent)
@@ -70,7 +72,7 @@ it('streams a requested Reply back to main', async () => {
 
 it('drops a command that does not parse', async () => {
   const main = fakeMain()
-  await runHost(main.port, createFakeDriver({delayMs: 0}))
+  await runHost(main.port, () => createFakeDriver({delayMs: 0}))
 
   main.command({type: 'reply.start', request: {...request, extra: true}})
   await tick()
@@ -89,7 +91,7 @@ it('fails the Reply when the driver throws', async () => {
     },
   }
 
-  await runHost(main.port, driver)
+  await runHost(main.port, () => driver)
 
   main.command({type: 'reply.start', request})
   await finished(main.sent)
@@ -119,7 +121,9 @@ async function signInFinished(sent: HostMessage[]) {
 
 it('streams each step of connecting back to main', async () => {
   const main = fakeMain()
-  await runHost(main.port, createFakeDriver({delayMs: 0, signInAnswerMs: null}))
+  await runHost(main.port, () =>
+    createFakeDriver({delayMs: 0, signInAnswerMs: null})
+  )
 
   main.command({type: 'sign-in.start', request: signInRequest})
   await lastStep(main.sent, 'sign-in-page')
@@ -133,7 +137,9 @@ it('streams each step of connecting back to main', async () => {
 
 it('passes a cancel on to the driver', async () => {
   const main = fakeMain()
-  await runHost(main.port, createFakeDriver({delayMs: 0, signInAnswerMs: null}))
+  await runHost(main.port, () =>
+    createFakeDriver({delayMs: 0, signInAnswerMs: null})
+  )
 
   main.command({type: 'sign-in.start', request: signInRequest})
   await lastStep(main.sent, 'sign-in-page')
@@ -157,7 +163,7 @@ it('fails connecting when the driver throws', async () => {
     },
   }
 
-  await runHost(main.port, driver)
+  await runHost(main.port, () => driver)
 
   main.command({type: 'sign-in.start', request: signInRequest})
   await signInFinished(main.sent)
@@ -167,4 +173,50 @@ it('fails connecting when the driver throws', async () => {
     outcome: 'failed',
     failure: {reason: 'failed', message: 'no vendor program'},
   })
+})
+
+it('passes a driver’s session store requests to main and main’s answers back', async () => {
+  const main = fakeMain()
+  let loaded: Promise<unknown> = Promise.resolve()
+
+  await runHost(main.port, store => {
+    loaded = store.load({projectKey: 'p', sessionId: 's'})
+
+    return createFakeDriver({delayMs: 0})
+  })
+
+  const [asked] = main.sent
+
+  if (asked?.type !== 'SESSION_STORE') throw new Error('Nothing was asked')
+
+  main.command({
+    type: 'session-store.result',
+    requestId: asked.requestId,
+    outcome: {ok: true, value: [{type: 'user', uuid: 'a'}]},
+  })
+
+  await expect(loaded).resolves.toEqual([{type: 'user', uuid: 'a'}])
+})
+
+it('rejects a session store request main couldn’t answer', async () => {
+  const main = fakeMain()
+  let saved: Promise<unknown> = Promise.resolve()
+
+  await runHost(main.port, store => {
+    saved = store.saveFiles({projectKey: 'p', sessionId: 's'}, [])
+
+    return createFakeDriver({delayMs: 0})
+  })
+
+  const [asked] = main.sent
+
+  if (asked?.type !== 'SESSION_STORE') throw new Error('Nothing was asked')
+
+  main.command({
+    type: 'session-store.result',
+    requestId: asked.requestId,
+    outcome: {ok: false, message: 'The disk is full.'},
+  })
+
+  await expect(saved).rejects.toThrow('The disk is full.')
 })

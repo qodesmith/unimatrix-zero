@@ -52,6 +52,7 @@
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "0.3.307",
         "@uz/contract": "workspace:*",
+        "zod": "^4.6.7",
       },
       "devDependencies": {
         "@uz/tooling": "workspace:*",

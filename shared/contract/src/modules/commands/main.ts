@@ -46,10 +46,15 @@ export const TreeTurnsResult = z.strictObject({
   replies: z.array(ReplySchema),
 })
 
-/** The root Prompt of an empty Tree, answered by a connected Provider. */
+/**
+ * A Prompt at the end of a Thread, continuing from its last Reply, or the
+ * root Prompt of an empty Tree, answered by a connected Provider.
+ */
 export const PromptSendCommand = z.strictObject({
   type: z.literal('prompt.send'),
   treeId: z.uuid(),
+  /** The Reply it answers; null for the root Prompt. */
+  parentReplyId: z.uuid().nullable(),
   text: z.string().trim().min(1),
 })
 

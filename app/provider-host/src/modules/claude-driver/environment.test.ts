@@ -23,6 +23,7 @@ it('strips every variable that could outrank the subscription', () => {
     PATH: '/usr/bin',
     HOME: '/Users/sam',
     CLAUDE_CONFIG_DIR: '/data/providers/claude',
+    CLAUDE_SECURESTORAGE_CONFIG_DIR: '/data/providers/claude',
     DISABLE_UPDATES: '1',
   })
 })

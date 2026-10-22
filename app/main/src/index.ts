@@ -14,6 +14,7 @@ import {createDroppedFiles} from '#modules/dropped-files/main'
 import {utilityHost} from '#modules/host-process/main'
 import {createHub, registerSubscribeChannel} from '#modules/hub/main'
 import {createProviderHosts} from '#modules/provider-hosts/main'
+import {createSessions} from '#modules/sessions/main'
 import {createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
 import {signInRequestFor} from '#modules/vendor-programs/main'
@@ -85,10 +86,13 @@ function openWindow(db: Database) {
   }))
 
   const turns = createTurns(db, hub.publish)
+  const sessions = createSessions(db)
 
   const hosts = createProviderHosts({
     spawn: utilityHost(hostsDist, dev?.fakeProvider ? ['--fake'] : []),
     onReplyEvent: turns.apply,
+    onReplyRecorded: turns.record,
+    onSessionStore: sessions.handle,
     onSignInUpdate: (provider, update) =>
       connections.applySignInUpdate(provider, update),
     onStatus: (provider, status) =>
@@ -138,6 +142,7 @@ function openWindow(db: Database) {
       turns,
       hosts,
       connections,
+      vendorFor: provider => signInRequestFor(provider, machine),
       publish: hub.publish,
     }
   )

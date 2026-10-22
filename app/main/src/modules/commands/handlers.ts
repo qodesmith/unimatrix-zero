@@ -4,6 +4,8 @@ import type {Trees} from '#modules/trees/main'
 import type {Turns} from '#modules/turns/main'
 import type {Command, CommandResult, CommandType} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
+import type {SignInRequest} from '@uz/contract/host'
+import type {ProviderId} from '@uz/contract/providers'
 import type {Tree} from '@uz/contract/trees'
 
 import {PROVIDER_NAMES} from '@uz/contract/providers'
@@ -17,6 +19,8 @@ export interface HandlerDeps {
     Connections,
     'connect' | 'openPage' | 'submitCode' | 'cancel'
   >
+  /** The vendor program and configuration folder a Provider's Replies use. */
+  vendorFor: (provider: ProviderId) => SignInRequest
   publish: (event: AppEvent) => void
 }
 
@@ -65,17 +69,35 @@ export const handlers: Handlers = {
     return turns.list(treeId)
   },
 
-  'prompt.send': ({treeId, text}, {now, trees, turns, hosts}) => {
+  'prompt.send': (
+    {treeId, parentReplyId, text},
+    {now, trees, turns, hosts, vendorFor}
+  ) => {
     found(trees.get(treeId))
-    const ready = hosts.ready()
 
-    if (!ready) throw new Error('Connect a Provider to send a Prompt.')
+    const continued =
+      parentReplyId === null ? null : turns.continuation(treeId, parentReplyId)
+
+    if (parentReplyId !== null && !continued) {
+      throw new NotFoundError('That Reply no longer exists.')
+    }
+
+    const ready = hosts.ready(continued?.provider)
+
+    if (!ready) {
+      throw new Error(
+        continued
+          ? `Connect ${PROVIDER_NAMES[continued.provider]} to continue this Thread.`
+          : 'Connect a Provider to send a Prompt.'
+      )
+    }
 
     const {provider, model} = ready
     const systemPrompt = ''
 
-    const sent = turns.startRoot({
+    const sent = turns.start({
       treeId,
+      parentReplyId,
       text,
       provider,
       model: model.id,
@@ -92,6 +114,8 @@ export const handlers: Handlers = {
           model: model.id,
           systemPrompt,
           prompt: {text},
+          vendor: vendorFor(provider),
+          session: continued?.session ?? null,
         },
       })
     } catch {

@@ -1,6 +1,12 @@
 import type {AnySQLiteColumn} from 'drizzle-orm/sqlite-core'
 
-import {integer, sqliteTable, text, uniqueIndex} from 'drizzle-orm/sqlite-core'
+import {
+  blob,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core'
 import {randomUUIDv7} from 'node:crypto'
 
 function id() {
@@ -70,6 +76,69 @@ export const replies = sqliteTable(
     createdAt: createdAt(),
   },
   table => [uniqueIndex('replies_prompt_id').on(table.promptId)]
+)
+
+function sessionKey() {
+  return {
+    provider: text('provider', {enum: ['claude', 'chatgpt']}).notNull(),
+    projectKey: text('project_key').notNull(),
+    sessionId: text('session_id').notNull(),
+  }
+}
+
+/**
+ * The app's own copy of each Provider session's transcript (ADR 0004): every
+ * entry as the vendor program wrote it, in order, never parsed or edited.
+ */
+export const sessionEntries = sqliteTable(
+  'session_entries',
+  {
+    id: id(),
+    ...sessionKey(),
+    /** A Subagent's transcript inside the session; '' for the session's own. */
+    subpath: text('subpath').notNull(),
+    /** Its place in the transcript, from 0. */
+    position: integer('position').notNull(),
+    /** The vendor's own entry id, which appends are deduplicated on. */
+    uuid: text('uuid'),
+    entry: blob('entry', {mode: 'buffer'}).notNull(),
+  },
+  table => [
+    uniqueIndex('session_entries_position').on(
+      table.provider,
+      table.projectKey,
+      table.sessionId,
+      table.subpath,
+      table.position
+    ),
+    uniqueIndex('session_entries_uuid').on(
+      table.provider,
+      table.projectKey,
+      table.sessionId,
+      table.subpath,
+      table.uuid
+    ),
+  ]
+)
+
+/** Files the vendor program keeps beside a session, such as large tool results. */
+export const sessionFiles = sqliteTable(
+  'session_files',
+  {
+    id: id(),
+    ...sessionKey(),
+    /** Relative to the session's folder, with `/` between parts. */
+    path: text('path').notNull(),
+    data: blob('data', {mode: 'buffer'}).notNull(),
+  },
+  table => [
+    uniqueIndex('session_files_path').on(
+      table.provider,
+      table.projectKey,
+      table.sessionId,
+      table.path
+    ),
+  ]
 )
 
 /** A connected Provider and the account its vendor program signed in with. */

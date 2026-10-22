@@ -20,14 +20,20 @@ export function useTurns(treeId: string) {
 }
 
 /**
- * Sends the root Prompt. Its Reply streams in through the live events; the
- * saved Turns are fetched again in case it finished before the send returned.
+ * Sends a Prompt answering a Reply, or the root Prompt when `parentReplyId`
+ * is null. Its Reply streams in through the live events; the saved Turns are
+ * fetched again in case it finished before the send returned.
  */
-export function useSendPrompt(treeId: string) {
+export function useSendPrompt(treeId: string, parentReplyId: string | null) {
   const queryClient = useQueryClient()
 
   return async (text: string): Promise<string | null> => {
-    const outcome = await bridge().send({type: 'prompt.send', treeId, text})
+    const outcome = await bridge().send({
+      type: 'prompt.send',
+      treeId,
+      parentReplyId,
+      text,
+    })
 
     if (!outcome.ok) return outcome.error.message
 

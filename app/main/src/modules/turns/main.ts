@@ -1,5 +1,6 @@
 import type {Database} from '#modules/database/main'
 import type {AppEvent} from '@uz/contract/events'
+import type {ReplyRecorded} from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
 import type {
   Prompt,
@@ -63,8 +64,10 @@ interface InFlight {
   saveTimer: ReturnType<typeof setTimeout> | null
 }
 
-interface RootPrompt {
+interface NewPrompt {
   treeId: string
+  /** The Reply it answers; null for the root Prompt. */
+  parentReplyId: string | null
   text: string
   provider: ProviderId
   model: string
@@ -138,6 +141,29 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
     })
   }
 
+  /**
+   * The Provider saved the Reply in its session: keeps where, and the Model
+   * that wrote it. Ignored for a Reply of another Provider or Tree.
+   */
+  function record(provider: ProviderId, recorded: ReplyRecorded) {
+    const {treeId, replyId, model, session} = recorded
+
+    db.update(replies)
+      .set({
+        model,
+        sessionId: session.sessionId,
+        sessionMessageId: session.messageId,
+      })
+      .where(
+        and(
+          eq(replies.id, replyId),
+          eq(replies.treeId, treeId),
+          eq(replies.provider, provider)
+        )
+      )
+      .run()
+  }
+
   /** The System prompt's id, saving it first if no Reply has used it. */
   function saveSystemPrompt(text: string) {
     const hash = createHash('sha256').update(text).digest('hex')
@@ -175,39 +201,81 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
       }
     },
 
-    /** Saves the root Prompt and its Reply, which starts out streaming. */
-    startRoot(root: RootPrompt): {prompt: Prompt; reply: Reply} {
-      const systemPromptId = saveSystemPrompt(root.systemPrompt)
+    /**
+     * Where a Thread continues from this Reply: its Provider and session.
+     * Null when the Tree has no such Reply.
+     */
+    continuation(treeId: string, replyId: string) {
+      const row = db
+        .select()
+        .from(replies)
+        .where(and(eq(replies.id, replyId), eq(replies.treeId, treeId)))
+        .get()
+
+      if (!row) return null
+
+      if (row.status === 'streaming') {
+        throw new Error('Wait for this Reply to finish before continuing.')
+      }
+
+      if (row.sessionId === null || row.sessionMessageId === null) {
+        throw new Error(
+          'This Reply can’t be continued: its Provider never saved it.'
+        )
+      }
+
+      return {
+        provider: row.provider,
+        session: {sessionId: row.sessionId, messageId: row.sessionMessageId},
+      }
+    },
+
+    /**
+     * Saves a Prompt at the end of a Thread, or the root Prompt of an empty
+     * Tree, and its Reply, which starts out streaming.
+     */
+    start(next: NewPrompt): {prompt: Prompt; reply: Reply} {
+      const systemPromptId = saveSystemPrompt(next.systemPrompt)
+      const {treeId, parentReplyId} = next
 
       const saved = db.transaction(tx => {
         const existing = tx
           .select({id: prompts.id})
           .from(prompts)
           .where(
-            and(eq(prompts.treeId, root.treeId), isNull(prompts.parentReplyId))
+            and(
+              eq(prompts.treeId, treeId),
+              parentReplyId === null
+                ? isNull(prompts.parentReplyId)
+                : eq(prompts.parentReplyId, parentReplyId)
+            )
           )
           .get()
 
         if (existing) {
-          throw new Error('This Tree already has its first Prompt.')
+          throw new Error(
+            parentReplyId === null
+              ? 'This Tree already has its first Prompt.'
+              : 'This Reply already has a Prompt after it.'
+          )
         }
 
         const prompt = tx
           .insert(prompts)
-          .values({treeId: root.treeId, text: root.text, createdAt: root.now})
+          .values({treeId, parentReplyId, text: next.text, createdAt: next.now})
           .returning()
           .get()
 
         const reply = tx
           .insert(replies)
           .values({
-            treeId: root.treeId,
+            treeId,
             promptId: prompt.id,
-            provider: root.provider,
-            model: root.model,
+            provider: next.provider,
+            model: next.model,
             ...NEW_REPLY,
             systemPromptId,
-            createdAt: root.now,
+            createdAt: next.now,
           })
           .returning()
           .get()
@@ -216,8 +284,8 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
       })
 
       inFlight.set(saved.reply.id, {
-        provider: root.provider,
-        reply: {...NEW_REPLY, treeId: root.treeId, replyId: saved.reply.id},
+        provider: next.provider,
+        reply: {...NEW_REPLY, treeId, replyId: saved.reply.id},
         saveTimer: null,
       })
 
@@ -225,6 +293,8 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
     },
 
     apply,
+
+    record,
 
     /** Fails one streaming Reply and returns it as saved. */
     fail(replyId: string, failure: RunFailure): Reply {

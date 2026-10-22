@@ -12,15 +12,12 @@ import {ModelSchema, SignInUpdateSchema} from '#modules/providers/main'
 import {ReplyEventSchema, ReplyPartSchema} from '#modules/turns/main'
 import {z} from 'zod'
 
-export const ReplyRequestSchema = z.strictObject({
-  treeId: z.uuid(),
-  replyId: z.uuid(),
-  model: z.string().min(1),
-  systemPrompt: z.string(),
-  prompt: z.strictObject({text: z.string()}),
-})
+import {
+  SessionStoreRequestSchema,
+  SessionStoreValueSchema,
+} from './session-store'
 
-export type ReplyRequest = z.infer<typeof ReplyRequestSchema>
+export * from './session-store'
 
 /** Where a Provider session stands: the session, and a message inside it. */
 export const SessionRefSchema = z.strictObject({
@@ -44,6 +41,35 @@ export const SignInRequestSchema = z.strictObject({
 })
 
 export type SignInRequest = z.infer<typeof SignInRequestSchema>
+
+export const ReplyRequestSchema = z.strictObject({
+  treeId: z.uuid(),
+  replyId: z.uuid(),
+  model: z.string().min(1),
+  systemPrompt: z.string(),
+  prompt: z.strictObject({text: z.string()}),
+  /** The vendor program and its configuration folder, as when connecting. */
+  vendor: SignInRequestSchema,
+  /** The session to continue, at the Reply being answered; null starts one. */
+  session: SessionRefSchema.nullable(),
+})
+
+export type ReplyRequest = z.infer<typeof ReplyRequestSchema>
+
+/**
+ * The Provider has saved the Reply in its session: where it sits there, and
+ * the Model that wrote it. Main keeps both on the Reply; the window never
+ * sees this.
+ */
+export const ReplyRecordedMessage = z.strictObject({
+  type: z.literal('REPLY_RECORDED'),
+  treeId: z.uuid(),
+  replyId: z.uuid(),
+  model: z.string().min(1),
+  session: z.strictObject({sessionId: z.string(), messageId: z.string()}),
+})
+
+export type ReplyRecorded = z.infer<typeof ReplyRecordedMessage>
 
 /** A Thread as any Provider can take it: each Prompt and the Reply to it. */
 export const ThreadSchema = z.array(
@@ -71,8 +97,11 @@ export interface ProviderDriver {
   cancelSignIn(): void
   listModels(): Promise<Model[]>
   readUsage(): Promise<Usage>
-  /** Ends with `RUN_FINISHED`, including after `stop`. */
-  startReply(request: ReplyRequest): AsyncIterable<ReplyEvent>
+  /**
+   * Ends with `RUN_FINISHED`, including after `stop`. `REPLY_RECORDED` comes
+   * before it once the Provider has saved the Reply.
+   */
+  startReply(request: ReplyRequest): AsyncIterable<ReplyEvent | ReplyRecorded>
   stop(replyId: string): Promise<void>
   answerApproval(approvalId: string, answer: ApprovalAnswer): Promise<void>
   forkSession(input: {
@@ -99,6 +128,15 @@ export const HostCommandSchema = z.discriminatedUnion('type', [
   z.strictObject({type: z.literal('sign-in.page-opened')}),
   z.strictObject({type: z.literal('sign-in.code'), code: z.string()}),
   z.strictObject({type: z.literal('sign-in.cancel')}),
+  /** Main's answer to a `SESSION_STORE` request. */
+  z.strictObject({
+    type: z.literal('session-store.result'),
+    requestId: z.string(),
+    outcome: z.discriminatedUnion('ok', [
+      z.strictObject({ok: z.literal(true), value: SessionStoreValueSchema}),
+      z.strictObject({ok: z.literal(false), message: z.string()}),
+    ]),
+  }),
 ])
 
 export type HostCommand = z.infer<typeof HostCommandSchema>
@@ -109,11 +147,20 @@ export const HostReadyMessage = z.strictObject({
   models: z.array(ModelSchema),
 })
 
+/** Asks main to keep, or give back, part of a Provider session. */
+export const SessionStoreMessage = z.strictObject({
+  type: z.literal('SESSION_STORE'),
+  requestId: z.string(),
+  request: SessionStoreRequestSchema,
+})
+
 /** Provider host → main. */
 export const HostMessageSchema = z.discriminatedUnion('type', [
   HostReadyMessage,
   ReplyEventSchema,
+  ReplyRecordedMessage,
   SignInUpdateSchema,
+  SessionStoreMessage,
 ])
 
 export type HostMessage = z.infer<typeof HostMessageSchema>

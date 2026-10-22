@@ -1,4 +1,8 @@
-import type {ProviderDriver, ReplyRequest} from '@uz/contract/host'
+import type {
+  ProviderDriver,
+  ReplyRecorded,
+  ReplyRequest,
+} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {randomUUID} from 'node:crypto'
@@ -83,7 +87,7 @@ export function createFakeDriver({
 
   async function* startReply(
     request: ReplyRequest
-  ): AsyncGenerator<ReplyEvent> {
+  ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
     const {treeId, replyId} = request
     const ids = {treeId, replyId}
     const controller = new AbortController()
@@ -185,6 +189,15 @@ export function createFakeDriver({
         inputTokens,
         outputTokens: written,
         contextSize: inputTokens + written,
+      }
+      yield {
+        ...ids,
+        type: 'REPLY_RECORDED',
+        model: 'fake',
+        session: {
+          sessionId: request.session?.sessionId ?? randomUUID(),
+          messageId: randomUUID(),
+        },
       }
       yield {...ids, type: 'RUN_FINISHED', status: 'complete'}
     } finally {
