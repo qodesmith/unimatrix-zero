@@ -143,9 +143,11 @@ export function createFakeDriver({
       }
 
       if (behavior === 'hang') {
-        await new Promise(resolve => {
-          signal.addEventListener('abort', resolve, {once: true})
-        })
+        if (!signal.aborted) {
+          await new Promise(resolve => {
+            signal.addEventListener('abort', resolve, {once: true})
+          })
+        }
 
         yield stopped()
 

@@ -80,3 +80,24 @@ it('hangs partway when the Prompt asks it to, until stopped', async () => {
     status: 'stopped',
   })
 })
+
+it('stops a hanging Reply that was stopped on its last word', async () => {
+  const driver = createFakeDriver({delayMs: 0})
+  const events: ReplyEvent[] = []
+
+  for await (const event of driver.startReply({
+    ...request,
+    prompt: {text: 'Please /hang'},
+  })) {
+    events.push(event)
+
+    if (event.type === 'TEXT_DELTA' && events.length === 13) {
+      await driver.stop(request.replyId)
+    }
+  }
+
+  expect(events.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'stopped',
+  })
+}, 1000)
