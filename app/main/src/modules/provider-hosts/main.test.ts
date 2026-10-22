@@ -115,6 +115,22 @@ it('passes on Reply events and drops messages that do not parse', () => {
   expect(events).toEqual([textDelta])
 })
 
+it('drops a RUN_FINISHED from a Subagent, which would end its whole Reply', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+  const {treeId, replyId} = textDelta
+
+  latest().say({
+    type: 'RUN_FINISHED',
+    treeId,
+    replyId,
+    subagentId: 's1',
+    status: 'complete',
+  })
+
+  expect(events).toEqual([])
+})
+
 it('sends commands to the Provider’s host', () => {
   const hosts = setUp()
   hosts.connect('claude')

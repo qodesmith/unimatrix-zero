@@ -93,11 +93,11 @@ export function foldReplyEvent<T extends ReplyProgress>(
   reply: T,
   event: ReplyEvent
 ): T {
+  if (event.type === 'RUN_FINISHED') return {...reply, status: event.status}
+
   if (event.subagentId !== undefined) return reply
 
   if (event.type === 'TOKENS') return {...reply, contextSize: event.contextSize}
-
-  if (event.type === 'RUN_FINISHED') return {...reply, status: event.status}
 
   if (!changesContent(event)) return reply
 

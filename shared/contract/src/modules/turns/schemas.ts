@@ -90,9 +90,13 @@ export const StreamingReplySchema = z.strictObject({
 
 export type StreamingReply = z.infer<typeof StreamingReplySchema>
 
-const replyEvent = {
+const replyIds = {
   treeId: z.uuid(),
   replyId: z.uuid(),
+}
+
+const replyEvent = {
+  ...replyIds,
   /** Set when a Subagent of the Reply did it. */
   subagentId: z.string().optional(),
 }
@@ -209,8 +213,9 @@ export const ContextCompactedEvent = z.strictObject({
   type: z.literal('CONTEXT_COMPACTED'),
 })
 
+/** Ends the whole Reply; a Subagent ends with SUBAGENT_FINISHED. */
 export const RunFinishedEvent = z.strictObject({
-  ...replyEvent,
+  ...replyIds,
   type: z.literal('RUN_FINISHED'),
   status: FinishedStatusSchema,
   failure: RunFailureSchema.optional(),
