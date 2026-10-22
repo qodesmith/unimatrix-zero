@@ -48,9 +48,11 @@ jobs:
           node-version-file: .node-version
       - run: bun install --frozen-lockfile
       - run: bun run build
+      - run: bun run test:node
       - if: matrix.renderer
         run: bunx playwright install chromium --only-shell --with-deps
-      - run: bun run ${{ matrix.renderer && 'test' || 'test:node' }}
+      - if: matrix.renderer
+        run: bun run test:renderer
 
   ci:
     name: CI
