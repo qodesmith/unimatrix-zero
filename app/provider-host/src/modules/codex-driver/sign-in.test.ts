@@ -89,7 +89,11 @@ function completed(success: boolean, error: string | null = null) {
 
 function setUp(
   answers: Answers = {'account/login/start': LOGIN, 'account/read': PLUS},
-  options: {download?: () => AsyncIterable<never>; timeoutMs?: number} = {}
+  options: {
+    download?: () => AsyncIterable<never>
+    portFree?: (port: number) => Promise<boolean>
+    timeoutMs?: number
+  } = {}
 ) {
   const fake = fakeServer(answers)
 
@@ -104,6 +108,7 @@ function setUp(
         yield {receivedBytes: 1, totalBytes: 1}
       },
     open,
+    portFree: options.portFree ?? (async () => true),
     timeoutMs: options.timeoutMs ?? 60_000,
   })
 
@@ -315,4 +320,22 @@ it('fails before starting Codex when the download fails', async () => {
     failure: {reason: 'download-failed', message: 'offline'},
   })
   expect(sign.open).not.toHaveBeenCalled()
+})
+
+it('doesn’t start a sign-in while another holds ChatGPT’s sign-in port', async () => {
+  const portFree = vi.fn<(port: number) => Promise<boolean>>(async () => false)
+  const sign = setUp(undefined, {portFree})
+
+  expect((await sign.run()).at(-1)).toEqual({
+    type: 'SIGN_IN_FINISHED',
+    outcome: 'failed',
+    failure: {
+      reason: 'failed',
+      message:
+        'Another ChatGPT or Codex sign-in is open. Finish or close it, then try again.',
+    },
+  })
+  expect(portFree).toHaveBeenCalledWith(1455)
+  expect(sign.open).not.toHaveBeenCalled()
+  expect(sign.requests).toEqual([])
 })

@@ -14,6 +14,13 @@ import {SIGN_IN_CANCELED, signInFailed} from '@uz/contract/providers'
 export const SIGN_IN_TIMEOUT_MS = 15 * 60 * 1000
 
 /**
+ * Where Codex's sign-in waits for ChatGPT's page. Starting a sign-in while
+ * another holds it makes Codex cancel that one (`login/src/server.rs`,
+ * 0.163.0).
+ */
+const SIGN_IN_PORT = 1455
+
+/**
  * What Codex says when the account's workspace can't use it: OpenAI's page
  * answers `missing_codex_entitlement` (`login/src/server.rs`, 0.163.0).
  */
@@ -49,6 +56,7 @@ export interface CodexSignInDeps {
     options: {signal: AbortSignal}
   ) => AsyncIterable<DownloadProgress>
   open: OpenAppServer
+  portFree: (port: number) => Promise<boolean>
   timeoutMs: number
 }
 
@@ -184,6 +192,15 @@ export function createCodexSignIn(deps: CodexSignInDeps) {
 
     if (notReady) {
       yield notReady
+
+      return
+    }
+
+    if (!(await deps.portFree(SIGN_IN_PORT))) {
+      yield signInFailed(
+        'failed',
+        'Another ChatGPT or Codex sign-in is open. Finish or close it, then try again.'
+      )
 
       return
     }

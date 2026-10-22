@@ -8,6 +8,7 @@ import fs from 'node:fs'
 
 import {startAppServer} from './app-server'
 import {CODEX_ARGS, codexEnvironment} from './environment'
+import {portFree} from './port'
 import {SIGN_IN_TIMEOUT_MS, createCodexSignIn} from './sign-in'
 import {DEFAULT_MODEL, IDLE_CLOSE_MS, createCodexReplies} from './streaming'
 
@@ -67,7 +68,7 @@ export function createCodexDriver({
       sseMcp: false,
       sessionFromTranscript: false,
     },
-    ...createCodexSignIn({getProgramReady, open, timeoutMs}),
+    ...createCodexSignIn({getProgramReady, open, portFree, timeoutMs}),
     readConnection: notYet,
     listModels: async () => [{id: DEFAULT_MODEL, name: 'Default'}],
     readUsage: notYet,
