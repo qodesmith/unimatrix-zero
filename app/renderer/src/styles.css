@@ -1,6 +1,12 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import '@fontsource-variable/figtree';
+@import 'streamdown/styles.css';
+
+/* Streamdown's own markup is styled with Tailwind classes it ships compiled. */
+@source '../node_modules/streamdown/dist/*.js';
+@source '../node_modules/@streamdown/code/dist/*.js';
+@source '../node_modules/@streamdown/mermaid/dist/*.js';
 
 @custom-variant dark (&:where([data-mode='dark'], [data-mode='dark'] *));
 

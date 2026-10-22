@@ -1,11 +1,11 @@
-import type {Prompt, Reply, ReplyPart} from '@uz/contract/turns'
+import type {Prompt, Reply} from '@uz/contract/turns'
 import type {KeyboardEvent} from 'react'
 
 import {Button} from '#modules/shadcn/main'
 import {useState} from 'react'
 
-import {useLiveReply} from '../use-live-reply'
 import {useSendPrompt, useTurns} from '../use-turns'
+import {ReplyView} from './ReplyView'
 
 /**
  * One Tree: the centered Input while it's empty, then its Turns, with an
@@ -58,44 +58,6 @@ function Exchange({prompt, reply}: {prompt: Prompt; reply?: Reply}) {
       </p>
       {reply && <ReplyView reply={reply} />}
     </li>
-  )
-}
-
-/** Re-renders only when this Reply changes, from the stream or once saved. */
-function ReplyView({reply}: {reply: Reply}) {
-  const live = useLiveReply(reply.id)
-  const {status, content} = live ?? reply
-
-  return (
-    <article
-      aria-label="Reply"
-      aria-busy={status === 'streaming'}
-      className="flex flex-col gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-card-foreground"
-    >
-      {content.map((part, index) => (
-        // oxlint-disable-next-line react/no-array-index-key -- parts only ever append, so positions are stable
-        <ReplyPartView key={index} part={part} />
-      ))}
-      {status === 'streaming' && (
-        <span className="text-xs text-muted-foreground">Writing…</span>
-      )}
-      {status === 'failed' && (
-        <span className="text-xs text-destructive">This Reply failed.</span>
-      )}
-    </article>
-  )
-}
-
-function ReplyPartView({part}: {part: ReplyPart}) {
-  if (part.type === 'text') {
-    return <p className="whitespace-pre-wrap">{part.text}</p>
-  }
-
-  return (
-    <span className="self-start rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-      {part.toolName}
-      {part.result ? '' : '…'}
-    </span>
   )
 }
 
