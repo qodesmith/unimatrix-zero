@@ -4,17 +4,22 @@ import {query} from '@anthropic-ai/claude-agent-sdk'
 import {spawn} from 'node:child_process'
 import {once} from 'node:events'
 
-/** The plans `claude` itself recognizes; anything else is a free account. */
-const PLANS = new Map([
-  ['pro', 'Pro'],
-  ['max', 'Max'],
-  ['team', 'Team'],
-  ['enterprise', 'Enterprise'],
-])
+const PREFIX = 'Claude '
+
+/**
+ * `accountInfo()` names the plan the way `claude` shows it: "Claude Pro",
+ * "Claude Max", "Claude Team", "Claude Enterprise" or the server's own
+ * "Claude <name>" for a paid plan, and "Claude API" for an account with none.
+ */
+const NO_PLAN = 'Claude API'
 
 /** The plan's name, or null when the account has no paid plan. */
 export function planOf(subscriptionType: string | undefined): string | null {
-  return PLANS.get(subscriptionType ?? '') ?? null
+  if (!subscriptionType?.startsWith(PREFIX) || subscriptionType === NO_PLAN) {
+    return null
+  }
+
+  return subscriptionType.slice(PREFIX.length).trim() || null
 }
 
 interface SessionOptions {

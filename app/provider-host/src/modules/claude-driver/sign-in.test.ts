@@ -22,7 +22,7 @@ const request = {
 
 const maxAccount: AccountInfo = {
   email: 'sam@example.com',
-  subscriptionType: 'max',
+  subscriptionType: 'Claude Max',
 }
 
 let claude: Awaited<ReturnType<typeof fakeClaude>>
@@ -280,6 +280,7 @@ it('signs a free account out again and refuses it', async () => {
     env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
     readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () => ({
       email: 'sam@example.com',
+      subscriptionType: 'Claude API',
     })),
   })
 
