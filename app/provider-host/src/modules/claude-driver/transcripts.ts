@@ -69,6 +69,13 @@ function sessionFolder({configDir, projectKey, sessionId}: SessionPlace) {
   return path.join(configDir, 'projects', projectKey, sessionId)
 }
 
+/** `relative` resolved in `folder`; null when it would land outside it. */
+function within(folder: string, relative: string) {
+  const target = path.resolve(folder, relative)
+
+  return target.startsWith(`${folder}${path.sep}`) ? target : null
+}
+
 function writeEntries(file: string, entries: SessionEntry[]) {
   fs.mkdirSync(path.dirname(file), {recursive: true, mode: 0o700})
   fs.writeFileSync(
@@ -81,8 +88,9 @@ function writeEntries(file: string, entries: SessionEntry[]) {
 /**
  * The fallback restore (ADR 0004): writes the kept transcript, and each
  * Subagent's, back where `claude` reads them, as the SDK does for its store.
- * A plain write, so the files are new and no cleanup sweep takes them. False
- * when nothing was kept for the session.
+ * A plain write, so the files are new and no cleanup sweep takes them. A
+ * Subagent whose subpath would land outside the session's folder is skipped.
+ * False when nothing was kept for the session.
  */
 export async function writeTranscriptBack(
   store: SessionStoreClient,
@@ -97,9 +105,12 @@ export async function writeTranscriptBack(
   writeEntries(`${folder}.jsonl`, entries)
 
   for (const subpath of await store.listSubkeys({projectKey, sessionId})) {
+    const file = within(folder, subpath)
+
+    if (!file) continue
+
     const kept = (await store.load({projectKey, sessionId, subpath})) ?? []
     const metadata = kept.filter(entry => entry.type === 'agent_metadata')
-    const file = path.join(folder, subpath)
 
     writeEntries(
       `${file}.jsonl`,
@@ -157,9 +168,9 @@ export function restoreFiles(place: SessionPlace, files: SessionFile[]) {
   const folder = sessionFolder(place)
 
   for (const file of files) {
-    const target = path.resolve(folder, file.path)
+    const target = within(folder, file.path)
 
-    if (!target.startsWith(`${folder}${path.sep}`)) continue
+    if (!target) continue
 
     fs.mkdirSync(path.dirname(target), {recursive: true, mode: 0o700})
     fs.writeFileSync(target, Buffer.from(file.base64, 'base64'), {mode: 0o600})
