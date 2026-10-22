@@ -336,6 +336,6 @@ it('doesn’t start a sign-in while another holds ChatGPT’s sign-in port', asy
     },
   })
   expect(portFree).toHaveBeenCalledWith(1455)
-  expect(sign.open).not.toHaveBeenCalled()
   expect(sign.requests).toEqual([])
+  expect(sign.close).toHaveBeenCalledOnce()
 })

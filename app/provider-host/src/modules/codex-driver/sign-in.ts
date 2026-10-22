@@ -104,6 +104,13 @@ export function createCodexSignIn(deps: CodexSignInDeps) {
     {inbox}: Attempt<Input>,
     server: AppServer
   ): AsyncGenerator<SignInUpdate, SignInFinished | null> {
+    if (!(await deps.portFree(SIGN_IN_PORT))) {
+      return signInFailed(
+        'failed',
+        'Another ChatGPT or Codex sign-in is open. Finish or close it, then try again.'
+      )
+    }
+
     const login = await server.request('account/login/start', {
       type: 'chatgpt',
     })
@@ -192,15 +199,6 @@ export function createCodexSignIn(deps: CodexSignInDeps) {
 
     if (notReady) {
       yield notReady
-
-      return
-    }
-
-    if (!(await deps.portFree(SIGN_IN_PORT))) {
-      yield signInFailed(
-        'failed',
-        'Another ChatGPT or Codex sign-in is open. Finish or close it, then try again.'
-      )
 
       return
     }
