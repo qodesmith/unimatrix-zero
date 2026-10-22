@@ -1,32 +1,12 @@
 import type {Card} from '../cards'
-import type {
-  ProviderId,
-  SignInFailure,
-  SignInStep,
-} from '@uz/contract/providers'
+import type {ProviderId, SignInStep} from '@uz/contract/providers'
 import type {ReactNode} from 'react'
 
 import {Button} from '#modules/shadcn/main'
 import {PROVIDER_NAMES, SignInStepEvent} from '@uz/contract/providers'
 import {useState} from 'react'
 
-const ABOUT: Record<
-  ProviderId,
-  {plans: string; company: string; mark: string; program: string}
-> = {
-  claude: {
-    plans: 'Pro or Max',
-    company: 'Anthropic',
-    mark: '✳',
-    program: 'Claude Code',
-  },
-  chatgpt: {
-    plans: 'Plus or Pro',
-    company: 'OpenAI',
-    mark: '◎',
-    program: 'Codex',
-  },
-}
+import {ABOUT, failureLine} from '../about'
 
 type Step = SignInStep['step']
 
@@ -106,7 +86,7 @@ function CardBody({
   if (card.kind === 'failed') {
     return (
       <p role="alert" className="text-sm text-destructive">
-        {FAILURE_LINES[card.failure.reason](provider, card.failure)}
+        {failureLine(provider, card.failure)}
       </p>
     )
   }
@@ -370,7 +350,7 @@ function CardAction({
     <Button size="lg" disabled={waitingFor !== null} onClick={connect}>
       {card.kind === 'idle'
         ? `Connect ${name}`
-        : card.failure.reason === 'free-plan'
+        : card.failure.reason === 'plan-refused'
           ? 'Use a different account'
           : 'Try again'}
     </Button>
@@ -411,17 +391,4 @@ const STEPS: Record<
     label: () => 'Check your plan',
     status: () => 'Checking your plan…',
   },
-}
-
-const FAILURE_LINES: Record<
-  SignInFailure['reason'],
-  (provider: ProviderId, failure: SignInFailure) => string
-> = {
-  'download-failed': provider =>
-    `Couldn’t get ${PROVIDER_NAMES[provider]} ready. Check your internet connection and try again.`,
-  'no-answer': provider =>
-    `Sign-in didn’t finish on ${PROVIDER_NAMES[provider]}’s page. Try again.`,
-  'free-plan': provider =>
-    `Unimatrix Zero needs ${PROVIDER_NAMES[provider]} ${ABOUT[provider].plans}.`,
-  failed: (_provider, failure) => failure.message,
 }

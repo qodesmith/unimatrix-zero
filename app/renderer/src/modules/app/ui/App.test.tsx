@@ -371,6 +371,10 @@ function claudeCard() {
   return page.getByRole('region', {name: 'Claude'})
 }
 
+function chatgptCard() {
+  return page.getByRole('region', {name: 'ChatGPT'})
+}
+
 describe('connecting a Provider', () => {
   const url = 'https://claude.com/cai/oauth/authorize?code=true&state=s'
 
@@ -386,9 +390,7 @@ describe('connecting a Provider', () => {
     await expect
       .element(page.getByText('Pro or Max · by Anthropic'))
       .toBeVisible()
-    await expect
-      .element(page.getByText('Plus or Pro · by OpenAI'))
-      .toBeVisible()
+    await expect.element(page.getByText('Any plan · by OpenAI')).toBeVisible()
     await expect
       .element(page.getByRole('button', {name: 'Start chatting →'}))
       .toBeDisabled()
@@ -575,7 +577,7 @@ describe('connecting a Provider', () => {
         action: 'Try again',
       },
       {
-        reason: 'free-plan',
+        reason: 'plan-refused',
         line: 'Unimatrix Zero needs Claude Pro or Max.',
         action: 'Use a different account',
       },
@@ -603,6 +605,39 @@ describe('connecting a Provider', () => {
         provider: 'claude',
       })
     }
+  })
+
+  it('says why Codex refused a ChatGPT account, with a different account to try', async () => {
+    const main = fakeMain({firstLaunch: true})
+    globalThis.window.uz = main
+    await render(<App />)
+
+    main.publish({
+      type: 'SIGN_IN_STEP',
+      provider: 'chatgpt',
+      step: 'sign-in-page',
+      url: 'https://auth.openai.com/oauth/authorize',
+    })
+    main.publish({
+      type: 'SIGN_IN_FINISHED',
+      provider: 'chatgpt',
+      outcome: 'failed',
+      failure: {
+        reason: 'plan-refused',
+        message: 'Codex is not enabled for your workspace.',
+      },
+    })
+
+    await expect
+      .element(chatgptCard().getByRole('alert'))
+      .toHaveTextContent(
+        'Codex isn’t turned on for this ChatGPT workspace. Ask its admin, or use a different account.'
+      )
+    await expect
+      .element(
+        chatgptCard().getByRole('button', {name: 'Use a different account'})
+      )
+      .toBeVisible()
   })
 
   it('shows why main refused to connect', async () => {

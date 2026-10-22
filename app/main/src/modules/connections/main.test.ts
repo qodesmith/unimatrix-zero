@@ -168,7 +168,7 @@ it('stops the host again when connecting fails or is canceled', () => {
     connections.applySignInUpdate(
       'claude',
       outcome === 'failed'
-        ? signInFailed('free-plan', 'No Pro or Max plan.')
+        ? signInFailed('plan-refused', 'No Pro or Max plan.')
         : SIGN_IN_CANCELED
     )
 

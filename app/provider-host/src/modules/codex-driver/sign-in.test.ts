@@ -213,7 +213,7 @@ it('shows the plan error when Codex refuses the account’s workspace', async ()
   expect((await done).at(-1)).toEqual({
     type: 'SIGN_IN_FINISHED',
     outcome: 'failed',
-    failure: {reason: 'free-plan', message: refused},
+    failure: {reason: 'plan-refused', message: refused},
   })
   expect(sign.close).toHaveBeenCalledOnce()
 })

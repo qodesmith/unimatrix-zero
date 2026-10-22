@@ -285,7 +285,7 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
       // next sign-in replaces this one anyway.
       await deps.signOut(command, env).catch(() => undefined)
       yield signInFailed(
-        'free-plan',
+        'plan-refused',
         'This Claude account has no Pro or Max plan.'
       )
 

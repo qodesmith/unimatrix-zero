@@ -114,7 +114,7 @@ export const SignInStepUpdate = z.strictObject({
 })
 
 export const SignInFailureSchema = z.strictObject({
-  reason: z.enum(['download-failed', 'no-answer', 'free-plan', 'failed']),
+  reason: z.enum(['download-failed', 'no-answer', 'plan-refused', 'failed']),
   message: z.string(),
 })
 

@@ -76,7 +76,7 @@ it('keeps the paste step listed once a page with a code was opened', () => {
 })
 
 it('shows a failure until connecting starts again', () => {
-  const failure = {reason: 'free-plan', message: 'No plan.'} as const
+  const failure = {reason: 'plan-refused', message: 'No plan.'} as const
 
   const failed = fold([
     snapshot,

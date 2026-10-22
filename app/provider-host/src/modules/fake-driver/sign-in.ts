@@ -139,7 +139,7 @@ export function createFakeSignIn({delayMs, answerMs}: FakeSignInOptions) {
     }
 
     if (plan === 'Free') {
-      yield signInFailed('free-plan', 'The fake account is on a free plan.')
+      yield signInFailed('plan-refused', 'The fake account is on a free plan.')
 
       return
     }

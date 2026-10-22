@@ -135,7 +135,7 @@ export function createCodexSignIn(deps: CodexSignInDeps) {
           const message = input.error ?? 'ChatGPT’s page didn’t sign in.'
 
           return message.includes(NOT_ENTITLED)
-            ? signInFailed('free-plan', message)
+            ? signInFailed('plan-refused', message)
             : signInFailed('no-answer', message)
         }
 

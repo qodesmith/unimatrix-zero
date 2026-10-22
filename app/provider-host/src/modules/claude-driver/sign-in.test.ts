@@ -321,7 +321,7 @@ it('signs a free account out again and refuses it', async () => {
   expect(used.signOut).toHaveBeenCalledOnce()
   expect(updates.at(-1)).toMatchObject({
     outcome: 'failed',
-    failure: {reason: 'free-plan'},
+    failure: {reason: 'plan-refused'},
   })
 })
 
@@ -338,7 +338,7 @@ it('still refuses a free account when signing it out fails', async () => {
 
   const updates = await connect(createClaudeSignIn(used))
 
-  expect(updates.at(-1)).toMatchObject({failure: {reason: 'free-plan'}})
+  expect(updates.at(-1)).toMatchObject({failure: {reason: 'plan-refused'}})
 })
 
 it('keeps an account whose plan isn’t reported, saying it wasn’t read', async () => {
