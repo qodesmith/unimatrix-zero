@@ -60,7 +60,7 @@ beforeEach(() => {
   globalThis.window.uz = main
 })
 
-function indexOf(type: AppEvent['type'], nth = 0) {
+function before(type: AppEvent['type'], nth = 0) {
   return (
     events.flatMap((event, index) => (event.type === type ? [index] : []))[
       nth
@@ -73,7 +73,7 @@ function indexOf(type: AppEvent['type'], nth = 0) {
  * end by default: `RUN_FINISHED` hands the Reply to the saved Turns, which
  * `<TreeView>` reads and this test does not.
  */
-async function replay(upTo = indexOf('RUN_FINISHED')) {
+async function replay(upTo = before('RUN_FINISHED')) {
   const store = createReplyStore()
   const queryClient = new QueryClient()
   let now = 1000
@@ -93,7 +93,7 @@ async function replay(upTo = indexOf('RUN_FINISHED')) {
 }
 
 it('shows the thinking live and collapsed, then how long it took', async () => {
-  const screen = await replay(indexOf('TEXT_DELTA'))
+  const screen = await replay(before('TEXT_DELTA'))
   const thinking = screen.getByText('Thinking…')
 
   await expect.element(thinking).toBeVisible()
@@ -106,11 +106,32 @@ it('shows the thinking live and collapsed, then how long it took', async () => {
 })
 
 it('replaces the thinking header with its duration once the words start', async () => {
-  const screen = await replay()
+  const screen = await replay(before('TOOL_CALL_START'))
 
-  // Every event is 100ms apart in this replay: the thought spans its deltas.
   await expect.element(screen.getByText(/^Thought for \d+s$/)).toBeVisible()
   await expect.element(screen.getByText('Thinking…')).not.toBeInTheDocument()
+})
+
+it('shows each round of thinking where it happened', async () => {
+  const screen = await replay()
+  const article = screen.getByRole('article', {name: 'Reply'}).element()
+
+  await expect.element(screen.getByText(/^Thought for/).nth(1)).toBeVisible()
+  await expect.element(screen.getByText('Thinking…')).not.toBeInTheDocument()
+
+  const order = [...article.querySelectorAll('p, details')].map(node =>
+    node.textContent.slice(0, 16)
+  )
+
+  const toolAt = order.findIndex(text => text.startsWith('search'))
+
+  const secondThoughtAt = order.findIndex(text =>
+    text.includes('The search answe')
+  )
+
+  expect(order[0]).toMatch(/^Thought for/)
+  expect(secondThoughtAt).toBeGreaterThan(toolAt)
+  expect(order.slice(secondThoughtAt + 1).join(' ')).toContain('Found it.')
 })
 
 it('renders the tool call inline, between the text before and after it', async () => {
@@ -141,7 +162,7 @@ it('renders the tool call inline, between the text before and after it', async (
 })
 
 it('shows the tool call as running until its result arrives', async () => {
-  const screen = await replay(indexOf('TOOL_RESULT'))
+  const screen = await replay(before('TOOL_RESULT'))
 
   await expect
     .element(

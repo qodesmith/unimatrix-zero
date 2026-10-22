@@ -5,11 +5,18 @@ import {useState} from 'react'
 
 type ImageProps = React.JSX.IntrinsicElements['img'] & ExtraProps
 
-type Load =
+type LoadState =
   | {state: 'unloaded'}
   | {state: 'loading'}
   | {state: 'loaded'; dataUrl: string}
   | {state: 'failed'; message: string}
+
+const BUTTON_LABELS: Record<LoadState['state'], string> = {
+  unloaded: 'Load',
+  loading: 'Loading…',
+  loaded: 'Load',
+  failed: 'Try again',
+}
 
 function hostOf(url: string) {
   return new URL(url).host
@@ -26,7 +33,7 @@ function remoteUrl(src: ImageProps['src']): string | null {
  * through main, without cookies or a referrer.
  */
 export function RemoteImage({src, alt, title}: ImageProps) {
-  const [load, setLoad] = useState<Load>({state: 'unloaded'})
+  const [load, setLoad] = useState<LoadState>({state: 'unloaded'})
   const url = remoteUrl(src)
 
   if (!url) return <span>{alt}</span>
@@ -69,11 +76,7 @@ export function RemoteImage({src, alt, title}: ImageProps) {
         onClick={() => void loadImage(url)}
         className="font-medium text-foreground underline-offset-2 hover:underline disabled:opacity-50"
       >
-        {load.state === 'loading'
-          ? 'Loading…'
-          : load.state === 'failed'
-            ? 'Try again'
-            : 'Load'}
+        {BUTTON_LABELS[load.state]}
       </button>
     </span>
   )

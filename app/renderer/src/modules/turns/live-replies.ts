@@ -9,11 +9,14 @@ import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 export type Turns = CommandResult<'tree.turns'>
 
 /**
- * What the Model thought before writing: display only, never stored, so it
- * lives here until the window reloads (PRD §7).
+ * One stretch of thinking: display only, never stored, so it lives here until
+ * the window reloads. A Model thinks before its first word and again between
+ * tool calls, so a Reply has a round per stretch.
  */
-export interface Thinking {
+export interface ThinkingRound {
   text: string
+  /** The content part the thinking came before; the count of parts so far. */
+  beforePart: number
   startedAt: number
   /** Set once the Reply moves on from thinking; null while it still thinks. */
   endedAt: number | null
@@ -23,7 +26,7 @@ interface LiveState {
   /** Replies being written, by Reply id. Saved Turns live in TanStack Query. */
   replies: Record<string, StreamingReply>
   /** By Reply id, kept after the Reply finishes. */
-  thinking: Record<string, Thinking>
+  thinking: Record<string, ThinkingRound[]>
 }
 
 export type ReplyStore = Store<LiveState>
@@ -45,19 +48,29 @@ function without(replies: Record<string, StreamingReply>, replyId: string) {
 type ReplyEvent = Extract<AppEvent, {replyId: string}>
 
 function foldThinking(
-  thinking: Thinking | undefined,
+  rounds: ThinkingRound[],
   event: ReplyEvent,
+  partsSoFar: number,
   now: number
-): Thinking | undefined {
+): ThinkingRound[] {
+  const last = rounds.at(-1)
+  const open = last?.endedAt === null ? last : null
+
   if (event.type === 'REASONING_DELTA') {
-    return thinking
-      ? {...thinking, text: thinking.text + event.delta}
-      : {text: event.delta, startedAt: now, endedAt: null}
+    return open
+      ? [...rounds.slice(0, -1), {...open, text: open.text + event.delta}]
+      : [
+          ...rounds,
+          {
+            text: event.delta,
+            beforePart: partsSoFar,
+            startedAt: now,
+            endedAt: null,
+          },
+        ]
   }
 
-  if (thinking?.endedAt === null) return {...thinking, endedAt: now}
-
-  return thinking
+  return open ? [...rounds.slice(0, -1), {...open, endedAt: now}] : rounds
 }
 
 /**
@@ -90,16 +103,15 @@ export function applyLiveEvent(
   const {replies, thinking} = store.state
   const current = replies[replyId] ?? {...NEW_REPLY, treeId, replyId}
   const next = foldReplyEvent(current, event)
+  const rounds = thinking[replyId] ?? []
 
-  const thought =
+  const nextRounds =
     'subagentId' in event && event.subagentId !== undefined
-      ? thinking[replyId]
-      : foldThinking(thinking[replyId], event, now())
+      ? rounds
+      : foldThinking(rounds, event, current.content.length, now())
 
   const nextThinking =
-    thought === thinking[replyId]
-      ? thinking
-      : {...thinking, ...(thought && {[replyId]: thought})}
+    nextRounds === rounds ? thinking : {...thinking, [replyId]: nextRounds}
 
   if (event.type === 'RUN_FINISHED') {
     const {status, content, contextSize} = next

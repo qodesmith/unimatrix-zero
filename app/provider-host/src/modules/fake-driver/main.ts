@@ -12,6 +12,9 @@ import {createFakeSignIn} from './sign-in'
 /** Streamed as thinking before the first word: shown live, never stored. */
 const THINKING = `The user wants to see the fake Provider at work. I'll open with a line about the stream, look something up with the search tool, then close with code, math, a diagram and a picture.`
 
+/** A Model thinks again once a tool has answered, so the fake does too. */
+const THINKING_AFTER_TOOL = `The search answered with three results. Time to close with the list, the code, the math, the diagram and the picture.`
+
 const OPENING = `Here is a **canned** Reply from the fake Provider. It streams word by word, the way a real one would, so the whole path from the Provider host to the window can be tried without an account.
 
 Let me look something up first.
@@ -136,10 +139,6 @@ export function createFakeDriver({
       return true
     }
 
-    async function* streamText(text: string, limit?: number) {
-      return yield* streamWords('TEXT_DELTA', text, limit)
-    }
-
     try {
       yield {...ids, type: 'RUN_STARTED'}
 
@@ -149,7 +148,8 @@ export function createFakeDriver({
         return
       }
 
-      const opened = yield* streamText(
+      const opened = yield* streamWords(
+        'TEXT_DELTA',
         OPENING,
         behavior === 'complete' ? undefined : WORDS_BEFORE_TROUBLE
       )
@@ -204,7 +204,13 @@ export function createFakeDriver({
         isError: false,
       }
 
-      if (!(yield* streamText(CLOSING))) {
+      if (!(yield* streamWords('REASONING_DELTA', THINKING_AFTER_TOOL))) {
+        yield stopped()
+
+        return
+      }
+
+      if (!(yield* streamWords('TEXT_DELTA', CLOSING))) {
         yield stopped()
 
         return

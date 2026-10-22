@@ -18,7 +18,12 @@ export function useLiveReply(replyId: string) {
   return useSelector(useReplyStore(), state => state.replies[replyId])
 }
 
+const NO_ROUNDS: never[] = []
+
 /** What the Reply's Model thought, while this window has been open. */
 export function useThinking(replyId: string) {
-  return useSelector(useReplyStore(), state => state.thinking[replyId])
+  return useSelector(
+    useReplyStore(),
+    state => state.thinking[replyId] ?? NO_ROUNDS
+  )
 }

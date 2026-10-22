@@ -1,7 +1,8 @@
-import type {Thinking} from '../live-replies'
+import type {ThinkingRound} from '../live-replies'
 import type {Reply, ReplyPart} from '@uz/contract/turns'
 
 import {ReplyMarkdown} from '#modules/markdown/main'
+import {Fragment} from 'react'
 
 import {useLiveReply, useThinking} from '../use-live-reply'
 
@@ -10,9 +11,15 @@ type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 /** Re-renders only when this Reply changes, from the stream or once saved. */
 export function ReplyView({reply}: {reply: Reply}) {
   const live = useLiveReply(reply.id)
-  const thinking = useThinking(reply.id)
+  const rounds = useThinking(reply.id)
   const {status, content} = live ?? reply
   const streaming = status === 'streaming'
+
+  function thinkingBefore(part: number) {
+    return rounds
+      .filter(round => round.beforePart === part)
+      .map(round => <ThinkingSummary key={round.startedAt} round={round} />)
+  }
 
   return (
     <article
@@ -20,19 +27,21 @@ export function ReplyView({reply}: {reply: Reply}) {
       aria-busy={streaming}
       className="flex flex-col gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-card-foreground"
     >
-      {thinking && <ThinkingSummary thinking={thinking} />}
-      {content.map((part, index) =>
-        part.type === 'text' ? (
-          <ReplyMarkdown
-            // oxlint-disable-next-line react/no-array-index-key -- parts only ever append, so positions are stable
-            key={index}
-            text={part.text}
-            streaming={streaming && index === content.length - 1}
-          />
-        ) : (
-          <ToolCallView key={part.toolCallId} part={part} />
-        )
-      )}
+      {content.map((part, index) => (
+        // oxlint-disable-next-line react/no-array-index-key -- parts only ever append, so positions are stable
+        <Fragment key={index}>
+          {thinkingBefore(index)}
+          {part.type === 'text' ? (
+            <ReplyMarkdown
+              text={part.text}
+              streaming={streaming && index === content.length - 1}
+            />
+          ) : (
+            <ToolCallView part={part} />
+          )}
+        </Fragment>
+      ))}
+      {thinkingBefore(content.length)}
       {streaming && (
         <span className="text-xs text-muted-foreground">Writing…</span>
       )}
@@ -51,9 +60,9 @@ function describeDuration(ms: number) {
   return `${Math.round(ms / 60_000)}m`
 }
 
-/** The Model's thinking, collapsed, with how long it took once it moved on. */
-function ThinkingSummary({thinking}: {thinking: Thinking}) {
-  const {text, startedAt, endedAt} = thinking
+/** One round of thinking, collapsed, with how long it took once it moved on. */
+function ThinkingSummary({round}: {round: ThinkingRound}) {
+  const {text, startedAt, endedAt} = round
 
   return (
     <details className="rounded-md bg-muted/50 px-2 py-1 text-xs text-muted-foreground">

@@ -76,6 +76,10 @@ _Avoid_: User message, question
 The AI's Turn in response to one Prompt, however many internal messages, tool calls, or thinking blocks it contains.
 _Avoid_: Response, answer, completion
 
+**Thinking summary**:
+What the Model thought before writing part of a Reply, as the Provider streams it. Shown live and collapsed while the window is open, with how long it took; never stored, so a reload loses it.
+_Avoid_: Reasoning, chain of thought
+
 **Subagent**:
 A helper the AI starts during a Reply to work on part of the task; several can run at once. A Subagent can do exactly what its Tree allows, no more. Its work belongs to the Reply that started it: it is not a Turn, and it never outlives that Reply.
 _Avoid_: Helper, agent, worker, child thread

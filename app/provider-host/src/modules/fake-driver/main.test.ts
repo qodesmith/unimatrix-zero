@@ -60,6 +60,9 @@ it('thinks before the first word, with everything a Reply can show', async () =>
   const firstThought = types.indexOf('REASONING_DELTA')
   expect(firstThought).toBe(1)
   expect(firstThought).toBeLessThan(types.indexOf('TEXT_DELTA'))
+  expect(types.lastIndexOf('REASONING_DELTA')).toBeGreaterThan(
+    types.indexOf('TOOL_RESULT')
+  )
 
   const text = textOf(events)
   expect(text).toContain('```ts\n')

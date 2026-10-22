@@ -13,22 +13,23 @@ import remarkMath from 'remark-math'
 import {bundledThemes} from 'shiki/themes'
 import {defaultRehypePlugins} from 'streamdown'
 
-const FALLBACK_THEMES: [BundledTheme, BundledTheme] = [
-  'github-light',
-  'github-dark',
-]
-
 function isBundledTheme(name: string): name is BundledTheme {
   return Object.hasOwn(bundledThemes, name)
 }
 
-/** The Theme's Shiki themes, light then dark, when Shiki ships them. */
+function bundledTheme(name: string): BundledTheme {
+  if (!isBundledTheme(name)) {
+    throw new Error(`Shiki ships no theme named "${name}"`)
+  }
+
+  return name
+}
+
+/** The Theme's Shiki themes, light then dark. */
 function codeThemes(): [BundledTheme, BundledTheme] {
   const [light, dark] = shikiThemes()
 
-  return isBundledTheme(light) && isBundledTheme(dark)
-    ? [light, dark]
-    : FALLBACK_THEMES
+  return [bundledTheme(light), bundledTheme(dark)]
 }
 
 /**

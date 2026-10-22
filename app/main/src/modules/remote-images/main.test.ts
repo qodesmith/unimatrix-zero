@@ -75,6 +75,21 @@ it('says when the server refused', async () => {
   )
 })
 
+/** A server that never answers; the request ends only when it is aborted. */
+async function stalled(...[, init]: Parameters<typeof globalThis.fetch>) {
+  return new Promise<Response>((_resolve, reject) => {
+    init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))
+  })
+}
+
+it('gives up on a server that never answers', async () => {
+  const images = createRemoteImages(stalled, {timeoutMs: 10})
+
+  await expect(images.load('https://example.com/slow.png')).rejects.toThrow(
+    'The image took too long to load.'
+  )
+})
+
 it('refuses an image larger than the limit', async () => {
   const images = createRemoteImages(
     fakeFetch({body: new Uint8Array(IMAGE_SIZE_LIMIT + 1)}).fetch
