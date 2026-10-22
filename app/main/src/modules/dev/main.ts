@@ -3,6 +3,8 @@ declare const __UZ_DEV__: boolean
 export interface DevRun {
   vitePort: number
   scriptNonce: string
+  /** `bun run dev --fake`: Claude is connected, answered by the fake driver. */
+  fakeProvider: boolean
 }
 
 /**
@@ -18,5 +20,5 @@ export function readDevRun(env: NodeJS.ProcessEnv): DevRun | null {
     throw new Error('UZ_DEV=1 needs UZ_DEV_VITE_PORT and UZ_DEV_NONCE')
   }
 
-  return {vitePort, scriptNonce}
+  return {vitePort, scriptNonce, fakeProvider: env.UZ_DEV_FAKE === '1'}
 }

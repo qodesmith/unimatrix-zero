@@ -1,0 +1,214 @@
+import type {HostProcess} from './main'
+import type {HostCommand} from '@uz/contract/host'
+import type {ProviderId} from '@uz/contract/providers'
+import type {ReplyEvent} from '@uz/contract/turns'
+
+import {afterEach, beforeEach, expect, it, vi} from 'vitest'
+
+import {RESTART_DELAYS_MS, STABLE_AFTER_MS, createProviderHosts} from './main'
+
+const models = [{id: 'fake', name: 'Fake model'}]
+
+const textDelta = {
+  type: 'TEXT_DELTA',
+  treeId: '01a16096-00ad-7d3b-8205-6b76ddc26ce0',
+  replyId: '01a16096-00ae-7d3b-8205-6b76ddc26ce0',
+  delta: 'Hi',
+} as const
+
+/** A host process main can drive and the test can make talk or crash. */
+function fakeProcess() {
+  const received: HostCommand[] = []
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- HostProcess hands main whatever the host sent
+  const messageListeners: ((message: unknown) => void)[] = []
+  const exitListeners: (() => void)[] = []
+  let killed = false
+
+  function crash() {
+    for (const listener of exitListeners) listener()
+  }
+
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- tests send malformed messages too
+  function say(message: unknown) {
+    for (const listener of messageListeners) listener(message)
+  }
+
+  const process: HostProcess = {
+    post: command => received.push(command),
+    onMessage: listener => messageListeners.push(listener),
+    onExit: listener => exitListeners.push(listener),
+    kill: () => {
+      killed = true
+      crash()
+    },
+  }
+
+  return {process, received, say, crash, isKilled: () => killed}
+}
+
+let spawned: ReturnType<typeof fakeProcess>[]
+let events: ReplyEvent[]
+let crashes: ProviderId[]
+
+function setUp() {
+  return createProviderHosts({
+    spawn: () => {
+      const child = fakeProcess()
+      spawned.push(child)
+
+      return child.process
+    },
+    onReplyEvent: (_provider, event) => events.push(event),
+    onCrash: provider => crashes.push(provider),
+  })
+}
+
+function latest() {
+  const child = spawned.at(-1)
+
+  if (!child) throw new Error('No host was started')
+
+  return child
+}
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  spawned = []
+  events = []
+  crashes = []
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+it('starts a host only when its Provider is connected, and only once', () => {
+  const hosts = setUp()
+
+  expect(spawned).toHaveLength(0)
+
+  hosts.connect('claude')
+  hosts.connect('claude')
+
+  expect(spawned).toHaveLength(1)
+})
+
+it('is ready once the host says so, with its first Model', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+
+  expect(hosts.ready()).toBeNull()
+
+  latest().say({type: 'HOST_READY', models})
+
+  expect(hosts.ready()).toEqual({provider: 'claude', model: models[0]})
+})
+
+it('passes on Reply events and drops messages that do not parse', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+
+  latest().say(textDelta)
+  latest().say({...textDelta, extra: true})
+  latest().say({type: 'NOPE'})
+
+  expect(events).toEqual([textDelta])
+})
+
+it('drops a RUN_FINISHED from a Subagent, which would end its whole Reply', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+  const {treeId, replyId} = textDelta
+
+  latest().say({
+    type: 'RUN_FINISHED',
+    treeId,
+    replyId,
+    subagentId: 's1',
+    status: 'complete',
+  })
+
+  expect(events).toEqual([])
+})
+
+it('sends commands to the Provider’s host', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+
+  const command = {
+    type: 'reply.start',
+    request: {
+      treeId: textDelta.treeId,
+      replyId: textDelta.replyId,
+      model: 'fake',
+      systemPrompt: '',
+      prompt: {text: 'Hi'},
+    },
+  } as const
+
+  hosts.send('claude', command)
+
+  expect(latest().received).toEqual([command])
+})
+
+it('reports a crash and restarts after 1 s, 5 s, then 30 s, then stays down', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+
+  for (const delay of RESTART_DELAYS_MS) {
+    latest().crash()
+    expect(hosts.ready()).toBeNull()
+
+    const before = spawned.length
+    vi.advanceTimersByTime(delay - 1)
+    expect(spawned).toHaveLength(before)
+    vi.advanceTimersByTime(1)
+    expect(spawned).toHaveLength(before + 1)
+  }
+
+  latest().crash()
+  vi.advanceTimersByTime(60 * 60_000)
+
+  expect(spawned).toHaveLength(1 + RESTART_DELAYS_MS.length)
+  expect(crashes).toHaveLength(1 + RESTART_DELAYS_MS.length)
+})
+
+it('starts the backoff over once a restarted host has stayed up', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+
+  latest().crash()
+  vi.advanceTimersByTime(RESTART_DELAYS_MS[0] ?? 0)
+  latest().say({type: 'HOST_READY', models})
+  vi.advanceTimersByTime(STABLE_AFTER_MS)
+
+  latest().crash()
+  const before = spawned.length
+  vi.advanceTimersByTime(RESTART_DELAYS_MS[0] ?? 0)
+
+  expect(spawned).toHaveLength(before + 1)
+})
+
+it('ignores a message from a host it has replaced', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+  const crashed = latest()
+
+  crashed.crash()
+  vi.advanceTimersByTime(RESTART_DELAYS_MS[0] ?? 0)
+  crashed.say(textDelta)
+
+  expect(events).toEqual([])
+})
+
+it('stops every host without counting it as a crash', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+
+  hosts.stopAll()
+  vi.advanceTimersByTime(60 * 60_000)
+
+  expect(latest().isKilled()).toBe(true)
+  expect(crashes).toEqual([])
+  expect(spawned).toHaveLength(1)
+})

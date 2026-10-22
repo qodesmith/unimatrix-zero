@@ -12,6 +12,7 @@ const worktree = createHash('sha256').update(root).digest('hex').slice(0, 8)
 const vitePort = 5173 + (parseInt(worktree, 16) % 2000)
 const dataFolder = `unimatrix-zero-dev-${worktree}`
 const scriptNonce = randomBytes(16).toString('base64')
+const fakeProvider = process.argv.includes('--fake')
 
 function fromRoot(relative: string) {
   return path.join(root, relative)
@@ -81,6 +82,7 @@ function startElectron() {
       UZ_DEV_VITE_PORT: String(vitePort),
       UZ_DEV_NONCE: scriptNonce,
       UZ_DEV_DATA_FOLDER: dataFolder,
+      UZ_DEV_FAKE: fakeProvider ? '1' : '0',
     },
     onExit: (_proc, code) => {
       if (stopping || restarting) return
@@ -115,12 +117,6 @@ for (const [name, watcher] of Object.entries(bundles)) {
   watcher.on('event', event => {
     if (event.code !== 'BUNDLE_END') return
 
-    if (name === 'hosts') {
-      console.log('Provider hosts rebuilt.')
-
-      return
-    }
-
     scheduleRestart(name)
   })
 }
@@ -140,7 +136,7 @@ process.on('SIGINT', () => void shutdown())
 process.on('SIGTERM', () => void shutdown())
 
 console.log(
-  `Unimatrix Zero dev: renderer on app-dev:// (Vite :${vitePort}), data in ${dataFolder}`
+  `Unimatrix Zero dev: renderer on app-dev:// (Vite :${vitePort}), data in ${dataFolder}${fakeProvider ? ', fake Provider' : ''}`
 )
 
 startElectron()

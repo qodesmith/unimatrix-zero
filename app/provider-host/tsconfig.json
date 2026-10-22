@@ -3,5 +3,6 @@
   "compilerOptions": {
     "types": ["node", "electron"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  "references": [{"path": "../../shared/contract"}]
 }

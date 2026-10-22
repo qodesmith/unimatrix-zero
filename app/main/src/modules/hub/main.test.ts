@@ -11,7 +11,11 @@ const tree = {
 }
 
 function setUp() {
-  return createHub(() => ({type: 'SNAPSHOT', app: {version: '1.0.0'}}))
+  return createHub(() => ({
+    type: 'SNAPSHOT',
+    app: {version: '1.0.0'},
+    replies: [],
+  }))
 }
 
 function recorder() {
