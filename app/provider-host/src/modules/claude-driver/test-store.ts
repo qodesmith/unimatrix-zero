@@ -51,27 +51,28 @@ export function fakeStore() {
   }
 
   function answer(request: SessionStoreRequest): SessionStoreValue {
-    const {op} = request
+    switch (request.op) {
+      case 'append':
+        append(request.key, request.entries)
 
-    if (op === 'append') {
-      append(request.key, request.entries)
+        return null
+      case 'load':
+        return entries.get(keyText(request.key)) ?? null
+      case 'list-subkeys':
+        return subkeys(request.projectKey, request.sessionId)
+      case 'load-files':
+        return [...filesOf(request.projectKey, request.sessionId).values()]
+      case 'save-files': {
+        const kept = filesOf(request.projectKey, request.sessionId)
 
-      return null
+        for (const file of request.files) kept.set(file.path, file)
+
+        return null
+      }
+
+      default:
+        throw new Error('Unknown session store request.')
     }
-
-    if (op === 'load') return entries.get(keyText(request.key)) ?? null
-
-    if (op === 'list-subkeys') {
-      return subkeys(request.projectKey, request.sessionId)
-    }
-
-    const kept = filesOf(request.projectKey, request.sessionId)
-
-    if (op === 'load-files') return [...kept.values()]
-
-    for (const file of request.files) kept.set(file.path, file)
-
-    return null
   }
 
   const client = createSessionStoreClient(message => {

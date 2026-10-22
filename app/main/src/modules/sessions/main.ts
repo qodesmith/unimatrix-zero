@@ -159,27 +159,29 @@ export function createSessions(db: Database) {
     provider: ProviderId,
     request: SessionStoreRequest
   ): SessionStoreValue {
-    const {op} = request
+    switch (request.op) {
+      case 'append':
+        append(provider, request.key, request.entries)
 
-    if (op === 'append') {
-      append(provider, request.key, request.entries)
+        return null
+      case 'load':
+        return load(provider, request.key)
+      case 'list-subkeys':
+        return listSubkeys(provider, request.projectKey, request.sessionId)
+      case 'save-files':
+        saveFiles(
+          provider,
+          request.projectKey,
+          request.sessionId,
+          request.files
+        )
 
-      return null
+        return null
+      case 'load-files':
+        return loadFiles(provider, request.projectKey, request.sessionId)
+      default:
+        throw new Error('Unknown session store request.')
     }
-
-    if (op === 'load') return load(provider, request.key)
-
-    if (op === 'list-subkeys') {
-      return listSubkeys(provider, request.projectKey, request.sessionId)
-    }
-
-    if (op === 'save-files') {
-      saveFiles(provider, request.projectKey, request.sessionId, request.files)
-
-      return null
-    }
-
-    return loadFiles(provider, request.projectKey, request.sessionId)
   }
 
   return {handle}

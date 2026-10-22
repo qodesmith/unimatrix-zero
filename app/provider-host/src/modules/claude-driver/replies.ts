@@ -4,6 +4,7 @@ import type {
   SDKPartialAssistantMessage,
   SDKResultMessage,
 } from '@anthropic-ai/claude-agent-sdk'
+import type {ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 type StreamEvent = SDKPartialAssistantMessage['event']
@@ -20,10 +21,7 @@ type RunFinished = Extract<ReplyEvent, {type: 'RUN_FINISHED'}>
  */
 const SYNTHETIC_MODEL = '<synthetic>'
 
-interface ReplyIds {
-  treeId: string
-  replyId: string
-}
+type ReplyIds = Pick<ReplyRequest, 'treeId' | 'replyId'>
 
 /**
  * Turns one Reply's SDK messages into contract events. Text streams as

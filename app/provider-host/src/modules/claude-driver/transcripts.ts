@@ -1,6 +1,6 @@
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {SessionKey, SessionStore} from '@anthropic-ai/claude-agent-sdk'
-import type {SessionEntry, SessionFile} from '@uz/contract/host'
+import type {SessionEntry, SessionFile, SessionFolder} from '@uz/contract/host'
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -57,11 +57,9 @@ export function appSessionStore(store: SessionStoreClient): SessionStore {
   }
 }
 
-interface SessionPlace {
+type SessionPlace = SessionFolder & {
   /** The configuration folder `claude` runs with. */
   configDir: string
-  projectKey: string
-  sessionId: string
 }
 
 /** The folder `claude` keeps a session's own files in. */
