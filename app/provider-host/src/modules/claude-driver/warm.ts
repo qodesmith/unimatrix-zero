@@ -3,12 +3,12 @@ import type {SessionRef} from '@uz/contract/host'
 /** A warm session closes after this long without a Prompt. */
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
 
-/** At most this many sessions stay open. */
+/** At most this many stay open once their Replies are written. */
 export const MAX_WARM = 6
 
 export interface WarmSession {
   readonly sessionId: string | null
-  readonly leaf: string | null
+  readonly messageId: string | null
   close(): Promise<void>
 }
 
@@ -61,7 +61,7 @@ export function createWarmSessions<Session extends WarmSession>({
       for (const session of idle.keys()) {
         if (session.sessionId !== ref.sessionId) continue
 
-        if (session.leaf === ref.messageId) {
+        if (session.messageId === ref.messageId) {
           clearTimeout(idle.get(session))
           idle.delete(session)
 

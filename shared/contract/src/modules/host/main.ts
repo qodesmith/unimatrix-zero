@@ -66,7 +66,7 @@ export const ReplyRecordedMessage = z.strictObject({
   treeId: z.uuid(),
   replyId: z.uuid(),
   model: z.string().min(1),
-  session: z.strictObject({sessionId: z.string(), messageId: z.string()}),
+  session: SessionRefSchema.extend({messageId: z.string()}),
 })
 
 export type ReplyRecorded = z.infer<typeof ReplyRecordedMessage>

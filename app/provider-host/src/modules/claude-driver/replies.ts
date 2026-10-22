@@ -158,7 +158,7 @@ export function createReplyMapper(ids: ReplyIds) {
       return []
     },
 
-    /** How the turn ended, as the Reply's last event. */
+    /** How the Reply ended, as its last event. */
     finished(result: SDKResultMessage): RunFinished {
       if (result.subtype === 'success' && !result.is_error) {
         return {...ids, type: 'RUN_FINISHED', status: 'complete'}

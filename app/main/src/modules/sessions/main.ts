@@ -2,6 +2,7 @@ import type {Database} from '#modules/database/main'
 import type {
   SessionEntry,
   SessionFile,
+  SessionFolder,
   SessionKey,
   SessionStoreRequest,
   SessionStoreValue,
@@ -22,11 +23,22 @@ function decode(blob: Uint8Array): SessionEntry {
   return SessionEntrySchema.parse(JSON.parse(Buffer.from(blob).toString()))
 }
 
+/** Rows of one Provider session, in either table. */
+function inFolder(
+  table: typeof sessionEntries | typeof sessionFiles,
+  provider: ProviderId,
+  {projectKey, sessionId}: SessionFolder
+) {
+  return and(
+    eq(table.provider, provider),
+    eq(table.projectKey, projectKey),
+    eq(table.sessionId, sessionId)
+  )
+}
+
 function whereKey(provider: ProviderId, key: SessionKey) {
   return and(
-    eq(sessionEntries.provider, provider),
-    eq(sessionEntries.projectKey, key.projectKey),
-    eq(sessionEntries.sessionId, key.sessionId),
+    inFolder(sessionEntries, provider, key),
     eq(sessionEntries.subpath, key.subpath ?? '')
   )
 }
@@ -92,13 +104,7 @@ export function createSessions(db: Database) {
     return db
       .selectDistinct({subpath: sessionEntries.subpath})
       .from(sessionEntries)
-      .where(
-        and(
-          eq(sessionEntries.provider, provider),
-          eq(sessionEntries.projectKey, projectKey),
-          eq(sessionEntries.sessionId, sessionId)
-        )
-      )
+      .where(inFolder(sessionEntries, provider, {projectKey, sessionId}))
       .all()
       .map(row => row.subpath)
       .filter(subpath => subpath !== '')
@@ -139,13 +145,7 @@ export function createSessions(db: Database) {
     return db
       .select({path: sessionFiles.path, data: sessionFiles.data})
       .from(sessionFiles)
-      .where(
-        and(
-          eq(sessionFiles.provider, provider),
-          eq(sessionFiles.projectKey, projectKey),
-          eq(sessionFiles.sessionId, sessionId)
-        )
-      )
+      .where(inFolder(sessionFiles, provider, {projectKey, sessionId}))
       .orderBy(asc(sessionFiles.path))
       .all()
       .map(row => ({

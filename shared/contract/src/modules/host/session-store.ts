@@ -1,9 +1,15 @@
 import {z} from 'zod'
 
-/** One Provider session's transcript, or a Subagent's inside it. */
-export const SessionKeySchema = z.strictObject({
+/** One Provider session, with every transcript and file kept for it. */
+export const SessionFolderSchema = z.strictObject({
   projectKey: z.string().min(1),
   sessionId: z.string().min(1),
+})
+
+export type SessionFolder = z.infer<typeof SessionFolderSchema>
+
+/** One Provider session's transcript, or a Subagent's inside it. */
+export const SessionKeySchema = SessionFolderSchema.extend({
   /** Set for a Subagent's transcript; absent for the session's own. */
   subpath: z.string().min(1).optional(),
 })
@@ -12,7 +18,8 @@ export type SessionKey = z.infer<typeof SessionKeySchema>
 
 /**
  * One transcript entry as the vendor program wrote it. Opaque: kept and given
- * back unchanged, never read beyond the `uuid` it is deduplicated on.
+ * back unchanged, read only for the `uuid` it is deduplicated on and the
+ * `type` the vendor's SDK files it by.
  */
 export const SessionEntrySchema = z.looseObject({
   type: z.string(),
@@ -33,11 +40,6 @@ export const SessionFileSchema = z.strictObject({
 
 export type SessionFile = z.infer<typeof SessionFileSchema>
 
-const sessionFolder = {
-  projectKey: z.string().min(1),
-  sessionId: z.string().min(1),
-}
-
 /** What a Provider host asks main to keep, or give back, of its sessions. */
 export const SessionStoreRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({
@@ -46,13 +48,13 @@ export const SessionStoreRequestSchema = z.discriminatedUnion('op', [
     entries: z.array(SessionEntrySchema),
   }),
   z.strictObject({op: z.literal('load'), key: SessionKeySchema}),
-  z.strictObject({op: z.literal('list-subkeys'), ...sessionFolder}),
+  z.strictObject({op: z.literal('list-subkeys'), ...SessionFolderSchema.shape}),
   z.strictObject({
     op: z.literal('save-files'),
-    ...sessionFolder,
+    ...SessionFolderSchema.shape,
     files: z.array(SessionFileSchema),
   }),
-  z.strictObject({op: z.literal('load-files'), ...sessionFolder}),
+  z.strictObject({op: z.literal('load-files'), ...SessionFolderSchema.shape}),
 ])
 
 export type SessionStoreRequest = z.infer<typeof SessionStoreRequestSchema>

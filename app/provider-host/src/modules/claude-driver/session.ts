@@ -20,18 +20,18 @@ type Input = {kind: 'prompt'; text: string} | {kind: 'end'}
 
 /**
  * One `claude` in streaming-input mode: a Provider session kept open between
- * Prompts. Its session id is known once `claude` starts; `leaf` is Claude's
- * last message, where the session's next Prompt continues from.
+ * Prompts. Its session id is known once `claude` starts; `messageId` is
+ * Claude's last message, where the session's next Prompt continues from.
  */
 export interface ClaudeSession {
   readonly sessionId: string | null
-  leaf: string | null
+  messageId: string | null
   /** Whether `claude` has started; false while it may still refuse to. */
   readonly started: boolean
   /** Whether `claude` has ended, by itself or by `close`. */
   readonly ended: boolean
   /** Sends a Prompt and yields what comes back, up to its `result`. */
-  turn(text: string): AsyncGenerator<SDKMessage>
+  send(text: string): AsyncGenerator<SDKMessage>
   /**
    * Ends `claude`'s input and waits for it to exit by itself, so it can
    * finish writing; one that is stuck is stopped.
@@ -83,7 +83,7 @@ export function openSession(query: QueryFn, options: Options): ClaudeSession {
     get sessionId() {
       return sessionId
     },
-    leaf: null,
+    messageId: null,
     get started() {
       return started
     },
@@ -91,7 +91,7 @@ export function openSession(query: QueryFn, options: Options): ClaudeSession {
       return ended
     },
 
-    async *turn(text) {
+    async *send(text) {
       inbox.push({kind: 'prompt', text})
 
       for (;;) {

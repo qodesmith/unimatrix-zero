@@ -1,7 +1,9 @@
 import type {
+  HostCommand,
   HostMessage,
   SessionEntry,
   SessionFile,
+  SessionFolder,
   SessionKey,
   SessionStoreRequest,
   SessionStoreValue,
@@ -10,18 +12,11 @@ import type {
 import {SESSION_STORE_RESULTS} from '@uz/contract/host'
 import {randomUUID} from 'node:crypto'
 
-type Outcome =
-  | {ok: true; value: SessionStoreValue}
-  | {ok: false; message: string}
+type Outcome = Extract<HostCommand, {type: 'session-store.result'}>['outcome']
 
 interface Pending {
   resolve: (value: SessionStoreValue) => void
   reject: (error: Error) => void
-}
-
-export interface SessionFolder {
-  projectKey: string
-  sessionId: string
 }
 
 /**

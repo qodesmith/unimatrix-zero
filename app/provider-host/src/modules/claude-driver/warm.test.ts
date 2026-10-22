@@ -2,10 +2,10 @@ import {afterEach, beforeEach, expect, it, vi} from 'vitest'
 
 import {createWarmSessions} from './warm'
 
-function session(sessionId: string, leaf: string) {
+function session(sessionId: string, messageId: string) {
   return {
     sessionId,
-    leaf,
+    messageId,
     closed: false,
     async close() {
       this.closed = true

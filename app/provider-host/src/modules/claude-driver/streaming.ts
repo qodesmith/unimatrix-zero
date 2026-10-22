@@ -38,7 +38,8 @@ type Restore = 'none' | 'store' | 'file'
 
 interface Live extends ClaudeSession {
   restore: Restore
-  cwd: string
+  /** Where `claude` files the session. */
+  projectKey: string
   /** The configuration folder `claude` runs with: the SDK's own on a restore. */
   activeConfigDir: () => string
   /** Tool result files already in the app's copy. */
@@ -116,7 +117,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     return Object.assign(openSession(deps.query, options), {
       restore,
-      cwd,
+      projectKey,
       activeConfigDir: () => activeConfigDir,
       saved: new Set(files.map(file => file.path)),
     })
@@ -128,7 +129,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     text: string
   ): AsyncGenerator<ReplyEvent, Outcome> {
     try {
-      for await (const message of session.turn(text)) {
+      for await (const message of session.send(text)) {
         if (message.type === 'result') return {result: message}
 
         yield* mapper.map(message)
@@ -145,7 +146,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     const files = readNewToolResults(
       {
         configDir: session.activeConfigDir(),
-        projectKey: projectKeyOf(session.cwd),
+        projectKey: session.projectKey,
         sessionId,
       },
       session.saved
@@ -154,7 +155,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     if (files.length === 0) return
 
     await deps.store.saveFiles(
-      {projectKey: projectKeyOf(session.cwd), sessionId},
+      {projectKey: session.projectKey, sessionId},
       files
     )
 
@@ -194,7 +195,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     const writtenBack = await writeTranscriptBack(deps.store, {
       configDir: request.vendor.configDir,
-      projectKey: projectKeyOf(session.cwd),
+      projectKey: session.projectKey,
       sessionId: request.session.sessionId,
     })
 
@@ -242,7 +243,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     if (sessionId) await saveToolResults(session, sessionId)
 
-    session.leaf = recorded?.uuid ?? null
+    session.messageId = recorded?.uuid ?? null
 
     if (recorded && sessionId) {
       yield {
