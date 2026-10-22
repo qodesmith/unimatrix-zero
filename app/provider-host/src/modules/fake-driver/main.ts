@@ -31,7 +31,8 @@ function words(text: string): string[] {
 
 async function sleep(ms: number, signal: AbortSignal) {
   return new Promise<void>(resolve => {
-    if (signal.aborted) {
+    // A zero-delay timer still waits ~15ms on Windows, once per word.
+    if (ms === 0 || signal.aborted) {
       resolve()
 
       return
