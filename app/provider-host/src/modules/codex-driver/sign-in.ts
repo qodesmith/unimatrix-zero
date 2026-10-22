@@ -123,7 +123,13 @@ export function createCodexSignIn(deps: CodexSignInDeps) {
         .catch(() => undefined)
     }
 
-    yield {type: 'SIGN_IN_STEP', step: 'sign-in-page', url: login.authUrl}
+    // Codex's app-server leaves opening the page to the app.
+    yield {
+      type: 'SIGN_IN_STEP',
+      step: 'sign-in-page',
+      url: login.authUrl,
+      openPage: true,
+    }
 
     try {
       for (;;) {

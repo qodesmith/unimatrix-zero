@@ -138,7 +138,12 @@ it('signs in on ChatGPT’s page and reads the account and plan', async () => {
       step: 'get-ready',
       progress: {receivedBytes: 1, totalBytes: 1},
     },
-    {type: 'SIGN_IN_STEP', step: 'sign-in-page', url: AUTH_URL},
+    {
+      type: 'SIGN_IN_STEP',
+      step: 'sign-in-page',
+      url: AUTH_URL,
+      openPage: true,
+    },
     {type: 'SIGN_IN_STEP', step: 'check-plan'},
     {
       type: 'SIGN_IN_FINISHED',

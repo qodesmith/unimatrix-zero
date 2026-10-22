@@ -178,6 +178,18 @@ it('stops the host again when connecting fails or is canceled', () => {
   }
 })
 
+it('opens the sign-in page itself when the host asks, once', () => {
+  const connections = setUp()
+  connections.connect('claude')
+
+  const step = {type: 'SIGN_IN_STEP', step: 'sign-in-page', url} as const
+  connections.applySignInUpdate('claude', {...step, openPage: true})
+
+  expect(opened).toEqual([url])
+  expect(published.at(-1)).toEqual({...step, provider: 'claude'})
+  expect(connections.snapshot().signIn).toEqual({...step, provider: 'claude'})
+})
+
 it('opens the sign-in page again and tells the host, which then takes a code', () => {
   const connections = setUp()
   connections.connect('claude')

@@ -182,7 +182,11 @@ export function createConnections({
         return
       }
 
-      signIn = {...update, provider}
+      const {openPage, ...step} = update
+
+      if (openPage && step.url) openExternal(step.url)
+
+      signIn = {...step, provider}
       publish(signIn)
     },
 
