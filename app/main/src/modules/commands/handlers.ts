@@ -20,7 +20,7 @@ export interface HandlerDeps {
     'connect' | 'openPage' | 'submitCode' | 'cancel'
   >
   /** The vendor program and configuration folder a Provider's Replies use. */
-  vendorFor: (provider: ProviderId) => SignInRequest
+  vendorProgramFor: (provider: ProviderId) => SignInRequest
   publish: (event: AppEvent) => void
 }
 
@@ -71,7 +71,7 @@ export const handlers: Handlers = {
 
   'prompt.send': (
     {treeId, parentReplyId, text},
-    {now, trees, turns, hosts, vendorFor}
+    {now, trees, turns, hosts, vendorProgramFor}
   ) => {
     found(trees.get(treeId))
 
@@ -114,7 +114,7 @@ export const handlers: Handlers = {
           model: model.id,
           systemPrompt,
           prompt: {text},
-          vendor: vendorFor(provider),
+          vendorProgram: vendorProgramFor(provider),
           session: continued?.session ?? null,
         },
       })

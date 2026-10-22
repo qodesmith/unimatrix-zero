@@ -49,7 +49,7 @@ export const ReplyRequestSchema = z.strictObject({
   systemPrompt: z.string(),
   prompt: z.strictObject({text: z.string()}),
   /** The vendor program and its configuration folder, as when connecting. */
-  vendor: SignInRequestSchema,
+  vendorProgram: SignInRequestSchema,
   /** The session to continue, at the Reply being answered; null starts one. */
   session: SessionRefSchema.nullable(),
 })

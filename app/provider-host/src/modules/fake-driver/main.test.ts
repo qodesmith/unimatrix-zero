@@ -11,7 +11,7 @@ const request = {
   replyId: '01a16096-00ae-7d3b-8205-6b76ddc26ce0',
   model: 'fake',
   systemPrompt: '',
-  vendor: {program: null, configDir: '/claude'},
+  vendorProgram: {program: null, configDir: '/claude'},
   session: null,
 }
 

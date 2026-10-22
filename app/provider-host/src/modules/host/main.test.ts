@@ -12,7 +12,7 @@ const request = {
   model: 'fake',
   systemPrompt: '',
   prompt: {text: 'Hi'},
-  vendor: {program: null, configDir: '/claude'},
+  vendorProgram: {program: null, configDir: '/claude'},
   session: null,
 }
 

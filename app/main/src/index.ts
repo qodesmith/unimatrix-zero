@@ -142,7 +142,7 @@ function openWindow(db: Database) {
       turns,
       hosts,
       connections,
-      vendorFor: provider => signInRequestFor(provider, machine),
+      vendorProgramFor: provider => signInRequestFor(provider, machine),
       publish: hub.publish,
     }
   )

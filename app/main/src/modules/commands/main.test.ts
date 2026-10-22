@@ -25,7 +25,7 @@ let hostCommands: HostCommand[]
 let hostReady: boolean
 let deps: Parameters<typeof dispatchCommand>[2]
 
-const vendor = {program: null, configDir: '/claude'}
+const vendorProgram = {program: null, configDir: '/claude'}
 
 beforeEach(() => {
   const db = openDatabase({file: ':memory:', migrationsFolder})
@@ -65,7 +65,7 @@ beforeEach(() => {
       openExternal: () => undefined,
       now,
     }),
-    vendorFor: () => vendor,
+    vendorProgramFor: () => vendorProgram,
     publish,
   }
 })
@@ -230,7 +230,7 @@ describe('the root Prompt', () => {
           model: 'fake',
           systemPrompt: '',
           prompt: {text: 'Hello'},
-          vendor,
+          vendorProgram,
           session: null,
         },
       },
@@ -378,7 +378,7 @@ describe('a Prompt at the end of a Thread', () => {
           model: 'fake',
           systemPrompt: '',
           prompt: {text: 'And then?'},
-          vendor,
+          vendorProgram,
           session: {sessionId: 's1', messageId: 'm1'},
         },
       },

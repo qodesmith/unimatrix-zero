@@ -65,7 +65,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   const sessionStore = appSessionStore(deps.store)
 
   async function open(request: ReplyRequest, restore: Restore): Promise<Live> {
-    const {program, configDir} = request.vendor
+    const {program, configDir} = request.vendorProgram
 
     if (!program) throw new Error('The manifest names no Claude program.')
 
@@ -204,7 +204,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     warm.drop(session)
 
     const writtenBack = await writeTranscriptBack(deps.store, {
-      configDir: request.vendor.configDir,
+      configDir: request.vendorProgram.configDir,
       projectKey: session.projectKey,
       sessionId: request.session.sessionId,
     })

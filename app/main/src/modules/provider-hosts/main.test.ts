@@ -221,7 +221,7 @@ it('sends commands to the Provider’s host', () => {
       model: 'fake',
       systemPrompt: '',
       prompt: {text: 'Hi'},
-      vendor: {program: null, configDir: '/claude'},
+      vendorProgram: {program: null, configDir: '/claude'},
       session: null,
     },
   } as const

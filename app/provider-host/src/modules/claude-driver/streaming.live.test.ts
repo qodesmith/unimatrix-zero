@@ -56,7 +56,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
           model: 'haiku',
           systemPrompt: 'You answer in as few words as you can.',
           prompt: {text},
-          vendor: {
+          vendorProgram: {
             program: {
               path: program ?? '',
               build: {url: 'https://x.test/', sha256: '', size: 0},

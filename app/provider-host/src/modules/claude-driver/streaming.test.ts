@@ -107,7 +107,7 @@ async function setUp(recordings: string[], env: Record<string, string> = {}) {
         model: 'haiku',
         systemPrompt: '',
         prompt: {text},
-        vendor: {
+        vendorProgram: {
           program: {
             path: fake.program,
             build: {url: 'https://example.com/claude', sha256: '', size: 0},
