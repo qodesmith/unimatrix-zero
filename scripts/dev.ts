@@ -10,9 +10,12 @@ const root = path.resolve(import.meta.dirname, '..')
 
 const worktree = createHash('sha256').update(root).digest('hex').slice(0, 8)
 const vitePort = 5173 + (parseInt(worktree, 16) % 2000)
-const dataFolder = `unimatrix-zero-dev-${worktree}`
-const scriptNonce = randomBytes(16).toString('base64')
 const fakeProvider = process.argv.includes('--fake')
+
+// A fake connection saved in the real data would pass for a real one.
+const dataFolder = `unimatrix-zero-dev-${worktree}${fakeProvider ? '-fake' : ''}`
+
+const scriptNonce = randomBytes(16).toString('base64')
 
 function fromRoot(relative: string) {
   return path.join(root, relative)
