@@ -58,7 +58,7 @@ export const replies = sqliteTable(
     provider: text('provider', {enum: ['claude', 'chatgpt']}).notNull(),
     model: text('model').notNull(),
     status: text('status', {
-      enum: ['streaming', 'finished', 'stopped', 'failed'],
+      enum: ['streaming', 'complete', 'stopped', 'failed'],
     }).notNull(),
     content: text('content', {mode: 'json'}).notNull().$type<unknown[]>(),
     systemPromptId: text('system_prompt_id')

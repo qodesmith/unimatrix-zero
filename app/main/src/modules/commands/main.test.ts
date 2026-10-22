@@ -1,8 +1,11 @@
 import type {Command} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
+import type {HostCommand} from '@uz/contract/host'
 
 import {openDatabase} from '#modules/database/main'
 import {createTrees} from '#modules/trees/main'
+import {createTurns} from '#modules/turns/main'
+import {PromptSendResult} from '@uz/contract/commands'
 import {TreeSchema} from '@uz/contract/trees'
 import path from 'node:path'
 import {beforeEach, describe, expect, it} from 'vitest'
@@ -13,14 +16,32 @@ const migrationsFolder = path.resolve(import.meta.dirname, '../../../drizzle')
 const trusted = {isTopLevelAppFrame: true}
 
 let published: AppEvent[]
+let hostCommands: HostCommand[]
+let hostReady: boolean
 let deps: Parameters<typeof dispatchCommand>[2]
 
 beforeEach(() => {
+  const db = openDatabase({file: ':memory:', migrationsFolder})
   published = []
+  hostCommands = []
+  hostReady = true
+
+  function publish(event: AppEvent) {
+    published.push(event)
+  }
+
   deps = {
     now: () => new Date('2026-10-19T12:00:00.000Z'),
-    trees: createTrees(openDatabase({file: ':memory:', migrationsFolder})),
-    publish: event => published.push(event),
+    trees: createTrees(db),
+    turns: createTurns(db, publish),
+    hosts: {
+      ready: () =>
+        hostReady
+          ? {provider: 'claude', model: {id: 'fake', name: 'Fake model'}}
+          : null,
+      send: (_provider, command) => hostCommands.push(command),
+    },
+    publish,
   }
 })
 
@@ -145,5 +166,84 @@ describe('Trees', () => {
     })
 
     expect(outcome).toMatchObject({ok: false, error: {code: 'invalid-command'}})
+  })
+})
+
+describe('the root Prompt', () => {
+  it('saves the Prompt and a streaming Reply, and asks the host for it', async () => {
+    const tree = await createTree()
+
+    const outcome = await send({
+      type: 'prompt.send',
+      treeId: tree.id,
+      text: ' Hello ',
+    })
+
+    if (!outcome.ok) throw new Error(outcome.error.message)
+
+    const {prompt, reply} = PromptSendResult.parse(outcome.value)
+
+    expect(prompt).toMatchObject({
+      treeId: tree.id,
+      parentReplyId: null,
+      text: 'Hello',
+    })
+    expect(reply).toMatchObject({
+      promptId: prompt.id,
+      provider: 'claude',
+      model: 'fake',
+      status: 'streaming',
+      content: [],
+    })
+    expect(hostCommands).toEqual([
+      {
+        type: 'reply.start',
+        request: {
+          treeId: tree.id,
+          replyId: reply.id,
+          model: 'fake',
+          systemPrompt: '',
+          prompt: {text: 'Hello'},
+        },
+      },
+    ])
+    expect(await send({type: 'tree.turns', treeId: tree.id})).toEqual({
+      ok: true,
+      value: {prompts: [prompt], replies: [reply]},
+    })
+  })
+
+  it('is refused when no Provider is ready, and nothing is saved', async () => {
+    const tree = await createTree()
+    hostReady = false
+
+    const outcome = await send({
+      type: 'prompt.send',
+      treeId: tree.id,
+      text: 'Hi',
+    })
+
+    expect(outcome).toMatchObject({ok: false, error: {code: 'handler-failed'}})
+    expect(await send({type: 'tree.turns', treeId: tree.id})).toEqual({
+      ok: true,
+      value: {prompts: [], replies: []},
+    })
+  })
+
+  it('is refused once the Tree has one', async () => {
+    const tree = await createTree()
+    await send({type: 'prompt.send', treeId: tree.id, text: 'Hi'})
+
+    const outcome = await send({
+      type: 'prompt.send',
+      treeId: tree.id,
+      text: 'Again',
+    })
+
+    expect(outcome).toMatchObject({
+      ok: false,
+      error: {message: 'This Tree already has its first Prompt.'},
+    })
+    expect(hostCommands).toHaveLength(1)
   })
 })

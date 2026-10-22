@@ -1,4 +1,6 @@
+import type {ProviderHosts} from '#modules/provider-hosts/main'
 import type {Trees} from '#modules/trees/main'
+import type {Turns} from '#modules/turns/main'
 import type {Command, CommandResult, CommandType} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {Tree} from '@uz/contract/trees'
@@ -6,6 +8,8 @@ import type {Tree} from '@uz/contract/trees'
 export interface HandlerDeps {
   now: () => Date
   trees: Trees
+  turns: Turns
+  hosts: Pick<ProviderHosts, 'ready' | 'send'>
   publish: (event: AppEvent) => void
 }
 
@@ -46,5 +50,43 @@ export const handlers: Handlers = {
     publish({type: 'TREE_RENAMED', tree})
 
     return tree
+  },
+
+  'tree.turns': ({treeId}, {trees, turns}) => {
+    found(trees.get(treeId))
+
+    return turns.list(treeId)
+  },
+
+  'prompt.send': ({treeId, text}, {now, trees, turns, hosts}) => {
+    found(trees.get(treeId))
+    const ready = hosts.ready()
+
+    if (!ready) throw new Error('Connect a Provider to send a Prompt.')
+
+    const {provider, model} = ready
+    const systemPrompt = ''
+
+    const sent = turns.startRoot({
+      treeId,
+      text,
+      provider,
+      model: model.id,
+      systemPrompt,
+      now: now(),
+    })
+
+    hosts.send(provider, {
+      type: 'reply.start',
+      request: {
+        treeId,
+        replyId: sent.reply.id,
+        model: model.id,
+        systemPrompt,
+        prompt: {text},
+      },
+    })
+
+    return sent
   },
 }

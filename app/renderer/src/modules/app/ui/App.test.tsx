@@ -2,6 +2,7 @@ import type {Bridge} from '@uz/contract/bridge'
 import type {Command, CommandOutcome, CommandType} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {Tree} from '@uz/contract/trees'
+import type {Prompt, Reply, StreamingReply} from '@uz/contract/turns'
 
 import {expect, it} from 'vitest'
 import {render} from 'vitest-browser-react'
@@ -11,12 +12,22 @@ import {App} from './App'
 
 const receivedAt = '2026-10-19T12:00:00.000Z'
 
+interface Saved {
+  trees?: Tree[]
+  prompts?: Prompt[]
+  replies?: Reply[]
+  /** What main has in progress, for the SNAPSHOT. */
+  streaming?: StreamingReply[]
+}
+
 /**
  * Main as the window sees it: answers commands, sends what it saved, and keeps
- * every command it was sent.
+ * every command it was sent. `publish` stands in for a Provider host's events.
  */
-function fakeMain(saved: Tree[] = []): Bridge & {sent: Command[]} {
-  const trees = [...saved]
+function fakeMain(saved: Saved = {}) {
+  const trees = [...(saved.trees ?? [])]
+  const prompts = [...(saved.prompts ?? [])]
+  const replies = [...(saved.replies ?? [])]
   const sent: Command[] = []
   const listeners = new Set<(event: AppEvent) => void>()
 
@@ -49,6 +60,45 @@ function fakeMain(saved: Tree[] = []): Bridge & {sent: Command[]} {
 
     if (command.type === 'tree.open') return {ok: true, value: found}
 
+    if (command.type === 'tree.turns') {
+      const {treeId} = command
+
+      return {
+        ok: true,
+        value: {
+          prompts: prompts.filter(prompt => prompt.treeId === treeId),
+          replies: replies.filter(reply => reply.treeId === treeId),
+        },
+      }
+    }
+
+    if (command.type === 'prompt.send') {
+      const prompt = {
+        id: crypto.randomUUID(),
+        treeId: command.treeId,
+        parentReplyId: null,
+        text: command.text,
+        createdAt: receivedAt,
+      }
+
+      const reply: Reply = {
+        id: crypto.randomUUID(),
+        treeId: command.treeId,
+        promptId: prompt.id,
+        provider: 'claude',
+        model: 'fake',
+        status: 'streaming',
+        content: [],
+        contextSize: null,
+        createdAt: receivedAt,
+      }
+
+      prompts.push(prompt)
+      replies.push(reply)
+
+      return {ok: true, value: {prompt, reply}}
+    }
+
     const tree = {...found, title: command.title}
     trees[index] = tree
     publish({type: 'TREE_RENAMED', tree})
@@ -56,8 +106,7 @@ function fakeMain(saved: Tree[] = []): Bridge & {sent: Command[]} {
     return {ok: true, value: tree}
   }
 
-  return {
-    sent,
+  const bridge: Bridge = {
     send: (async (command: Command) => {
       sent.push(command)
 
@@ -65,12 +114,27 @@ function fakeMain(saved: Tree[] = []): Bridge & {sent: Command[]} {
     }) as Bridge['send'],
     subscribe: listener => {
       listeners.add(listener)
-      listener({type: 'SNAPSHOT', app: {version: '0.0.0'}})
+      listener({
+        type: 'SNAPSHOT',
+        app: {version: '0.0.0'},
+        replies: saved.streaming ?? [],
+      })
 
       return () => listeners.delete(listener)
     },
     registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
   }
+
+  return {...bridge, sent, replies, publish}
+}
+
+/** The ids of the first Reply main started. */
+function firstReply(main: ReturnType<typeof fakeMain>) {
+  const [reply] = main.replies
+
+  if (!reply) throw new Error('No Reply was started')
+
+  return {treeId: reply.treeId, replyId: reply.id}
 }
 
 it('shows the pong main sends back', async () => {
@@ -83,9 +147,11 @@ it('shows the pong main sends back', async () => {
 })
 
 it('lists the Trees main has saved', async () => {
-  globalThis.window.uz = fakeMain([
-    {id: crypto.randomUUID(), title: 'Trip planning', createdAt: receivedAt},
-  ])
+  globalThis.window.uz = fakeMain({
+    trees: [
+      {id: crypto.randomUUID(), title: 'Trip planning', createdAt: receivedAt},
+    ],
+  })
   await render(<App />)
 
   await expect
@@ -109,9 +175,9 @@ it('creates a Tree and opens it', async () => {
 })
 
 it('renames a Tree by double-clicking it', async () => {
-  globalThis.window.uz = fakeMain([
-    {id: crypto.randomUUID(), title: 'Draft', createdAt: receivedAt},
-  ])
+  globalThis.window.uz = fakeMain({
+    trees: [{id: crypto.randomUUID(), title: 'Draft', createdAt: receivedAt}],
+  })
   await render(<App />)
 
   await page.getByRole('button', {name: 'Draft'}).dblClick()
@@ -124,9 +190,9 @@ it('renames a Tree by double-clicking it', async () => {
 })
 
 it('leaves the name alone when renaming is abandoned', async () => {
-  const main = fakeMain([
-    {id: crypto.randomUUID(), title: 'Draft', createdAt: receivedAt},
-  ])
+  const main = fakeMain({
+    trees: [{id: crypto.randomUUID(), title: 'Draft', createdAt: receivedAt}],
+  })
 
   globalThis.window.uz = main
   await render(<App />)
@@ -138,4 +204,103 @@ it('leaves the name alone when renaming is abandoned', async () => {
 
   await expect.element(page.getByRole('button', {name: 'Draft'})).toBeVisible()
   expect(main.sent.map(command => command.type)).not.toContain('tree.rename')
+})
+
+it('streams a Reply word by word into an empty Tree', async () => {
+  const main = fakeMain()
+  globalThis.window.uz = main
+  await render(<App />)
+  await page.getByRole('button', {name: 'New Tree'}).click()
+
+  await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
+  await userEvent.keyboard('{Enter}')
+  await expect.element(page.getByText('Hello?')).toBeVisible()
+
+  const ids = firstReply(main)
+  main.publish({...ids, type: 'RUN_STARTED'})
+  main.publish({...ids, type: 'TEXT_DELTA', delta: 'Hi '})
+  await expect.element(page.getByText('Hi', {exact: true})).toBeVisible()
+  main.publish({...ids, type: 'TEXT_DELTA', delta: 'there'})
+  await expect.element(page.getByText('Hi there')).toBeVisible()
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+
+  main.publish({...ids, type: 'RUN_FINISHED', status: 'complete'})
+  await expect.element(page.getByText('Writing…')).not.toBeInTheDocument()
+  await expect.element(page.getByText('Hi there')).toBeVisible()
+})
+
+it('shows a streaming Reply where it was after a reload, and keeps going', async () => {
+  const tree = {
+    id: crypto.randomUUID(),
+    title: 'Mid-stream',
+    createdAt: receivedAt,
+  }
+
+  const prompt: Prompt = {
+    id: crypto.randomUUID(),
+    treeId: tree.id,
+    parentReplyId: null,
+    text: 'Tell me',
+    createdAt: receivedAt,
+  }
+
+  const reply: Reply = {
+    id: crypto.randomUUID(),
+    treeId: tree.id,
+    promptId: prompt.id,
+    provider: 'claude',
+    model: 'fake',
+    status: 'streaming',
+    // Saved up to a second before the reload.
+    content: [{type: 'text', text: 'Once'}],
+    contextSize: null,
+    createdAt: receivedAt,
+  }
+
+  const ids = {treeId: tree.id, replyId: reply.id}
+
+  const main = fakeMain({
+    trees: [tree],
+    prompts: [prompt],
+    replies: [reply],
+    streaming: [
+      {
+        ...ids,
+        status: 'streaming',
+        content: [{type: 'text', text: 'Once upon a'}],
+        contextSize: null,
+      },
+    ],
+  })
+
+  globalThis.window.uz = main
+  await render(<App />)
+
+  await page.getByRole('button', {name: 'Mid-stream'}).click()
+  await expect.element(page.getByText('Once upon a')).toBeVisible()
+
+  main.publish({...ids, type: 'TEXT_DELTA', delta: ' time'})
+  await expect.element(page.getByText('Once upon a time')).toBeVisible()
+})
+
+it('shows a failed Reply with the text it had', async () => {
+  const main = fakeMain()
+  globalThis.window.uz = main
+  await render(<App />)
+  await page.getByRole('button', {name: 'New Tree'}).click()
+  await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
+  await page.getByRole('button', {name: 'Send'}).click()
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+
+  const ids = firstReply(main)
+  main.publish({...ids, type: 'TEXT_DELTA', delta: 'Cut off'})
+  main.publish({
+    ...ids,
+    type: 'RUN_FINISHED',
+    status: 'failed',
+    failure: {code: 'host-crashed', message: 'Claude stopped unexpectedly.'},
+  })
+
+  await expect.element(page.getByText('This Reply failed.')).toBeVisible()
+  await expect.element(page.getByText('Cut off')).toBeVisible()
 })

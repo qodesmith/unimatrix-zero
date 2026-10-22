@@ -3,11 +3,26 @@ import type {CommandResult} from '@uz/contract/commands'
 import {bridge} from '#modules/bridge/main'
 import {Button} from '#modules/shadcn/main'
 import {TreeList, TreeTitle, useTrees} from '#modules/trees/main'
+import {LiveReplies, TreeView} from '#modules/turns/main'
+import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {useState} from 'react'
 
 type Pong = CommandResult<'app.ping'>
 
 export function App() {
+  // oxlint-disable-next-line react/hook-use-state -- created once and never replaced
+  const [queryClient] = useState(() => new QueryClient())
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <LiveReplies>
+        <Shell />
+      </LiveReplies>
+    </QueryClientProvider>
+  )
+}
+
+function Shell() {
   const {trees, openTree, error: treesError, open, create, rename} = useTrees()
   const [pong, setPong] = useState<Pong | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -39,11 +54,14 @@ export function App() {
         />
         {treesError && <p className="text-xs text-destructive">{treesError}</p>}
       </aside>
-      <main className="flex flex-1 flex-col items-center justify-center gap-4 bg-canvas-background">
+      <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 bg-canvas-background">
         {openTree ? (
-          <h2 className="text-lg font-semibold">
-            <TreeTitle tree={openTree} />
-          </h2>
+          <>
+            <h2 className="pt-4 text-lg font-semibold">
+              <TreeTitle tree={openTree} />
+            </h2>
+            <TreeView key={openTree.id} treeId={openTree.id} />
+          </>
         ) : (
           <>
             <Button onClick={() => void ping()}>Ping main</Button>
