@@ -90,16 +90,12 @@ export const handlers: Handlers = {
         },
       })
     } catch {
-      turns.apply(provider, {
-        type: 'RUN_FINISHED',
-        treeId,
-        replyId: sent.reply.id,
-        status: 'failed',
-        failure: {
-          code: 'host-unreachable',
-          message: `${PROVIDER_NAMES[provider]} could not be reached.`,
-        },
+      const reply = turns.fail(sent.reply.id, {
+        code: 'host-unreachable',
+        message: `${PROVIDER_NAMES[provider]} could not be reached.`,
       })
+
+      return {prompt: sent.prompt, reply}
     }
 
     return sent

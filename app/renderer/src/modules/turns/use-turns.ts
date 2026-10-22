@@ -21,7 +21,7 @@ export function useTurns(treeId: string) {
 
 /**
  * Sends the root Prompt. Its Reply streams in through the live events; the
- * saved Turns are fetched again in case it finished before the answer came.
+ * saved Turns are fetched again in case it finished before the send returned.
  */
 export function useSendPrompt(treeId: string) {
   const queryClient = useQueryClient()

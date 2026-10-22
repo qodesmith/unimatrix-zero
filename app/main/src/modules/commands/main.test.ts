@@ -240,8 +240,9 @@ describe('the root Prompt', () => {
       },
     }
 
-    await send({type: 'prompt.send', treeId: tree.id, text: 'Hi'})
-
+    expect(
+      await send({type: 'prompt.send', treeId: tree.id, text: 'Hi'})
+    ).toMatchObject({ok: true, value: {reply: {status: 'failed'}}})
     expect(await send({type: 'tree.turns', treeId: tree.id})).toMatchObject({
       ok: true,
       value: {replies: [{status: 'failed'}]},

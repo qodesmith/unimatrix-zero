@@ -49,7 +49,12 @@ const FinishedStatusSchema = ReplyStatusSchema.exclude(['streaming'])
 
 /** Why a Reply failed, as the Provider host or main tells it. */
 export const RunFailureSchema = z.strictObject({
-  code: z.string(),
+  code: z.enum([
+    'host-crashed',
+    'host-unreachable',
+    'driver-error',
+    'fake-failure',
+  ]),
   message: z.string(),
 })
 

@@ -22,7 +22,7 @@ export function TreeView({treeId}: {treeId: string}) {
   if (prompts.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center p-6">
-        <PromptInput treeId={treeId} />
+        <Input treeId={treeId} />
       </div>
     )
   }
@@ -89,7 +89,7 @@ function ReplyPartView({part}: {part: ReplyPart}) {
   )
 }
 
-function PromptInput({treeId}: {treeId: string}) {
+function Input({treeId}: {treeId: string}) {
   const sendPrompt = useSendPrompt(treeId)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)

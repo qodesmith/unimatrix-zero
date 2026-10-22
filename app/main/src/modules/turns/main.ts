@@ -125,6 +125,19 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
     publish(event)
   }
 
+  /** Saves and publishes the Reply as failed, with the text it last showed. */
+  function fail(entry: InFlight, failure: RunFailure) {
+    const {treeId, replyId} = entry.reply
+
+    apply(entry.provider, {
+      type: 'RUN_FINISHED',
+      treeId,
+      replyId,
+      status: 'failed',
+      failure,
+    })
+  }
+
   /** The System prompt's id, saving it first if no Reply has used it. */
   function saveSystemPrompt(text: string) {
     const hash = createHash('sha256').update(text).digest('hex')
@@ -213,22 +226,26 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
 
     apply,
 
+    /** Fails one streaming Reply and returns it as saved. */
+    fail(replyId: string, failure: RunFailure): Reply {
+      const entry = inFlight.get(replyId)
+
+      if (entry) fail(entry, failure)
+
+      const row = db.select().from(replies).where(eq(replies.id, replyId)).get()
+
+      if (!row) throw new Error('That Reply was not saved.')
+
+      return toReply(row)
+    },
+
     /**
      * The host for this Provider is gone: each of its Replies is saved as
      * failed with the text it last showed. Nothing is re-run.
      */
     failAll(provider: ProviderId, failure: RunFailure) {
       for (const entry of inFlight.values()) {
-        if (entry.provider !== provider) continue
-
-        const {treeId, replyId} = entry.reply
-        apply(provider, {
-          type: 'RUN_FINISHED',
-          treeId,
-          replyId,
-          status: 'failed',
-          failure,
-        })
+        if (entry.provider === provider) fail(entry, failure)
       }
     },
 
