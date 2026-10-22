@@ -9,6 +9,9 @@ import {randomUUID} from 'node:crypto'
 
 import {createFakeSignIn} from './sign-in'
 
+/** Streamed as thinking before the first word: shown live, never stored. */
+const THINKING = `The user wants to see the fake Provider at work. I'll open with a line about the stream, look something up with the search tool, then close with code, math, a diagram and a picture.`
+
 const OPENING = `Here is a **canned** Reply from the fake Provider. It streams word by word, the way a real one would, so the whole path from the Provider host to the window can be tried without an account.
 
 Let me look something up first.
@@ -24,6 +27,19 @@ const CLOSING = `Found it. A few things worth knowing:
 \`\`\`ts
 const answer = 42
 \`\`\`
+
+Compound growth is $A = P(1 + r)^n$, or spelled out:
+
+$$
+A = P \\left(1 + \\frac{r}{n}\\right)^{nt}
+$$
+
+\`\`\`mermaid
+flowchart LR
+  Prompt --> Host --> Main --> Window
+\`\`\`
+
+![The Reply's path, as a picture](https://example.com/fake-reply-path.png)
 
 That's the end of the fake Reply.`
 
@@ -102,7 +118,8 @@ export function createFakeDriver({
     }
 
     /** Streams the words up to `limit`; false when the Reply was stopped. */
-    async function* streamText(
+    async function* streamWords(
+      type: 'TEXT_DELTA' | 'REASONING_DELTA',
       text: string,
       limit?: number
     ): AsyncGenerator<ReplyEvent, boolean> {
@@ -111,15 +128,26 @@ export function createFakeDriver({
 
         if (signal.aborted) return false
 
-        yield {...ids, type: 'TEXT_DELTA', delta: word}
-        written += 1
+        yield {...ids, type, delta: word}
+
+        if (type === 'TEXT_DELTA') written += 1
       }
 
       return true
     }
 
+    async function* streamText(text: string, limit?: number) {
+      return yield* streamWords('TEXT_DELTA', text, limit)
+    }
+
     try {
       yield {...ids, type: 'RUN_STARTED'}
+
+      if (!(yield* streamWords('REASONING_DELTA', THINKING))) {
+        yield stopped()
+
+        return
+      }
 
       const opened = yield* streamText(
         OPENING,
