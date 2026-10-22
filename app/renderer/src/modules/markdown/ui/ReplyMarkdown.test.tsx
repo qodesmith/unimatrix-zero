@@ -46,7 +46,7 @@ it('closes unfinished Markdown while the Reply is still being written', async ()
 it('renders a KaTeX command that needs trust as an error, not markup', async () => {
   const screen = await render(
     <ReplyMarkdown
-      text="$\href{https://example.com}{click}$"
+      text="$$\href{https://example.com}{click}$$"
       streaming={false}
     />
   )
@@ -55,6 +55,21 @@ it('renders a KaTeX command that needs trust as an error, not markup', async () 
     .poll(() => screen.container.querySelector('.katex'))
     .not.toBeNull()
   expect(screen.container.querySelector('a')).toBeNull()
+})
+
+it('leaves dollar amounts in prose alone', async () => {
+  const screen = await render(
+    <ReplyMarkdown
+      text="It costs $5 and $10 more, but $$x^2$$ is math."
+      streaming={false}
+    />
+  )
+
+  await expect
+    .poll(() => screen.container.querySelector('.katex'))
+    .not.toBeNull()
+  expect(screen.container.querySelectorAll('.katex')).toHaveLength(1)
+  expect(screen.container.textContent).toContain('$5 and $10 more')
 })
 
 it('refuses a diagram that would load a remote image on its own', async () => {

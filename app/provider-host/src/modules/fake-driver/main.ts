@@ -31,7 +31,7 @@ const CLOSING = `Found it. A few things worth knowing:
 const answer = 42
 \`\`\`
 
-Compound growth is $A = P(1 + r)^n$, or spelled out:
+Compound growth is $$A = P(1 + r)^n$$, or spelled out:
 
 $$
 A = P \\left(1 + \\frac{r}{n}\\right)^{nt}

@@ -55,11 +55,14 @@ export const rehypePlugins = withoutRawHtml()
  * commands render as errors rather than markup (ADR 0014). This is the only
  * gate on KaTeX's output: Streamdown runs the math plugin after the rehype
  * plugins above, so the sanitizer never sees it.
+ *
+ * Inline math needs `$$`, as in `@streamdown/math`. remark-math's own default
+ * accepts a single `$`, which turns "$5 and $10" into an equation.
  */
 const math: MathPlugin = {
   name: 'katex',
   type: 'math',
-  remarkPlugin: remarkMath,
+  remarkPlugin: [remarkMath, {singleDollarTextMath: false}],
   rehypePlugin: [
     rehypeKatex,
     {trust: false, strict: 'ignore', errorColor: 'var(--destructive)'},

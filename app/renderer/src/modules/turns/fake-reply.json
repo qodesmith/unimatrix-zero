@@ -960,7 +960,7 @@
     "treeId": "01a16096-00ad-7d3b-8205-6b76ddc26ce0",
     "replyId": "01a16096-00ae-7d3b-8205-6b76ddc26ce0",
     "type": "TEXT_DELTA",
-    "delta": "$A "
+    "delta": "$$A "
   },
   {
     "treeId": "01a16096-00ad-7d3b-8205-6b76ddc26ce0",
@@ -984,7 +984,7 @@
     "treeId": "01a16096-00ad-7d3b-8205-6b76ddc26ce0",
     "replyId": "01a16096-00ae-7d3b-8205-6b76ddc26ce0",
     "type": "TEXT_DELTA",
-    "delta": "r)^n$, "
+    "delta": "r)^n$$, "
   },
   {
     "treeId": "01a16096-00ad-7d3b-8205-6b76ddc26ce0",
