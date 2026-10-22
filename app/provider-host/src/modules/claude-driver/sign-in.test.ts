@@ -291,3 +291,37 @@ it('signs a free account out again and refuses it', async () => {
     failure: {reason: 'free-plan'},
   })
 })
+
+it('still refuses a free account when signing it out fails', async () => {
+  const used = deps({
+    env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
+    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () => ({})),
+    signOut: vi.fn<ClaudeSignInDeps['signOut']>(async () => {
+      throw new Error('claude auth logout exited with 1')
+    }),
+  })
+
+  const updates = await connect(createClaudeSignIn(used))
+
+  expect(updates.at(-1)).toMatchObject({failure: {reason: 'free-plan'}})
+})
+
+it('says so in plain words when the plan can’t be read', async () => {
+  const used = deps({
+    env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
+    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () => {
+      throw new Error('Claude Code process exited with code 1')
+    }),
+  })
+
+  const updates = await connect(createClaudeSignIn(used))
+
+  expect(updates.at(-1)).toEqual({
+    type: 'SIGN_IN_FINISHED',
+    outcome: 'failed',
+    failure: {
+      reason: 'failed',
+      message: 'Couldn’t check your Claude plan. Try again.',
+    },
+  })
+})

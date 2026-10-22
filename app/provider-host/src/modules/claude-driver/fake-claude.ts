@@ -9,7 +9,6 @@ export const FAKE_STATE = 'fake-state'
 /** The page `claude auth login` prints, which shows a code. */
 export const FAKE_CODE_PAGE = `https://claude.com/cai/oauth/authorize?code=true&state=${FAKE_STATE}`
 
-/** The code the fake page shows. */
 export const FAKE_CODE = `the-code#${FAKE_STATE}`
 
 /**

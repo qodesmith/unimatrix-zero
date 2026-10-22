@@ -1,10 +1,9 @@
 import type {Inbox} from '#modules/inbox/main'
 import type {ClaudeCommand, Login, LoginEvents} from './login'
-import type {DownloadProgress} from './program'
+import type {DownloadProgress, ProgramTarget} from './program'
 import type {AccountInfo} from '@anthropic-ai/claude-agent-sdk'
 import type {SignInRequest} from '@uz/contract/host'
-import type {VendorBuild} from '@uz/contract/manifest'
-import type {SignInUpdate} from '@uz/contract/providers'
+import type {SignInFailure, SignInUpdate} from '@uz/contract/providers'
 
 import {createInbox} from '#modules/inbox/main'
 
@@ -15,8 +14,8 @@ import {claudeEnvironment} from './environment'
 export const SIGN_IN_TIMEOUT_MS = 15 * 60 * 1000
 
 type Input =
-  | {kind: 'url'; attempt: number; url: string}
-  | {kind: 'exit'; attempt: number; code: number | null; output: string}
+  | {kind: 'url'; run: number; url: string}
+  | {kind: 'exit'; run: number; code: number | null; output: string}
   | {kind: 'page-opened'}
   | {kind: 'code'; code: string}
   | {kind: 'cancel'}
@@ -27,7 +26,7 @@ type PageStep = Extract<SignInUpdate, {type: 'SIGN_IN_STEP'}>
 /** The sign-in page as the user has seen it so far. */
 interface Page {
   /** Which run of `claude auth login` is current. */
-  attempt: number
+  run: number
   url: string | null
   /** Opened again by the app, so it shows a code. */
   opened: boolean
@@ -42,14 +41,15 @@ interface Reaction {
   end?: SignInUpdate | 'signed-in'
 }
 
-interface Session {
+/** One go at connecting, from Connect to its end. */
+interface Attempt {
   inbox: Inbox<Input>
   abort: AbortController
 }
 
 export interface ClaudeSignInDeps {
   getProgramReady: (
-    target: {path: string; build: VendorBuild},
+    target: ProgramTarget,
     options: {signal: AbortSignal}
   ) => AsyncIterable<DownloadProgress>
   /** How to run the vendor program at `path`. */
@@ -75,7 +75,7 @@ export interface ClaudeSignInDeps {
 const canceled: SignInUpdate = {type: 'SIGN_IN_FINISHED', outcome: 'canceled'}
 
 function failed(
-  reason: 'download-failed' | 'no-answer' | 'free-plan',
+  reason: SignInFailure['reason'],
   message: string
 ): SignInUpdate {
   return {
@@ -119,19 +119,19 @@ function pageStep(page: Page, url: string): PageStep {
  * again, so trying again can use a different one.
  */
 export function createClaudeSignIn(deps: ClaudeSignInDeps) {
-  let session: Session | null = null
+  let attempt: Attempt | null = null
 
   /**
    * Runs `claude auth login` until it signs in; the update to end with if it
    * doesn't.
    */
   async function* signInOnPage(
-    {inbox}: Session,
+    {inbox}: Attempt,
     command: ClaudeCommand,
     env: Record<string, string>
   ): AsyncGenerator<SignInUpdate, SignInUpdate | null> {
     const page: Page = {
-      attempt: 0,
+      run: 0,
       url: null,
       opened: false,
       pasted: false,
@@ -139,13 +139,12 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
     }
 
     function start() {
-      page.attempt += 1
-      const {attempt} = page
+      page.run += 1
+      const {run} = page
 
       return deps.startLogin(command, env, {
-        onUrl: url => inbox.push({kind: 'url', attempt, url}),
-        onExit: (code, output) =>
-          inbox.push({kind: 'exit', attempt, code, output}),
+        onUrl: url => inbox.push({kind: 'url', run, url}),
+        onExit: (code, output) => inbox.push({kind: 'exit', run, code, output}),
       })
     }
 
@@ -229,7 +228,7 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
         const input = await inbox.next()
 
         // From a login that was replaced after Claude refused a code.
-        if ('attempt' in input && input.attempt !== page.attempt) continue
+        if ('run' in input && input.run !== page.run) continue
 
         const {update, end} = react(input)
 
@@ -247,7 +246,7 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
 
     if (!program) throw new Error('The manifest names no Claude program.')
 
-    const current: Session = {
+    const current: Attempt = {
       inbox: createInbox<Input>(),
       abort: new AbortController(),
     }
@@ -258,7 +257,7 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
       return signal.aborted
     }
 
-    session = current
+    attempt = current
 
     try {
       yield {type: 'SIGN_IN_STEP', step: 'get-ready'}
@@ -300,16 +299,22 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
 
       yield {type: 'SIGN_IN_STEP', step: 'check-plan'}
 
-      const account = await deps.readAccount({
-        program: program.path,
-        env,
-        cwd: configDir,
-      })
+      const account = await deps
+        .readAccount({program: program.path, env, cwd: configDir})
+        .catch(() => null)
+
+      if (!account) {
+        yield failed('failed', 'Couldn’t check your Claude plan. Try again.')
+
+        return
+      }
 
       const plan = planOf(account.subscriptionType)
 
       if (!plan) {
-        await deps.signOut(command, env)
+        // Signed out so another account can be used; if that fails, the
+        // next sign-in replaces this one anyway.
+        await deps.signOut(command, env).catch(() => undefined)
         yield failed('free-plan', 'This Claude account has no Pro or Max plan.')
 
         return
@@ -328,18 +333,18 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
         account: {email: account.email ?? '', plan},
       }
     } finally {
-      if (session === current) session = null
+      if (attempt === current) attempt = null
     }
   }
 
   return {
     signIn,
-    signInPageOpened: () => session?.inbox.push({kind: 'page-opened'}),
+    signInPageOpened: () => attempt?.inbox.push({kind: 'page-opened'}),
     submitSignInCode: (code: string) =>
-      session?.inbox.push({kind: 'code', code}),
+      attempt?.inbox.push({kind: 'code', code}),
     cancelSignIn: () => {
-      session?.abort.abort()
-      session?.inbox.push({kind: 'cancel'})
+      attempt?.abort.abort()
+      attempt?.inbox.push({kind: 'cancel'})
     },
   }
 }

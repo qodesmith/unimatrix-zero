@@ -100,7 +100,7 @@ export const ModelsChangedEvent = z.strictObject({
 export const SignInStepUpdate = z.strictObject({
   type: z.literal('SIGN_IN_STEP'),
   step: z.enum(['get-ready', 'sign-in-page', 'paste-code', 'check-plan']),
-  /** The vendor's sign-in page, from `sign-in-page` on. */
+  /** The Provider's sign-in page, from `sign-in-page` on. */
   url: z.url().optional(),
   /** The vendor program's download, during `get-ready`. */
   progress: z

@@ -10,7 +10,6 @@ const DOWNLOAD_STEPS = 25
 
 export const FAKE_SIGN_IN_URL = 'https://example.com/fake-sign-in'
 
-/** The code the fake sign-in page shows. */
 export const FAKE_CODE = 'fake-code'
 
 /** A code that signs in to an account on a free plan. */
@@ -24,13 +23,13 @@ type Input =
   | {kind: 'answered'}
   | {kind: 'cancel'}
 
-interface Session {
+/** One go at connecting, from Connect to its end. */
+interface Attempt {
   inbox: Inbox<Input>
   canceled: boolean
 }
 
 export interface FakeSignInOptions {
-  /** The pause between steps. */
   delayMs: number
   /**
    * When the page the browser opened answers by itself, as Claude's does
@@ -48,8 +47,8 @@ async function pause(ms: number) {
 }
 
 /** Read after a pause, during which a cancel may have arrived. */
-function isCanceled(session: Session) {
-  return session.canceled
+function isCanceled(attempt: Attempt) {
+  return attempt.canceled
 }
 
 const canceled: SignInUpdate = {type: 'SIGN_IN_FINISHED', outcome: 'canceled'}
@@ -61,14 +60,14 @@ const canceled: SignInUpdate = {type: 'SIGN_IN_FINISHED', outcome: 'canceled'}
  * any other code is wrong.
  */
 export function createFakeSignIn({delayMs, answerMs}: FakeSignInOptions) {
-  let session: Session | null = null
+  let attempt: Attempt | null = null
 
   /**
    * Waits for the page or the user; the plan they signed in on, or null if
    * canceled.
    */
   async function* signInOnPage(
-    current: Session
+    current: Attempt
   ): AsyncGenerator<SignInUpdate, string | null> {
     const timer =
       answerMs === null
@@ -109,8 +108,8 @@ export function createFakeSignIn({delayMs, answerMs}: FakeSignInOptions) {
   }
 
   async function* signIn(): AsyncGenerator<SignInUpdate> {
-    const current: Session = {inbox: createInbox<Input>(), canceled: false}
-    session = current
+    const current: Attempt = {inbox: createInbox<Input>(), canceled: false}
+    attempt = current
 
     try {
       for (let step = 0; step <= DOWNLOAD_STEPS; step++) {
@@ -175,20 +174,20 @@ export function createFakeSignIn({delayMs, answerMs}: FakeSignInOptions) {
         account: FAKE_ACCOUNT,
       }
     } finally {
-      if (session === current) session = null
+      if (attempt === current) attempt = null
     }
   }
 
   return {
     signIn,
-    signInPageOpened: () => session?.inbox.push({kind: 'page-opened'}),
+    signInPageOpened: () => attempt?.inbox.push({kind: 'page-opened'}),
     submitSignInCode: (code: string) =>
-      session?.inbox.push({kind: 'code', code}),
+      attempt?.inbox.push({kind: 'code', code}),
     cancelSignIn: () => {
-      if (!session) return
+      if (!attempt) return
 
-      session.canceled = true
-      session.inbox.push({kind: 'cancel'})
+      attempt.canceled = true
+      attempt.inbox.push({kind: 'cancel'})
     },
   }
 }

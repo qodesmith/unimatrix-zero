@@ -23,7 +23,7 @@ interface ConnectionsOptions {
    * here.
    */
   requestFor: (provider: ProviderId) => SignInRequest | null
-  /** Opens a vendor's sign-in page in the default browser. */
+  /** Opens a Provider's sign-in page in the default browser. */
   openExternal: (url: string) => void
   now: () => Date
 }

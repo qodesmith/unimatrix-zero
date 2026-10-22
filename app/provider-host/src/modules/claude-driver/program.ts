@@ -1,19 +1,16 @@
-import type {VendorBuild} from '@uz/contract/manifest'
+import type {SignInRequest} from '@uz/contract/host'
+import type {SignInUpdate} from '@uz/contract/providers'
 
 import {createHash} from 'node:crypto'
 import {createReadStream} from 'node:fs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-export interface DownloadProgress {
-  receivedBytes: number
-  totalBytes: number
-}
+export type DownloadProgress = NonNullable<
+  Extract<SignInUpdate, {type: 'SIGN_IN_STEP'}>['progress']
+>
 
-interface ProgramTarget {
-  path: string
-  build: VendorBuild
-}
+export type ProgramTarget = NonNullable<SignInRequest['program']>
 
 interface ReadyOptions {
   signal: AbortSignal
@@ -28,7 +25,6 @@ async function sha256Of(file: string) {
   return hash.digest('hex')
 }
 
-/** True when the exact build is already in place. */
 async function isInPlace({path: file, build}: ProgramTarget) {
   try {
     return (await sha256Of(file)) === build.sha256

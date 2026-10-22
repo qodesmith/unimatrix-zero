@@ -1,6 +1,8 @@
 import type {AccountInfo, SDKUserMessage} from '@anthropic-ai/claude-agent-sdk'
 
 import {query} from '@anthropic-ai/claude-agent-sdk'
+import {spawn} from 'node:child_process'
+import {once} from 'node:events'
 
 /** The plans `claude` itself recognizes; anything else is a free account. */
 const PLANS = new Map([
@@ -16,7 +18,6 @@ export function planOf(subscriptionType: string | undefined): string | null {
 }
 
 interface SessionOptions {
-  /** The vendor program. */
   program: string
   env: Record<string, string>
   cwd: string
@@ -33,6 +34,7 @@ export async function readAccount({
   cwd,
 }: SessionOptions): Promise<AccountInfo> {
   const input = Promise.withResolvers<void>()
+  let exited: Promise<unknown> = Promise.resolve()
 
   // oxlint-disable-next-line require-yield -- the session is never sent a Prompt
   async function* noPrompts(): AsyncGenerator<SDKUserMessage> {
@@ -47,6 +49,27 @@ export async function readAccount({
       cwd,
       settingSources: [],
       settings: {autoMemoryEnabled: false},
+      // The SDK's own spawn stops waiting for the exit after 2 s; this one
+      // keeps the process, so closing waits as long as `claude` takes.
+      spawnClaudeCodeProcess: ({
+        command,
+        args,
+        cwd: folder,
+        env: vars,
+        signal,
+      }) => {
+        const child = spawn(command, args, {
+          cwd: folder,
+          env: vars,
+          signal,
+          stdio: ['pipe', 'pipe', 'ignore'],
+          windowsHide: true,
+        })
+
+        exited = once(child, 'exit')
+
+        return child
+      },
     },
   })
 
@@ -55,5 +78,6 @@ export async function readAccount({
   } finally {
     input.resolve()
     await session.return()
+    await exited.catch(() => undefined)
   }
 }

@@ -32,7 +32,6 @@ interface Host {
   timers: Set<ReturnType<typeof setTimeout>>
 }
 
-/** Where a running host stands. */
 export type HostStatus = Extract<
   ProviderStatus['status'],
   'starting' | 'ready' | 'restarting' | 'failed'
