@@ -355,6 +355,7 @@ describe('a Prompt at the end of a Thread', () => {
     const {treeId, replyId} = await sendRoot()
     record(treeId, replyId)
     finish(treeId, replyId)
+    deps.now = () => new Date('2026-10-20T12:00:00.000Z')
 
     const outcome = await send({
       type: 'prompt.send',
