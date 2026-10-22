@@ -63,15 +63,11 @@ function ReplyView({reply}: {reply: Reply}) {
       className="flex flex-col gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-card-foreground"
     >
       {content.map((part, index) => (
-        // Parts only ever append, so their positions are stable.
-        // oxlint-disable-next-line react/no-array-index-key -- see above
+        // oxlint-disable-next-line react/no-array-index-key -- parts only ever append, so positions are stable
         <ReplyPartView key={index} part={part} />
       ))}
       {status === 'streaming' && (
         <span className="text-xs text-muted-foreground">Writing…</span>
-      )}
-      {status === 'stopped' && (
-        <span className="text-xs text-muted-foreground">Stopped</span>
       )}
       {status === 'failed' && (
         <span className="text-xs text-destructive">This Reply failed.</span>

@@ -6,6 +6,7 @@ import type {
   Reply,
   ReplyEvent,
   ReplyProgress,
+  RunFailure,
   StreamingReply,
 } from '@uz/contract/turns'
 
@@ -124,7 +125,8 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
     publish(event)
   }
 
-  function systemPromptId(text: string) {
+  /** The System prompt's id, saving it first if no Reply has used it. */
+  function saveSystemPrompt(text: string) {
     const hash = createHash('sha256').update(text).digest('hex')
 
     db.insert(systemPrompts).values({hash, text}).onConflictDoNothing().run()
@@ -162,7 +164,7 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
 
     /** Saves the root Prompt and its Reply, which starts out streaming. */
     startRoot(root: RootPrompt): {prompt: Prompt; reply: Reply} {
-      const systemPromptIdOfRoot = systemPromptId(root.systemPrompt)
+      const systemPromptId = saveSystemPrompt(root.systemPrompt)
 
       const saved = db.transaction(tx => {
         const existing = tx
@@ -191,7 +193,7 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
             provider: root.provider,
             model: root.model,
             ...NEW_REPLY,
-            systemPromptId: systemPromptIdOfRoot,
+            systemPromptId,
             createdAt: root.now,
           })
           .returning()
@@ -215,7 +217,7 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
      * The host for this Provider is gone: each of its Replies is saved as
      * failed with the text it last showed. Nothing is re-run.
      */
-    failAll(provider: ProviderId, failure: {code: string; message: string}) {
+    failAll(provider: ProviderId, failure: RunFailure) {
       for (const entry of inFlight.values()) {
         if (entry.provider !== provider) continue
 

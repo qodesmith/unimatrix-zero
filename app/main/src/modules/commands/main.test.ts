@@ -230,6 +230,29 @@ describe('the root Prompt', () => {
     })
   })
 
+  it('fails the Reply when the host cannot be reached', async () => {
+    const tree = await createTree()
+
+    deps.hosts = {
+      ...deps.hosts,
+      send: () => {
+        throw new Error('The claude host is not running.')
+      },
+    }
+
+    await send({type: 'prompt.send', treeId: tree.id, text: 'Hi'})
+
+    expect(await send({type: 'tree.turns', treeId: tree.id})).toMatchObject({
+      ok: true,
+      value: {replies: [{status: 'failed'}]},
+    })
+    expect(published.at(-1)).toMatchObject({
+      type: 'RUN_FINISHED',
+      status: 'failed',
+      failure: {code: 'host-unreachable'},
+    })
+  })
+
   it('is refused once the Tree has one', async () => {
     const tree = await createTree()
     await send({type: 'prompt.send', treeId: tree.id, text: 'Hi'})

@@ -16,13 +16,13 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <LiveReplies>
-        <Shell />
+        <AppLayout />
       </LiveReplies>
     </QueryClientProvider>
   )
 }
 
-function Shell() {
+function AppLayout() {
   const {trees, openTree, error: treesError, open, create, rename} = useTrees()
   const [pong, setPong] = useState<Pong | null>(null)
   const [error, setError] = useState<string | null>(null)

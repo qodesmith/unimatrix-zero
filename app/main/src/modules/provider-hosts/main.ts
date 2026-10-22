@@ -38,8 +38,8 @@ export type ProviderHosts = ReturnType<typeof createProviderHosts>
 
 /**
  * One utility process per connected Provider. A host that crashes is
- * restarted after 1 s, 5 s, then 30 s; one that then stays up a minute starts
- * the count over.
+ * restarted after each delay in turn; one that then stays up long enough
+ * starts the count over.
  */
 export function createProviderHosts({
   spawn,

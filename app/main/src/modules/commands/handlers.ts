@@ -5,6 +5,8 @@ import type {Command, CommandResult, CommandType} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {Tree} from '@uz/contract/trees'
 
+import {PROVIDER_NAMES} from '@uz/contract/providers'
+
 export interface HandlerDeps {
   now: () => Date
   trees: Trees
@@ -76,16 +78,29 @@ export const handlers: Handlers = {
       now: now(),
     })
 
-    hosts.send(provider, {
-      type: 'reply.start',
-      request: {
+    try {
+      hosts.send(provider, {
+        type: 'reply.start',
+        request: {
+          treeId,
+          replyId: sent.reply.id,
+          model: model.id,
+          systemPrompt,
+          prompt: {text},
+        },
+      })
+    } catch {
+      turns.apply(provider, {
+        type: 'RUN_FINISHED',
         treeId,
         replyId: sent.reply.id,
-        model: model.id,
-        systemPrompt,
-        prompt: {text},
-      },
-    })
+        status: 'failed',
+        failure: {
+          code: 'host-unreachable',
+          message: `${PROVIDER_NAMES[provider]} could not be reached.`,
+        },
+      })
+    }
 
     return sent
   },

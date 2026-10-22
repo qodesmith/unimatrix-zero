@@ -60,7 +60,7 @@ function behaviorOf(prompt: string): Behavior {
 }
 
 interface FakeDriverOptions {
-  /** The pause before each word; tests use 0. */
+  /** The pause before each word. */
   delayMs?: number
 }
 
@@ -90,22 +90,35 @@ export function createFakeDriver({
       return {...ids, type: 'RUN_FINISHED', status: 'stopped'}
     }
 
-    try {
-      yield {...ids, type: 'RUN_STARTED'}
-
-      for (const word of words(OPENING)) {
+    /** Streams the words up to `limit`; false when the Reply was stopped. */
+    async function* streamText(
+      text: string,
+      limit?: number
+    ): AsyncGenerator<ReplyEvent, boolean> {
+      for (const word of words(text).slice(0, limit)) {
         await sleep(delayMs, signal)
 
-        if (signal.aborted) {
-          yield stopped()
-
-          return
-        }
-
-        if (behavior !== 'complete' && written === WORDS_BEFORE_TROUBLE) break
+        if (signal.aborted) return false
 
         yield {...ids, type: 'TEXT_DELTA', delta: word}
         written += 1
+      }
+
+      return true
+    }
+
+    try {
+      yield {...ids, type: 'RUN_STARTED'}
+
+      const opened = yield* streamText(
+        OPENING,
+        behavior === 'complete' ? undefined : WORDS_BEFORE_TROUBLE
+      )
+
+      if (!opened) {
+        yield stopped()
+
+        return
       }
 
       if (behavior === 'fail') {
@@ -150,17 +163,10 @@ export function createFakeDriver({
         isError: false,
       }
 
-      for (const word of words(CLOSING)) {
-        await sleep(delayMs, signal)
+      if (!(yield* streamText(CLOSING))) {
+        yield stopped()
 
-        if (signal.aborted) {
-          yield stopped()
-
-          return
-        }
-
-        yield {...ids, type: 'TEXT_DELTA', delta: word}
-        written += 1
+        return
       }
 
       const inputTokens = words(request.prompt.text).length

@@ -45,6 +45,16 @@ export const ReplyStatusSchema = z.enum([
 
 export type ReplyStatus = z.infer<typeof ReplyStatusSchema>
 
+const FinishedStatusSchema = ReplyStatusSchema.exclude(['streaming'])
+
+/** Why a Reply failed, as the Provider host or main tells it. */
+export const RunFailureSchema = z.strictObject({
+  code: z.string(),
+  message: z.string(),
+})
+
+export type RunFailure = z.infer<typeof RunFailureSchema>
+
 /** The part of a Reply that changes while it streams. */
 export const ReplyProgressSchema = z.strictObject({
   status: ReplyStatusSchema,
@@ -169,7 +179,7 @@ export const SubagentFinishedEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('SUBAGENT_FINISHED'),
   subagentId: z.string(),
-  status: z.enum(['complete', 'stopped', 'failed']),
+  status: FinishedStatusSchema,
 })
 
 export const FilesChangedEvent = z.strictObject({
@@ -197,8 +207,8 @@ export const ContextCompactedEvent = z.strictObject({
 export const RunFinishedEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('RUN_FINISHED'),
-  status: z.enum(['complete', 'stopped', 'failed']),
-  failure: z.strictObject({code: z.string(), message: z.string()}).optional(),
+  status: FinishedStatusSchema,
+  failure: RunFailureSchema.optional(),
 })
 
 export const ReplyEventSchema = z.discriminatedUnion('type', [
