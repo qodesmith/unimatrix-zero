@@ -15,6 +15,8 @@ function setUp() {
     type: 'SNAPSHOT',
     app: {version: '1.0.0'},
     replies: [],
+    providers: [],
+    signIn: null,
   }))
 }
 

@@ -75,7 +75,8 @@ function lockNavigation(contents: WebContents, appUrl: string) {
   contents.on('will-attach-webview', event => event.preventDefault())
 }
 
-function openLink(url: string) {
+/** Opens a link in the default browser, if the link rule allows it. */
+export function openLink(url: string) {
   if (isOpenableExternally(url)) void shell.openExternal(url)
 }
 

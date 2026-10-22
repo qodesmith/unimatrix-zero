@@ -53,5 +53,15 @@
     "vite": "^8.3.4",
     "vitest": "^5.0.5",
     "zod": "^4.6.7"
+  },
+  "overrides": {
+    "@anthropic-ai/claude-agent-sdk-darwin-arm64": "file:./tooling/no-vendor-binary",
+    "@anthropic-ai/claude-agent-sdk-darwin-x64": "file:./tooling/no-vendor-binary",
+    "@anthropic-ai/claude-agent-sdk-linux-arm64": "file:./tooling/no-vendor-binary",
+    "@anthropic-ai/claude-agent-sdk-linux-arm64-musl": "file:./tooling/no-vendor-binary",
+    "@anthropic-ai/claude-agent-sdk-linux-x64": "file:./tooling/no-vendor-binary",
+    "@anthropic-ai/claude-agent-sdk-linux-x64-musl": "file:./tooling/no-vendor-binary",
+    "@anthropic-ai/claude-agent-sdk-win32-arm64": "file:./tooling/no-vendor-binary",
+    "@anthropic-ai/claude-agent-sdk-win32-x64": "file:./tooling/no-vendor-binary"
   }
 }

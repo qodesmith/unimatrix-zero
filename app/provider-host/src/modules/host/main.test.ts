@@ -102,3 +102,69 @@ it('fails the Reply when the driver throws', async () => {
     failure: {code: 'driver-error', message: 'vendor program missing'},
   })
 })
+
+const signInRequest = {program: null, configDir: '/nowhere'}
+
+async function lastStep(sent: HostMessage[], step: string) {
+  await vi.waitFor(() => {
+    expect(sent.at(-1)).toMatchObject({step})
+  })
+}
+
+async function signInFinished(sent: HostMessage[]) {
+  await vi.waitFor(() => {
+    expect(sent.at(-1)?.type).toBe('SIGN_IN_FINISHED')
+  })
+}
+
+it('streams each step of connecting back to main', async () => {
+  const main = fakeMain()
+  await runHost(main.port, createFakeDriver({delayMs: 0, signInAnswerMs: null}))
+
+  main.command({type: 'sign-in.start', request: signInRequest})
+  await lastStep(main.sent, 'sign-in-page')
+  main.command({type: 'sign-in.page-opened'})
+  await lastStep(main.sent, 'paste-code')
+  main.command({type: 'sign-in.code', code: 'fake-code'})
+  await signInFinished(main.sent)
+
+  expect(main.sent.at(-1)).toMatchObject({outcome: 'connected'})
+})
+
+it('passes a cancel on to the driver', async () => {
+  const main = fakeMain()
+  await runHost(main.port, createFakeDriver({delayMs: 0, signInAnswerMs: null}))
+
+  main.command({type: 'sign-in.start', request: signInRequest})
+  await lastStep(main.sent, 'sign-in-page')
+  main.command({type: 'sign-in.cancel'})
+  await signInFinished(main.sent)
+
+  expect(main.sent.at(-1)).toEqual({
+    type: 'SIGN_IN_FINISHED',
+    outcome: 'canceled',
+  })
+})
+
+it('fails connecting when the driver throws', async () => {
+  const main = fakeMain()
+
+  const driver: ProviderDriver = {
+    ...createFakeDriver({delayMs: 0}),
+    // oxlint-disable-next-line require-yield -- a driver that breaks before its first step
+    async *signIn() {
+      throw new Error('no vendor program')
+    },
+  }
+
+  await runHost(main.port, driver)
+
+  main.command({type: 'sign-in.start', request: signInRequest})
+  await signInFinished(main.sent)
+
+  expect(main.sent.at(-1)).toEqual({
+    type: 'SIGN_IN_FINISHED',
+    outcome: 'failed',
+    failure: {reason: 'failed', message: 'no vendor program'},
+  })
+})

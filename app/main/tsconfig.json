@@ -1,6 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {"types": ["node"]},
-  "include": ["src"],
+  "include": ["src", "src/**/*.json"],
   "references": [{"path": "../../shared/contract"}]
 }

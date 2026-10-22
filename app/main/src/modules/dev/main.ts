@@ -3,7 +3,10 @@ declare const __UZ_DEV__: boolean
 export interface DevRun {
   vitePort: number
   scriptNonce: string
-  /** `bun run dev --fake`: Claude is connected, answered by the fake driver. */
+  /**
+   * `bun run dev --fake`: every Provider is the fake driver, which connects
+   * without an account or a download.
+   */
   fakeProvider: boolean
 }
 

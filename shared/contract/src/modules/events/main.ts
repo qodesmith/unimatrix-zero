@@ -1,4 +1,8 @@
-import {ProviderEventSchema} from '#modules/providers/main'
+import {
+  ProviderEventSchema,
+  ProviderStatusSchema,
+  SignInStepEvent,
+} from '#modules/providers/main'
 import {TreeSchema} from '#modules/trees/main'
 import {ReplyEventSchema, StreamingReplySchema} from '#modules/turns/main'
 import {z} from 'zod'
@@ -8,6 +12,10 @@ export const SnapshotEvent = z.strictObject({
   app: z.strictObject({version: z.string()}),
   /** Every Reply still being written, as displayed when the window connected. */
   replies: z.array(StreamingReplySchema),
+  /** Every Provider, connected or not. */
+  providers: z.array(ProviderStatusSchema),
+  /** The Provider being connected, at its latest step. */
+  signIn: SignInStepEvent.nullable(),
 })
 
 export const TreeCreatedEvent = z.strictObject({

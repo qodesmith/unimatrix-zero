@@ -4,7 +4,7 @@ import type {AppEvent} from '@uz/contract/events'
 import type {Tree} from '@uz/contract/trees'
 import type {Prompt, Reply, StreamingReply} from '@uz/contract/turns'
 
-import {expect, it} from 'vitest'
+import {describe, expect, it} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {page, userEvent} from 'vitest/browser'
 
@@ -18,7 +18,11 @@ interface Saved {
   replies?: Reply[]
   /** What main has in progress, for the SNAPSHOT. */
   streaming?: StreamingReply[]
+  /** Claude is connected unless this is a first launch. */
+  firstLaunch?: boolean
 }
+
+const account = {email: 'sam@example.com', plan: 'Max'}
 
 /**
  * Main as the window sees it: answers commands, sends what it saved, and keeps
@@ -36,6 +40,8 @@ function fakeMain(saved: Saved = {}) {
   }
 
   function answer(command: Command): CommandOutcome<CommandType> {
+    if ('provider' in command) return {ok: true, value: {}}
+
     if (command.type === 'app.ping') {
       return {ok: true, value: {nonce: command.nonce, receivedAt}}
     }
@@ -118,6 +124,13 @@ function fakeMain(saved: Saved = {}) {
         type: 'SNAPSHOT',
         app: {version: '0.0.0'},
         replies: saved.streaming ?? [],
+        providers: [
+          saved.firstLaunch
+            ? {provider: 'claude', status: 'not-connected', account: null}
+            : {provider: 'claude', status: 'ready', account},
+          {provider: 'chatgpt', status: 'not-connected', account: null},
+        ],
+        signIn: null,
       })
 
       return () => listeners.delete(listener)
@@ -303,4 +316,252 @@ it('shows a failed Reply with the text it had', async () => {
 
   await expect.element(page.getByText('This Reply failed.')).toBeVisible()
   await expect.element(page.getByText('Cut off')).toBeVisible()
+})
+
+function claudeCard() {
+  return page.getByRole('region', {name: 'Claude'})
+}
+
+describe('connecting a Provider', () => {
+  const url = 'https://claude.com/cai/oauth/authorize?code=true&state=s'
+
+  it('starts on the Connections screen until a Provider is connected', async () => {
+    globalThis.window.uz = fakeMain({firstLaunch: true})
+    await render(<App />)
+
+    await expect
+      .element(
+        page.getByRole('heading', {name: 'Connect the AI you already pay for'})
+      )
+      .toBeVisible()
+    await expect
+      .element(page.getByText('Pro or Max · by Anthropic'))
+      .toBeVisible()
+    await expect
+      .element(page.getByText('Plus or Pro · by OpenAI'))
+      .toBeVisible()
+    await expect
+      .element(page.getByRole('button', {name: 'Start chatting →'}))
+      .toBeDisabled()
+    await expect
+      .element(page.getByRole('region', {name: 'Trees'}))
+      .not.toBeInTheDocument()
+  })
+
+  it('walks Claude’s card through every step, then starts chatting', async () => {
+    const main = fakeMain({firstLaunch: true})
+    globalThis.window.uz = main
+    await render(<App />)
+
+    await page.getByRole('button', {name: 'Connect Claude'}).click()
+    expect(main.sent.at(-1)).toEqual({
+      type: 'provider.connect',
+      provider: 'claude',
+    })
+
+    main.publish({
+      type: 'SIGN_IN_STEP',
+      provider: 'claude',
+      step: 'get-ready',
+      progress: {receivedBytes: 24_000_000, totalBytes: 100_000_000},
+    })
+    await expect
+      .element(claudeCard().getByText('Getting Claude ready… 24 of 100 MB'))
+      .toBeVisible()
+    await expect
+      .element(page.getByRole('button', {name: 'Connect ChatGPT'}))
+      .toBeDisabled()
+    await expect
+      .element(page.getByText('You can connect ChatGPT once Claude is done.'))
+      .toBeVisible()
+
+    main.publish({
+      type: 'SIGN_IN_STEP',
+      provider: 'claude',
+      step: 'sign-in-page',
+      url,
+    })
+    await expect
+      .element(
+        claudeCard().getByText(
+          'Claude’s page may say “Claude Code”. That’s normal.'
+        )
+      )
+      .toBeVisible()
+    await claudeCard()
+      .getByRole('button', {name: 'Don’t see the page? Open it again'})
+      .click()
+    expect(main.sent.at(-1)).toEqual({
+      type: 'sign-in.open-page',
+      provider: 'claude',
+    })
+
+    main.publish({
+      type: 'SIGN_IN_STEP',
+      provider: 'claude',
+      step: 'paste-code',
+      url,
+    })
+    await claudeCard().getByRole('textbox', {name: 'Code'}).fill('typo')
+    await claudeCard()
+      .getByRole('button', {name: 'Connect', exact: true})
+      .click()
+    expect(main.sent.at(-1)).toEqual({
+      type: 'sign-in.code',
+      provider: 'claude',
+      code: 'typo',
+    })
+
+    main.publish({
+      type: 'SIGN_IN_STEP',
+      provider: 'claude',
+      step: 'paste-code',
+      url,
+      wrongCode: true,
+    })
+    await expect
+      .element(
+        claudeCard().getByText(
+          'That code didn’t work. Copy it again from Claude’s page.'
+        )
+      )
+      .toBeVisible()
+
+    main.publish({type: 'SIGN_IN_STEP', provider: 'claude', step: 'check-plan'})
+    await expect
+      .element(claudeCard().getByText('Checking your plan…'))
+      .toBeVisible()
+
+    main.publish({
+      type: 'SIGN_IN_FINISHED',
+      provider: 'claude',
+      outcome: 'connected',
+      account,
+    })
+    main.publish({
+      type: 'PROVIDER_STATUS',
+      provider: 'claude',
+      status: 'ready',
+      account,
+    })
+    await expect.element(claudeCard().getByText('Connected')).toBeVisible()
+    await expect
+      .element(claudeCard().getByText('sam@example.com'))
+      .toBeVisible()
+    await expect.element(claudeCard().getByText('Claude Max')).toBeVisible()
+
+    await page.getByRole('button', {name: 'Start chatting →'}).click()
+    await expect
+      .element(page.getByRole('textbox', {name: 'Prompt'}))
+      .toBeVisible()
+    expect(main.sent.map(command => command.type)).toContain('tree.create')
+  })
+
+  it('cancels connecting from the card', async () => {
+    const main = fakeMain({firstLaunch: true})
+    globalThis.window.uz = main
+    await render(<App />)
+
+    await page.getByRole('button', {name: 'Connect Claude'}).click()
+    main.publish({type: 'SIGN_IN_STEP', provider: 'claude', step: 'get-ready'})
+    await claudeCard().getByRole('button', {name: 'Cancel'}).click()
+
+    expect(main.sent.at(-1)).toEqual({
+      type: 'sign-in.cancel',
+      provider: 'claude',
+    })
+  })
+
+  it('shows each failure in plain words with one action', async () => {
+    const main = fakeMain({firstLaunch: true})
+    globalThis.window.uz = main
+    await render(<App />)
+
+    const failures = [
+      {
+        reason: 'download-failed',
+        line: 'Couldn’t get Claude ready. Check your internet connection and try again.',
+        action: 'Try again',
+      },
+      {
+        reason: 'no-answer',
+        line: 'Sign-in didn’t finish on Claude’s page. Try again.',
+        action: 'Try again',
+      },
+      {
+        reason: 'free-plan',
+        line: 'Unimatrix Zero needs Claude Pro or Max.',
+        action: 'Use a different account',
+      },
+    ] as const
+
+    for (const {reason, line, action} of failures) {
+      main.publish({
+        type: 'SIGN_IN_STEP',
+        provider: 'claude',
+        step: 'check-plan',
+      })
+      main.publish({
+        type: 'SIGN_IN_FINISHED',
+        provider: 'claude',
+        outcome: 'failed',
+        failure: {reason, message: 'from the host'},
+      })
+
+      await expect
+        .element(claudeCard().getByRole('alert'))
+        .toHaveTextContent(line)
+      await claudeCard().getByRole('button', {name: action}).click()
+      expect(main.sent.at(-1)).toEqual({
+        type: 'provider.connect',
+        provider: 'claude',
+      })
+    }
+  })
+
+  it('shows why main refused to connect', async () => {
+    const main = fakeMain({firstLaunch: true})
+    globalThis.window.uz = {
+      ...main,
+      send: (async (command: Command) =>
+        command.type === 'provider.connect'
+          ? {
+              ok: false,
+              error: {
+                code: 'handler-failed',
+                message: 'ChatGPT can’t be connected in this version yet.',
+              },
+            }
+          : main.send(command)) as Bridge['send'],
+    }
+    await render(<App />)
+
+    await page.getByRole('button', {name: 'Connect ChatGPT'}).click()
+
+    await expect
+      .element(page.getByRole('region', {name: 'ChatGPT'}).getByRole('alert'))
+      .toHaveTextContent('ChatGPT can’t be connected in this version yet.')
+  })
+
+  it('shows the same cards from the sidebar once connected', async () => {
+    globalThis.window.uz = fakeMain()
+    await render(<App />)
+
+    await page.getByRole('button', {name: 'Connections'}).click()
+
+    await expect
+      .element(page.getByRole('heading', {name: 'Connections'}))
+      .toBeVisible()
+    await expect
+      .element(claudeCard().getByText('sam@example.com'))
+      .toBeVisible()
+    await expect
+      .element(page.getByRole('button', {name: 'Connect ChatGPT'}))
+      .toBeEnabled()
+
+    await page.getByRole('button', {name: '← Back to your Tree'}).click()
+    await expect
+      .element(page.getByRole('button', {name: 'Ping main'}))
+      .toBeVisible()
+  })
 })
