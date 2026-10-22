@@ -1,4 +1,4 @@
-import type {ThinkingRound} from '../live-replies'
+import type {ThinkingSummary} from '../live-replies'
 import type {Reply, ReplyPart} from '@uz/contract/turns'
 
 import {ReplyMarkdown} from '#modules/markdown/main'
@@ -11,14 +11,16 @@ type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 /** Re-renders only when this Reply changes, from the stream or once saved. */
 export function ReplyView({reply}: {reply: Reply}) {
   const live = useLiveReply(reply.id)
-  const rounds = useThinking(reply.id)
+  const summaries = useThinking(reply.id)
   const {status, content} = live ?? reply
   const streaming = status === 'streaming'
 
   function thinkingBefore(part: number) {
-    return rounds
-      .filter(round => round.beforePart === part)
-      .map(round => <ThinkingSummary key={round.startedAt} round={round} />)
+    return summaries
+      .filter(summary => summary.beforePart === part)
+      .map(summary => (
+        <ThinkingSummaryView key={summary.startedAt} summary={summary} />
+      ))
   }
 
   return (
@@ -60,9 +62,9 @@ function describeDuration(ms: number) {
   return `${Math.round(ms / 60_000)}m`
 }
 
-/** One round of thinking, collapsed, with how long it took once it moved on. */
-function ThinkingSummary({round}: {round: ThinkingRound}) {
-  const {text, startedAt, endedAt} = round
+/** One stretch of thinking, collapsed, with how long it took once it moved on. */
+function ThinkingSummaryView({summary}: {summary: ThinkingSummary}) {
+  const {text, startedAt, endedAt} = summary
 
   return (
     <details className="rounded-md bg-muted/50 px-2 py-1 text-xs text-muted-foreground">

@@ -8,7 +8,8 @@ export const ReplyStoreContext = createContext<ReplyStore | null>(null)
 function useReplyStore() {
   const store = use(ReplyStoreContext)
 
-  if (!store) throw new Error('useLiveReply needs <LiveReplies> above it')
+  if (!store)
+    throw new Error('The live Reply hooks need <LiveReplies> above them')
 
   return store
 }
@@ -18,12 +19,12 @@ export function useLiveReply(replyId: string) {
   return useSelector(useReplyStore(), state => state.replies[replyId])
 }
 
-const NO_ROUNDS: never[] = []
+const NO_SUMMARIES: never[] = []
 
 /** What the Reply's Model thought, while this window has been open. */
 export function useThinking(replyId: string) {
   return useSelector(
     useReplyStore(),
-    state => state.thinking[replyId] ?? NO_ROUNDS
+    state => state.thinking[replyId] ?? NO_SUMMARIES
   )
 }

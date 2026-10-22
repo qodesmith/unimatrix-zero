@@ -56,3 +56,23 @@ it('renders a KaTeX command that needs trust as an error, not markup', async () 
     .not.toBeNull()
   expect(screen.container.querySelector('a')).toBeNull()
 })
+
+it('refuses a diagram that would load a remote image on its own', async () => {
+  const screen = await render(
+    <ReplyMarkdown
+      text={
+        '```mermaid\nflowchart LR\n  A@{ img: "https://example.com/x.png", label: "a picture" }\n```'
+      }
+      streaming={false}
+    />
+  )
+
+  await expect
+    .element(screen.getByText(/a diagram cannot show a remote image/u), {
+      timeout: 15_000,
+    })
+    .toBeVisible()
+  expect(screen.getByRole('alert').element()).not.toBeNull()
+  expect(screen.container.querySelector('image')).toBeNull()
+  expect(screen.container.querySelector('img')).toBeNull()
+}, 20_000)

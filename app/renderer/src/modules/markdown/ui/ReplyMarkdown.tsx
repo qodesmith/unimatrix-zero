@@ -1,4 +1,4 @@
-import type {Components, DiagramPlugin} from 'streamdown'
+import type {Components, DiagramPlugin, MermaidOptions} from 'streamdown'
 
 import 'katex/dist/katex.min.css'
 
@@ -12,9 +12,11 @@ import {
   plugins,
   rehypePlugins,
 } from '../plugins'
+import {DiagramError} from './DiagramError'
 import {RemoteImage} from './RemoteImage'
 
 const components: Components = {img: RemoteImage}
+const mermaidOptions: MermaidOptions = {errorComponent: DiagramError}
 
 /** The Mermaid plugin, loading it the first time a Reply needs it. */
 function useMermaid(needed: boolean): DiagramPlugin | null {
@@ -60,6 +62,7 @@ export function ReplyMarkdown({text, streaming}: ReplyMarkdownProps) {
     <Streamdown
       isAnimating={streaming}
       plugins={mermaid ? {...plugins, mermaid} : plugins}
+      mermaid={mermaidOptions}
       rehypePlugins={rehypePlugins}
       components={components}
       linkSafety={{enabled: false}}

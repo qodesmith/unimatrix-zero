@@ -1,6 +1,7 @@
 /**
  * Writes the fake driver's complete Reply where the window's tests replay it.
- * Run after changing the fake Reply: `bun run record-fake-reply`.
+ * Run after changing the fake Reply:
+ * `bun run --filter @uz/provider-host record-fake-reply`.
  */
 import {
   FAKE_REPLY_RECORDING,

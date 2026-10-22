@@ -52,7 +52,9 @@ export const rehypePlugins = withoutRawHtml()
 
 /**
  * KaTeX in untrusted mode: `\url`, `\href`, `\includegraphics` and raw HTML
- * commands render as errors rather than markup (ADR 0014).
+ * commands render as errors rather than markup (ADR 0014). This is the only
+ * gate on KaTeX's output: Streamdown runs the math plugin after the rehype
+ * plugins above, so the sanitizer never sees it.
  */
 const math: MathPlugin = {
   name: 'katex',
@@ -84,6 +86,34 @@ export function loadedMermaid() {
   return mermaid
 }
 
+/** A flowchart node drawn as a picture: `A@{ img: "https://…" }`. */
+const IMAGE_NODE = /@\{[^}]*\bimg\s*:/u
+
+/**
+ * Mermaid's image shape fetches its URL as soon as the diagram draws, and
+ * strict mode does not stop it. A Reply never reaches the network on its own
+ * (ADR 0014), so such a diagram is an error instead.
+ */
+function withoutImages(plugin: DiagramPlugin): DiagramPlugin {
+  return {
+    ...plugin,
+    getMermaid(config) {
+      const instance = plugin.getMermaid(config)
+
+      return {
+        ...instance,
+        async render(id, source) {
+          if (IMAGE_NODE.test(source)) {
+            throw new Error('a diagram cannot show a remote image')
+          }
+
+          return instance.render(id, source)
+        },
+      }
+    },
+  }
+}
+
 /**
  * Mermaid is the heaviest thing a Reply can show, so its bundle loads the
  * first time a Reply contains a diagram and never otherwise. Strict mode: no
@@ -91,7 +121,9 @@ export function loadedMermaid() {
  */
 export async function loadMermaid(): Promise<DiagramPlugin> {
   loading ??= import('@streamdown/mermaid').then(({createMermaidPlugin}) => {
-    mermaid = createMermaidPlugin({config: {securityLevel: 'strict'}})
+    mermaid = withoutImages(
+      createMermaidPlugin({config: {securityLevel: 'strict'}})
+    )
 
     return mermaid
   })
