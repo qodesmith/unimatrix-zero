@@ -1,5 +1,5 @@
 import type {SessionStoreClient} from '#modules/session-store/main'
-import type {AppServer} from './app-server'
+import type {AppServer, OpenAppServer} from './app-server'
 import type {Notification, ParamsOf} from './wire'
 import type {
   ReplyRecorded,
@@ -10,7 +10,7 @@ import type {ReplyEvent} from '@uz/contract/turns'
 
 import {createInbox} from '#modules/inbox/main'
 
-import {createTurnMapper, threadOf, turnOf} from './replies'
+import {createReplyMapper, threadOf, turnOf} from './replies'
 import {folderOf, readRollouts, writeRolloutsBack} from './rollouts'
 
 /** The Model id that leaves the choice to Codex: the plan's default. */
@@ -21,8 +21,7 @@ export const IDLE_CLOSE_MS = 10 * 60 * 1000
 
 export interface CodexRepliesDeps {
   store: SessionStoreClient
-  /** Starts `codex app-server` from the program in place. */
-  open: (vendorProgram: SignInRequest) => Promise<AppServer>
+  open: OpenAppServer
   idleMs: number
 }
 
@@ -144,8 +143,8 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     return {id, model}
   }
 
-  /** Sends the Prompt and streams the turn's answer, to its end. */
-  async function* turn(
+  /** Sends the Prompt and streams Codex's answer, to its end. */
+  async function* send(
     running: Running,
     request: ReplyRequest,
     thread: OpenThread
@@ -166,7 +165,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       })
 
       const turnId = started.turn.id
-      const mapper = createTurnMapper(ids)
+      const mapper = createReplyMapper(ids)
 
       for (;;) {
         const notification = await inbox.next()
@@ -211,28 +210,29 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
    * answers nothing, so a new one takes the Prompt in its place, once.
    */
   async function* write(
-    request: ReplyRequest,
-    again = true
+    request: ReplyRequest
   ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
-    const running = await claim(request.vendorProgram)
-    let heard = false
+    for (let attempt = 1; ; attempt++) {
+      const running = await claim(request.vendorProgram)
+      let heard = false
 
-    try {
-      const thread = await threadFor(running, request)
+      try {
+        const thread = await threadFor(running, request)
 
-      for await (const event of turn(running, request, thread)) {
-        heard = true
-        yield event
+        for await (const event of send(running, request, thread)) {
+          heard = true
+          yield event
+        }
+
+        return
+      } catch (error) {
+        if (heard || attempt === 2 || !running.server.hasExited) throw error
+
+        if (current === running) current = null
+      } finally {
+        release(running)
       }
-    } catch (error) {
-      if (heard || !again || !running.server.hasExited) throw error
-
-      if (current === running) current = null
-    } finally {
-      release(running)
     }
-
-    if (!heard) yield* write(request, false)
   }
 
   async function* startReply(

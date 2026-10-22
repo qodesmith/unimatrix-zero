@@ -8,7 +8,8 @@ type ReplyIds = Pick<ReplyRequest, 'treeId' | 'replyId'>
 
 type RunFinished = Extract<ReplyEvent, {type: 'RUN_FINISHED'}>
 
-type CompletedTurn = Extract<
+/** Codex's record of the request that wrote the Reply. */
+type CodexTurn = Extract<
   Notification,
   {method: 'turn/completed'}
 >['params']['turn']
@@ -32,11 +33,11 @@ export function turnOf(notification: Notification) {
 }
 
 /**
- * Turns one turn's notifications into contract events. Each message's text
+ * Turns one Reply's notifications into contract events. Each message's text
  * streams as deltas; when the finished message differs from what streamed,
  * its text replaces it. Reasoning is passed on for display and never kept.
  */
-export function createTurnMapper(ids: ReplyIds) {
+export function createReplyMapper(ids: ReplyIds) {
   /** The text part's text, as the events so far show it. */
   let shown = ''
   /** Each message so far: `shown` when it began, and its own text. */
@@ -113,7 +114,7 @@ export function createTurnMapper(ids: ReplyIds) {
     },
 
     /** How the Reply ended, as its last event. */
-    finished(turn: CompletedTurn): RunFinished {
+    finished(turn: CodexTurn): RunFinished {
       if (turn.status === 'completed') {
         return {...ids, type: 'RUN_FINISHED', status: 'complete'}
       }

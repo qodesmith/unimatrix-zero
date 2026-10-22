@@ -47,7 +47,10 @@ const AccountSchema = z.looseObject({
   Partial<Pick<Extract<Account, {type: 'chatgpt'}>, 'email'>>
 >
 
-/** A Thread opened by `thread/start` or `thread/resume`, and its Model. */
+/**
+ * A Provider session opened by `thread/start` or `thread/resume`, and its
+ * Model.
+ */
 const OpenedThreadSchema = z.looseObject({
   thread: ThreadSchema,
   model: z.string(),

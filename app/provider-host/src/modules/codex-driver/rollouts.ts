@@ -5,7 +5,7 @@ import type {SessionFile, SessionFolder} from '@uz/contract/host'
 import fs from 'node:fs'
 import path from 'node:path'
 
-/** Where the app keeps Codex's Threads: one folder per Codex thread. */
+/** Where the app keeps Codex's Provider sessions: one folder for each. */
 export function folderOf(threadId: string): SessionFolder {
   return {projectKey: 'codex', sessionId: threadId}
 }

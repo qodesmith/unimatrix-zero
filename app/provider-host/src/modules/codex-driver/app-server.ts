@@ -1,4 +1,5 @@
 import type {Method, Notification, ParamsOf, ResponseOf} from './wire'
+import type {SignInRequest} from '@uz/contract/host'
 import type {EventEmitter} from 'node:events'
 import type {Readable, Writable} from 'node:stream'
 import type {z} from 'zod'
@@ -71,6 +72,9 @@ function resultOf<M extends Method>(method: M, answer: Answer): ResponseOf<M> {
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- caller-typed lookup: RESPONSES[method] parses exactly ResponseOf<M>
   return RESPONSES[method].parse(answer.result) as ResponseOf<M>
 }
+
+/** Starts `codex app-server` from the vendor program in place. */
+export type OpenAppServer = (vendorProgram: SignInRequest) => Promise<AppServer>
 
 /** Starts `codex app-server` and introduces the app to it. */
 export async function startAppServer(

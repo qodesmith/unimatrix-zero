@@ -3,7 +3,7 @@ import type {
   DownloadProgress,
   ProgramTarget,
 } from '#modules/vendor-program/main'
-import type {AppServer} from './app-server'
+import type {AppServer, OpenAppServer} from './app-server'
 import type {SignInRequest} from '@uz/contract/host'
 import type {SignInFinished, SignInUpdate} from '@uz/contract/providers'
 
@@ -48,8 +48,7 @@ export interface CodexSignInDeps {
     target: ProgramTarget,
     options: {signal: AbortSignal}
   ) => AsyncIterable<DownloadProgress>
-  /** Starts `codex app-server` from the program in place. */
-  open: (request: SignInRequest) => Promise<AppServer>
+  open: OpenAppServer
   timeoutMs: number
 }
 

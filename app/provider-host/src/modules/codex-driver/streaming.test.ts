@@ -165,7 +165,6 @@ it('streams a Reply, records where Codex saved it, and reports its Context size'
   expect(events[0]?.type).toBe('RUN_STARTED')
   expect(events.filter(event => event.type === 'TEXT_DELTA').length).toBe(5)
   expect(textOf(events)).toBe('Hi there, friend!')
-  // Provider-reported: what this request sent and wrote.
   expect(shown(events).contextSize).toBe(14_478)
   expect(events.slice(-2)).toEqual([
     expect.objectContaining({
@@ -175,7 +174,6 @@ it('streams a Reply, records where Codex saved it, and reports its Context size'
     }),
     expect.objectContaining({type: 'RUN_FINISHED', status: 'complete'}),
   ])
-  // In the app's copy before it was recorded, under its name in CODEX_HOME.
   const {projectKey, sessionId} = folderOf(THREAD_ID)
 
   expect([...codex.store.filesOf(projectKey, sessionId).keys()]).toEqual([
@@ -195,7 +193,7 @@ it('runs codex in its own CODEX_HOME, updater off and nothing that outranks the 
   expect(report?.vendorVariables).toEqual(['CODEX_HOME'])
 })
 
-it('continues the Thread in the app-server that has it loaded, then closes when idle', async () => {
+it('continues the Provider session in the app-server that has it loaded, then closes when idle', async () => {
   const codex = await setUp(['started.ndjson'])
 
   const first = await codex.reply(FIRST_PROMPT)
@@ -216,13 +214,12 @@ it('continues the Thread in the app-server that has it loaded, then closes when 
   expect(reports[0]?.ended).toBe('input-closed')
 })
 
-it('resumes the Thread from the app’s copy alone, written back under its own name', async () => {
+it('resumes the Provider session from the app’s copy alone, written back under its own name', async () => {
   const opened = await setUp(['started.ndjson'])
   const first = await opened.reply(FIRST_PROMPT)
   const second = await opened.reply(SECOND_PROMPT, recordedIn(first))
   await opened.allClosed()
 
-  // A new CODEX_HOME, with nothing of the thread in it.
   const codex = await setUp(['resumed.ndjson'], {store: opened.store})
   const third = await codex.reply(THIRD_PROMPT, recordedIn(second))
 
@@ -245,7 +242,7 @@ it('resumes the Thread from the app’s copy alone, written back under its own n
   ])
 })
 
-it('fails the Reply when the app has no copy of the Thread', async () => {
+it('fails the Reply when the app has no copy of the Provider session', async () => {
   const codex = await setUp(['resumed.ndjson'])
 
   const events = await codex.reply(THIRD_PROMPT, {

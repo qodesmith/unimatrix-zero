@@ -2,7 +2,7 @@ import type {Notification} from './wire'
 
 import {expect, it} from 'vitest'
 
-import {createTurnMapper} from './replies'
+import {createReplyMapper} from './replies'
 
 const ids = {treeId: crypto.randomUUID(), replyId: crypto.randomUUID()}
 const inTurn = {threadId: 'thread', turnId: 'turn'}
@@ -22,7 +22,7 @@ function message(id: string, text: string): Notification {
 }
 
 it('replaces what streamed when the finished message differs', () => {
-  const mapper = createTurnMapper(ids)
+  const mapper = createReplyMapper(ids)
 
   expect([
     ...mapper.map(delta('a', 'Hel')),
@@ -36,7 +36,7 @@ it('replaces what streamed when the finished message differs', () => {
 })
 
 it('replaces only the last message, after the ones before it', () => {
-  const mapper = createTurnMapper(ids)
+  const mapper = createReplyMapper(ids)
   mapper.map(message('a', 'One. '))
   mapper.map(delta('b', 'Tw'))
 
@@ -46,7 +46,7 @@ it('replaces only the last message, after the ones before it', () => {
 })
 
 it('adds a message that never streamed, and leaves one that matches', () => {
-  const mapper = createTurnMapper(ids)
+  const mapper = createReplyMapper(ids)
 
   expect(mapper.map(message('a', 'Hi'))).toEqual([
     {...ids, type: 'TEXT_DELTA', delta: 'Hi'},
@@ -55,7 +55,7 @@ it('adds a message that never streamed, and leaves one that matches', () => {
 })
 
 it('passes reasoning on and reads each request’s own token count', () => {
-  const mapper = createTurnMapper(ids)
+  const mapper = createReplyMapper(ids)
 
   const usage = {
     totalTokens: 120,
@@ -102,7 +102,7 @@ it.each([
     },
   ],
 ] as const)('ends a %s turn', (status, error, ended) => {
-  expect(createTurnMapper(ids).finished({id: 'turn', status, error})).toEqual({
+  expect(createReplyMapper(ids).finished({id: 'turn', status, error})).toEqual({
     ...ids,
     type: 'RUN_FINISHED',
     ...ended,

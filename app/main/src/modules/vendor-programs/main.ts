@@ -35,13 +35,14 @@ export function signInRequestFor(
 ): SignInRequest {
   const configDir = path.join(userData, 'providers', provider)
   const target = PlatformSchema.safeParse(`${platform}-${arch}`)
-  const program = manifest.vendorPrograms[PROGRAMS[provider]]
+  const name = PROGRAMS[provider]
+  const program = manifest.vendorPrograms[name]
   const build = target.success ? program.builds[target.data] : undefined
 
   if (!build) return {program: null, configDir}
 
   const folder = path.join(userData, 'vendor', provider, program.version)
-  const file = platform === 'win32' ? 'claude.exe' : 'claude'
+  const file = platform === 'win32' ? `${name}.exe` : name
 
   return {
     program: {path: build.archive ? folder : path.join(folder, file), build},
