@@ -7,7 +7,10 @@ import {useState} from 'react'
 import {useLiveReply} from '../use-live-reply'
 import {useSendPrompt, useTurns} from '../use-turns'
 
-/** One Tree: the centered Input while it's empty, then its Turns. */
+/**
+ * One Tree: the centered Input while it's empty, then its Turns, with an
+ * Input after the last Reply once it has finished.
+ */
 export function TreeView({treeId}: {treeId: string}) {
   const turns = useTurns(treeId)
 
@@ -22,21 +25,28 @@ export function TreeView({treeId}: {treeId: string}) {
   if (prompts.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center p-6">
-        <Input treeId={treeId} />
+        <Input treeId={treeId} parentReplyId={null} />
       </div>
     )
   }
 
+  const leaf = replies.at(-1)
+
   return (
-    <ol className="flex w-full max-w-2xl flex-1 flex-col gap-4 overflow-y-auto p-6">
-      {prompts.map(prompt => (
-        <Exchange
-          key={prompt.id}
-          prompt={prompt}
-          reply={replies.find(reply => reply.promptId === prompt.id)}
-        />
-      ))}
-    </ol>
+    <div className="flex w-full max-w-2xl flex-1 flex-col gap-4 overflow-y-auto p-6">
+      <ol className="flex flex-col gap-4">
+        {prompts.map(prompt => (
+          <Exchange
+            key={prompt.id}
+            prompt={prompt}
+            reply={replies.find(reply => reply.promptId === prompt.id)}
+          />
+        ))}
+      </ol>
+      {leaf && leaf.status !== 'streaming' && (
+        <Input key={leaf.id} treeId={treeId} parentReplyId={leaf.id} />
+      )}
+    </div>
   )
 }
 
@@ -89,8 +99,14 @@ function ReplyPartView({part}: {part: ReplyPart}) {
   )
 }
 
-function Input({treeId}: {treeId: string}) {
-  const sendPrompt = useSendPrompt(treeId)
+function Input({
+  treeId,
+  parentReplyId,
+}: {
+  treeId: string
+  parentReplyId: string | null
+}) {
+  const sendPrompt = useSendPrompt(treeId, parentReplyId)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)

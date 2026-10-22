@@ -1,3 +1,4 @@
+import type {SessionStoreClient} from '#modules/session-store/main'
 import type {
   HostCommand,
   HostMessage,
@@ -9,6 +10,7 @@ import type {ProviderId} from '@uz/contract/providers'
 
 import {createClaudeDriver} from '#modules/claude-driver/main'
 import {createFakeDriver} from '#modules/fake-driver/main'
+import {createSessionStoreClient} from '#modules/session-store/main'
 import {HostCommandSchema} from '@uz/contract/host'
 import {signInFailed} from '@uz/contract/providers'
 
@@ -21,9 +23,16 @@ export interface HostPort {
 /**
  * Runs one driver behind the port: tells main it is ready with the driver's
  * Models, then streams each requested Reply, and each step of connecting,
- * back as it happens. Commands that don't parse are dropped.
+ * back as it happens. The driver reaches the app's copy of its sessions
+ * through the same port. Commands that don't parse are dropped.
  */
-export async function runHost(port: HostPort, driver: ProviderDriver) {
+export async function runHost(
+  port: HostPort,
+  createDriver: (store: SessionStoreClient) => ProviderDriver
+) {
+  const store = createSessionStoreClient(message => port.postMessage(message))
+  const driver = createDriver(store)
+
   async function stream(request: ReplyRequest) {
     const {treeId, replyId} = request
 
@@ -77,6 +86,9 @@ export async function runHost(port: HostPort, driver: ProviderDriver) {
       case 'sign-in.cancel':
         driver.cancelSignIn()
         break
+      case 'session-store.result':
+        store.settle(command.requestId, command.outcome)
+        break
     }
   }
 
@@ -89,14 +101,14 @@ export async function runHost(port: HostPort, driver: ProviderDriver) {
   port.postMessage({type: 'HOST_READY', models: await driver.listModels()})
 }
 
-function driverFor(provider: ProviderId): ProviderDriver {
+function driverFor(provider: ProviderId, store: SessionStoreClient) {
   if (process.argv.includes('--fake')) return createFakeDriver()
 
-  if (provider === 'claude') return createClaudeDriver()
+  if (provider === 'claude') return createClaudeDriver({store})
 
   throw new Error(`There is no ${provider} driver yet; start with --fake.`)
 }
 
 export function startHost(provider: ProviderId) {
-  void runHost(process.parentPort, driverFor(provider))
+  void runHost(process.parentPort, store => driverFor(provider, store))
 }

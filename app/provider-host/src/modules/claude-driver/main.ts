@@ -1,19 +1,52 @@
+import type {ClaudeRepliesDeps} from './streaming'
 import type {ProviderDriver} from '@uz/contract/host'
+
+import {query} from '@anthropic-ai/claude-agent-sdk'
+import {spawn} from 'node:child_process'
 
 import {readAccount} from './account'
 import {signOut, startLogin} from './login'
 import {getProgramReady} from './program'
 import {SIGN_IN_TIMEOUT_MS, createClaudeSignIn} from './sign-in'
+import {DEFAULT_MODEL, createClaudeReplies} from './streaming'
+import {IDLE_CLOSE_MS, MAX_WARM} from './warm'
 
 async function notYet(): Promise<never> {
   throw new Error('Claude can’t do this yet.')
 }
 
+type ClaudeDriverOptions = Pick<ClaudeRepliesDeps, 'store'> &
+  Partial<Omit<ClaudeRepliesDeps, 'store'>>
+
 /**
- * Claude through its unmodified vendor program. Connecting works; Replies
- * come later, so it offers no Models yet.
+ * Claude through its unmodified vendor program: connecting, and Replies that
+ * stream from `claude` in streaming-input mode, written by the plan's default
+ * Model.
  */
-export function createClaudeDriver(): ProviderDriver {
+export function createClaudeDriver({
+  store,
+  query: run = query,
+  spawn: start = ({command, args, cwd, env, signal}) =>
+    spawn(command, args, {
+      cwd,
+      env,
+      signal,
+      stdio: ['pipe', 'pipe', 'ignore'],
+      windowsHide: true,
+    }),
+  env = process.env,
+  idleMs = IDLE_CLOSE_MS,
+  maxWarm = MAX_WARM,
+}: ClaudeDriverOptions): ProviderDriver {
+  const replies = createClaudeReplies({
+    store,
+    query: run,
+    spawn: start,
+    env,
+    idleMs,
+    maxWarm,
+  })
+
   return {
     capabilities: {
       pdfAttachments: true,
@@ -28,16 +61,13 @@ export function createClaudeDriver(): ProviderDriver {
       startLogin,
       readAccount,
       signOut,
-      env: process.env,
+      env,
       timeoutMs: SIGN_IN_TIMEOUT_MS,
     }),
     readConnection: notYet,
-    listModels: async () => [],
+    listModels: async () => [{id: DEFAULT_MODEL, name: 'Default'}],
     readUsage: notYet,
-    // oxlint-disable-next-line require-yield -- nothing streams until Replies are built
-    async *startReply() {
-      await notYet()
-    },
+    startReply: replies.startReply,
     stop: notYet,
     answerApproval: notYet,
     forkSession: notYet,

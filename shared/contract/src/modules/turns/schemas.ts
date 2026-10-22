@@ -53,6 +53,7 @@ export const RunFailureSchema = z.strictObject({
     'host-crashed',
     'host-unreachable',
     'driver-error',
+    'provider-error',
     'fake-failure',
   ]),
   message: z.string(),

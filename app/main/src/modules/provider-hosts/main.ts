@@ -1,4 +1,9 @@
-import type {HostCommand} from '@uz/contract/host'
+import type {
+  HostCommand,
+  ReplyRecorded,
+  SessionStoreRequest,
+  SessionStoreValue,
+} from '@uz/contract/host'
 import type {
   Model,
   ProviderId,
@@ -40,7 +45,13 @@ export type HostStatus = Extract<
 interface ProviderHostsOptions {
   spawn: (provider: ProviderId) => HostProcess
   onReplyEvent: (provider: ProviderId, event: ReplyEvent) => void
+  onReplyRecorded: (provider: ProviderId, recorded: ReplyRecorded) => void
   onSignInUpdate: (provider: ProviderId, update: SignInUpdate) => void
+  /** Answers a host's request about its sessions; throws if it can't. */
+  onSessionStore: (
+    provider: ProviderId,
+    request: SessionStoreRequest
+  ) => SessionStoreValue
   onStatus: (provider: ProviderId, status: HostStatus) => void
   /** The host died without main asking it to. */
   onCrash: (provider: ProviderId) => void
@@ -56,11 +67,24 @@ export type ProviderHosts = ReturnType<typeof createProviderHosts>
 export function createProviderHosts({
   spawn,
   onReplyEvent,
+  onReplyRecorded,
   onSignInUpdate,
+  onSessionStore,
   onStatus,
   onCrash,
 }: ProviderHostsOptions) {
   const hosts = new Map<ProviderId, Host>()
+
+  function answer(provider: ProviderId, request: SessionStoreRequest) {
+    try {
+      return {ok: true as const, value: onSessionStore(provider, request)}
+    } catch (error) {
+      return {
+        ok: false as const,
+        message: error instanceof Error ? error.message : String(error),
+      }
+    }
+  }
 
   function later(host: Host, ms: number, run: () => void) {
     const timer = setTimeout(() => {
@@ -100,6 +124,14 @@ export function createProviderHosts({
         message.type === 'SIGN_IN_FINISHED'
       ) {
         onSignInUpdate(provider, message)
+      } else if (message.type === 'REPLY_RECORDED') {
+        onReplyRecorded(provider, message)
+      } else if (message.type === 'SESSION_STORE') {
+        child.post({
+          type: 'session-store.result',
+          requestId: message.requestId,
+          outcome: answer(provider, message.request),
+        })
       } else {
         onReplyEvent(provider, message)
       }
@@ -159,12 +191,17 @@ export function createProviderHosts({
       start(provider, host)
     },
 
-    /** The first Provider whose host is ready, with its default Model. */
-    ready(): {provider: ProviderId; model: Model} | null {
+    /**
+     * The given Provider, or else the first one, whose host is ready, with
+     * its default Model.
+     */
+    ready(only?: ProviderId): {provider: ProviderId; model: Model} | null {
       for (const [provider, host] of hosts) {
         const model = host.models?.[0]
 
-        if (host.process && model) return {provider, model}
+        if (host.process && model && (only ?? provider) === provider) {
+          return {provider, model}
+        }
       }
 
       return null

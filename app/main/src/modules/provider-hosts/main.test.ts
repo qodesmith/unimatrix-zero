@@ -1,5 +1,9 @@
 import type {HostProcess, HostStatus} from './main'
-import type {HostCommand} from '@uz/contract/host'
+import type {
+  HostCommand,
+  ReplyRecorded,
+  SessionStoreRequest,
+} from '@uz/contract/host'
 import type {ProviderId, SignInUpdate} from '@uz/contract/providers'
 import type {ReplyEvent} from '@uz/contract/turns'
 
@@ -48,6 +52,8 @@ function fakeProcess() {
 
 let spawned: ReturnType<typeof fakeProcess>[]
 let events: ReplyEvent[]
+let recorded: ReplyRecorded[]
+let storeRequests: SessionStoreRequest[]
 let signInUpdates: SignInUpdate[]
 let statuses: HostStatus[]
 let crashes: ProviderId[]
@@ -61,7 +67,15 @@ function setUp() {
       return child.process
     },
     onReplyEvent: (_provider, event) => events.push(event),
+    onReplyRecorded: (_provider, message) => recorded.push(message),
     onSignInUpdate: (_provider, update) => signInUpdates.push(update),
+    onSessionStore: (_provider, request) => {
+      storeRequests.push(request)
+
+      if (request.op === 'load') throw new Error('The disk is full.')
+
+      return null
+    },
     onStatus: (_provider, status) => statuses.push(status),
     onCrash: provider => crashes.push(provider),
   })
@@ -79,6 +93,8 @@ beforeEach(() => {
   vi.useFakeTimers()
   spawned = []
   events = []
+  recorded = []
+  storeRequests = []
   signInUpdates = []
   statuses = []
   crashes = []
@@ -137,6 +153,62 @@ it('drops a RUN_FINISHED from a Subagent, which would end its whole Reply', () =
   expect(events).toEqual([])
 })
 
+it('passes on where the Provider saved a Reply', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+  const {treeId, replyId} = textDelta
+
+  const message = {
+    type: 'REPLY_RECORDED',
+    treeId,
+    replyId,
+    model: 'claude-haiku-5-5',
+    session: {sessionId: 's1', messageId: 'm1'},
+  } as const
+
+  latest().say(message)
+
+  expect(recorded).toEqual([message])
+  expect(events).toEqual([])
+})
+
+it('answers a host’s session store requests, failures included', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+  const key = {projectKey: 'p', sessionId: 's'}
+  const append = {op: 'append', key, entries: [{type: 'user'}]} as const
+
+  latest().say({type: 'SESSION_STORE', requestId: 'r1', request: append})
+  latest().say({
+    type: 'SESSION_STORE',
+    requestId: 'r2',
+    request: {op: 'load', key},
+  })
+
+  expect(storeRequests).toEqual([append, {op: 'load', key}])
+  expect(latest().received).toEqual([
+    {
+      type: 'session-store.result',
+      requestId: 'r1',
+      outcome: {ok: true, value: null},
+    },
+    {
+      type: 'session-store.result',
+      requestId: 'r2',
+      outcome: {ok: false, message: 'The disk is full.'},
+    },
+  ])
+})
+
+it('is ready for a given Provider only when that Provider’s host is', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+  latest().say({type: 'HOST_READY', models})
+
+  expect(hosts.ready('claude')).toEqual({provider: 'claude', model: models[0]})
+  expect(hosts.ready('chatgpt')).toBeNull()
+})
+
 it('sends commands to the Provider’s host', () => {
   const hosts = setUp()
   hosts.connect('claude')
@@ -149,6 +221,8 @@ it('sends commands to the Provider’s host', () => {
       model: 'fake',
       systemPrompt: '',
       prompt: {text: 'Hi'},
+      vendorProgram: {program: null, configDir: '/claude'},
+      session: null,
     },
   } as const
 
@@ -285,7 +359,9 @@ it('does not restart a host that was stopped while its crash was handled', () =>
       return child.process
     },
     onReplyEvent: () => undefined,
+    onReplyRecorded: () => undefined,
     onSignInUpdate: () => undefined,
+    onSessionStore: () => null,
     onStatus: (_provider, status) => statuses.push(status),
     onCrash: provider => hosts?.stop(provider),
   })

@@ -82,7 +82,7 @@ function fakeMain(saved: Saved = {}) {
       const prompt = {
         id: crypto.randomUUID(),
         treeId: command.treeId,
-        parentReplyId: null,
+        parentReplyId: command.parentReplyId,
         text: command.text,
         createdAt: receivedAt,
       }
@@ -239,6 +239,55 @@ it('streams a Reply word by word into an empty Tree', async () => {
 
   main.publish({...ids, type: 'RUN_FINISHED', status: 'complete'})
   await expect.element(page.getByText('Writing…')).not.toBeInTheDocument()
+  await expect.element(page.getByText('Hi there')).toBeVisible()
+})
+
+it('continues the Thread from its last Reply once that Reply has finished', async () => {
+  const main = fakeMain()
+  globalThis.window.uz = main
+  await render(<App />)
+  await page.getByRole('button', {name: 'New Tree'}).click()
+  await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
+  await userEvent.keyboard('{Enter}')
+
+  const first = firstReply(main)
+  main.publish({...first, type: 'TEXT_DELTA', delta: 'Hi there'})
+  await expect.element(page.getByText('Hi there')).toBeVisible()
+  await expect
+    .element(page.getByRole('textbox', {name: 'Prompt'}))
+    .not.toBeInTheDocument()
+
+  main.publish({...first, type: 'RUN_FINISHED', status: 'complete'})
+  // As main saved it, for the Turns fetched again after the next send.
+  const [saved] = main.replies
+
+  if (!saved) throw new Error('No Reply was started')
+
+  main.replies[0] = {
+    ...saved,
+    status: 'complete',
+    content: [{type: 'text', text: 'Hi there'}],
+  }
+  await page.getByRole('textbox', {name: 'Prompt'}).fill('And then?')
+  await userEvent.keyboard('{Enter}')
+
+  await expect.element(page.getByText('And then?')).toBeVisible()
+  expect(main.sent.filter(command => command.type === 'prompt.send')).toEqual([
+    expect.objectContaining({parentReplyId: null, text: 'Hello?'}),
+    expect.objectContaining({parentReplyId: first.replyId, text: 'And then?'}),
+  ])
+
+  const [, second] = main.replies
+
+  if (!second) throw new Error('No second Reply was started')
+
+  main.publish({
+    treeId: second.treeId,
+    replyId: second.id,
+    type: 'TEXT_DELTA',
+    delta: 'Then the end.',
+  })
+  await expect.element(page.getByText('Then the end.')).toBeVisible()
   await expect.element(page.getByText('Hi there')).toBeVisible()
 })
 

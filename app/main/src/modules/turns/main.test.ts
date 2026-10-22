@@ -21,8 +21,9 @@ beforeEach(() => {
   published = []
   turns = createTurns(db, event => published.push(event))
   treeId = createTrees(db).create(new Date()).id
-  replyId = turns.startRoot({
+  replyId = turns.start({
     treeId,
+    parentReplyId: null,
     text: 'Hi',
     provider: 'claude',
     model: 'fake',
