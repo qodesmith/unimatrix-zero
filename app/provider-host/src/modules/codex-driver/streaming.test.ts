@@ -40,12 +40,14 @@ interface Report {
 const cleanUps: (() => Promise<void>)[] = []
 
 afterEach(async () => {
-  for (const cleanUp of cleanUps.splice(0)) await cleanUp()
+  for (const cleanUp of cleanUps.splice(0).toReversed()) await cleanUp()
 })
 
 function folder(prefix: string) {
   const made = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)))
-  cleanUps.push(async () => fs.rmSync(made, {recursive: true, force: true}))
+  cleanUps.push(async () =>
+    fs.rmSync(made, {recursive: true, force: true, maxRetries: 10})
+  )
 
   return made
 }
@@ -127,6 +129,9 @@ async function setUp(
       {timeout: 5000}
     )
   }
+
+  // Windows can't remove a folder while a `codex` still runs in it.
+  cleanUps.push(allClosed)
 
   return {configDir, store, reply, reports: reportsSoFar, allClosed}
 }
