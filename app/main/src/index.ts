@@ -92,7 +92,10 @@ function openWindow(db: Database) {
       }),
   })
 
-  app.on('will-quit', () => hosts.stopAll())
+  app.on('will-quit', () => {
+    hosts.stopAll()
+    turns.saveAll()
+  })
 
   // Connecting a Provider comes with the Connections screen; until then only
   // the fake one connects.
@@ -130,8 +133,9 @@ async function start() {
     return
   }
 
-  app.on('will-quit', () => db.$client.close())
   openWindow(db)
+  // After openWindow's will-quit, which saves the Replies still streaming.
+  app.on('will-quit', () => db.$client.close())
 }
 
 void start()

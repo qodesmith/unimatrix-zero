@@ -64,6 +64,18 @@ it('saves partial text about every second, not on every word', () => {
   expect(saved().content).toEqual([{type: 'text', text: 'Hello there'}])
 })
 
+it('saves partial text at once when the app quits, leaving no timer', () => {
+  apply({type: 'TEXT_DELTA', delta: 'Half a'})
+
+  turns.saveAll()
+
+  expect(saved()).toMatchObject({
+    status: 'streaming',
+    content: [{type: 'text', text: 'Half a'}],
+  })
+  expect(vi.getTimerCount()).toBe(0)
+})
+
 it('saves each part as soon as it finishes', () => {
   apply({type: 'TEXT_DELTA', delta: 'Looking.'})
   apply({type: 'TOOL_CALL_START', toolCallId: 't1', toolName: 'search'})

@@ -249,6 +249,13 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
       }
     },
 
+    /** Saves any partial text still waiting on its timer, before quitting. */
+    saveAll() {
+      for (const entry of inFlight.values()) {
+        if (entry.saveTimer) save(entry)
+      }
+    },
+
     /** Every Reply being written, as last published. */
     streaming(): StreamingReply[] {
       return [...inFlight.values()].map(entry => entry.reply)
