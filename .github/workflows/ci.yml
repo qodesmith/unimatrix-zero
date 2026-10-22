@@ -49,8 +49,13 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build
       - run: bun run test:node
+      # No --with-deps: the runner already has Chromium's libraries, and the fonts
+      # and xvfb it adds come from an apt mirror that often stalls for minutes.
+      # Without those fonts, non-Latin text and emoji render as boxes, so add it
+      # back before writing a screenshot, text-measuring, or headed test.
       - if: matrix.renderer
-        run: bunx playwright install chromium --only-shell --with-deps
+        run: bunx playwright install chromium --only-shell
+        timeout-minutes: 5
       - if: matrix.renderer
         run: bun run test:renderer
 
