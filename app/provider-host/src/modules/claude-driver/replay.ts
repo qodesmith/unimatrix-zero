@@ -36,7 +36,9 @@ export type RecordedLine = z.infer<typeof RecordedLineSchema>
  * transcript entries it reports. It writes what it saw to
  * `FAKE_CLAUDE_REPORTS/<n>.json`. `FAKE_CLAUDE_TOOL_RESULT` names a tool
  * result file it writes beside the session; `FAKE_CLAUDE_REFUSE_STORE=yes`
- * refuses to resume from the SDK's temporary folder, as if the store broke.
+ * refuses to resume from the SDK's temporary folder, as if the store broke;
+ * `FAKE_CLAUDE_EXIT_AFTER=<n>` exits once it has answered the nth Prompt, as
+ * if it died while idle.
  */
 const SCRIPT = `
 import fs from 'node:fs'
@@ -139,6 +141,13 @@ process.stdin.on('data', chunk => {
     if (message.type === 'user') report.prompts.push(message.message.content)
     save()
     answer()
+    if (message.type === 'user' && report.prompts.length === Number(process.env.FAKE_CLAUDE_EXIT_AFTER)) {
+      process.stdout.write('', () => {
+        report.ended = 'exited'
+        save()
+        process.exit(1)
+      })
+    }
   }
 })
 process.stdin.on('end', () => {

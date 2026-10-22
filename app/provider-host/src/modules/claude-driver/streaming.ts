@@ -48,7 +48,8 @@ interface Live extends ClaudeSession {
 
 type Mapper = ReturnType<typeof createReplyMapper>
 
-type Outcome = {result: SDKResultMessage} | {error: string}
+/** `heard` says whether `claude` sent anything back to the Prompt. */
+type Outcome = {result: SDKResultMessage} | {error: string; heard: boolean}
 
 /**
  * Claude's Replies: each Prompt goes to the warm session standing at the
@@ -128,16 +129,23 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     mapper: Mapper,
     text: string
   ): AsyncGenerator<ReplyEvent, Outcome> {
+    let heard = false
+
     try {
       for await (const message of session.send(text)) {
+        heard = true
+
         if (message.type === 'result') return {result: message}
 
         yield* mapper.map(message)
       }
 
-      return {error: 'Claude stopped before finishing this Reply.'}
+      return {error: 'Claude stopped before finishing this Reply.', heard}
     } catch (error) {
-      return {error: error instanceof Error ? error.message : String(error)}
+      return {
+        error: error instanceof Error ? error.message : String(error),
+        heard,
+      }
     }
   }
 
@@ -162,30 +170,32 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     for (const file of files) session.saved.add(file.path)
   }
 
-  /** The warm session standing at the Reply answered, or a new `claude`. */
-  async function sessionFor(request: ReplyRequest) {
-    const {session} = request
-
-    const found =
-      (session && warm.claim(session)) ??
-      (await open(request, session ? 'store' : 'none'))
-
-    warm.add(found)
-
-    return found
-  }
-
   /**
-   * Sends the Prompt and streams Claude's answer. When the restore from the
-   * store doesn't get `claude` going, the transcript is written back and it
-   * goes again from there.
+   * Sends the Prompt and streams Claude's answer, from the warm session
+   * standing at the Reply answered, else a new `claude`. A warm one whose
+   * `claude` exited while idle answers nothing, so a new one resumes in its
+   * place. When the restore from the store doesn't get `claude` going, the
+   * transcript is written back and it goes again from there.
    */
   async function* answer(
     request: ReplyRequest,
     mapper: Mapper
   ): AsyncGenerator<ReplyEvent, {session: Live; outcome: Outcome}> {
     const {text} = request.prompt
-    const session = await sessionFor(request)
+    const claimed = request.session && warm.claim(request.session)
+
+    if (claimed) {
+      const outcome = yield* attempt(claimed, mapper, text)
+
+      if (!('error' in outcome) || outcome.heard || !claimed.ended) {
+        return {session: claimed, outcome}
+      }
+
+      warm.drop(claimed)
+    }
+
+    const session = await open(request, request.session ? 'store' : 'none')
+    warm.add(session)
     const outcome = yield* attempt(session, mapper, text)
     const refused = !session.started && session.restore === 'store'
 

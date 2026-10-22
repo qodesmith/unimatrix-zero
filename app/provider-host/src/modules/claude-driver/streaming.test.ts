@@ -31,7 +31,13 @@ interface Report {
   prompts: string[]
   resumedFrom: string[]
   toolResults: string[]
-  ended: 'input-closed' | 'killed' | 'refused' | `unexpected-${string}` | null
+  ended:
+    | 'input-closed'
+    | 'killed'
+    | 'refused'
+    | 'exited'
+    | `unexpected-${string}`
+    | null
 }
 
 const cleanUps: (() => Promise<void>)[] = []
@@ -257,6 +263,30 @@ it('resumes a cold session from the app’s copy alone', async () => {
   )
   // The SDK's own folder, which it fills from the store.
   expect(resumed?.configDir).not.toBe(claude.configDir)
+})
+
+it('resumes from the app’s copy when the warm session’s `claude` exited while idle', async () => {
+  const claude = await setUp(['warm.ndjson', 'resumed.ndjson'], {
+    FAKE_CLAUDE_EXIT_AFTER: '2',
+  })
+
+  const first = await claude.reply(FIRST_PROMPT)
+  const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
+
+  await vi.waitFor(() => {
+    expect(claude.reports()[0]?.ended).toBe('exited')
+  })
+
+  const third = await claude.reply(THIRD_PROMPT, recordedIn(second))
+
+  expect(textOf(third)).toBe('TEAL OTTER')
+  expect(third.at(-1)).toMatchObject({status: 'complete'})
+
+  await claude.allClosed()
+  const [, resumed] = claude.reports()
+
+  expect(resumed?.args).toContain(`--resume=${SESSION_ID}`)
+  expect(resumed?.prompts).toEqual([THIRD_PROMPT])
 })
 
 it('writes the transcript back when resuming from the store fails', async () => {
