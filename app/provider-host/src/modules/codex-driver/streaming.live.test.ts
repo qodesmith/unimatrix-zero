@@ -13,6 +13,7 @@
  * into `recordings/`, which the driver tests replay.
  */
 import type {ReplyRecorded, ReplyRequest} from '@uz/contract/host'
+import type {ReplyEvent} from '@uz/contract/turns'
 
 import {fakeStore} from '#modules/test-store/main'
 import fs from 'node:fs'
@@ -35,6 +36,13 @@ function homeFrom(source: string) {
   fs.copyFileSync(path.join(source, 'auth.json'), path.join(home, 'auth.json'))
 
   return home
+}
+
+function expectComplete(events: (ReplyEvent | ReplyRecorded)[]) {
+  const last = events.at(-1)
+
+  expect(last?.type === 'RUN_FINISHED' && last.failure).toBeFalsy()
+  expect(last).toMatchObject({status: 'complete'})
 }
 
 describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
@@ -102,7 +110,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       const [home, otherHome] = homes as [string, string]
       const opened = await reply(first, home, 'Say hi in three words.', null)
 
-      expect(opened.events.at(-1)).toMatchObject({status: 'complete'})
+      expectComplete(opened.events)
       expect(opened.events.some(event => event.type === 'TEXT_DELTA')).toBe(
         true
       )
@@ -114,7 +122,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         opened.recorded?.session ?? null
       )
 
-      expect(continued.events.at(-1)).toMatchObject({status: 'complete'})
+      expectComplete(continued.events)
       expect(continued.recorded?.session.sessionId).toBe(
         opened.recorded?.session.sessionId
       )
@@ -128,7 +136,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         continued.recorded?.session ?? null
       )
 
-      expect(resumed.events.at(-1)).toMatchObject({status: 'complete'})
+      expectComplete(resumed.events)
       expect(resumed.recorded?.session.sessionId).toBe(
         opened.recorded?.session.sessionId
       )
