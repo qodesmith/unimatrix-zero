@@ -3,6 +3,7 @@ import type {SDKPartialAssistantMessage} from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRecorded, ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {fakeStore} from '#modules/test-store/main'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -11,7 +12,6 @@ import {afterEach, expect, it, vi} from 'vitest'
 
 import {createClaudeDriver} from './main'
 import {RECORDINGS, RecordedLineSchema, replayClaude} from './replay'
-import {fakeStore} from './test-store'
 import {projectKeyOf} from './transcripts'
 
 /** As `warm.ndjson` and `resumed.ndjson` recorded them. */

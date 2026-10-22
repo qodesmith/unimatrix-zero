@@ -1,11 +1,11 @@
 import type {SessionEntry} from '@uz/contract/host'
 
+import {fakeStore} from '#modules/test-store/main'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import {afterEach, expect, it} from 'vitest'
 
-import {fakeStore} from './test-store'
 import {writeTranscriptBack} from './transcripts'
 
 const PROJECT_KEY = '-tmp-uz-claude-config'

@@ -8,7 +8,7 @@ import type {AccountInfo} from '@anthropic-ai/claude-agent-sdk'
 import type {SignInRequest} from '@uz/contract/host'
 import type {SignInFinished, SignInUpdate} from '@uz/contract/providers'
 
-import {createSignIn} from '#modules/sign-in/main'
+import {createSignIn, getReady} from '#modules/sign-in/main'
 import {SIGN_IN_CANCELED, signInFailed} from '@uz/contract/providers'
 
 import {planOf} from './account'
@@ -234,31 +234,13 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
 
     if (!program) throw new Error('The manifest names no Claude program.')
 
-    yield {type: 'SIGN_IN_STEP', step: 'get-ready'}
+    const notReady = yield* getReady(
+      attempt,
+      deps.getProgramReady(program, {signal: attempt.signal})
+    )
 
-    try {
-      for await (const progress of deps.getProgramReady(program, {
-        signal: attempt.signal,
-      })) {
-        yield {type: 'SIGN_IN_STEP', step: 'get-ready', progress}
-      }
-    } catch (error) {
-      if (attempt.canceled()) {
-        yield SIGN_IN_CANCELED
-
-        return
-      }
-
-      yield signInFailed(
-        'download-failed',
-        error instanceof Error ? error.message : String(error)
-      )
-
-      return
-    }
-
-    if (attempt.canceled()) {
-      yield SIGN_IN_CANCELED
+    if (notReady) {
+      yield notReady
 
       return
     }
