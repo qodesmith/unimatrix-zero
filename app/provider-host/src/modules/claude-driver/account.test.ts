@@ -61,11 +61,10 @@ process.stdin.on('end', () => {
 
 it('waits for claude to exit by itself after reading the account', async () => {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'uz-fake-session-'))
-  const program = path.join(folder, 'claude')
+  // The SDK runs a `.mjs` with the `node` on PATH.
+  const program = path.join(folder, 'claude.mjs')
   const endedFile = path.join(folder, 'ended')
-  await fs.writeFile(program, `#!${process.execPath}\n${SESSION}`, {
-    mode: 0o755,
-  })
+  await fs.writeFile(program, SESSION)
 
   try {
     const account = await readAccount({
