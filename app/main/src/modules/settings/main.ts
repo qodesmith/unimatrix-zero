@@ -22,23 +22,25 @@ export type SettingsStore = ReturnType<typeof createSettings>
 export function createSettings(db: Database) {
   const {settings} = schema
 
-  return {
-    read(): Settings {
-      const rows = db.select().from(settings).all()
-      const result: Settings = {...DEFAULT_SETTINGS}
+  function read(): Settings {
+    const rows = db.select().from(settings).all()
+    const result: Settings = {...DEFAULT_SETTINGS}
 
-      for (const key of KEYS) {
-        const row = rows.find(candidate => candidate.key === key)
-        const parsed = SettingsSchema.shape[key].safeParse(row?.value)
+    for (const key of KEYS) {
+      const row = rows.find(candidate => candidate.key === key)
+      const parsed = SettingsSchema.shape[key].safeParse(row?.value)
 
-        if (parsed.success) {
-          // Each key's schema is the type of its own field.
-          Object.assign(result, {[key]: parsed.data})
-        }
+      if (parsed.success) {
+        // Each key's schema is the type of its own field.
+        Object.assign(result, {[key]: parsed.data})
       }
+    }
 
-      return result
-    },
+    return result
+  }
+
+  return {
+    read,
 
     update(changes: SettingsUpdate): Settings {
       db.transaction(tx => {
@@ -54,7 +56,7 @@ export function createSettings(db: Database) {
         }
       })
 
-      return this.read()
+      return read()
     },
   }
 }

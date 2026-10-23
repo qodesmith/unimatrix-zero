@@ -66,7 +66,6 @@ export const ReplyProgressSchema = z.strictObject({
   status: ReplyStatusSchema,
   content: z.array(ReplyPartSchema),
   contextSize: z.number().int().nonnegative().nullable(),
-  /** The Model's context window, once the Provider has reported it. */
   contextWindow: z.number().int().positive().nullable(),
 })
 
@@ -209,7 +208,6 @@ export const TokensEvent = z.strictObject({
   outputTokens: tokenCount,
   /** As the Provider reports it, never summed from Turns. */
   contextSize: tokenCount,
-  /** The Model's context window, when the Provider reports it with its usage. */
   contextWindow: z.number().int().positive().optional(),
 })
 
@@ -224,7 +222,7 @@ export const RunFinishedEvent = z.strictObject({
   type: z.literal('RUN_FINISHED'),
   status: FinishedStatusSchema,
   failure: RunFailureSchema.optional(),
-  /** The Model's context window, when the Provider reports it only at the end. */
+  /** Claude reports it only at the end; Codex with every usage report. */
   contextWindow: z.number().int().positive().optional(),
 })
 

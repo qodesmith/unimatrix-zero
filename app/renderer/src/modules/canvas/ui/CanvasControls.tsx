@@ -2,6 +2,7 @@ import type {CanvasOrientation} from '@uz/contract/settings'
 import type {ReactNode} from 'react'
 
 import {Button, cn} from '#modules/shadcn/main'
+import {CanvasOrientationSchema} from '@uz/contract/settings'
 import {MiniMap, Panel, useReactFlow} from '@xyflow/react'
 import {useRef} from 'react'
 
@@ -12,14 +13,13 @@ interface CanvasControlsProps {
   streaming: string[]
   /** Replies that failed, oldest first. */
   failed: string[]
-  /** Pans to a Reply. */
   onJump: (replyId: string) => void
 }
 
-const ORIENTATIONS: {value: CanvasOrientation; label: string}[] = [
-  {value: 'vertical', label: 'Vertical'},
-  {value: 'horizontal', label: 'Horizontal'},
-]
+const LABELS: Record<CanvasOrientation, string> = {
+  vertical: 'Vertical',
+  horizontal: 'Horizontal',
+}
 
 /**
  * The canvas's one control at bottom-left: what needs attention, the minimap,
@@ -97,7 +97,7 @@ export function CanvasControls({
           aria-label="Orientation"
           className="flex rounded-lg bg-muted p-0.5 text-[11px]"
         >
-          {ORIENTATIONS.map(({value, label}) => (
+          {CanvasOrientationSchema.options.map(value => (
             <button
               key={value}
               type="button"
@@ -110,7 +110,7 @@ export function CanvasControls({
               )}
               onClick={() => onOrientation(value)}
             >
-              {label}
+              {LABELS[value]}
             </button>
           ))}
         </div>

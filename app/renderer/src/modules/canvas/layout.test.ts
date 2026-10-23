@@ -194,7 +194,6 @@ it('orders Branches by when they were started, not by their ids', () => {
 
   expect(started('Pb').x).toBeLessThan(started('Pa').x)
 
-  // Started in the same instant: the id (UUIDv7, so also by time) decides.
   const tied = positions(layoutTree(twoBranches(at(2)), 'vertical', sized({})))
   expect(tied('Pa').x).toBeLessThan(tied('Pb').x)
 })

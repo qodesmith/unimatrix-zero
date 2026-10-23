@@ -177,12 +177,11 @@ export function createReplyMapper(ids: ReplyIds) {
 
     /** How the Reply ended, as its last event. */
     finished(result: SDKResultMessage): RunFinished {
-      if (result.subtype === 'success' && !result.is_error) {
-        const contextWindow = contextWindowOf(result.modelUsage)
+      const contextWindow = contextWindowOf(result.modelUsage)
+      const window = contextWindow === undefined ? {} : {contextWindow}
 
-        return contextWindow === undefined
-          ? {...ids, type: 'RUN_FINISHED', status: 'complete'}
-          : {...ids, type: 'RUN_FINISHED', status: 'complete', contextWindow}
+      if (result.subtype === 'success' && !result.is_error) {
+        return {...ids, ...window, type: 'RUN_FINISHED', status: 'complete'}
       }
 
       const message =
@@ -190,6 +189,7 @@ export function createReplyMapper(ids: ReplyIds) {
 
       return {
         ...ids,
+        ...window,
         type: 'RUN_FINISHED',
         status: 'failed',
         failure: {

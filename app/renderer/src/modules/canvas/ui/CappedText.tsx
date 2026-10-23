@@ -6,7 +6,6 @@ import {useEffect, useRef, useState} from 'react'
 interface CappedTextProps {
   /** Off: the text takes its full height and there is nothing to show more of. */
   limit: boolean
-  /** A Tailwind max-height class for the capped box. */
   maxHeightClass: string
   /**
    * Still being written: the box stays on the newest text until the user

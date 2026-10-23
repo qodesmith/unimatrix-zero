@@ -15,7 +15,7 @@ beforeEach(() => {
 it('starts from the defaults: vertical, capped heights, the meter on', () => {
   expect(createSettings(db).read()).toEqual({
     canvasOrientation: 'vertical',
-    limitMessageHeight: true,
+    limitTurnHeight: true,
     contextSizeMeter: true,
   })
 })
@@ -25,7 +25,7 @@ it('keeps a change across reopening and leaves the other Settings alone', () => 
 
   expect(createSettings(db).read()).toEqual({
     canvasOrientation: 'horizontal',
-    limitMessageHeight: true,
+    limitTurnHeight: true,
     contextSizeMeter: true,
   })
 })
@@ -36,7 +36,7 @@ it('answers an update with every Setting as now saved', () => {
 
   expect(settings.update({contextSizeMeter: false})).toEqual({
     canvasOrientation: 'horizontal',
-    limitMessageHeight: true,
+    limitTurnHeight: true,
     contextSizeMeter: false,
   })
 })

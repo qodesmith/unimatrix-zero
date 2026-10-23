@@ -11,10 +11,13 @@ import {layoutTree} from '../layout'
 import {CanvasControls} from './CanvasControls'
 import {ExchangeNode, PromptNode, ReplyNode} from './TurnNodes'
 
-/** A request to bring a Reply to the center; `n` makes each request new. */
+/**
+ * A request to bring a Reply to the center; each request has a new sequence
+ * number.
+ */
 export interface Focus {
   replyId: string
-  n: number
+  sequence: number
 }
 
 interface FlowProps {
@@ -147,7 +150,7 @@ export function Flow({
   const centered = useRef(0)
 
   useEffect(() => {
-    if (!focus || centered.current === focus.n) return
+    if (!focus || centered.current === focus.sequence) return
 
     const nodeId =
       orientation === 'vertical'
@@ -159,7 +162,7 @@ export function Flow({
 
     if (!node || !size) return
 
-    centered.current = focus.n
+    centered.current = focus.sequence
     void flow.setCenter(
       node.position.x + size.width / 2,
       node.position.y + size.height / 2,

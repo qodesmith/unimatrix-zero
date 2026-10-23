@@ -98,7 +98,8 @@ const LastUsageSchema = z.looseObject({
 
 const ThreadTokenUsageSchema = z.looseObject({
   last: LastUsageSchema,
-  modelContextWindow: z.number().nullable(),
+  // Unknown or malformed reads as absent, so the usage itself is never lost with it.
+  modelContextWindow: z.number().nullable().catch(null),
 }) satisfies z.ZodType<Pick<ThreadTokenUsage, 'modelContextWindow'>>
 
 /** A message the AI wrote; every other item is passed over. */

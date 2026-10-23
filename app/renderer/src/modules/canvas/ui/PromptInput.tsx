@@ -30,7 +30,7 @@ export function PromptInput({
   const [error, setError] = useState<string | null>(null)
   const [focused, setFocused] = useState(false)
 
-  function report(nextFocused: boolean, nextDraft: string) {
+  function reportTyping(nextFocused: boolean, nextDraft: string) {
     setFocused(nextFocused)
     onTypingChange?.(nextFocused && nextDraft.trim() !== '')
   }
@@ -50,7 +50,7 @@ export function PromptInput({
 
     setError(null)
     setDraft('')
-    report(focused, '')
+    reportTyping(focused, '')
     onSent?.(outcome.reply.id)
   }
 
@@ -76,13 +76,13 @@ export function PromptInput({
         className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm"
         value={draft}
         onFocus={() => {
-          report(true, draft)
+          reportTyping(true, draft)
           onFocus?.()
         }}
-        onBlur={() => report(false, draft)}
+        onBlur={() => reportTyping(false, draft)}
         onChange={event => {
           setDraft(event.target.value)
-          report(focused, event.target.value)
+          reportTyping(focused, event.target.value)
         }}
         onKeyDown={onKeyDown}
       />

@@ -7,14 +7,13 @@ import {createContext, use} from 'react'
 export interface CanvasState {
   treeId: string
   index: TreeIndex
-  /** The leaf Reply of the active Thread. */
   activeReplyId: string | null
   setActiveReplyId: (replyId: string) => void
   /** The Reply whose Input the user is typing into. */
   setTypingReplyId: Dispatch<SetStateAction<string | null>>
   /** A Prompt was sent and main started this Reply for it. */
   onSent: (replyId: string) => void
-  limitMessageHeight: boolean
+  limitTurnHeight: boolean
   contextSizeMeter: boolean
 }
 

@@ -1,5 +1,5 @@
 import type {LayoutNode} from '../layout'
-import type {Reply} from '@uz/contract/turns'
+import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Node, NodeProps} from '@xyflow/react'
 
 import {cn} from '#modules/shadcn/main'
@@ -7,6 +7,7 @@ import {ReplyView, useLiveReply} from '#modules/turns/main'
 import {Handle, Position} from '@xyflow/react'
 
 import {useCanvas} from '../canvas-context'
+import {TURN_WIDTH} from '../layout'
 import {isLeaf, previousReply} from '../tree'
 import {CappedText} from './CappedText'
 import {ContextMeter, ContextSizeBadge} from './ContextSize'
@@ -18,10 +19,10 @@ export type TurnNode = Node<{turn: LayoutNode}, LayoutNode['kind']>
 const hiddenHandle = 'opacity-0!'
 
 function PromptText({text}: {text: string}) {
-  const {limitMessageHeight} = useCanvas()
+  const {limitTurnHeight} = useCanvas()
 
   return (
-    <CappedText limit={limitMessageHeight} maxHeightClass="max-h-32">
+    <CappedText limit={limitTurnHeight} maxHeightClass="max-h-32">
       <p className="text-sm whitespace-pre-wrap">{text}</p>
     </CappedText>
   )
@@ -29,7 +30,7 @@ function PromptText({text}: {text: string}) {
 
 /** The Reply's content with its Context size, live while it streams. */
 function ReplyBody({reply}: {reply: Reply}) {
-  const {index, limitMessageHeight, contextSizeMeter} = useCanvas()
+  const {index, limitTurnHeight, contextSizeMeter} = useCanvas()
   const live = useLiveReply(reply.id)
   const status = live?.status ?? reply.status
   const contextSize = live?.contextSize ?? reply.contextSize
@@ -42,12 +43,12 @@ function ReplyBody({reply}: {reply: Reply}) {
         <header className="flex justify-end px-3.5 pt-2">
           <ContextSizeBadge
             contextSize={contextSize}
-            previousContextSize={previous?.contextSize ?? null}
+            previousContextSize={previous ? previous.contextSize : 0}
           />
         </header>
       )}
       <CappedText
-        limit={limitMessageHeight}
+        limit={limitTurnHeight}
         maxHeightClass="max-h-72"
         streaming={status === 'streaming'}
         className="px-3.5 py-2"
@@ -95,13 +96,14 @@ function replyFrame(status: Reply['status']) {
   )
 }
 
+/** Vertical: a Prompt on its own, the same width as a Reply. */
 export function PromptNode({data}: NodeProps<TurnNode>) {
   const {turn} = data
 
   if (turn.kind !== 'prompt') return null
 
   return (
-    <div className="w-[440px]">
+    <div style={{width: TURN_WIDTH}}>
       <Handle type="target" position={Position.Top} className={hiddenHandle} />
       <div
         data-turn={turn.prompt.id}
@@ -118,24 +120,17 @@ export function PromptNode({data}: NodeProps<TurnNode>) {
   )
 }
 
+/** Vertical: a Reply on its own, with its Thread's Input once it is done. */
 export function ReplyNode({data}: NodeProps<TurnNode>) {
   const {turn} = data
-  const live = useLiveReply(turn.kind === 'reply' ? turn.reply.id : '')
 
   if (turn.kind !== 'reply') return null
 
-  const {reply} = turn
-
   return (
-    <div className="w-[440px]">
+    <div style={{width: TURN_WIDTH}}>
       <Handle type="target" position={Position.Top} className={hiddenHandle} />
-      <div
-        data-turn={reply.id}
-        className={replyFrame(live?.status ?? reply.status)}
-      >
-        <ReplyBody reply={reply} />
-      </div>
-      <LeafInput reply={reply} />
+      <ReplyTurn reply={turn.reply} />
+      <LeafInput reply={turn.reply} />
       <Handle
         type="source"
         position={Position.Bottom}
@@ -145,41 +140,53 @@ export function ReplyNode({data}: NodeProps<TurnNode>) {
   )
 }
 
+function ReplyTurn({reply}: {reply: Reply}) {
+  const status = useLiveReply(reply.id)?.status ?? reply.status
+
+  return (
+    <div data-turn={reply.id} className={replyFrame(status)}>
+      <ReplyBody reply={reply} />
+    </div>
+  )
+}
+
 /** Horizontal: the Prompt as the card's header and its Reply as the body. */
 export function ExchangeNode({data}: NodeProps<TurnNode>) {
   const {turn} = data
-  const reply = turn.kind === 'exchange' ? turn.reply : null
-  const live = useLiveReply(reply?.id ?? '')
 
   if (turn.kind !== 'exchange') return null
 
   return (
-    <div className="w-[440px]">
+    <div style={{width: TURN_WIDTH}}>
       <Handle type="target" position={Position.Left} className={hiddenHandle} />
-      <div
-        className={cn(
-          'overflow-hidden',
-          replyFrame(live?.status ?? reply?.status ?? 'complete')
-        )}
-      >
-        <div
-          data-turn={turn.prompt.id}
-          className="border-b border-border bg-prompt px-3.5 py-2.5 text-prompt-foreground"
-        >
-          <PromptText text={turn.prompt.text} />
-        </div>
-        {reply && (
-          <div data-turn={reply.id}>
-            <ReplyBody reply={reply} />
-          </div>
-        )}
-      </div>
-      {reply && <LeafInput reply={reply} />}
+      <ExchangeTurns prompt={turn.prompt} reply={turn.reply} />
+      {turn.reply && <LeafInput reply={turn.reply} />}
       <Handle
         type="source"
         position={Position.Right}
         className={hiddenHandle}
       />
+    </div>
+  )
+}
+
+function ExchangeTurns({prompt, reply}: {prompt: Prompt; reply: Reply | null}) {
+  const live = useLiveReply(reply?.id ?? prompt.id)
+  const status = live?.status ?? reply?.status ?? 'complete'
+
+  return (
+    <div className={cn('overflow-hidden', replyFrame(status))}>
+      <div
+        data-turn={prompt.id}
+        className="border-b border-border bg-prompt px-3.5 py-2.5 text-prompt-foreground"
+      >
+        <PromptText text={prompt.text} />
+      </div>
+      {reply && (
+        <div data-turn={reply.id}>
+          <ReplyBody reply={reply} />
+        </div>
+      )}
     </div>
   )
 }

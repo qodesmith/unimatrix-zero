@@ -14,30 +14,33 @@ interface Point {
   y: number
 }
 
-/** The box React Flow draws before it has measured a node. */
-const DEFAULT_SIZE: Size = {width: 440, height: 80}
+/** Every Turn is drawn this wide, in both orientations. */
+export const TURN_WIDTH = 440
 
-interface PromptBox {
+/** The box React Flow draws before it has measured a node. */
+const DEFAULT_SIZE: Size = {width: TURN_WIDTH, height: 80}
+
+interface PromptTurn {
   id: string
   kind: 'prompt'
   prompt: Prompt
 }
 
-interface ReplyBox {
+interface ReplyTurn {
   id: string
   kind: 'reply'
   reply: Reply
 }
 
 /** One card per Exchange, keyed by its Prompt. */
-interface ExchangeCard {
+interface ExchangeTurns {
   id: string
   kind: 'exchange'
   prompt: Prompt
   reply: Reply | null
 }
 
-type Unplaced = PromptBox | ReplyBox | ExchangeCard
+type Unplaced = PromptTurn | ReplyTurn | ExchangeTurns
 
 export type LayoutNode = Unplaced & {position: Point}
 

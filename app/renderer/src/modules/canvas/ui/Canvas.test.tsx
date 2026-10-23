@@ -336,13 +336,13 @@ it('opens with the orientation the Setting says', async () => {
 
 const longText = Array.from({length: 40}, (_, i) => `Line ${i + 1}`).join('\n')
 
-/** The root Prompt's box, the first Turn on the canvas. */
-function promptBox() {
+/** The root Prompt as drawn, the first Turn on the canvas. */
+function rootPrompt() {
   return document.querySelector(`[data-turn="${uuid(1)}"]`)
 }
 
-function promptBoxHeight() {
-  return promptBox()?.getBoundingClientRect().height ?? 0
+function rootPromptHeight() {
+  return rootPrompt()?.getBoundingClientRect().height ?? 0
 }
 
 it('caps a long Prompt, with Show more letting it out and Show less capping it again', async () => {
@@ -354,14 +354,14 @@ it('caps a long Prompt, with Show more letting it out and Show less capping it a
 
   const more = page.getByRole('button', {name: 'Show more'})
   await expect.element(more).toBeVisible()
-  expect(promptBox()?.textContent).toContain('Line 40')
-  const capped = promptBoxHeight()
+  expect(rootPrompt()?.textContent).toContain('Line 40')
+  const capped = rootPromptHeight()
 
   await more.click()
   await expect
     .element(page.getByRole('button', {name: 'Show less'}))
     .toBeVisible()
-  expect(promptBoxHeight()).toBeGreaterThan(capped + 200)
+  expect(rootPromptHeight()).toBeGreaterThan(capped + 200)
 
   await page.getByRole('button', {name: 'Show less'}).click()
   await expect
@@ -374,12 +374,12 @@ it('lets long messages take their full height when the Setting is off', async ()
   await renderCanvas({
     prompts: [prompt(1, null, longText)],
     replies: [reply(11, 1, 'Short')],
-    settings: {limitMessageHeight: false},
+    settings: {limitTurnHeight: false},
   })
 
   await expect.element(page.getByText('Short')).toBeVisible()
-  expect(promptBox()?.textContent).toContain('Line 40')
-  expect(promptBoxHeight()).toBeGreaterThan(500)
+  expect(rootPrompt()?.textContent).toContain('Line 40')
+  expect(rootPromptHeight()).toBeGreaterThan(500)
   await expect
     .element(page.getByRole('button', {name: 'Show more'}))
     .not.toBeInTheDocument()

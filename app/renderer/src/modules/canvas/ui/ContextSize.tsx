@@ -3,13 +3,22 @@ import {formatTokens} from '../format'
 interface ContextSizeProps {
   /** The Thread's Context size up to this Reply. */
   contextSize: number
-  /** The previous Exchange's, so the badge can say how much this one added. */
+  /**
+   * The Thread's Context size before this Exchange: 0 at the root, null when
+   * the previous Reply never reported one.
+   */
   previousContextSize: number | null
+}
+
+/** Signed, since a compaction can shrink the Thread. */
+function signed(tokens: number) {
+  return tokens < 0 ? `−${formatTokens(-tokens)}` : `+${formatTokens(tokens)}`
 }
 
 /**
  * The Context size badge every Reply shows: the Thread's size up to here, and
- * on hover how much this Exchange added to it.
+ * on hover how much this Exchange changed it by. Providers report only the
+ * cumulative size, so an Exchange's own size is the difference.
  */
 export function ContextSizeBadge({
   contextSize,
@@ -32,7 +41,7 @@ export function ContextSizeBadge({
       >
         {added === null
           ? `Thread up to here: ${formatTokens(contextSize)}`
-          : `This Exchange: +${formatTokens(Math.max(0, added))} · Thread up to here: ${formatTokens(contextSize)}`}
+          : `This Exchange: ${signed(added)} · Thread up to here: ${formatTokens(contextSize)}`}
       </span>
     </span>
   )
@@ -40,7 +49,6 @@ export function ContextSizeBadge({
 
 interface ContextMeterProps {
   contextSize: number
-  /** The Model's context window. */
   contextWindow: number
 }
 

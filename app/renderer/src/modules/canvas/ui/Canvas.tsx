@@ -32,7 +32,7 @@ export function Canvas({treeId}: {treeId: string}) {
 function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
   const index = useMemo(() => indexTurns(turns), [turns])
   const settings = useSettings()
-  const {canvasOrientation, limitMessageHeight, contextSizeMeter} = settings
+  const {canvasOrientation, limitTurnHeight, contextSizeMeter} = settings
   const updateSettings = useUpdateSettings()
   // oxlint-disable-next-line react/hook-use-state -- a Tree that starts here keeps its zoom instead of fitting
   const [startedEmpty] = useState(() => isEmpty(index))
@@ -50,7 +50,6 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
     []
   )
 
-  // Where the user left off, until they pick a Thread.
   const activeReplyId =
     chosenReplyId !== null && index.replyById.has(chosenReplyId)
       ? chosenReplyId
@@ -65,7 +64,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
   )
 
   const focusOn = useCallback((replyId: string) => {
-    setFocus(current => ({replyId, n: (current?.n ?? 0) + 1}))
+    setFocus(current => ({replyId, sequence: (current?.sequence ?? 0) + 1}))
   }, [])
 
   const onSent = useCallback(
@@ -97,10 +96,10 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       setActiveReplyId: setChosenReplyId,
       setTypingReplyId,
       onSent,
-      limitMessageHeight,
+      limitTurnHeight,
       contextSizeMeter,
     }),
-    [treeId, index, activeReplyId, onSent, limitMessageHeight, contextSizeMeter]
+    [treeId, index, activeReplyId, onSent, limitTurnHeight, contextSizeMeter]
   )
 
   if (isEmpty(index)) {

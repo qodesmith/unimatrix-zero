@@ -198,7 +198,6 @@ it('streams a Reply, records where Claude saved it, and reports its Context size
       model: MODEL,
       session: {sessionId: SESSION_ID, messageId: FIRST_MESSAGE},
     }),
-    // The window comes only with the result, from its entry for the Model.
     expect.objectContaining({
       type: 'RUN_FINISHED',
       status: 'complete',
