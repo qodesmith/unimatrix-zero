@@ -1,5 +1,5 @@
 import type {Turns} from '#modules/turns/main'
-import type {CanvasState} from '../canvas-context'
+import type {CanvasState, Collapsed} from '../canvas-context'
 import type {Focus} from './Flow'
 import type {CanvasOrientation} from '@uz/contract/settings'
 
@@ -56,9 +56,10 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
     () => new Set()
   )
 
-  const [collapsedReplyIds, setCollapsedReplyIds] = useState<
-    ReadonlySet<string>
-  >(() => new Set())
+  const [collapsed, setCollapsed] = useState<Collapsed>(() => ({
+    ids: new Set(),
+    toggledReplyId: null,
+  }))
 
   const switchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -94,7 +95,10 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
   }, [])
 
   const toggleCollapsed = useCallback((replyId: string) => {
-    setCollapsedReplyIds(toggled(replyId))
+    setCollapsed(current => ({
+      ids: toggled(replyId)(current.ids),
+      toggledReplyId: replyId,
+    }))
   }, [])
 
   const onSent = useCallback(
@@ -127,7 +131,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       onSent,
       expandedTurnIds,
       toggleExpanded,
-      collapsedReplyIds,
+      collapsedReplyIds: collapsed.ids,
       toggleCollapsed,
       limitTurnHeight,
       contextSizeMeter,
@@ -139,7 +143,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       onSent,
       expandedTurnIds,
       toggleExpanded,
-      collapsedReplyIds,
+      collapsed.ids,
       toggleCollapsed,
       limitTurnHeight,
       contextSizeMeter,
@@ -163,7 +167,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
           index={index}
           orientation={canvasOrientation}
           thread={thread}
-          collapsedReplyIds={collapsedReplyIds}
+          collapsed={collapsed}
           focus={focus}
           fitOnLoad={!startedEmpty}
           switching={switching}

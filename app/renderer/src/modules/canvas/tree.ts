@@ -86,6 +86,11 @@ export function previousReply(index: TreeIndex, reply: Reply): Reply | null {
     : (index.replyById.get(parentReplyId) ?? null)
 }
 
+/** A Fork: a Reply with two or more Prompts answering it. */
+export function isFork(index: TreeIndex, replyId: string) {
+  return branchesOf(index, replyId).length >= 2
+}
+
 /** The newest Reply: where the user left off until they pick a Thread. */
 export function newestReply(index: TreeIndex): Reply | null {
   return index.replies.at(-1) ?? null

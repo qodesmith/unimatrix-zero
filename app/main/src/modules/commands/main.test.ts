@@ -355,7 +355,7 @@ function record(treeId: string, replyId: string) {
   })
 }
 
-describe('a Prompt at the end of a Thread', () => {
+describe('a Prompt answering a Reply', () => {
   it('continues the Reply’s Provider session from that Reply', async () => {
     const {treeId, replyId} = await sendRoot()
     record(treeId, replyId)

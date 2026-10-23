@@ -9,7 +9,7 @@ import {useState} from 'react'
 
 import {useCanvas} from '../canvas-context'
 import {TURN_WIDTH} from '../layout'
-import {branchesOf, previousReply} from '../tree'
+import {branchesOf, isFork, previousReply} from '../tree'
 import {CappedText} from './CappedText'
 import {ContextMeter, ContextSizeBadge} from './ContextSize'
 import {PromptInput} from './PromptInput'
@@ -49,7 +49,6 @@ function ReplyBody({reply}: {reply: Reply}) {
   const contextSize = live?.contextSize ?? reply.contextSize
   const contextWindow = live?.contextWindow ?? reply.contextWindow
   const previous = previousReply(index, reply)
-  const branches = branchesOf(index, reply.id).length
 
   return (
     <>
@@ -71,7 +70,12 @@ function ReplyBody({reply}: {reply: Reply}) {
       >
         <ReplyView reply={reply} />
       </CappedText>
-      {branches >= 2 && <ForkPill replyId={reply.id} branches={branches} />}
+      {isFork(index, reply.id) && (
+        <ForkPill
+          replyId={reply.id}
+          branches={branchesOf(index, reply.id).length}
+        />
+      )}
       {contextSizeMeter && contextSize !== null && contextWindow !== null && (
         <ContextMeter contextSize={contextSize} contextWindow={contextWindow} />
       )}
@@ -104,9 +108,8 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
 /**
  * The Input answering a Reply, mounted once the Reply is done with its space
  * kept, so revealing it shifts nothing and a draft survives the pointer
- * leaving. Shown for the active Thread, while the Reply's box (a `group`) is
- * hovered or holds focus, and while it holds a draft; `data-revealed` says so
- * without reading the opacity.
+ * leaving. Revealed for the active Thread, while the Reply's box is hovered
+ * or holds focus, and while it holds a draft.
  */
 function ReplyInput({reply, hovered}: {reply: Reply; hovered: boolean}) {
   const {treeId, activeReplyId, setActiveReplyId, onSent} = useCanvas()
@@ -115,14 +118,14 @@ function ReplyInput({reply, hovered}: {reply: Reply; hovered: boolean}) {
 
   if (status === 'streaming') return null
 
-  const kept = activeReplyId === reply.id || drafting
+  const revealed = activeReplyId === reply.id || drafting || hovered
 
   return (
     <div
-      data-revealed={kept || hovered}
+      data-revealed={revealed}
       className={cn(
         'mt-2 transition-opacity',
-        !kept && 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
+        !revealed && 'opacity-0 focus-within:opacity-100'
       )}
     >
       <PromptInput
@@ -189,7 +192,7 @@ export function ReplyNode({data}: NodeProps<TurnNode>) {
   if (turn.kind !== 'reply') return null
 
   return (
-    <div style={{width: TURN_WIDTH}} className="group" {...hoverProps}>
+    <div style={{width: TURN_WIDTH}} {...hoverProps}>
       <Handle type="target" position={Position.Top} className={hiddenHandle} />
       <ReplyTurn reply={turn.reply} />
       <ReplyInput reply={turn.reply} hovered={hovered} />
@@ -220,7 +223,7 @@ export function ExchangeNode({data}: NodeProps<TurnNode>) {
   if (turn.kind !== 'exchange') return null
 
   return (
-    <div style={{width: TURN_WIDTH}} className="group" {...hoverProps}>
+    <div style={{width: TURN_WIDTH}} {...hoverProps}>
       <Handle type="target" position={Position.Left} className={hiddenHandle} />
       <ExchangeTurns prompt={turn.prompt} reply={turn.reply} />
       {turn.reply && <ReplyInput reply={turn.reply} hovered={hovered} />}

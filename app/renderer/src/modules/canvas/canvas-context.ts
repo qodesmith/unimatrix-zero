@@ -2,6 +2,14 @@ import type {TreeIndex} from './tree'
 
 import {createContext, use} from 'react'
 
+/** Forks folded through their pill, and the one toggled last. */
+export interface Collapsed {
+  /** Their Branches are left off the canvas. */
+  ids: ReadonlySet<string>
+  /** Kept where it was on screen as the layout changes around it. */
+  toggledReplyId: string | null
+}
+
 /** What every Turn on the canvas needs, without carrying it in node data. */
 export interface CanvasState {
   treeId: string

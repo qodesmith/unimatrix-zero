@@ -1,3 +1,4 @@
+import type {Collapsed} from '../canvas-context'
 import type {Size} from '../layout'
 import type {TreeIndex} from '../tree'
 import type {TurnNode} from './TurnNodes'
@@ -15,7 +16,7 @@ import {
 } from 'react'
 
 import {layoutTree} from '../layout'
-import {branchesOf} from '../tree'
+import {isFork} from '../tree'
 import {CanvasControls} from './CanvasControls'
 import {ExchangeNode, PromptNode, ReplyNode} from './TurnNodes'
 
@@ -33,8 +34,7 @@ interface FlowProps {
   orientation: CanvasOrientation
   /** The Turn ids on the highlighted Thread. */
   thread: ReadonlySet<string>
-  /** Forks whose Branches are folded away. */
-  collapsedReplyIds: ReadonlySet<string>
+  collapsed: Collapsed
   focus: Focus | null
   /** Fit the whole Tree once it is measured; off for a Tree that starts here. */
   fitOnLoad: boolean
@@ -67,7 +67,7 @@ export function Flow({
   index,
   orientation,
   thread,
-  collapsedReplyIds,
+  collapsed,
   focus,
   fitOnLoad,
   switching,
@@ -81,8 +81,8 @@ export function Flow({
   const measured = sizes[orientation]
 
   const layout = useMemo(
-    () => layoutTree(index, orientation, id => measured[id], collapsedReplyIds),
-    [index, orientation, measured, collapsedReplyIds]
+    () => layoutTree(index, orientation, id => measured[id], collapsed.ids),
+    [index, orientation, measured, collapsed.ids]
   )
 
   // The node a Reply is drawn in: its own box, or its Exchange's card.
@@ -97,23 +97,17 @@ export function Flow({
   // Folding or unfolding a Fork moves its Reply in the layout; the viewport
   // moves by the same amount, scaled, so the Reply stays where it is on screen.
   const lastLayout = useRef(layout)
-  const lastCollapsed = useRef(collapsedReplyIds)
+  const lastCollapsed = useRef(collapsed)
 
   useLayoutEffect(() => {
     const before = lastLayout.current
     const wasCollapsed = lastCollapsed.current
     lastLayout.current = layout
-    lastCollapsed.current = collapsedReplyIds
+    lastCollapsed.current = collapsed
 
-    if (wasCollapsed === collapsedReplyIds) return
+    if (wasCollapsed === collapsed || collapsed.toggledReplyId === null) return
 
-    const toggledReplyId = [...collapsedReplyIds, ...wasCollapsed].find(
-      id => collapsedReplyIds.has(id) !== wasCollapsed.has(id)
-    )
-
-    if (toggledReplyId === undefined) return
-
-    const nodeId = nodeIdOf(toggledReplyId)
+    const nodeId = nodeIdOf(collapsed.toggledReplyId)
     const from = before.nodes.find(node => node.id === nodeId)?.position
     const to = layout.nodes.find(node => node.id === nodeId)?.position
 
@@ -126,7 +120,7 @@ export function Flow({
       y: y - (to.y - from.y) * zoom,
       zoom,
     })
-  }, [layout, collapsedReplyIds, nodeIdOf, flow])
+  }, [layout, collapsed, nodeIdOf, flow])
 
   const onNodesChange = useCallback(
     (changes: NodeChange<TurnNode>[]) => {
@@ -200,9 +194,7 @@ export function Flow({
     void flow.fitView(FIT)
   }, [allMeasured, flow])
 
-  const hasFork = index.replies.some(
-    reply => branchesOf(index, reply.id).length >= 2
-  )
+  const hasFork = index.replies.some(reply => isFork(index, reply.id))
 
   // The first Fork made here zooms out just enough to show the whole Tree, in
   // place of the pan to its Reply; a Tree loaded with Forks was fitted on load.

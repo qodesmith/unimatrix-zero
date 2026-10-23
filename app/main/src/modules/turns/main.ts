@@ -251,15 +251,17 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
       const {treeId, parentReplyId} = next
 
       const saved = db.transaction(tx => {
-        const root = tx
-          .select({id: prompts.id})
-          .from(prompts)
-          .where(and(eq(prompts.treeId, treeId), isNull(prompts.parentReplyId)))
-          .get()
+        const root =
+          parentReplyId === null &&
+          tx
+            .select({id: prompts.id})
+            .from(prompts)
+            .where(
+              and(eq(prompts.treeId, treeId), isNull(prompts.parentReplyId))
+            )
+            .get()
 
-        if (parentReplyId === null && root) {
-          throw new Error('This Tree already has its first Prompt.')
-        }
+        if (root) throw new Error('This Tree already has its first Prompt.')
 
         const prompt = tx
           .insert(prompts)
