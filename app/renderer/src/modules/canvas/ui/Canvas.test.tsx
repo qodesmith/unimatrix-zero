@@ -199,21 +199,61 @@ function viewport() {
   )
 }
 
+/** The canvas's zoom, as React Flow writes it. */
+function zoomOf() {
+  const scale = /scale\(([\d.]+)\)/.exec(viewport())?.[1]
+
+  return scale === undefined ? Number.NaN : Number(scale)
+}
+
+/** The viewport once it has stopped moving: the same two reads 100ms apart. */
+async function settledViewport() {
+  let last: string | null = null
+
+  await expect
+    .poll(
+      () => {
+        const now = viewport()
+        const same = now === last
+        last = now
+
+        return same
+      },
+      {interval: 100}
+    )
+    .toBe(true)
+
+  return last
+}
+
 /** Pointer off every Turn. */
 async function hoverAway() {
   await page.getByRole('group', {name: 'Orientation'}).hover()
 }
 
-/** The Input under a Reply's box. */
-function inputUnder(replyText: string) {
-  const box = page.getByText(replyText).element().closest('.react-flow__node')
+/** The box a Turn is drawn in. */
+function nodeOf(turnText: string) {
+  const box = page.getByText(turnText).element().closest('.react-flow__node')
 
-  if (!box) throw new Error(`${replyText} is not on the canvas`)
+  if (!box) throw new Error(`${turnText} is not on the canvas`)
 
-  return page.elementLocator(box).getByRole('textbox', {name: 'Prompt'})
+  return page.elementLocator(box)
 }
 
-it('draws every Turn as its own box, top-down, with an Input on each Thread’s end', async () => {
+/** The Input under a Reply's box. */
+function inputUnder(replyText: string) {
+  return nodeOf(replyText).getByRole('textbox', {name: 'Prompt'})
+}
+
+/** Whether a Reply's Input is shown, as the canvas marks it. */
+function revealed(replyText: string) {
+  return inputUnder(replyText)
+    .element()
+    .closest('[data-revealed]')
+    ?.getAttribute('data-revealed')
+}
+
+it('draws every Turn as its own box, top-down, with an Input under every Reply', async () => {
   await renderCanvas(forkedTree())
 
   await expect.element(page.getByText('Prompt three')).toBeVisible()
@@ -223,7 +263,7 @@ it('draws every Turn as its own box, top-down, with an Input on each Thread’s 
   await expect
     .element(page.getByRole('textbox', {name: 'Prompt'}).first())
     .toBeVisible()
-  expect(document.querySelectorAll('textarea')).toHaveLength(3)
+  expect(document.querySelectorAll('textarea')).toHaveLength(5)
 
   const three = page.getByText('Prompt three').element().getBoundingClientRect()
   const two = page.getByText('Prompt two').element().getBoundingClientRect()
@@ -232,6 +272,29 @@ it('draws every Turn as its own box, top-down, with an Input on each Thread’s 
   expect(two.top).toBeGreaterThan(one.bottom)
   expect(two.top).toBe(three.top)
   expect(two.left).toBeLessThan(three.left)
+})
+
+it('shows the active Thread’s Input, reveals another Reply’s on hover, and keeps one holding a draft', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await hoverAway()
+
+  expect(document.querySelectorAll('textarea')).toHaveLength(5)
+  await expect.poll(() => revealed('Reply five')).toBe('true')
+  expect(revealed('Reply one')).toBe('false')
+  expect(revealed('Reply three')).toBe('false')
+
+  await page.getByText('Reply three').hover()
+  await expect.poll(() => revealed('Reply three')).toBe('true')
+  await hoverAway()
+  await expect.poll(() => revealed('Reply three')).toBe('false')
+
+  await inputUnder('Reply one').fill('A draft')
+  await inputUnder('Reply five').click()
+  await hoverAway()
+  await expect.poll(() => revealed('Reply five')).toBe('true')
+  expect(revealed('Reply one')).toBe('true')
+  expect(revealed('Reply three')).toBe('false')
 })
 
 it('highlights the newest Thread until the user picks another by focusing its Input', async () => {
@@ -313,6 +376,150 @@ it('moves the highlight to the Reply a leaf Input sends for, and keeps hovering 
   await expect
     .poll(highlightedEdges)
     .toEqual([edge(1, 11), edge(11, 2), edge(2, 12), edge(12, 4)].toSorted())
+})
+
+/** Where a Turn's text is drawn. */
+function rect(turnText: string) {
+  return page.getByText(turnText).element().getBoundingClientRect()
+}
+
+it('branches: a Prompt sent into an answered Reply lands beside the old Branches', async () => {
+  const {main} = await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply three')).toBeVisible()
+
+  await inputUnder('Reply one').fill('Another way')
+  await userEvent.keyboard('{Enter}')
+  await expect.element(page.getByText('Another way')).toBeVisible()
+
+  expect(main.sent.filter(command => command.type === 'prompt.send')).toEqual([
+    expect.objectContaining({parentReplyId: uuid(11), text: 'Another way'}),
+  ])
+  await expect
+    .poll(() => {
+      const row = [
+        rect('Another way'),
+        rect('Prompt two'),
+        rect('Prompt three'),
+      ]
+
+      const lefts = row.map(box => box.left).toSorted((a, b) => a - b)
+
+      return (
+        row.every(box => box.top === row[0]?.top) &&
+        lefts.every((left, i) => i === 0 || left - (lefts[i - 1] ?? 0) >= 440)
+      )
+    })
+    .toBe(true)
+})
+
+/** One Thread: `P1 - R1 - P2 - R2`. */
+function linearTree(): Saved {
+  clock = 0
+
+  return {
+    prompts: [prompt(1, null, 'Prompt one'), prompt(2, 11, 'Prompt two')],
+    replies: [reply(11, 1, 'Reply one'), reply(12, 2, 'Reply two')],
+  }
+}
+
+async function sendInto(replyText: string, text: string) {
+  await inputUnder(replyText).fill(text)
+  await userEvent.keyboard('{Enter}')
+  await expect.element(page.getByText(text)).toBeVisible()
+}
+
+it('zooms out just enough to show the whole Tree on its first Fork, and keeps the zoom on every other send', async () => {
+  await renderCanvas(linearTree())
+  await expect.element(page.getByText('Reply two')).toBeVisible()
+  // Fitting the Tree on load moves it off the origin.
+  await expect.poll(viewport).not.toContain('translate(0px, 0px)')
+  await settledViewport()
+
+  // Zoomed in, two Branches side by side no longer fit the window.
+  const loaded = zoomOf()
+  await page.getByRole('button', {name: 'Zoom in'}).click()
+  await expect.poll(zoomOf).toBeGreaterThan(loaded * 1.1)
+  const zoomedIn = await settledViewport()
+  const zoom = zoomOf()
+
+  await sendInto('Reply two', 'Carry on')
+  await expect.poll(viewport).not.toBe(zoomedIn)
+  const continued = await settledViewport()
+  expect(zoomOf()).toBe(zoom)
+
+  await sendInto('Reply one', 'Another way')
+  await expect.poll(viewport).not.toBe(continued)
+  const forked = await settledViewport()
+  expect(zoomOf()).toBeLessThan(zoom)
+  const fitted = zoomOf()
+
+  await sendInto('Reply two', 'Yet another')
+  await expect.poll(viewport).not.toBe(forked)
+  await settledViewport()
+  expect(zoomOf()).toBe(fitted)
+})
+
+function nodeCount() {
+  return document.querySelectorAll('.react-flow__node').length
+}
+
+it('folds a Fork’s Branches through its pill and unfolds them again, with the Reply staying put', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await expect.poll(viewport).not.toContain('translate(0px, 0px)')
+  await settledViewport()
+
+  const pill = nodeOf('Reply two').getByRole('button', {
+    name: 'Fork · 2 Branches',
+  })
+
+  await expect.element(pill).toHaveAttribute('aria-expanded', 'true')
+  const before = rect('Reply two')
+
+  await pill.click()
+  await expect.element(page.getByText('Prompt four')).not.toBeInTheDocument()
+  expect(page.getByText('Reply five').query()).toBeNull()
+  expect(nodeCount()).toBe(6)
+  await expect.element(pill).toHaveAttribute('aria-expanded', 'false')
+  expect(rect('Reply two').left).toBeCloseTo(before.left, 0)
+  expect(rect('Reply two').top).toBeCloseTo(before.top, 0)
+
+  await pill.click()
+  await expect.element(page.getByText('Prompt four')).toBeVisible()
+  expect(nodeCount()).toBe(10)
+  await expect.element(pill).toHaveAttribute('aria-expanded', 'true')
+  expect(rect('Reply two').left).toBeCloseTo(before.left, 0)
+  expect(rect('Reply two').top).toBeCloseTo(before.top, 0)
+})
+
+it('folds a Fork’s Branches in the horizontal orientation too, its card staying put', async () => {
+  await renderCanvas({
+    ...forkedTree(),
+    settings: {canvasOrientation: 'horizontal'},
+  })
+
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await expect.poll(viewport).not.toContain('translate(0px, 0px)')
+  await settledViewport()
+
+  const pill = nodeOf('Reply two').getByRole('button', {
+    name: 'Fork · 2 Branches',
+  })
+
+  const before = rect('Reply two')
+
+  await pill.click()
+  await expect.element(page.getByText('Prompt four')).not.toBeInTheDocument()
+  expect(nodeCount()).toBe(3)
+  expect(rect('Reply two').left).toBeCloseTo(before.left, 0)
+  expect(rect('Reply two').top).toBeCloseTo(before.top, 0)
+})
+
+it('shows no pill on a Reply the conversation simply continues from', async () => {
+  await renderCanvas(linearTree())
+  await expect.element(page.getByText('Reply two')).toBeVisible()
+
+  expect(page.getByRole('button', {name: /Fork/}).query()).toBeNull()
 })
 
 it('switches to one card per Exchange, left to right, and writes the Setting', async () => {
@@ -521,6 +728,7 @@ it('counts the Replies being written and the failed ones, and jumps to them', as
   const status = page.getByRole('status')
   await expect.element(status.getByText('1 streaming')).toBeVisible()
   await expect.element(status.getByText('1 failed')).toBeVisible()
+  expect(document.querySelectorAll('textarea')).toHaveLength(2)
 
   await expect.poll(viewport).toContain('translate')
   const before = viewport()

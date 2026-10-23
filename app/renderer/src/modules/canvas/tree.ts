@@ -86,10 +86,6 @@ export function previousReply(index: TreeIndex, reply: Reply): Reply | null {
     : (index.replyById.get(parentReplyId) ?? null)
 }
 
-export function isLeaf(index: TreeIndex, replyId: string) {
-  return branchesOf(index, replyId).length === 0
-}
-
 /** The newest Reply: where the user left off until they pick a Thread. */
 export function newestReply(index: TreeIndex): Reply | null {
   return index.replies.at(-1) ?? null
