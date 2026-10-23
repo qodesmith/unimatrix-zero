@@ -120,7 +120,10 @@ export function createFakeDriver({
       return {...ids, type: 'RUN_FINISHED', status: 'stopped'}
     }
 
-    /** Streams the words up to `limit`; false when the Reply was stopped. */
+    /**
+     * Streams the words up to `limit`. When the Reply is stopped meanwhile,
+     * ends it and returns false, so the caller only has to return.
+     */
     async function* streamWords(
       type: 'TEXT_DELTA' | 'REASONING_DELTA',
       text: string,
@@ -129,7 +132,11 @@ export function createFakeDriver({
       for (const word of words(text).slice(0, limit)) {
         await sleep(delayMs, signal)
 
-        if (signal.aborted) return false
+        if (signal.aborted) {
+          yield stopped()
+
+          return false
+        }
 
         yield {...ids, type, delta: word}
 
@@ -142,11 +149,7 @@ export function createFakeDriver({
     try {
       yield {...ids, type: 'RUN_STARTED'}
 
-      if (!(yield* streamWords('REASONING_DELTA', THINKING))) {
-        yield stopped()
-
-        return
-      }
+      if (!(yield* streamWords('REASONING_DELTA', THINKING))) return
 
       const opened = yield* streamWords(
         'TEXT_DELTA',
@@ -154,11 +157,7 @@ export function createFakeDriver({
         behavior === 'complete' ? undefined : WORDS_BEFORE_TROUBLE
       )
 
-      if (!opened) {
-        yield stopped()
-
-        return
-      }
+      if (!opened) return
 
       if (behavior === 'fail') {
         yield {
@@ -204,17 +203,9 @@ export function createFakeDriver({
         isError: false,
       }
 
-      if (!(yield* streamWords('REASONING_DELTA', THINKING_AFTER_TOOL))) {
-        yield stopped()
+      if (!(yield* streamWords('REASONING_DELTA', THINKING_AFTER_TOOL))) return
 
-        return
-      }
-
-      if (!(yield* streamWords('TEXT_DELTA', CLOSING))) {
-        yield stopped()
-
-        return
-      }
+      if (!(yield* streamWords('TEXT_DELTA', CLOSING))) return
 
       const inputTokens = words(request.prompt.text).length
       yield {

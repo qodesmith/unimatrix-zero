@@ -18,18 +18,30 @@ function tooLarge() {
 }
 
 /**
+ * The user's click agreed to the secure address on the chip. A redirect may
+ * move the image to another host, as image CDNs do, but not off https.
+ */
+function leftHttps(requested: string, answered: string) {
+  return (
+    answered !== '' &&
+    new URL(requested).protocol === 'https:' &&
+    new URL(answered).protocol !== 'https:'
+  )
+}
+
+/**
  * Reads the body and stops the moment it passes the limit, so a server that
  * sends no size, or lies about it, still cannot fill main's memory. Leaving
  * the loop cancels the stream, which closes the connection.
  */
-async function readWithin(body: ReadableStream<Uint8Array>, limit: number) {
+async function readWithin(body: ReadableStream<Uint8Array>) {
   const chunks: Uint8Array[] = []
   let total = 0
 
   for await (const chunk of body) {
     total += chunk.byteLength
 
-    if (total > limit) throw tooLarge()
+    if (total > IMAGE_SIZE_LIMIT) throw tooLarge()
 
     chunks.push(chunk)
   }
@@ -49,6 +61,10 @@ async function fetchImage(
     signal: AbortSignal.timeout(timeoutMs),
   })
 
+  if (leftHttps(url, response.url)) {
+    throw new Error('The image moved to an address that is not https.')
+  }
+
   if (!response.ok) {
     throw new Error(`The image could not be loaded (${response.status}).`)
   }
@@ -65,7 +81,7 @@ async function fetchImage(
     throw tooLarge()
   }
 
-  const bytes = await readWithin(response.body, IMAGE_SIZE_LIMIT)
+  const bytes = await readWithin(response.body)
 
   return {dataUrl: `data:${mediaType};base64,${bytes.toBase64()}`}
 }

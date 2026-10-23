@@ -92,6 +92,16 @@ async function replay(upTo = before('RUN_FINISHED')) {
   return screen
 }
 
+/**
+ * The Reply's paragraphs, thinking and tool calls in page order, by their first
+ * words.
+ */
+function visibleOrder(article: Element) {
+  return [...article.querySelectorAll('p, details')].map(node =>
+    node.textContent.slice(0, 20)
+  )
+}
+
 it('shows the thinking live and collapsed, then how long it took', async () => {
   const screen = await replay(before('TEXT_DELTA'))
   const thinking = screen.getByText('Thinking…')
@@ -119,10 +129,7 @@ it('shows each round of thinking where it happened', async () => {
   await expect.element(screen.getByText(/^Thought for/).nth(1)).toBeVisible()
   await expect.element(screen.getByText('Thinking…')).not.toBeInTheDocument()
 
-  const order = [...article.querySelectorAll('p, details')].map(node =>
-    node.textContent.slice(0, 16)
-  )
-
+  const order = visibleOrder(article)
   const toolAt = order.findIndex(text => text.startsWith('search'))
 
   const secondThoughtAt = order.findIndex(text =>
@@ -150,11 +157,7 @@ it('renders the tool call inline, between the text before and after it', async (
     .toBeVisible()
 
   const article = screen.getByRole('article', {name: 'Reply'}).element()
-
-  const order = [...article.querySelectorAll('p, details[aria-label]')].map(
-    node => node.textContent.slice(0, 20)
-  )
-
+  const order = visibleOrder(article)
   const toolAt = order.findIndex(text => text.startsWith('search'))
 
   expect(order.slice(0, toolAt).join(' ')).toContain('Let me look somethin')

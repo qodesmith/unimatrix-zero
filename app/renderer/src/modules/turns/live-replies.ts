@@ -1,7 +1,7 @@
 import type {QueryClient} from '@tanstack/react-query'
 import type {CommandResult} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
-import type {StreamingReply} from '@uz/contract/turns'
+import type {ReplyEvent, StreamingReply} from '@uz/contract/turns'
 
 import {Store} from '@tanstack/react-store'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
@@ -45,8 +45,19 @@ function without(replies: Record<string, StreamingReply>, replyId: string) {
   )
 }
 
-type ReplyEvent = Extract<AppEvent, {replyId: string}>
+/** The events that mean the Model has moved on from thinking. */
+const MOVES_ON: ReadonlySet<ReplyEvent['type']> = new Set([
+  'TEXT_DELTA',
+  'TEXT_REPLACE',
+  'TOOL_CALL_START',
+  'RUN_FINISHED',
+])
 
+/**
+ * A round of thinking stays open across bookkeeping such as `TOKENS`, which
+ * a Provider may report mid-thought, and closes only once words, a tool call
+ * or the end of the Reply arrive.
+ */
 function foldThinking(
   summaries: ThinkingSummary[],
   event: ReplyEvent,
@@ -70,7 +81,9 @@ function foldThinking(
         ]
   }
 
-  return open ? [...summaries.slice(0, -1), {...open, endedAt: now}] : summaries
+  return open && MOVES_ON.has(event.type)
+    ? [...summaries.slice(0, -1), {...open, endedAt: now}]
+    : summaries
 }
 
 /**

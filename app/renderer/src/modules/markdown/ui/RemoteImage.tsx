@@ -32,10 +32,25 @@ function remoteUrl(src: ImageProps['src']): string | null {
  * through main, without cookies or a referrer.
  */
 export function RemoteImage({src, alt, title}: ImageProps) {
-  const [load, setLoad] = useState<LoadState>({state: 'unloaded'})
   const url = remoteUrl(src)
 
-  if (!url) return <span>{alt}</span>
+  return url ? (
+    <RemoteImageChip url={url} alt={alt} title={title} />
+  ) : (
+    <span>{alt}</span>
+  )
+}
+
+function RemoteImageChip({
+  url,
+  alt,
+  title,
+}: {
+  url: string
+  alt: ImageProps['alt']
+  title: ImageProps['title']
+}) {
+  const [load, setLoad] = useState<LoadState>({state: 'unloaded'})
 
   if (load.state === 'loaded') {
     return (
@@ -48,9 +63,9 @@ export function RemoteImage({src, alt, title}: ImageProps) {
     )
   }
 
-  async function loadImage(from: string) {
+  async function loadImage() {
     setLoad({state: 'loading'})
-    const outcome = await bridge().send({type: 'image.load', url: from})
+    const outcome = await bridge().send({type: 'image.load', url})
 
     setLoad(
       outcome.ok
@@ -72,7 +87,7 @@ export function RemoteImage({src, alt, title}: ImageProps) {
       <button
         type="button"
         disabled={load.state === 'loading'}
-        onClick={() => void loadImage(url)}
+        onClick={() => void loadImage()}
         className="font-medium text-foreground underline-offset-2 hover:underline disabled:opacity-50"
       >
         {BUTTON_LABELS[load.state]}

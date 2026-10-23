@@ -16,11 +16,14 @@ export function ReplyView({reply}: {reply: Reply}) {
   const streaming = status === 'streaming'
 
   function thinkingBefore(part: number) {
-    return summaries
-      .filter(summary => summary.beforePart === part)
-      .map(summary => (
-        <ThinkingSummaryView key={summary.startedAt} summary={summary} />
-      ))
+    return summaries.flatMap((summary, round) =>
+      summary.beforePart === part
+        ? [
+            // oxlint-disable-next-line react/no-array-index-key -- rounds only ever append, so positions are stable
+            <ThinkingSummaryView key={round} summary={summary} />,
+          ]
+        : []
+    )
   }
 
   return (

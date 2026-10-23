@@ -9,6 +9,8 @@ interface Served {
   type?: string | null
   length?: number
   body?: Uint8Array | ReadableStream<Uint8Array>
+  /** Where the response came from, when a redirect moved it. */
+  from?: string
 }
 
 /** The network as main sees it, keeping the request it was sent. */
@@ -17,6 +19,7 @@ function fakeFetch({
   type = 'image/png',
   length,
   body = png,
+  from,
 }: Served) {
   const requests: ({url: string} & RequestInit)[] = []
 
@@ -29,7 +32,12 @@ function fakeFetch({
 
     if (length !== undefined) headers.set('Content-Length', String(length))
 
-    return new Response(body, {status, headers})
+    const response = new Response(body, {status, headers})
+
+    if (from !== undefined)
+      Object.defineProperty(response, 'url', {value: from})
+
+    return response
   }
 
   return {fetch, requests}
@@ -73,6 +81,26 @@ it('refuses a response with no media type', async () => {
 
   await expect(images.load('https://example.com/blob')).rejects.toThrow(
     'The link does not point at an image.'
+  )
+})
+
+it('follows a redirect to another https host', async () => {
+  const images = createRemoteImages(
+    fakeFetch({from: 'https://cdn.example.net/chart.png'}).fetch
+  )
+
+  await expect(images.load('https://example.com/chart.png')).resolves.toEqual({
+    dataUrl: 'data:image/png;base64,iVBORw==',
+  })
+})
+
+it('refuses a redirect that leaves https', async () => {
+  const images = createRemoteImages(
+    fakeFetch({from: 'http://127.0.0.1/chart.png'}).fetch
+  )
+
+  await expect(images.load('https://example.com/chart.png')).rejects.toThrow(
+    'The image moved to an address that is not https.'
   )
 })
 

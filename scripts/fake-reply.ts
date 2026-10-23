@@ -1,8 +1,7 @@
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {createFakeDriver} from '@uz/provider-host/fake-driver'
 import path from 'node:path'
-
-import {createFakeDriver} from '../app/provider-host/src/modules/fake-driver/main.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
