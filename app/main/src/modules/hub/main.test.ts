@@ -1,5 +1,6 @@
 import type {AppEvent} from '@uz/contract/events'
 
+import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import {expect, it} from 'vitest'
 
 import {createHub} from './main'
@@ -17,6 +18,7 @@ function setUp() {
     replies: [],
     providers: [],
     signIn: null,
+    settings: DEFAULT_SETTINGS,
   }))
 }
 

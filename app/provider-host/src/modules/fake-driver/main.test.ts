@@ -45,6 +45,7 @@ it('streams canned Markdown word by word around a tool call, then tokens', async
   expect(textDeltas(events)).toBeGreaterThan(20)
   expect(types).toContain('TOOL_RESULT')
   expect(types.slice(-3)).toEqual(['TOKENS', 'REPLY_RECORDED', 'RUN_FINISHED'])
+  expect(events.at(-3)).toMatchObject({contextWindow: 200_000})
   expect(events.at(-1)).toMatchObject({status: 'complete'})
   expect(textOf(events)).toContain("That's the end of the fake Reply.")
 })

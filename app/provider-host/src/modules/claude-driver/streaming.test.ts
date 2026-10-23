@@ -198,8 +198,13 @@ it('streams a Reply, records where Claude saved it, and reports its Context size
       model: MODEL,
       session: {sessionId: SESSION_ID, messageId: FIRST_MESSAGE},
     }),
-    expect.objectContaining({type: 'RUN_FINISHED', status: 'complete'}),
+    expect.objectContaining({
+      type: 'RUN_FINISHED',
+      status: 'complete',
+      contextWindow: 1_000_000,
+    }),
   ])
+  expect(shown(events).contextWindow).toBe(1_000_000)
   // In the app's copy before it was recorded.
   expect(
     claude.store

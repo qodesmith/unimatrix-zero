@@ -8,7 +8,10 @@ import {useLiveReply, useThinking} from '../use-live-reply'
 
 type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 
-/** Re-renders only when this Reply changes, from the stream or once saved. */
+/**
+ * A Reply's content, live while it streams: the box around it belongs to
+ * whoever shows it. Re-renders only when this Reply changes.
+ */
 export function ReplyView({reply}: {reply: Reply}) {
   const live = useLiveReply(reply.id)
   const blocks = useThinking(reply.id)
@@ -30,7 +33,7 @@ export function ReplyView({reply}: {reply: Reply}) {
     <article
       aria-label="Reply"
       aria-busy={streaming}
-      className="flex flex-col gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-card-foreground"
+      className="flex flex-col gap-2 text-sm"
     >
       {content.map((part, index) => (
         // oxlint-disable-next-line react/no-array-index-key -- parts only ever append, so positions are stable

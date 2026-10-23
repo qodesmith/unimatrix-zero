@@ -100,16 +100,20 @@ export function createReplyMapper(ids: ReplyIds) {
 
       if (method !== 'thread/tokenUsage/updated') return []
 
-      const {last: usage} = params.tokenUsage
+      const {last: usage, modelContextWindow} = params.tokenUsage
+
+      const tokens: ReplyEvent = {
+        ...ids,
+        type: 'TOKENS',
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        contextSize: usage.totalTokens,
+      }
 
       return [
-        {
-          ...ids,
-          type: 'TOKENS',
-          inputTokens: usage.inputTokens,
-          outputTokens: usage.outputTokens,
-          contextSize: usage.totalTokens,
-        },
+        modelContextWindow !== null && modelContextWindow > 0
+          ? {...tokens, contextWindow: modelContextWindow}
+          : tokens,
       ]
     },
 

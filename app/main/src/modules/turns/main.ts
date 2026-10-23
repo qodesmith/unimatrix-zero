@@ -46,6 +46,7 @@ function toReply(row: ReplyRow): Reply {
     status: row.status,
     content: ContentSchema.parse(row.content),
     contextSize: row.contextSize,
+    contextWindow: row.contextWindow,
     createdAt: row.createdAt.toISOString(),
   }
 }
@@ -91,9 +92,9 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
     if (entry.saveTimer) clearTimeout(entry.saveTimer)
     entry.saveTimer = null
 
-    const {status, content, contextSize} = entry.reply
+    const {status, content, contextSize, contextWindow} = entry.reply
     db.update(replies)
-      .set({status, content, contextSize})
+      .set({status, content, contextSize, contextWindow})
       .where(eq(replies.id, entry.reply.replyId))
       .run()
   }

@@ -66,6 +66,7 @@ export const ReplyProgressSchema = z.strictObject({
   status: ReplyStatusSchema,
   content: z.array(ReplyPartSchema),
   contextSize: z.number().int().nonnegative().nullable(),
+  contextWindow: z.number().int().positive().nullable(),
 })
 
 export type ReplyProgress = z.infer<typeof ReplyProgressSchema>
@@ -207,6 +208,7 @@ export const TokensEvent = z.strictObject({
   outputTokens: tokenCount,
   /** As the Provider reports it, never summed from Turns. */
   contextSize: tokenCount,
+  contextWindow: z.number().int().positive().optional(),
 })
 
 export const ContextCompactedEvent = z.strictObject({
@@ -220,6 +222,8 @@ export const RunFinishedEvent = z.strictObject({
   type: z.literal('RUN_FINISHED'),
   status: FinishedStatusSchema,
   failure: RunFailureSchema.optional(),
+  /** Claude reports it only at the end; Codex with every usage report. */
+  contextWindow: z.number().int().positive().optional(),
 })
 
 export const ReplyEventSchema = z.discriminatedUnion('type', [

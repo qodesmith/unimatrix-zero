@@ -5,6 +5,7 @@ import type {AccountLoginCompletedNotification} from './protocol/v2/AccountLogin
 import type {AgentMessageDeltaNotification} from './protocol/v2/AgentMessageDeltaNotification'
 import type {LoginAccountResponse} from './protocol/v2/LoginAccountResponse'
 import type {Thread} from './protocol/v2/Thread'
+import type {ThreadTokenUsage} from './protocol/v2/ThreadTokenUsage'
 import type {TokenUsageBreakdown} from './protocol/v2/TokenUsageBreakdown'
 import type {Turn} from './protocol/v2/Turn'
 import type {TurnError} from './protocol/v2/TurnError'
@@ -95,6 +96,12 @@ const LastUsageSchema = z.looseObject({
   Pick<TokenUsageBreakdown, 'inputTokens' | 'outputTokens' | 'totalTokens'>
 >
 
+const ThreadTokenUsageSchema = z.looseObject({
+  last: LastUsageSchema,
+  // Unknown or malformed reads as absent, so the usage itself is never lost with it.
+  modelContextWindow: z.number().nullable().catch(null),
+}) satisfies z.ZodType<Pick<ThreadTokenUsage, 'modelContextWindow'>>
+
 /** A message the AI wrote; every other item is passed over. */
 export const AgentMessageItemSchema = z.looseObject({
   type: z.literal('agentMessage'),
@@ -145,7 +152,7 @@ export const NotificationSchema = z.discriminatedUnion('method', [
     'thread/tokenUsage/updated',
     z.looseObject({
       ...inTurn,
-      tokenUsage: z.looseObject({last: LastUsageSchema}),
+      tokenUsage: ThreadTokenUsageSchema,
     })
   ),
   notification(

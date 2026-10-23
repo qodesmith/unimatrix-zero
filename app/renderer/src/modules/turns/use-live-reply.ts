@@ -14,9 +14,14 @@ function useReplyStore() {
   return store
 }
 
-/** The Reply as it streams, or undefined once it isn't streaming here. */
-export function useLiveReply(replyId: string) {
-  return useSelector(useReplyStore(), state => state.replies[replyId])
+/**
+ * The Reply as it streams, or undefined once it isn't streaming here. Takes
+ * null where there is no Reply yet, so a caller's hooks stay in order.
+ */
+export function useLiveReply(replyId: string | null) {
+  return useSelector(useReplyStore(), state =>
+    replyId === null ? undefined : state.replies[replyId]
+  )
 }
 
 const NO_BLOCKS: never[] = []

@@ -4,6 +4,7 @@ export const NEW_REPLY: ReplyProgress = {
   status: 'streaming',
   content: [],
   contextSize: null,
+  contextWindow: null,
 }
 
 function withLastText(
@@ -93,11 +94,23 @@ export function foldReplyEvent<T extends ReplyProgress>(
   reply: T,
   event: ReplyEvent
 ): T {
-  if (event.type === 'RUN_FINISHED') return {...reply, status: event.status}
+  if (event.type === 'RUN_FINISHED') {
+    return {
+      ...reply,
+      status: event.status,
+      contextWindow: event.contextWindow ?? reply.contextWindow,
+    }
+  }
 
   if (event.subagentId !== undefined) return reply
 
-  if (event.type === 'TOKENS') return {...reply, contextSize: event.contextSize}
+  if (event.type === 'TOKENS') {
+    return {
+      ...reply,
+      contextSize: event.contextSize,
+      contextWindow: event.contextWindow ?? reply.contextWindow,
+    }
+  }
 
   if (!changesContent(event)) return reply
 

@@ -73,6 +73,7 @@ export const replies = sqliteTable(
     sessionId: text('session_id'),
     sessionMessageId: text('session_message_id'),
     contextSize: integer('context_size'),
+    contextWindow: integer('context_window'),
     createdAt: createdAt(),
   },
   table => [uniqueIndex('replies_prompt_id').on(table.promptId)]

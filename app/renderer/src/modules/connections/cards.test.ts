@@ -1,5 +1,6 @@
 import type {AppEvent} from '@uz/contract/events'
 
+import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import {expect, it} from 'vitest'
 
 import {NOT_LOADED, applyConnectionEvent, cardOf} from './cards'
@@ -21,6 +22,7 @@ const snapshot: AppEvent = {
     {provider: 'chatgpt', status: 'not-connected', account: null},
   ],
   signIn: null,
+  settings: DEFAULT_SETTINGS,
 }
 
 it('shows every card ready to connect once main has answered', () => {

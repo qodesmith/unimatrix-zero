@@ -171,6 +171,7 @@ it('streams a Reply, records where Codex saved it, and reports its Context size'
   expect(events.filter(event => event.type === 'TEXT_DELTA').length).toBe(5)
   expect(textOf(events)).toBe('Hi there, friend!')
   expect(shown(events).contextSize).toBe(14_478)
+  expect(shown(events).contextWindow).toBe(475_000)
   expect(events.slice(-2)).toEqual([
     expect.objectContaining({
       type: 'REPLY_RECORDED',

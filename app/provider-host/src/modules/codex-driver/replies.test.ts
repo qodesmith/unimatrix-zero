@@ -73,10 +73,36 @@ it('passes reasoning on and reads each request’s own token count', () => {
     }),
     ...mapper.map({
       method: 'thread/tokenUsage/updated',
-      params: {...inTurn, tokenUsage: {total: usage, last: usage}},
+      params: {
+        ...inTurn,
+        tokenUsage: {total: usage, last: usage, modelContextWindow: 475_000},
+      },
     }),
   ]).toEqual([
     {...ids, type: 'REASONING_DELTA', delta: 'Thinking'},
+    {
+      ...ids,
+      type: 'TOKENS',
+      inputTokens: 100,
+      outputTokens: 20,
+      contextSize: 120,
+      contextWindow: 475_000,
+    },
+  ])
+})
+
+it('leaves the context window out when Codex has none to report', () => {
+  const usage = {totalTokens: 120, inputTokens: 100, outputTokens: 20}
+
+  expect(
+    createReplyMapper(ids).map({
+      method: 'thread/tokenUsage/updated',
+      params: {
+        ...inTurn,
+        tokenUsage: {total: usage, last: usage, modelContextWindow: null},
+      },
+    })
+  ).toStrictEqual([
     {
       ...ids,
       type: 'TOKENS',

@@ -16,6 +16,7 @@ import {createHub, registerSubscribeChannel} from '#modules/hub/main'
 import {createProviderHosts} from '#modules/provider-hosts/main'
 import {createRemoteImages} from '#modules/remote-images/main'
 import {createSessions} from '#modules/sessions/main'
+import {createSettings} from '#modules/settings/main'
 import {createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
 import {signInRequestFor} from '#modules/vendor-programs/main'
@@ -79,11 +80,14 @@ function openWindow(db: Database) {
     return isTopLevelAppFrame(event, url)
   }
 
+  const settings = createSettings(db)
+
   const hub = createHub(() => ({
     type: 'SNAPSHOT',
     app: {version: app.getVersion()},
     replies: turns.streaming(),
     ...connections.snapshot(),
+    settings: settings.read(),
   }))
 
   const turns = createTurns(db, hub.publish)
@@ -145,6 +149,7 @@ function openWindow(db: Database) {
       connections,
       vendorProgramFor: provider => signInRequestFor(provider, machine),
       images: createRemoteImages(globalThis.fetch),
+      settings,
       publish: hub.publish,
     }
   )

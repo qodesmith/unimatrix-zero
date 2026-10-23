@@ -15,10 +15,12 @@ export default defineConfig({
   test: {
     name: 'renderer',
     include: ['src/**/*.test.{ts,tsx}'],
+    setupFiles: ['./src/test-setup.ts'],
     browser: {
       enabled: true,
       headless: true,
       provider: playwright(),
+      viewport: {width: 1280, height: 800},
       instances: [{browser: 'chromium'}],
     },
   },

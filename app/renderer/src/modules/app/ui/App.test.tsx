@@ -1,9 +1,12 @@
 import type {Bridge} from '@uz/contract/bridge'
 import type {Command, CommandOutcome, CommandType} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
+import type {Settings} from '@uz/contract/settings'
 import type {Tree} from '@uz/contract/trees'
 import type {Prompt, Reply, StreamingReply} from '@uz/contract/turns'
+import type {ReactNode} from 'react'
 
+import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import {describe, expect, it} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {page, userEvent} from 'vitest/browser'
@@ -20,6 +23,7 @@ interface Saved {
   streaming?: StreamingReply[]
   /** Claude is connected unless this is a first launch. */
   firstLaunch?: boolean
+  settings?: Partial<Settings>
 }
 
 const account = {email: 'sam@example.com', plan: 'Max'}
@@ -32,6 +36,7 @@ function fakeMain(saved: Saved = {}) {
   const trees = [...(saved.trees ?? [])]
   const prompts = [...(saved.prompts ?? [])]
   const replies = [...(saved.replies ?? [])]
+  const settings: Settings = {...DEFAULT_SETTINGS, ...saved.settings}
   const sent: Command[] = []
   const listeners = new Set<(event: AppEvent) => void>()
 
@@ -52,6 +57,13 @@ function fakeMain(saved: Saved = {}) {
 
     if (command.type === 'image.load') {
       return {ok: true, value: {dataUrl: 'data:image/png;base64,'}}
+    }
+
+    if (command.type === 'settings.update') {
+      Object.assign(settings, command.changes)
+      publish({type: 'SETTINGS_CHANGED', settings: {...settings}})
+
+      return {ok: true, value: {...settings}}
     }
 
     if (command.type === 'tree.create') {
@@ -100,6 +112,7 @@ function fakeMain(saved: Saved = {}) {
         status: 'streaming',
         content: [],
         contextSize: null,
+        contextWindow: null,
         createdAt: receivedAt,
       }
 
@@ -135,6 +148,7 @@ function fakeMain(saved: Saved = {}) {
           {provider: 'chatgpt', status: 'not-connected', account: null},
         ],
         signIn: null,
+        settings: {...settings},
       })
 
       return () => listeners.delete(listener)
@@ -143,6 +157,15 @@ function fakeMain(saved: Saved = {}) {
   }
 
   return {...bridge, sent, replies, publish}
+}
+
+/** The window at its full height, which the canvas fills. */
+function FullHeight({children}: {children: ReactNode}) {
+  return <div style={{height: '100vh'}}>{children}</div>
+}
+
+async function renderApp() {
+  return render(<App />, {wrapper: FullHeight})
 }
 
 /** The ids of the first Reply main started. */
@@ -156,7 +179,7 @@ function firstReply(main: ReturnType<typeof fakeMain>) {
 
 it('shows the pong main sends back', async () => {
   globalThis.window.uz = fakeMain()
-  await render(<App />)
+  await renderApp()
   await page.getByRole('button', {name: 'Ping main'}).click()
   await expect
     .element(page.getByText(/pong · .* · 2026-10-19T12:00:00.000Z/))
@@ -169,7 +192,7 @@ it('lists the Trees main has saved', async () => {
       {id: crypto.randomUUID(), title: 'Trip planning', createdAt: receivedAt},
     ],
   })
-  await render(<App />)
+  await renderApp()
 
   await expect
     .element(page.getByRole('button', {name: 'Trip planning'}))
@@ -178,7 +201,7 @@ it('lists the Trees main has saved', async () => {
 
 it('creates a Tree and opens it', async () => {
   globalThis.window.uz = fakeMain()
-  await render(<App />)
+  await renderApp()
   await expect.element(page.getByText('Start a new Tree')).toBeVisible()
 
   await page.getByRole('button', {name: 'New Tree'}).click()
@@ -195,7 +218,7 @@ it('renames a Tree by double-clicking it', async () => {
   globalThis.window.uz = fakeMain({
     trees: [{id: crypto.randomUUID(), title: 'Draft', createdAt: receivedAt}],
   })
-  await render(<App />)
+  await renderApp()
 
   await page.getByRole('button', {name: 'Draft'}).dblClick()
   await page.getByRole('textbox', {name: 'Tree name'}).fill('Trip planning')
@@ -212,7 +235,7 @@ it('leaves the name alone when renaming is abandoned', async () => {
   })
 
   globalThis.window.uz = main
-  await render(<App />)
+  await renderApp()
 
   await page.getByRole('button', {name: 'Draft'}).click()
   await userEvent.keyboard('{F2}')
@@ -226,7 +249,7 @@ it('leaves the name alone when renaming is abandoned', async () => {
 it('streams a Reply word by word into an empty Tree', async () => {
   const main = fakeMain()
   globalThis.window.uz = main
-  await render(<App />)
+  await renderApp()
   await page.getByRole('button', {name: 'New Tree'}).click()
 
   await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
@@ -249,7 +272,7 @@ it('streams a Reply word by word into an empty Tree', async () => {
 it('continues the Thread from its last Reply once that Reply has finished', async () => {
   const main = fakeMain()
   globalThis.window.uz = main
-  await render(<App />)
+  await renderApp()
   await page.getByRole('button', {name: 'New Tree'}).click()
   await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
   await userEvent.keyboard('{Enter}')
@@ -320,6 +343,7 @@ it('shows a streaming Reply where it was after a reload, and keeps going', async
     // Saved up to a second before the reload.
     content: [{type: 'text', text: 'Once'}],
     contextSize: null,
+    contextWindow: null,
     createdAt: receivedAt,
   }
 
@@ -335,12 +359,13 @@ it('shows a streaming Reply where it was after a reload, and keeps going', async
         status: 'streaming',
         content: [{type: 'text', text: 'Once upon a'}],
         contextSize: null,
+        contextWindow: null,
       },
     ],
   })
 
   globalThis.window.uz = main
-  await render(<App />)
+  await renderApp()
 
   await page.getByRole('button', {name: 'Mid-stream'}).click()
   await expect.element(page.getByText('Once upon a')).toBeVisible()
@@ -352,7 +377,7 @@ it('shows a streaming Reply where it was after a reload, and keeps going', async
 it('shows a failed Reply with the text it had', async () => {
   const main = fakeMain()
   globalThis.window.uz = main
-  await render(<App />)
+  await renderApp()
   await page.getByRole('button', {name: 'New Tree'}).click()
   await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
   await page.getByRole('button', {name: 'Send'}).click()
@@ -384,7 +409,7 @@ describe('connecting a Provider', () => {
 
   it('starts on the Connections screen until a Provider is connected', async () => {
     globalThis.window.uz = fakeMain({firstLaunch: true})
-    await render(<App />)
+    await renderApp()
 
     await expect
       .element(
@@ -406,7 +431,7 @@ describe('connecting a Provider', () => {
   it('walks Claude’s card through every step, then starts chatting', async () => {
     const main = fakeMain({firstLaunch: true})
     globalThis.window.uz = main
-    await render(<App />)
+    await renderApp()
 
     await page.getByRole('button', {name: 'Connect Claude'}).click()
     expect(main.sent.at(-1)).toEqual({
@@ -515,7 +540,7 @@ describe('connecting a Provider', () => {
   it('waits for the new page after Claude refuses a code', async () => {
     const main = fakeMain({firstLaunch: true})
     globalThis.window.uz = main
-    await render(<App />)
+    await renderApp()
 
     await page.getByRole('button', {name: 'Connect Claude'}).click()
     main.publish({
@@ -552,7 +577,7 @@ describe('connecting a Provider', () => {
   it('cancels connecting from the card', async () => {
     const main = fakeMain({firstLaunch: true})
     globalThis.window.uz = main
-    await render(<App />)
+    await renderApp()
 
     await page.getByRole('button', {name: 'Connect Claude'}).click()
     main.publish({type: 'SIGN_IN_STEP', provider: 'claude', step: 'get-ready'})
@@ -567,7 +592,7 @@ describe('connecting a Provider', () => {
   it('shows each failure in plain words with one action', async () => {
     const main = fakeMain({firstLaunch: true})
     globalThis.window.uz = main
-    await render(<App />)
+    await renderApp()
 
     const failures = [
       {
@@ -614,7 +639,7 @@ describe('connecting a Provider', () => {
   it('says why Codex refused a ChatGPT account, with a different account to try', async () => {
     const main = fakeMain({firstLaunch: true})
     globalThis.window.uz = main
-    await render(<App />)
+    await renderApp()
 
     main.publish({
       type: 'SIGN_IN_STEP',
@@ -659,7 +684,7 @@ describe('connecting a Provider', () => {
             }
           : main.send(command)) as Bridge['send'],
     }
-    await render(<App />)
+    await renderApp()
 
     await page.getByRole('button', {name: 'Connect ChatGPT'}).click()
 
@@ -670,7 +695,7 @@ describe('connecting a Provider', () => {
 
   it('shows the same cards from the sidebar once connected', async () => {
     globalThis.window.uz = fakeMain()
-    await render(<App />)
+    await renderApp()
 
     await page.getByRole('button', {name: 'Connections'}).click()
 
