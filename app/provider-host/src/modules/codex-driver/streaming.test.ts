@@ -1,4 +1,4 @@
-import type {ReplyRecorded, ReplyRequest} from '@uz/contract/host'
+import type {ReplyRecorded, SessionRef} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {fakeStore} from '#modules/test-store/main'
@@ -86,7 +86,11 @@ async function setUp(
 
   const treeId = crypto.randomUUID()
 
-  async function reply(text: string, session: ReplyRequest['session'] = null) {
+  async function reply(
+    text: string,
+    session: SessionRef | null = null,
+    fork = false
+  ) {
     return Array.fromAsync<Streamed>(
       driver.startReply({
         treeId,
@@ -106,7 +110,7 @@ async function setUp(
           },
           configDir,
         },
-        session,
+        session: session && {...session, fork},
       })
     )
   }

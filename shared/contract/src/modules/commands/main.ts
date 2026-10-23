@@ -48,8 +48,9 @@ export const TreeTurnsResult = z.strictObject({
 })
 
 /**
- * A Prompt at the end of a Thread, continuing from its last Reply, or the
- * root Prompt of an empty Tree, answered by a connected Provider.
+ * A Prompt answering a Reply, or the root Prompt of an empty Tree, answered
+ * by a connected Provider. Into a Reply that already has a Prompt after it,
+ * the Prompt starts a Branch.
  */
 export const PromptSendCommand = z.strictObject({
   type: z.literal('prompt.send'),

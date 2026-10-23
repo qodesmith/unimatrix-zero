@@ -12,7 +12,7 @@
  * With `UZ_RECORD=yes` it also writes what the driver and `codex` exchanged
  * into `recordings/`, which the driver tests replay.
  */
-import type {ReplyRecorded, ReplyRequest} from '@uz/contract/host'
+import type {ReplyRecorded, SessionRef} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {fakeStore} from '#modules/test-store/main'
@@ -73,7 +73,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       on: ReturnType<typeof driver>,
       home: string,
       text: string,
-      session: ReplyRequest['session']
+      session: SessionRef | null,
+      fork = false
     ) {
       const events = await Array.fromAsync(
         on.startReply({
@@ -94,7 +95,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             },
             configDir: home,
           },
-          session,
+          session: session && {...session, fork},
         })
       )
 

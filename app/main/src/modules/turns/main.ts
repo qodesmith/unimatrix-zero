@@ -203,8 +203,9 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
     },
 
     /**
-     * Where a Thread continues from this Reply: its Provider and session.
-     * Null when the Tree has no such Reply.
+     * Where a Thread continues from this Reply: its Provider and session,
+     * which the next Prompt forks when the Reply already has a Prompt after
+     * it. Null when the Tree has no such Reply.
      */
     continuation(treeId: string, replyId: string) {
       const row = db
@@ -225,40 +226,39 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
         )
       }
 
+      const answered = db
+        .select({id: prompts.id})
+        .from(prompts)
+        .where(eq(prompts.parentReplyId, replyId))
+        .get()
+
       return {
         provider: row.provider,
-        session: {sessionId: row.sessionId, messageId: row.sessionMessageId},
+        session: {
+          sessionId: row.sessionId,
+          messageId: row.sessionMessageId,
+          fork: answered !== undefined,
+        },
       }
     },
 
     /**
-     * Saves a Prompt at the end of a Thread, or the root Prompt of an empty
-     * Tree, and its Reply, which starts out streaming.
+     * Saves a Prompt answering a Reply, or the root Prompt of an empty Tree,
+     * and its Reply, which starts out streaming.
      */
     start(next: NewPrompt): {prompt: Prompt; reply: Reply} {
       const systemPromptId = saveSystemPrompt(next.systemPrompt)
       const {treeId, parentReplyId} = next
 
       const saved = db.transaction(tx => {
-        const existing = tx
+        const root = tx
           .select({id: prompts.id})
           .from(prompts)
-          .where(
-            and(
-              eq(prompts.treeId, treeId),
-              parentReplyId === null
-                ? isNull(prompts.parentReplyId)
-                : eq(prompts.parentReplyId, parentReplyId)
-            )
-          )
+          .where(and(eq(prompts.treeId, treeId), isNull(prompts.parentReplyId)))
           .get()
 
-        if (existing) {
-          throw new Error(
-            parentReplyId === null
-              ? 'This Tree already has its first Prompt.'
-              : 'This Reply already has a Prompt after it.'
-          )
+        if (parentReplyId === null && root) {
+          throw new Error('This Tree already has its first Prompt.')
         }
 
         const prompt = tx

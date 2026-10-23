@@ -51,8 +51,13 @@ export const ReplyRequestSchema = z.strictObject({
   prompt: z.strictObject({text: z.string()}),
   /** The vendor program and its configuration folder, as when connecting. */
   vendorProgram: SignInRequestSchema,
-  /** The session to continue, at the Reply being answered; null starts one. */
-  session: SessionRefSchema.nullable(),
+  /**
+   * The session to continue, at the Reply being answered; null starts one.
+   * `fork` says the Reply already has a Branch, so the Provider forks its
+   * session there (ADR 0001) and this Reply's Branch continues in the fork;
+   * the session the other Branch continues in is never rewound.
+   */
+  session: SessionRefSchema.extend({fork: z.boolean()}).nullable(),
 })
 
 export type ReplyRequest = z.infer<typeof ReplyRequestSchema>

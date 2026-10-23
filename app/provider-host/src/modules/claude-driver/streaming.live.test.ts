@@ -9,7 +9,7 @@
  * With `UZ_RECORD=yes` it also writes what `claude` and the SDK exchanged
  * into `recordings/`, which the driver tests replay.
  */
-import type {ReplyRecorded, ReplyRequest} from '@uz/contract/host'
+import type {ReplyRecorded, SessionRef} from '@uz/contract/host'
 
 import {fakeStore} from '#modules/test-store/main'
 import {spawn} from 'node:child_process'
@@ -48,7 +48,11 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     const treeId = crypto.randomUUID()
 
-    async function reply(text: string, session: ReplyRequest['session']) {
+    async function reply(
+      text: string,
+      session: SessionRef | null,
+      fork = false
+    ) {
       const events = await Array.fromAsync(
         driver.startReply({
           treeId,
@@ -63,7 +67,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
             },
             configDir: configDir ?? '',
           },
-          session,
+          session: session && {...session, fork},
         })
       )
 
