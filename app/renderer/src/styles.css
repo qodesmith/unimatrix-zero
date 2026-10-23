@@ -2,6 +2,7 @@
 @import 'tw-animate-css';
 @import '@fontsource-variable/figtree';
 @import 'streamdown/styles.css';
+@import '@xyflow/react/dist/style.css';
 
 /* Streamdown's own markup is styled with Tailwind classes it ships compiled. */
 @source '../node_modules/streamdown/dist/*.js';
@@ -60,4 +61,45 @@
   body {
     @apply bg-background font-sans text-foreground antialiased;
   }
+}
+
+/* React Flow reads these; every value is a Theme token. */
+.react-flow {
+  --xy-background-color: var(--canvas-background);
+  --xy-background-pattern-color: var(--canvas-dots);
+  --xy-edge-stroke: var(--canvas-edge);
+  --xy-edge-stroke-width: 1.5;
+  --xy-minimap-background-color: var(--card);
+  --xy-minimap-mask-background-color: color-mix(
+    in oklab,
+    var(--muted) 70%,
+    transparent
+  );
+  --xy-minimap-mask-stroke-color: var(--border);
+  --xy-minimap-node-background-color: var(--muted-foreground);
+  --xy-minimap-node-stroke-color: transparent;
+}
+
+/* The highlighted Thread's connections. */
+.react-flow__edge.on-thread .react-flow__edge-path {
+  stroke: var(--thread-highlight);
+  stroke-width: 2.5;
+}
+
+/* A hovered Turn sits above its neighbors, so nothing covers what it shows. */
+.react-flow__node:hover,
+.react-flow__node:focus-within {
+  z-index: 1000 !important;
+}
+
+/* Switching orientation: Turns glide to their new places and the connections,
+   which jump, stay out of sight until they have arrived. */
+.canvas-switching .react-flow__node {
+  transition: transform 400ms ease;
+}
+.react-flow__edges {
+  transition: opacity 200ms ease;
+}
+.canvas-switching .react-flow__edges {
+  opacity: 0;
 }

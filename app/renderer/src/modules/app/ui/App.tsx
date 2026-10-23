@@ -1,14 +1,16 @@
 import type {CommandResult} from '@uz/contract/commands'
 
 import {bridge} from '#modules/bridge/main'
+import {Canvas} from '#modules/canvas/main'
 import {
   Connections,
   anyConnected,
   useConnections,
 } from '#modules/connections/main'
+import {SettingsProvider} from '#modules/settings/main'
 import {Button} from '#modules/shadcn/main'
 import {TreeList, TreeTitle, useTrees} from '#modules/trees/main'
-import {LiveReplies, TreeView} from '#modules/turns/main'
+import {LiveReplies} from '#modules/turns/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {useState} from 'react'
 
@@ -20,9 +22,11 @@ export function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <LiveReplies>
-        <AppLayout />
-      </LiveReplies>
+      <SettingsProvider>
+        <LiveReplies>
+          <AppLayout />
+        </LiveReplies>
+      </SettingsProvider>
     </QueryClientProvider>
   )
 }
@@ -98,21 +102,25 @@ function AppLayout() {
           Connections
         </Button>
       </aside>
-      <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-y-auto bg-canvas-background">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-canvas-background">
         {showConnections ? (
-          <Connections
-            connections={connections}
-            onBack={() => setShowConnections(false)}
-          />
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 overflow-y-auto">
+            <Connections
+              connections={connections}
+              onBack={() => setShowConnections(false)}
+            />
+          </div>
         ) : openTree ? (
           <>
-            <h2 className="pt-4 text-lg font-semibold">
+            <h2 className="shrink-0 px-4 pt-4 pb-2 text-lg font-semibold">
               <TreeTitle tree={openTree} />
             </h2>
-            <TreeView key={openTree.id} treeId={openTree.id} />
+            <div className="min-h-0 flex-1">
+              <Canvas key={openTree.id} treeId={openTree.id} />
+            </div>
           </>
         ) : (
-          <>
+          <div className="flex flex-1 flex-col items-center justify-center gap-4">
             <Button onClick={() => void ping()}>Ping main</Button>
             {pong && (
               <p className="rounded-lg bg-prompt px-3 py-2 text-sm text-prompt-foreground">
@@ -120,7 +128,7 @@ function AppLayout() {
               </p>
             )}
             {error && <p className="text-sm text-destructive">{error}</p>}
-          </>
+          </div>
         )}
       </main>
     </div>

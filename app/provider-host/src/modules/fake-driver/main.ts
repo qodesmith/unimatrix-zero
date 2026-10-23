@@ -214,6 +214,7 @@ export function createFakeDriver({
         inputTokens,
         outputTokens: written,
         contextSize: inputTokens + written,
+        contextWindow: 200_000,
       }
       yield {
         ...ids,

@@ -1,4 +1,5 @@
 import type {
+  ModelUsage,
   SDKAssistantMessage,
   SDKMessage,
   SDKPartialAssistantMessage,
@@ -112,6 +113,24 @@ export function createReplyMapper(ids: ReplyIds) {
   }
 
   /**
+   * The window of the Model that wrote the Reply, which `claude` reports only
+   * with the result, per Model. Omitted when no entry can be told apart.
+   */
+  function contextWindowOf(modelUsage: Record<string, ModelUsage>) {
+    const entries = Object.values(modelUsage)
+
+    const usage =
+      (lastMessage && modelUsage[lastMessage.model]) ??
+      (entries.length === 1 ? entries[0] : undefined)
+
+    const contextWindow = usage?.contextWindow
+
+    return contextWindow !== undefined && contextWindow > 0
+      ? contextWindow
+      : undefined
+  }
+
+  /**
    * The finished block as Claude wrote it. When it differs from what
    * streamed, it replaces it; when it never streamed, it is added whole.
    */
@@ -159,7 +178,11 @@ export function createReplyMapper(ids: ReplyIds) {
     /** How the Reply ended, as its last event. */
     finished(result: SDKResultMessage): RunFinished {
       if (result.subtype === 'success' && !result.is_error) {
-        return {...ids, type: 'RUN_FINISHED', status: 'complete'}
+        const contextWindow = contextWindowOf(result.modelUsage)
+
+        return contextWindow === undefined
+          ? {...ids, type: 'RUN_FINISHED', status: 'complete'}
+          : {...ids, type: 'RUN_FINISHED', status: 'complete', contextWindow}
       }
 
       const message =

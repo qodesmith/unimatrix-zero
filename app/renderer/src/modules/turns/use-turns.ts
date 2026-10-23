@@ -1,4 +1,5 @@
 import type {Turns} from './live-replies'
+import type {Reply} from '@uz/contract/turns'
 
 import {bridge} from '#modules/bridge/main'
 import {useQuery, useQueryClient} from '@tanstack/react-query'
@@ -19,6 +20,8 @@ export function useTurns(treeId: string) {
   })
 }
 
+export type SendOutcome = {ok: true; reply: Reply} | {ok: false; error: string}
+
 /**
  * Sends a Prompt answering a Reply, or the root Prompt when `parentReplyId`
  * is null. Its Reply streams in through the live events; the saved Turns are
@@ -27,7 +30,7 @@ export function useTurns(treeId: string) {
 export function useSendPrompt(treeId: string, parentReplyId: string | null) {
   const queryClient = useQueryClient()
 
-  return async (text: string): Promise<string | null> => {
+  return async (text: string): Promise<SendOutcome> => {
     const outcome = await bridge().send({
       type: 'prompt.send',
       treeId,
@@ -35,7 +38,7 @@ export function useSendPrompt(treeId: string, parentReplyId: string | null) {
       text,
     })
 
-    if (!outcome.ok) return outcome.error.message
+    if (!outcome.ok) return {ok: false, error: outcome.error.message}
 
     const {prompt, reply} = outcome.value
     queryClient.setQueryData<Turns>(turnsKey(treeId), turns => ({
@@ -44,6 +47,6 @@ export function useSendPrompt(treeId: string, parentReplyId: string | null) {
     }))
     void queryClient.invalidateQueries({queryKey: turnsKey(treeId)})
 
-    return null
+    return {ok: true, reply}
   }
 }
