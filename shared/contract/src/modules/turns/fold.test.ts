@@ -75,7 +75,7 @@ it('takes the Context size the Provider reports and the final status', () => {
   })
 })
 
-it('keeps the Model’s context window from whichever event reports it', () => {
+it('keeps the Context window from whichever event reports it', () => {
   expect(
     fold(
       {

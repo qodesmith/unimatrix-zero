@@ -52,14 +52,13 @@ interface ContextMeterProps {
   contextWindow: number
 }
 
-/** A thin bar along the Reply's bottom edge, filling toward the Model's limit. */
 export function ContextMeter({contextSize, contextWindow}: ContextMeterProps) {
   const percent = Math.min(100, (contextSize / contextWindow) * 100)
 
   return (
     <div
       role="meter"
-      aria-label="Context size toward the Model’s limit"
+      aria-label="Context size toward the Context window"
       aria-valuenow={contextSize}
       aria-valuemin={0}
       aria-valuemax={contextWindow}

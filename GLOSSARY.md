@@ -104,6 +104,10 @@ _Avoid_: Card, pair, round
 The cumulative tokens along a Thread up to a given Reply: what the AI carries if the conversation continues from there. A Subagent's own tokens are not part of it.
 _Avoid_: Token count (ambiguous with the Turn's own size)
 
+**Context window**:
+The most tokens the Model can carry in one Thread, which the Context size meter fills toward. Neither vendor lists it per Model, so each Reply keeps the window its Provider reported for it, and a Reply whose Provider reported none has no meter.
+_Avoid_: The Model's limit, the Model's window, max tokens (that is output)
+
 ### Views
 
 **Canvas mode**:

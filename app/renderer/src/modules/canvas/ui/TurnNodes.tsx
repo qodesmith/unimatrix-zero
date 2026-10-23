@@ -185,7 +185,7 @@ export function ExchangeNode({data}: NodeProps<TurnNode>) {
 }
 
 function ExchangeTurns({prompt, reply}: {prompt: Prompt; reply: Reply | null}) {
-  const live = useLiveReply(reply?.id ?? prompt.id)
+  const live = useLiveReply(reply?.id ?? null)
   const status = live?.status ?? reply?.status ?? 'complete'
 
   return (

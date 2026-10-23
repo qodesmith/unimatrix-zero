@@ -409,7 +409,7 @@ it('lets long Turns take their full height when the Setting is off', async () =>
     .not.toBeInTheDocument()
 })
 
-it('shows each Reply’s Context size, what its Exchange added on hover, and the meter toward the Model’s limit', async () => {
+it('shows each Reply’s Context size, what its Exchange added on hover, and the meter toward the Context window', async () => {
   clock = 0
 
   const first = {
@@ -444,7 +444,7 @@ it('shows each Reply’s Context size, what its Exchange added on hover, and the
     .toBeVisible()
 
   const meters = page.getByRole('meter', {
-    name: 'Context size toward the Model’s limit',
+    name: 'Context size toward the Context window',
   })
 
   await expect.element(meters.nth(1)).toHaveAttribute('aria-valuenow', '12300')

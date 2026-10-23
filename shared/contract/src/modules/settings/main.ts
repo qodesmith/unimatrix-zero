@@ -12,7 +12,7 @@ export const SettingsSchema = z.strictObject({
   canvasOrientation: CanvasOrientationSchema,
   /** Long Prompts and Replies scroll inside a capped height. */
   limitTurnHeight: z.boolean(),
-  /** A thin bar on each Reply toward the Model's context window. */
+  /** A thin bar on each Reply toward the Context window. */
   contextSizeMeter: z.boolean(),
 })
 

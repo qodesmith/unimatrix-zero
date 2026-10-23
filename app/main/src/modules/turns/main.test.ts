@@ -99,7 +99,7 @@ it('saves each part as soon as it finishes', () => {
   })
 })
 
-it('saves the end as complete with the Context size and the Model’s window', () => {
+it('saves the end as complete with the Context size and the Context window', () => {
   apply({type: 'TEXT_DELTA', delta: 'Done.'})
   apply({type: 'TOKENS', inputTokens: 3, outputTokens: 2, contextSize: 5})
   apply({type: 'RUN_FINISHED', status: 'complete', contextWindow: 200_000})
