@@ -128,7 +128,7 @@ export function applyLiveEvent(
     nextBlocks === blocks ? thinking : {...thinking, [replyId]: nextBlocks}
 
   if (event.type === 'RUN_FINISHED') {
-    const {status, content, contextSize} = next
+    const {status, content, contextSize, contextWindow} = next
 
     queryClient.setQueryData<Turns>(turnsKey(treeId), turns =>
       turns
@@ -136,7 +136,7 @@ export function applyLiveEvent(
             ...turns,
             replies: turns.replies.map(reply =>
               reply.id === replyId
-                ? {...reply, status, content, contextSize}
+                ? {...reply, status, content, contextSize, contextWindow}
                 : reply
             ),
           }

@@ -1,4 +1,5 @@
 import {ProviderIdSchema} from '#modules/providers/main'
+import {SettingsSchema, SettingsUpdateSchema} from '#modules/settings/main'
 import {TREE_TITLE_MAX_LENGTH, TreeSchema} from '#modules/trees/main'
 import {PromptSchema, ReplySchema} from '#modules/turns/main'
 import {z} from 'zod'
@@ -99,6 +100,12 @@ export const ImageLoadResult = z.strictObject({
   dataUrl: z.string().startsWith('data:image/'),
 })
 
+/** Changes some Settings; `SETTINGS_CHANGED` follows with all of them. */
+export const SettingsUpdateCommand = z.strictObject({
+  type: z.literal('settings.update'),
+  changes: SettingsUpdateSchema,
+})
+
 const Done = z.strictObject({})
 
 export const CommandSchema = z.discriminatedUnion('type', [
@@ -114,6 +121,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   SignInCodeCommand,
   SignInCancelCommand,
   ImageLoadCommand,
+  SettingsUpdateCommand,
 ])
 
 export type Command = z.infer<typeof CommandSchema>
@@ -133,6 +141,7 @@ const resultSchemas = {
   'sign-in.code': Done,
   'sign-in.cancel': Done,
   'image.load': ImageLoadResult,
+  'settings.update': SettingsSchema,
 } as const satisfies Record<CommandType, z.ZodType>
 
 export type CommandResult<T extends CommandType> = z.infer<

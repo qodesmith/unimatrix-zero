@@ -99,15 +99,16 @@ it('saves each part as soon as it finishes', () => {
   })
 })
 
-it('saves the end as complete with the Context size', () => {
+it('saves the end as complete with the Context size and the Model’s window', () => {
   apply({type: 'TEXT_DELTA', delta: 'Done.'})
   apply({type: 'TOKENS', inputTokens: 3, outputTokens: 2, contextSize: 5})
-  apply({type: 'RUN_FINISHED', status: 'complete'})
+  apply({type: 'RUN_FINISHED', status: 'complete', contextWindow: 200_000})
 
   expect(saved()).toMatchObject({
     status: 'complete',
     content: [{type: 'text', text: 'Done.'}],
     contextSize: 5,
+    contextWindow: 200_000,
   })
   expect(turns.streaming()).toEqual([])
 })
@@ -133,6 +134,7 @@ it('keeps what each Reply shows for a window that connects mid-stream', () => {
       status: 'streaming',
       content: [{type: 'text', text: 'Half a sentence'}],
       contextSize: null,
+      contextWindow: null,
     },
   ])
 })

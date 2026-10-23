@@ -1,0 +1,1 @@
+ALTER TABLE `replies` ADD `context_window` integer;

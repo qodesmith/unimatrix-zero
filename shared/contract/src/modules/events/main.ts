@@ -3,6 +3,7 @@ import {
   ProviderStatusSchema,
   SignInStepEvent,
 } from '#modules/providers/main'
+import {SettingsSchema} from '#modules/settings/main'
 import {TreeSchema} from '#modules/trees/main'
 import {ReplyEventSchema, StreamingReplySchema} from '#modules/turns/main'
 import {z} from 'zod'
@@ -16,6 +17,12 @@ export const SnapshotEvent = z.strictObject({
   providers: z.array(ProviderStatusSchema),
   /** The Provider being connected, at its latest step. */
   signIn: SignInStepEvent.nullable(),
+  settings: SettingsSchema,
+})
+
+export const SettingsChangedEvent = z.strictObject({
+  type: z.literal('SETTINGS_CHANGED'),
+  settings: SettingsSchema,
 })
 
 export const TreeCreatedEvent = z.strictObject({
@@ -32,6 +39,7 @@ export const EventSchema = z.discriminatedUnion('type', [
   SnapshotEvent,
   TreeCreatedEvent,
   TreeRenamedEvent,
+  SettingsChangedEvent,
   ReplyEventSchema,
   ProviderEventSchema,
 ])

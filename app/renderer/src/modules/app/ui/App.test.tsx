@@ -1,9 +1,11 @@
 import type {Bridge} from '@uz/contract/bridge'
 import type {Command, CommandOutcome, CommandType} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
+import type {Settings} from '@uz/contract/settings'
 import type {Tree} from '@uz/contract/trees'
 import type {Prompt, Reply, StreamingReply} from '@uz/contract/turns'
 
+import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import {describe, expect, it} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {page, userEvent} from 'vitest/browser'
@@ -20,6 +22,7 @@ interface Saved {
   streaming?: StreamingReply[]
   /** Claude is connected unless this is a first launch. */
   firstLaunch?: boolean
+  settings?: Partial<Settings>
 }
 
 const account = {email: 'sam@example.com', plan: 'Max'}
@@ -32,6 +35,7 @@ function fakeMain(saved: Saved = {}) {
   const trees = [...(saved.trees ?? [])]
   const prompts = [...(saved.prompts ?? [])]
   const replies = [...(saved.replies ?? [])]
+  const settings: Settings = {...DEFAULT_SETTINGS, ...saved.settings}
   const sent: Command[] = []
   const listeners = new Set<(event: AppEvent) => void>()
 
@@ -52,6 +56,13 @@ function fakeMain(saved: Saved = {}) {
 
     if (command.type === 'image.load') {
       return {ok: true, value: {dataUrl: 'data:image/png;base64,'}}
+    }
+
+    if (command.type === 'settings.update') {
+      Object.assign(settings, command.changes)
+      publish({type: 'SETTINGS_CHANGED', settings: {...settings}})
+
+      return {ok: true, value: {...settings}}
     }
 
     if (command.type === 'tree.create') {
@@ -100,6 +111,7 @@ function fakeMain(saved: Saved = {}) {
         status: 'streaming',
         content: [],
         contextSize: null,
+        contextWindow: null,
         createdAt: receivedAt,
       }
 
@@ -135,6 +147,7 @@ function fakeMain(saved: Saved = {}) {
           {provider: 'chatgpt', status: 'not-connected', account: null},
         ],
         signIn: null,
+        settings: {...settings},
       })
 
       return () => listeners.delete(listener)
@@ -320,6 +333,7 @@ it('shows a streaming Reply where it was after a reload, and keeps going', async
     // Saved up to a second before the reload.
     content: [{type: 'text', text: 'Once'}],
     contextSize: null,
+    contextWindow: null,
     createdAt: receivedAt,
   }
 
@@ -335,6 +349,7 @@ it('shows a streaming Reply where it was after a reload, and keeps going', async
         status: 'streaming',
         content: [{type: 'text', text: 'Once upon a'}],
         contextSize: null,
+        contextWindow: null,
       },
     ],
   })

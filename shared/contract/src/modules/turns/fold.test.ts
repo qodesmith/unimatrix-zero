@@ -67,7 +67,35 @@ it('takes the Context size the Provider reports and the final status', () => {
       {type: 'TOKENS', inputTokens: 10, outputTokens: 5, contextSize: 15},
       {type: 'RUN_FINISHED', status: 'complete'}
     )
-  ).toEqual({status: 'complete', content: [], contextSize: 15})
+  ).toEqual({
+    status: 'complete',
+    content: [],
+    contextSize: 15,
+    contextWindow: null,
+  })
+})
+
+it('keeps the Model’s context window from whichever event reports it', () => {
+  expect(
+    fold(
+      {
+        type: 'TOKENS',
+        inputTokens: 10,
+        outputTokens: 5,
+        contextSize: 15,
+        contextWindow: 200_000,
+      },
+      {type: 'TOKENS', inputTokens: 12, outputTokens: 6, contextSize: 18},
+      {type: 'RUN_FINISHED', status: 'complete'}
+    ).contextWindow
+  ).toBe(200_000)
+
+  expect(
+    fold(
+      {type: 'TOKENS', inputTokens: 10, outputTokens: 5, contextSize: 15},
+      {type: 'RUN_FINISHED', status: 'complete', contextWindow: 272_000}
+    ).contextWindow
+  ).toBe(272_000)
 })
 
 it('keeps thinking and Subagent work out of the Reply’s content', () => {

@@ -4,6 +4,7 @@ import type {HostCommand} from '@uz/contract/host'
 
 import {createConnections} from '#modules/connections/main'
 import {openDatabase} from '#modules/database/main'
+import {createSettings} from '#modules/settings/main'
 import {createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
 import {PromptSendResult} from '@uz/contract/commands'
@@ -69,6 +70,7 @@ beforeEach(() => {
     images: {
       load: async url => ({dataUrl: `data:image/png;base64,${url.length}`}),
     },
+    settings: createSettings(db),
     publish,
   }
 })
