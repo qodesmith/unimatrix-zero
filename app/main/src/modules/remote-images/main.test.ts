@@ -7,20 +7,29 @@ const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47])
 interface Served {
   status?: number
   type?: string | null
-  body?: Uint8Array
+  length?: number
+  body?: Uint8Array | ReadableStream<Uint8Array>
 }
 
 /** The network as main sees it, keeping the request it was sent. */
-function fakeFetch({status = 200, type = 'image/png', body = png}: Served) {
+function fakeFetch({
+  status = 200,
+  type = 'image/png',
+  length,
+  body = png,
+}: Served) {
   const requests: ({url: string} & RequestInit)[] = []
 
   async function fetch(...[input, init]: Parameters<typeof globalThis.fetch>) {
     requests.push({url: new Request(input).url, ...init})
 
-    return new Response(body, {
-      status,
-      headers: type === null ? {} : {'Content-Type': type},
-    })
+    const headers = new Headers()
+
+    if (type !== null) headers.set('Content-Type', type)
+
+    if (length !== undefined) headers.set('Content-Length', String(length))
+
+    return new Response(body, {status, headers})
   }
 
   return {fetch, requests}
@@ -75,15 +84,39 @@ it('says when the server refused', async () => {
   )
 })
 
+/** Rejects once the request is aborted, as a fetch that is cut off does. */
+async function untilAborted(signal: AbortSignal | null | undefined) {
+  return new Promise<never>((_resolve, reject) => {
+    signal?.addEventListener('abort', () => reject(signal.reason))
+  })
+}
+
 /** A server that never answers; the request ends only when it is aborted. */
 async function stalled(...[, init]: Parameters<typeof globalThis.fetch>) {
-  return new Promise<Response>((_resolve, reject) => {
-    init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))
-  })
+  return untilAborted(init?.signal)
 }
 
 it('gives up on a server that never answers', async () => {
   const images = createRemoteImages(stalled, {timeoutMs: 10})
+
+  await expect(images.load('https://example.com/slow.png')).rejects.toThrow(
+    'The image took too long to load.'
+  )
+})
+
+/** A server that sends the headers and then never finishes the body. */
+async function stalledBody(...[, init]: Parameters<typeof globalThis.fetch>) {
+  const body = new ReadableStream<Uint8Array>({
+    async pull() {
+      await untilAborted(init?.signal)
+    },
+  })
+
+  return new Response(body, {headers: {'Content-Type': 'image/png'}})
+}
+
+it('gives up on a body that never finishes', async () => {
+  const images = createRemoteImages(stalledBody, {timeoutMs: 10})
 
   await expect(images.load('https://example.com/slow.png')).rejects.toThrow(
     'The image took too long to load.'
@@ -98,4 +131,53 @@ it('refuses an image larger than the limit', async () => {
   await expect(images.load('https://example.com/huge.png')).rejects.toThrow(
     'The image is larger than 20 MB.'
   )
+})
+
+it('refuses an image the server says is too large before reading it', async () => {
+  let pulled = false
+
+  const body = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        pulled = true
+        controller.close()
+      },
+    },
+    {highWaterMark: 0}
+  )
+
+  const images = createRemoteImages(
+    fakeFetch({length: IMAGE_SIZE_LIMIT + 1, body}).fetch
+  )
+
+  await expect(images.load('https://example.com/huge.png')).rejects.toThrow(
+    'The image is larger than 20 MB.'
+  )
+
+  expect(pulled).toBe(false)
+})
+
+it('stops reading a body that grows past the limit', async () => {
+  const chunk = new Uint8Array(1024 * 1024)
+  let sent = 0
+  let canceled = false
+
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      sent += chunk.byteLength
+      controller.enqueue(chunk)
+    },
+    cancel() {
+      canceled = true
+    },
+  })
+
+  const images = createRemoteImages(fakeFetch({body}).fetch)
+
+  await expect(images.load('https://example.com/endless.png')).rejects.toThrow(
+    'The image is larger than 20 MB.'
+  )
+
+  expect(canceled).toBe(true)
+  expect(sent).toBeLessThanOrEqual(IMAGE_SIZE_LIMIT + 2 * chunk.byteLength)
 })
