@@ -167,6 +167,53 @@ describe('horizontal', () => {
   })
 })
 
+describe('a collapsed Fork', () => {
+  const collapsed = new Set(['R2'])
+
+  it('leaves its Branches out, Turns and connections, in both orientations', () => {
+    const vertical = layoutTree(forkedTree(), 'vertical', sized({}), collapsed)
+
+    expect(vertical.nodes.map(node => node.id).toSorted()).toEqual([
+      'P1',
+      'P2',
+      'P3',
+      'R1',
+      'R2',
+      'R3',
+    ])
+    expect(
+      vertical.edges.map(edge => `${edge.source}>${edge.target}`).toSorted()
+    ).toEqual(['P1>R1', 'P2>R2', 'P3>R3', 'R1>P2', 'R1>P3'])
+
+    const horizontal = layoutTree(
+      forkedTree(),
+      'horizontal',
+      sized({}),
+      collapsed
+    )
+
+    expect(horizontal.nodes.map(node => node.id).toSorted()).toEqual([
+      'P1',
+      'P2',
+      'P3',
+    ])
+    expect(
+      horizontal.edges.map(edge => `${edge.source}>${edge.target}`).toSorted()
+    ).toEqual(['P1>P2', 'P1>P3'])
+  })
+
+  it('takes only its own room, so its sibling Branch moves in beside it', () => {
+    const open = positions(layoutTree(forkedTree(), 'vertical', sized({})))
+
+    const folded = positions(
+      layoutTree(forkedTree(), 'vertical', sized({}), collapsed)
+    )
+
+    expect(folded('P3').x).toBeLessThan(open('P3').x)
+    expect(folded('P3').x - folded('P2').x).toBe(width + 36)
+  })
+})
+
 it('lays out from the structure alone: the same Tree always lands in the same places', () => {
   const first = layoutTree(forkedTree(), 'vertical', sized({}))
   const second = layoutTree(forkedTree(), 'vertical', sized({}))

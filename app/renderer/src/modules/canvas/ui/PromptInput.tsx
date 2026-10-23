@@ -12,6 +12,10 @@ interface PromptInputProps {
   onFocus?: () => void
   /** The Reply main started for the sent Prompt. */
   onSent?: (replyId: string) => void
+  /** The draft, kept by the caller so it outlives this Input's box. */
+  draft?: string
+  /** The draft as it changes; empty again once sent. */
+  onDraftChange?: (draft: string) => void
 }
 
 /** Where the user types the next Prompt. Enter sends; Shift+Enter breaks a line. */
@@ -20,11 +24,19 @@ export function PromptInput({
   parentReplyId,
   onFocus,
   onSent,
+  draft: kept,
+  onDraftChange,
 }: PromptInputProps) {
   const sendPrompt = useSendPrompt(treeId, parentReplyId)
-  const [draft, setDraft] = useState('')
+  const [ownDraft, setOwnDraft] = useState('')
+  const draft = kept ?? ownDraft
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  function updateDraft(text: string) {
+    setOwnDraft(text)
+    onDraftChange?.(text)
+  }
 
   async function send() {
     if (sending || draft.trim() === '') return
@@ -40,7 +52,7 @@ export function PromptInput({
     }
 
     setError(null)
-    setDraft('')
+    updateDraft('')
     onSent?.(outcome.reply.id)
   }
 
@@ -66,7 +78,7 @@ export function PromptInput({
         className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm"
         value={draft}
         onFocus={onFocus}
-        onChange={event => setDraft(event.target.value)}
+        onChange={event => updateDraft(event.target.value)}
         onKeyDown={onKeyDown}
       />
       <div className="flex items-center justify-between gap-2">

@@ -7,12 +7,13 @@
  * UZ_LIVE_CODEX_HOME=<userData>/providers/chatgpt\
  * bun run test:node app/provider-host/src/modules/codex-driver/streaming.live
  *
- * It copies the sign-in into two fresh folders and runs there, so the second
- * app-server has nothing but the app's copy of the rollouts to resume from.
+ * It copies the sign-in into three fresh folders and runs there, so the
+ * second app-server has nothing but the app's copy of the rollouts to resume
+ * from, and the third nothing but that copy to fork from.
  * With `UZ_RECORD=yes` it also writes what the driver and `codex` exchanged
  * into `recordings/`, which the driver tests replay.
  */
-import type {ReplyRecorded, ReplyRequest} from '@uz/contract/host'
+import type {ReplyRecorded, SessionRef} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {fakeStore} from '#modules/test-store/main'
@@ -46,19 +47,19 @@ function expectComplete(events: (ReplyEvent | ReplyRecorded)[]) {
 }
 
 describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
-  it('streams, continues the loaded thread, then resumes from the app’s copy alone', async () => {
+  it('streams, continues the loaded thread, resumes from the app’s copy alone, then forks mid-Thread', async () => {
     if (!folder || !signedIn) return
 
     const store = fakeStore()
     const recording = process.env.UZ_RECORD === 'yes'
 
     const recorder = createRecorder(
-      ['started.ndjson', 'resumed.ndjson'].map(name =>
+      ['started.ndjson', 'resumed.ndjson', 'forked.ndjson'].map(name =>
         path.join(RECORDINGS, name)
       )
     )
 
-    const homes = [homeFrom(signedIn), homeFrom(signedIn)]
+    const homes = [homeFrom(signedIn), homeFrom(signedIn), homeFrom(signedIn)]
     const treeId = crypto.randomUUID()
 
     function driver() {
@@ -73,7 +74,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       on: ReturnType<typeof driver>,
       home: string,
       text: string,
-      session: ReplyRequest['session']
+      session: SessionRef | null,
+      fork = false
     ) {
       const events = await Array.fromAsync(
         on.startReply({
@@ -94,23 +96,26 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             },
             configDir: home,
           },
-          session,
+          session: session && {...session, fork},
         })
       )
+
+      expectComplete(events)
 
       const recorded = events.find(
         (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
       )
+
+      if (!recorded) throw new Error('The Reply was not recorded')
 
       return {events, recorded}
     }
 
     try {
       const first = driver()
-      const [home, otherHome] = homes as [string, string]
+      const [home, otherHome, thirdHome] = homes as [string, string, string]
       const opened = await reply(first, home, 'Say hi in three words.', null)
 
-      expectComplete(opened.events)
       expect(opened.events.some(event => event.type === 'TEXT_DELTA')).toBe(
         true
       )
@@ -119,12 +124,11 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         first,
         home,
         'Now say bye in three words.',
-        opened.recorded?.session ?? null
+        opened.recorded.session
       )
 
-      expectComplete(continued.events)
-      expect(continued.recorded?.session.sessionId).toBe(
-        opened.recorded?.session.sessionId
+      expect(continued.recorded.session.sessionId).toBe(
+        opened.recorded.session.sessionId
       )
 
       await delay(IDLE_MS * 2)
@@ -133,13 +137,34 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         driver(),
         otherHome,
         'What was the first thing I asked you?',
-        continued.recorded?.session ?? null
+        continued.recorded.session
       )
 
-      expectComplete(resumed.events)
-      expect(resumed.recorded?.session.sessionId).toBe(
-        opened.recorded?.session.sessionId
+      expect(resumed.recorded.session.sessionId).toBe(
+        opened.recorded.session.sessionId
       )
+
+      await delay(IDLE_MS * 2)
+
+      // Through the first Reply only: the second never happened on this Branch.
+      const forked = await reply(
+        driver(),
+        thirdHome,
+        'What was the last thing I asked you?',
+        opened.recorded.session,
+        true
+      )
+
+      expect(forked.recorded.session.sessionId).not.toBe(
+        opened.recorded.session.sessionId
+      )
+
+      const answer = forked.events
+        .flatMap(event => (event.type === 'TEXT_DELTA' ? [event.delta] : []))
+        .join('')
+
+      expect(answer).toMatch(/hi/i)
+      expect(answer).not.toMatch(/bye/i)
 
       await delay(IDLE_MS * 2)
     } finally {

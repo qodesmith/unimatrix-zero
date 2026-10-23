@@ -1,5 +1,5 @@
 import type {Turns} from '#modules/turns/main'
-import type {CanvasState} from '../canvas-context'
+import type {CanvasState, Collapsed} from '../canvas-context'
 import type {Focus} from './Flow'
 import type {CanvasOrientation} from '@uz/contract/settings'
 
@@ -15,6 +15,17 @@ import {PromptInput} from './PromptInput'
 
 /** How long Turns take to glide to their places in the other orientation. */
 const SWITCH_MS = 400
+
+/** The set with one id added when it was out, or taken out when it was in. */
+function toggled(id: string) {
+  return (current: ReadonlySet<string>) => {
+    const next = new Set(current)
+
+    if (!next.delete(id)) next.add(id)
+
+    return next
+  }
+}
 
 /** One Tree on the canvas: a centered Input while it is empty, then its Turns. */
 export function Canvas({treeId}: {treeId: string}) {
@@ -43,6 +54,15 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
 
   const [expandedTurnIds, setExpandedTurnIds] = useState<ReadonlySet<string>>(
     () => new Set()
+  )
+
+  const [collapsed, setCollapsed] = useState<Collapsed>(() => ({
+    ids: new Set(),
+    toggledReplyId: null,
+  }))
+
+  const [drafts, setDrafts] = useState<ReadonlyMap<string, string>>(
+    () => new Map()
   )
 
   const switchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -75,10 +95,22 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
   }, [])
 
   const toggleExpanded = useCallback((turnId: string) => {
-    setExpandedTurnIds(current => {
-      const next = new Set(current)
+    setExpandedTurnIds(toggled(turnId))
+  }, [])
 
-      if (!next.delete(turnId)) next.add(turnId)
+  const toggleCollapsed = useCallback((replyId: string) => {
+    setCollapsed(current => ({
+      ids: toggled(replyId)(current.ids),
+      toggledReplyId: replyId,
+    }))
+  }, [])
+
+  const setDraft = useCallback((replyId: string, draft: string) => {
+    setDrafts(current => {
+      const next = new Map(current)
+
+      if (draft === '') next.delete(replyId)
+      else next.set(replyId, draft)
 
       return next
     })
@@ -114,6 +146,10 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       onSent,
       expandedTurnIds,
       toggleExpanded,
+      collapsedReplyIds: collapsed.ids,
+      toggleCollapsed,
+      drafts,
+      setDraft,
       limitTurnHeight,
       contextSizeMeter,
     }),
@@ -124,6 +160,10 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       onSent,
       expandedTurnIds,
       toggleExpanded,
+      collapsed.ids,
+      toggleCollapsed,
+      drafts,
+      setDraft,
       limitTurnHeight,
       contextSizeMeter,
     ]
@@ -146,6 +186,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
           index={index}
           orientation={canvasOrientation}
           thread={thread}
+          collapsed={collapsed}
           focus={focus}
           fitOnLoad={!startedEmpty}
           switching={switching}

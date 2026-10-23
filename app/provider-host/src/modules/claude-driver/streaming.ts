@@ -54,7 +54,9 @@ type Outcome = {result: SDKResultMessage} | {error: string; heard: boolean}
 /**
  * Claude's Replies: each Prompt goes to the warm session standing at the
  * Reply it answers, or to a `claude` that resumes the Provider session from
- * the app's copy, or that starts a new one.
+ * the app's copy, or that starts a new one. A Prompt that starts a Branch
+ * goes to a `claude` that forks the session through the Reply it answers,
+ * into a new session; the warm `claude` of the other Branch keeps going.
  */
 export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   const warm = createWarmSessions<Live>({
@@ -72,6 +74,8 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     const cwd = configDir
     const projectKey = projectKeyOf(cwd)
     const resume = restore === 'none' ? null : request.session?.sessionId
+    const fork = resume ? request.session?.fork : false
+    const forkAt = fork ? request.session?.messageId : null
     let files: SessionFile[] = []
     let activeConfigDir = configDir
 
@@ -93,6 +97,8 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       systemPrompt: request.systemPrompt,
       ...(request.model === DEFAULT_MODEL ? {} : {model: request.model}),
       ...(resume ? {resume} : {}),
+      ...(fork ? {forkSession: true} : {}),
+      ...(forkAt ? {resumeSessionAt: forkAt} : {}),
       // The fallback resumes from the transcript written back, not the store.
       sessionStore:
         restore === 'file'
@@ -120,7 +126,8 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       restore,
       projectKey,
       activeConfigDir: () => activeConfigDir,
-      saved: new Set(files.map(file => file.path)),
+      // A fork is a new session, with nothing of its own saved yet.
+      saved: new Set(fork ? [] : files.map(file => file.path)),
     })
   }
 
@@ -175,14 +182,17 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
    * standing at the Reply answered, else a new `claude`. A warm one whose
    * `claude` exited while idle answers nothing, so a new one resumes in its
    * place. When the restore from the store doesn't get `claude` going, the
-   * transcript is written back and it goes again from there.
+   * transcript is written back and it goes again from there. A fork always
+   * gets a new `claude`: no warm session is claimed, and none is closed.
    */
   async function* answer(
     request: ReplyRequest,
     mapper: Mapper
   ): AsyncGenerator<ReplyEvent, {session: Live; outcome: Outcome}> {
     const {text} = request.prompt
-    const claimed = request.session && warm.claim(request.session)
+
+    const claimed =
+      request.session && !request.session.fork && warm.claim(request.session)
 
     if (claimed) {
       const outcome = yield* attempt(claimed, mapper, text)

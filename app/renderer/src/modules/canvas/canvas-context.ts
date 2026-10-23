@@ -2,6 +2,14 @@ import type {TreeIndex} from './tree'
 
 import {createContext, use} from 'react'
 
+/** Forks folded through their pill, and the one toggled last. */
+export interface Collapsed {
+  /** Their Branches are left off the canvas. */
+  ids: ReadonlySet<string>
+  /** Kept where it was on screen as the layout changes around it. */
+  toggledReplyId: string | null
+}
+
 /** What every Turn on the canvas needs, without carrying it in node data. */
 export interface CanvasState {
   treeId: string
@@ -16,6 +24,15 @@ export interface CanvasState {
    */
   expandedTurnIds: ReadonlySet<string>
   toggleExpanded: (turnId: string) => void
+  /** Forks folded through their pill: their Branches are left off the canvas. */
+  collapsedReplyIds: ReadonlySet<string>
+  toggleCollapsed: (replyId: string) => void
+  /**
+   * What is typed into each Reply's Input, by Reply id; kept here so a draft
+   * outlives its box being folded away or redrawn in the other orientation.
+   */
+  drafts: ReadonlyMap<string, string>
+  setDraft: (replyId: string, draft: string) => void
   limitTurnHeight: boolean
   contextSizeMeter: boolean
 }

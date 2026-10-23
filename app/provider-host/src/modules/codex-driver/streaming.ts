@@ -44,6 +44,9 @@ interface OpenThread {
  * ChatGPT's Replies through one `codex app-server`, which every Thread
  * shares: a Prompt continues its Codex thread where it is loaded, or else
  * resumes it from the app's own copy of its rollouts, or starts a new one.
+ * A Prompt that starts a Branch forks the thread through the Reply it
+ * answers, into a new thread; the thread the other Branch continues in is
+ * left as it is.
  */
 export function createCodexReplies(deps: CodexRepliesDeps) {
   let current: Running | null = null
@@ -125,12 +128,29 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       return {id: thread.id, model}
     }
 
-    const id = request.session.sessionId
+    const {sessionId: id, messageId, fork} = request.session
     const loaded = running.threads.get(id)
 
-    if (loaded) return {id, model: loaded}
+    if (loaded && !fork) return {id, model: loaded}
 
-    writeRolloutsBack(configDir, await deps.store.loadFiles(folderOf(id)))
+    // Codex forks and resumes from the rollout on disk, which only a loaded
+    // thread is sure to have written here.
+    if (!loaded) {
+      writeRolloutsBack(configDir, await deps.store.loadFiles(folderOf(id)))
+    }
+
+    if (fork) {
+      const {thread, model} = await running.server.request('thread/fork', {
+        threadId: id,
+        lastTurnId: messageId,
+        ...settings,
+        excludeTurns: true,
+      })
+
+      running.threads.set(thread.id, model)
+
+      return {id: thread.id, model}
+    }
 
     const {model} = await running.server.request('thread/resume', {
       threadId: id,
