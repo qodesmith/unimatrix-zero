@@ -12,12 +12,10 @@
   "devEngines": {
     "runtime": {
       "name": "bun",
-      "version": "1.4.2",
       "onFail": "error"
     },
     "packageManager": {
       "name": "bun",
-      "version": "1.4.2",
       "onFail": "error"
     }
   },
@@ -26,7 +24,7 @@
     "build": "bun run --filter '@uz/*' build",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
-    "lint": "bun run scripts/check-oxlint-version.ts && bun run scripts/check-vendor-binary-overrides.ts && oxlint && bun run scripts/check-css-tokens.ts && bun run scripts/check-us-english.ts",
+    "lint": "bun run scripts/check-bun-version.ts && bun run scripts/check-oxlint-version.ts && bun run scripts/check-vendor-binary-overrides.ts && oxlint && bun run scripts/check-css-tokens.ts && bun run scripts/check-us-english.ts",
     "lint:fix": "oxlint --fix",
     "typecheck": "tsc -b",
     "knip": "knip",
@@ -41,7 +39,7 @@
     "skills:update": "bunx skills update --project -y"
   },
   "devDependencies": {
-    "@types/bun": "^1.4.2",
+    "@types/bun": "^1.4.4",
     "@types/node": "^24.9.0",
     "@uz/contract": "workspace:*",
     "@uz/provider-host": "workspace:*",
