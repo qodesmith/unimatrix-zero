@@ -13,13 +13,16 @@ import {createCodexDriver} from './main'
 import {replayCodex} from './replay'
 import {folderOf} from './rollouts'
 
-/** As `started.ndjson` and `resumed.ndjson` recorded them. */
-const THREAD_ID = '01a163d2-5139-7a70-abf8-6a5cb5ccebdc'
-const FIRST_TURN = '01a163d2-5381-7652-b39d-371b8dbe723c'
-const SECOND_TURN = '01a163d2-62e6-7171-ac23-b8feeec8a011'
-const RESUMED_TURN = '01a163d2-800d-7fa0-947a-194fc06a1a72'
+/** As `started.ndjson`, `resumed.ndjson` and `forked.ndjson` recorded them. */
+const THREAD_ID = '01a168e8-439c-71f2-bbd1-52697c97d40d'
+const FIRST_TURN = '01a168e8-4e8e-7312-b51e-dcc3f2d051eb'
+const SECOND_TURN = '01a168e8-60f5-71c3-81f4-a35411c1913a'
+const RESUMED_TURN = '01a168e8-7ae7-71d3-b6fa-169bec1fd887'
+const FORKED_THREAD_ID = '01a168e8-9d25-7df2-b2f4-208bfb1bbd5e'
+const FORKED_TURN = '01a168e8-9d50-7fb1-a539-2fd85f3c4b2b'
 const MODEL = 'gpt-6.1-sol'
-const ROLLOUT = `sessions/2026/10/22/rollout-2026-10-22T09-34-50-${THREAD_ID}.jsonl`
+const ROLLOUT = `sessions/2026/10/23/rollout-2026-10-23T09-16-57-${THREAD_ID}.jsonl`
+const FORKED_ROLLOUT = `sessions/2026/10/23/rollout-2026-10-23T09-17-17-${FORKED_THREAD_ID}.jsonl`
 
 const IDLE_MS = 300
 
@@ -33,6 +36,8 @@ interface Report {
   methods: string[]
   prompts: string[]
   resumedFrom: {type: string; id: string}[]
+  /** The `lastTurnId` of a `thread/fork`. */
+  forkedThrough: string | null
   /** `input-closed`, `killed`, `refused`, `exited`, or what it didn't expect. */
   ended: string | null
 }
@@ -165,6 +170,7 @@ function textOf(events: Streamed[]) {
 const FIRST_PROMPT = 'Say hi in three words.'
 const SECOND_PROMPT = 'Now say bye in three words.'
 const THIRD_PROMPT = 'What was the first thing I asked you?'
+const FORK_PROMPT = 'What was the last thing I asked you?'
 
 it('streams a Reply, records where Codex saved it, and reports its Context size', async () => {
   const codex = await setUp(['started.ndjson'])
@@ -174,7 +180,7 @@ it('streams a Reply, records where Codex saved it, and reports its Context size'
   expect(events[0]?.type).toBe('RUN_STARTED')
   expect(events.filter(event => event.type === 'TEXT_DELTA').length).toBe(5)
   expect(textOf(events)).toBe('Hi there, friend!')
-  expect(shown(events).contextSize).toBe(14_478)
+  expect(shown(events).contextSize).toBe(14_487)
   expect(shown(events).contextWindow).toBe(475_000)
   expect(events.slice(-2)).toEqual([
     expect.objectContaining({
@@ -250,6 +256,47 @@ it('resumes the Provider session from the app’s copy alone, written back under
     FIRST_TURN,
     SECOND_TURN,
   ])
+})
+
+it('forks the Provider session through a mid-Thread Reply into a new thread, from the app’s copy alone', async () => {
+  const opened = await setUp(['started.ndjson'])
+  const first = await opened.reply(FIRST_PROMPT)
+  await opened.reply(SECOND_PROMPT, recordedIn(first))
+  await opened.allClosed()
+
+  const codex = await setUp(['forked.ndjson'], {store: opened.store})
+  const forked = await codex.reply(FORK_PROMPT, recordedIn(first), true)
+
+  // The second Reply never happened on this Branch.
+  expect(textOf(forked)).toBe('You asked: “Say hi in three words.”')
+  expect(recordedIn(forked)).toEqual({
+    sessionId: FORKED_THREAD_ID,
+    messageId: FORKED_TURN,
+  })
+
+  const [report] = codex.reports()
+
+  expect(report?.methods).not.toContain('thread/resume')
+  expect(report?.forkedThrough).toBe(FIRST_TURN)
+  // Written back whole for Codex to fork; the fork is Codex's to cut.
+  expect(report?.resumedFrom.map(line => line.id)).toEqual([
+    THREAD_ID,
+    FIRST_TURN,
+    SECOND_TURN,
+  ])
+
+  // The fork's rollout, and the original's it points into, are kept under the fork.
+  const fork = folderOf(FORKED_THREAD_ID)
+
+  expect([
+    ...codex.store.filesOf(fork.projectKey, fork.sessionId).keys(),
+  ]).toEqual([FORKED_ROLLOUT, ROLLOUT])
+
+  const original = folderOf(THREAD_ID)
+
+  expect([
+    ...codex.store.filesOf(original.projectKey, original.sessionId).keys(),
+  ]).toEqual([ROLLOUT])
 })
 
 it('fails the Reply when the app has no copy of the Provider session', async () => {

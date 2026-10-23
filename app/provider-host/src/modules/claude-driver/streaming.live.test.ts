@@ -28,7 +28,7 @@ const configDir = process.env.UZ_LIVE_CLAUDE_CONFIG
 const IDLE_MS = 2000
 
 describe.skipIf(!program || !configDir)('a live Claude', () => {
-  it('streams, continues warm, then resumes from the app’s copy alone', async () => {
+  it('streams, continues warm, resumes from the app’s copy alone, then forks mid-Thread', async () => {
     if (!program || !configDir) return
 
     const store = fakeStore()
@@ -37,7 +37,9 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     const recorder = createRecorder(
       ({command, args, cwd, env, signal}) =>
         spawn(command, args, {cwd, env, signal, stdio: 'pipe'}),
-      ['warm.ndjson', 'resumed.ndjson'].map(name => path.join(RECORDINGS, name))
+      ['warm.ndjson', 'resumed.ndjson', 'forked.ndjson'].map(name =>
+        path.join(RECORDINGS, name)
+      )
     )
 
     const driver = createClaudeDriver({
@@ -118,6 +120,24 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     expect(text).toMatch(/TEAL/)
     expect(text).toMatch(/OTTER/)
+
+    // Through the first Reply only: OTTER never happened on this Branch.
+    const forked = await reply(
+      'Which word did you reply with? Just the word.',
+      first.recorded.session,
+      true
+    )
+
+    expect(forked.recorded.session.sessionId).not.toBe(
+      first.recorded.session.sessionId
+    )
+
+    const forkedText = forked.events
+      .flatMap(event => (event.type === 'TEXT_DELTA' ? [event.delta] : []))
+      .join('')
+
+    expect(forkedText).toMatch(/TEAL/)
+    expect(forkedText).not.toMatch(/OTTER/)
 
     await new Promise(resolve => {
       setTimeout(resolve, IDLE_MS * 3)

@@ -14,11 +14,13 @@ import {createClaudeDriver} from './main'
 import {RECORDINGS, RecordedLineSchema, replayClaude} from './replay'
 import {projectKeyOf} from './transcripts'
 
-/** As `warm.ndjson` and `resumed.ndjson` recorded them. */
-const SESSION_ID = 'af3affab-d77c-43f2-9ed8-a9e32acdfc14'
-const FIRST_MESSAGE = 'ecbda6ab-733d-4dc8-b40a-4817cc036086'
-const SECOND_MESSAGE = 'f65ec778-d975-4d2c-a039-0cd3ae2b6775'
-const RESUMED_MESSAGE = '6f429a2b-faa7-48b3-951a-b7d5c455ab49'
+/** As `warm.ndjson`, `resumed.ndjson` and `forked.ndjson` recorded them. */
+const SESSION_ID = '6b3fb527-e561-4b5c-810d-0ef9ac53978c'
+const FIRST_MESSAGE = '62e0dab1-d770-4979-863e-4df4e2be3150'
+const SECOND_MESSAGE = '7e7158ab-59c9-4e14-9828-54466ba8084e'
+const RESUMED_MESSAGE = '54a838e7-618e-41c6-a747-d57b47a7908e'
+const FORKED_SESSION_ID = '830530ec-a381-4e19-98a4-d7383b717af5'
+const FORKED_MESSAGE = '1f72cfd4-d1f2-4d35-aa13-f8df39b2bdb1'
 const MODEL = 'claude-haiku-5-5'
 
 const IDLE_MS = 300
@@ -186,6 +188,7 @@ function textOf(events: Streamed[]) {
 const FIRST_PROMPT = 'Reply with the single word TEAL.'
 const SECOND_PROMPT = 'Now reply with the single word OTTER.'
 const THIRD_PROMPT = 'Which two words did you reply with? Just the words.'
+const FORK_PROMPT = 'Which word did you reply with? Just the word.'
 
 it('streams a Reply, records where Claude saved it, and reports its Context size', async () => {
   const claude = await setUp(['warm.ndjson'])
@@ -277,6 +280,52 @@ it('resumes a cold session from the app’s copy alone', async () => {
   )
   // The SDK's own folder, which it fills from the store.
   expect(resumed?.configDir).not.toBe(claude.configDir)
+})
+
+it('forks the session through a mid-Thread Reply into a new session, leaving the warm one alone', async () => {
+  const claude = await setUp(['warm.ndjson', 'resumed.ndjson', 'forked.ndjson'])
+  const session = await warmThread(claude)
+  await claude.reply(THIRD_PROMPT, session)
+
+  const first = {sessionId: SESSION_ID, messageId: FIRST_MESSAGE}
+  const forked = await claude.reply(FORK_PROMPT, first, true)
+
+  // The second Reply never happened on this Branch.
+  expect(textOf(forked)).toBe('TEAL')
+  expect(recordedIn(forked)).toEqual({
+    sessionId: FORKED_SESSION_ID,
+    messageId: FORKED_MESSAGE,
+  })
+  // In the app's copy under its own id, whole, so it resumes on its own.
+  expect(
+    claude.store
+      .entriesOf(claude.projectKey, FORKED_SESSION_ID)
+      .map(entry => entry.uuid)
+  ).toEqual(expect.arrayContaining([FIRST_MESSAGE, FORKED_MESSAGE]))
+
+  const [, resumed, fork] = claude.reports()
+
+  // The warm `claude` at the end of the other Branch keeps going.
+  expect(resumed?.ended).toBeNull()
+  expect(fork?.args).toEqual(
+    expect.arrayContaining([
+      `--resume=${SESSION_ID}`,
+      `--resume-session-at=${FIRST_MESSAGE}`,
+      '--fork-session',
+    ])
+  )
+  // Restored whole for `claude` to fork; the fork is its to cut.
+  expect(fork?.resumedFrom).toEqual(
+    expect.arrayContaining([FIRST_MESSAGE, SECOND_MESSAGE])
+  )
+  expect(fork?.prompts).toEqual([FORK_PROMPT])
+
+  await claude.allClosed()
+  expect(claude.reports().map(report => report.ended)).toEqual([
+    'input-closed',
+    'input-closed',
+    'input-closed',
+  ])
 })
 
 it('resumes from the app’s copy when the warm session’s `claude` exited while idle', async () => {
