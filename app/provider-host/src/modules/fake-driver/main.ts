@@ -9,6 +9,12 @@ import {randomUUID} from 'node:crypto'
 
 import {createFakeSignIn} from './sign-in'
 
+/** Streamed as thinking before the first word: shown live, never stored. */
+const THINKING = `The user wants to see the fake Provider at work. I'll open with a line about the stream, look something up with the search tool, then close with code, math, a diagram and a picture.`
+
+/** A Model thinks again once a tool has answered, so the fake does too. */
+const THINKING_AFTER_TOOL = `The search answered with three results. Time to close with the list, the code, the math, the diagram and the picture.`
+
 const OPENING = `Here is a **canned** Reply from the fake Provider. It streams word by word, the way a real one would, so the whole path from the Provider host to the window can be tried without an account.
 
 Let me look something up first.
@@ -24,6 +30,19 @@ const CLOSING = `Found it. A few things worth knowing:
 \`\`\`ts
 const answer = 42
 \`\`\`
+
+Compound growth is $$A = P(1 + r)^n$$, or spelled out:
+
+$$
+A = P \\left(1 + \\frac{r}{n}\\right)^{nt}
+$$
+
+\`\`\`mermaid
+flowchart LR
+  Prompt --> Host --> Main --> Window
+\`\`\`
+
+![The Reply's path, as a picture](https://example.com/fake-reply-path.png)
 
 That's the end of the fake Reply.`
 
@@ -101,18 +120,27 @@ export function createFakeDriver({
       return {...ids, type: 'RUN_FINISHED', status: 'stopped'}
     }
 
-    /** Streams the words up to `limit`; false when the Reply was stopped. */
-    async function* streamText(
+    /**
+     * Streams the words up to `limit`. When the Reply is stopped meanwhile,
+     * ends it and returns false, so the caller only has to return.
+     */
+    async function* streamWords(
+      type: 'TEXT_DELTA' | 'REASONING_DELTA',
       text: string,
       limit?: number
     ): AsyncGenerator<ReplyEvent, boolean> {
       for (const word of words(text).slice(0, limit)) {
         await sleep(delayMs, signal)
 
-        if (signal.aborted) return false
+        if (signal.aborted) {
+          yield stopped()
 
-        yield {...ids, type: 'TEXT_DELTA', delta: word}
-        written += 1
+          return false
+        }
+
+        yield {...ids, type, delta: word}
+
+        if (type === 'TEXT_DELTA') written += 1
       }
 
       return true
@@ -121,16 +149,15 @@ export function createFakeDriver({
     try {
       yield {...ids, type: 'RUN_STARTED'}
 
-      const opened = yield* streamText(
+      if (!(yield* streamWords('REASONING_DELTA', THINKING))) return
+
+      const opened = yield* streamWords(
+        'TEXT_DELTA',
         OPENING,
         behavior === 'complete' ? undefined : WORDS_BEFORE_TROUBLE
       )
 
-      if (!opened) {
-        yield stopped()
-
-        return
-      }
+      if (!opened) return
 
       if (behavior === 'fail') {
         yield {
@@ -176,11 +203,9 @@ export function createFakeDriver({
         isError: false,
       }
 
-      if (!(yield* streamText(CLOSING))) {
-        yield stopped()
+      if (!(yield* streamWords('REASONING_DELTA', THINKING_AFTER_TOOL))) return
 
-        return
-      }
+      if (!(yield* streamWords('TEXT_DELTA', CLOSING))) return
 
       const inputTokens = words(request.prompt.text).length
       yield {

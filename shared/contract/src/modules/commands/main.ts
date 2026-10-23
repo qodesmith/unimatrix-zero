@@ -86,6 +86,19 @@ export const SignInCancelCommand = z.strictObject({
   provider: ProviderIdSchema,
 })
 
+/**
+ * A remote image a Reply linked, loaded on the user's click: main fetches it
+ * without cookies or a referrer and answers with a `data:` URL (ADR 0014).
+ */
+export const ImageLoadCommand = z.strictObject({
+  type: z.literal('image.load'),
+  url: z.url({protocol: /^https?$/u}),
+})
+
+export const ImageLoadResult = z.strictObject({
+  dataUrl: z.string().startsWith('data:image/'),
+})
+
 const Done = z.strictObject({})
 
 export const CommandSchema = z.discriminatedUnion('type', [
@@ -100,6 +113,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   SignInOpenPageCommand,
   SignInCodeCommand,
   SignInCancelCommand,
+  ImageLoadCommand,
 ])
 
 export type Command = z.infer<typeof CommandSchema>
@@ -118,6 +132,7 @@ const resultSchemas = {
   'sign-in.open-page': Done,
   'sign-in.code': Done,
   'sign-in.cancel': Done,
+  'image.load': ImageLoadResult,
 } as const satisfies Record<CommandType, z.ZodType>
 
 export type CommandResult<T extends CommandType> = z.infer<

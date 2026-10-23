@@ -50,6 +50,10 @@ function fakeMain(saved: Saved = {}) {
       return {ok: true, value: {trees: trees.toReversed()}}
     }
 
+    if (command.type === 'image.load') {
+      return {ok: true, value: {dataUrl: 'data:image/png;base64,'}}
+    }
+
     if (command.type === 'tree.create') {
       const tree = {id: crypto.randomUUID(), title: null, createdAt: receivedAt}
 

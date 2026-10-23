@@ -13,5 +13,7 @@
     "electron-runtime.json"
   ],
   // Vendored, type-checked upstream under its own settings
-  "exclude": ["tooling/oxlint/anti-slop"]
+  "exclude": ["tooling/oxlint/anti-slop"],
+  // record-fake-reply plays the fake driver
+  "references": [{"path": "./app/provider-host"}]
 }

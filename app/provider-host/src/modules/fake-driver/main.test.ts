@@ -29,6 +29,10 @@ function textOf(events: Streamed[]) {
     .join('')
 }
 
+function textDeltas(events: Streamed[]) {
+  return events.filter(event => event.type === 'TEXT_DELTA').length
+}
+
 it('streams canned Markdown word by word around a tool call, then tokens', async () => {
   const driver = createFakeDriver({delayMs: 0})
 
@@ -38,11 +42,33 @@ it('streams canned Markdown word by word around a tool call, then tokens', async
 
   const types = events.map(event => event.type)
   expect(types[0]).toBe('RUN_STARTED')
-  expect(types.filter(type => type === 'TEXT_DELTA').length).toBeGreaterThan(20)
+  expect(textDeltas(events)).toBeGreaterThan(20)
   expect(types).toContain('TOOL_RESULT')
   expect(types.slice(-3)).toEqual(['TOKENS', 'REPLY_RECORDED', 'RUN_FINISHED'])
   expect(events.at(-1)).toMatchObject({status: 'complete'})
   expect(textOf(events)).toContain("That's the end of the fake Reply.")
+})
+
+it('thinks before the first word, with everything a Reply can show', async () => {
+  const driver = createFakeDriver({delayMs: 0})
+
+  const events = await collect(
+    driver.startReply({...request, prompt: {text: 'Show me everything'}})
+  )
+
+  const types = events.map(event => event.type)
+  const firstThought = types.indexOf('REASONING_DELTA')
+  expect(firstThought).toBe(1)
+  expect(firstThought).toBeLessThan(types.indexOf('TEXT_DELTA'))
+  expect(types.lastIndexOf('REASONING_DELTA')).toBeGreaterThan(
+    types.indexOf('TOOL_RESULT')
+  )
+
+  const text = textOf(events)
+  expect(text).toContain('```ts\n')
+  expect(text).toContain('$$\n')
+  expect(text).toContain('```mermaid\n')
+  expect(text).toContain('](https://example.com/fake-reply-path.png)')
 })
 
 it('fails partway when the Prompt asks it to', async () => {
@@ -71,7 +97,7 @@ it('hangs partway when the Prompt asks it to, until stopped', async () => {
     })) {
       events.push(event)
 
-      if (event.type === 'TEXT_DELTA' && events.length === 13) {
+      if (textDeltas(events) === 12) {
         setTimeout(() => void driver.stop(request.replyId), 20)
       }
     }
@@ -97,9 +123,7 @@ it('stops a hanging Reply that was stopped on its last word', async () => {
   })) {
     events.push(event)
 
-    if (event.type === 'TEXT_DELTA' && events.length === 13) {
-      await driver.stop(request.replyId)
-    }
+    if (textDeltas(events) === 12) await driver.stop(request.replyId)
   }
 
   expect(events.at(-1)).toMatchObject({

@@ -66,6 +66,9 @@ beforeEach(() => {
       now,
     }),
     vendorProgramFor: () => vendorProgram,
+    images: {
+      load: async url => ({dataUrl: `data:image/png;base64,${url.length}`}),
+    },
     publish,
   }
 })
@@ -499,6 +502,20 @@ describe('connecting a Provider', () => {
   it('refuses an empty code', async () => {
     expect(
       await send({type: 'sign-in.code', provider: 'claude', code: '  '})
+    ).toMatchObject({ok: false, error: {code: 'invalid-command'}})
+  })
+})
+
+describe('loading a remote image', () => {
+  it('hands back what main fetched, as a data URL', async () => {
+    expect(
+      await send({type: 'image.load', url: 'https://example.com/a.png'})
+    ).toEqual({ok: true, value: {dataUrl: 'data:image/png;base64,25'}})
+  })
+
+  it('refuses any link that is not http or https', async () => {
+    expect(
+      await send({type: 'image.load', url: 'file:///etc/passwd'})
     ).toMatchObject({ok: false, error: {code: 'invalid-command'}})
   })
 })

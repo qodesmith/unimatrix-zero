@@ -5,6 +5,9 @@
   "imports": {
     "#modules/*": "./src/modules/*.ts"
   },
+  "exports": {
+    "./fake-driver": "./src/modules/fake-driver/main.ts"
+  },
   "scripts": {
     "build": "vite build"
   },
