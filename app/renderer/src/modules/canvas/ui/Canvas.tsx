@@ -61,6 +61,10 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
     toggledReplyId: null,
   }))
 
+  const [drafts, setDrafts] = useState<ReadonlyMap<string, string>>(
+    () => new Map()
+  )
+
   const switchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(
@@ -101,6 +105,17 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
     }))
   }, [])
 
+  const setDraft = useCallback((replyId: string, draft: string) => {
+    setDrafts(current => {
+      const next = new Map(current)
+
+      if (draft === '') next.delete(replyId)
+      else next.set(replyId, draft)
+
+      return next
+    })
+  }, [])
+
   const onSent = useCallback(
     (replyId: string) => {
       setChosenReplyId(replyId)
@@ -133,6 +148,8 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       toggleExpanded,
       collapsedReplyIds: collapsed.ids,
       toggleCollapsed,
+      drafts,
+      setDraft,
       limitTurnHeight,
       contextSizeMeter,
     }),
@@ -145,6 +162,8 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       toggleExpanded,
       collapsed.ids,
       toggleCollapsed,
+      drafts,
+      setDraft,
       limitTurnHeight,
       contextSizeMeter,
     ]

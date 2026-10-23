@@ -460,6 +460,36 @@ describe('a Prompt answering a Reply', () => {
     ).toEqual(['More', 'Or instead?'])
   })
 
+  it('streams a Branch while the other Branch’s Reply is still being written', async () => {
+    const {treeId, replyId} = await sendRoot()
+    record(treeId, replyId)
+    finish(treeId, replyId)
+
+    const next = {
+      type: 'prompt.send',
+      treeId,
+      parentReplyId: replyId,
+      text: 'More',
+    } as const
+
+    const one = await send(next)
+    const two = await send({...next, text: 'Or instead?'})
+
+    if (!one.ok || !two.ok) throw new Error('A Prompt was refused')
+
+    expect(
+      deps.turns
+        .streaming()
+        .map(streaming => streaming.replyId)
+        .toSorted()
+    ).toEqual(
+      [
+        PromptSendResult.parse(one.value).reply.id,
+        PromptSendResult.parse(two.value).reply.id,
+      ].toSorted()
+    )
+  })
+
   it('answers not-found for a Reply the Tree doesn’t have', async () => {
     const {treeId} = await sendRoot()
 

@@ -107,18 +107,19 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
 
 /**
  * The Input answering a Reply, mounted once the Reply is done with its space
- * kept, so revealing it shifts nothing and a draft survives the pointer
- * leaving. Revealed for the active Thread, while the Reply's box is hovered
- * or holds focus, and while it holds a draft.
+ * kept, so revealing it shifts nothing. Revealed for the active Thread, while
+ * the Reply's box is hovered or holds focus, and while it holds a draft.
  */
 function ReplyInput({reply, hovered}: {reply: Reply; hovered: boolean}) {
-  const {treeId, activeReplyId, setActiveReplyId, onSent} = useCanvas()
+  const {treeId, activeReplyId, setActiveReplyId, onSent, drafts, setDraft} =
+    useCanvas()
+
   const status = useLiveReply(reply.id)?.status ?? reply.status
-  const [drafting, setDrafting] = useState(false)
 
   if (status === 'streaming') return null
 
-  const revealed = activeReplyId === reply.id || drafting || hovered
+  const draft = drafts.get(reply.id) ?? ''
+  const revealed = activeReplyId === reply.id || draft.trim() !== '' || hovered
 
   return (
     <div
@@ -133,7 +134,8 @@ function ReplyInput({reply, hovered}: {reply: Reply; hovered: boolean}) {
         parentReplyId={reply.id}
         onFocus={() => setActiveReplyId(reply.id)}
         onSent={onSent}
-        onDraftChange={draft => setDrafting(draft.trim() !== '')}
+        draft={draft}
+        onDraftChange={text => setDraft(reply.id, text)}
       />
     </div>
   )

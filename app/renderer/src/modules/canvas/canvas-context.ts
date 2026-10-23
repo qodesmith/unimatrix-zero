@@ -27,6 +27,12 @@ export interface CanvasState {
   /** Forks folded through their pill: their Branches are left off the canvas. */
   collapsedReplyIds: ReadonlySet<string>
   toggleCollapsed: (replyId: string) => void
+  /**
+   * What is typed into each Reply's Input, by Reply id; kept here so a draft
+   * outlives its box being folded away or redrawn in the other orientation.
+   */
+  drafts: ReadonlyMap<string, string>
+  setDraft: (replyId: string, draft: string) => void
   limitTurnHeight: boolean
   contextSizeMeter: boolean
 }

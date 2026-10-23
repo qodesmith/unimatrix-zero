@@ -297,6 +297,32 @@ it('shows the active Thread’s Input, reveals another Reply’s on hover, and k
   expect(revealed('Reply three')).toBe('false')
 })
 
+it('keeps a draft through its Fork folding and unfolding, and through an orientation switch', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await inputUnder('Reply four').fill('Half a thought')
+  await hoverAway()
+
+  const pill = nodeOf('Reply two').getByRole('button', {
+    name: 'Fork · 2 Branches',
+  })
+
+  await pill.click()
+  await expect.element(page.getByText('Reply four')).not.toBeInTheDocument()
+  await pill.click()
+  await expect.element(page.getByText('Reply four')).toBeVisible()
+  await expect.element(inputUnder('Reply four')).toHaveValue('Half a thought')
+  await expect.poll(() => revealed('Reply four')).toBe('true')
+
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+  await expect
+    .poll(() => document.querySelectorAll('.react-flow__node-exchange').length)
+    .toBe(5)
+  await expect.element(inputUnder('Reply four')).toHaveValue('Half a thought')
+  await expect.poll(() => revealed('Reply four')).toBe('true')
+})
+
 it('highlights the newest Thread until the user picks another by focusing its Input', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
@@ -735,6 +761,37 @@ it('counts the Replies being written and the failed ones, and jumps to them', as
 
   await status.getByText('1 failed').click()
   await expect.poll(viewport).not.toBe(before)
+})
+
+it('counts the Replies streaming on several Threads at once and jumps to each in turn', async () => {
+  clock = 0
+
+  function streaming(n: number, promptN: number): Reply {
+    return {...reply(n, promptN, ''), status: 'streaming', content: []}
+  }
+
+  await renderCanvas({
+    prompts: [
+      prompt(1, null, 'Prompt one'),
+      prompt(2, 11, 'Prompt two'),
+      prompt(3, 11, 'Prompt three'),
+    ],
+    replies: [reply(11, 1, 'Reply one'), streaming(12, 2), streaming(13, 3)],
+  })
+
+  const status = page.getByRole('status')
+  await expect.element(status.getByText('2 streaming')).toBeVisible()
+  await expect.poll(viewport).toContain('translate')
+  await settledViewport()
+  const start = viewport()
+
+  await status.getByText('2 streaming').click()
+  await expect.poll(viewport).not.toBe(start)
+  await settledViewport()
+  const first = viewport()
+
+  await status.getByText('2 streaming').click()
+  await expect.poll(viewport).not.toBe(first)
 })
 
 it('shows one centered Input on an empty Tree and the Turns once it is sent', async () => {
