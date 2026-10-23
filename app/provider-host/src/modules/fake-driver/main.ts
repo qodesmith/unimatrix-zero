@@ -221,7 +221,11 @@ export function createFakeDriver({
         type: 'REPLY_RECORDED',
         model: 'fake',
         session: {
-          sessionId: request.session?.sessionId ?? randomUUID(),
+          // A fork is a new session, as with a real Provider.
+          sessionId:
+            request.session && !request.session.fork
+              ? request.session.sessionId
+              : randomUUID(),
           messageId: randomUUID(),
         },
       }
