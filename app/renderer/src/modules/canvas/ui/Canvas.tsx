@@ -41,6 +41,11 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
   const [typingReplyId, setTypingReplyId] = useState<string | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const [switching, setSwitching] = useState(false)
+
+  const [expandedTurnIds, setExpandedTurnIds] = useState<ReadonlySet<string>>(
+    () => new Set()
+  )
+
   const switchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(
@@ -64,7 +69,20 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
   )
 
   const focusOn = useCallback((replyId: string) => {
-    setFocus(current => ({replyId, sequence: (current?.sequence ?? 0) + 1}))
+    setFocus(current => ({
+      replyId,
+      sequence: (current?.sequence ?? 0) + 1,
+    }))
+  }, [])
+
+  const toggleExpanded = useCallback((turnId: string) => {
+    setExpandedTurnIds(current => {
+      const next = new Set(current)
+
+      if (!next.delete(turnId)) next.add(turnId)
+
+      return next
+    })
   }, [])
 
   const onSent = useCallback(
@@ -96,10 +114,21 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       setActiveReplyId: setChosenReplyId,
       setTypingReplyId,
       onSent,
+      expandedTurnIds,
+      toggleExpanded,
       limitTurnHeight,
       contextSizeMeter,
     }),
-    [treeId, index, activeReplyId, onSent, limitTurnHeight, contextSizeMeter]
+    [
+      treeId,
+      index,
+      activeReplyId,
+      onSent,
+      expandedTurnIds,
+      toggleExpanded,
+      limitTurnHeight,
+      contextSizeMeter,
+    ]
   )
 
   if (isEmpty(index)) {

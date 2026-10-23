@@ -13,6 +13,12 @@ export interface CanvasState {
   setTypingReplyId: Dispatch<SetStateAction<string | null>>
   /** A Prompt was sent and main started this Reply for it. */
   onSent: (replyId: string) => void
+  /**
+   * Turns the user let out of their capped height; kept here so they survive an
+   * orientation switch.
+   */
+  expandedTurnIds: ReadonlySet<string>
+  toggleExpanded: (turnId: string) => void
   limitTurnHeight: boolean
   contextSizeMeter: boolean
 }

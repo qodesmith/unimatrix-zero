@@ -102,4 +102,5 @@
 }
 .canvas-switching .react-flow__edges {
   opacity: 0;
+  transition: none;
 }

@@ -18,19 +18,31 @@ export type TurnNode = Node<{turn: LayoutNode}, LayoutNode['kind']>
 
 const hiddenHandle = 'opacity-0!'
 
-function PromptText({text}: {text: string}) {
-  const {limitTurnHeight} = useCanvas()
+function PromptText({prompt}: {prompt: Prompt}) {
+  const {limitTurnHeight, expandedTurnIds, toggleExpanded} = useCanvas()
 
   return (
-    <CappedText limit={limitTurnHeight} maxHeightClass="max-h-32">
-      <p className="text-sm whitespace-pre-wrap">{text}</p>
+    <CappedText
+      limit={limitTurnHeight}
+      maxHeightClass="max-h-32"
+      expanded={expandedTurnIds.has(prompt.id)}
+      onToggle={() => toggleExpanded(prompt.id)}
+    >
+      <p className="text-sm whitespace-pre-wrap">{prompt.text}</p>
     </CappedText>
   )
 }
 
 /** The Reply's content with its Context size, live while it streams. */
 function ReplyBody({reply}: {reply: Reply}) {
-  const {index, limitTurnHeight, contextSizeMeter} = useCanvas()
+  const {
+    index,
+    limitTurnHeight,
+    contextSizeMeter,
+    expandedTurnIds,
+    toggleExpanded,
+  } = useCanvas()
+
   const live = useLiveReply(reply.id)
   const status = live?.status ?? reply.status
   const contextSize = live?.contextSize ?? reply.contextSize
@@ -50,6 +62,8 @@ function ReplyBody({reply}: {reply: Reply}) {
       <CappedText
         limit={limitTurnHeight}
         maxHeightClass="max-h-72"
+        expanded={expandedTurnIds.has(reply.id)}
+        onToggle={() => toggleExpanded(reply.id)}
         streaming={status === 'streaming'}
         className="px-3.5 py-2"
       >
@@ -109,7 +123,7 @@ export function PromptNode({data}: NodeProps<TurnNode>) {
         data-turn={turn.prompt.id}
         className="rounded-xl border border-border bg-prompt px-3.5 py-2.5 text-prompt-foreground shadow-sm"
       >
-        <PromptText text={turn.prompt.text} />
+        <PromptText prompt={turn.prompt} />
       </div>
       <Handle
         type="source"
@@ -180,7 +194,7 @@ function ExchangeTurns({prompt, reply}: {prompt: Prompt; reply: Reply | null}) {
         data-turn={prompt.id}
         className="border-b border-border bg-prompt px-3.5 py-2.5 text-prompt-foreground"
       >
-        <PromptText text={prompt.text} />
+        <PromptText prompt={prompt} />
       </div>
       {reply && (
         <div data-turn={reply.id}>

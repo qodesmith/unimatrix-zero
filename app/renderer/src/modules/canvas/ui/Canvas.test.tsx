@@ -369,7 +369,31 @@ it('caps a long Prompt, with Show more letting it out and Show less capping it a
     .toBeVisible()
 })
 
-it('lets long messages take their full height when the Setting is off', async () => {
+it('keeps a Reply let out by Show more open across an orientation switch', async () => {
+  clock = 0
+  await renderCanvas({
+    prompts: [prompt(1, null, 'Short')],
+    // Markdown folds single newlines into one paragraph.
+    replies: [reply(11, 1, longText.replaceAll('\n', '\n\n'))],
+  })
+
+  await page.getByRole('button', {name: 'Show more'}).click()
+  await expect
+    .element(page.getByRole('button', {name: 'Show less'}))
+    .toBeVisible()
+
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+  await expect
+    .poll(() => document.querySelectorAll('.react-flow__node-exchange').length)
+    .toBe(1)
+
+  await expect
+    .element(page.getByRole('button', {name: 'Show less'}))
+    .toBeVisible()
+  expect(page.getByRole('button', {name: 'Show more'}).query()).toBeNull()
+})
+
+it('lets long Turns take their full height when the Setting is off', async () => {
   clock = 0
   await renderCanvas({
     prompts: [prompt(1, null, longText)],

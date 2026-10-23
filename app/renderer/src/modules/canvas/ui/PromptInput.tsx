@@ -10,7 +10,10 @@ interface PromptInputProps {
   parentReplyId: string | null
   /** The user is in this Input: its Thread becomes the active one. */
   onFocus?: () => void
-  /** Flips as the user starts and stops typing a Prompt here. */
+  /**
+   * Flips as this Input gains and loses focus: a focused Input counts as
+   * typing.
+   */
   onTypingChange?: (typing: boolean) => void
   /** The Reply main started for the sent Prompt. */
   onSent?: (replyId: string) => void
@@ -28,12 +31,6 @@ export function PromptInput({
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [focused, setFocused] = useState(false)
-
-  function reportTyping(nextFocused: boolean, nextDraft: string) {
-    setFocused(nextFocused)
-    onTypingChange?.(nextFocused && nextDraft.trim() !== '')
-  }
 
   async function send() {
     if (sending || draft.trim() === '') return
@@ -50,7 +47,6 @@ export function PromptInput({
 
     setError(null)
     setDraft('')
-    reportTyping(focused, '')
     onSent?.(outcome.reply.id)
   }
 
@@ -76,14 +72,11 @@ export function PromptInput({
         className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm"
         value={draft}
         onFocus={() => {
-          reportTyping(true, draft)
+          onTypingChange?.(true)
           onFocus?.()
         }}
-        onBlur={() => reportTyping(false, draft)}
-        onChange={event => {
-          setDraft(event.target.value)
-          reportTyping(focused, event.target.value)
-        }}
+        onBlur={() => onTypingChange?.(false)}
+        onChange={event => setDraft(event.target.value)}
         onKeyDown={onKeyDown}
       />
       <div className="flex items-center justify-between gap-2">

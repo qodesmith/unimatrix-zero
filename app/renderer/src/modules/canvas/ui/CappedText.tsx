@@ -7,6 +7,9 @@ interface CappedTextProps {
   /** Off: the text takes its full height and there is nothing to show more of. */
   limit: boolean
   maxHeightClass: string
+  /** Let out of the cap by Show more. */
+  expanded: boolean
+  onToggle: () => void
   /**
    * Still being written: the box stays on the newest text until the user
    * scrolls up.
@@ -27,11 +30,12 @@ const AT_BOTTOM = 24
 export function CappedText({
   limit,
   maxHeightClass,
+  expanded,
+  onToggle,
   streaming = false,
   className,
   children,
 }: CappedTextProps) {
-  const [expanded, setExpanded] = useState(false)
   const [overflows, setOverflows] = useState(false)
   const box = useRef<HTMLDivElement>(null)
   const content = useRef<HTMLDivElement>(null)
@@ -73,7 +77,7 @@ export function CappedText({
           <button
             type="button"
             className="text-xs text-primary hover:underline"
-            onClick={() => setExpanded(current => !current)}
+            onClick={onToggle}
           >
             {expanded ? 'Show less' : 'Show more'}
           </button>
