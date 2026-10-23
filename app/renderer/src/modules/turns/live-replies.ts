@@ -9,11 +9,12 @@ import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 export type Turns = CommandResult<'tree.turns'>
 
 /**
- * One stretch of thinking: display only, never stored, so it lives here until
- * the window reloads. A Model thinks before its first word and again between
- * tool calls, so a Reply has a summary per stretch.
+ * One contiguous run of the Model's reasoning, before a content part. Display
+ * only, never stored, so it lives here until the window reloads. A Model thinks
+ * before its first word and again between tool calls, so a Reply may hold
+ * several.
  */
-export interface ThinkingSummary {
+export interface ThinkingBlock {
   text: string
   /** The content part the thinking came before; the count of parts so far. */
   beforePart: number
@@ -25,8 +26,8 @@ export interface ThinkingSummary {
 interface LiveState {
   /** Replies being written, by Reply id. Saved Turns live in TanStack Query. */
   replies: Record<string, StreamingReply>
-  /** By Reply id, kept after the Reply finishes. */
-  thinking: Record<string, ThinkingSummary[]>
+  /** By Reply id, kept after the Reply finishes; only a reload clears it. */
+  thinking: Record<string, ThinkingBlock[]>
 }
 
 export type ReplyStore = Store<LiveState>
@@ -54,24 +55,24 @@ const MOVES_ON: ReadonlySet<ReplyEvent['type']> = new Set([
 ])
 
 /**
- * A round of thinking stays open across bookkeeping such as `TOKENS`, which
- * a Provider may report mid-thought, and closes only once words, a tool call
- * or the end of the Reply arrive.
+ * A Thinking block stays open across bookkeeping such as `TOKENS`, which a
+ * Provider may report mid-thought, and closes only once words, a tool call or
+ * the end of the Reply arrive.
  */
 function foldThinking(
-  summaries: ThinkingSummary[],
+  blocks: ThinkingBlock[],
   event: ReplyEvent,
   partsSoFar: number,
   now: number
-): ThinkingSummary[] {
-  const last = summaries.at(-1)
+): ThinkingBlock[] {
+  const last = blocks.at(-1)
   const open = last?.endedAt === null ? last : null
 
   if (event.type === 'REASONING_DELTA') {
     return open
-      ? [...summaries.slice(0, -1), {...open, text: open.text + event.delta}]
+      ? [...blocks.slice(0, -1), {...open, text: open.text + event.delta}]
       : [
-          ...summaries,
+          ...blocks,
           {
             text: event.delta,
             beforePart: partsSoFar,
@@ -82,8 +83,8 @@ function foldThinking(
   }
 
   return open && MOVES_ON.has(event.type)
-    ? [...summaries.slice(0, -1), {...open, endedAt: now}]
-    : summaries
+    ? [...blocks.slice(0, -1), {...open, endedAt: now}]
+    : blocks
 }
 
 /**
@@ -116,17 +117,15 @@ export function applyLiveEvent(
   const {replies, thinking} = store.state
   const current = replies[replyId] ?? {...NEW_REPLY, treeId, replyId}
   const next = foldReplyEvent(current, event)
-  const summaries = thinking[replyId] ?? []
+  const blocks = thinking[replyId] ?? []
 
-  const nextSummaries =
+  const nextBlocks =
     'subagentId' in event && event.subagentId !== undefined
-      ? summaries
-      : foldThinking(summaries, event, current.content.length, now())
+      ? blocks
+      : foldThinking(blocks, event, current.content.length, now())
 
   const nextThinking =
-    nextSummaries === summaries
-      ? thinking
-      : {...thinking, [replyId]: nextSummaries}
+    nextBlocks === blocks ? thinking : {...thinking, [replyId]: nextBlocks}
 
   if (event.type === 'RUN_FINISHED') {
     const {status, content, contextSize} = next

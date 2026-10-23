@@ -1,4 +1,4 @@
-import type {ThinkingSummary} from '../live-replies'
+import type {ThinkingBlock} from '../live-replies'
 import type {Reply, ReplyPart} from '@uz/contract/turns'
 
 import {ReplyMarkdown} from '#modules/markdown/main'
@@ -11,16 +11,16 @@ type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 /** Re-renders only when this Reply changes, from the stream or once saved. */
 export function ReplyView({reply}: {reply: Reply}) {
   const live = useLiveReply(reply.id)
-  const summaries = useThinking(reply.id)
+  const blocks = useThinking(reply.id)
   const {status, content} = live ?? reply
   const streaming = status === 'streaming'
 
   function thinkingBefore(part: number) {
-    return summaries.flatMap((summary, round) =>
-      summary.beforePart === part
+    return blocks.flatMap((block, index) =>
+      block.beforePart === part
         ? [
-            // oxlint-disable-next-line react/no-array-index-key -- rounds only ever append, so positions are stable
-            <ThinkingSummaryView key={round} summary={summary} />,
+            // oxlint-disable-next-line react/no-array-index-key -- blocks only ever append, so positions are stable
+            <ThinkingBlockView key={index} block={block} />,
           ]
         : []
     )
@@ -65,9 +65,9 @@ function describeDuration(ms: number) {
   return `${Math.round(ms / 60_000)}m`
 }
 
-/** One stretch of thinking, collapsed, with how long it took once it moved on. */
-function ThinkingSummaryView({summary}: {summary: ThinkingSummary}) {
-  const {text, startedAt, endedAt} = summary
+/** One Thinking block, collapsed, with how long it took once the Model moved on. */
+function ThinkingBlockView({block}: {block: ThinkingBlock}) {
+  const {text, startedAt, endedAt} = block
 
   return (
     <details className="rounded-md bg-muted/50 px-2 py-1 text-xs text-muted-foreground">

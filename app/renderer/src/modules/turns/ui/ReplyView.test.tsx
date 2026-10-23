@@ -3,13 +3,12 @@ import type {Command} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {Reply} from '@uz/contract/turns'
 
-import {QueryClient} from '@tanstack/react-query'
 import {EventSchema} from '@uz/contract/events'
 import {beforeEach, expect, it} from 'vitest'
 import {render} from 'vitest-browser-react'
 
 import recording from '../fake-reply.json'
-import {applyLiveEvent, createReplyStore} from '../live-replies'
+import {createReplay} from '../replay'
 import {ReplyStoreContext} from '../use-live-reply'
 import {ReplyView} from './ReplyView'
 
@@ -74,20 +73,15 @@ function before(type: AppEvent['type'], nth = 0) {
  * `<TreeView>` reads and this test does not.
  */
 async function replay(upTo = before('RUN_FINISHED')) {
-  const store = createReplyStore()
-  const queryClient = new QueryClient()
-  let now = 1000
+  const live = createReplay()
 
   const screen = await render(
-    <ReplyStoreContext value={store}>
+    <ReplyStoreContext value={live.store}>
       <ReplyView reply={reply} />
     </ReplyStoreContext>
   )
 
-  for (const event of events.slice(0, upTo)) {
-    now += 100
-    applyLiveEvent(event, store, queryClient, () => now)
-  }
+  live.replay(events.slice(0, upTo))
 
   return screen
 }
@@ -122,7 +116,7 @@ it('replaces the thinking header with its duration once the words start', async 
   await expect.element(screen.getByText('Thinking…')).not.toBeInTheDocument()
 })
 
-it('shows each round of thinking where it happened', async () => {
+it('shows each Thinking block where it happened', async () => {
   const screen = await replay()
   const article = screen.getByRole('article', {name: 'Reply'}).element()
 

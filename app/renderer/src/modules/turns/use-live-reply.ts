@@ -19,12 +19,12 @@ export function useLiveReply(replyId: string) {
   return useSelector(useReplyStore(), state => state.replies[replyId])
 }
 
-const NO_SUMMARIES: never[] = []
+const NO_BLOCKS: never[] = []
 
-/** What the Reply's Model thought, while this window has been open. */
+/** The Reply's Thinking blocks, while this window has been open. */
 export function useThinking(replyId: string) {
   return useSelector(
     useReplyStore(),
-    state => state.thinking[replyId] ?? NO_SUMMARIES
+    state => state.thinking[replyId] ?? NO_BLOCKS
   )
 }

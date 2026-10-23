@@ -1,6 +1,6 @@
 import {expect, it} from 'vitest'
 
-import {IMAGE_SIZE_LIMIT, createRemoteImages} from './main'
+import {IMAGE_SIZE_LIMIT, REDIRECT_LIMIT, createRemoteImages} from './main'
 
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47])
 
@@ -9,22 +9,29 @@ interface Served {
   type?: string | null
   length?: number
   body?: Uint8Array | ReadableStream<Uint8Array>
-  /** Where the response came from, when a redirect moved it. */
-  from?: string
 }
 
-/** The network as main sees it, keeping the request it was sent. */
-function fakeFetch({
-  status = 200,
-  type = 'image/png',
-  length,
-  body = png,
-  from,
-}: Served) {
+/**
+ * The network as main sees it, keeping every request it was sent. Addresses
+ * in `redirects` answer with a 302 to where they point; any other serves the
+ * image.
+ */
+function fakeFetch(
+  {status = 200, type = 'image/png', length, body = png}: Served,
+  redirects: Record<string, string> = {}
+) {
   const requests: ({url: string} & RequestInit)[] = []
 
   async function fetch(...[input, init]: Parameters<typeof globalThis.fetch>) {
-    requests.push({url: new Request(input).url, ...init})
+    const {url} = new Request(input)
+
+    requests.push({url, ...init})
+
+    const to = redirects[url]
+
+    if (to !== undefined) {
+      return new Response(null, {status: 302, headers: {Location: to}})
+    }
 
     const headers = new Headers()
 
@@ -32,12 +39,7 @@ function fakeFetch({
 
     if (length !== undefined) headers.set('Content-Length', String(length))
 
-    const response = new Response(body, {status, headers})
-
-    if (from !== undefined)
-      Object.defineProperty(response, 'url', {value: from})
-
-    return response
+    return new Response(body, {status, headers})
   }
 
   return {fetch, requests}
@@ -84,24 +86,82 @@ it('refuses a response with no media type', async () => {
   )
 })
 
-it('follows a redirect to another https host', async () => {
-  const images = createRemoteImages(
-    fakeFetch({from: 'https://cdn.example.net/chart.png'}).fetch
+it('follows a redirect to another https host, one hop at a time', async () => {
+  const network = fakeFetch(
+    {},
+    {'https://example.com/chart.png': 'https://cdn.example.net/chart.png'}
   )
+
+  const images = createRemoteImages(network.fetch)
 
   await expect(images.load('https://example.com/chart.png')).resolves.toEqual({
     dataUrl: 'data:image/png;base64,iVBORw==',
   })
+  expect(network.requests.map(request => request.url)).toEqual([
+    'https://example.com/chart.png',
+    'https://cdn.example.net/chart.png',
+  ])
+  expect(network.requests[0]).toMatchObject({redirect: 'manual'})
 })
 
-it('refuses a redirect that leaves https', async () => {
-  const images = createRemoteImages(
-    fakeFetch({from: 'http://127.0.0.1/chart.png'}).fetch
+it('resolves a relative redirect against the address it came from', async () => {
+  const network = fakeFetch(
+    {},
+    {'https://example.com/chart.png': '/images/chart.png'}
   )
+
+  const images = createRemoteImages(network.fetch)
+
+  await expect(images.load('https://example.com/chart.png')).resolves.toEqual({
+    dataUrl: 'data:image/png;base64,iVBORw==',
+  })
+  expect(network.requests.at(-1)?.url).toBe(
+    'https://example.com/images/chart.png'
+  )
+})
+
+it('refuses a redirect that leaves https before requesting it', async () => {
+  const network = fakeFetch(
+    {},
+    {'https://example.com/chart.png': 'http://127.0.0.1/chart.png'}
+  )
+
+  const images = createRemoteImages(network.fetch)
 
   await expect(images.load('https://example.com/chart.png')).rejects.toThrow(
     'The image moved to an address that is not https.'
   )
+  expect(network.requests.map(request => request.url)).toEqual([
+    'https://example.com/chart.png',
+  ])
+})
+
+it('refuses a redirect off the web, even from an http chip', async () => {
+  const network = fakeFetch(
+    {},
+    {'http://example.com/chart.png': 'file:///etc/passwd'}
+  )
+
+  const images = createRemoteImages(network.fetch)
+
+  await expect(images.load('http://example.com/chart.png')).rejects.toThrow(
+    'The image moved to an address that is not a web address.'
+  )
+  expect(network.requests).toHaveLength(1)
+})
+
+it('gives up on a redirect loop', async () => {
+  const network = fakeFetch(
+    {},
+    {'https://example.com/chart.png': 'https://example.com/chart.png'}
+  )
+
+  const images = createRemoteImages(network.fetch)
+
+  await expect(images.load('https://example.com/chart.png')).rejects.toThrow(
+    'The image redirected too many times.'
+  )
+  expect(network.requests).toHaveLength(REDIRECT_LIMIT + 1)
 })
 
 it('says when the server refused', async () => {
