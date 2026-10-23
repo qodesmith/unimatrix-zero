@@ -78,8 +78,7 @@ function ReplyBody({reply}: {reply: Reply}) {
 
 /** The Input continuing a Thread from its leaf Reply, once that Reply is done. */
 function LeafInput({reply}: {reply: Reply}) {
-  const {treeId, index, setActiveReplyId, setTypingReplyId, onSent} =
-    useCanvas()
+  const {treeId, index, setActiveReplyId, onSent} = useCanvas()
 
   const status = useLiveReply(reply.id)?.status ?? reply.status
 
@@ -91,11 +90,6 @@ function LeafInput({reply}: {reply: Reply}) {
         treeId={treeId}
         parentReplyId={reply.id}
         onFocus={() => setActiveReplyId(reply.id)}
-        onTypingChange={typing =>
-          setTypingReplyId(current =>
-            typing ? reply.id : current === reply.id ? null : current
-          )
-        }
         onSent={onSent}
       />
     </div>

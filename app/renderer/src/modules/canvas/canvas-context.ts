@@ -1,5 +1,4 @@
 import type {TreeIndex} from './tree'
-import type {Dispatch, SetStateAction} from 'react'
 
 import {createContext, use} from 'react'
 
@@ -9,8 +8,6 @@ export interface CanvasState {
   index: TreeIndex
   activeReplyId: string | null
   setActiveReplyId: (replyId: string) => void
-  /** The Reply whose Input the user is typing into. */
-  setTypingReplyId: Dispatch<SetStateAction<string | null>>
   /** A Prompt was sent and main started this Reply for it. */
   onSent: (replyId: string) => void
   /**

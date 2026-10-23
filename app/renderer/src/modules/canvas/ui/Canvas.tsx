@@ -38,7 +38,6 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
   const [startedEmpty] = useState(() => isEmpty(index))
   const [chosenReplyId, setChosenReplyId] = useState<string | null>(null)
   const [hoverTurnId, setHoverTurnId] = useState<string | null>(null)
-  const [typingReplyId, setTypingReplyId] = useState<string | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const [switching, setSwitching] = useState(false)
 
@@ -60,8 +59,8 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       ? chosenReplyId
       : (newestReply(index)?.id ?? null)
 
-  // Typing wins over hovering, and both are temporary.
-  const highlightedTurnId = typingReplyId ?? hoverTurnId ?? activeReplyId
+  // Hovering redraws the highlight only while the pointer is on the Turn.
+  const highlightedTurnId = hoverTurnId ?? activeReplyId
 
   const thread = useMemo(
     () => new Set(highlightedTurnId ? pathTo(index, highlightedTurnId) : []),
@@ -112,7 +111,6 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       index,
       activeReplyId,
       setActiveReplyId: setChosenReplyId,
-      setTypingReplyId,
       onSent,
       expandedTurnIds,
       toggleExpanded,

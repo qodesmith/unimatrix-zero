@@ -10,11 +10,6 @@ interface PromptInputProps {
   parentReplyId: string | null
   /** The user is in this Input: its Thread becomes the active one. */
   onFocus?: () => void
-  /**
-   * Flips as this Input gains and loses focus: a focused Input counts as
-   * typing.
-   */
-  onTypingChange?: (typing: boolean) => void
   /** The Reply main started for the sent Prompt. */
   onSent?: (replyId: string) => void
 }
@@ -24,7 +19,6 @@ export function PromptInput({
   treeId,
   parentReplyId,
   onFocus,
-  onTypingChange,
   onSent,
 }: PromptInputProps) {
   const sendPrompt = useSendPrompt(treeId, parentReplyId)
@@ -71,11 +65,7 @@ export function PromptInput({
         placeholder={parentReplyId === null ? 'Ask anything' : 'Reply…'}
         className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm"
         value={draft}
-        onFocus={() => {
-          onTypingChange?.(true)
-          onFocus?.()
-        }}
-        onBlur={() => onTypingChange?.(false)}
+        onFocus={onFocus}
         onChange={event => setDraft(event.target.value)}
         onKeyDown={onKeyDown}
       />

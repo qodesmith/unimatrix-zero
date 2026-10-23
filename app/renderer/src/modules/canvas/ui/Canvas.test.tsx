@@ -204,6 +204,15 @@ async function hoverAway() {
   await page.getByRole('group', {name: 'Orientation'}).hover()
 }
 
+/** The Input under a Reply's box. */
+function inputUnder(replyText: string) {
+  const box = page.getByText(replyText).element().closest('.react-flow__node')
+
+  if (!box) throw new Error(`${replyText} is not on the canvas`)
+
+  return page.elementLocator(box).getByRole('textbox', {name: 'Prompt'})
+}
+
 it('draws every Turn as its own box, top-down, with an Input on each Thread’s end', async () => {
   await renderCanvas(forkedTree())
 
@@ -242,17 +251,7 @@ it('highlights the newest Thread until the user picks another by focusing its In
       ].toSorted()
     )
 
-  const threeBox = page
-    .getByText('Reply three')
-    .element()
-    .closest('.react-flow__node')
-
-  if (!threeBox) throw new Error('Reply three is not on the canvas')
-
-  await page
-    .elementLocator(threeBox)
-    .getByRole('textbox', {name: 'Prompt'})
-    .click()
+  await inputUnder('Reply three').click()
   await hoverAway()
 
   await expect
@@ -260,7 +259,7 @@ it('highlights the newest Thread until the user picks another by focusing its In
     .toEqual([edge(1, 11), edge(11, 3), edge(3, 13)].toSorted())
 })
 
-it('highlights a hovered Turn’s Thread while the pointer is on it, and the typed-in one over that', async () => {
+it('highlights a hovered Turn’s Thread only while the pointer is on it, even over the focused Input’s', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply four')).toBeVisible()
 
@@ -269,22 +268,51 @@ it('highlights a hovered Turn’s Thread while the pointer is on it, and the typ
     .poll(highlightedEdges)
     .toEqual([edge(1, 11), edge(11, 2), edge(2, 12), edge(12, 4)].toSorted())
 
-  const threeBox = page
-    .getByText('Reply three')
-    .element()
-    .closest('.react-flow__node')
-
-  if (!threeBox) throw new Error('Reply three is not on the canvas')
-
-  await page
-    .elementLocator(threeBox)
-    .getByRole('textbox', {name: 'Prompt'})
-    .fill('A thought')
+  await inputUnder('Reply three').fill('A thought')
   await page.getByText('Prompt four').hover()
+  await expect
+    .poll(highlightedEdges)
+    .toEqual([edge(1, 11), edge(11, 2), edge(2, 12), edge(12, 4)].toSorted())
 
+  await hoverAway()
   await expect
     .poll(highlightedEdges)
     .toEqual([edge(1, 11), edge(11, 3), edge(3, 13)].toSorted())
+})
+
+it('moves the highlight to the Reply a leaf Input sends for, and keeps hovering alive', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply three')).toBeVisible()
+
+  await inputUnder('Reply three').fill('A thought')
+  await userEvent.keyboard('{Enter}')
+  await expect.element(page.getByText('A thought')).toBeVisible()
+  await hoverAway()
+
+  const sentPromptId = page
+    .getByText('A thought')
+    .element()
+    .closest('.react-flow__node')
+    ?.getAttribute('data-id')
+
+  if (!sentPromptId) throw new Error('The sent Prompt is not on the canvas')
+
+  await expect
+    .poll(highlightedEdges)
+    .toEqual(
+      expect.arrayContaining([
+        edge(1, 11),
+        edge(11, 3),
+        edge(3, 13),
+        `${uuid(13)}-${sentPromptId}`,
+      ])
+    )
+  expect(highlightedEdges()).toHaveLength(5)
+
+  await page.getByText('Prompt four').hover()
+  await expect
+    .poll(highlightedEdges)
+    .toEqual([edge(1, 11), edge(11, 2), edge(2, 12), edge(12, 4)].toSorted())
 })
 
 it('switches to one card per Exchange, left to right, and writes the Setting', async () => {
