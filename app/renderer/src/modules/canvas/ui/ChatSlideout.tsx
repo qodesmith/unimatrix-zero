@@ -97,7 +97,7 @@ export function ChatSlideout({
       inert={!open}
       style={{transitionDuration: `${SLIDE_MS}ms`}}
       className={cn(
-        'absolute inset-y-0 right-0 z-10 flex flex-col bg-background transition-transform ease-out starting:translate-x-full',
+        'absolute inset-y-0 right-0 z-10 flex flex-col bg-background transition-transform ease-out motion-reduce:transition-none starting:translate-x-full',
         full ? 'left-0' : 'w-110 max-w-full border-l border-border shadow-xl',
         !open && 'translate-x-full'
       )}

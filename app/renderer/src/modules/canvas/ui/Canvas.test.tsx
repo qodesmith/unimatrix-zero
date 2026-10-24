@@ -1,3 +1,5 @@
+// The Playwright provider gives `cdp()` its `send`.
+/// <reference types="@vitest/browser-playwright" />
 import type {Bridge} from '@uz/contract/bridge'
 import type {Command} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
@@ -9,9 +11,9 @@ import {SettingsProvider} from '#modules/settings/main'
 import {LiveReplies} from '#modules/turns/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
-import {expect, it} from 'vitest'
+import {expect, it, onTestFinished} from 'vitest'
 import {render} from 'vitest-browser-react'
-import {page, userEvent} from 'vitest/browser'
+import {cdp, page, userEvent} from 'vitest/browser'
 
 import {Canvas} from './Canvas'
 
@@ -1035,6 +1037,29 @@ it('slides the slideout in as it opens and out as it closes', async () => {
   await slideout().getByRole('button', {name: 'Close'}).click()
   expect(aside.isConnected).toBe(true)
   expect(sliding(aside)).toBe(true)
+  await expect.poll(() => aside.isConnected).toBe(false)
+})
+
+/** The OS's reduced motion setting as Chromium reports it; '' is no preference. */
+async function emulateReducedMotion(value: 'reduce' | '') {
+  await cdp().send('Emulation.setEmulatedMedia', {
+    features: [{name: 'prefers-reduced-motion', value}],
+  })
+}
+
+it('opens and closes the slideout without sliding when the OS asks for reduced motion', async () => {
+  await emulateReducedMotion('reduce')
+  onTestFinished(async () => emulateReducedMotion(''))
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await canvas().getByText('Prompt four').click()
+  await expect.element(slideout()).toBeInTheDocument()
+  const aside = slideout().element()
+  expect(sliding(aside)).toBe(false)
+
+  await slideout().getByRole('button', {name: 'Close'}).click()
+  expect(sliding(aside)).toBe(false)
   await expect.poll(() => aside.isConnected).toBe(false)
 })
 
