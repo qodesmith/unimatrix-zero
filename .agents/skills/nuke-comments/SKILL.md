@@ -12,7 +12,7 @@ It earns that cost only by carrying what the code cannot.
 
 Four keepers, and nothing else:
 
-- **Trap**: library or framework behaviour that bites the next editor.
+- **Trap**: library or framework behavior that bites the next editor.
   _"This Checkbox spreads external props over its own click handler, so an `onClick` here would replace the toggle rather than compose with it."_
 - **Contract**: an invariant, a unit, or an order that the code does not show.
   _"`riskCells` stays row-major; the heatmap rebuilds its axes from that order."_
@@ -98,6 +98,6 @@ Asked to review rather than to sweep, for example a CI job or a pull request dif
 
 5. **Report the numbers.**
    Total comment lines before and after, the files touched, and the checks that passed.
-   Name a few comments you kept on purpose and why, so the judgement is reviewable rather than a wall of deletions.
+   Name a few comments you kept on purpose and why, so the judgment is reviewable rather than a wall of deletions.
 
 Done means: the baseline is green, the minified output is identical, and the directive counts reconcile.

@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "address-pr-comments": {
+      "source": "qodesmith/skills",
+      "sourceType": "github",
+      "skillPath": "address-pr-comments/SKILL.md",
+      "computedHash": "9603829d0cd1bd52aa20a2cbecaa1c95b94b1ec22dd192544fb87503cf3ce7fb"
+    },
     "ask-matt": {
       "source": "mattpocock/skills",
       "ref": "v1.3.1",
@@ -123,14 +129,13 @@
       "source": "qodesmith/skills",
       "sourceType": "github",
       "skillPath": "nuke-comments/SKILL.md",
-      "computedHash": "93318736aa621217f7df947aa63078dd3e2270ae23bc2a3389c09fbe9a45868a"
+      "computedHash": "69e7e701001fe24e886c89b7a8b4dce692bfadaaa608714e123a0eef2610508d"
     },
     "pr": {
-      "source": "mattpocock/skills",
-      "ref": "v1.3.1",
+      "source": "qodesmith/skills",
       "sourceType": "github",
-      "skillPath": "skills/engineering/pr/SKILL.md",
-      "computedHash": "22a15d4d469344b38e03eb0e95772478393975836289393b1bad3c0febcdc679"
+      "skillPath": "pr/SKILL.md",
+      "computedHash": "17077690f8dde3c30ef00dab572b16b9f9a52a69e9d480ab9d10926d36ded494"
     },
     "prototype": {
       "source": "mattpocock/skills",

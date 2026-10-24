@@ -9,10 +9,16 @@ metadata:
     url: "https://github.com/humanlayer/skills/blob/main/plugins/show-me/skills/show-me/SKILL.md"
 ---
 
-Use this template for writing the PR body:
+A PR body has two halves. The first half is read by everyone. The second half is read by the reviewer who wants to dig.
 
 ```markdown
-## Summary
+## What this PR does
+
+- <bullet>
+- <bullet>
+- <bullet>
+
+## Details
 
 <diagram, diff-sketch, or tree>
 
@@ -25,20 +31,28 @@ Use this template for writing the PR body:
 
 **Door:** <one-way or two-way>
 
-<optional: description>
-
 **Blast Radius:** <one-word description>
 
 <optional: potential ramifications of merge>
 ```
 
-## Sections
+## What this PR does
 
-Skip all preambles and keep prose brief. Use the user's domain language from `GLOSSARY.md`.
+Three to six bullets. A reader who stops here knows the whole change.
 
-### Summary
+Write each bullet like a smart engineer talking across a desk: plain English, answer first, one change per bullet, under 15 words. Say the user-visible effect before the mechanism ("The contract panel's scrollbar now follows the theme", then how). Open with the issue ref if there is one (`Fixes #123`).
 
-Pick the smallest view that makes the key point clear.
+Prose rules for this section:
+
+- Short word over long word: "fix" over "implement a solution for".
+- One idea per sentence, active voice, 20 words max.
+- Plain text. Bold and inline code only for a name the reader must search for.
+- Every not, never, no, only survives. Clarity beats compression.
+- Keep tangents (reverted commits, drive-by test fixes, what is left for another PR) out of this section. They go under Details.
+
+## Details
+
+Everything else lives here, and it may be long. Pick the smallest view that makes the key point clear. Use the user's domain language from `GLOSSARY.md`.
 
 - Show logic or an algorithm as pseudocode:
 
@@ -90,46 +104,7 @@ sequenceDiagram
     Daemon-->>UI: stream result
 ```
 
-- Use `diff` when the point is what changes and the surrounding shape already exists. Match the diff shape to the topic.
-
-For a component change:
-
-```diff
- <SessionPage>
-   useSessionEvents()
-   <SessionToolbar>
-+    <RunSkillButton />
-   <SessionTimeline>
-+    <SkillResultCard />
-```
-
-For a file-layout change:
-
-```diff
- src/
- ├── commands/
-+│   └── show-me.ts       # expands the slash command
- ├── sessions/
--└── transport.ts
-+└── transport/
-+    ├── client.ts
-+    └── stream.ts
-```
-
-For a call-tree or call-stack change:
-
-```diff
- submitForm
-   createSession
-     persistPrompt
-+    expandSkillMention
-     launchAgent
--  navigateToSession
-+  navigateToSession
-+    subscribeToEvents
-```
-
-For a state or control-flow change:
+- Use `diff` when the point is what changes and the surrounding shape already exists. Match the diff shape to the topic: a component tree, a file layout, a call tree, or a control-flow sketch.
 
 ```diff
  on(save)
@@ -140,31 +115,26 @@ For a state or control-flow change:
 +  invalidate cache
 ```
 
-- Show the whole block when most of it is new, when omitted context would hide ownership or order, or when the user needs a copyable target shape:
+- Show the whole block when most of it is new, when omitted context would hide ownership or order, or when the user needs a copyable target shape.
 
-```ts
-function expandSkill(command: string): string {
-  const skillName = command.slice(1);
-  return `use the ${skillName} skill`;
-}
-```
+Place each visual next to the short text it supports. Keep only the calls, files, props, states, and boundaries needed to make the point. You may use one of these, you may use several, it is unlikely you will use all of them.
 
-#### Guidance
+Tangents go here too, each under its own short sub-heading: a commit that was superseded, a pre-existing failure this PR also repairs, work deliberately left for another PR.
 
-Place each visual next to the short text it supports. Keep only the calls, files, props, states, and boundaries needed to answer the user's current question or the options to resolve the current discussion point.
-
-You may use one of these, you may use several, it is unlikely you will use all of them. Use your judgement and don't overwhelm the user.
-
-### Evidence
+## Evidence
 
 Concrete evidence that the change works. Show a before and after.
 
-Screenshots are S-tier - when the environment is set up for it and the change is visual.
+Screenshots are S-tier when the environment is set up for it and the change is visual. Execution-based evidence is A-tier: test results, console output. Show the exact test that now fails and passes, using pseudocode.
 
-Execution-based evidence is A-tier. Test results, console output. Show the exact test that now fails and passes, using pseudocode.
+## Merge Danger
 
-### Merge Danger
+Describe whether it is a one-way or two-way door. You can walk back through two-way doors, but not one-way doors. Changes that involve destructive actions or hard-to-reverse decisions are one-way doors.
 
-Describe whether it's a one-way or two-way door. You can walk back through two-way doors, but not one-way doors. A PR that is cheap to roll back is lower risk. Changes that involve destructive actions or hard-to-reverse decisions are one-way doors.
+The blast radius is the potential scope of the change. Consider all possibilities: layout shift, breakages for consumers, mobile responsiveness.
 
-The blast radius is the potential impact or scope of the changes introduced by this PR. Consider all possibilities. Examples are layout shift, breakages for consumers, mobile responsiveness, etc.
+## Pre-send check
+
+1. Does the first section stand alone? A reader who stops there has the whole picture.
+2. Does any bullet in the first section open with context or mechanism instead of the change? Flip it.
+3. Did a tangent sneak into the first section? Move it to Details.
