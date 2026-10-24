@@ -1011,6 +1011,33 @@ it('branches from the slideout into a Reply that already has a response, and fol
   expect(highlightedEdges()).toHaveLength(3)
 })
 
+/** Whether a transition is moving the slideout across the canvas right now. */
+function sliding(aside: Element) {
+  return aside
+    .getAnimations()
+    .some(
+      animation =>
+        animation instanceof CSSTransition &&
+        animation.transitionProperty === 'translate'
+    )
+}
+
+it('slides the slideout in as it opens and out as it closes', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await canvas().getByText('Prompt four').click()
+  await expect.element(slideout()).toBeInTheDocument()
+  const aside = slideout().element()
+  expect(sliding(aside)).toBe(true)
+  await expect.poll(() => sliding(aside)).toBe(false)
+
+  await slideout().getByRole('button', {name: 'Close'}).click()
+  expect(aside.isConnected).toBe(true)
+  expect(sliding(aside)).toBe(true)
+  await expect.poll(() => aside.isConnected).toBe(false)
+})
+
 it('scrolls the slideout to the clicked Turn, expands to cover the canvas, and closes with Esc or its close control', async () => {
   clock = 0
   await renderCanvas({

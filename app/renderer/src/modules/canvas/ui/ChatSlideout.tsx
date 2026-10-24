@@ -14,7 +14,10 @@ interface ChatSlideoutProps {
   end: Reply
   /** The Turn to start reading at, brought to the top as it changes. */
   scrollToTurnId: string
+  /** Off: it slides away, then calls `onClosed` to be unmounted. */
+  open: boolean
   onClose: () => void
+  onClosed: () => void
   /** The user is in the Input: its Thread becomes the Active Thread. */
   onFocus: (replyId: string) => void
   /** A Prompt was sent from the Input and main started this Reply for it. */
@@ -24,11 +27,15 @@ interface ChatSlideoutProps {
 /** Room left above the Turn scrolled to, in px. */
 const SCROLL_MARGIN = 12
 
+const SLIDE_MS = 300
+
 /** Chat mode: one Thread as a conventional chat in a slideout over the canvas. */
 export function ChatSlideout({
   end,
   scrollToTurnId,
+  open,
   onClose,
+  onClosed,
   onFocus,
   onSent,
 }: ChatSlideoutProps) {
@@ -40,6 +47,8 @@ export function ChatSlideout({
 
   // Esc in a field elsewhere, like a Tree's name, belongs to that field.
   useEffect(() => {
+    if (!open) return undefined
+
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape' || event.defaultPrevented) return
 
@@ -59,7 +68,15 @@ export function ChatSlideout({
     globalThis.addEventListener('keydown', onKeyDown)
 
     return () => globalThis.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+  }, [open, onClose])
+
+  useEffect(() => {
+    if (open) return undefined
+
+    const timer = setTimeout(onClosed, SLIDE_MS)
+
+    return () => clearTimeout(timer)
+  }, [open, onClosed])
 
   useLayoutEffect(() => {
     const scroller = body.current
@@ -77,9 +94,12 @@ export function ChatSlideout({
     <aside
       ref={aside}
       aria-label="Chat"
+      inert={!open}
+      style={{transitionDuration: `${SLIDE_MS}ms`}}
       className={cn(
-        'absolute inset-y-0 right-0 z-10 flex flex-col bg-background',
-        full ? 'left-0' : 'w-110 max-w-full border-l border-border shadow-xl'
+        'absolute inset-y-0 right-0 z-10 flex flex-col bg-background transition-transform ease-out starting:translate-x-full',
+        full ? 'left-0' : 'w-110 max-w-full border-l border-border shadow-xl',
+        !open && 'translate-x-full'
       )}
     >
       <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2">

@@ -76,8 +76,9 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
   // oxlint-disable-next-line react/hook-use-state -- a Tree that starts here keeps its zoom instead of fitting
   const [startedEmpty] = useState(() => isEmpty(index))
   const [chosenReplyId, setChosenReplyId] = useState<string | null>(null)
-  // The Turn the slideout was opened at, null while it is closed.
+  // The Turn the slideout was opened at, kept while it slides away.
   const [chatTurnId, setChatTurnId] = useState<string | null>(null)
+  const [chatOpen, setChatOpen] = useState(false)
   // A Reply sent from the slideout, followed once the Tree has it.
   const [followReplyId, setFollowReplyId] = useState<string | null>(null)
   const [hoverTurnId, setHoverTurnId] = useState<string | null>(null)
@@ -119,7 +120,8 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
   const chatEnd = chatTurnId === null ? null : replyOf(index, chatTurnId)
 
   // Hovering redraws the highlight only while the pointer is on the Turn.
-  const highlightedTurnId = hoverTurnId ?? chatEnd?.id ?? activeReplyId
+  const highlightedTurnId =
+    hoverTurnId ?? (chatOpen ? chatEnd?.id : null) ?? activeReplyId
 
   const thread = useMemo(
     () => new Set(highlightedTurnId ? pathTo(index, highlightedTurnId) : []),
@@ -172,12 +174,15 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
   const openChat = useCallback((turnId: string) => {
     setFollowReplyId(null)
     setChatTurnId(turnId)
+    setChatOpen(true)
   }, [])
 
   const closeChat = useCallback(() => {
     setFollowReplyId(null)
-    setChatTurnId(null)
+    setChatOpen(false)
   }, [])
+
+  const chatClosed = useCallback(() => setChatTurnId(null), [])
 
   const onInputFocus = useCallback(
     (replyId: string) => {
@@ -290,7 +295,9 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
           <ChatSlideout
             end={chatEnd}
             scrollToTurnId={chatTurnId}
+            open={chatOpen}
             onClose={closeChat}
+            onClosed={chatClosed}
             onFocus={setChosenReplyId}
             onSent={sentFromChat}
           />
