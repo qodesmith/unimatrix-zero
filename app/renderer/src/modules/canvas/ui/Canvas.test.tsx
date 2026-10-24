@@ -906,6 +906,17 @@ function chatTurns() {
   )
 }
 
+/** The connections from the root down to Reply four. */
+function threadToReplyFour() {
+  return [
+    edge(1, 11),
+    edge(11, 2),
+    edge(2, 12),
+    edge(12, 4),
+    edge(4, 14),
+  ].toSorted()
+}
+
 function slideoutWidth() {
   return slideout().element().getBoundingClientRect().width
 }
@@ -930,17 +941,7 @@ it('opens the slideout on a clicked Turn’s Thread, with one Input at its end a
   ).toHaveLength(1)
 
   await hoverAway()
-  await expect
-    .poll(highlightedEdges)
-    .toEqual(
-      [
-        edge(1, 11),
-        edge(11, 2),
-        edge(2, 12),
-        edge(12, 4),
-        edge(4, 14),
-      ].toSorted()
-    )
+  await expect.poll(highlightedEdges).toEqual(threadToReplyFour())
 })
 
 it('switches the slideout to another clicked Turn’s Thread, and closes it when a canvas Input takes focus', async () => {
@@ -965,17 +966,7 @@ it('switches the slideout to another clicked Turn’s Thread, and closes it when
       'Reply four',
     ])
   await hoverAway()
-  await expect
-    .poll(highlightedEdges)
-    .toEqual(
-      [
-        edge(1, 11),
-        edge(11, 2),
-        edge(2, 12),
-        edge(12, 4),
-        edge(4, 14),
-      ].toSorted()
-    )
+  await expect.poll(highlightedEdges).toEqual(threadToReplyFour())
 
   await inputUnder('Reply two').click()
   await expect.element(slideout()).not.toBeInTheDocument()
@@ -1007,7 +998,6 @@ it('branches from the slideout into a Reply that already has a response, and fol
   await expect
     .poll(chatTurns)
     .toEqual(['Prompt one', 'Reply one', 'A third way', 'Writing…'])
-  // The new Reply is still being written: no Input until it is done.
   expect(slideout().getByRole('textbox').query()).toBeNull()
 
   const sentPromptId = nodeOf('A third way').element().getAttribute('data-id')

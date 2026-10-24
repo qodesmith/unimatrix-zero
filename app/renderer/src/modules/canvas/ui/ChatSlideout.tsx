@@ -10,8 +10,8 @@ import {pathTo} from '../tree'
 import {PromptInput} from './PromptInput'
 
 interface ChatSlideoutProps {
-  /** The Reply the shown Thread ends at, or a Prompt still waiting for one. */
-  endTurnId: string
+  /** The Reply the shown Thread ends at. */
+  end: Reply
   /** The Turn to start reading at, brought to the top as it changes. */
   scrollToTurnId: string
   onClose: () => void
@@ -24,12 +24,9 @@ interface ChatSlideoutProps {
 /** Room left above the Turn scrolled to, in px. */
 const SCROLL_MARGIN = 12
 
-/**
- * Chat mode: one Thread as a conventional chat in a slideout over the canvas,
- * with one Input at its end. It can expand to cover the canvas; Esc closes it.
- */
+/** Chat mode: one Thread as a conventional chat in a slideout over the canvas. */
 export function ChatSlideout({
-  endTurnId,
+  end,
   scrollToTurnId,
   onClose,
   onFocus,
@@ -37,13 +34,26 @@ export function ChatSlideout({
 }: ChatSlideoutProps) {
   const {index} = useCanvas()
   const [full, setFull] = useState(false)
+  const aside = useRef<HTMLElement>(null)
   const body = useRef<HTMLDivElement>(null)
-  const thread = pathTo(index, endTurnId)
-  const end = index.replyById.get(endTurnId) ?? null
+  const thread = pathTo(index, end.id)
 
+  // Esc in a field elsewhere, like a Tree's name, belongs to that field.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose()
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+
+      const {target} = event
+
+      if (
+        target instanceof Element &&
+        target.matches('input, textarea') &&
+        !aside.current?.contains(target)
+      ) {
+        return
+      }
+
+      onClose()
     }
 
     globalThis.addEventListener('keydown', onKeyDown)
@@ -65,6 +75,7 @@ export function ChatSlideout({
 
   return (
     <aside
+      ref={aside}
       aria-label="Chat"
       className={cn(
         'absolute inset-y-0 right-0 z-10 flex flex-col bg-background',
@@ -92,7 +103,7 @@ export function ChatSlideout({
           ))}
         </div>
       </div>
-      {end && <ChatInput end={end} onFocus={onFocus} onSent={onSent} />}
+      <ChatInput end={end} onFocus={onFocus} onSent={onSent} />
     </aside>
   )
 }

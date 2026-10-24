@@ -16,7 +16,7 @@ import {
   newestReply,
   pathTo,
   previousReply,
-  threadEnd,
+  replyOf,
 } from '../tree'
 import {ChatSlideout} from './ChatSlideout'
 import {Flow} from './Flow'
@@ -116,10 +116,10 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
     setFollowReplyId(null)
   }
 
-  const chatEndId = chatTurnId === null ? null : threadEnd(index, chatTurnId)
+  const chatEnd = chatTurnId === null ? null : replyOf(index, chatTurnId)
 
   // Hovering redraws the highlight only while the pointer is on the Turn.
-  const highlightedTurnId = hoverTurnId ?? chatEndId ?? activeReplyId
+  const highlightedTurnId = hoverTurnId ?? chatEnd?.id ?? activeReplyId
 
   const thread = useMemo(
     () => new Set(highlightedTurnId ? pathTo(index, highlightedTurnId) : []),
@@ -168,8 +168,8 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
     [index, focusOn]
   )
 
-  /** Opens the slideout on a Turn's Thread: how a Tree is opened at a Turn. */
-  const openAt = useCallback((turnId: string) => {
+  /** Opening the Tree at a Turn: the slideout on that Turn's Thread. */
+  const openChat = useCallback((turnId: string) => {
     setFollowReplyId(null)
     setChatTurnId(turnId)
   }, [])
@@ -179,7 +179,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
     setChatTurnId(null)
   }, [])
 
-  const focusInput = useCallback(
+  const onInputFocus = useCallback(
     (replyId: string) => {
       setChosenReplyId(replyId)
       closeChat()
@@ -189,11 +189,11 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
 
   const sentFromChat = useCallback(
     (replyId: string) => {
-      if (chatEndId !== null) onSent(replyId, chatEndId)
+      if (chatEnd) onSent(replyId, chatEnd.id)
 
       setFollowReplyId(replyId)
     },
-    [chatEndId, onSent]
+    [chatEnd, onSent]
   )
 
   const jumpTo = useCallback(
@@ -226,7 +226,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       treeId,
       index,
       activeReplyId,
-      focusInput,
+      onInputFocus,
       onSent,
       expandedTurnIds,
       toggleExpanded,
@@ -241,7 +241,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       treeId,
       index,
       activeReplyId,
-      focusInput,
+      onInputFocus,
       onSent,
       expandedTurnIds,
       toggleExpanded,
@@ -281,14 +281,14 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
             fitOnLoad={!startedEmpty}
             switching={switching}
             onHover={setHoverTurnId}
-            onOpen={openAt}
+            onOpenChat={openChat}
             onOrientation={onOrientation}
             onJump={jumpTo}
           />
         </ReactFlowProvider>
-        {chatTurnId !== null && chatEndId !== null && (
+        {chatTurnId !== null && chatEnd && (
           <ChatSlideout
-            endTurnId={chatEndId}
+            end={chatEnd}
             scrollToTurnId={chatTurnId}
             onClose={closeChat}
             onFocus={setChosenReplyId}

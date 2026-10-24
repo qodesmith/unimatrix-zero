@@ -97,14 +97,9 @@ export function newestReply(index: TreeIndex): Reply | null {
 }
 
 /**
- * Where the Thread a Turn is on ends: a Reply is its own end and a Prompt
- * stands for its Reply, or for itself until main has started one. Null when
- * the Tree has no such Turn.
+ * The Reply a Turn stands for: a Reply itself, or a Prompt's Reply. Null for a
+ * Prompt main has not started one for yet, or a Turn the Tree does not have.
  */
-export function threadEnd(index: TreeIndex, turnId: string): string | null {
-  if (index.replyById.has(turnId)) return turnId
-
-  if (!index.promptById.has(turnId)) return null
-
-  return index.replyByPrompt.get(turnId)?.id ?? turnId
+export function replyOf(index: TreeIndex, turnId: string): Reply | null {
+  return index.replyById.get(turnId) ?? index.replyByPrompt.get(turnId) ?? null
 }

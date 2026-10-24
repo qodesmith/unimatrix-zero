@@ -112,7 +112,7 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
  * a draft.
  */
 function ReplyInput({reply, hovered}: {reply: Reply; hovered: boolean}) {
-  const {treeId, activeReplyId, focusInput, onSent, drafts, setDraft} =
+  const {treeId, activeReplyId, onInputFocus, onSent, drafts, setDraft} =
     useCanvas()
 
   const status = useLiveReply(reply.id)?.status ?? reply.status
@@ -133,7 +133,7 @@ function ReplyInput({reply, hovered}: {reply: Reply; hovered: boolean}) {
       <PromptInput
         treeId={treeId}
         parentReplyId={reply.id}
-        onFocus={() => focusInput(reply.id)}
+        onFocus={() => onInputFocus(reply.id)}
         onSent={replyId => onSent(replyId, reply.id)}
         draft={draft}
         onDraftChange={text => setDraft(reply.id, text)}

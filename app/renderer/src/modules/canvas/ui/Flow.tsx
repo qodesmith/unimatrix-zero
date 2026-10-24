@@ -41,8 +41,7 @@ interface FlowProps {
   /** Turns glide to their new places while the orientation switches. */
   switching: boolean
   onHover: (turnId: string | null) => void
-  /** A Turn was clicked: open the slideout on its Thread. */
-  onOpen: (turnId: string) => void
+  onOpenChat: (turnId: string) => void
   onOrientation: (orientation: CanvasOrientation) => void
   onJump: (replyId: string) => void
 }
@@ -87,7 +86,7 @@ export function Flow({
   fitOnLoad,
   switching,
   onHover,
-  onOpen,
+  onOpenChat,
   onOrientation,
   onJump,
 }: FlowProps) {
@@ -294,7 +293,7 @@ export function Flow({
       onNodeClick={event => {
         const turnId = clickedTurnId(event.target)
 
-        if (turnId !== null) onOpen(turnId)
+        if (turnId !== null) onOpenChat(turnId)
       }}
     >
       <Background gap={24} />
