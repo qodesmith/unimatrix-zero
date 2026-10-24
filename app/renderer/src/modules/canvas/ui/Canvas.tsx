@@ -170,12 +170,20 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
     [index, focusOn]
   )
 
-  /** Opening the Tree at a Turn: the slideout on that Turn's Thread. */
-  const openChat = useCallback((turnId: string) => {
-    setFollowReplyId(null)
-    setChatTurnId(turnId)
-    setChatOpen(true)
-  }, [])
+  /**
+   * Opening the Tree at a Turn: the slideout on that Turn's Thread. A Prompt
+   * with no Reply yet has no Thread, so it opens nothing.
+   */
+  const openChat = useCallback(
+    (turnId: string) => {
+      if (!replyOf(index, turnId)) return
+
+      setFollowReplyId(null)
+      setChatTurnId(turnId)
+      setChatOpen(true)
+    },
+    [index]
+  )
 
   const closeChat = useCallback(() => {
     setFollowReplyId(null)

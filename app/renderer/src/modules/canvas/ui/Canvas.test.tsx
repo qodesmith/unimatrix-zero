@@ -108,7 +108,7 @@ function fakeMain(saved: Saved) {
       sent.push(command)
 
       if (command.type === 'tree.turns') {
-        return {ok: true, value: {prompts, replies}}
+        return {ok: true, value: {prompts: [...prompts], replies: [...replies]}}
       }
 
       if (command.type === 'settings.update') {
@@ -160,7 +160,7 @@ function fakeMain(saved: Saved) {
     registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
   }
 
-  return {...bridge, sent, publish}
+  return {...bridge, sent, publish, replies}
 }
 
 function Providers({children}: {children: ReactNode}) {
@@ -1011,6 +1011,32 @@ it('branches from the slideout into a Reply that already has a response, and fol
       expect.arrayContaining([edge(1, 11), `${uuid(11)}-${sentPromptId}`])
     )
   expect(highlightedEdges()).toHaveLength(3)
+})
+
+it('opens nothing on a clicked Prompt with no Reply yet, even once its Reply arrives', async () => {
+  clock = 0
+
+  const {main} = await renderCanvas({
+    prompts: [prompt(1, null, 'Prompt one'), prompt(2, 11, 'Prompt two')],
+    replies: [reply(11, 1, 'Reply one')],
+  })
+
+  await expect.element(page.getByText('Prompt two')).toBeVisible()
+
+  await canvas().getByText('Prompt two').click()
+  await expect.element(slideout()).not.toBeInTheDocument()
+
+  main.replies.push(reply(12, 2, 'Reply two'))
+  main.publish({
+    type: 'SNAPSHOT',
+    app: {version: '0.0.0'},
+    replies: [],
+    providers: [],
+    signIn: null,
+    settings: DEFAULT_SETTINGS,
+  })
+  await expect.element(canvas().getByText('Reply two')).toBeVisible()
+  await expect.element(slideout()).not.toBeInTheDocument()
 })
 
 /** Whether a transition is moving the slideout across the canvas right now. */
