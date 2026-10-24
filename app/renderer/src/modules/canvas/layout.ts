@@ -80,12 +80,12 @@ function edge(source: string, target: string): LayoutEdge {
 }
 
 /** A collapsed Reply keeps its Branches out of the layout. */
-type Collapsed = ReadonlySet<string>
+type CollapsedReplyIds = ReadonlySet<string>
 
-const NONE_COLLAPSED: Collapsed = new Set()
+const NONE_COLLAPSED: CollapsedReplyIds = new Set()
 
 /** Vertical: every Turn its own box, a Reply under its Prompt. */
-function turnGraph(index: TreeIndex, collapsed: Collapsed): Graph {
+function turnGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
   const nodes: Unplaced[] = []
   const edges: LayoutEdge[] = []
   const children = new Map<string, string[]>()
@@ -125,7 +125,7 @@ function turnGraph(index: TreeIndex, collapsed: Collapsed): Graph {
 }
 
 /** Horizontal: one card per Exchange, Branches fanning out to the right. */
-function exchangeGraph(index: TreeIndex, collapsed: Collapsed): Graph {
+function exchangeGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
   const nodes: Unplaced[] = []
   const edges: LayoutEdge[] = []
   const children = new Map<string, string[]>()
@@ -167,7 +167,7 @@ export function layoutTree(
   index: TreeIndex,
   orientation: CanvasOrientation,
   sizeOf: (nodeId: string) => Size | undefined,
-  collapsed: Collapsed = NONE_COLLAPSED
+  collapsed: CollapsedReplyIds = NONE_COLLAPSED
 ): Layout {
   const vertical = orientation === 'vertical'
   const gap = GAPS[orientation]
