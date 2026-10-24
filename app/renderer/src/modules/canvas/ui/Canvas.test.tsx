@@ -541,6 +541,80 @@ it('folds a Fork’s Branches in the horizontal orientation too, its card stayin
   expect(rect('Reply two').top).toBeCloseTo(before.top, 0)
 })
 
+it('unfolds a folded Fork to jump to a Reply streaming in one of its Branches', async () => {
+  const saved = forkedTree()
+
+  saved.replies = saved.replies.map(one =>
+    one.id === uuid(15) ? {...one, status: 'streaming', content: []} : one
+  )
+
+  await renderCanvas(saved)
+  await expect.element(page.getByText('Prompt five')).toBeVisible()
+  await expect.poll(viewport).not.toContain('translate(0px, 0px)')
+
+  const pill = nodeOf('Reply two').getByRole('button', {
+    name: 'Fork · 2 Branches',
+  })
+
+  await pill.click()
+  await expect.element(page.getByText('Prompt five')).not.toBeInTheDocument()
+  const folded = await settledViewport()
+
+  await page.getByRole('status').getByText('1 streaming').click()
+  await expect.element(page.getByText('Prompt five')).toBeVisible()
+  await expect.element(pill).toHaveAttribute('aria-expanded', 'true')
+  await expect.poll(viewport).not.toBe(folded)
+})
+
+it('unfolds a folded Fork when a Prompt is sent into it, showing the new Branch', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await nodeOf('Reply two')
+    .getByRole('button', {name: 'Fork · 2 Branches'})
+    .click()
+  await expect.element(page.getByText('Prompt four')).not.toBeInTheDocument()
+
+  await sendInto('Reply two', 'A third way')
+  await expect.element(page.getByText('Prompt four')).toBeVisible()
+  await expect
+    .element(
+      nodeOf('Reply two').getByRole('button', {name: 'Fork · 3 Branches'})
+    )
+    .toHaveAttribute('aria-expanded', 'true')
+})
+
+it('keeps a Fork’s card put on unfolding Branches folded since before an orientation switch', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await expect.poll(viewport).not.toContain('translate(0px, 0px)')
+
+  // Reply five, the newest, ends the active Thread: the switch has it to pan to
+  // but folded away, and the unfolded cards are measured only once they show.
+  await nodeOf('Reply two')
+    .getByRole('button', {name: 'Fork · 2 Branches'})
+    .click()
+  await expect.element(page.getByText('Reply five')).not.toBeInTheDocument()
+
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+  await expect
+    .poll(() => document.querySelectorAll('.react-flow__node-exchange').length)
+    .toBe(3)
+  await expect
+    .poll(() => document.querySelector('.canvas-switching'))
+    .toBeNull()
+  await settledViewport()
+  const before = rect('Reply two')
+
+  await nodeOf('Reply two')
+    .getByRole('button', {name: 'Fork · 2 Branches'})
+    .click()
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await settledViewport()
+  expect(rect('Reply two').left).toBeCloseTo(before.left, 0)
+  expect(rect('Reply two').top).toBeCloseTo(before.top, 0)
+})
+
 it('shows no pill on a Reply the conversation simply continues from', async () => {
   await renderCanvas(linearTree())
   await expect.element(page.getByText('Reply two')).toBeVisible()

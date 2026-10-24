@@ -94,20 +94,33 @@ export function Flow({
     [orientation, index]
   )
 
-  // Folding or unfolding a Fork moves its Reply in the layout; the viewport
-  // moves by the same amount, scaled, so the Reply stays where it is on screen.
+  const allMeasured =
+    layout.nodes.length > 0 &&
+    layout.nodes.every(node => measured[node.id] !== undefined)
+
+  // Folding or unfolding a Fork moves its Reply in the layout, and again as the
+  // boxes it shows are measured; the viewport moves by the same amount, scaled,
+  // so the Reply stays where it is on screen. A pan lets it go.
   const lastLayout = useRef(layout)
   const lastCollapsed = useRef(collapsed)
+  const heldReplyId = useRef<string | null>(null)
 
   useLayoutEffect(() => {
     const before = lastLayout.current
-    const wasCollapsed = lastCollapsed.current
     lastLayout.current = layout
-    lastCollapsed.current = collapsed
 
-    if (wasCollapsed === collapsed || collapsed.toggledReplyId === null) return
+    if (lastCollapsed.current !== collapsed) {
+      lastCollapsed.current = collapsed
+      heldReplyId.current = collapsed.toggledReplyId
+    }
 
-    const nodeId = nodeIdOf(collapsed.toggledReplyId)
+    const replyId = heldReplyId.current
+
+    if (replyId === null) return
+
+    if (allMeasured) heldReplyId.current = null
+
+    const nodeId = nodeIdOf(replyId)
     const from = before.nodes.find(node => node.id === nodeId)?.position
     const to = layout.nodes.find(node => node.id === nodeId)?.position
 
@@ -120,7 +133,7 @@ export function Flow({
       y: y - (to.y - from.y) * zoom,
       zoom,
     })
-  }, [layout, collapsed, nodeIdOf, flow])
+  }, [layout, collapsed, allMeasured, nodeIdOf, flow])
 
   const onNodesChange = useCallback(
     (changes: NodeChange<TurnNode>[]) => {
@@ -180,10 +193,6 @@ export function Flow({
     [layout, thread]
   )
 
-  const allMeasured =
-    layout.nodes.length > 0 &&
-    layout.nodes.every(node => measured[node.id] !== undefined)
-
   // Once: the first layout with real sizes shows the whole Tree.
   const fitted = useRef(!fitOnLoad)
 
@@ -213,6 +222,7 @@ export function Flow({
 
   // Each focus pans to its Reply at the current zoom, once the Reply's box has
   // a size; while the first Fork waits to be fitted, the fit takes it instead.
+  // A Reply folded away is not panned to, then or once it is unfolded.
   useEffect(() => {
     if (!focus || centered.current === focus.sequence) return
 
@@ -222,15 +232,22 @@ export function Flow({
     const node = layout.nodes.find(candidate => candidate.id === nodeId)
     const size = measured[nodeId]
 
+    if (!node && index.replyById.has(focus.replyId)) {
+      centered.current = focus.sequence
+
+      return
+    }
+
     if (!node || !size) return
 
     centered.current = focus.sequence
+    heldReplyId.current = null
     void flow.setCenter(
       node.position.x + size.width / 2,
       node.position.y + size.height / 2,
       {zoom: flow.getZoom(), duration: 400, interpolate: 'linear'}
     )
-  }, [focus, hasFork, nodeIdOf, layout, measured, flow])
+  }, [focus, hasFork, nodeIdOf, layout, index, measured, flow])
 
   const streaming = index.replies
     .filter(reply => reply.status === 'streaming')

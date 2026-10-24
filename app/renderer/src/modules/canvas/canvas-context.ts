@@ -16,8 +16,8 @@ export interface CanvasState {
   index: TreeIndex
   activeReplyId: string | null
   setActiveReplyId: (replyId: string) => void
-  /** A Prompt was sent and main started this Reply for it. */
-  onSent: (replyId: string) => void
+  /** A Prompt was sent into a Reply's Input and main started this Reply for it. */
+  onSent: (replyId: string, parentReplyId: string) => void
   /**
    * Turns the user let out of their capped height; kept here so they survive an
    * orientation switch.

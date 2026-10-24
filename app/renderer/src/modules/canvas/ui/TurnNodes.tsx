@@ -133,7 +133,7 @@ function ReplyInput({reply, hovered}: {reply: Reply; hovered: boolean}) {
         treeId={treeId}
         parentReplyId={reply.id}
         onFocus={() => setActiveReplyId(reply.id)}
-        onSent={onSent}
+        onSent={replyId => onSent(replyId, reply.id)}
         draft={draft}
         onDraftChange={text => setDraft(reply.id, text)}
       />

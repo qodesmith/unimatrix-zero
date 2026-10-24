@@ -1,5 +1,6 @@
 import type {Turns} from '#modules/turns/main'
 import type {CanvasState, Collapsed} from '../canvas-context'
+import type {TreeIndex} from '../tree'
 import type {Focus} from './Flow'
 import type {CanvasOrientation} from '@uz/contract/settings'
 
@@ -9,7 +10,7 @@ import {ReactFlowProvider} from '@xyflow/react'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 
 import {CanvasContext} from '../canvas-context'
-import {indexTurns, isEmpty, newestReply, pathTo} from '../tree'
+import {indexTurns, isEmpty, newestReply, pathTo, previousReply} from '../tree'
 import {Flow} from './Flow'
 import {PromptInput} from './PromptInput'
 
@@ -24,6 +25,25 @@ function toggled(id: string) {
     if (!next.delete(id)) next.add(id)
 
     return next
+  }
+}
+
+/**
+ * The Forks on a Thread unfolded, so the Turn after it is on the canvas; the
+ * topmost, the one still on screen, keeps its place.
+ */
+function unfoldedOver(index: TreeIndex, replyId: string) {
+  return (current: Collapsed): Collapsed => {
+    const folded = pathTo(index, replyId).filter(id => current.ids.has(id))
+    const [topmost] = folded
+
+    if (topmost === undefined) return current
+
+    const ids = new Set(current.ids)
+
+    for (const id of folded) ids.delete(id)
+
+    return {ids, toggledReplyId: topmost}
   }
 }
 
@@ -117,11 +137,28 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
   }, [])
 
   const onSent = useCallback(
-    (replyId: string) => {
+    (replyId: string, parentReplyId: string | null) => {
       setChosenReplyId(replyId)
+
+      if (parentReplyId !== null) {
+        setCollapsed(unfoldedOver(index, parentReplyId))
+      }
+
       focusOn(replyId)
     },
-    [focusOn]
+    [index, focusOn]
+  )
+
+  const jumpTo = useCallback(
+    (replyId: string) => {
+      const reply = index.replyById.get(replyId)
+      const parent = reply ? previousReply(index, reply) : null
+
+      if (parent) setCollapsed(unfoldedOver(index, parent.id))
+
+      focusOn(replyId)
+    },
+    [index, focusOn]
   )
 
   function onOrientation(orientation: CanvasOrientation) {
@@ -173,7 +210,11 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
     return (
       <div className="flex h-full items-center justify-center p-6">
         <div className="w-full max-w-xl">
-          <PromptInput treeId={treeId} parentReplyId={null} onSent={onSent} />
+          <PromptInput
+            treeId={treeId}
+            parentReplyId={null}
+            onSent={replyId => onSent(replyId, null)}
+          />
         </div>
       </div>
     )
@@ -192,7 +233,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
           switching={switching}
           onHover={setHoverTurnId}
           onOrientation={onOrientation}
-          onJump={focusOn}
+          onJump={jumpTo}
         />
       </ReactFlowProvider>
     </CanvasContext>
