@@ -221,7 +221,10 @@ export function createFakeDriver({
         type: 'REPLY_RECORDED',
         model: 'fake',
         session: {
-          sessionId: request.session?.sessionId ?? randomUUID(),
+          sessionId:
+            request.session && !request.session.fork
+              ? request.session.sessionId
+              : randomUUID(),
           messageId: randomUUID(),
         },
       }

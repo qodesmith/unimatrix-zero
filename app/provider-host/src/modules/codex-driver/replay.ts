@@ -31,8 +31,8 @@ export type RecordedLine = z.infer<typeof RecordedLineSchema>
  * the next one recorded, by method, with request ids mapped onto this run;
  * it answers with what `codex` wrote after it, in this run's `CODEX_HOME`.
  * Like `codex`, it writes each thread's rollout, a line per finished turn,
- * and resumes only a thread whose rollout is in place under `sessions/`. It
- * writes what it saw to `FAKE_CODEX_REPORTS/<n>.json`.
+ * and resumes or forks only a thread whose rollout is in place under
+ * `sessions/`. It writes what it saw to `FAKE_CODEX_REPORTS/<n>.json`.
  * `FAKE_CODEX_EXIT_AT=<method>` exits instead of answering that request, in
  * each run or only the first `FAKE_CODEX_EXITS`.
  */
@@ -50,7 +50,7 @@ const [, ...steps] = fs.readFileSync(recording, 'utf8')
 const home = process.env.CODEX_HOME
 const standIn = ${JSON.stringify(CODEX_HOME_STAND_IN)}
 const vendorVariables = Object.keys(process.env).filter(name => /^(OPENAI|CODEX|ANTHROPIC|CLAUDE)_/i.test(name))
-const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], resumedFrom: [], ended: null}
+const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], resumedFrom: [], forkedThrough: null, ended: null}
 
 function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
@@ -114,13 +114,14 @@ process.stdin.on('data', chunk => {
     buffer = buffer.slice(newline + 1)
     report.methods.push(message.method)
     if (message.method === process.env.FAKE_CODEX_EXIT_AT && run < Number(process.env.FAKE_CODEX_EXITS ?? Infinity)) end('exited', 1)
-    if (message.method === 'thread/resume') {
+    if (message.method === 'thread/resume' || message.method === 'thread/fork') {
       const rollout = rolloutOf(message.params.threadId)
       if (!rollout) {
         process.stdout.write(JSON.stringify({id: message.id, error: {code: -32600, message: 'no rollout found for thread id ' + message.params.threadId}}) + '\\n')
         end('refused', 1)
       }
       report.resumedFrom = fs.readFileSync(rollout, 'utf8').split('\\n').filter(Boolean).map(line => JSON.parse(line))
+      if (message.method === 'thread/fork') report.forkedThrough = message.params.lastTurnId
     }
     if (message.method === 'turn/start') report.prompts.push(message.params.input[0].text)
     const recorded = expected(message)

@@ -7,7 +7,7 @@ import {openDatabase} from '#modules/database/main'
 import {createSettings} from '#modules/settings/main'
 import {createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
-import {PromptSendResult} from '@uz/contract/commands'
+import {PromptSendResult, TreeTurnsResult} from '@uz/contract/commands'
 import {TreeSchema} from '@uz/contract/trees'
 import path from 'node:path'
 import {beforeEach, describe, expect, it} from 'vitest'
@@ -355,7 +355,7 @@ function record(treeId: string, replyId: string) {
   })
 }
 
-describe('a Prompt at the end of a Thread', () => {
+describe('a Prompt answering a Reply', () => {
   it('continues the Reply’s Provider session from that Reply', async () => {
     const {treeId, replyId} = await sendRoot()
     record(treeId, replyId)
@@ -384,7 +384,7 @@ describe('a Prompt at the end of a Thread', () => {
           systemPrompt: '',
           prompt: {text: 'And then?'},
           vendorProgram,
-          session: {sessionId: 's1', messageId: 'm1'},
+          session: {sessionId: 's1', messageId: 'm1', fork: false},
         },
       },
     ])
@@ -420,7 +420,7 @@ describe('a Prompt at the end of a Thread', () => {
     expect(hostCommands).toEqual([])
   })
 
-  it('is refused from a Reply that already has a Prompt after it', async () => {
+  it('starts a Branch from a Reply that already has a Prompt after it, forking its session', async () => {
     const {treeId, replyId} = await sendRoot()
     record(treeId, replyId)
     finish(treeId, replyId)
@@ -433,11 +433,61 @@ describe('a Prompt at the end of a Thread', () => {
     } as const
 
     await send(next)
+    const outcome = await send({...next, text: 'Or instead?'})
 
-    expect(await send(next)).toMatchObject({
-      ok: false,
-      error: {message: 'This Reply already has a Prompt after it.'},
-    })
+    if (!outcome.ok) throw new Error(outcome.error.message)
+
+    const {prompt} = PromptSendResult.parse(outcome.value)
+
+    expect(prompt).toMatchObject({parentReplyId: replyId, text: 'Or instead?'})
+    expect(
+      hostCommands.flatMap(command =>
+        command.type === 'reply.start' ? [command.request.session] : []
+      )
+    ).toEqual([
+      {sessionId: 's1', messageId: 'm1', fork: false},
+      {sessionId: 's1', messageId: 'm1', fork: true},
+    ])
+    const turns = await send({type: 'tree.turns', treeId})
+
+    if (!turns.ok) throw new Error(turns.error.message)
+
+    expect(
+      TreeTurnsResult.parse(turns.value)
+        .prompts.filter(saved => saved.parentReplyId === replyId)
+        .map(saved => saved.text)
+        .toSorted()
+    ).toEqual(['More', 'Or instead?'])
+  })
+
+  it('streams a Branch while the other Branch’s Reply is still being written', async () => {
+    const {treeId, replyId} = await sendRoot()
+    record(treeId, replyId)
+    finish(treeId, replyId)
+
+    const next = {
+      type: 'prompt.send',
+      treeId,
+      parentReplyId: replyId,
+      text: 'More',
+    } as const
+
+    const one = await send(next)
+    const two = await send({...next, text: 'Or instead?'})
+
+    if (!one.ok || !two.ok) throw new Error('A Prompt was refused')
+
+    expect(
+      deps.turns
+        .streaming()
+        .map(streaming => streaming.replyId)
+        .toSorted()
+    ).toEqual(
+      [
+        PromptSendResult.parse(one.value).reply.id,
+        PromptSendResult.parse(two.value).reply.id,
+      ].toSorted()
+    )
   })
 
   it('answers not-found for a Reply the Tree doesn’t have', async () => {

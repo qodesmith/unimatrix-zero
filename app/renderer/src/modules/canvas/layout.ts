@@ -79,8 +79,13 @@ function edge(source: string, target: string): LayoutEdge {
   return {id: `${source}-${target}`, source, target}
 }
 
+/** A collapsed Reply keeps its Branches out of the layout. */
+type CollapsedReplyIds = ReadonlySet<string>
+
+const NONE_COLLAPSED: CollapsedReplyIds = new Set()
+
 /** Vertical: every Turn its own box, a Reply under its Prompt. */
-function turnGraph(index: TreeIndex): Graph {
+function turnGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
   const nodes: Unplaced[] = []
   const edges: LayoutEdge[] = []
   const children = new Map<string, string[]>()
@@ -99,7 +104,7 @@ function turnGraph(index: TreeIndex): Graph {
     nodes.push({id: reply.id, kind: 'reply', reply})
     edges.push(edge(prompt.id, reply.id))
     children.set(prompt.id, [reply.id])
-    const branches = branchesOf(index, reply.id)
+    const branches = collapsed.has(reply.id) ? [] : branchesOf(index, reply.id)
     children.set(
       reply.id,
       branches.map(branch => branch.id)
@@ -120,7 +125,7 @@ function turnGraph(index: TreeIndex): Graph {
 }
 
 /** Horizontal: one card per Exchange, Branches fanning out to the right. */
-function exchangeGraph(index: TreeIndex): Graph {
+function exchangeGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
   const nodes: Unplaced[] = []
   const edges: LayoutEdge[] = []
   const children = new Map<string, string[]>()
@@ -129,7 +134,10 @@ function exchangeGraph(index: TreeIndex): Graph {
   function visit(prompt: Prompt) {
     const reply = index.replyByPrompt.get(prompt.id) ?? null
     nodes.push({id: prompt.id, kind: 'exchange', prompt, reply})
-    const branches = reply ? branchesOf(index, reply.id) : []
+
+    const branches =
+      reply && !collapsed.has(reply.id) ? branchesOf(index, reply.id) : []
+
     children.set(
       prompt.id,
       branches.map(branch => branch.id)
@@ -158,11 +166,16 @@ function exchangeGraph(index: TreeIndex): Graph {
 export function layoutTree(
   index: TreeIndex,
   orientation: CanvasOrientation,
-  sizeOf: (nodeId: string) => Size | undefined
+  sizeOf: (nodeId: string) => Size | undefined,
+  collapsed: CollapsedReplyIds = NONE_COLLAPSED
 ): Layout {
   const vertical = orientation === 'vertical'
   const gap = GAPS[orientation]
-  const graph = vertical ? turnGraph(index) : exchangeGraph(index)
+
+  const graph = vertical
+    ? turnGraph(index, collapsed)
+    : exchangeGraph(index, collapsed)
+
   const span = new Map<string, number>()
   const positions = new Map<string, Point>()
 

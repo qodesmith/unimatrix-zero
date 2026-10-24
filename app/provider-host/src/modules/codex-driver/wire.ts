@@ -49,8 +49,8 @@ const AccountSchema = z.looseObject({
 >
 
 /**
- * A Provider session opened by `thread/start` or `thread/resume`, and its
- * Model.
+ * A Provider session opened by `thread/start`, `thread/resume` or
+ * `thread/fork`, and its Model.
  */
 const OpenedThreadSchema = z.looseObject({
   thread: ThreadSchema,
@@ -71,6 +71,7 @@ export const RESPONSES = {
   }),
   'thread/start': OpenedThreadSchema,
   'thread/resume': OpenedThreadSchema,
+  'thread/fork': OpenedThreadSchema,
   'thread/read': z.looseObject({thread: ThreadSchema}),
   'turn/start': z.looseObject({turn: z.looseObject({id: z.string()})}),
 } satisfies Partial<Record<ClientRequest['method'], z.ZodType>>
