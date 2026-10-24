@@ -274,7 +274,7 @@ it('draws every Turn as its own box, top-down, with an Input under every Reply',
   expect(two.left).toBeLessThan(three.left)
 })
 
-it('shows the active Thread’s Input, reveals another Reply’s on hover, and keeps one holding a draft', async () => {
+it('shows the Active Thread’s Input, reveals another Reply’s on hover, and keeps one holding a draft', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
   await hoverAway()
@@ -589,7 +589,7 @@ it('keeps a Fork’s card put on unfolding Branches folded since before an orien
   await expect.element(page.getByText('Reply five')).toBeVisible()
   await expect.poll(viewport).not.toContain('translate(0px, 0px)')
 
-  // Reply five, the newest, ends the active Thread: the switch has it to pan to
+  // Reply five, the newest, ends the Active Thread: the switch has it to pan to
   // but folded away, and the unfolded cards are measured only once they show.
   await nodeOf('Reply two')
     .getByRole('button', {name: 'Fork · 2 Branches'})

@@ -107,8 +107,9 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
 
 /**
  * The Input answering a Reply, mounted once the Reply is done with its space
- * kept, so revealing it shifts nothing. Revealed for the active Thread, while
- * the Reply's box is hovered or holds focus, and while it holds a draft.
+ * kept, so revealing it shifts nothing. Revealed at the end of the Active
+ * Thread, while the Reply's box is hovered or holds focus, and while it holds
+ * a draft.
  */
 function ReplyInput({reply, hovered}: {reply: Reply; hovered: boolean}) {
   const {treeId, activeReplyId, setActiveReplyId, onSent, drafts, setDraft} =

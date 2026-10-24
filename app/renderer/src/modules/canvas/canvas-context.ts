@@ -24,7 +24,6 @@ export interface CanvasState {
    */
   expandedTurnIds: ReadonlySet<string>
   toggleExpanded: (turnId: string) => void
-  /** Forks folded through their pill: their Branches are left off the canvas. */
   collapsedReplyIds: ReadonlySet<string>
   toggleCollapsed: (replyId: string) => void
   /**
