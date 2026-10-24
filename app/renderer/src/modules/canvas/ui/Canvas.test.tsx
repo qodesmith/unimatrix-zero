@@ -1063,6 +1063,27 @@ it('opens and closes the slideout without sliding when the OS asks for reduced m
   await expect.poll(() => aside.isConnected).toBe(false)
 })
 
+it('zooms and switches orientation without gliding when the OS asks for reduced motion', async () => {
+  await emulateReducedMotion('reduce')
+  onTestFinished(async () => emulateReducedMotion(''))
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await expect.poll(viewport).not.toContain('translate(0px, 0px)')
+  await settledViewport()
+
+  const loaded = zoomOf()
+  await page.getByRole('button', {name: 'Zoom in'}).click()
+  expect(zoomOf()).toBeCloseTo(loaded * 1.2, 2)
+
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+
+  const gliding = [...document.querySelectorAll('.react-flow__node')].filter(
+    node => node.getAnimations().length > 0
+  )
+
+  expect(gliding).toEqual([])
+})
+
 it('scrolls the slideout to the clicked Turn, expands to cover the canvas, and closes with Esc or its close control', async () => {
   clock = 0
   await renderCanvas({

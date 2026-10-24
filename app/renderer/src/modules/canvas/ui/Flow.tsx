@@ -16,6 +16,7 @@ import {
 } from 'react'
 
 import {layoutTree} from '../layout'
+import {useReducedMotion} from '../reduced-motion'
 import {isFork} from '../tree'
 import {CanvasControls} from './CanvasControls'
 import {ExchangeNode, PromptNode, ReplyNode} from './TurnNodes'
@@ -91,6 +92,7 @@ export function Flow({
   onJump,
 }: FlowProps) {
   const flow = useReactFlow<TurnNode>()
+  const panMs = useReducedMotion() ? 0 : 400
   // Per orientation: the same id is a Prompt box in one and an Exchange card in the other.
   const [sizes, setSizes] = useState<Sizes>(NO_SIZES)
   const measured = sizes[orientation]
@@ -232,8 +234,12 @@ export function Flow({
 
     if (focus) centered.current = focus.sequence
 
-    void flow.fitView({padding: 0.15, maxZoom: flow.getZoom(), duration: 400})
-  }, [hasFork, allMeasured, focus, flow])
+    void flow.fitView({
+      padding: 0.15,
+      maxZoom: flow.getZoom(),
+      duration: panMs,
+    })
+  }, [hasFork, allMeasured, focus, flow, panMs])
 
   // Each focus pans to its Reply at the current zoom, once the Reply's box has
   // a size; while the first Fork waits to be fitted, the fit takes it instead.
@@ -260,9 +266,9 @@ export function Flow({
     void flow.setCenter(
       node.position.x + size.width / 2,
       node.position.y + size.height / 2,
-      {zoom: flow.getZoom(), duration: 400, interpolate: 'linear'}
+      {zoom: flow.getZoom(), duration: panMs, interpolate: 'linear'}
     )
-  }, [focus, hasFork, nodeIdOf, layout, index, measured, flow])
+  }, [focus, hasFork, nodeIdOf, layout, index, measured, flow, panMs])
 
   const streaming = index.replies
     .filter(reply => reply.status === 'streaming')

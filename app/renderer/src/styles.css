@@ -92,10 +92,13 @@
   z-index: 1000 !important;
 }
 
-/* Switching orientation: Turns glide to their new places and the connections,
-   which jump, stay out of sight until they have arrived. */
-.canvas-switching .react-flow__node {
-  transition: transform 400ms ease;
+/* Switching orientation: Turns glide to their new places, or jump there under
+   reduced motion, and the connections, which jump, stay out of sight until
+   they have arrived. */
+@media (prefers-reduced-motion: no-preference) {
+  .canvas-switching .react-flow__node {
+    transition: transform 400ms ease;
+  }
 }
 .react-flow__edges {
   transition: opacity 200ms ease;
