@@ -85,7 +85,7 @@ A helper the AI starts during a Reply to work on part of the task; several can r
 _Avoid_: Helper, agent, worker, child thread
 
 **Thread**:
-One path from the Tree's root to a leaf: the complete, linear conversation the AI sees when continuing from that leaf. A Tree with no Forks has exactly one Thread; there is no "main" Thread.
+One path from the Tree's root to a Reply: the complete, linear conversation the AI sees when answering a Prompt sent into that Reply. Said of a whole Tree, its Threads are the paths to its leaves, so a Tree with no Forks has exactly one Thread; there is no "main" Thread.
 _Avoid_: Conversation (ambiguous between Tree and Thread), main thread, trunk
 
 **Fork**:
@@ -118,8 +118,12 @@ One Thread of a Tree shown as a conventional vertical chat, in a slideout over c
 _Avoid_: Drawer, chat view
 
 **Input**:
-The place the user types the next Prompt, always attached to a Reply, except on an empty Tree, where a single Input creates the root Prompt. Chat mode has exactly one, at the end of the shown Thread. In canvas mode every Reply can have one: it is always shown on the active Thread and revealed on hover elsewhere, and submitting into a Reply that already has a response branches.
+The place the user types the next Prompt, always attached to a Reply, except on an empty Tree, where a single Input creates the root Prompt. Chat mode has exactly one, at the end of the shown Thread. In canvas mode every Reply can have one: it is always shown on the Active Thread and revealed on hover elsewhere, and submitting into a Reply that already has a response branches.
 _Avoid_: Composer, prompt box, head
+
+**Active Thread**:
+The Thread ending at the Reply whose Input the user last focused, or at the newest Reply until then. Canvas mode highlights it and always shows its Input.
+_Avoid_: Current thread, selected thread, focused thread
 
 ### App
 
