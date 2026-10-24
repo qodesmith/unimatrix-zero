@@ -41,6 +41,8 @@ interface FlowProps {
   /** Turns glide to their new places while the orientation switches. */
   switching: boolean
   onHover: (turnId: string | null) => void
+  /** A Turn was clicked: open the slideout on its Thread. */
+  onOpen: (turnId: string) => void
   onOrientation: (orientation: CanvasOrientation) => void
   onJump: (replyId: string) => void
 }
@@ -52,6 +54,19 @@ const NO_SIZES: Sizes = {vertical: {}, horizontal: {}}
 const FIT = {padding: 0.15, maxZoom: 1}
 
 const nodeTypes = {prompt: PromptNode, reply: ReplyNode, exchange: ExchangeNode}
+
+/** Controls inside a Turn's box keep their clicks to themselves. */
+const CONTROLS = 'a, button, input, textarea, summary, [role="button"]'
+
+/**
+ * The Turn a click landed on, read from the box it hit: an Exchange card
+ * holds two. None for a click on a control or on the Input under a Reply.
+ */
+function clickedTurnId(target: EventTarget) {
+  if (!(target instanceof Element) || target.closest(CONTROLS)) return null
+
+  return target.closest('[data-turn]')?.getAttribute('data-turn') ?? null
+}
 
 function hoverIdOf(node: TurnNode) {
   const {turn} = node.data
@@ -72,6 +87,7 @@ export function Flow({
   fitOnLoad,
   switching,
   onHover,
+  onOpen,
   onOrientation,
   onJump,
 }: FlowProps) {
@@ -275,6 +291,11 @@ export function Flow({
       className={switching ? 'canvas-switching' : undefined}
       onNodeMouseEnter={(_event, node) => onHover(hoverIdOf(node))}
       onNodeMouseLeave={() => onHover(null)}
+      onNodeClick={event => {
+        const turnId = clickedTurnId(event.target)
+
+        if (turnId !== null) onOpen(turnId)
+      }}
     >
       <Background gap={24} />
       <CanvasControls

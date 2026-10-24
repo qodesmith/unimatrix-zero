@@ -95,3 +95,16 @@ export function isFork(index: TreeIndex, replyId: string) {
 export function newestReply(index: TreeIndex): Reply | null {
   return index.replies.at(-1) ?? null
 }
+
+/**
+ * Where the Thread a Turn is on ends: a Reply is its own end and a Prompt
+ * stands for its Reply, or for itself until main has started one. Null when
+ * the Tree has no such Turn.
+ */
+export function threadEnd(index: TreeIndex, turnId: string): string | null {
+  if (index.replyById.has(turnId)) return turnId
+
+  if (!index.promptById.has(turnId)) return null
+
+  return index.replyByPrompt.get(turnId)?.id ?? turnId
+}

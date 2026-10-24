@@ -15,7 +15,11 @@ export interface CanvasState {
   treeId: string
   index: TreeIndex
   activeReplyId: string | null
-  setActiveReplyId: (replyId: string) => void
+  /**
+   * A Reply's Input on the canvas took focus: its Thread becomes the Active
+   * Thread and the slideout closes.
+   */
+  focusInput: (replyId: string) => void
   /** A Prompt was sent into a Reply's Input and main started this Reply for it. */
   onSent: (replyId: string, parentReplyId: string) => void
   /**
