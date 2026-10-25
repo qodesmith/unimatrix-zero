@@ -63,6 +63,8 @@ interface Report {
 const cleanUps: (() => Promise<void>)[] = []
 
 afterEach(async () => {
+  vi.useRealTimers()
+
   for (const cleanUp of cleanUps.splice(0).toReversed()) await cleanUp()
 })
 
@@ -73,6 +75,19 @@ function folder(prefix: string) {
   )
 
   return made
+}
+
+/** A copy of the recording `name`, its text as `edit` changes it. */
+function edited(name: string, edit: (text: string) => string) {
+  const text = fs.readFileSync(
+    path.join(import.meta.dirname, 'recordings', name),
+    'utf8'
+  )
+
+  const file = path.join(folder('uz-recording-'), name)
+  fs.writeFileSync(file, edit(text))
+
+  return file
 }
 
 /** Runs the Codex driver against the fake `codex`, which replays `recordings`. */
@@ -99,7 +114,11 @@ async function setUp(
       OPENAI_API_KEY: 'sk-outranks-the-plan',
       CODEX_HOME: '/Users/sam/.codex',
       FAKE_CODEX_RECORDINGS: recordings
-        .map(name => path.join(import.meta.dirname, 'recordings', name))
+        .map(name =>
+          path.isAbsolute(name)
+            ? name
+            : path.join(import.meta.dirname, 'recordings', name)
+        )
         .join(path.delimiter),
       FAKE_CODEX_REPORTS: reports,
       ...env,
@@ -529,6 +548,27 @@ it('fails the Reply as a crash, keeping its text, when Codex stops mid-stream', 
   )
   expect(events.some(event => event.type === 'REPLY_RECORDED')).toBe(false)
   expect(codex.reports()).toHaveLength(1)
+})
+
+it('names when a limit lifts by the full window Codex reported', async () => {
+  const limited = edited('started.ndjson', text =>
+    text
+      .replace('"usedPercent":0', '"usedPercent":100')
+      .replace(
+        '"status":"completed","error":null',
+        '"status":"failed","error":{"message":"You’ve hit your usage limit."}'
+      )
+  )
+
+  vi.useFakeTimers({toFake: ['Date'], now: new Date('2026-10-23T09:00:00Z')})
+  const codex = await setUp([limited])
+
+  const events = await codex.reply(FIRST_PROMPT)
+
+  expect(events.at(-1)).toMatchObject({
+    status: 'failed',
+    failure: {code: 'limit-reached', resetsAt: '2026-10-29T18:43:34.000Z'},
+  })
 })
 
 it('takes the Prompt to a new app-server when the last one stopped unheard', async () => {

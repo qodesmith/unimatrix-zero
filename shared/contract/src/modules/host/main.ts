@@ -56,7 +56,7 @@ export const ReplyRequestSchema = z.strictObject({
    * `fork` says the Reply already has a Prompt after it, so the Provider
    * forks its session there and this Reply continues in the fork; the
    * session the other Branch continues in is never rewound. `rewind` says
-   * the session may go on past `messageId`, with a Turn that failed, and
+   * the session may go on past `messageId`, with a turn that failed, and
    * the Provider drops that before answering; never set with `fork`.
    */
   session: SessionRefSchema.extend({

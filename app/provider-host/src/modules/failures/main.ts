@@ -26,17 +26,22 @@ function resetsAtIn(message: string): string | undefined {
 /**
  * The failure a Provider's error message amounts to, by what the window can
  * say about it: the connection, a limit, or the disk. Anything else is a
- * `provider-error`, shown by its message.
+ * `provider-error`, shown by its message. A limit lifts at `resetsAt`, in
+ * seconds since the epoch, when the Provider reported it apart from the
+ * message, or else at a time the message states.
  */
-export function failureOf(message: string): RunFailure {
+export function failureOf(message: string, resetsAt?: number): RunFailure {
   if (CONNECTION_LOST.test(message)) return {code: 'connection-lost', message}
 
   if (LIMIT_REACHED.test(message)) {
-    const resetsAt = resetsAtIn(message)
+    const lifts =
+      resetsAt === undefined
+        ? resetsAtIn(message)
+        : new Date(resetsAt * 1000).toISOString()
 
-    return resetsAt === undefined
+    return lifts === undefined
       ? {code: 'limit-reached', message}
-      : {code: 'limit-reached', message, resetsAt}
+      : {code: 'limit-reached', message, resetsAt: lifts}
   }
 
   if (DISK_FULL.test(message)) return {code: 'disk-full', message}

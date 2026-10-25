@@ -168,3 +168,22 @@ it.each([
     ...ended,
   })
 })
+
+it('names when a limit lifts as Codex reported it apart from the message', () => {
+  const turn = {
+    id: 'turn',
+    status: 'failed',
+    error: {message: 'You’ve hit your usage limit.'},
+  } as const
+
+  expect(createReplyMapper(ids).finished(turn, 1793970000)).toEqual({
+    ...ids,
+    type: 'RUN_FINISHED',
+    status: 'failed',
+    failure: {
+      code: 'limit-reached',
+      message: 'You’ve hit your usage limit.',
+      resetsAt: '2026-11-06T13:00:00.000Z',
+    },
+  })
+})

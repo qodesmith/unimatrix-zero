@@ -4,6 +4,7 @@ import type {Account} from './protocol/v2/Account'
 import type {AccountLoginCompletedNotification} from './protocol/v2/AccountLoginCompletedNotification'
 import type {AgentMessageDeltaNotification} from './protocol/v2/AgentMessageDeltaNotification'
 import type {LoginAccountResponse} from './protocol/v2/LoginAccountResponse'
+import type {RateLimitWindow} from './protocol/v2/RateLimitWindow'
 import type {Thread} from './protocol/v2/Thread'
 import type {ThreadTokenUsage} from './protocol/v2/ThreadTokenUsage'
 import type {TokenUsageBreakdown} from './protocol/v2/TokenUsageBreakdown'
@@ -112,6 +113,19 @@ export const AgentMessageItemSchema = z.looseObject({
   text: z.string(),
 })
 
+const RateLimitWindowSchema = z.looseObject({
+  usedPercent: z.number(),
+  resetsAt: z.number().nullable(),
+}) satisfies z.ZodType<Pick<RateLimitWindow, 'usedPercent' | 'resetsAt'>>
+
+/** The account's windows; one unknown or malformed reads as unreported. */
+const RateLimitsSchema = z.looseObject({
+  primary: RateLimitWindowSchema.nullable().catch(null),
+  secondary: RateLimitWindowSchema.nullable().catch(null),
+})
+
+export type RateLimits = z.infer<typeof RateLimitsSchema>
+
 function notification<
   M extends ServerNotification['method'],
   P extends z.ZodType,
@@ -138,6 +152,10 @@ export const NotificationSchema = z.discriminatedUnion('method', [
       itemId: z.string(),
       delta: z.string(),
     }) satisfies z.ZodType<AgentMessageDeltaNotification>
+  ),
+  notification(
+    'account/rateLimits/updated',
+    z.looseObject({rateLimits: RateLimitsSchema})
   ),
   notification('item/reasoning/summaryTextDelta', DeltaSchema),
   notification('item/reasoning/textDelta', DeltaSchema),

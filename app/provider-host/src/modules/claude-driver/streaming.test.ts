@@ -589,6 +589,45 @@ it('names a limit Claude ran into, with when it lifts', async () => {
   await claude.allClosed()
 })
 
+it('names when a limit lifts as Claude reported it apart from the message', async () => {
+  const limited = edited('warm.ndjson', lines =>
+    lines.map(line => {
+      if (line.kind !== 'out') return line
+
+      if (line.message.type === 'rate_limit_event') {
+        return {
+          ...line,
+          message: {
+            ...line.message,
+            rate_limit_info: {status: 'rejected', resetsAt: 1793970000},
+          },
+        }
+      }
+
+      return line.message.type === 'result'
+        ? {
+            ...line,
+            message: {
+              ...line.message,
+              is_error: true,
+              result: 'You’ve hit your limit · resets 3pm (Europe/London)',
+            },
+          }
+        : line
+    })
+  )
+
+  const claude = await setUp([limited])
+
+  const events = await claude.reply(FIRST_PROMPT)
+
+  expect(events.at(-1)).toMatchObject({
+    status: 'failed',
+    failure: {code: 'limit-reached', resetsAt: '2026-11-06T13:00:00.000Z'},
+  })
+  await claude.allClosed()
+})
+
 it('fails the Reply as a crash when `claude` exits before its result, keeping the text so far', async () => {
   const crashing = edited('warm.ndjson', lines => {
     const result = lines.findIndex(

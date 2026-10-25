@@ -16,11 +16,17 @@ type CodexTurn = Extract<
   {method: 'turn/completed'}
 >['params']['turn']
 
+type AccountNotification = Extract<Notification, {method: `account/${string}`}>
+
+function aboutTheAccount(
+  notification: Notification
+): notification is AccountNotification {
+  return notification.method.startsWith('account/')
+}
+
 /** The thread a notification belongs to; null for one outside any. */
 export function threadOf(notification: Notification) {
-  return notification.method === 'account/login/completed'
-    ? null
-    : notification.params.threadId
+  return aboutTheAccount(notification) ? null : notification.params.threadId
 }
 
 /** The turn a notification belongs to; null for one outside any turn. */
@@ -29,7 +35,7 @@ export function turnOf(notification: Notification) {
     return notification.params.turn.id
   }
 
-  if (notification.method === 'account/login/completed') return null
+  if (aboutTheAccount(notification)) return null
 
   return notification.params.turnId
 }
@@ -119,8 +125,11 @@ export function createReplyMapper(ids: ReplyIds) {
       ]
     },
 
-    /** How the Reply ended, as its last event. */
-    finished(turn: CodexTurn): RunFinished {
+    /**
+     * How the Reply ended, as its last event; a limit lifts at `resetsAt`, in
+     * seconds since the epoch, when Codex reported one.
+     */
+    finished(turn: CodexTurn, resetsAt?: number): RunFinished {
       if (turn.status === 'completed') {
         return {...ids, type: 'RUN_FINISHED', status: 'complete'}
       }
@@ -134,7 +143,8 @@ export function createReplyMapper(ids: ReplyIds) {
         type: 'RUN_FINISHED',
         status: 'failed',
         failure: failureOf(
-          turn.error?.message ?? 'ChatGPT couldn’t finish this Reply.'
+          turn.error?.message ?? 'ChatGPT couldn’t finish this Reply.',
+          resetsAt
         ),
       }
     },

@@ -1,6 +1,6 @@
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
-import type {Notification, ParamsOf} from './wire'
+import type {Notification, ParamsOf, RateLimits} from './wire'
 import type {
   ReplyRecorded,
   ReplyRequest,
@@ -24,11 +24,30 @@ export const IDLE_CLOSE_MS = 10 * 60 * 1000
 const STOPPED_BEFORE_FINISHING = 'Codex stopped before finishing this Reply.'
 
 /** Why a Reply failed, by the message of the error that ended it. */
-function failureFrom(message: string): RunFailure {
+function failureFrom(message: string, resetsAt?: number): RunFailure {
   return message === STOPPED_BEFORE_FINISHING ||
     message === STOPPED_BEFORE_ANSWERING
     ? {code: 'program-crashed', message}
-    : failureOf(message)
+    : failureOf(message, resetsAt)
+}
+
+/**
+ * When the account's full windows have all lifted, in seconds since the
+ * epoch; undefined with none full.
+ */
+function limitLifts({primary, secondary}: RateLimits) {
+  const now = Date.now() / 1000
+
+  const lifts = [primary, secondary].flatMap(window =>
+    window !== null &&
+    window.usedPercent >= 100 &&
+    window.resetsAt !== null &&
+    window.resetsAt > now
+      ? [window.resetsAt]
+      : []
+  )
+
+  return lifts.length === 0 ? undefined : Math.max(...lifts)
 }
 
 export interface CodexRepliesDeps {
@@ -109,6 +128,22 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   let current: Running | null = null
   let starting: Promise<Running> | null = null
   const writing = new Map<string, Writing>()
+  /**
+   * The account's windows as Codex last reported them; one an update leaves
+   * out keeps what it was.
+   */
+  let limits: RateLimits = {primary: null, secondary: null}
+
+  function onRateLimits(notification: Notification) {
+    if (notification.method !== 'account/rateLimits/updated') return
+
+    const {primary, secondary} = notification.params.rateLimits
+
+    limits = {
+      primary: primary ?? limits.primary,
+      secondary: secondary ?? limits.secondary,
+    }
+  }
 
   async function forgetOnExit(running: Running) {
     await running.server.exited
@@ -119,6 +154,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
 
   async function start(vendorProgram: SignInRequest) {
     const server = await deps.open(vendorProgram)
+    server.listen(onRateLimits)
 
     const running: Running = {
       server,
@@ -281,7 +317,10 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
 
         if (notification.method !== 'turn/completed') continue
 
-        const finished = mapper.finished(notification.params.turn)
+        const finished = mapper.finished(
+          notification.params.turn,
+          limitLifts(limits)
+        )
 
         // A stopped turn stays in the thread as a completed one does.
         if (finished.status !== 'failed') {
@@ -369,7 +408,8 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
         type: 'RUN_FINISHED',
         status: 'failed',
         failure: failureFrom(
-          error instanceof Error ? error.message : String(error)
+          error instanceof Error ? error.message : String(error),
+          limitLifts(limits)
         ),
       }
     } finally {

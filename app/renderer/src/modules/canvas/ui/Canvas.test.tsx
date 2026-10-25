@@ -1244,7 +1244,7 @@ it('gives a stopped Reply an Input and a failed one Retry instead, on the canvas
     .toBeVisible()
 })
 
-it('retries a failed Reply in place: the same box streams again from nothing', async () => {
+it('retries a failed Reply in place: the same Reply streams again from nothing', async () => {
   const {main} = await renderCanvas(endingIn('failed', 'Cut off'))
   await expect.element(page.getByText('Connection lost')).toBeVisible()
 

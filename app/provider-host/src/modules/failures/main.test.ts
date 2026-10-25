@@ -30,3 +30,17 @@ it('keeps when a limit lifts, when the Provider said', () => {
     message: 'Rate limit reached. Resets in a while.',
   })
 })
+
+it('takes when a limit lifts from the Provider over the message', () => {
+  expect(
+    failureOf('You’ve hit your limit · resets 3pm (Europe/London)', 1793970000)
+  ).toEqual({
+    code: 'limit-reached',
+    message: 'You’ve hit your limit · resets 3pm (Europe/London)',
+    resetsAt: '2026-11-06T13:00:00.000Z',
+  })
+  expect(failureOf('fetch failed', 1793970000)).toEqual({
+    code: 'connection-lost',
+    message: 'fetch failed',
+  })
+})
