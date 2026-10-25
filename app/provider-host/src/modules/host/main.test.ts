@@ -70,6 +70,26 @@ it('streams a requested Reply back to main', async () => {
   expect(main.sent.at(-1)).toMatchObject({status: 'complete'})
 })
 
+it('stops a Reply on main’s word, keeping the text so far', async () => {
+  const main = fakeMain()
+  await runHost(main.port, () => createFakeDriver({delayMs: 1}))
+
+  main.command({
+    type: 'reply.start',
+    request: {...request, prompt: {text: 'Please /hang'}},
+  })
+  await vi.waitFor(() => {
+    expect(
+      main.sent.filter(message => message.type === 'TEXT_DELTA').length
+    ).toBeGreaterThan(3)
+  })
+
+  main.command({type: 'reply.stop', replyId: request.replyId})
+  await finished(main.sent)
+
+  expect(main.sent.at(-1)).toMatchObject({status: 'stopped'})
+})
+
 it('drops a command that does not parse', async () => {
   const main = fakeMain()
   await runHost(main.port, () => createFakeDriver({delayMs: 0}))
