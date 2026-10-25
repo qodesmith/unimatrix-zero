@@ -64,8 +64,8 @@ export async function stopReply(treeId: string, replyId: string) {
 export type RetryOutcome = {ok: true} | {ok: false; error: string}
 
 /**
- * Runs a failed or interrupted Reply's Prompt again. Main hands back the same
- * Reply, streaming from nothing, which takes the old one's place in the saved
+ * Runs a failed Reply's Prompt again. Main hands back the same Reply,
+ * streaming from nothing, which takes the old one's place in the saved
  * Turns; its events then stream in as usual.
  */
 export function useRetryReply(treeId: string) {

@@ -1,4 +1,5 @@
 import type {Database} from '#modules/database/main'
+import type {ReplyRequest} from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
 import type {Reply} from '@uz/contract/turns'
 
@@ -16,12 +17,7 @@ const CUT_SHORT = new Set<Reply['status']>(['stopped', 'interrupted'])
  */
 export interface Continuation {
   provider: ProviderId
-  session: {
-    sessionId: string
-    messageId: string
-    fork: boolean
-    rewind: boolean
-  } | null
+  session: ReplyRequest['session']
 }
 
 /** How a Reply runs again: its Prompt, and the session it goes to. */
@@ -55,7 +51,8 @@ function answered(db: Database, replyId: string, except?: string) {
  * it, other than `except`, the Prompt being run again. A Reply stopped or
  * interrupted before its Provider saved it continues from the Reply its
  * own Prompt answers, since the Provider session stands there with the
- * Prompt in it. Null when the Tree has no such Reply.
+ * Prompt in it; a Prompt after the cut-short Reply forks that session all
+ * the same. Null when the Tree has no such Reply.
  */
 export function continuation(
   db: Database,
@@ -106,7 +103,15 @@ export function continuation(
       ? null
       : continuation(db, treeId, parentReplyId, row.promptId)
 
-  return {provider: row.provider, session: before?.session ?? null}
+  const session = before?.session ?? null
+
+  return {
+    provider: row.provider,
+    session: session && {
+      ...session,
+      fork: session.fork || answered(db, replyId, except),
+    },
+  }
 }
 
 /**

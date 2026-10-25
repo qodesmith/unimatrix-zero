@@ -638,6 +638,44 @@ describe('continuing from a Reply its Provider never saved', () => {
     ])
   })
 
+  it('forks the session before it for a second Prompt into the stopped Reply', async () => {
+    const {treeId, replyId} = await sendRoot()
+    record(treeId, replyId)
+    finish(treeId, replyId)
+
+    const sent = await send({
+      type: 'prompt.send',
+      treeId,
+      parentReplyId: replyId,
+      text: 'And then?',
+    })
+
+    if (!sent.ok) throw new Error(sent.error.message)
+
+    const {reply} = PromptSendResult.parse(sent.value)
+    stopUnrecorded(treeId, reply.id)
+    hostCommands = []
+
+    const next = {
+      type: 'prompt.send',
+      treeId,
+      parentReplyId: reply.id,
+      text: 'Go on',
+    } as const
+
+    await send(next)
+    await send({...next, text: 'Or instead?'})
+
+    expect(
+      hostCommands.flatMap(command =>
+        command.type === 'reply.start' ? [command.request.session] : []
+      )
+    ).toEqual([
+      {sessionId: 's1', messageId: 'm1', fork: false, rewind: false},
+      {sessionId: 's1', messageId: 'm1', fork: true, rewind: false},
+    ])
+  })
+
   it('starts a new session when the stopped Reply answered the root Prompt', async () => {
     const {treeId, replyId} = await sendRoot()
     stopUnrecorded(treeId, replyId)

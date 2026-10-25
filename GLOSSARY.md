@@ -81,7 +81,7 @@ Ending a streaming Reply early, by its button or Esc. The Provider is asked to e
 _Avoid_: Cancel, abort, interrupt (the Providers' word for what Stop asks of them)
 
 **Retry**:
-Running a failed or interrupted Reply's Prompt again in the same place: the Reply streams again from nothing, in the Provider session rewound to the Reply its Prompt answers. It is a recovery, never a Fork, and the app never retries on its own.
+Running a failed Reply's Prompt again in the same place: the Reply streams again from nothing, in the Provider session rewound to the Reply its Prompt answers. It is a recovery, never a Fork, and the app never retries on its own.
 _Avoid_: Regenerate, resend, re-run
 
 **Thinking block**:
