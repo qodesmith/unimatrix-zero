@@ -21,5 +21,5 @@ export function createReplay() {
     }
   }
 
-  return {store, replay}
+  return {store, queryClient, replay}
 }

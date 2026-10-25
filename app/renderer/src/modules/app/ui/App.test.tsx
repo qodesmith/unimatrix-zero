@@ -113,6 +113,7 @@ function fakeMain(saved: Saved = {}) {
         content: [],
         contextSize: null,
         contextWindow: null,
+        failure: null,
         createdAt: receivedAt,
       }
 
@@ -120,6 +121,10 @@ function fakeMain(saved: Saved = {}) {
       replies.push(reply)
 
       return {ok: true, value: {prompt, reply}}
+    }
+
+    if (command.type === 'reply.stop' || command.type === 'reply.retry') {
+      return {ok: false, error: {code: 'not-found', message: 'Gone'}}
     }
 
     const tree = {...found, title: command.title}
@@ -344,6 +349,7 @@ it('shows a streaming Reply where it was after a reload, and keeps going', async
     content: [{type: 'text', text: 'Once'}],
     contextSize: null,
     contextWindow: null,
+    failure: null,
     createdAt: receivedAt,
   }
 
@@ -360,6 +366,7 @@ it('shows a streaming Reply where it was after a reload, and keeps going', async
         content: [{type: 'text', text: 'Once upon a'}],
         contextSize: null,
         contextWindow: null,
+        failure: null,
       },
     ],
   })
@@ -392,8 +399,11 @@ it('shows a failed Reply with the text it had', async () => {
     failure: {code: 'host-crashed', message: 'Claude stopped unexpectedly.'},
   })
 
-  await expect.element(page.getByText('This Reply failed.')).toBeVisible()
+  await expect
+    .element(page.getByText('Claude stopped unexpectedly'))
+    .toBeVisible()
   await expect.element(page.getByText('Cut off')).toBeVisible()
+  await expect.element(page.getByRole('button', {name: 'Retry'})).toBeEnabled()
 })
 
 function claudeCard() {

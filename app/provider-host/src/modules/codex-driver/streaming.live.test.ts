@@ -7,11 +7,13 @@
  * UZ_LIVE_CODEX_HOME=<userData>/providers/chatgpt\
  * bun run test:node app/provider-host/src/modules/codex-driver/streaming.live
  *
- * It copies the sign-in into three fresh folders and runs there, so the
- * second app-server has nothing but the app's copy of the rollouts to resume
- * from, and the third nothing but that copy to fork from.
+ * It copies the sign-in into fresh folders and runs there, so the second
+ * app-server of the first test has nothing but the app's copy of the rollouts
+ * to resume from, and the third nothing but that copy to fork from.
  * With `UZ_RECORD=yes` it also writes what the driver and `codex` exchanged
- * into `recordings/`, which the driver tests replay.
+ * into `recordings/`, which the driver tests replay. Each test writes its own
+ * recordings, so record one at a time with `-t`: the ids the driver tests pin
+ * change with every recording.
  */
 import type {ReplyRecorded, SessionRef} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
@@ -96,7 +98,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             },
             configDir: home,
           },
-          session: session && {...session, fork},
+          session: session && {...session, fork, rewind: false},
         })
       )
 
@@ -165,6 +167,148 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
 
       expect(answer).toMatch(/hi/i)
       expect(answer).not.toMatch(/bye/i)
+
+      await delay(IDLE_MS * 2)
+    } finally {
+      for (const home of homes) fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 180_000)
+
+  it('stops a Reply mid-stream and continues after it, then rewinds the loaded thread for a Retry', async () => {
+    if (!folder || !signedIn) return
+
+    const store = fakeStore()
+    const recording = process.env.UZ_RECORD === 'yes'
+
+    const recorder = createRecorder(
+      ['stopped.ndjson', 'reverted.ndjson'].map(name =>
+        path.join(RECORDINGS, name)
+      )
+    )
+
+    const homes = [homeFrom(signedIn), homeFrom(signedIn)]
+    const treeId = crypto.randomUUID()
+
+    function driver() {
+      return createCodexDriver({
+        store: store.client,
+        ...(recording ? {spawn: recorder.spawn} : {}),
+        idleMs: IDLE_MS,
+      })
+    }
+
+    async function reply(
+      on: ReturnType<typeof driver>,
+      home: string,
+      text: string,
+      session: SessionRef | null,
+      {rewind = false, stopAfter = Infinity} = {}
+    ) {
+      const replyId = crypto.randomUUID()
+      const events: (ReplyEvent | ReplyRecorded)[] = []
+      let deltas = 0
+
+      for await (const event of on.startReply({
+        treeId,
+        replyId,
+        model: 'default',
+        systemPrompt: 'You answer in as few words as you can.',
+        prompt: {text},
+        vendorProgram: {
+          program: {
+            path: folder ?? '',
+            build: {
+              url: 'https://example.com/codex.tar.gz',
+              sha256: '0'.repeat(64),
+              size: 1,
+              archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+            },
+          },
+          configDir: home,
+        },
+        session: session && {...session, fork: false, rewind},
+      })) {
+        events.push(event)
+
+        if (event.type === 'TEXT_DELTA' && ++deltas === stopAfter) {
+          await on.stop(replyId)
+        }
+      }
+
+      const recorded = events.find(
+        (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+      )
+
+      if (!recorded) throw new Error('The Reply was not recorded')
+
+      const answer = events
+        .flatMap(event => (event.type === 'TEXT_DELTA' ? [event.delta] : []))
+        .join('')
+
+      return {events, recorded, answer}
+    }
+
+    try {
+      const [home, otherHome] = homes as [string, string]
+      const first = driver()
+
+      const stopped = await reply(
+        first,
+        home,
+        'Count from 1 to 300, one number per line.',
+        null,
+        {stopAfter: 5}
+      )
+
+      expect(stopped.events.at(-1)).toMatchObject({
+        type: 'RUN_FINISHED',
+        status: 'stopped',
+      })
+      expect(stopped.events.at(-2)?.type).toBe('REPLY_RECORDED')
+      expect(stopped.answer).not.toMatch(/\b300\b/)
+
+      const continued = await reply(
+        first,
+        home,
+        'What did I ask you to do? Answer in five words.',
+        stopped.recorded.session
+      )
+
+      expectComplete(continued.events)
+      expect(continued.recorded.session.sessionId).toBe(
+        stopped.recorded.session.sessionId
+      )
+
+      await delay(IDLE_MS * 2)
+
+      const second = driver()
+      const hi = await reply(second, otherHome, 'Say hi in three words.', null)
+
+      expectComplete(hi.events)
+
+      const bye = await reply(
+        second,
+        otherHome,
+        'Now say bye in three words.',
+        hi.recorded.session
+      )
+
+      expectComplete(bye.events)
+
+      const retried = await reply(
+        second,
+        otherHome,
+        'What was the last thing I asked you? Just the words.',
+        hi.recorded.session,
+        {rewind: true}
+      )
+
+      expectComplete(retried.events)
+      expect(retried.recorded.session.sessionId).toBe(
+        hi.recorded.session.sessionId
+      )
+      expect(retried.answer).toMatch(/hi/i)
+      expect(retried.answer).not.toMatch(/bye/i)
 
       await delay(IDLE_MS * 2)
     } finally {

@@ -5,6 +5,7 @@ export const NEW_REPLY: ReplyProgress = {
   content: [],
   contextSize: null,
   contextWindow: null,
+  failure: null,
 }
 
 function withLastText(
@@ -99,6 +100,7 @@ export function foldReplyEvent<T extends ReplyProgress>(
       ...reply,
       status: event.status,
       contextWindow: event.contextWindow ?? reply.contextWindow,
+      failure: event.failure ?? null,
     }
   }
 

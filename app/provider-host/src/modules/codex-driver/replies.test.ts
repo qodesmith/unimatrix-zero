@@ -127,10 +127,63 @@ it.each([
       },
     },
   ],
+  [
+    'failed',
+    {message: 'You’ve hit your usage limit. Resets at 2026-10-24T15:00:00Z.'},
+    {
+      status: 'failed',
+      failure: {
+        code: 'limit-reached',
+        message: 'You’ve hit your usage limit. Resets at 2026-10-24T15:00:00Z.',
+        resetsAt: '2026-10-24T15:00:00.000Z',
+      },
+    },
+  ],
+  [
+    'failed',
+    {message: 'stream disconnected before completion: connection reset'},
+    {
+      status: 'failed',
+      failure: {
+        code: 'connection-lost',
+        message: 'stream disconnected before completion: connection reset',
+      },
+    },
+  ],
+  [
+    'failed',
+    null,
+    {
+      status: 'failed',
+      failure: {
+        code: 'provider-error',
+        message: 'ChatGPT couldn’t finish this Reply.',
+      },
+    },
+  ],
 ] as const)('ends a %s turn', (status, error, ended) => {
   expect(createReplyMapper(ids).finished({id: 'turn', status, error})).toEqual({
     ...ids,
     type: 'RUN_FINISHED',
     ...ended,
+  })
+})
+
+it('names when a limit lifts as Codex reported it apart from the message', () => {
+  const turn = {
+    id: 'turn',
+    status: 'failed',
+    error: {message: 'You’ve hit your usage limit.'},
+  } as const
+
+  expect(createReplyMapper(ids).finished(turn, 1793970000)).toEqual({
+    ...ids,
+    type: 'RUN_FINISHED',
+    status: 'failed',
+    failure: {
+      code: 'limit-reached',
+      message: 'You’ve hit your usage limit.',
+      resetsAt: '2026-11-06T13:00:00.000Z',
+    },
   })
 })

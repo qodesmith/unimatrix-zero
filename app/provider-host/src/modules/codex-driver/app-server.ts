@@ -18,6 +18,9 @@ import {
 /** How long `codex` may take to exit once its input ends. */
 const CLOSE_TIMEOUT_MS = 10_000
 
+/** What every request still waiting fails with once `codex` has exited. */
+export const STOPPED_BEFORE_ANSWERING = 'Codex stopped before it answered.'
+
 /** How to run one vendor program. */
 export interface CodexCommand {
   command: string
@@ -104,7 +107,7 @@ export async function startAppServer(
     hasExited = true
 
     for (const waiting of pending.values()) {
-      waiting.reject(new Error('Codex stopped before it answered.'))
+      waiting.reject(new Error(STOPPED_BEFORE_ANSWERING))
     }
 
     pending.clear()

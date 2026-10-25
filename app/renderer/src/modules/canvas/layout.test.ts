@@ -28,6 +28,7 @@ function reply(id: string, promptId: string): Reply {
     content: [{type: 'text', text: id}],
     contextSize: null,
     contextWindow: null,
+    failure: null,
     createdAt: at(++clock),
   }
 }

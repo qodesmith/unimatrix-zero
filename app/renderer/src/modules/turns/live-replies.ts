@@ -118,17 +118,23 @@ export function applyLiveEvent(
   const current = replies[replyId] ?? {...NEW_REPLY, treeId, replyId}
   const next = foldReplyEvent(current, event)
   const blocks = thinking[replyId] ?? []
+  const startsOver = event.type === 'RUN_STARTED' && blocks.length > 0
 
   const nextBlocks =
     'subagentId' in event && event.subagentId !== undefined
       ? blocks
-      : foldThinking(blocks, event, current.content.length, now())
+      : foldThinking(
+          startsOver ? [] : blocks,
+          event,
+          current.content.length,
+          now()
+        )
 
   const nextThinking =
     nextBlocks === blocks ? thinking : {...thinking, [replyId]: nextBlocks}
 
   if (event.type === 'RUN_FINISHED') {
-    const {status, content, contextSize, contextWindow} = next
+    const {status, content, contextSize, contextWindow, failure} = next
 
     queryClient.setQueryData<Turns>(turnsKey(treeId), turns =>
       turns
@@ -136,7 +142,14 @@ export function applyLiveEvent(
             ...turns,
             replies: turns.replies.map(reply =>
               reply.id === replyId
-                ? {...reply, status, content, contextSize, contextWindow}
+                ? {
+                    ...reply,
+                    status,
+                    content,
+                    contextSize,
+                    contextWindow,
+                    failure,
+                  }
                 : reply
             ),
           }

@@ -36,11 +36,16 @@ export const ReplyPartSchema = z.discriminatedUnion('type', [
 
 export type ReplyPart = z.infer<typeof ReplyPartSchema>
 
+/**
+ * `interrupted`: the app quit while the Reply was streaming; set at the next
+ * launch, and from then on like `stopped`.
+ */
 export const ReplyStatusSchema = z.enum([
   'streaming',
   'complete',
   'stopped',
   'failed',
+  'interrupted',
 ])
 
 export type ReplyStatus = z.infer<typeof ReplyStatusSchema>
@@ -50,6 +55,10 @@ const FinishedStatusSchema = ReplyStatusSchema.exclude(['streaming'])
 /** Why a Reply failed, as the Provider host or main tells it. */
 export const RunFailureSchema = z.strictObject({
   code: z.enum([
+    'connection-lost',
+    'limit-reached',
+    'program-crashed',
+    'disk-full',
     'host-crashed',
     'host-unreachable',
     'driver-error',
@@ -57,6 +66,8 @@ export const RunFailureSchema = z.strictObject({
     'fake-failure',
   ]),
   message: z.string(),
+  /** When the limit lifts, for `limit-reached`, when the Provider said. */
+  resetsAt: z.iso.datetime().optional(),
 })
 
 export type RunFailure = z.infer<typeof RunFailureSchema>
@@ -67,6 +78,8 @@ export const ReplyProgressSchema = z.strictObject({
   content: z.array(ReplyPartSchema),
   contextSize: z.number().int().nonnegative().nullable(),
   contextWindow: z.number().int().positive().nullable(),
+  /** Set once the Reply has failed. */
+  failure: RunFailureSchema.nullable(),
 })
 
 export type ReplyProgress = z.infer<typeof ReplyProgressSchema>

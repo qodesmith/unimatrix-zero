@@ -8,6 +8,8 @@ import type {
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {failureOf} from '#modules/failures/main'
+
 type StreamEvent = SDKPartialAssistantMessage['event']
 
 type BlockDelta = Extract<StreamEvent, {type: 'content_block_delta'}>['delta']
@@ -43,6 +45,8 @@ export function createReplyMapper(ids: ReplyIds) {
   let messageOpen = false
   let mirrorFailed = false
   let lastMessage: {uuid: string; model: string} | null = null
+  /** When the limit refusing Claude's requests lifts; undefined while none does. */
+  let limitLifts: number | undefined
 
   function replace(text: string): ReplyEvent[] {
     if (text === shown) return []
@@ -164,6 +168,11 @@ export function createReplyMapper(ids: ReplyIds) {
         mirrorFailed = true
       }
 
+      if (message.type === 'rate_limit_event') {
+        const {status, resetsAt} = message.rate_limit_info
+        limitLifts = status === 'rejected' ? resetsAt : undefined
+      }
+
       if (!('parent_tool_use_id' in message)) return []
 
       if (message.parent_tool_use_id !== null) return []
@@ -179,6 +188,15 @@ export function createReplyMapper(ids: ReplyIds) {
     finished(result: SDKResultMessage): RunFinished {
       const contextWindow = contextWindowOf(result.modelUsage)
       const windowField = contextWindow === undefined ? {} : {contextWindow}
+
+      // A stopped turn’s result comes with either subtype and either
+      // `is_error`, partial text or not; only `terminal_reason` tells.
+      if (
+        result.terminal_reason === 'aborted_streaming' ||
+        result.terminal_reason === 'aborted_tools'
+      ) {
+        return {...ids, ...windowField, type: 'RUN_FINISHED', status: 'stopped'}
+      }
 
       if (result.subtype === 'success' && !result.is_error) {
         return {
@@ -197,10 +215,10 @@ export function createReplyMapper(ids: ReplyIds) {
         ...windowField,
         type: 'RUN_FINISHED',
         status: 'failed',
-        failure: {
-          code: 'provider-error',
-          message: message || 'Claude couldn’t finish this Reply.',
-        },
+        failure: failureOf(
+          message || 'Claude couldn’t finish this Reply.',
+          limitLifts
+        ),
       }
     },
 

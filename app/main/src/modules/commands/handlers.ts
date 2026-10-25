@@ -6,9 +6,10 @@ import type {Trees} from '#modules/trees/main'
 import type {Turns} from '#modules/turns/main'
 import type {Command, CommandResult, CommandType} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
-import type {SignInRequest} from '@uz/contract/host'
+import type {ReplyRequest, SignInRequest} from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
 import type {Tree} from '@uz/contract/trees'
+import type {Reply} from '@uz/contract/turns'
 
 import {PROVIDER_NAMES} from '@uz/contract/providers'
 
@@ -44,6 +45,27 @@ function found(tree: Tree | null): Tree {
   if (!tree) throw new NotFoundError('That Tree no longer exists.')
 
   return tree
+}
+
+/**
+ * Asks the Provider's host to write the Reply. One that can't be reached
+ * fails the Reply instead, with the text it has, which is none yet.
+ */
+function startOnHost(
+  {turns, hosts}: Pick<HandlerDeps, 'turns' | 'hosts'>,
+  provider: ProviderId,
+  request: ReplyRequest
+): Reply | null {
+  try {
+    hosts.send(provider, {type: 'reply.start', request})
+
+    return null
+  } catch {
+    return turns.fail(request.replyId, {
+      code: 'host-unreachable',
+      message: `${PROVIDER_NAMES[provider]} could not be reached.`,
+    })
+  }
 }
 
 export const handlers: Handlers = {
@@ -109,29 +131,54 @@ export const handlers: Handlers = {
       now: now(),
     })
 
-    try {
-      hosts.send(provider, {
-        type: 'reply.start',
-        request: {
-          treeId,
-          replyId: sent.reply.id,
-          model: model.id,
-          systemPrompt,
-          prompt: {text},
-          vendorProgram: vendorProgramFor(provider),
-          session: continued?.session ?? null,
-        },
-      })
-    } catch {
-      const reply = turns.fail(sent.reply.id, {
-        code: 'host-unreachable',
-        message: `${PROVIDER_NAMES[provider]} could not be reached.`,
-      })
+    const failed = startOnHost({turns, hosts}, provider, {
+      treeId,
+      replyId: sent.reply.id,
+      model: model.id,
+      systemPrompt,
+      prompt: {text},
+      vendorProgram: vendorProgramFor(provider),
+      session: continued?.session ?? null,
+    })
 
-      return {prompt: sent.prompt, reply}
+    return failed ? {prompt: sent.prompt, reply: failed} : sent
+  },
+
+  'reply.stop': ({treeId, replyId}, {turns, hosts}) => {
+    hosts.send(turns.writer(treeId, replyId), {type: 'reply.stop', replyId})
+
+    return {}
+  },
+
+  'reply.retry': (
+    {treeId, replyId},
+    {trees, turns, hosts, vendorProgramFor}
+  ) => {
+    found(trees.get(treeId))
+
+    const recovery = turns.recovery(treeId, replyId)
+
+    if (!recovery) throw new NotFoundError('That Reply no longer exists.')
+
+    const {provider, model, systemPrompt, text, session} = recovery
+
+    if (!hosts.ready(provider)) {
+      throw new Error(`Connect ${PROVIDER_NAMES[provider]} to retry.`)
     }
 
-    return sent
+    const reply = turns.restart(replyId)
+
+    const failed = startOnHost({turns, hosts}, provider, {
+      treeId,
+      replyId,
+      model,
+      systemPrompt,
+      prompt: {text},
+      vendorProgram: vendorProgramFor(provider),
+      session,
+    })
+
+    return {reply: failed ?? reply}
   },
 
   'provider.connect': ({provider}, {connections}) => {

@@ -21,6 +21,17 @@ const SECOND_MESSAGE = '7e7158ab-59c9-4e14-9828-54466ba8084e'
 const RESUMED_MESSAGE = '54a838e7-618e-41c6-a747-d57b47a7908e'
 const FORKED_SESSION_ID = '830530ec-a381-4e19-98a4-d7383b717af5'
 const FORKED_MESSAGE = '1f72cfd4-d1f2-4d35-aa13-f8df39b2bdb1'
+
+/** As `stopped.ndjson` recorded them. */
+const STOPPED_SESSION_ID = '3a5d1c74-2159-4d23-a6a3-fd192b046074'
+const STOPPED_MESSAGE = '8ce30d53-0856-4a14-a476-50e3b6184868'
+const ASKED_MESSAGE = '2f4dc5fc-2bbc-434b-a571-f92d02cbda82'
+
+/** As `rewound-warm.ndjson` and `rewound.ndjson` recorded them. */
+const REWOUND_SESSION_ID = '0dcd3d7c-ebce-4799-8da8-bdf836d1cbf3'
+const TEAL_MESSAGE = '90b7a04e-36fa-4aa1-84e8-66380ab18fe0'
+const OTTER_MESSAGE = '52786f10-3dd8-4f5b-995f-c5f9c5a27a0e'
+const REWOUND_MESSAGE = '18fb8495-3399-43a8-bc37-573286cfc9ed'
 const MODEL = 'claude-haiku-5-5'
 
 const IDLE_MS = 300
@@ -103,28 +114,51 @@ async function setUp(recordings: string[], env: Record<string, string> = {}) {
 
   const treeId = crypto.randomUUID()
 
+  interface ReplyOptions {
+    fork?: boolean
+    rewind?: boolean
+    /**
+     * Stops the Reply once this many text deltas have streamed; 0 stops it as
+     * it starts.
+     */
+    stopAfterDeltas?: number
+  }
+
   async function reply(
     text: string,
     session: SessionRef | null = null,
-    fork = false
+    {fork = false, rewind = false, stopAfterDeltas}: ReplyOptions = {}
   ) {
-    return Array.fromAsync<Streamed>(
-      driver.startReply({
-        treeId,
-        replyId: crypto.randomUUID(),
-        model: 'haiku',
-        systemPrompt: '',
-        prompt: {text},
-        vendorProgram: {
-          program: {
-            path: fake.program,
-            build: {url: 'https://example.com/claude', sha256: '', size: 0},
-          },
-          configDir,
+    const replyId = crypto.randomUUID()
+    const events: Streamed[] = []
+    let deltas = 0
+
+    for await (const event of driver.startReply({
+      treeId,
+      replyId,
+      model: 'haiku',
+      systemPrompt: '',
+      prompt: {text},
+      vendorProgram: {
+        program: {
+          path: fake.program,
+          build: {url: 'https://example.com/claude', sha256: '', size: 0},
         },
-        session: session && {...session, fork},
-      })
-    )
+        configDir,
+      },
+      session: session && {...session, fork, rewind},
+    })) {
+      events.push(event)
+
+      if (
+        (event.type === 'RUN_STARTED' && stopAfterDeltas === 0) ||
+        (event.type === 'TEXT_DELTA' && ++deltas === stopAfterDeltas)
+      ) {
+        await driver.stop(replyId)
+      }
+    }
+
+    return events
   }
 
   function reportsSoFar(): Report[] {
@@ -150,6 +184,7 @@ async function setUp(recordings: string[], env: Record<string, string> = {}) {
   cleanUps.push(allClosed)
 
   return {
+    driver,
     configDir,
     projectKey: projectKeyOf(configDir),
     store,
@@ -189,6 +224,8 @@ const FIRST_PROMPT = 'Reply with the single word TEAL.'
 const SECOND_PROMPT = 'Now reply with the single word OTTER.'
 const THIRD_PROMPT = 'Which two words did you reply with? Just the words.'
 const FORK_PROMPT = 'Which word did you reply with? Just the word.'
+const COUNT_PROMPT = 'Count from 1 to 300, one number per line.'
+const ASK_PROMPT = 'What did I ask you to do? Answer in five words.'
 
 it('streams a Reply, records where Claude saved it, and reports its Context size', async () => {
   const claude = await setUp(['warm.ndjson'])
@@ -288,7 +325,7 @@ it('forks the session through a mid-Thread Reply into a new session, leaving the
   await claude.reply(THIRD_PROMPT, session)
 
   const first = {sessionId: SESSION_ID, messageId: FIRST_MESSAGE}
-  const forked = await claude.reply(FORK_PROMPT, first, true)
+  const forked = await claude.reply(FORK_PROMPT, first, {fork: true})
 
   // The second Reply never happened on this Branch.
   expect(textOf(forked)).toBe('TEAL')
@@ -523,4 +560,212 @@ it('fails the Reply with Claude’s reason, without recording it', async () => {
   // Not kept warm, so no later Prompt goes to it.
   await claude.allClosed()
   expect(claude.reports()).toHaveLength(1)
+})
+
+it('names a limit Claude ran into, with when it lifts', async () => {
+  const limited = edited('warm.ndjson', lines =>
+    lines.map(line =>
+      line.kind === 'out' && line.message.type === 'result'
+        ? {
+            ...line,
+            message: {
+              ...line.message,
+              is_error: true,
+              result: 'You’ve hit your limit · resets 2026-10-24T15:00:00Z',
+            },
+          }
+        : line
+    )
+  )
+
+  const claude = await setUp([limited])
+
+  const events = await claude.reply(FIRST_PROMPT)
+
+  expect(events.at(-1)).toMatchObject({
+    status: 'failed',
+    failure: {code: 'limit-reached', resetsAt: '2026-10-24T15:00:00.000Z'},
+  })
+  await claude.allClosed()
+})
+
+it('names when a limit lifts as Claude reported it apart from the message', async () => {
+  const limited = edited('warm.ndjson', lines =>
+    lines.map(line => {
+      if (line.kind !== 'out') return line
+
+      if (line.message.type === 'rate_limit_event') {
+        return {
+          ...line,
+          message: {
+            ...line.message,
+            rate_limit_info: {status: 'rejected', resetsAt: 1793970000},
+          },
+        }
+      }
+
+      return line.message.type === 'result'
+        ? {
+            ...line,
+            message: {
+              ...line.message,
+              is_error: true,
+              result: 'You’ve hit your limit · resets 3pm (Europe/London)',
+            },
+          }
+        : line
+    })
+  )
+
+  const claude = await setUp([limited])
+
+  const events = await claude.reply(FIRST_PROMPT)
+
+  expect(events.at(-1)).toMatchObject({
+    status: 'failed',
+    failure: {code: 'limit-reached', resetsAt: '2026-11-06T13:00:00.000Z'},
+  })
+  await claude.allClosed()
+})
+
+it('fails the Reply as a crash when `claude` exits before its result, keeping the text so far', async () => {
+  const crashing = edited('warm.ndjson', lines => {
+    const result = lines.findIndex(
+      line => line.kind === 'out' && line.message.type === 'result'
+    )
+
+    return lines.toSpliced(result, 1)
+  })
+
+  const claude = await setUp([crashing], {FAKE_CLAUDE_EXIT_AFTER: '1'})
+
+  const events = await claude.reply(FIRST_PROMPT)
+
+  expect(textOf(events)).toBe('TEAL')
+  expect(events.map(event => event.type)).not.toContain('REPLY_RECORDED')
+  expect(events.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'failed',
+    failure: {code: 'program-crashed'},
+  })
+  await claude.allClosed()
+  expect(claude.reports()[0]?.ended).toBe('exited')
+})
+
+it('passes on a stop asked before claude has the Prompt', async () => {
+  const claude = await setUp(['stopped.ndjson'])
+
+  const stopped = await claude.reply(COUNT_PROMPT, null, {stopAfterDeltas: 0})
+
+  expect(stopped.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'stopped',
+  })
+  expect(textOf(stopped)).not.toBe('')
+})
+
+it('stops a Reply where it is, records it, and continues the Thread warm from it', async () => {
+  const claude = await setUp(['stopped.ndjson'])
+
+  await expect(claude.driver.stop(crypto.randomUUID())).resolves.toBeUndefined()
+
+  const stopped = await claude.reply(COUNT_PROMPT, null, {stopAfterDeltas: 5})
+
+  // What Claude had written when the interrupt reached it, as it saved it.
+  expect(textOf(stopped)).toBe(
+    Array.from({length: 30}, (_, index) => index + 1).join('\n')
+  )
+  expect(stopped.slice(-2)).toEqual([
+    expect.objectContaining({
+      type: 'REPLY_RECORDED',
+      model: MODEL,
+      session: {sessionId: STOPPED_SESSION_ID, messageId: STOPPED_MESSAGE},
+    }),
+    {
+      treeId: expect.any(String),
+      replyId: expect.any(String),
+      type: 'RUN_FINISHED',
+      status: 'stopped',
+      contextWindow: 1_000_000,
+    },
+  ])
+  expect(
+    claude.store
+      .entriesOf(claude.projectKey, STOPPED_SESSION_ID)
+      .map(entry => entry.uuid)
+  ).toContain(STOPPED_MESSAGE)
+
+  const asked = await claude.reply(ASK_PROMPT, recordedIn(stopped))
+
+  expect(textOf(asked)).toBe('Count from 1 to 300.')
+  expect(recordedIn(asked)).toEqual({
+    sessionId: STOPPED_SESSION_ID,
+    messageId: ASKED_MESSAGE,
+  })
+
+  await claude.allClosed()
+  const [report] = claude.reports()
+
+  expect(claude.reports()).toHaveLength(1)
+  expect(report?.prompts).toEqual([COUNT_PROMPT, ASK_PROMPT])
+  expect(report?.ended).toBe('input-closed')
+})
+
+it('rewinds a cold session to an earlier Reply and goes on from there, in the same session', async () => {
+  const claude = await setUp(['rewound-warm.ndjson', 'rewound.ndjson'])
+
+  const first = await claude.reply(FIRST_PROMPT)
+  await claude.reply(SECOND_PROMPT, recordedIn(first))
+  await claude.allClosed()
+  fs.rmSync(path.join(claude.configDir, 'projects'), {
+    recursive: true,
+    force: true,
+  })
+
+  const rewound = await claude.reply(FORK_PROMPT, recordedIn(first), {
+    rewind: true,
+  })
+
+  expect(textOf(rewound)).toBe('TEAL')
+  expect(recordedIn(rewound)).toEqual({
+    sessionId: REWOUND_SESSION_ID,
+    messageId: REWOUND_MESSAGE,
+  })
+
+  await claude.allClosed()
+  const [, rewind] = claude.reports()
+
+  expect(rewind?.args).toEqual(
+    expect.arrayContaining([
+      `--resume=${REWOUND_SESSION_ID}`,
+      `--resume-session-at=${TEAL_MESSAGE}`,
+    ])
+  )
+  expect(rewind?.args).not.toContain('--fork-session')
+  // Restored whole from the app's copy; the cut is `claude`'s to make.
+  expect(rewind?.resumedFrom).toEqual(
+    expect.arrayContaining([TEAL_MESSAGE, OTTER_MESSAGE])
+  )
+  expect(rewind?.prompts).toEqual([FORK_PROMPT])
+})
+
+it('never rewinds in the warm session standing there: it closes, and a new `claude` resumes the cut session', async () => {
+  const claude = await setUp(['rewound-warm.ndjson', 'rewound.ndjson'])
+
+  const first = await claude.reply(FIRST_PROMPT)
+
+  const rewound = await claude.reply(FORK_PROMPT, recordedIn(first), {
+    rewind: true,
+  })
+
+  expect(textOf(rewound)).toBe('TEAL')
+  expect(recordedIn(rewound).sessionId).toBe(REWOUND_SESSION_ID)
+
+  await claude.allClosed()
+  const [warm, rewind] = claude.reports()
+
+  expect(warm?.prompts).toEqual([FIRST_PROMPT])
+  expect(warm?.ended).not.toBeNull()
+  expect(rewind?.args).toContain(`--resume-session-at=${TEAL_MESSAGE}`)
+  expect(rewind?.prompts).toEqual([FORK_PROMPT])
 })

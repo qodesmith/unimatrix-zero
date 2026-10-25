@@ -75,6 +75,9 @@ export async function runHost(
       case 'reply.start':
         void stream(command.request)
         break
+      case 'reply.stop':
+        void driver.stop(command.replyId).catch(() => undefined)
+        break
       case 'sign-in.start':
         void signIn(command.request)
         break

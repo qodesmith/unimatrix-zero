@@ -146,7 +146,7 @@ it('records each Reply in the session it continues, or a new one', async () => {
     driver.startReply({
       ...request,
       prompt,
-      session: {...recorded.session, fork: false},
+      session: {...recorded.session, fork: false, rewind: false},
     })
   )
 

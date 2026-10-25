@@ -1,31 +1,40 @@
+import type {ConnectionsStore} from './connections-store'
 import type {Command} from '@uz/contract/commands'
 import type {ProviderId} from '@uz/contract/providers'
 
 import {bridge} from '#modules/bridge/main'
-import {useEffect, useState} from 'react'
+import {useSelector} from '@tanstack/react-store'
+import {createContext, use} from 'react'
 
-import {NOT_LOADED, applyConnectionEvent, withFailure} from './cards'
+import {withFailure} from './cards'
+
+export const ConnectionsStoreContext = createContext<ConnectionsStore | null>(
+  null
+)
+
+export function useConnectionsStore() {
+  const store = use(ConnectionsStoreContext)
+
+  if (!store) {
+    throw new Error('useConnections needs <ConnectionsProvider> above it')
+  }
+
+  return store
+}
 
 /**
  * Which Providers are connected, and the one being connected, as main reports
  * them. A command main refuses shows on the Provider's card.
  */
 export function useConnections() {
-  const [state, setState] = useState(NOT_LOADED)
-
-  useEffect(
-    () =>
-      bridge().subscribe(event => {
-        setState(current => applyConnectionEvent(current, event))
-      }),
-    []
-  )
+  const store = useConnectionsStore()
+  const state = useSelector(store, current => current)
 
   async function run(provider: ProviderId, command: Command) {
     const outcome = await bridge().send(command)
 
     if (!outcome.ok) {
-      setState(current =>
+      store.setState(current =>
         withFailure(current, provider, {
           reason: 'failed',
           message: outcome.error.message,

@@ -1,10 +1,21 @@
 import type {ThinkingBlock} from '../live-replies'
-import type {Reply, ReplyPart} from '@uz/contract/turns'
+import type {ProviderId, ProviderStatus} from '@uz/contract/providers'
+import type {
+  Reply,
+  ReplyPart,
+  ReplyStatus,
+  RunFailure,
+} from '@uz/contract/turns'
 
+import {useProviderStatus} from '#modules/connections/main'
 import {ReplyMarkdown} from '#modules/markdown/main'
-import {Fragment} from 'react'
+import {Button} from '#modules/shadcn/main'
+import {PROVIDER_NAMES} from '@uz/contract/providers'
+import {Fragment, useState} from 'react'
 
 import {useLiveReply, useThinking} from '../use-live-reply'
+import {useOnline} from '../use-online'
+import {stopReply, useRetryReply} from '../use-turns'
 
 type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 
@@ -15,7 +26,7 @@ type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 export function ReplyView({reply}: {reply: Reply}) {
   const live = useLiveReply(reply.id)
   const blocks = useThinking(reply.id)
-  const {status, content} = live ?? reply
+  const {status, content, failure} = live ?? reply
   const streaming = status === 'streaming'
 
   function thinkingBefore(part: number) {
@@ -51,13 +62,174 @@ export function ReplyView({reply}: {reply: Reply}) {
       ))}
       {thinkingBefore(content.length)}
       {streaming && (
-        <span className="text-xs text-muted-foreground">Writing…</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted-foreground">Writing…</span>
+          <StopButton treeId={reply.treeId} replyId={reply.id} />
+        </div>
       )}
-      {status === 'failed' && (
-        <span className="text-xs text-destructive">This Reply failed.</span>
-      )}
+      <StatusLine status={status} failure={failure} provider={reply.provider} />
+      {status === 'failed' && <RetryControls reply={reply} />}
     </article>
   )
+}
+
+const NOT_READY: Record<
+  Exclude<ProviderStatus['status'], 'ready'>,
+  (name: string) => string
+> = {
+  'signed-out': name => `Sign in to ${name} again to retry`,
+  'not-connected': name => `Connect ${name} to retry`,
+  starting: name => `${name} is starting…`,
+  restarting: name => `${name} is starting…`,
+  failed: name => `${name} isn't running`,
+}
+
+/**
+ * Why Retry is held right now, or null when it may run. Held without a
+ * reason until main has said where the Provider stands.
+ */
+function retryHeldBecause(
+  online: boolean,
+  status: ProviderStatus['status'] | null,
+  provider: ProviderId
+) {
+  if (!online) return 'Offline · Retry waits for the connection'
+
+  if (status === null) return ''
+
+  if (status === 'ready') return null
+
+  return NOT_READY[status](PROVIDER_NAMES[provider])
+}
+
+/**
+ * Mounted only while the Reply has failed, so a retry that takes starts it
+ * fresh.
+ */
+function RetryControls({reply}: {reply: Reply}) {
+  const retryReply = useRetryReply(reply.treeId)
+  const online = useOnline()
+  const providerStatus = useProviderStatus(reply.provider)
+  const [retrying, setRetrying] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const held = retryHeldBecause(online, providerStatus, reply.provider)
+
+  async function retry() {
+    setRetrying(true)
+    setError(null)
+    const outcome = await retryReply(reply.id)
+
+    setRetrying(false)
+
+    if (!outcome.ok) setError(outcome.error)
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-6 px-2 text-xs"
+        disabled={held !== null || retrying}
+        onClick={() => void retry()}
+      >
+        Retry
+      </Button>
+      {held ? (
+        <span className="text-xs text-muted-foreground">{held}</span>
+      ) : (
+        error && <span className="text-xs text-destructive">{error}</span>
+      )}
+    </div>
+  )
+}
+
+/** Mounted only while the Reply streams, so a retry starts it fresh. */
+function StopButton({treeId, replyId}: {treeId: string; replyId: string}) {
+  const [stopping, setStopping] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function stop() {
+    setStopping(true)
+    setError(null)
+    const refused = await stopReply(treeId, replyId)
+
+    if (refused !== null) {
+      setError(refused)
+      setStopping(false)
+    }
+  }
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-6 px-2 text-xs"
+        disabled={stopping}
+        onClick={() => void stop()}
+      >
+        {stopping ? 'Stopping…' : 'Stop'}
+      </Button>
+      {error && <span className="text-xs text-destructive">{error}</span>}
+    </>
+  )
+}
+
+const resetTime = new Intl.DateTimeFormat(undefined, {
+  hour: 'numeric',
+  minute: '2-digit',
+})
+
+const FAILURE_LINES: Record<
+  RunFailure['code'],
+  (failure: RunFailure, name: string) => string
+> = {
+  'connection-lost': () => 'Connection lost',
+  'limit-reached': ({resetsAt}) =>
+    resetsAt === undefined
+      ? 'Limit reached'
+      : `Limit reached · resets at ${resetTime.format(new Date(resetsAt))}`,
+  'program-crashed': (_, name) => `${name} stopped unexpectedly`,
+  'host-crashed': (_, name) => `${name} stopped unexpectedly`,
+  'disk-full': () => 'Disk full',
+  'host-unreachable': (_, name) => `${name} could not be reached`,
+  'driver-error': ({message}) => message,
+  'provider-error': ({message}) => message,
+  'fake-failure': ({message}) => message,
+}
+
+function describeFailure(failure: RunFailure, provider: ProviderId) {
+  return FAILURE_LINES[failure.code](failure, PROVIDER_NAMES[provider])
+}
+
+/** How a Reply ended, when it did not simply finish. */
+function StatusLine({
+  status,
+  failure,
+  provider,
+}: {
+  status: ReplyStatus
+  failure: RunFailure | null
+  provider: ProviderId
+}) {
+  if (status === 'failed') {
+    return (
+      <span className="text-xs text-destructive">
+        {failure ? describeFailure(failure, provider) : 'Failed'}
+      </span>
+    )
+  }
+
+  if (status === 'stopped' || status === 'interrupted') {
+    return (
+      <span className="text-xs text-muted-foreground">
+        {status === 'stopped' ? 'Stopped' : 'Interrupted when the app quit'}
+      </span>
+    )
+  }
+
+  return null
 }
 
 function describeDuration(ms: number) {

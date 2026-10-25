@@ -55,9 +55,14 @@ export const ReplyRequestSchema = z.strictObject({
    * The session to continue, at the Reply being answered; null starts one.
    * `fork` says the Reply already has a Prompt after it, so the Provider
    * forks its session there and this Reply continues in the fork; the
-   * session the other Branch continues in is never rewound.
+   * session the other Branch continues in is never rewound. `rewind` says
+   * the session may go on past `messageId`, with a turn that failed, and
+   * the Provider drops that before answering; never set with `fork`.
    */
-  session: SessionRefSchema.extend({fork: z.boolean()}).nullable(),
+  session: SessionRefSchema.extend({
+    fork: z.boolean(),
+    rewind: z.boolean(),
+  }).nullable(),
 })
 
 export type ReplyRequest = z.infer<typeof ReplyRequestSchema>
@@ -127,6 +132,8 @@ export interface ProviderDriver {
 /** Main → Provider host. */
 export const HostCommandSchema = z.discriminatedUnion('type', [
   z.strictObject({type: z.literal('reply.start'), request: ReplyRequestSchema}),
+  /** Interrupts the Reply's turn; its `RUN_FINISHED` follows. */
+  z.strictObject({type: z.literal('reply.stop'), replyId: z.uuid()}),
   z.strictObject({
     type: z.literal('sign-in.start'),
     request: SignInRequestSchema,
