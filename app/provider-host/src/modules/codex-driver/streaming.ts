@@ -6,10 +6,12 @@ import type {
   ReplyRequest,
   SignInRequest,
 } from '@uz/contract/host'
-import type {ReplyEvent} from '@uz/contract/turns'
+import type {ReplyEvent, RunFailure} from '@uz/contract/turns'
 
+import {failureOf} from '#modules/failures/main'
 import {createInbox} from '#modules/inbox/main'
 
+import {STOPPED_BEFORE_ANSWERING} from './app-server'
 import {createReplyMapper, threadOf, turnOf} from './replies'
 import {folderOf, readRollouts, writeRolloutsBack} from './rollouts'
 
@@ -18,6 +20,16 @@ export const DEFAULT_MODEL = 'default'
 
 /** The app-server closes after this long without a Reply to write. */
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
+
+const STOPPED_BEFORE_FINISHING = 'Codex stopped before finishing this Reply.'
+
+/** Why a Reply failed, by the message of the error that ended it. */
+function failureFrom(message: string): RunFailure {
+  return message === STOPPED_BEFORE_FINISHING ||
+    message === STOPPED_BEFORE_ANSWERING
+    ? {code: 'program-crashed', message}
+    : failureOf(message)
+}
 
 export interface CodexRepliesDeps {
   store: SessionStoreClient
@@ -28,16 +40,46 @@ export interface CodexRepliesDeps {
 /** The app-server writing Replies, and the threads loaded in it. */
 interface Running {
   server: AppServer
-  /** Each loaded thread's id, with the Model it runs. */
-  threads: Map<string, string>
+  threads: Map<string, LoadedThread>
   /** How many Replies it is writing. */
   writing: number
   idle: ReturnType<typeof setTimeout> | undefined
 }
 
-interface OpenThread {
+interface LoadedThread {
   id: string
   model: string
+  /**
+   * The turns this driver knows of it, oldest first: the one it was opened
+   * at, then each one started here, whether it completed, stopped or failed.
+   */
+  turns: string[]
+}
+
+/** Where a Reply being written is, for a stop to reach it. */
+interface Writing {
+  server: AppServer
+  threadId: string
+  turnId: string
+}
+
+/** Drops the turns after `messageId` from the thread, for a Retry. */
+async function dropAfter(
+  server: AppServer,
+  thread: LoadedThread,
+  messageId: string | null
+) {
+  const at = messageId === null ? -1 : thread.turns.indexOf(messageId)
+  const next = at === -1 ? undefined : thread.turns[at + 1]
+
+  if (next === undefined) return
+
+  await server.request('thread/revert', {
+    threadId: thread.id,
+    beforeTurnId: next,
+  })
+
+  thread.turns.length = at + 1
 }
 
 /**
@@ -46,11 +88,14 @@ interface OpenThread {
  * resumes it from the app's own copy of its rollouts, or starts a new one.
  * A Prompt that starts a Branch forks the thread through the Reply it
  * answers, into a new thread; the thread the other Branch continues in is
- * left as it is.
+ * left as it is. A Retry drops the turns after the Reply it answers from the
+ * loaded thread first; a thread that isn't loaded resumes from the app's
+ * copy, which ends at that Reply.
  */
 export function createCodexReplies(deps: CodexRepliesDeps) {
   let current: Running | null = null
   let starting: Promise<Running> | null = null
+  const writing = new Map<string, Writing>()
 
   async function forgetOnExit(running: Running) {
     await running.server.exited
@@ -102,11 +147,22 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     }, deps.idleMs)
   }
 
+  function load(
+    running: Running,
+    opened: {thread: {id: string}; model: string},
+    turns: string[]
+  ): LoadedThread {
+    const thread = {id: opened.thread.id, model: opened.model, turns}
+    running.threads.set(thread.id, thread)
+
+    return thread
+  }
+
   /** The Codex thread the Prompt goes to, loaded in the app-server. */
   async function threadFor(
     running: Running,
     request: ReplyRequest
-  ): Promise<OpenThread> {
+  ): Promise<LoadedThread> {
     const {configDir} = request.vendorProgram
 
     const settings = {
@@ -118,20 +174,22 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     } satisfies ParamsOf<'thread/start'>
 
     if (!request.session) {
-      const {thread, model} = await running.server.request(
-        'thread/start',
-        settings
+      return load(
+        running,
+        await running.server.request('thread/start', settings),
+        []
       )
-
-      running.threads.set(thread.id, model)
-
-      return {id: thread.id, model}
     }
 
-    const {sessionId: id, messageId, fork} = request.session
+    const {sessionId: id, messageId, fork, rewind} = request.session
     const loaded = running.threads.get(id)
+    const openedAt = messageId === null ? [] : [messageId]
 
-    if (loaded && !fork) return {id, model: loaded}
+    if (loaded && !fork) {
+      if (rewind) await dropAfter(running.server, loaded, messageId)
+
+      return loaded
+    }
 
     // Codex forks and resumes from the rollout on disk, which only a loaded
     // thread is sure to have written here.
@@ -140,41 +198,41 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     }
 
     if (fork) {
-      const {thread, model} = await running.server.request('thread/fork', {
-        threadId: id,
-        lastTurnId: messageId,
-        ...settings,
-        excludeTurns: true,
-      })
-
-      running.threads.set(thread.id, model)
-
-      return {id: thread.id, model}
+      return load(
+        running,
+        await running.server.request('thread/fork', {
+          threadId: id,
+          lastTurnId: messageId,
+          ...settings,
+          excludeTurns: true,
+        }),
+        openedAt
+      )
     }
 
-    const {model} = await running.server.request('thread/resume', {
-      threadId: id,
-      ...settings,
-      excludeTurns: true,
-    })
-
-    running.threads.set(id, model)
-
-    return {id, model}
+    return load(
+      running,
+      await running.server.request('thread/resume', {
+        threadId: id,
+        ...settings,
+        excludeTurns: true,
+      }),
+      openedAt
+    )
   }
 
   /** Sends the Prompt and streams Codex's answer, to its end. */
   async function* send(
     running: Running,
     request: ReplyRequest,
-    thread: OpenThread
+    thread: LoadedThread
   ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
     const ids = {treeId: request.treeId, replyId: request.replyId}
     const {server} = running
     const inbox = createInbox<Notification | {method: 'exited'}>()
     void server.exited.then(() => inbox.push({method: 'exited'}))
 
-    const stop = server.listen(notification => {
+    const unlisten = server.listen(notification => {
       if (threadOf(notification) === thread.id) inbox.push(notification)
     })
 
@@ -185,13 +243,15 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       })
 
       const turnId = started.turn.id
+      thread.turns.push(turnId)
+      writing.set(request.replyId, {server, threadId: thread.id, turnId})
       const mapper = createReplyMapper(ids)
 
       for (;;) {
         const notification = await inbox.next()
 
         if (notification.method === 'exited') {
-          throw new Error('Codex stopped before finishing this Reply.')
+          throw new Error(STOPPED_BEFORE_FINISHING)
         }
 
         // Resuming repeats the last turn's token count, for instance.
@@ -203,7 +263,8 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
 
         const finished = mapper.finished(notification.params.turn)
 
-        if (finished.status === 'complete') {
+        // A stopped turn stays in the thread as a completed one does.
+        if (finished.status !== 'failed') {
           const {configDir} = request.vendorProgram
           const files = await readRollouts(server, configDir, thread.id)
           await deps.store.saveFiles(folderOf(thread.id), files)
@@ -221,8 +282,21 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
         return
       }
     } finally {
-      stop()
+      writing.delete(request.replyId)
+      unlisten()
     }
+  }
+
+  /** Interrupts the Reply's turn; the stream then ends as `stopped`. */
+  async function stop(replyId: string) {
+    const reply = writing.get(replyId)
+
+    if (!reply) return
+
+    await reply.server.request('turn/interrupt', {
+      threadId: reply.threadId,
+      turnId: reply.turnId,
+    })
   }
 
   /**
@@ -269,13 +343,12 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
         ...ids,
         type: 'RUN_FINISHED',
         status: 'failed',
-        failure: {
-          code: 'provider-error',
-          message: error instanceof Error ? error.message : String(error),
-        },
+        failure: failureFrom(
+          error instanceof Error ? error.message : String(error)
+        ),
       }
     }
   }
 
-  return {startReply}
+  return {startReply, stop}
 }

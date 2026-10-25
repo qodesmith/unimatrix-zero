@@ -2,6 +2,8 @@ import type {Notification} from './wire'
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {failureOf} from '#modules/failures/main'
+
 import {AgentMessageItemSchema} from './wire'
 
 type ReplyIds = Pick<ReplyRequest, 'treeId' | 'replyId'>
@@ -131,10 +133,9 @@ export function createReplyMapper(ids: ReplyIds) {
         ...ids,
         type: 'RUN_FINISHED',
         status: 'failed',
-        failure: {
-          code: 'provider-error',
-          message: turn.error?.message ?? 'ChatGPT couldn’t finish this Reply.',
-        },
+        failure: failureOf(
+          turn.error?.message ?? 'ChatGPT couldn’t finish this Reply.'
+        ),
       }
     },
   }

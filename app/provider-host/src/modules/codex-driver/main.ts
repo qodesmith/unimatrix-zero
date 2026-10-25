@@ -73,7 +73,7 @@ export function createCodexDriver({
     listModels: async () => [{id: DEFAULT_MODEL, name: 'Default'}],
     readUsage: notYet,
     startReply: replies.startReply,
-    stop: notYet,
+    stop: replies.stop,
     answerApproval: notYet,
     forkSession: notYet,
     rebuildSession: notYet,

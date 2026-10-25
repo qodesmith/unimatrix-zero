@@ -33,8 +33,9 @@ export type RecordedLine = z.infer<typeof RecordedLineSchema>
  * Like `codex`, it writes each thread's rollout, a line per finished turn,
  * and resumes or forks only a thread whose rollout is in place under
  * `sessions/`. It writes what it saw to `FAKE_CODEX_REPORTS/<n>.json`.
- * `FAKE_CODEX_EXIT_AT=<method>` exits instead of answering that request, in
- * each run or only the first `FAKE_CODEX_EXITS`.
+ * `FAKE_CODEX_EXIT_AT=<method>` exits instead of answering that request, or
+ * instead of writing that notification, in each run or only the first
+ * `FAKE_CODEX_EXITS`.
  */
 const SCRIPT = `
 import fs from 'node:fs'
@@ -50,7 +51,7 @@ const [, ...steps] = fs.readFileSync(recording, 'utf8')
 const home = process.env.CODEX_HOME
 const standIn = ${JSON.stringify(CODEX_HOME_STAND_IN)}
 const vendorVariables = Object.keys(process.env).filter(name => /^(OPENAI|CODEX|ANTHROPIC|CLAUDE)_/i.test(name))
-const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], resumedFrom: [], forkedThrough: null, ended: null}
+const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], resumedFrom: [], forkedThrough: null, interrupted: null, reverted: null, ended: null}
 
 function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
@@ -67,7 +68,12 @@ function rolloutOf(threadId) {
 const ids = new Map()
 let at = 0
 
+function exitsHere(method) {
+  return method !== undefined && method === process.env.FAKE_CODEX_EXIT_AT && run < Number(process.env.FAKE_CODEX_EXITS ?? Infinity)
+}
+
 function write(message) {
+  if (exitsHere(message.method)) end('exited', 1)
   if ('id' in message && ('result' in message || 'error' in message)) message = {...message, id: ids.get(message.id)}
   const text = JSON.stringify(message).replaceAll(standIn, JSON.stringify(home).slice(1, -1))
   message = JSON.parse(text)
@@ -113,7 +119,7 @@ process.stdin.on('data', chunk => {
     const message = JSON.parse(buffer.slice(0, newline))
     buffer = buffer.slice(newline + 1)
     report.methods.push(message.method)
-    if (message.method === process.env.FAKE_CODEX_EXIT_AT && run < Number(process.env.FAKE_CODEX_EXITS ?? Infinity)) end('exited', 1)
+    if (exitsHere(message.method)) end('exited', 1)
     if (message.method === 'thread/resume' || message.method === 'thread/fork') {
       const rollout = rolloutOf(message.params.threadId)
       if (!rollout) {
@@ -124,6 +130,8 @@ process.stdin.on('data', chunk => {
       if (message.method === 'thread/fork') report.forkedThrough = message.params.lastTurnId
     }
     if (message.method === 'turn/start') report.prompts.push(message.params.input[0].text)
+    if (message.method === 'turn/interrupt') report.interrupted = message.params.turnId
+    if (message.method === 'thread/revert') report.reverted = message.params.beforeTurnId
     const recorded = expected(message)
     if ('id' in message) ids.set(recorded.id, message.id)
     save()

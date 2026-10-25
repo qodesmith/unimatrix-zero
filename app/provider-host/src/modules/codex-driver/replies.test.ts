@@ -127,6 +127,40 @@ it.each([
       },
     },
   ],
+  [
+    'failed',
+    {message: 'You’ve hit your usage limit. Resets at 2026-10-24T15:00:00Z.'},
+    {
+      status: 'failed',
+      failure: {
+        code: 'limit-reached',
+        message: 'You’ve hit your usage limit. Resets at 2026-10-24T15:00:00Z.',
+        resetsAt: '2026-10-24T15:00:00.000Z',
+      },
+    },
+  ],
+  [
+    'failed',
+    {message: 'stream disconnected before completion: connection reset'},
+    {
+      status: 'failed',
+      failure: {
+        code: 'connection-lost',
+        message: 'stream disconnected before completion: connection reset',
+      },
+    },
+  ],
+  [
+    'failed',
+    null,
+    {
+      status: 'failed',
+      failure: {
+        code: 'provider-error',
+        message: 'ChatGPT couldn’t finish this Reply.',
+      },
+    },
+  ],
 ] as const)('ends a %s turn', (status, error, ended) => {
   expect(createReplyMapper(ids).finished({id: 'turn', status, error})).toEqual({
     ...ids,

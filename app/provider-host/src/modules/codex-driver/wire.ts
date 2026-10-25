@@ -73,7 +73,9 @@ export const RESPONSES = {
   'thread/resume': OpenedThreadSchema,
   'thread/fork': OpenedThreadSchema,
   'thread/read': z.looseObject({thread: ThreadSchema}),
+  'thread/revert': z.looseObject({thread: ThreadSchema}),
   'turn/start': z.looseObject({turn: z.looseObject({id: z.string()})}),
+  'turn/interrupt': z.looseObject({}),
 } satisfies Partial<Record<ClientRequest['method'], z.ZodType>>
 
 export type Method = keyof typeof RESPONSES
