@@ -69,7 +69,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
             },
             configDir: configDir ?? '',
           },
-          session: session && {...session, fork},
+          session: session && {...session, fork, rewind: false},
         })
       )
 

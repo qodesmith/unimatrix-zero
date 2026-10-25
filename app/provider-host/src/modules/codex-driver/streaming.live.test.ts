@@ -96,7 +96,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             },
             configDir: home,
           },
-          session: session && {...session, fork},
+          session: session && {...session, fork, rewind: false},
         })
       )
 

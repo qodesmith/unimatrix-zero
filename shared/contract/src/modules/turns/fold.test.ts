@@ -113,3 +113,15 @@ it('keeps thinking and Subagent work out of the Reply’s content', () => {
     })
   ).toBe(before)
 })
+
+it('keeps why the Reply failed, and clears it when it ends another way', () => {
+  const failure = {code: 'connection-lost' as const, message: 'Offline.'}
+
+  expect(fold({type: 'RUN_FINISHED', status: 'failed', failure})).toMatchObject(
+    {status: 'failed', failure}
+  )
+  expect(fold({type: 'RUN_FINISHED', status: 'stopped'})).toMatchObject({
+    status: 'stopped',
+    failure: null,
+  })
+})

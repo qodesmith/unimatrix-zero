@@ -113,6 +113,7 @@ function fakeMain(saved: Saved = {}) {
         content: [],
         contextSize: null,
         contextWindow: null,
+        failure: null,
         createdAt: receivedAt,
       }
 
@@ -120,6 +121,10 @@ function fakeMain(saved: Saved = {}) {
       replies.push(reply)
 
       return {ok: true, value: {prompt, reply}}
+    }
+
+    if (command.type === 'reply.stop' || command.type === 'reply.retry') {
+      return {ok: false, error: {code: 'not-found', message: 'Gone'}}
     }
 
     const tree = {...found, title: command.title}
@@ -344,6 +349,7 @@ it('shows a streaming Reply where it was after a reload, and keeps going', async
     content: [{type: 'text', text: 'Once'}],
     contextSize: null,
     contextWindow: null,
+    failure: null,
     createdAt: receivedAt,
   }
 
@@ -360,6 +366,7 @@ it('shows a streaming Reply where it was after a reload, and keeps going', async
         content: [{type: 'text', text: 'Once upon a'}],
         contextSize: null,
         contextWindow: null,
+        failure: null,
       },
     ],
   })

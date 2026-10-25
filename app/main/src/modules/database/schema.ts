@@ -64,9 +64,11 @@ export const replies = sqliteTable(
     provider: text('provider', {enum: ['claude', 'chatgpt']}).notNull(),
     model: text('model').notNull(),
     status: text('status', {
-      enum: ['streaming', 'complete', 'stopped', 'failed'],
+      enum: ['streaming', 'complete', 'stopped', 'failed', 'interrupted'],
     }).notNull(),
     content: text('content', {mode: 'json'}).notNull().$type<unknown[]>(),
+    /** Why it failed, as `RunFailureSchema`; null unless it did. */
+    failure: text('failure', {mode: 'json'}),
     systemPromptId: text('system_prompt_id')
       .notNull()
       .references(() => systemPrompts.id),

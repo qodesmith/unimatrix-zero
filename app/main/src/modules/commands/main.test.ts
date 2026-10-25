@@ -384,7 +384,12 @@ describe('a Prompt answering a Reply', () => {
           systemPrompt: '',
           prompt: {text: 'And then?'},
           vendorProgram,
-          session: {sessionId: 's1', messageId: 'm1', fork: false},
+          session: {
+            sessionId: 's1',
+            messageId: 'm1',
+            fork: false,
+            rewind: false,
+          },
         },
       },
     ])
@@ -445,8 +450,8 @@ describe('a Prompt answering a Reply', () => {
         command.type === 'reply.start' ? [command.request.session] : []
       )
     ).toEqual([
-      {sessionId: 's1', messageId: 'm1', fork: false},
-      {sessionId: 's1', messageId: 'm1', fork: true},
+      {sessionId: 's1', messageId: 'm1', fork: false, rewind: false},
+      {sessionId: 's1', messageId: 'm1', fork: true, rewind: false},
     ])
     const turns = await send({type: 'tree.turns', treeId})
 
@@ -569,5 +574,212 @@ describe('loading a remote image', () => {
     expect(
       await send({type: 'image.load', url: 'file:///etc/passwd'})
     ).toMatchObject({ok: false, error: {code: 'invalid-command'}})
+  })
+})
+
+function fail(treeId: string, replyId: string) {
+  deps.turns.apply('claude', {
+    type: 'RUN_FINISHED',
+    treeId,
+    replyId,
+    status: 'failed',
+    failure: {code: 'host-crashed', message: 'Claude stopped unexpectedly.'},
+  })
+}
+
+describe('stopping a Reply', () => {
+  it('asks the host writing it to interrupt it', async () => {
+    const {treeId, replyId} = await sendRoot()
+
+    expect(await send({type: 'reply.stop', treeId, replyId})).toEqual({
+      ok: true,
+      value: {},
+    })
+    expect(hostCommands).toEqual([{type: 'reply.stop', replyId}])
+  })
+
+  it('is refused for a Reply no host is writing', async () => {
+    const {treeId, replyId} = await sendRoot()
+    finish(treeId, replyId)
+
+    expect(await send({type: 'reply.stop', treeId, replyId})).toMatchObject({
+      ok: false,
+      error: {message: 'That Reply isn’t being written.'},
+    })
+    expect(hostCommands).toEqual([])
+  })
+})
+
+describe('retrying a Reply', () => {
+  it('runs the root Prompt again in place, in a new session', async () => {
+    const {treeId, replyId} = await sendRoot()
+    deps.turns.apply('claude', {
+      type: 'TEXT_DELTA',
+      treeId,
+      replyId,
+      delta: 'H',
+    })
+    fail(treeId, replyId)
+
+    const outcome = await send({type: 'reply.retry', treeId, replyId})
+
+    if (!outcome.ok) throw new Error(outcome.error.message)
+
+    expect(outcome.value).toMatchObject({
+      reply: {id: replyId, status: 'streaming', content: [], failure: null},
+    })
+    expect(hostCommands).toEqual([
+      {
+        type: 'reply.start',
+        request: {
+          treeId,
+          replyId,
+          model: 'fake',
+          systemPrompt: '',
+          prompt: {text: 'Hi'},
+          vendorProgram,
+          session: null,
+        },
+      },
+    ])
+    expect(await send({type: 'tree.turns', treeId})).toMatchObject({
+      ok: true,
+      value: {replies: [{id: replyId, status: 'streaming', content: []}]},
+    })
+  })
+
+  it('rewinds the Provider session to the Reply the Prompt answers', async () => {
+    const {treeId, replyId} = await sendRoot()
+    record(treeId, replyId)
+    finish(treeId, replyId)
+
+    const sent = await send({
+      type: 'prompt.send',
+      treeId,
+      parentReplyId: replyId,
+      text: 'And then?',
+    })
+
+    if (!sent.ok) throw new Error(sent.error.message)
+
+    const {reply} = PromptSendResult.parse(sent.value)
+    fail(treeId, reply.id)
+    hostCommands = []
+
+    await send({type: 'reply.retry', treeId, replyId: reply.id})
+
+    expect(hostCommands).toEqual([
+      {
+        type: 'reply.start',
+        request: expect.objectContaining({
+          replyId: reply.id,
+          prompt: {text: 'And then?'},
+          session: {
+            sessionId: 's1',
+            messageId: 'm1',
+            fork: false,
+            rewind: true,
+          },
+        }),
+      },
+    ])
+  })
+
+  it('forks again, without rewinding, when the Prompt started a Branch', async () => {
+    const {treeId, replyId} = await sendRoot()
+    record(treeId, replyId)
+    finish(treeId, replyId)
+
+    await send({type: 'prompt.send', treeId, parentReplyId: replyId, text: 'A'})
+
+    const sent = await send({
+      type: 'prompt.send',
+      treeId,
+      parentReplyId: replyId,
+      text: 'B',
+    })
+
+    if (!sent.ok) throw new Error(sent.error.message)
+
+    const {reply} = PromptSendResult.parse(sent.value)
+    fail(treeId, reply.id)
+    hostCommands = []
+
+    await send({type: 'reply.retry', treeId, replyId: reply.id})
+
+    expect(hostCommands).toEqual([
+      {
+        type: 'reply.start',
+        request: expect.objectContaining({
+          prompt: {text: 'B'},
+          session: {
+            sessionId: 's1',
+            messageId: 'm1',
+            fork: true,
+            rewind: false,
+          },
+        }),
+      },
+    ])
+  })
+
+  it.each([
+    ['finished', finish],
+    ['still streaming', () => undefined],
+  ])('is refused for a Reply that %s', async (_case, setUp) => {
+    const {treeId, replyId} = await sendRoot()
+    setUp(treeId, replyId)
+
+    expect(await send({type: 'reply.retry', treeId, replyId})).toMatchObject({
+      ok: false,
+      error: {message: 'Only a Reply that failed can be retried.'},
+    })
+    expect(hostCommands).toEqual([])
+  })
+
+  it('is refused, leaving the Reply as it is, when its Provider isn’t ready', async () => {
+    const {treeId, replyId} = await sendRoot()
+    deps.turns.apply('claude', {
+      type: 'TEXT_DELTA',
+      treeId,
+      replyId,
+      delta: 'H',
+    })
+    fail(treeId, replyId)
+    hostReady = false
+
+    expect(await send({type: 'reply.retry', treeId, replyId})).toMatchObject({
+      ok: false,
+      error: {message: 'Connect Claude to retry.'},
+    })
+    expect(await send({type: 'tree.turns', treeId})).toMatchObject({
+      ok: true,
+      value: {
+        replies: [
+          {
+            status: 'failed',
+            content: [{type: 'text', text: 'H'}],
+            failure: {code: 'host-crashed'},
+          },
+        ],
+      },
+    })
+  })
+
+  it('fails the Reply again when the host cannot be reached', async () => {
+    const {treeId, replyId} = await sendRoot()
+    fail(treeId, replyId)
+
+    deps.hosts = {
+      ...deps.hosts,
+      send: () => {
+        throw new Error('The claude host is not running.')
+      },
+    }
+
+    expect(await send({type: 'reply.retry', treeId, replyId})).toMatchObject({
+      ok: true,
+      value: {reply: {status: 'failed', failure: {code: 'host-unreachable'}}},
+    })
   })
 })

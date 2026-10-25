@@ -135,6 +135,7 @@ it('keeps what each Reply shows for a window that connects mid-stream', () => {
       content: [{type: 'text', text: 'Half a sentence'}],
       contextSize: null,
       contextWindow: null,
+      failure: null,
     },
   ])
 })
@@ -163,4 +164,91 @@ it('fails a crashed host’s Replies with the text they last showed', () => {
     failure: {code: 'host-crashed', message: 'Claude stopped.'},
   })
   expect(turns.streaming()).toEqual([])
+})
+
+it('saves why the Reply failed, and lists it with the Reply', () => {
+  apply({type: 'TEXT_DELTA', delta: 'Half'})
+  apply({
+    type: 'RUN_FINISHED',
+    status: 'failed',
+    failure: {code: 'connection-lost', message: 'Connection lost.'},
+  })
+
+  expect(saved()).toMatchObject({
+    status: 'failed',
+    content: [{type: 'text', text: 'Half'}],
+    failure: {code: 'connection-lost', message: 'Connection lost.'},
+  })
+})
+
+it('marks a Reply left streaming by the last run as interrupted at launch', () => {
+  apply({type: 'TEXT_DELTA', delta: 'Half a'})
+  turns.saveAll()
+  const db = openDatabase({file: ':memory:', migrationsFolder})
+  const left = createTrees(db).create(new Date()).id
+  const before = createTurns(db, () => undefined)
+  before.start({
+    treeId: left,
+    parentReplyId: null,
+    text: 'Hi',
+    provider: 'claude',
+    model: 'fake',
+    systemPrompt: '',
+    now: new Date(),
+  })
+
+  const relaunched = createTurns(db, () => undefined)
+
+  expect(relaunched.list(left).replies[0]).toMatchObject({
+    status: 'interrupted',
+    failure: null,
+  })
+  // The run that is still going keeps its own.
+  expect(saved().status).toBe('streaming')
+})
+
+it('starts a failed Reply over from nothing, streaming again in place', () => {
+  apply({type: 'TEXT_DELTA', delta: 'Half'})
+  apply({type: 'TOKENS', inputTokens: 3, outputTokens: 2, contextSize: 5})
+  apply({
+    type: 'RUN_FINISHED',
+    status: 'failed',
+    failure: {code: 'host-crashed', message: 'Claude stopped.'},
+  })
+
+  const reply = turns.restart(replyId)
+
+  expect(reply).toMatchObject({
+    id: replyId,
+    status: 'streaming',
+    content: [],
+    contextSize: null,
+    failure: null,
+  })
+  expect(saved()).toEqual(reply)
+  expect(turns.writer(treeId, replyId)).toBe('claude')
+  expect(turns.streaming()).toEqual([
+    {
+      treeId,
+      replyId,
+      status: 'streaming',
+      content: [],
+      contextSize: null,
+      contextWindow: null,
+      failure: null,
+    },
+  ])
+})
+
+it('knows which host is writing a Reply, and when none is', () => {
+  expect(turns.writer(treeId, replyId)).toBe('claude')
+  expect(() => turns.writer(crypto.randomUUID(), replyId)).toThrow(
+    'That Reply isn’t being written.'
+  )
+
+  apply({type: 'RUN_FINISHED', status: 'complete'})
+
+  expect(() => turns.writer(treeId, replyId)).toThrow(
+    'That Reply isn’t being written.'
+  )
 })

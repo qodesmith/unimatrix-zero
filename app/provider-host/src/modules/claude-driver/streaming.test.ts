@@ -122,7 +122,7 @@ async function setUp(recordings: string[], env: Record<string, string> = {}) {
           },
           configDir,
         },
-        session: session && {...session, fork},
+        session: session && {...session, fork, rewind: false},
       })
     )
   }

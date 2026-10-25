@@ -65,6 +65,30 @@ export const PromptSendResult = z.strictObject({
   reply: ReplySchema,
 })
 
+/**
+ * Stops a streaming Reply, keeping the text so far. The Reply ends with its
+ * `RUN_FINISHED` once the Provider has let go of the turn.
+ */
+export const ReplyStopCommand = z.strictObject({
+  type: z.literal('reply.stop'),
+  treeId: z.uuid(),
+  replyId: z.uuid(),
+})
+
+/**
+ * Runs a failed or interrupted Reply's Prompt again, in place: the Reply
+ * streams again from nothing, in the Provider session rewound to before it.
+ */
+export const ReplyRetryCommand = z.strictObject({
+  type: z.literal('reply.retry'),
+  treeId: z.uuid(),
+  replyId: z.uuid(),
+})
+
+export const ReplyRetryResult = z.strictObject({
+  reply: ReplySchema,
+})
+
 /** Starts connecting a Provider; `SIGN_IN_STEP` and `SIGN_IN_FINISHED` follow. */
 export const ProviderConnectCommand = z.strictObject({
   type: z.literal('provider.connect'),
@@ -117,6 +141,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
   TreeRenameCommand,
   TreeTurnsCommand,
   PromptSendCommand,
+  ReplyStopCommand,
+  ReplyRetryCommand,
   ProviderConnectCommand,
   SignInOpenPageCommand,
   SignInCodeCommand,
@@ -137,6 +163,8 @@ const resultSchemas = {
   'tree.rename': TreeSchema,
   'tree.turns': TreeTurnsResult,
   'prompt.send': PromptSendResult,
+  'reply.stop': Done,
+  'reply.retry': ReplyRetryResult,
   'provider.connect': Done,
   'sign-in.open-page': Done,
   'sign-in.code': Done,

@@ -115,7 +115,7 @@ async function setUp(
           },
           configDir,
         },
-        session: session && {...session, fork},
+        session: session && {...session, fork, rewind: false},
       })
     )
   }

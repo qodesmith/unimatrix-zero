@@ -57,6 +57,7 @@ function reply(n: number, promptN: number, text: string): Reply {
     content: [{type: 'text', text}],
     contextSize: null,
     contextWindow: null,
+    failure: null,
     createdAt: at(++clock),
   }
 }
