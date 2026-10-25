@@ -3,9 +3,10 @@ import type {CanvasState, Collapsed} from '../canvas-context'
 import type {TreeIndex} from '../tree'
 import type {Focus} from './Flow'
 import type {CanvasOrientation} from '@uz/contract/settings'
+import type {Reply} from '@uz/contract/turns'
 
 import {useSettings, useUpdateSettings} from '#modules/settings/main'
-import {useTurns} from '#modules/turns/main'
+import {stopReply, useLiveReply, useTurns} from '#modules/turns/main'
 import {ReactFlowProvider} from '@xyflow/react'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 
@@ -53,6 +54,58 @@ function unfoldedOver(index: TreeIndex, replyId: string) {
 
     return {ids, toggledReplyId: topmost}
   }
+}
+
+interface EscapeStops {
+  treeId: string
+  index: TreeIndex
+  activeReplyId: string | null
+  chatOpen: boolean
+  /** The Reply the slideout ends at, kept while it slides away. */
+  chatEnd: Reply | null
+}
+
+/**
+ * Esc stops the streaming Reply the user is looking at: the open slideout's
+ * end, else the Active Thread's. It takes the key before the slideout closes
+ * on it. Esc in a field belongs to that field.
+ */
+function useEscapeStops({
+  treeId,
+  index,
+  activeReplyId,
+  chatOpen,
+  chatEnd,
+}: EscapeStops) {
+  const replyId = chatOpen && chatEnd ? chatEnd.id : activeReplyId
+  const live = useLiveReply(replyId)
+
+  const status =
+    live?.status ??
+    (replyId === null ? null : index.replyById.get(replyId))?.status
+
+  const streaming = status === 'streaming' ? replyId : null
+
+  useEffect(() => {
+    if (streaming === null) return undefined
+
+    const replyToStop = streaming
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+
+      const {target} = event
+
+      if (target instanceof Element && target.matches('input, textarea')) return
+
+      event.preventDefault()
+      void stopReply(treeId, replyToStop)
+    }
+
+    globalThis.addEventListener('keydown', onKeyDown, true)
+
+    return () => globalThis.removeEventListener('keydown', onKeyDown, true)
+  }, [treeId, streaming])
 }
 
 /** One Tree on the canvas: a centered Input while it is empty, then its Turns. */
@@ -118,6 +171,8 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
   }
 
   const chatEnd = chatTurnId === null ? null : replyOf(index, chatTurnId)
+
+  useEscapeStops({treeId, index, activeReplyId, chatOpen, chatEnd})
 
   // Hovering redraws the highlight only while the pointer is on the Turn.
   const highlightedTurnId =

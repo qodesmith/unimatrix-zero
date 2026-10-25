@@ -109,7 +109,7 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
  * The Input answering a Reply, mounted once the Reply is done with its space
  * kept, so revealing it shifts nothing. Revealed at the end of the Active
  * Thread, while the Reply's box is hovered or holds focus, and while it holds
- * a draft.
+ * a draft. A failed Reply has Retry instead.
  */
 function ReplyInput({reply, hovered}: {reply: Reply; hovered: boolean}) {
   const {treeId, activeReplyId, onInputFocus, onSent, drafts, setDraft} =
@@ -117,7 +117,7 @@ function ReplyInput({reply, hovered}: {reply: Reply; hovered: boolean}) {
 
   const status = useLiveReply(reply.id)?.status ?? reply.status
 
-  if (status === 'streaming') return null
+  if (status === 'streaming' || status === 'failed') return null
 
   const draft = drafts.get(reply.id) ?? ''
   const revealed = activeReplyId === reply.id || draft.trim() !== '' || hovered

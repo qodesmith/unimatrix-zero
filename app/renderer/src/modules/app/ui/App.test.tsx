@@ -399,8 +399,11 @@ it('shows a failed Reply with the text it had', async () => {
     failure: {code: 'host-crashed', message: 'Claude stopped unexpectedly.'},
   })
 
-  await expect.element(page.getByText('This Reply failed.')).toBeVisible()
+  await expect
+    .element(page.getByText('Claude stopped unexpectedly'))
+    .toBeVisible()
   await expect.element(page.getByText('Cut off')).toBeVisible()
+  await expect.element(page.getByRole('button', {name: 'Retry'})).toBeEnabled()
 })
 
 function claudeCard() {

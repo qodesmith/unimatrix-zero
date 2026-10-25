@@ -173,14 +173,14 @@ interface ChatInputProps {
 }
 
 /**
- * The Input at the end of the Thread, once its Reply is done, sharing its
- * draft with that Reply's Input on the canvas.
+ * The Input at the end of the Thread, once its Reply is done, sharing its draft
+ * with that Reply's Input on the canvas. A failed Reply has Retry instead.
  */
 function ChatInput({end, onFocus, onSent}: ChatInputProps) {
   const {treeId, drafts, setDraft} = useCanvas()
   const status = useLiveReply(end.id)?.status ?? end.status
 
-  if (status === 'streaming') return null
+  if (status === 'streaming' || status === 'failed') return null
 
   return (
     <footer className="shrink-0 border-t border-border px-4 py-3">

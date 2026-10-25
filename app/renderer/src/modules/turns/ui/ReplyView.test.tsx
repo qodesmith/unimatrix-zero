@@ -1,10 +1,14 @@
 import type {Bridge} from '@uz/contract/bridge'
 import type {Command} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
-import type {Reply} from '@uz/contract/turns'
+import type {ProviderStatus} from '@uz/contract/providers'
+import type {Reply, RunFailure} from '@uz/contract/turns'
+import type {ReactNode} from 'react'
 
+import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {EventSchema} from '@uz/contract/events'
-import {beforeEach, expect, it} from 'vitest'
+import {DEFAULT_SETTINGS} from '@uz/contract/settings'
+import {beforeEach, expect, it, onTestFinished} from 'vitest'
 import {render} from 'vitest-browser-react'
 
 import recording from '../fake-reply.json'
@@ -37,29 +41,72 @@ const reply: Reply = {
 
 const sent: Command[] = []
 
-/** Only `image.load` reaches main from a Reply, and only on a click. */
-const main: Bridge = {
-  send: (async (command: Command) => {
-    sent.push(command)
+/**
+ * Main as a Reply sees it: `image.load` on a click, `reply.stop` and
+ * `reply.retry` from its buttons, and Claude's status in the SNAPSHOT.
+ */
+function fakeMain(claude: ProviderStatus['status'] = 'ready'): Bridge {
+  return {
+    send: (async (command: Command) => {
+      sent.push(command)
 
-    return command.type === 'image.load'
-      ? {
+      if (command.type === 'image.load') {
+        return {
           ok: true,
           value: {
             dataUrl:
               'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
           },
         }
-      : {ok: false, error: {code: 'not-found', message: 'Not in this test'}}
-  }) as Bridge['send'],
-  subscribe: () => () => undefined,
-  registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
+      }
+
+      if (command.type === 'reply.stop') return {ok: true, value: {}}
+
+      if (command.type === 'reply.retry') {
+        return {
+          ok: true,
+          value: {reply: {...reply, status: 'streaming', content: []}},
+        }
+      }
+
+      return {
+        ok: false,
+        error: {code: 'not-found', message: 'Not in this test'},
+      }
+    }) as Bridge['send'],
+    subscribe: listener => {
+      listener({
+        type: 'SNAPSHOT',
+        app: {version: '0.0.0'},
+        replies: [],
+        providers: [
+          {provider: 'claude', status: claude, account: null},
+          {provider: 'chatgpt', status: 'not-connected', account: null},
+        ],
+        signIn: null,
+        settings: DEFAULT_SETTINGS,
+      })
+
+      return () => undefined
+    },
+    registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
+  }
 }
+
+const main = fakeMain()
 
 beforeEach(() => {
   sent.length = 0
   globalThis.window.uz = main
 })
+
+function Providers({children}: {children: ReactNode}) {
+  return (
+    <QueryClientProvider client={new QueryClient()}>
+      {children}
+    </QueryClientProvider>
+  )
+}
 
 function before(type: AppEvent['type'], nth = 0) {
   return (
@@ -80,12 +127,33 @@ async function replay(upTo = before('RUN_FINISHED')) {
   const screen = await render(
     <ReplyStoreContext value={live.store}>
       <ReplyView reply={reply} />
-    </ReplyStoreContext>
+    </ReplyStoreContext>,
+    {wrapper: Providers}
   )
 
   live.replay(events.slice(0, upTo))
 
   return screen
+}
+
+/** A saved Reply, as the Tree's Turns hold it, with nothing streaming. */
+async function renderSaved(changes: Partial<Reply>) {
+  const live = createReplay()
+
+  return render(
+    <ReplyStoreContext value={live.store}>
+      <ReplyView reply={{...reply, ...changes}} />
+    </ReplyStoreContext>,
+    {wrapper: Providers}
+  )
+}
+
+function failed(failure: RunFailure): Partial<Reply> {
+  return {
+    status: 'failed',
+    content: [{type: 'text', text: 'Half an answer'}],
+    failure,
+  }
 }
 
 /**
@@ -241,3 +309,216 @@ it('says why an image could not load, and offers to try again', async () => {
     .element(screen.getByRole('button', {name: 'Try again'}))
     .toBeVisible()
 })
+
+it('says a stopped Reply was stopped, keeping its text', async () => {
+  const screen = await renderSaved({
+    status: 'stopped',
+    content: [{type: 'text', text: 'Half an answer'}],
+  })
+
+  await expect.element(screen.getByText('Half an answer')).toBeVisible()
+  await expect
+    .element(screen.getByText('Stopped'))
+    .toHaveClass('text-muted-foreground')
+})
+
+it('says an interrupted Reply was cut short by the app quitting', async () => {
+  const screen = await renderSaved({
+    status: 'interrupted',
+    content: [{type: 'text', text: 'Half an answer'}],
+  })
+
+  await expect
+    .element(screen.getByText('Interrupted when the app quit'))
+    .toHaveClass('text-muted-foreground')
+})
+
+it.each([
+  [{code: 'connection-lost', message: 'ECONNRESET'}, 'Connection lost'],
+  [
+    {code: 'program-crashed', message: 'exit 137'},
+    'Claude stopped unexpectedly',
+  ],
+  [{code: 'host-crashed', message: 'exit 1'}, 'Claude stopped unexpectedly'],
+  [{code: 'disk-full', message: 'ENOSPC'}, 'Disk full'],
+  [
+    {code: 'host-unreachable', message: 'no reply in 5s'},
+    'Claude could not be reached',
+  ],
+  [
+    {code: 'provider-error', message: 'Overloaded, try again later'},
+    'Overloaded, try again later',
+  ],
+  [{code: 'driver-error', message: 'Bad frame'}, 'Bad frame'],
+  [{code: 'fake-failure', message: 'Asked to fail'}, 'Asked to fail'],
+] satisfies [RunFailure, string][])(
+  'says why a Reply failed: %o reads "%s"',
+  async (failure, line) => {
+    const screen = await renderSaved(failed(failure))
+
+    await expect.element(screen.getByText('Half an answer')).toBeVisible()
+    await expect.element(screen.getByText(line)).toHaveClass('text-destructive')
+    expect(screen.getByText('This Reply failed.').query()).toBeNull()
+  }
+)
+
+it('says when a reached limit lifts, in local time', async () => {
+  const screen = await renderSaved(
+    failed({
+      code: 'limit-reached',
+      message: '5-hour limit',
+      resetsAt: '2026-10-19T15:05:00.000Z',
+    })
+  )
+
+  await expect
+    .element(screen.getByText(/^Limit reached · resets at \d{1,2}:\d{2}/))
+    .toHaveClass('text-destructive')
+})
+
+it('says only that the limit was reached when the Provider gave no reset time', async () => {
+  const screen = await renderSaved(
+    failed({code: 'limit-reached', message: '5-hour limit'})
+  )
+
+  await expect.element(screen.getByText('Limit reached')).toBeVisible()
+})
+
+it('stops a streaming Reply from its button, which waits as Stopping… until the Reply ends', async () => {
+  const live = createReplay()
+
+  const screen = await render(
+    <ReplyStoreContext value={live.store}>
+      <ReplyView reply={reply} />
+    </ReplyStoreContext>,
+    {wrapper: Providers}
+  )
+
+  live.replay(events.slice(0, before('TOOL_CALL_START')))
+
+  await expect.element(screen.getByText('Writing…')).toBeVisible()
+  await screen.getByRole('button', {name: 'Stop'}).click()
+
+  expect(sent).toEqual([{type: 'reply.stop', treeId, replyId}])
+  await expect
+    .element(screen.getByRole('button', {name: 'Stopping…'}))
+    .toBeDisabled()
+
+  live.replay([{type: 'RUN_FINISHED', treeId, replyId, status: 'stopped'}])
+  await screen.rerender(
+    <ReplyStoreContext value={live.store}>
+      <ReplyView
+        reply={{
+          ...reply,
+          status: 'stopped',
+          content: [{type: 'text', text: 'Let me look'}],
+        }}
+      />
+    </ReplyStoreContext>
+  )
+
+  await expect.element(screen.getByText('Stopped')).toBeVisible()
+  expect(screen.getByRole('button', {name: /Stop/}).query()).toBeNull()
+})
+
+const lost: RunFailure = {code: 'connection-lost', message: 'ECONNRESET'}
+
+it('retries a failed Reply in place: it streams again from nothing', async () => {
+  const live = createReplay()
+
+  const screen = await render(
+    <ReplyStoreContext value={live.store}>
+      <ReplyView reply={{...reply, ...failed(lost)}} />
+    </ReplyStoreContext>,
+    {wrapper: Providers}
+  )
+
+  await expect.element(screen.getByText('Connection lost')).toBeVisible()
+  await screen.getByRole('button', {name: 'Retry'}).click()
+
+  expect(sent).toEqual([{type: 'reply.retry', treeId, replyId}])
+
+  live.replay([{type: 'RUN_STARTED', treeId, replyId}])
+  await expect.element(screen.getByText('Writing…')).toBeVisible()
+  expect(screen.getByText('Half an answer').query()).toBeNull()
+  expect(screen.getByText('Connection lost').query()).toBeNull()
+})
+
+it('offers Retry on a Reply the app quit on', async () => {
+  const screen = await renderSaved({status: 'interrupted'})
+
+  await expect
+    .element(screen.getByRole('button', {name: 'Retry'}))
+    .toBeEnabled()
+})
+
+it('shows why main refused a retry, beside the button', async () => {
+  globalThis.window.uz = {
+    ...main,
+    send: async () => ({
+      ok: false,
+      error: {code: 'handler-failed', message: 'Connect Claude to retry.'},
+    }),
+  }
+  const screen = await renderSaved(failed(lost))
+
+  await screen.getByRole('button', {name: 'Retry'}).click()
+
+  await expect
+    .element(screen.getByText('Connect Claude to retry.'))
+    .toBeVisible()
+  await expect
+    .element(screen.getByRole('button', {name: 'Retry'}))
+    .toBeEnabled()
+})
+
+/** The browser's view of the connection, as `navigator.onLine` reports it. */
+function goOffline() {
+  Object.defineProperty(navigator, 'onLine', {
+    configurable: true,
+    get: () => false,
+  })
+  globalThis.dispatchEvent(new Event('offline'))
+  onTestFinished(() => {
+    goOnline()
+  })
+}
+
+function goOnline() {
+  Reflect.deleteProperty(navigator, 'onLine')
+  globalThis.dispatchEvent(new Event('online'))
+}
+
+it('holds Retry while offline, saying so, and frees it once the connection is back', async () => {
+  goOffline()
+  const screen = await renderSaved(failed(lost))
+  const retry = screen.getByRole('button', {name: 'Retry'})
+
+  await expect.element(retry).toBeDisabled()
+  await expect
+    .element(screen.getByText('Offline · Retry waits for the connection'))
+    .toBeVisible()
+
+  goOnline()
+  await expect.element(retry).toBeEnabled()
+  expect(screen.getByText(/Offline/).query()).toBeNull()
+})
+
+it.each([
+  ['signed-out', 'Sign in to Claude again to retry'],
+  ['not-connected', 'Connect Claude to retry'],
+  ['starting', 'Claude is starting…'],
+  ['restarting', 'Claude is starting…'],
+  ['failed', "Claude isn't running"],
+] satisfies [ProviderStatus['status'], string][])(
+  'holds Retry while Claude is %s: "%s"',
+  async (status, reason) => {
+    globalThis.window.uz = fakeMain(status)
+    const screen = await renderSaved(failed(lost))
+
+    await expect
+      .element(screen.getByRole('button', {name: 'Retry'}))
+      .toBeDisabled()
+    await expect.element(screen.getByText(reason)).toBeVisible()
+  }
+)

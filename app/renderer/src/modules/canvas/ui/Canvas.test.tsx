@@ -143,6 +143,28 @@ function fakeMain(saved: Saved) {
         return {ok: true, value: {prompt: sentPrompt, reply: started}}
       }
 
+      if (command.type === 'reply.stop') return {ok: true, value: {}}
+
+      if (command.type === 'reply.retry') {
+        const where = replies.findIndex(one => one.id === command.replyId)
+        const failed = replies[where]
+
+        if (!failed) {
+          return {ok: false, error: {code: 'not-found', message: 'Not here'}}
+        }
+
+        const again: Reply = {
+          ...failed,
+          status: 'streaming',
+          content: [],
+          failure: null,
+        }
+
+        replies[where] = again
+
+        return {ok: true, value: {reply: again}}
+      }
+
       return {ok: false, error: {code: 'not-found', message: 'Not here'}}
     }) as Bridge['send'],
     subscribe: listener => {
@@ -843,7 +865,7 @@ it('counts the Replies being written and the failed ones, and jumps to them', as
   const status = page.getByRole('status')
   await expect.element(status.getByText('1 streaming')).toBeVisible()
   await expect.element(status.getByText('1 failed')).toBeVisible()
-  expect(document.querySelectorAll('textarea')).toHaveLength(2)
+  expect(document.querySelectorAll('textarea')).toHaveLength(1)
 
   await expect.poll(viewport).toContain('translate')
   const before = viewport()
@@ -1000,7 +1022,7 @@ it('branches from the slideout into a Reply that already has a response, and fol
 
   await expect
     .poll(chatTurns)
-    .toEqual(['Prompt one', 'Reply one', 'A third way', 'Writing…'])
+    .toEqual(['Prompt one', 'Reply one', 'A third way', 'Writing…Stop'])
   expect(slideout().getByRole('textbox').query()).toBeNull()
 
   const sentPromptId = nodeOf('A third way').element().getAttribute('data-id')
@@ -1149,5 +1171,147 @@ it('scrolls the slideout to the clicked Turn, expands to cover the canvas, and c
 
   await canvas().getByText('Prompt one').click()
   await slideout().getByRole('button', {name: 'Close'}).click()
+  await expect.element(slideout()).not.toBeInTheDocument()
+})
+
+/** `P1 - R1 - P2 - R2`, with Reply two as `status` says. */
+function endingIn(status: Reply['status'], text = 'Reply two'): Saved {
+  clock = 0
+
+  return {
+    prompts: [prompt(1, null, 'Prompt one'), prompt(2, 11, 'Prompt two')],
+    replies: [
+      reply(11, 1, 'Reply one'),
+      {
+        ...reply(12, 2, text),
+        status,
+        failure:
+          status === 'failed'
+            ? {code: 'connection-lost', message: 'ECONNRESET'}
+            : null,
+      },
+    ],
+  }
+}
+
+it('gives a stopped Reply an Input and a failed one Retry instead, on the canvas and in the slideout', async () => {
+  clock = 0
+  const saved = forkedTree()
+
+  saved.replies = saved.replies.map(one => {
+    if (one.id === uuid(12)) return {...one, status: 'stopped'}
+
+    if (one.id === uuid(13)) {
+      return {
+        ...one,
+        status: 'failed',
+        failure: {code: 'disk-full', message: 'ENOSPC'},
+      }
+    }
+
+    return one
+  })
+
+  await renderCanvas(saved)
+  await expect.element(page.getByText('Disk full')).toBeVisible()
+
+  expect(document.querySelectorAll('textarea')).toHaveLength(4)
+  await expect.element(inputUnder('Reply two')).toBeInTheDocument()
+  expect(nodeOf('Reply three').getByRole('textbox').query()).toBeNull()
+  await expect
+    .element(nodeOf('Reply three').getByRole('button', {name: 'Retry'}))
+    .toBeVisible()
+
+  await canvas().getByText('Prompt three').click()
+  await expect.element(slideout()).toBeVisible()
+  expect(slideout().getByRole('textbox').query()).toBeNull()
+  await expect
+    .element(slideout().getByRole('button', {name: 'Retry'}))
+    .toBeVisible()
+})
+
+it('retries a failed Reply in place: the same box streams again from nothing', async () => {
+  const {main} = await renderCanvas(endingIn('failed', 'Cut off'))
+  await expect.element(page.getByText('Connection lost')).toBeVisible()
+
+  await nodeOf('Cut off').getByRole('button', {name: 'Retry'}).click()
+
+  expect(main.sent.filter(command => command.type === 'reply.retry')).toEqual([
+    {type: 'reply.retry', treeId, replyId: uuid(12)},
+  ])
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  expect(page.getByText('Cut off').query()).toBeNull()
+  expect(page.getByText('Connection lost').query()).toBeNull()
+  await expect
+    .element(page.getByRole('status').getByText('1 streaming'))
+    .toBeVisible()
+  expect(nodeCount()).toBe(4)
+
+  const ids = {treeId, replyId: uuid(12)}
+  main.publish({...ids, type: 'RUN_STARTED'})
+  main.publish({...ids, type: 'TEXT_DELTA', delta: 'Second try'})
+  await expect.element(page.getByText('Second try')).toBeVisible()
+})
+
+/** A field outside the canvas, like a Tree's name in the sidebar. */
+function fieldElsewhere() {
+  const field = document.createElement('input')
+
+  field.setAttribute('aria-label', 'Tree name')
+  document.body.append(field)
+  onTestFinished(() => field.remove())
+
+  return page.getByRole('textbox', {name: 'Tree name'})
+}
+
+it('stops the streaming Reply at the end of the Active Thread with Esc, unless the user is typing elsewhere', async () => {
+  const {main} = await renderCanvas(endingIn('streaming', ''))
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+
+  await fieldElsewhere().fill('A name')
+  await userEvent.keyboard('{Escape}')
+  expect(main.sent.map(command => command.type)).not.toContain('reply.stop')
+
+  await page.getByRole('button', {name: 'Zoom in'}).click()
+  await userEvent.keyboard('{Escape}')
+
+  expect(main.sent.filter(command => command.type === 'reply.stop')).toEqual([
+    {type: 'reply.stop', treeId, replyId: uuid(12)},
+  ])
+
+  main.publish({
+    treeId,
+    replyId: uuid(12),
+    type: 'RUN_FINISHED',
+    status: 'stopped',
+  })
+  await expect.element(page.getByText('Stopped')).toBeVisible()
+  await expect.element(inputUnder('Stopped')).toBeInTheDocument()
+})
+
+it('stops the slideout’s streaming Reply with Esc rather than closing the slideout', async () => {
+  const {main} = await renderCanvas(endingIn('streaming', ''))
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+
+  await canvas().getByText('Prompt two').click()
+  await expect.element(slideout()).toBeVisible()
+  await expect.element(slideout().getByText('Writing…')).toBeVisible()
+
+  await userEvent.keyboard('{Escape}')
+
+  expect(main.sent.filter(command => command.type === 'reply.stop')).toEqual([
+    {type: 'reply.stop', treeId, replyId: uuid(12)},
+  ])
+  await expect.element(slideout()).toBeVisible()
+
+  main.publish({
+    treeId,
+    replyId: uuid(12),
+    type: 'RUN_FINISHED',
+    status: 'stopped',
+  })
+  await expect.element(slideout().getByText('Stopped')).toBeVisible()
+
+  await userEvent.keyboard('{Escape}')
   await expect.element(slideout()).not.toBeInTheDocument()
 })
