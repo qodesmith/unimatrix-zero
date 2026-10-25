@@ -95,3 +95,11 @@ export function isFork(index: TreeIndex, replyId: string) {
 export function newestReply(index: TreeIndex): Reply | null {
   return index.replies.at(-1) ?? null
 }
+
+/**
+ * The Reply a Turn stands for: a Reply itself, or a Prompt's Reply. Null for a
+ * Prompt main has not started one for yet, or a Turn the Tree does not have.
+ */
+export function replyOf(index: TreeIndex, turnId: string): Reply | null {
+  return index.replyById.get(turnId) ?? index.replyByPrompt.get(turnId) ?? null
+}

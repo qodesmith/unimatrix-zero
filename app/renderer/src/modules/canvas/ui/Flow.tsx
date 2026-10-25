@@ -16,6 +16,7 @@ import {
 } from 'react'
 
 import {layoutTree} from '../layout'
+import {useReducedMotion} from '../reduced-motion'
 import {isFork} from '../tree'
 import {CanvasControls} from './CanvasControls'
 import {ExchangeNode, PromptNode, ReplyNode} from './TurnNodes'
@@ -41,6 +42,7 @@ interface FlowProps {
   /** Turns glide to their new places while the orientation switches. */
   switching: boolean
   onHover: (turnId: string | null) => void
+  onOpenChat: (turnId: string) => void
   onOrientation: (orientation: CanvasOrientation) => void
   onJump: (replyId: string) => void
 }
@@ -52,6 +54,19 @@ const NO_SIZES: Sizes = {vertical: {}, horizontal: {}}
 const FIT = {padding: 0.15, maxZoom: 1}
 
 const nodeTypes = {prompt: PromptNode, reply: ReplyNode, exchange: ExchangeNode}
+
+/** Controls inside a Turn's box keep their clicks to themselves. */
+const CONTROLS = 'a, button, input, textarea, summary, [role="button"]'
+
+/**
+ * The Turn a click landed on, read from the box it hit: an Exchange card
+ * holds two. None for a click on a control or on the Input under a Reply.
+ */
+function clickedTurnId(target: EventTarget) {
+  if (!(target instanceof Element) || target.closest(CONTROLS)) return null
+
+  return target.closest('[data-turn]')?.getAttribute('data-turn') ?? null
+}
 
 function hoverIdOf(node: TurnNode) {
   const {turn} = node.data
@@ -72,10 +87,12 @@ export function Flow({
   fitOnLoad,
   switching,
   onHover,
+  onOpenChat,
   onOrientation,
   onJump,
 }: FlowProps) {
   const flow = useReactFlow<TurnNode>()
+  const panMs = useReducedMotion() ? 0 : 400
   // Per orientation: the same id is a Prompt box in one and an Exchange card in the other.
   const [sizes, setSizes] = useState<Sizes>(NO_SIZES)
   const measured = sizes[orientation]
@@ -217,8 +234,12 @@ export function Flow({
 
     if (focus) centered.current = focus.sequence
 
-    void flow.fitView({padding: 0.15, maxZoom: flow.getZoom(), duration: 400})
-  }, [hasFork, allMeasured, focus, flow])
+    void flow.fitView({
+      padding: 0.15,
+      maxZoom: flow.getZoom(),
+      duration: panMs,
+    })
+  }, [hasFork, allMeasured, focus, flow, panMs])
 
   // Each focus pans to its Reply at the current zoom, once the Reply's box has
   // a size; while the first Fork waits to be fitted, the fit takes it instead.
@@ -245,9 +266,9 @@ export function Flow({
     void flow.setCenter(
       node.position.x + size.width / 2,
       node.position.y + size.height / 2,
-      {zoom: flow.getZoom(), duration: 400, interpolate: 'linear'}
+      {zoom: flow.getZoom(), duration: panMs, interpolate: 'linear'}
     )
-  }, [focus, hasFork, nodeIdOf, layout, index, measured, flow])
+  }, [focus, hasFork, nodeIdOf, layout, index, measured, flow, panMs])
 
   const streaming = index.replies
     .filter(reply => reply.status === 'streaming')
@@ -275,6 +296,11 @@ export function Flow({
       className={switching ? 'canvas-switching' : undefined}
       onNodeMouseEnter={(_event, node) => onHover(hoverIdOf(node))}
       onNodeMouseLeave={() => onHover(null)}
+      onNodeClick={event => {
+        const turnId = clickedTurnId(event.target)
+
+        if (turnId !== null) onOpenChat(turnId)
+      }}
     >
       <Background gap={24} />
       <CanvasControls

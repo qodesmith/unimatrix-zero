@@ -6,6 +6,8 @@ import {CanvasOrientationSchema} from '@uz/contract/settings'
 import {MiniMap, Panel, useReactFlow} from '@xyflow/react'
 import {useRef} from 'react'
 
+import {useReducedMotion} from '../reduced-motion'
+
 interface CanvasControlsProps {
   orientation: CanvasOrientation
   onOrientation: (orientation: CanvasOrientation) => void
@@ -33,6 +35,7 @@ export function CanvasControls({
   onJump,
 }: CanvasControlsProps) {
   const flow = useReactFlow()
+  const still = useReducedMotion()
 
   return (
     <Panel
@@ -73,20 +76,24 @@ export function CanvasControls({
       <div className="flex items-center gap-1 border-t border-border p-1.5">
         <ToolButton
           title="Zoom in"
-          onClick={() => void flow.zoomIn({duration: 200})}
+          onClick={() => void flow.zoomIn({duration: still ? 0 : 200})}
         >
           +
         </ToolButton>
         <ToolButton
           title="Zoom out"
-          onClick={() => void flow.zoomOut({duration: 200})}
+          onClick={() => void flow.zoomOut({duration: still ? 0 : 200})}
         >
           −
         </ToolButton>
         <ToolButton
           title="Fit the whole Tree"
           onClick={() =>
-            void flow.fitView({padding: 0.15, maxZoom: 1, duration: 300})
+            void flow.fitView({
+              padding: 0.15,
+              maxZoom: 1,
+              duration: still ? 0 : 300,
+            })
           }
         >
           ⤢

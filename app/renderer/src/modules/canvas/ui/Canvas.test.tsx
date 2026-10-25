@@ -1,3 +1,5 @@
+// The Playwright provider gives `cdp()` its `send`.
+/// <reference types="@vitest/browser-playwright" />
 import type {Bridge} from '@uz/contract/bridge'
 import type {Command} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
@@ -9,9 +11,9 @@ import {SettingsProvider} from '#modules/settings/main'
 import {LiveReplies} from '#modules/turns/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
-import {expect, it} from 'vitest'
+import {expect, it, onTestFinished} from 'vitest'
 import {render} from 'vitest-browser-react'
-import {page, userEvent} from 'vitest/browser'
+import {cdp, page, userEvent} from 'vitest/browser'
 
 import {Canvas} from './Canvas'
 
@@ -106,7 +108,7 @@ function fakeMain(saved: Saved) {
       sent.push(command)
 
       if (command.type === 'tree.turns') {
-        return {ok: true, value: {prompts, replies}}
+        return {ok: true, value: {prompts: [...prompts], replies: [...replies]}}
       }
 
       if (command.type === 'settings.update') {
@@ -158,7 +160,7 @@ function fakeMain(saved: Saved) {
     registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
   }
 
-  return {...bridge, sent, publish}
+  return {...bridge, sent, publish, replies}
 }
 
 function Providers({children}: {children: ReactNode}) {
@@ -231,9 +233,21 @@ async function hoverAway() {
   await page.getByRole('group', {name: 'Orientation'}).hover()
 }
 
+/** The canvas itself, leaving out the slideout drawn over it. */
+function canvas() {
+  const flow = document.querySelector('.react-flow')
+
+  if (!flow) throw new Error('The canvas is not drawn')
+
+  return page.elementLocator(flow)
+}
+
 /** The box a Turn is drawn in. */
 function nodeOf(turnText: string) {
-  const box = page.getByText(turnText).element().closest('.react-flow__node')
+  const box = canvas()
+    .getByText(turnText)
+    .element()
+    .closest('.react-flow__node')
 
   if (!box) throw new Error(`${turnText} is not on the canvas`)
 
@@ -881,4 +895,258 @@ it('shows one centered Input on an empty Tree and the Turns once it is sent', as
   await expect
     .poll(() => document.querySelectorAll('.react-flow__node').length)
     .toBe(2)
+})
+
+function slideout() {
+  return page.getByRole('complementary', {name: 'Chat'})
+}
+
+/** The Turn texts the slideout shows, top to bottom. */
+function chatTurns() {
+  return [...slideout().element().querySelectorAll('[data-chat-turn]')].map(
+    turn => turn.textContent.trim()
+  )
+}
+
+/** The connections from the root down to Reply four. */
+function threadToReplyFour() {
+  return [
+    edge(1, 11),
+    edge(11, 2),
+    edge(2, 12),
+    edge(12, 4),
+    edge(4, 14),
+  ].toSorted()
+}
+
+function slideoutWidth() {
+  return slideout().element().getBoundingClientRect().width
+}
+
+it('opens the slideout on a clicked Turn’s Thread, with one Input at its end and that Thread highlighted', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await canvas().getByText('Prompt four').click()
+  await expect.element(slideout()).toBeVisible()
+
+  expect(chatTurns()).toEqual([
+    'Prompt one',
+    'Reply one',
+    'Prompt two',
+    'Reply two',
+    'Prompt four',
+    'Reply four',
+  ])
+  expect(
+    slideout().getByRole('textbox', {name: 'Prompt'}).elements()
+  ).toHaveLength(1)
+
+  await hoverAway()
+  await expect.poll(highlightedEdges).toEqual(threadToReplyFour())
+})
+
+it('switches the slideout to another clicked Turn’s Thread, and closes it when a canvas Input takes focus', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  // The slideout covers the right of the canvas: the Branch on the left stays clickable.
+  await canvas().getByText('Reply three').click()
+  await expect
+    .poll(chatTurns)
+    .toEqual(['Prompt one', 'Reply one', 'Prompt three', 'Reply three'])
+  await canvas().getByText('Prompt four').click()
+
+  await expect
+    .poll(chatTurns)
+    .toEqual([
+      'Prompt one',
+      'Reply one',
+      'Prompt two',
+      'Reply two',
+      'Prompt four',
+      'Reply four',
+    ])
+  await hoverAway()
+  await expect.poll(highlightedEdges).toEqual(threadToReplyFour())
+
+  await inputUnder('Reply two').click()
+  await expect.element(slideout()).not.toBeInTheDocument()
+  await hoverAway()
+  await expect
+    .poll(highlightedEdges)
+    .toEqual([edge(1, 11), edge(11, 2), edge(2, 12)].toSorted())
+})
+
+it('branches from the slideout into a Reply that already has a response, and follows the new Branch', async () => {
+  const {main} = await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await canvas().getByText('Prompt one').click()
+  await expect.poll(chatTurns).toEqual(['Prompt one', 'Reply one'])
+
+  await slideout().getByRole('textbox', {name: 'Prompt'}).fill('A third way')
+  await userEvent.keyboard('{Enter}')
+
+  await expect
+    .element(
+      nodeOf('Reply one').getByRole('button', {name: 'Fork · 3 Branches'})
+    )
+    .toBeVisible()
+  expect(main.sent.filter(command => command.type === 'prompt.send')).toEqual([
+    expect.objectContaining({parentReplyId: uuid(11), text: 'A third way'}),
+  ])
+
+  await expect
+    .poll(chatTurns)
+    .toEqual(['Prompt one', 'Reply one', 'A third way', 'Writing…'])
+  expect(slideout().getByRole('textbox').query()).toBeNull()
+
+  const sentPromptId = nodeOf('A third way').element().getAttribute('data-id')
+
+  await hoverAway()
+  await expect
+    .poll(highlightedEdges)
+    .toEqual(
+      expect.arrayContaining([edge(1, 11), `${uuid(11)}-${sentPromptId}`])
+    )
+  expect(highlightedEdges()).toHaveLength(3)
+})
+
+it('opens nothing on a clicked Prompt with no Reply yet, even once its Reply arrives', async () => {
+  clock = 0
+
+  const {main} = await renderCanvas({
+    prompts: [prompt(1, null, 'Prompt one'), prompt(2, 11, 'Prompt two')],
+    replies: [reply(11, 1, 'Reply one')],
+  })
+
+  await expect.element(page.getByText('Prompt two')).toBeVisible()
+
+  await canvas().getByText('Prompt two').click()
+  await expect.element(slideout()).not.toBeInTheDocument()
+
+  main.replies.push(reply(12, 2, 'Reply two'))
+  main.publish({
+    type: 'SNAPSHOT',
+    app: {version: '0.0.0'},
+    replies: [],
+    providers: [],
+    signIn: null,
+    settings: DEFAULT_SETTINGS,
+  })
+  await expect.element(canvas().getByText('Reply two')).toBeVisible()
+  await expect.element(slideout()).not.toBeInTheDocument()
+})
+
+/** Whether a transition is moving the slideout across the canvas right now. */
+function sliding(aside: Element) {
+  return aside
+    .getAnimations()
+    .some(
+      animation =>
+        animation instanceof CSSTransition &&
+        animation.transitionProperty === 'translate'
+    )
+}
+
+it('slides the slideout in as it opens and out as it closes', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await canvas().getByText('Prompt four').click()
+  await expect.element(slideout()).toBeInTheDocument()
+  const aside = slideout().element()
+  expect(sliding(aside)).toBe(true)
+  await expect.poll(() => sliding(aside)).toBe(false)
+
+  await slideout().getByRole('button', {name: 'Close'}).click()
+  expect(aside.isConnected).toBe(true)
+  expect(sliding(aside)).toBe(true)
+  await expect.poll(() => aside.isConnected).toBe(false)
+})
+
+/** The OS's reduced motion setting as Chromium reports it; '' is no preference. */
+async function emulateReducedMotion(value: 'reduce' | '') {
+  await cdp().send('Emulation.setEmulatedMedia', {
+    features: [{name: 'prefers-reduced-motion', value}],
+  })
+}
+
+it('opens and closes the slideout without sliding when the OS asks for reduced motion', async () => {
+  await emulateReducedMotion('reduce')
+  onTestFinished(async () => emulateReducedMotion(''))
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await canvas().getByText('Prompt four').click()
+  await expect.element(slideout()).toBeInTheDocument()
+  const aside = slideout().element()
+  expect(sliding(aside)).toBe(false)
+
+  await slideout().getByRole('button', {name: 'Close'}).click()
+  expect(sliding(aside)).toBe(false)
+  await expect.poll(() => aside.isConnected).toBe(false)
+})
+
+it('zooms and switches orientation without gliding when the OS asks for reduced motion', async () => {
+  await emulateReducedMotion('reduce')
+  onTestFinished(async () => emulateReducedMotion(''))
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await expect.poll(viewport).not.toContain('translate(0px, 0px)')
+  await settledViewport()
+
+  const loaded = zoomOf()
+  await page.getByRole('button', {name: 'Zoom in'}).click()
+  expect(zoomOf()).toBeCloseTo(loaded * 1.2, 2)
+
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+
+  const gliding = [...document.querySelectorAll('.react-flow__node')].filter(
+    node => node.getAnimations().length > 0
+  )
+
+  expect(gliding).toEqual([])
+})
+
+it('scrolls the slideout to the clicked Turn, expands to cover the canvas, and closes with Esc or its close control', async () => {
+  clock = 0
+  await renderCanvas({
+    prompts: [prompt(1, null, 'Prompt one'), prompt(2, 11, 'Prompt two')],
+    // Long enough below Prompt two for it to reach the top.
+    replies: [
+      reply(11, 1, longText.replaceAll('\n', '\n\n')),
+      reply(12, 2, longText.replaceAll('\n', '\n\n')),
+    ],
+  })
+  await expect.element(page.getByText('Prompt two')).toBeVisible()
+
+  await canvas().getByText('Prompt two').click()
+  await expect.element(slideout()).toBeVisible()
+
+  const scroller = slideout().element().querySelector('.overflow-y-auto')
+  const turn = slideout().getByText('Prompt two').element()
+
+  if (!scroller) throw new Error('The slideout does not scroll')
+
+  expect(scroller.scrollTop).toBeGreaterThan(0)
+  expect(
+    turn.getBoundingClientRect().top - scroller.getBoundingClientRect().top
+  ).toBeLessThan(40)
+
+  const canvasWidth = canvas().element().getBoundingClientRect().width
+
+  expect(slideoutWidth()).toBeLessThan(canvasWidth / 2)
+  await slideout().getByRole('button', {name: 'Full screen'}).click()
+  await expect.poll(slideoutWidth).toBe(canvasWidth)
+  await slideout().getByRole('button', {name: 'Exit full screen'}).click()
+  await expect.poll(slideoutWidth).toBeLessThan(canvasWidth / 2)
+
+  await userEvent.keyboard('{Escape}')
+  await expect.element(slideout()).not.toBeInTheDocument()
+
+  await canvas().getByText('Prompt one').click()
+  await slideout().getByRole('button', {name: 'Close'}).click()
+  await expect.element(slideout()).not.toBeInTheDocument()
 })
