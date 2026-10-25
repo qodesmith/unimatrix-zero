@@ -57,7 +57,7 @@ interface LoadedThread {
 }
 
 /** Where a Reply's turn is, for a stop to reach it. */
-interface Turn {
+interface CodexTurn {
   server: AppServer
   threadId: string
   turnId: string
@@ -68,11 +68,11 @@ interface Turn {
  * stop came before then, to pass on as soon as it has.
  */
 interface Writing {
-  turn: Turn | null
+  turn: CodexTurn | null
   stopAsked: boolean
 }
 
-async function interrupt({server, threadId, turnId}: Turn) {
+async function interrupt({server, threadId, turnId}: CodexTurn) {
   await server.request('turn/interrupt', {threadId, turnId})
 }
 

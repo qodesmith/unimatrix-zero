@@ -116,10 +116,11 @@ export function continuation(
 
 /**
  * How a failed Reply runs again: its Prompt, to the same Provider and
- * Model, in the session of the Reply its Prompt answers, rewound to
- * there, since the Reply's own Turn may be in it. A Prompt that started
- * a Branch forks again instead. Null when the Tree has no such Reply;
- * throws for one that didn't fail.
+ * Model, in the session rewound to the Reply its Prompt answers. A Prompt
+ * that started a Branch forks again instead, and one answering a Reply its
+ * Provider never saved goes on without a rewind, which would drop that
+ * Reply's Prompt too. Null when the Tree has no such Reply; throws for one
+ * that didn't fail.
  */
 export function recovery(
   db: Database,
@@ -161,13 +162,27 @@ export function recovery(
     throw new Error('The Reply this one’s Prompt answers no longer exists.')
   }
 
+  const answeredAt =
+    prompt.parentReplyId === null
+      ? undefined
+      : db
+          .select({messageId: replies.sessionMessageId})
+          .from(replies)
+          .where(eq(replies.id, prompt.parentReplyId))
+          .get()
+
   return {
     provider: row.provider,
     model: row.model,
     systemPrompt: systemPrompt.text,
     text: prompt.text,
     session: continued?.session
-      ? {...continued.session, rewind: !continued.session.fork}
+      ? {
+          ...continued.session,
+          rewind:
+            !continued.session.fork &&
+            answeredAt?.messageId === continued.session.messageId,
+        }
       : null,
   }
 }

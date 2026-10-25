@@ -4,6 +4,7 @@ import {bridge} from '#modules/bridge/main'
 import {Canvas} from '#modules/canvas/main'
 import {
   Connections,
+  ConnectionsProvider,
   anyConnected,
   useConnections,
 } from '#modules/connections/main'
@@ -23,9 +24,11 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
-        <LiveReplies>
-          <AppLayout />
-        </LiveReplies>
+        <ConnectionsProvider>
+          <LiveReplies>
+            <AppLayout />
+          </LiveReplies>
+        </ConnectionsProvider>
       </SettingsProvider>
     </QueryClientProvider>
   )

@@ -52,10 +52,7 @@ export type ReplyStatus = z.infer<typeof ReplyStatusSchema>
 
 const FinishedStatusSchema = ReplyStatusSchema.exclude(['streaming'])
 
-/**
- * Why a Reply failed, as the Provider host or main tells it. The first four
- * are the reasons the window names; the rest it shows by their message.
- */
+/** Why a Reply failed, as the Provider host or main tells it. */
 export const RunFailureSchema = z.strictObject({
   code: z.enum([
     'connection-lost',

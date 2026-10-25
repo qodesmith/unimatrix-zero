@@ -354,7 +354,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   }
 
   /**
-   * Interrupts the Turn writing the Reply, once `claude` has taken the
+   * Interrupts the turn writing the Reply, once `claude` has taken the
    * request; the Reply's stream goes on to its `RUN_FINISHED`. A stop before
    * `claude` has the Prompt is passed on as soon as it does. Nothing when no
    * Reply by that id is being written.

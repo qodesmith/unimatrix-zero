@@ -8,6 +8,7 @@ import type {Settings} from '@uz/contract/settings'
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
 
+import {ConnectionsProvider} from '#modules/connections/main'
 import {SettingsProvider} from '#modules/settings/main'
 import {LiveReplies} from '#modules/turns/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
@@ -201,9 +202,11 @@ function Providers({children}: {children: ReactNode}) {
   return (
     <QueryClientProvider client={new QueryClient()}>
       <SettingsProvider>
-        <LiveReplies>
-          <div style={{height: '100vh'}}>{children}</div>
-        </LiveReplies>
+        <ConnectionsProvider>
+          <LiveReplies>
+            <div style={{height: '100vh'}}>{children}</div>
+          </LiveReplies>
+        </ConnectionsProvider>
       </SettingsProvider>
     </QueryClientProvider>
   )

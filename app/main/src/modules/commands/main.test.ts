@@ -794,6 +794,54 @@ describe('retrying a Reply', () => {
     ])
   })
 
+  it('goes on without rewinding when the Reply answered was stopped before its Provider saved it', async () => {
+    const {treeId, replyId} = await sendRoot()
+    record(treeId, replyId)
+    finish(treeId, replyId)
+
+    const stopped = await send({
+      type: 'prompt.send',
+      treeId,
+      parentReplyId: replyId,
+      text: 'And then?',
+    })
+
+    if (!stopped.ok) throw new Error(stopped.error.message)
+
+    const cutShort = PromptSendResult.parse(stopped.value).reply
+    stopUnrecorded(treeId, cutShort.id)
+
+    const sent = await send({
+      type: 'prompt.send',
+      treeId,
+      parentReplyId: cutShort.id,
+      text: 'Go on',
+    })
+
+    if (!sent.ok) throw new Error(sent.error.message)
+
+    const {reply} = PromptSendResult.parse(sent.value)
+    fail(treeId, reply.id)
+    hostCommands = []
+
+    await send({type: 'reply.retry', treeId, replyId: reply.id})
+
+    expect(hostCommands).toEqual([
+      {
+        type: 'reply.start',
+        request: expect.objectContaining({
+          prompt: {text: 'Go on'},
+          session: {
+            sessionId: 's1',
+            messageId: 'm1',
+            fork: false,
+            rewind: false,
+          },
+        }),
+      },
+    ])
+  })
+
   it('forks again, without rewinding, when the Prompt started a Branch', async () => {
     const {treeId, replyId} = await sendRoot()
     record(treeId, replyId)

@@ -5,6 +5,7 @@ import type {ProviderStatus} from '@uz/contract/providers'
 import type {Reply, RunFailure} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
 
+import {ConnectionsProvider} from '#modules/connections/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {EventSchema} from '@uz/contract/events'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
@@ -103,7 +104,7 @@ beforeEach(() => {
 function Providers({children}: {children: ReactNode}) {
   return (
     <QueryClientProvider client={new QueryClient()}>
-      {children}
+      <ConnectionsProvider>{children}</ConnectionsProvider>
     </QueryClientProvider>
   )
 }
@@ -523,3 +524,29 @@ it.each([
     await expect.element(screen.getByText(reason)).toBeVisible()
   }
 )
+
+it('gates every failed Reply on one subscription to main', async () => {
+  let subscriptions = 0
+  globalThis.window.uz = {
+    ...main,
+    subscribe: listener => {
+      subscriptions += 1
+
+      return main.subscribe(listener)
+    },
+  }
+  const live = createReplay()
+
+  const screen = await render(
+    <ReplyStoreContext value={live.store}>
+      <ReplyView reply={{...reply, ...failed(lost)}} />
+      <ReplyView reply={{...reply, ...failed(lost), id: crypto.randomUUID()}} />
+    </ReplyStoreContext>,
+    {wrapper: Providers}
+  )
+
+  await expect
+    .element(screen.getByRole('button', {name: 'Retry'}).nth(1))
+    .toBeEnabled()
+  expect(subscriptions).toBe(1)
+})
