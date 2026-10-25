@@ -24,7 +24,7 @@ const MODEL = 'gpt-6.1-sol'
 const ROLLOUT = `sessions/2026/10/23/rollout-2026-10-23T09-16-57-${THREAD_ID}.jsonl`
 const FORKED_ROLLOUT = `sessions/2026/10/23/rollout-2026-10-23T09-17-17-${FORKED_THREAD_ID}.jsonl`
 
-/** As `interrupted.ndjson` recorded them. */
+/** As `stopped.ndjson` recorded them. */
 const STOPPED_THREAD_ID = '01a170a9-cc05-7142-8908-96e20ff7d881'
 const STOPPED_TURN = '01a170a9-ce9a-7972-abbb-60582c32b871'
 const AFTER_STOP_TURN = '01a170a9-de52-7e32-98fa-57fc6eeb8640'
@@ -332,7 +332,7 @@ it('forks the Provider session through a mid-Thread Reply into a new thread, fro
 })
 
 it('stops a Reply where it is, records it, and continues the Provider session after it', async () => {
-  const codex = await setUp(['interrupted.ndjson'])
+  const codex = await setUp(['stopped.ndjson'])
 
   const stopped = await codex.reply(
     'Count from 1 to 300, one number per line.',
@@ -405,7 +405,6 @@ it('rewinds the loaded thread to the Reply a Retry answers, keeping both rollout
     {rewind: true}
   )
 
-  // The second Reply is gone from the thread.
   expect(textOf(retried)).toBe('Say hi in three words.')
   expect(recordedIn(retried)).toEqual({
     sessionId: REWOUND_THREAD_ID,

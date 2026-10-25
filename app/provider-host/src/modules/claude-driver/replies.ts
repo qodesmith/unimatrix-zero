@@ -182,7 +182,7 @@ export function createReplyMapper(ids: ReplyIds) {
       const contextWindow = contextWindowOf(result.modelUsage)
       const windowField = contextWindow === undefined ? {} : {contextWindow}
 
-      // An interrupted Turn's result comes with either subtype and either
+      // A stopped Turn’s result comes with either subtype and either
       // `is_error`, partial text or not; only `terminal_reason` tells.
       if (
         result.terminal_reason === 'aborted_streaming' ||

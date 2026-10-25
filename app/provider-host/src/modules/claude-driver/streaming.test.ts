@@ -669,7 +669,6 @@ it('rewinds a cold session to an earlier Reply and goes on from there, in the sa
     rewind: true,
   })
 
-  // OTTER is gone from the session, and no new session was made.
   expect(textOf(rewound)).toBe('TEAL')
   expect(recordedIn(rewound)).toEqual({
     sessionId: REWOUND_SESSION_ID,

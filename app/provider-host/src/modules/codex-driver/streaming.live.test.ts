@@ -181,7 +181,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     const recording = process.env.UZ_RECORD === 'yes'
 
     const recorder = createRecorder(
-      ['interrupted.ndjson', 'reverted.ndjson'].map(name =>
+      ['stopped.ndjson', 'reverted.ndjson'].map(name =>
         path.join(RECORDINGS, name)
       )
     )
@@ -295,7 +295,6 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
 
       expectComplete(bye.events)
 
-      // Retried from the first Reply: the second is dropped from the thread.
       const retried = await reply(
         second,
         otherHome,

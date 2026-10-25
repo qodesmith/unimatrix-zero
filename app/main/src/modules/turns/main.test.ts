@@ -203,7 +203,6 @@ it('marks a Reply left streaming by the last run as interrupted at launch', () =
     status: 'interrupted',
     failure: null,
   })
-  // The run that is still going keeps its own.
   expect(saved().status).toBe('streaming')
 })
 

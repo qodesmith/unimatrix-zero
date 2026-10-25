@@ -76,6 +76,14 @@ _Avoid_: User message, question
 The AI's Turn in response to one Prompt, however many internal messages, tool calls, or thinking blocks it contains.
 _Avoid_: Response, answer, completion
 
+**Stop**:
+Ending a streaming Reply early, by its button or Esc. The Provider is asked to end the turn and keeps its session; the app keeps the text shown so far and tags the Reply _stopped_. A stopped Reply can be continued or branched from. A Reply the app itself left streaming, because it quit, is tagged _interrupted_ at the next launch and behaves like a stopped one.
+_Avoid_: Cancel, abort, interrupt (the Providers' word for what Stop asks of them)
+
+**Retry**:
+Running a failed or interrupted Reply's Prompt again in the same place: the Reply streams again from nothing, in the Provider session rewound to the Reply its Prompt answers. It is a recovery, never a Fork, and the app never retries on its own.
+_Avoid_: Regenerate, resend, re-run
+
 **Thinking block**:
 One contiguous run of the Model's reasoning, streamed by the Provider before a content part of a Reply: before the first word, and again between tool calls, so a Reply may hold several. Shown live and collapsed while the window is open, with how long it took. A Thinking block sits beside the Reply, not in its content: it is not a part, is never stored, and a reload loses it.
 _Avoid_: Reasoning, chain of thought, thinking summary, round
