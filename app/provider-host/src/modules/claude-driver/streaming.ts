@@ -7,7 +7,9 @@ import type {
   SpawnedProcess,
 } from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRecorded, ReplyRequest, SessionFile} from '@uz/contract/host'
-import type {ReplyEvent} from '@uz/contract/turns'
+import type {ReplyEvent, RunFailure} from '@uz/contract/turns'
+
+import {failureOf} from '#modules/failures/main'
 
 import {claudeEnvironment} from './environment'
 import {createReplyMapper} from './replies'
@@ -48,8 +50,29 @@ interface Live extends ClaudeSession {
 
 type Mapper = ReturnType<typeof createReplyMapper>
 
+/**
+ * How `claude` takes up the Provider session: as it stands, forked through
+ * the Reply answered into a new session, or cut back to that Reply for a
+ * rewind. `upTo` is the last message kept, when it is cut.
+ */
+function resumption(session: ReplyRequest['session'], restore: Restore) {
+  if (!session || restore === 'none') {
+    return {resume: null, fork: false, upTo: null}
+  }
+
+  const {sessionId: resume, fork, rewind, messageId} = session
+
+  return {resume, fork, upTo: fork || rewind ? messageId : null}
+}
+
 /** `heard` says whether `claude` sent anything back to the Prompt. */
-type Outcome = {result: SDKResultMessage} | {error: string; heard: boolean}
+type Outcome =
+  | {result: SDKResultMessage}
+  | {failure: RunFailure; heard: boolean}
+
+function crashed(message: string): RunFailure {
+  return {code: 'program-crashed', message}
+}
 
 /**
  * Claude's Replies: each Prompt goes to the warm session standing at the
@@ -73,9 +96,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     const cwd = configDir
     const projectKey = projectKeyOf(cwd)
-    const resume = restore === 'none' ? null : request.session?.sessionId
-    const fork = resume ? request.session?.fork : false
-    const forkAt = fork ? request.session?.messageId : null
+    const {resume, fork, upTo} = resumption(request.session, restore)
     let files: SessionFile[] = []
     let activeConfigDir = configDir
 
@@ -98,7 +119,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       ...(request.model === DEFAULT_MODEL ? {} : {model: request.model}),
       ...(resume ? {resume} : {}),
       ...(fork ? {forkSession: true} : {}),
-      ...(forkAt ? {resumeSessionAt: forkAt} : {}),
+      ...(upTo ? {resumeSessionAt: upTo} : {}),
       // The fallback resumes from the transcript written back, not the store.
       sessionStore:
         restore === 'file'
@@ -131,15 +152,19 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     })
   }
 
+  /** The session writing each Reply, for as long as it is. */
+  const writing = new Map<string, Live>()
+
   async function* attempt(
     session: Live,
     mapper: Mapper,
-    text: string
+    {replyId, prompt}: ReplyRequest
   ): AsyncGenerator<ReplyEvent, Outcome> {
     let heard = false
+    writing.set(replyId, session)
 
     try {
-      for await (const message of session.send(text)) {
+      for await (const message of session.send(prompt.text)) {
         heard = true
 
         if (message.type === 'result') return {result: message}
@@ -147,12 +172,17 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
         yield* mapper.map(message)
       }
 
-      return {error: 'Claude stopped before finishing this Reply.', heard}
-    } catch (error) {
       return {
-        error: error instanceof Error ? error.message : String(error),
+        failure: crashed('Claude stopped before finishing this Reply.'),
         heard,
       }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+
+      // Once heard, the only thing that throws is `claude` going away.
+      return {failure: heard ? crashed(message) : failureOf(message), heard}
+    } finally {
+      writing.delete(replyId)
     }
   }
 
@@ -178,26 +208,45 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   }
 
   /**
+   * The warm session standing at the Reply the Prompt answers, when the
+   * Prompt can go to it. A fork never takes one, and a rewind can't: the
+   * session it finds there has gone past that Reply, so it is closed.
+   */
+  function claimable(request: ReplyRequest): Live | null {
+    const {session} = request
+
+    if (!session || session.fork) return null
+
+    const claimed = warm.claim(session)
+
+    if (claimed && session.rewind) {
+      warm.drop(claimed)
+
+      return null
+    }
+
+    return claimed
+  }
+
+  /**
    * Sends the Prompt and streams Claude's answer, from the warm session
    * standing at the Reply answered, else a new `claude`. A warm one whose
    * `claude` exited while idle answers nothing, so a new one resumes in its
    * place. When the restore from the store doesn't get `claude` going, the
    * transcript is written back and it goes again from there. A fork always
-   * gets a new `claude`: no warm session is claimed, and none is closed.
+   * gets a new `claude`: no warm session is claimed, and none is closed. So
+   * does a rewind, which resumes the session cut back to the Reply answered.
    */
   async function* answer(
     request: ReplyRequest,
     mapper: Mapper
   ): AsyncGenerator<ReplyEvent, {session: Live; outcome: Outcome}> {
-    const {text} = request.prompt
-
-    const claimed =
-      request.session && !request.session.fork && warm.claim(request.session)
+    const claimed = claimable(request)
 
     if (claimed) {
-      const outcome = yield* attempt(claimed, mapper, text)
+      const outcome = yield* attempt(claimed, mapper, request)
 
-      if (!('error' in outcome) || outcome.heard || !claimed.ended) {
+      if (!('failure' in outcome) || outcome.heard || !claimed.ended) {
         return {session: claimed, outcome}
       }
 
@@ -206,7 +255,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     const session = await open(request, request.session ? 'store' : 'none')
     warm.add(session)
-    const outcome = yield* attempt(session, mapper, text)
+    const outcome = yield* attempt(session, mapper, request)
     const refused = !session.started && session.restore === 'store'
 
     if (!refused || !request.session) return {session, outcome}
@@ -224,7 +273,10 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     const fallback = await open(request, 'file')
     warm.add(fallback)
 
-    return {session: fallback, outcome: yield* attempt(fallback, mapper, text)}
+    return {
+      session: fallback,
+      outcome: yield* attempt(fallback, mapper, request),
+    }
   }
 
   async function* startReply(
@@ -238,13 +290,13 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     const {session, outcome} = yield* answer(request, mapper)
 
-    if ('error' in outcome) {
+    if ('failure' in outcome) {
       warm.drop(session)
       yield {
         ...ids,
         type: 'RUN_FINISHED',
         status: 'failed',
-        failure: {code: 'provider-error', message: outcome.error},
+        failure: outcome.failure,
       }
 
       return
@@ -254,7 +306,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     const recorded = mapper.recorded()
     const {sessionId} = session
 
-    if (finished.status !== 'complete') {
+    if (finished.status === 'failed') {
       warm.drop(session)
       yield finished
 
@@ -280,5 +332,14 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     yield finished
   }
 
-  return {startReply}
+  /**
+   * Interrupts the Turn writing the Reply, once `claude` has taken the
+   * request; the Reply's stream goes on to its `RUN_FINISHED`. Nothing when
+   * no Reply by that id is being written.
+   */
+  async function stop(replyId: string) {
+    await writing.get(replyId)?.interrupt()
+  }
+
+  return {startReply, stop}
 }

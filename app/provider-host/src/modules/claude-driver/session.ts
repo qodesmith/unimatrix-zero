@@ -33,6 +33,12 @@ export interface ClaudeSession {
   /** Sends a Prompt and yields what comes back, up to its `result`. */
   send(text: string): AsyncGenerator<SDKMessage>
   /**
+   * Asks `claude` to end the Turn it is on; resolves once it has taken the
+   * request. The Turn's `result` still follows on `send`, and `claude` stays
+   * open for the next Prompt.
+   */
+  interrupt(): Promise<void>
+  /**
    * Ends `claude`'s input and waits for it to exit by itself, so it can
    * finish writing; one that is stuck is stopped.
    */
@@ -110,6 +116,10 @@ export function openSession(query: QueryFn, options: Options): ClaudeSession {
 
         if (message.type === 'result') return
       }
+    },
+
+    async interrupt() {
+      await running.interrupt()
     },
 
     async close() {

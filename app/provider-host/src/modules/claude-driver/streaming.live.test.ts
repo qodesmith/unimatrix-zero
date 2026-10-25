@@ -7,9 +7,11 @@
  * bun run test:node app/provider-host/src/modules/claude-driver/streaming.live
  *
  * With `UZ_RECORD=yes` it also writes what `claude` and the SDK exchanged
- * into `recordings/`, which the driver tests replay.
+ * into `recordings/`, which the driver tests replay. Each `it` records its
+ * own files, so run one with `-t` to re-record only those.
  */
-import type {ReplyRecorded, SessionRef} from '@uz/contract/host'
+import type {ReplyRecorded, ReplyRequest, SessionRef} from '@uz/contract/host'
+import type {ReplyEvent} from '@uz/contract/turns'
 
 import {fakeStore} from '#modules/test-store/main'
 import {spawn} from 'node:child_process'
@@ -22,127 +24,211 @@ import {createRecorder} from './recording'
 import {RECORDINGS} from './replay'
 import {projectKeyOf} from './transcripts'
 
-const program = process.env.UZ_LIVE_CLAUDE_PROGRAM
-const configDir = process.env.UZ_LIVE_CLAUDE_CONFIG
+const program = process.env.UZ_LIVE_CLAUDE_PROGRAM ?? ''
+const configDir = process.env.UZ_LIVE_CLAUDE_CONFIG ?? ''
+const recording = process.env.UZ_RECORD === 'yes'
 
 const IDLE_MS = 2000
 
-describe.skipIf(!program || !configDir)('a live Claude', () => {
-  it('streams, continues warm, resumes from the app’s copy alone, then forks mid-Thread', async () => {
-    if (!program || !configDir) return
+type Streamed = ReplyEvent | ReplyRecorded
 
-    const store = fakeStore()
-    const recording = process.env.UZ_RECORD === 'yes'
+function textOf(events: Streamed[]) {
+  return events
+    .flatMap(event => (event.type === 'TEXT_DELTA' ? [event.delta] : []))
+    .join('')
+}
 
-    const recorder = createRecorder(
-      ({command, args, cwd, env, signal}) =>
-        spawn(command, args, {cwd, env, signal, stdio: 'pipe'}),
-      ['warm.ndjson', 'resumed.ndjson', 'forked.ndjson'].map(name =>
-        path.join(RECORDINGS, name)
-      )
+function recordedIn(events: Streamed[]) {
+  const recorded = events.find(
+    (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+  )
+
+  if (!recorded) throw new Error('The Reply was not recorded')
+
+  return recorded
+}
+
+/** Idle long enough for every warm `claude` to close. */
+async function idle() {
+  await new Promise(resolve => {
+    setTimeout(resolve, IDLE_MS * 3)
+  })
+}
+
+/** Without `claude`'s own transcript, so only the app's copy can bring it back. */
+function forgetTranscript(sessionId: string) {
+  fs.rmSync(
+    path.join(
+      configDir,
+      'projects',
+      projectKeyOf(configDir),
+      `${sessionId}.jsonl`
+    ),
+    {force: true}
+  )
+}
+
+/** The driver on the live `claude`, recording each one it starts into `files`. */
+function liveDriver(files: string[]) {
+  const recorder = createRecorder(
+    ({command, args, cwd, env, signal}) =>
+      spawn(command, args, {cwd, env, signal, stdio: 'pipe'}),
+    files.map(name => path.join(RECORDINGS, name))
+  )
+
+  const driver = createClaudeDriver({
+    store: fakeStore().client,
+    ...(recording ? {spawn: recorder.spawn} : {}),
+    idleMs: IDLE_MS,
+  })
+
+  const treeId = crypto.randomUUID()
+
+  function request(
+    text: string,
+    session: ReplyRequest['session']
+  ): ReplyRequest {
+    return {
+      treeId,
+      replyId: crypto.randomUUID(),
+      model: 'haiku',
+      systemPrompt: 'You answer in as few words as you can.',
+      prompt: {text},
+      vendorProgram: {
+        program: {
+          path: program,
+          build: {url: 'https://x.test/', sha256: '', size: 0},
+        },
+        configDir,
+      },
+      session,
+    }
+  }
+
+  async function reply(text: string, session: ReplyRequest['session']) {
+    const events = await Array.fromAsync(
+      driver.startReply(request(text, session))
     )
 
-    const driver = createClaudeDriver({
-      store: store.client,
-      ...(recording ? {spawn: recorder.spawn} : {}),
-      idleMs: IDLE_MS,
-    })
+    expect(events.at(-1)).toMatchObject({status: 'complete'})
 
-    const treeId = crypto.randomUUID()
+    return {events, recorded: recordedIn(events)}
+  }
 
-    async function reply(
-      text: string,
-      session: SessionRef | null,
-      fork = false
-    ) {
-      const events = await Array.fromAsync(
-        driver.startReply({
-          treeId,
-          replyId: crypto.randomUUID(),
-          model: 'haiku',
-          systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text},
-          vendorProgram: {
-            program: {
-              path: program ?? '',
-              build: {url: 'https://x.test/', sha256: '', size: 0},
-            },
-            configDir: configDir ?? '',
-          },
-          session: session && {...session, fork, rewind: false},
-        })
-      )
+  return {
+    driver,
+    request,
+    reply,
+    async done() {
+      await idle()
 
-      const recorded = events.find(
-        (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
-      )
+      if (recording) await recorder.done()
+    },
+  }
+}
 
-      expect(events.at(-1)).toMatchObject({status: 'complete'})
+function continuing(session: SessionRef, fork = false) {
+  return {...session, fork, rewind: false}
+}
 
-      if (!recorded) throw new Error('The Reply was not recorded')
+describe.skipIf(!program || !configDir)('a live Claude', () => {
+  it('streams, continues warm, resumes from the app’s copy alone, then forks mid-Thread', async () => {
+    const live = liveDriver(['warm.ndjson', 'resumed.ndjson', 'forked.ndjson'])
 
-      return {events, recorded}
-    }
+    const first = await live.reply('Reply with the single word TEAL.', null)
 
-    const first = await reply('Reply with the single word TEAL.', null)
-
-    const second = await reply(
+    const second = await live.reply(
       'Now reply with the single word OTTER.',
-      first.recorded.session
+      continuing(first.recorded.session)
     )
 
     expect(second.recorded.session.sessionId).toBe(
       first.recorded.session.sessionId
     )
 
-    // Idle long enough to close, then without claude's own transcript.
-    await new Promise(resolve => {
-      setTimeout(resolve, IDLE_MS * 3)
-    })
-    fs.rmSync(
-      path.join(
-        configDir,
-        'projects',
-        projectKeyOf(configDir),
-        `${first.recorded.session.sessionId}.jsonl`
-      ),
-      {force: true}
-    )
+    await idle()
+    forgetTranscript(first.recorded.session.sessionId)
 
-    const third = await reply(
+    const third = await live.reply(
       'Which two words did you reply with? Just the words.',
-      second.recorded.session
+      continuing(second.recorded.session)
     )
 
-    const text = third.events
-      .flatMap(event => (event.type === 'TEXT_DELTA' ? [event.delta] : []))
-      .join('')
-
-    expect(text).toMatch(/TEAL/)
-    expect(text).toMatch(/OTTER/)
+    expect(textOf(third.events)).toMatch(/TEAL/)
+    expect(textOf(third.events)).toMatch(/OTTER/)
 
     // Through the first Reply only: OTTER never happened on this Branch.
-    const forked = await reply(
+    const forked = await live.reply(
       'Which word did you reply with? Just the word.',
-      first.recorded.session,
-      true
+      continuing(first.recorded.session, true)
     )
 
     expect(forked.recorded.session.sessionId).not.toBe(
       first.recorded.session.sessionId
     )
+    expect(textOf(forked.events)).toMatch(/TEAL/)
+    expect(textOf(forked.events)).not.toMatch(/OTTER/)
 
-    const forkedText = forked.events
-      .flatMap(event => (event.type === 'TEXT_DELTA' ? [event.delta] : []))
-      .join('')
+    await live.done()
+  }, 180_000)
 
-    expect(forkedText).toMatch(/TEAL/)
-    expect(forkedText).not.toMatch(/OTTER/)
+  it('stops a Reply mid-stream and continues warm from it, then rewinds a session to an earlier Reply', async () => {
+    const live = liveDriver([
+      'stopped.ndjson',
+      'rewound-warm.ndjson',
+      'rewound.ndjson',
+    ])
 
-    await new Promise(resolve => {
-      setTimeout(resolve, IDLE_MS * 3)
+    const counting = live.request(
+      'Count from 1 to 300, one number per line.',
+      null
+    )
+
+    const events: Streamed[] = []
+    let deltas = 0
+
+    for await (const event of live.driver.startReply(counting)) {
+      events.push(event)
+
+      if (event.type === 'TEXT_DELTA' && ++deltas === 5) {
+        await live.driver.stop(counting.replyId)
+      }
+    }
+
+    expect(textOf(events).length).toBeGreaterThan(0)
+    expect(events.at(-1)).toMatchObject({status: 'stopped'})
+    const stopped = recordedIn(events)
+
+    const asked = await live.reply(
+      'What did I ask you to do? Answer in five words.',
+      {...stopped.session, fork: false, rewind: false}
+    )
+
+    expect(asked.recorded.session.sessionId).toBe(stopped.session.sessionId)
+
+    const first = await live.reply('Reply with the single word TEAL.', null)
+
+    await live.reply('Now reply with the single word OTTER.', {
+      ...first.recorded.session,
+      fork: false,
+      rewind: false,
     })
 
-    if (recording) await recorder.done()
+    await idle()
+    forgetTranscript(first.recorded.session.sessionId)
+
+    // Back to before OTTER, on the same session rather than a fork.
+    const rewound = await live.reply(
+      'Which word did you reply with? Just the word.',
+      {...first.recorded.session, fork: false, rewind: true}
+    )
+
+    expect(rewound.recorded.session.sessionId).toBe(
+      first.recorded.session.sessionId
+    )
+    expect(textOf(rewound.events)).toMatch(/TEAL/)
+    expect(textOf(rewound.events)).not.toMatch(/OTTER/)
+
+    await live.done()
   }, 180_000)
 })

@@ -8,6 +8,8 @@ import type {
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {failureOf} from '#modules/failures/main'
+
 type StreamEvent = SDKPartialAssistantMessage['event']
 
 type BlockDelta = Extract<StreamEvent, {type: 'content_block_delta'}>['delta']
@@ -180,6 +182,15 @@ export function createReplyMapper(ids: ReplyIds) {
       const contextWindow = contextWindowOf(result.modelUsage)
       const windowField = contextWindow === undefined ? {} : {contextWindow}
 
+      // An interrupted Turn's result comes with either subtype and either
+      // `is_error`, partial text or not; only `terminal_reason` tells.
+      if (
+        result.terminal_reason === 'aborted_streaming' ||
+        result.terminal_reason === 'aborted_tools'
+      ) {
+        return {...ids, ...windowField, type: 'RUN_FINISHED', status: 'stopped'}
+      }
+
       if (result.subtype === 'success' && !result.is_error) {
         return {
           ...ids,
@@ -197,10 +208,7 @@ export function createReplyMapper(ids: ReplyIds) {
         ...windowField,
         type: 'RUN_FINISHED',
         status: 'failed',
-        failure: {
-          code: 'provider-error',
-          message: message || 'Claude couldn’t finish this Reply.',
-        },
+        failure: failureOf(message || 'Claude couldn’t finish this Reply.'),
       }
     },
 
