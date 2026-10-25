@@ -3,6 +3,7 @@
 import type {Bridge} from '@uz/contract/bridge'
 import type {Command} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
+import type {ProviderStatus} from '@uz/contract/providers'
 import type {Settings} from '@uz/contract/settings'
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
@@ -93,6 +94,16 @@ function forkedTree(): Saved {
 }
 
 /** Main as the canvas sees it. */
+/** Every Provider, as main's SNAPSHOT lists them: Claude connected and ready. */
+const PROVIDERS: ProviderStatus[] = [
+  {
+    provider: 'claude',
+    status: 'ready',
+    account: {email: 'sam@example.com', plan: 'Max'},
+  },
+  {provider: 'chatgpt', status: 'not-connected', account: null},
+]
+
 function fakeMain(saved: Saved) {
   const prompts = [...saved.prompts]
   const replies = [...saved.replies]
@@ -173,7 +184,7 @@ function fakeMain(saved: Saved) {
         type: 'SNAPSHOT',
         app: {version: '0.0.0'},
         replies: [],
-        providers: [],
+        providers: PROVIDERS,
         signIn: null,
         settings: {...settings},
       })
@@ -1054,7 +1065,7 @@ it('opens nothing on a clicked Prompt with no Reply yet, even once its Reply arr
     type: 'SNAPSHOT',
     app: {version: '0.0.0'},
     replies: [],
-    providers: [],
+    providers: PROVIDERS,
     signIn: null,
     settings: DEFAULT_SETTINGS,
   })

@@ -18,9 +18,11 @@ import {
   RunFailureSchema,
   foldReplyEvent,
 } from '@uz/contract/turns'
-import {and, asc, eq, isNull, ne} from 'drizzle-orm'
+import {and, asc, eq, isNull} from 'drizzle-orm'
 import {createHash} from 'node:crypto'
 import {z} from 'zod'
+
+import {continuation, recovery} from './continuation'
 
 /** How long partial text may go unsaved while a Reply streams. */
 export const PARTIAL_SAVE_MS = 1000
@@ -28,9 +30,6 @@ export const PARTIAL_SAVE_MS = 1000
 const ContentSchema = z.array(ReplyPartSchema)
 
 const FailureSchema = RunFailureSchema.nullable()
-
-/** The statuses Retry runs again: the Provider never finished the Reply. */
-const RETRIABLE = new Set<Reply['status']>(['failed', 'interrupted'])
 
 type PromptRow = typeof schema.prompts.$inferSelect
 
@@ -85,26 +84,6 @@ interface NewPrompt {
   model: string
   systemPrompt: string
   now: Date
-}
-
-/** How a Reply runs again: its Prompt, and the session it goes to. */
-export interface Recovery {
-  provider: ProviderId
-  model: string
-  systemPrompt: string
-  text: string
-  session: Continuation['session'] | null
-}
-
-/** Where a Thread continues: a Reply's Provider, and its session there. */
-export interface Continuation {
-  provider: ProviderId
-  session: {
-    sessionId: string
-    messageId: string
-    fork: boolean
-    rewind: boolean
-  }
 }
 
 export type Turns = ReturnType<typeof createTurns>
@@ -203,57 +182,6 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
       .run()
   }
 
-  /**
-   * Where a Thread continues from this Reply: its Provider and session,
-   * which the next Prompt forks when the Reply already has a Prompt after
-   * it, other than `except`, the Prompt being run again. Null when the Tree
-   * has no such Reply.
-   */
-  function continuation(
-    treeId: string,
-    replyId: string,
-    except?: string
-  ): Continuation | null {
-    const row = db
-      .select()
-      .from(replies)
-      .where(and(eq(replies.id, replyId), eq(replies.treeId, treeId)))
-      .get()
-
-    if (!row) return null
-
-    if (row.status === 'streaming') {
-      throw new Error('Wait for this Reply to finish before continuing.')
-    }
-
-    if (row.sessionId === null || row.sessionMessageId === null) {
-      throw new Error(
-        'This Reply can’t be continued: its Provider never saved it.'
-      )
-    }
-
-    const answered = db
-      .select({id: prompts.id})
-      .from(prompts)
-      .where(
-        and(
-          eq(prompts.parentReplyId, replyId),
-          except === undefined ? undefined : ne(prompts.id, except)
-        )
-      )
-      .get()
-
-    return {
-      provider: row.provider,
-      session: {
-        sessionId: row.sessionId,
-        messageId: row.sessionMessageId,
-        fork: answered !== undefined,
-        rewind: false,
-      },
-    }
-  }
-
   /** The System prompt's id, saving it first if no Reply has used it. */
   function saveSystemPrompt(text: string) {
     const hash = createHash('sha256').update(text).digest('hex')
@@ -291,62 +219,11 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
       }
     },
 
-    continuation,
+    continuation: (treeId: string, replyId: string) =>
+      continuation(db, treeId, replyId),
 
-    /**
-     * How a failed or interrupted Reply runs again: its Prompt, to the same
-     * Provider and Model, in the session of the Reply its Prompt answers,
-     * rewound to there, since the Reply's own Turn may be in it. A Prompt
-     * that started a Branch forks again instead. Null when the Tree has no
-     * such Reply; throws for one that finished, or that is streaming.
-     */
-    recovery(treeId: string, replyId: string): Recovery | null {
-      const row = db
-        .select()
-        .from(replies)
-        .where(and(eq(replies.id, replyId), eq(replies.treeId, treeId)))
-        .get()
-
-      if (!row) return null
-
-      if (!RETRIABLE.has(row.status)) {
-        throw new Error('Only a Reply that failed can be retried.')
-      }
-
-      const prompt = db
-        .select()
-        .from(prompts)
-        .where(eq(prompts.id, row.promptId))
-        .get()
-
-      const systemPrompt = db
-        .select({text: systemPrompts.text})
-        .from(systemPrompts)
-        .where(eq(systemPrompts.id, row.systemPromptId))
-        .get()
-
-      if (!prompt || !systemPrompt) throw new Error('That Reply was not saved.')
-
-      const continued =
-        prompt.parentReplyId === null
-          ? null
-          : continuation(treeId, prompt.parentReplyId, prompt.id)
-
-      if (prompt.parentReplyId !== null && !continued) {
-        throw new Error('The Reply this one’s Prompt answers no longer exists.')
-      }
-
-      return {
-        provider: row.provider,
-        model: row.model,
-        systemPrompt: systemPrompt.text,
-        text: prompt.text,
-        session: continued && {
-          ...continued.session,
-          rewind: !continued.session.fork,
-        },
-      }
-    },
+    recovery: (treeId: string, replyId: string) =>
+      recovery(db, treeId, replyId),
 
     /**
      * Starts the Reply over, in place: streaming again from nothing, with

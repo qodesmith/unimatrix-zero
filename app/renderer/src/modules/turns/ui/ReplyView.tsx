@@ -68,9 +68,7 @@ export function ReplyView({reply}: {reply: Reply}) {
         </div>
       )}
       <StatusLine status={status} failure={failure} provider={reply.provider} />
-      {(status === 'failed' || status === 'interrupted') && (
-        <RetryControls reply={reply} />
-      )}
+      {status === 'failed' && <RetryControls reply={reply} />}
     </article>
   )
 }
@@ -86,7 +84,10 @@ const NOT_READY: Record<
   failed: name => `${name} isn't running`,
 }
 
-/** Why Retry is held right now, or null when it may run. */
+/**
+ * Why Retry is held right now, or null when it may run. Held without a
+ * reason until main has said where the Provider stands.
+ */
 function retryHeldBecause(
   online: boolean,
   status: ProviderStatus['status'] | null,
@@ -94,14 +95,16 @@ function retryHeldBecause(
 ) {
   if (!online) return 'Offline · Retry waits for the connection'
 
-  if (status === null || status === 'ready') return null
+  if (status === null) return ''
+
+  if (status === 'ready') return null
 
   return NOT_READY[status](PROVIDER_NAMES[provider])
 }
 
 /**
- * Mounted only while the Reply has failed or was interrupted, so a retry that
- * takes starts it fresh.
+ * Mounted only while the Reply has failed, so a retry that takes starts it
+ * fresh.
  */
 function RetryControls({reply}: {reply: Reply}) {
   const retryReply = useRetryReply(reply.treeId)

@@ -117,7 +117,10 @@ async function setUp(recordings: string[], env: Record<string, string> = {}) {
   interface ReplyOptions {
     fork?: boolean
     rewind?: boolean
-    /** Stops the Reply once this many text deltas have streamed. */
+    /**
+     * Stops the Reply once this many text deltas have streamed; 0 stops it as
+     * it starts.
+     */
     stopAfterDeltas?: number
   }
 
@@ -147,7 +150,10 @@ async function setUp(recordings: string[], env: Record<string, string> = {}) {
     })) {
       events.push(event)
 
-      if (event.type === 'TEXT_DELTA' && ++deltas === stopAfterDeltas) {
+      if (
+        (event.type === 'RUN_STARTED' && stopAfterDeltas === 0) ||
+        (event.type === 'TEXT_DELTA' && ++deltas === stopAfterDeltas)
+      ) {
         await driver.stop(replyId)
       }
     }
@@ -605,6 +611,18 @@ it('fails the Reply as a crash when `claude` exits before its result, keeping th
   })
   await claude.allClosed()
   expect(claude.reports()[0]?.ended).toBe('exited')
+})
+
+it('passes on a stop asked before claude has the Prompt', async () => {
+  const claude = await setUp(['stopped.ndjson'])
+
+  const stopped = await claude.reply(COUNT_PROMPT, null, {stopAfterDeltas: 0})
+
+  expect(stopped.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'stopped',
+  })
+  expect(textOf(stopped)).not.toBe('')
 })
 
 it('stops a Reply where it is, records it, and continues the Thread warm from it', async () => {

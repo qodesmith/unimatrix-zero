@@ -577,6 +577,15 @@ describe('loading a remote image', () => {
   })
 })
 
+function stopUnrecorded(treeId: string, replyId: string) {
+  deps.turns.apply('claude', {
+    type: 'RUN_FINISHED',
+    treeId,
+    replyId,
+    status: 'stopped',
+  })
+}
+
 function fail(treeId: string, replyId: string) {
   deps.turns.apply('claude', {
     type: 'RUN_FINISHED',
@@ -586,6 +595,68 @@ function fail(treeId: string, replyId: string) {
     failure: {code: 'host-crashed', message: 'Claude stopped unexpectedly.'},
   })
 }
+
+describe('continuing from a Reply its Provider never saved', () => {
+  it('goes on from the Reply before it when it was stopped, Prompt and all', async () => {
+    const {treeId, replyId} = await sendRoot()
+    record(treeId, replyId)
+    finish(treeId, replyId)
+
+    const sent = await send({
+      type: 'prompt.send',
+      treeId,
+      parentReplyId: replyId,
+      text: 'And then?',
+    })
+
+    if (!sent.ok) throw new Error(sent.error.message)
+
+    const {reply} = PromptSendResult.parse(sent.value)
+    stopUnrecorded(treeId, reply.id)
+    hostCommands = []
+
+    await send({
+      type: 'prompt.send',
+      treeId,
+      parentReplyId: reply.id,
+      text: 'Go on',
+    })
+
+    expect(hostCommands).toEqual([
+      {
+        type: 'reply.start',
+        request: expect.objectContaining({
+          prompt: {text: 'Go on'},
+          session: {
+            sessionId: 's1',
+            messageId: 'm1',
+            fork: false,
+            rewind: false,
+          },
+        }),
+      },
+    ])
+  })
+
+  it('starts a new session when the stopped Reply answered the root Prompt', async () => {
+    const {treeId, replyId} = await sendRoot()
+    stopUnrecorded(treeId, replyId)
+
+    await send({
+      type: 'prompt.send',
+      treeId,
+      parentReplyId: replyId,
+      text: 'On',
+    })
+
+    expect(hostCommands).toEqual([
+      {
+        type: 'reply.start',
+        request: expect.objectContaining({prompt: {text: 'On'}, session: null}),
+      },
+    ])
+  })
+})
 
 describe('stopping a Reply', () => {
   it('asks the host writing it to interrupt it', async () => {

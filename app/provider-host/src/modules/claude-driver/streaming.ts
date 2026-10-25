@@ -152,8 +152,11 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     })
   }
 
-  /** The session writing each Reply, for as long as it is. */
-  const writing = new Map<string, Live>()
+  /**
+   * Each Reply being written: its session once `claude` has the Prompt, and
+   * whether a stop came before then, to pass on as soon as it does.
+   */
+  const writing = new Map<string, {session: Live | null; stopAsked: boolean}>()
 
   async function* attempt(
     session: Live,
@@ -161,10 +164,16 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     {replyId, prompt}: ReplyRequest
   ): AsyncGenerator<ReplyEvent, Outcome> {
     let heard = false
-    writing.set(replyId, session)
+    const entry = writing.get(replyId)
 
     try {
       for await (const message of session.send(prompt.text)) {
+        if (!heard && entry) {
+          entry.session = session
+
+          if (entry.stopAsked) void session.interrupt().catch(() => undefined)
+        }
+
         heard = true
 
         if (message.type === 'result') return {result: message}
@@ -182,7 +191,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       // Once heard, the only thing that throws is `claude` going away.
       return {failure: heard ? crashed(message) : failureOf(message), heard}
     } finally {
-      writing.delete(replyId)
+      if (entry) entry.session = null
     }
   }
 
@@ -282,6 +291,18 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   async function* startReply(
     request: ReplyRequest
   ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
+    writing.set(request.replyId, {session: null, stopAsked: false})
+
+    try {
+      yield* write(request)
+    } finally {
+      writing.delete(request.replyId)
+    }
+  }
+
+  async function* write(
+    request: ReplyRequest
+  ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
     const {treeId, replyId} = request
     const ids = {treeId, replyId}
     const mapper = createReplyMapper(ids)
@@ -334,11 +355,17 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
   /**
    * Interrupts the Turn writing the Reply, once `claude` has taken the
-   * request; the Reply's stream goes on to its `RUN_FINISHED`. Nothing when
-   * no Reply by that id is being written.
+   * request; the Reply's stream goes on to its `RUN_FINISHED`. A stop before
+   * `claude` has the Prompt is passed on as soon as it does. Nothing when no
+   * Reply by that id is being written.
    */
   async function stop(replyId: string) {
-    await writing.get(replyId)?.interrupt()
+    const entry = writing.get(replyId)
+
+    if (!entry) return
+
+    if (entry.session) await entry.session.interrupt()
+    else entry.stopAsked = true
   }
 
   return {startReply, stop}

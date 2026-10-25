@@ -76,8 +76,8 @@ export const ReplyStopCommand = z.strictObject({
 })
 
 /**
- * Runs a failed or interrupted Reply's Prompt again, in place: the Reply
- * streams again from nothing, in the Provider session rewound to before it.
+ * Runs a failed Reply's Prompt again, in place: the Reply streams again
+ * from nothing, in the Provider session rewound to before it.
  */
 export const ReplyRetryCommand = z.strictObject({
   type: z.literal('reply.retry'),

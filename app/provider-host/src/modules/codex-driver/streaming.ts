@@ -56,11 +56,24 @@ interface LoadedThread {
   turns: string[]
 }
 
-/** Where a Reply being written is, for a stop to reach it. */
-interface Writing {
+/** Where a Reply's turn is, for a stop to reach it. */
+interface Turn {
   server: AppServer
   threadId: string
   turnId: string
+}
+
+/**
+ * A Reply being written: its turn once Codex has started it, and whether a
+ * stop came before then, to pass on as soon as it has.
+ */
+interface Writing {
+  turn: Turn | null
+  stopAsked: boolean
+}
+
+async function interrupt({server, threadId, turnId}: Turn) {
+  await server.request('turn/interrupt', {threadId, turnId})
 }
 
 /** Drops the turns after `messageId` from the thread, for a Retry. */
@@ -244,7 +257,14 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
 
       const turnId = started.turn.id
       thread.turns.push(turnId)
-      writing.set(request.replyId, {server, threadId: thread.id, turnId})
+      const entry = writing.get(request.replyId)
+
+      if (entry) {
+        entry.turn = {server, threadId: thread.id, turnId}
+
+        if (entry.stopAsked) void interrupt(entry.turn).catch(() => undefined)
+      }
+
       const mapper = createReplyMapper(ids)
 
       for (;;) {
@@ -282,21 +302,25 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
         return
       }
     } finally {
-      writing.delete(request.replyId)
+      const entry = writing.get(request.replyId)
+
+      if (entry) entry.turn = null
+
       unlisten()
     }
   }
 
-  /** Interrupts the Reply's turn; the stream then ends as `stopped`. */
+  /**
+   * Interrupts the Reply's turn; the stream then ends as `stopped`. A stop
+   * before Codex has started the turn is passed on as soon as it has.
+   */
   async function stop(replyId: string) {
-    const reply = writing.get(replyId)
+    const entry = writing.get(replyId)
 
-    if (!reply) return
+    if (!entry) return
 
-    await reply.server.request('turn/interrupt', {
-      threadId: reply.threadId,
-      turnId: reply.turnId,
-    })
+    if (entry.turn) await interrupt(entry.turn)
+    else entry.stopAsked = true
   }
 
   /**
@@ -333,6 +357,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     request: ReplyRequest
   ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
     const ids = {treeId: request.treeId, replyId: request.replyId}
+    writing.set(request.replyId, {turn: null, stopAsked: false})
 
     yield {...ids, type: 'RUN_STARTED'}
 
@@ -347,6 +372,8 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
           error instanceof Error ? error.message : String(error)
         ),
       }
+    } finally {
+      writing.delete(request.replyId)
     }
   }
 

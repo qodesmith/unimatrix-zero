@@ -444,12 +444,13 @@ it('retries a failed Reply in place: it streams again from nothing', async () =>
   expect(screen.getByText('Connection lost').query()).toBeNull()
 })
 
-it('offers Retry on a Reply the app quit on', async () => {
+it('offers no Retry on a Reply the app quit on: it goes on like a stopped one', async () => {
   const screen = await renderSaved({status: 'interrupted'})
 
   await expect
-    .element(screen.getByRole('button', {name: 'Retry'}))
-    .toBeEnabled()
+    .element(screen.getByText('Interrupted when the app quit'))
+    .toBeVisible()
+  expect(screen.getByRole('button', {name: 'Retry'}).query()).toBeNull()
 })
 
 it('shows why main refused a retry, beside the button', async () => {

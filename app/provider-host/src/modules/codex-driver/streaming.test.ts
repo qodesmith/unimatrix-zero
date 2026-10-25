@@ -109,7 +109,10 @@ async function setUp(
 
   const treeId = crypto.randomUUID()
 
-  /** Streams a Reply to its end, stopping it after `stopAfter` text deltas. */
+  /**
+   * Streams a Reply to its end, stopping it after `stopAfter` text deltas; 0
+   * stops it as it starts.
+   */
   async function reply(
     text: string,
     session: SessionRef | null = null,
@@ -141,7 +144,10 @@ async function setUp(
     })) {
       events.push(event)
 
-      if (event.type === 'TEXT_DELTA' && ++deltas === stopAfter) {
+      if (
+        (event.type === 'RUN_STARTED' && stopAfter === 0) ||
+        (event.type === 'TEXT_DELTA' && ++deltas === stopAfter)
+      ) {
         await driver.stop(replyId)
       }
     }
@@ -329,6 +335,22 @@ it('forks the Provider session through a mid-Thread Reply into a new thread, fro
   expect([
     ...codex.store.filesOf(original.projectKey, original.sessionId).keys(),
   ]).toEqual([ROLLOUT])
+})
+
+it('passes on a stop asked before Codex has started the turn', async () => {
+  const codex = await setUp(['stopped.ndjson'])
+
+  const stopped = await codex.reply(
+    'Count from 1 to 300, one number per line.',
+    null,
+    {stopAfter: 0}
+  )
+
+  expect(stopped.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'stopped',
+  })
+  expect(codex.reports()[0]?.interrupted).toBe(STOPPED_TURN)
 })
 
 it('stops a Reply where it is, records it, and continues the Provider session after it', async () => {

@@ -199,9 +199,13 @@ it('marks a Reply left streaming by the last run as interrupted at launch', () =
 
   const relaunched = createTurns(db, () => undefined)
 
-  expect(relaunched.list(left).replies[0]).toMatchObject({
-    status: 'interrupted',
-    failure: null,
+  const [interrupted] = relaunched.list(left).replies
+
+  expect(interrupted).toMatchObject({status: 'interrupted', failure: null})
+  // Like a stopped one: the Thread goes on, in a new session for a root Reply.
+  expect(relaunched.continuation(left, interrupted?.id ?? '')).toEqual({
+    provider: 'claude',
+    session: null,
   })
   expect(saved().status).toBe('streaming')
 })
