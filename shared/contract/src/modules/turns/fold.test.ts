@@ -72,6 +72,7 @@ it('takes the Context size the Provider reports and the final status', () => {
     content: [],
     contextSize: 15,
     contextWindow: null,
+    failure: null,
   })
 })
 
