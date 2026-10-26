@@ -7,10 +7,8 @@ export interface MachineEvent {
 }
 
 /**
- * A machine's transition table: every status, each with only the events it
- * accepts. A handler is pure: one that mutates the state and returns it reads
- * as unchanged. Each variant needs one literal `status`, and each event one
- * literal `type`, or its handler receives `never`.
+ * A handler is pure: one that mutates the state and returns it reads as
+ * unchanged. A non-literal `status` or `type` gives its handler `never`.
  */
 export type Transitions<S extends MachineState, E extends MachineEvent> = {
   [K in S['status']]: {

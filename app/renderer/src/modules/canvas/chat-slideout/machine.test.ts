@@ -54,6 +54,12 @@ describe('the chat slideout machine', () => {
       expect(chatTransition(open, {type: 'opened', turnId: 'p1'})).toBe(open)
     })
 
+    it('drops a Reply it was following when opened again at the same Turn', () => {
+      expect(chatTransition(following, {type: 'opened', turnId: 'p1'})).toEqual(
+        open
+      )
+    })
+
     it('slides away on dismissal, keeping its Turn', () => {
       expect(chatTransition(following, {type: 'dismissed'})).toEqual(closing)
     })
