@@ -17,7 +17,7 @@ export type ContentEvent = Exclude<
   {type: 'RUN_STARTED' | 'RUN_FINISHED'}
 >
 
-/** How the vendor ended the Reply; a failed one is never recorded. */
+/** How the vendor program ended the Reply; a failed one is never recorded. */
 export interface Ending {
   finished: RunFinished
   recorded?: ReplyRecorded | null
@@ -28,15 +28,15 @@ export class ProgramCrashed extends Error {}
 
 export interface ReplyRun {
   /**
-   * Stop now interrupts the vendor this way; one asked before is passed on at
-   * once. Call the returned function once that no longer stops it.
+   * Stop now interrupts the vendor program this way; one asked before is passed
+   * on at once. Call the returned function once that no longer stops it.
    */
   stoppable(interrupt: () => Promise<void>): () => void
   /** Runs once the Reply has finished, however it did, before it's sent on. */
   afterward(cleanUp: (status: FinishedStatus) => void): void
 }
 
-/** The vendor's part of one Reply: its content, then how it ended. */
+/** The vendor program's part of one Reply: its content, then how it ended. */
 export type WriteReply = (
   request: ReplyRequest,
   run: ReplyRun

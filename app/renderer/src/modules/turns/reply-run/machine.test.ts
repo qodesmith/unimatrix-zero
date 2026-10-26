@@ -30,6 +30,8 @@ const EVENTS = {
   retryAsked: {type: 'retryAsked'},
   retryAccepted: {type: 'retryAccepted'},
   retryRefused: {type: 'retryRefused', error: 'Connect Claude to retry.'},
+  runStarted: {type: 'runStarted'},
+  runFinished: {type: 'runFinished'},
 } satisfies Record<ReplyRunEvent['type'], ReplyRunEvent>
 
 /** The events besides `taken` that return anything but the same state. */
@@ -68,8 +70,18 @@ describe('the Reply run machine', () => {
       )
     })
 
+    it('waits through a run starting, so a Stop asked before it stays asked', () => {
+      expect(replyRunTransition(stopping, EVENTS.runStarted)).toBe(stopping)
+    })
+
+    it('goes idle once the run finishes', () => {
+      expect(replyRunTransition(stopping, EVENTS.runFinished)).toEqual(
+        initialReplyRun
+      )
+    })
+
     it('ignores asking again, so Esc twice sends one Stop', () => {
-      expect(movedBy(stopping, ['stopRefused'])).toEqual([])
+      expect(movedBy(stopping, ['stopRefused', 'runFinished'])).toEqual([])
     })
   })
 
@@ -80,8 +92,19 @@ describe('the Reply run machine', () => {
       )
     })
 
+    it('drops the reason once a run starts or finishes', () => {
+      expect(replyRunTransition(stopRefused, EVENTS.runStarted)).toEqual(
+        initialReplyRun
+      )
+      expect(replyRunTransition(stopRefused, EVENTS.runFinished)).toEqual(
+        initialReplyRun
+      )
+    })
+
     it('ignores everything else', () => {
-      expect(movedBy(stopRefused, ['stopAsked'])).toEqual([])
+      expect(
+        movedBy(stopRefused, ['stopAsked', 'runStarted', 'runFinished'])
+      ).toEqual([])
     })
   })
 
@@ -98,8 +121,20 @@ describe('the Reply run machine', () => {
       )
     })
 
+    it('waits through the new run starting before main answers', () => {
+      expect(replyRunTransition(retrying, EVENTS.runStarted)).toBe(retrying)
+    })
+
+    it('goes idle once a run finishes', () => {
+      expect(replyRunTransition(retrying, EVENTS.runFinished)).toEqual(
+        initialReplyRun
+      )
+    })
+
     it('ignores asking again, so a double click sends one Retry', () => {
-      expect(movedBy(retrying, ['retryAccepted', 'retryRefused'])).toEqual([])
+      expect(
+        movedBy(retrying, ['retryAccepted', 'retryRefused', 'runFinished'])
+      ).toEqual([])
     })
   })
 
@@ -110,8 +145,30 @@ describe('the Reply run machine', () => {
       )
     })
 
-    it('ignores everything else', () => {
-      expect(movedBy(retryRefused, ['retryAsked'])).toEqual([])
+    it('drops the reason once a run starts or finishes', () => {
+      expect(replyRunTransition(retryRefused, EVENTS.runStarted)).toEqual(
+        initialReplyRun
+      )
+      expect(replyRunTransition(retryRefused, EVENTS.runFinished)).toEqual(
+        initialReplyRun
+      )
     })
+
+    it('ignores everything else', () => {
+      expect(
+        movedBy(retryRefused, ['retryAsked', 'runStarted', 'runFinished'])
+      ).toEqual([])
+    })
+  })
+
+  it('keeps a Stop asked after main took a Retry but before its run started', () => {
+    const events = [
+      EVENTS.retryAsked,
+      EVENTS.retryAccepted,
+      EVENTS.stopAsked,
+      EVENTS.runStarted,
+    ]
+
+    expect(events.reduce(replyRunTransition, initialReplyRun)).toEqual(stopping)
   })
 })

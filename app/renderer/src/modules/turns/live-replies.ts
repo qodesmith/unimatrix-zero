@@ -1,4 +1,4 @@
-import type {ReplyRunState} from './reply-run/machine'
+import type {ReplyRunEvent, ReplyRunState} from './reply-run/machine'
 import type {QueryClient} from '@tanstack/react-query'
 import type {AppEvent} from '@uz/contract/events'
 import type {ReplyEvent, StreamingReply} from '@uz/contract/turns'
@@ -6,6 +6,7 @@ import type {ReplyEvent, StreamingReply} from '@uz/contract/turns'
 import {Store} from '@tanstack/react-store'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 
+import {replyRunTransition} from './reply-run/machine'
 import {updateSavedReply, withProgress} from './saved-turns'
 
 /** A run of the Model's reasoning; display only, never stored. */
@@ -23,7 +24,7 @@ interface LiveState {
   replies: Record<string, StreamingReply>
   /** By Reply id, kept after the Reply finishes; only a reload clears it. */
   thinking: Record<string, ThinkingBlock[]>
-  /** By Reply id, from a Stop or Retry asked until a run starts or finishes. */
+  /** By Reply id, from a Stop or Retry asked until the machine is idle again. */
   runs: Record<string, ReplyRunState>
 }
 
@@ -99,11 +100,24 @@ function thinkingAfter(
   return nextBlocks === blocks ? thinking : {...thinking, [replyId]: nextBlocks}
 }
 
-/** A run that starts or finishes ends what was asked of its Reply. */
-function runsAfter(runs: LiveState['runs'], event: ReplyEvent) {
-  const ends = event.type === 'RUN_STARTED' || event.type === 'RUN_FINISHED'
+const RUN_EVENTS: Partial<Record<ReplyEvent['type'], ReplyRunEvent>> = {
+  RUN_STARTED: {type: 'runStarted'},
+  RUN_FINISHED: {type: 'runFinished'},
+}
 
-  return ends && event.replyId in runs ? without(runs, event.replyId) : runs
+function runsAfter(runs: LiveState['runs'], event: ReplyEvent) {
+  const before = runs[event.replyId]
+  const runEvent = RUN_EVENTS[event.type]
+
+  if (!before || !runEvent) return runs
+
+  const after = replyRunTransition(before, runEvent)
+
+  if (after === before) return runs
+
+  return after.status === 'idle'
+    ? without(runs, event.replyId)
+    : {...runs, [event.replyId]: after}
 }
 
 /**

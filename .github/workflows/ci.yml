@@ -49,7 +49,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build
       - run: bun run test:node
-      # No --with-deps: its apt mirror often stalls for minutes. Without its fonts,
+      # No --with-deps: the runner already has Chromium's libraries, and the apt
+      # mirror --with-deps uses often stalls for minutes. Without the fonts it adds,
       # non-Latin text and emoji render as boxes, so add it back before writing a
       # screenshot, text-measuring, or headed test.
       - if: matrix.renderer

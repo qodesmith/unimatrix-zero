@@ -17,6 +17,7 @@ import {ChatSlideout} from './ChatSlideout'
 import {Flow} from './Flow'
 import {PromptInput} from './PromptInput'
 
+/** The length of `.canvas-switching`'s transform transition in styles.css. */
 const SWITCH_MS = 400
 
 function toggled(id: string) {

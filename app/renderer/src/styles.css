@@ -80,6 +80,8 @@
   --xy-minimap-node-stroke-color: transparent;
 }
 
+/* React Flow draws the edge's path inside its own markup; Flow marks the
+   highlighted Thread's edges `on-thread`. */
 .react-flow__edge.on-thread .react-flow__edge-path {
   stroke: var(--thread-highlight);
   stroke-width: 2.5;

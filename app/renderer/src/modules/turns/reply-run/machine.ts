@@ -16,6 +16,8 @@ export type ReplyRunEvent =
   | {type: 'retryAsked'}
   | {type: 'retryAccepted'}
   | {type: 'retryRefused'; error: string}
+  | {type: 'runStarted'}
+  | {type: 'runFinished'}
 
 export const initialReplyRun: ReplyRunState = {status: 'idle'}
 
@@ -26,16 +28,22 @@ const transitions = {
   },
   stopping: {
     stopRefused: (_, {error}) => ({status: 'stopRefused', error}),
+    runFinished: () => initialReplyRun,
   },
   stopRefused: {
     stopAsked: () => ({status: 'stopping'}),
+    runStarted: () => initialReplyRun,
+    runFinished: () => initialReplyRun,
   },
   retrying: {
     retryAccepted: () => initialReplyRun,
     retryRefused: (_, {error}) => ({status: 'retryRefused', error}),
+    runFinished: () => initialReplyRun,
   },
   retryRefused: {
     retryAsked: () => ({status: 'retrying'}),
+    runStarted: () => initialReplyRun,
+    runFinished: () => initialReplyRun,
   },
 } satisfies Transitions<ReplyRunState, ReplyRunEvent>
 

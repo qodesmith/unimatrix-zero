@@ -34,7 +34,7 @@ async function pause(ms: number) {
   })
 }
 
-/** Connecting with no vendor: a fake download, then a fake sign-in page. */
+/** Connecting with no vendor program: a fake download, then a fake sign-in page. */
 export function createFakeSignIn({delayMs, answerMs}: FakeSignInOptions) {
   /** The plan signed in on, or null if canceled. */
   async function* signInOnPage({

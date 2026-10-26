@@ -110,3 +110,19 @@ it('starts a retried Reply over, dropping the thinking of its first run', () => 
 
   expect(blocks).toEqual([])
 })
+
+it('keeps a Stop asked before a retried run starts until that run finishes', () => {
+  const live = createReplay()
+
+  live.store.setState(state => ({
+    ...state,
+    runs: {[ids.replyId]: {status: 'stopping'}},
+  }))
+  live.replay([{...ids, type: 'RUN_STARTED'}])
+
+  expect(live.store.state.runs[ids.replyId]).toEqual({status: 'stopping'})
+
+  live.replay([{...ids, type: 'RUN_FINISHED', status: 'stopped'}])
+
+  expect(live.store.state.runs[ids.replyId]).toBeUndefined()
+})

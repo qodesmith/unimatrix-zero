@@ -86,7 +86,7 @@ interface FakeDriverOptions {
   signInAnswerMs?: number | null
 }
 
-/** A driver with no vendor; `/fail` or `/hang` in a Prompt misbehaves. */
+/** A driver with no vendor program; `/fail` or `/hang` in a Prompt misbehaves. */
 export function createFakeDriver({
   delayMs = 40,
   signInAnswerMs = 3000,

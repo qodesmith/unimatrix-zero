@@ -139,7 +139,7 @@ it('fails a throw with its reason, a crashed program as a crash', async () => {
   })
 })
 
-it('passes on a Stop asked before the vendor could be stopped, once it can', async () => {
+it('passes on a Stop asked before the vendor program could be stopped, once it can', async () => {
   const interrupt = vi.fn<() => Promise<void>>(async () => undefined)
   const {promise: canStop, resolve: letStop} = Promise.withResolvers<void>()
 
@@ -163,7 +163,7 @@ it('passes on a Stop asked before the vendor could be stopped, once it can', asy
   expect(interrupt).toHaveBeenCalledOnce()
 })
 
-it('interrupts at once while the vendor can be stopped, and waits again once it can’t', async () => {
+it('interrupts at once while the vendor program can be stopped, and waits again once it can’t', async () => {
   const interrupt = vi.fn<() => Promise<void>>(async () => undefined)
   const later = vi.fn<() => Promise<void>>(async () => undefined)
 
