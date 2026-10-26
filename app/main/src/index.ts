@@ -26,7 +26,6 @@ import {
   isTopLevelAppFrame,
   openLink,
 } from '#modules/window/main'
-import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {app, dialog, ipcMain, protocol, session} from 'electron'
 import path from 'node:path'
 
@@ -90,23 +89,20 @@ function openWindow(db: Database) {
     settings: settings.read(),
   }))
 
-  const turns = createTurns(db, hub.publish)
   const sessions = createSessions(db)
 
   const hosts = createProviderHosts({
     spawn: utilityHost(hostsDist, dev?.fakeProvider ? ['--fake'] : []),
-    onReplyEvent: turns.apply,
-    onReplyRecorded: turns.record,
+    onReplyEvent: (provider, event) => turns.hostEvent(provider, event),
+    onReplyRecorded: (provider, recorded) =>
+      turns.hostRecorded(provider, recorded),
     onSessionStore: sessions.handle,
     onSignInUpdate: (provider, update) =>
       connections.applySignInUpdate(provider, update),
     onStatus: (provider, status) =>
       connections.applyHostStatus(provider, status),
     onCrash: provider => {
-      turns.failAll(provider, {
-        code: 'host-crashed',
-        message: `${PROVIDER_NAMES[provider]} stopped unexpectedly.`,
-      })
+      turns.hostCrashed(provider)
       connections.hostCrashed(provider)
     },
   })
@@ -116,6 +112,15 @@ function openWindow(db: Database) {
     platform: process.platform,
     arch: process.arch,
   }
+
+  // Before any host starts, so a Reply left streaming is marked interrupted.
+  const turns = createTurns({
+    db,
+    publish: hub.publish,
+    hosts,
+    vendorProgramFor: provider => signInRequestFor(provider, machine),
+    now: () => new Date(),
+  })
 
   const connections = createConnections({
     db,
@@ -133,7 +138,7 @@ function openWindow(db: Database) {
 
   app.on('will-quit', () => {
     hosts.stopAll()
-    turns.saveAll()
+    turns.quitting()
   })
 
   connections.startConnected()
@@ -145,9 +150,7 @@ function openWindow(db: Database) {
       now: () => new Date(),
       trees: createTrees(db),
       turns,
-      hosts,
       connections,
-      vendorProgramFor: provider => signInRequestFor(provider, machine),
       images: createRemoteImages(globalThis.fetch),
       settings,
       publish: hub.publish,
