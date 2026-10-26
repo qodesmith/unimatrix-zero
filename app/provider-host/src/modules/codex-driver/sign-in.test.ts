@@ -120,9 +120,9 @@ function setUp(
   }
 
   async function onPage() {
-    await vi.waitFor(() => {
-      expect(updates.at(-1)).toMatchObject({step: 'sign-in-page'})
-    })
+    await expect
+      .poll(() => updates.at(-1))
+      .toMatchObject({step: 'sign-in-page'})
   }
 
   return {...fake, signIn, open, updates, run, onPage}

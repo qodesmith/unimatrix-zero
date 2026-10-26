@@ -12,14 +12,14 @@
 import type {ReplyRecorded, ReplyRequest, SessionRef} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
-import {idleFor} from '#modules/idle/main'
+import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
 import {spawn} from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import {describe, expect, it} from 'vitest'
 
-import {createClaudeDriver} from './main'
+import {createClaudeDriver, spawnClaude} from './main'
 import {createRecorder} from './recording'
 import {RECORDINGS} from './replay'
 import {projectKeyOf} from './transcripts'
@@ -27,8 +27,6 @@ import {projectKeyOf} from './transcripts'
 const program = process.env.UZ_LIVE_CLAUDE_PROGRAM ?? ''
 const configDir = process.env.UZ_LIVE_CLAUDE_CONFIG ?? ''
 const recording = process.env.UZ_RECORD === 'yes'
-
-const IDLE_MS = 2000
 
 type Streamed = ReplyEvent | ReplyRecorded
 
@@ -46,12 +44,6 @@ function recordedIn(events: Streamed[]) {
   if (!recorded) throw new Error('The Reply was not recorded')
 
   return recorded
-}
-
-async function idle() {
-  await new Promise(resolve => {
-    setTimeout(resolve, IDLE_MS * 3)
-  })
 }
 
 function forgetTranscript(sessionId: string) {
@@ -73,11 +65,30 @@ function liveDriver(files: string[]) {
     files.map(name => path.join(RECORDINGS, name))
   )
 
+  const idle = heldIdle()
+  const exits: Promise<unknown>[] = []
+  const start = recording ? recorder.spawn : spawnClaude
+
   const driver = createClaudeDriver({
     store: fakeStore().client,
-    ...(recording ? {spawn: recorder.spawn} : {}),
-    whenIdle: idleFor(IDLE_MS),
+    spawn: options => {
+      const child = start(options)
+      exits.push(
+        new Promise(resolve => {
+          child.on('exit', resolve)
+        })
+      )
+
+      return child
+    },
+    whenIdle: idle.whenIdle,
   })
+
+  /** Lets idle time pass, then waits for every `claude` to exit. */
+  async function closed() {
+    idle.pass()
+    await Promise.all(exits)
+  }
 
   const treeId = crypto.randomUUID()
 
@@ -116,8 +127,9 @@ function liveDriver(files: string[]) {
     driver,
     request,
     reply,
+    closed,
     async done() {
-      await idle()
+      await closed()
 
       if (recording) await recorder.done()
     },
@@ -143,7 +155,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       first.recorded.session.sessionId
     )
 
-    await idle()
+    await live.closed()
     forgetTranscript(first.recorded.session.sessionId)
 
     const third = await live.reply(
@@ -211,7 +223,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       rewind: false,
     })
 
-    await idle()
+    await live.closed()
     forgetTranscript(first.recorded.session.sessionId)
 
     const rewound = await live.reply(

@@ -131,7 +131,7 @@ it('stops a hanging Reply that was stopped on its last word', async () => {
     type: 'RUN_FINISHED',
     status: 'stopped',
   })
-}, 1000)
+})
 
 it('records each Reply in the session it continues, or a new one', async () => {
   const driver = createFakeDriver({delayMs: 0})

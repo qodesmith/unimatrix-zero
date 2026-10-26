@@ -6,12 +6,13 @@ import type {ReplyEvent} from '@uz/contract/turns'
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
+import {once} from 'node:events'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import {afterEach, expect, it, vi} from 'vitest'
+import {afterEach, expect, it} from 'vitest'
 
-import {createClaudeDriver} from './main'
+import {createClaudeDriver, spawnClaude} from './main'
 import {RECORDINGS, RecordedLineSchema, replayClaude} from './replay'
 import {projectKeyOf} from './transcripts'
 
@@ -60,9 +61,7 @@ afterEach(async () => {
 
 function folder(prefix: string) {
   const made = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)))
-  cleanUps.push(async () =>
-    fs.rmSync(made, {recursive: true, force: true, maxRetries: 10})
-  )
+  cleanUps.push(async () => fs.rmSync(made, {recursive: true, force: true}))
 
   return made
 }
@@ -98,9 +97,16 @@ async function setUp(
   const configDir = folder('uz-claude-config-')
   const reports = folder('uz-claude-reports-')
   const idle = heldIdle()
+  const exits: Promise<unknown>[] = []
 
   const driver = createClaudeDriver({
     store: store.client,
+    spawn: options => {
+      const child = spawnClaude(options)
+      exits.push(once(child, 'exit').catch(() => undefined))
+
+      return child
+    },
     env: {
       PATH: process.env.PATH ?? '',
       FAKE_CLAUDE_RECORDINGS: recordings
@@ -172,16 +178,16 @@ async function setUp(
   /** Lets idle time pass, then waits for every `claude` to end. */
   async function allClosed() {
     idle.pass()
-    await vi.waitFor(
-      () => {
-        expect(reportsSoFar().every(report => report.ended !== null)).toBe(true)
-      },
-      {timeout: 5000}
-    )
+    await expect
+      .poll(() => reportsSoFar().every(report => report.ended !== null))
+      .toBe(true)
   }
 
   // Windows can't remove a folder while a `claude` still runs in it.
-  cleanUps.push(allClosed)
+  cleanUps.push(async () => {
+    idle.pass()
+    await Promise.all(exits)
+  })
 
   return {
     driver,
@@ -369,9 +375,7 @@ it('resumes from the app’s copy when the warm session’s `claude` exited whil
   const first = await claude.reply(FIRST_PROMPT)
   const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
 
-  await vi.waitFor(() => {
-    expect(claude.reports()[0]?.ended).toBe('exited')
-  })
+  await expect.poll(() => claude.reports()[0]?.ended).toBe('exited')
 
   const third = await claude.reply(THIRD_PROMPT, recordedIn(second))
 
@@ -769,12 +773,13 @@ it('never rewinds in the warm session standing there: it closes, and a new `clau
 
   expect(textOf(rewound)).toBe('TEAL')
   expect(recordedIn(rewound).sessionId).toBe(REWOUND_SESSION_ID)
+  // No idle time has passed, so only the rewind could have closed it.
+  await expect.poll(() => claude.reports()[0]?.ended).not.toBeNull()
 
   await claude.allClosed()
   const [warm, rewind] = claude.reports()
 
   expect(warm?.prompts).toEqual([FIRST_PROMPT])
-  expect(warm?.ended).not.toBeNull()
   expect(rewind?.args).toContain(`--resume-session-at=${TEAL_MESSAGE}`)
   expect(rewind?.prompts).toEqual([FORK_PROMPT])
 })

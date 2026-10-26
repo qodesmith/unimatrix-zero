@@ -1,4 +1,5 @@
 import type {ClaudeRepliesDeps} from './streaming'
+import type {SpawnOptions} from '@anthropic-ai/claude-agent-sdk'
 import type {ProviderDriver} from '@uz/contract/host'
 
 import {idleFor} from '#modules/idle/main'
@@ -16,6 +17,16 @@ async function notYet(): Promise<never> {
   throw new Error('Claude can’t do this yet.')
 }
 
+export function spawnClaude({command, args, cwd, env, signal}: SpawnOptions) {
+  return spawn(command, args, {
+    cwd,
+    env,
+    signal,
+    stdio: ['pipe', 'pipe', 'ignore'],
+    windowsHide: true,
+  })
+}
+
 type ClaudeDriverOptions = Pick<ClaudeRepliesDeps, 'store'> &
   Partial<Omit<ClaudeRepliesDeps, 'store'>>
 
@@ -23,14 +34,7 @@ type ClaudeDriverOptions = Pick<ClaudeRepliesDeps, 'store'> &
 export function createClaudeDriver({
   store,
   query: run = query,
-  spawn: start = ({command, args, cwd, env, signal}) =>
-    spawn(command, args, {
-      cwd,
-      env,
-      signal,
-      stdio: ['pipe', 'pipe', 'ignore'],
-      windowsHide: true,
-    }),
+  spawn: start = spawnClaude,
   env = process.env,
   whenIdle = idleFor(IDLE_CLOSE_MS),
   maxWarm = MAX_WARM,

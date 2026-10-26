@@ -4,13 +4,14 @@ import type {ReplyEvent} from '@uz/contract/turns'
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
+import {once} from 'node:events'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import {afterEach, expect, it, vi} from 'vitest'
 
 import {CODEX_ARGS} from './environment'
-import {createCodexDriver} from './main'
+import {createCodexDriver, spawnCodex} from './main'
 import {replayCodex} from './replay'
 import {folderOf} from './rollouts'
 
@@ -66,9 +67,7 @@ afterEach(async () => {
 
 function folder(prefix: string) {
   const made = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)))
-  cleanUps.push(async () =>
-    fs.rmSync(made, {recursive: true, force: true, maxRetries: 10})
-  )
+  cleanUps.push(async () => fs.rmSync(made, {recursive: true, force: true}))
 
   return made
 }
@@ -97,9 +96,16 @@ async function setUp(
   const configDir = folder('uz-codex-home-')
   const reports = folder('uz-codex-reports-')
   const idle = heldIdle()
+  const exits: Promise<unknown>[] = []
 
   const driver = createCodexDriver({
     store: store.client,
+    spawn: (command, options) => {
+      const child = spawnCodex(command, options)
+      exits.push(once(child, 'exit').catch(() => undefined))
+
+      return child
+    },
     commandFor: program => ({command: process.execPath, args: [program]}),
     env: {
       PATH: process.env.PATH ?? '',
@@ -178,16 +184,16 @@ async function setUp(
   /** Lets idle time pass, then waits for every `codex` to end. */
   async function allClosed() {
     idle.pass()
-    await vi.waitFor(
-      () => {
-        expect(reportsSoFar().every(report => report.ended !== null)).toBe(true)
-      },
-      {timeout: 5000}
-    )
+    await expect
+      .poll(() => reportsSoFar().every(report => report.ended !== null))
+      .toBe(true)
   }
 
   // Windows can't remove a folder while a `codex` still runs in it.
-  cleanUps.push(allClosed)
+  cleanUps.push(async () => {
+    idle.pass()
+    await Promise.all(exits)
+  })
 
   return {configDir, store, driver, reply, reports: reportsSoFar, allClosed}
 }

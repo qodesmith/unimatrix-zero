@@ -18,6 +18,18 @@ async function notYet(): Promise<never> {
   throw new Error('ChatGPT can’t do this yet.')
 }
 
+export function spawnCodex(
+  {command, args}: CodexCommand,
+  {cwd, env}: {cwd: string; env: Record<string, string>}
+) {
+  return spawn(command, args, {
+    cwd,
+    env,
+    stdio: ['pipe', 'pipe', 'ignore'],
+    windowsHide: true,
+  })
+}
+
 interface CodexDriverOptions {
   store: SessionStoreClient
   spawn?: SpawnCodex
@@ -30,13 +42,7 @@ interface CodexDriverOptions {
 /** ChatGPT through Codex's unmodified `codex app-server`. */
 export function createCodexDriver({
   store,
-  spawn: start = ({command, args}, {cwd, env}) =>
-    spawn(command, args, {
-      cwd,
-      env,
-      stdio: ['pipe', 'pipe', 'ignore'],
-      windowsHide: true,
-    }),
+  spawn: start = spawnCodex,
   commandFor = path => ({command: path, args: []}),
   env = process.env,
   whenIdle = idleFor(IDLE_CLOSE_MS),

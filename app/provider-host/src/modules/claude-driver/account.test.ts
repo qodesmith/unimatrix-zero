@@ -77,4 +77,4 @@ it('waits for claude to exit by itself after reading the account', async () => {
   } finally {
     await fs.rm(folder, {recursive: true, force: true})
   }
-}, 15_000)
+})

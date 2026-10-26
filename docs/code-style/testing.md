@@ -18,10 +18,12 @@
 
 - A test controls every source of nondeterminism its assertions depend on: time, ordering, randomness, other processes. When it can't control one, it asserts nothing that depends on it.
 - Inject the clock the code waits on. `heldIdle()` in `#modules/test-idle/main` is the example: in a driver test no idle time passes until the test passes it, so a warm vendor program closes only when the test says.
-- Wait for something to happen with `vi.waitFor` or `expect.poll`. Its timeout only catches a hang.
+- Wait for something to happen with `expect.poll`.
+- Every limit only catches a hang. `vitest.config.ts` sets the node project's test, hook and poll limits that way, so a test sets no shorter one of its own.
 - Assert that something has not happened only when nothing but the code under test could make it happen. While a real timer runs, that assertion is a race.
 - A test that guards a race goes red on every run with the behavior broken, under CPU load too.
-- A failure on a commit that passes in another run is a bug. Find the race, make it fail every time, then remove it. The fix keeps every timeout as it was, and adds no sleep and no retry; Vitest's `retry` stays unset.
+- A failure on a commit that passes in another run is a bug. Find the race, make it fail every time, then remove it. The fix adds no sleep and no retry, and Vitest's `retry` stays unset.
+- Raise a limit only when it was checking speed rather than catching a hang. A longer limit never fixes a race.
 
 ## Assert on what the unit produced, not on a value the test built. Enforced by: uz/no-fixture-assertion
 
