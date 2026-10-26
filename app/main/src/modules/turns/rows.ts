@@ -142,7 +142,7 @@ export function insertExchange(
 }
 
 /** Back to streaming from nothing, in no session. */
-export function resetReply(db: Database, replyId: string): Reply {
+export function resetReply(db: Database, replyId: string): void {
   const row = db
     .update(replies)
     .set({...NEW_REPLY, sessionId: null, sessionMessageId: null})
@@ -151,6 +151,4 @@ export function resetReply(db: Database, replyId: string): Reply {
     .get()
 
   if (!row) throw new Error('That Reply was not saved.')
-
-  return toReply(row)
 }
