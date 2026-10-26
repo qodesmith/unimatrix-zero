@@ -14,7 +14,7 @@ import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {Fragment, useState} from 'react'
 
 import {useStop} from '../stop/use-stop'
-import {useLiveReply, useThinking} from '../use-live-reply'
+import {useReply, useThinking} from '../use-live-reply'
 import {useOnline} from '../use-online'
 import {useRetryReply} from '../use-turns'
 
@@ -22,9 +22,8 @@ type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 
 /** A Reply's content, live while it streams; the caller owns its box. */
 export function ReplyView({reply}: {reply: Reply}) {
-  const live = useLiveReply(reply.id)
   const blocks = useThinking(reply.id)
-  const {status, content, failure} = live ?? reply
+  const {status, content, failure} = useReply(reply)
   const streaming = status === 'streaming'
 
   function thinkingBefore(part: number) {

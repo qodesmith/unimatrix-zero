@@ -3,7 +3,7 @@ import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Node, NodeProps} from '@xyflow/react'
 
 import {cn} from '#modules/shadcn/main'
-import {ReplyView, useLiveReply} from '#modules/turns/main'
+import {ReplyView, useReply} from '#modules/turns/main'
 import {Handle, Position} from '@xyflow/react'
 import {useState} from 'react'
 
@@ -42,10 +42,7 @@ function ReplyBody({reply}: {reply: Reply}) {
     toggleExpanded,
   } = useCanvas()
 
-  const live = useLiveReply(reply.id)
-  const status = live?.status ?? reply.status
-  const contextSize = live?.contextSize ?? reply.contextSize
-  const contextWindow = live?.contextWindow ?? reply.contextWindow
+  const {status, contextSize, contextWindow} = useReply(reply)
   const previous = previousReply(index, reply)
 
   return (
@@ -107,7 +104,7 @@ function ReplyInput({reply, hovered}: {reply: Reply; hovered: boolean}) {
   const {treeId, activeReplyId, onInputFocus, onSent, drafts, setDraft} =
     useCanvas()
 
-  const status = useLiveReply(reply.id)?.status ?? reply.status
+  const {status} = useReply(reply)
 
   if (status === 'streaming' || status === 'failed') return null
 
@@ -201,7 +198,7 @@ export function ReplyNode({data}: NodeProps<TurnNode>) {
 }
 
 function ReplyTurn({reply}: {reply: Reply}) {
-  const status = useLiveReply(reply.id)?.status ?? reply.status
+  const {status} = useReply(reply)
 
   return (
     <div data-turn={reply.id} className={replyFrame(status)}>
@@ -232,8 +229,7 @@ export function ExchangeNode({data}: NodeProps<TurnNode>) {
 }
 
 function ExchangeTurns({prompt, reply}: {prompt: Prompt; reply: Reply | null}) {
-  const live = useLiveReply(reply?.id ?? null)
-  const status = live?.status ?? reply?.status ?? 'complete'
+  const status = useReply(reply)?.status ?? 'complete'
 
   return (
     <div className={cn('overflow-hidden', replyFrame(status))}>

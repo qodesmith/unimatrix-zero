@@ -1,11 +1,11 @@
-import type {Turns} from './live-replies'
+import type {Turns} from './saved-turns'
 import type {AppEvent} from '@uz/contract/events'
 import type {Reply} from '@uz/contract/turns'
 
 import {expect, it} from 'vitest'
 
-import {turnsKey} from './live-replies'
 import {createReplay} from './replay'
+import {turnsKey} from './saved-turns'
 
 const ids = {treeId: 'tree-1', replyId: 'reply-1'}
 

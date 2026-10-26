@@ -2,7 +2,7 @@ import type {Prompt, Reply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
 
 import {Button, cn} from '#modules/shadcn/main'
-import {ReplyView, useLiveReply} from '#modules/turns/main'
+import {ReplyView, useReply} from '#modules/turns/main'
 import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 
 import {useCanvas} from '../canvas-context'
@@ -149,7 +149,7 @@ function ChatPrompt({prompt}: {prompt: Prompt}) {
 }
 
 function ChatReply({reply}: {reply: Reply}) {
-  const status = useLiveReply(reply.id)?.status ?? reply.status
+  const {status} = useReply(reply)
 
   return (
     <div
@@ -174,7 +174,7 @@ interface ChatInputProps {
 /** Shares its draft with the same Reply's Input on the canvas. */
 function ChatInput({end, onFocus, onSent}: ChatInputProps) {
   const {treeId, drafts, setDraft} = useCanvas()
-  const status = useLiveReply(end.id)?.status ?? end.status
+  const {status} = useReply(end)
 
   if (status === 'streaming' || status === 'failed') return null
 

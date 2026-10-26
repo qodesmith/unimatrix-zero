@@ -1,10 +1,9 @@
-import type {Turns} from './live-replies'
 import type {Reply} from '@uz/contract/turns'
 
 import {bridge} from '#modules/bridge/main'
 import {useQuery, useQueryClient} from '@tanstack/react-query'
 
-import {turnsKey} from './live-replies'
+import {addSent, turnsKey, updateSavedReply} from './saved-turns'
 
 /** A Tree's saved Prompts and Replies. */
 export function useTurns(treeId: string) {
@@ -39,14 +38,10 @@ export function useSendPrompt(treeId: string, parentReplyId: string | null) {
 
     if (!outcome.ok) return {ok: false, error: outcome.error.message}
 
-    const {prompt, reply} = outcome.value
-    queryClient.setQueryData<Turns>(turnsKey(treeId), turns => ({
-      prompts: [...(turns?.prompts ?? []), prompt],
-      replies: [...(turns?.replies ?? []), reply],
-    }))
+    addSent(queryClient, treeId, outcome.value)
     void queryClient.invalidateQueries({queryKey: turnsKey(treeId)})
 
-    return {ok: true, reply}
+    return {ok: true, reply: outcome.value.reply}
   }
 }
 
@@ -64,17 +59,7 @@ export function useRetryReply(treeId: string) {
 
     if (!outcome.ok) return {ok: false, error: outcome.error.message}
 
-    const {reply} = outcome.value
-    queryClient.setQueryData<Turns>(turnsKey(treeId), turns =>
-      turns
-        ? {
-            ...turns,
-            replies: turns.replies.map(saved =>
-              saved.id === replyId ? reply : saved
-            ),
-          }
-        : turns
-    )
+    updateSavedReply(queryClient, {treeId, replyId}, () => outcome.value.reply)
 
     return {ok: true}
   }

@@ -6,7 +6,7 @@ import type {CanvasOrientation} from '@uz/contract/settings'
 import type {Reply} from '@uz/contract/turns'
 
 import {useSettings, useUpdateSettings} from '#modules/settings/main'
-import {useLiveReply, useStop, useTurns} from '#modules/turns/main'
+import {useReply, useStop, useTurns} from '#modules/turns/main'
 import {ReactFlowProvider} from '@xyflow/react'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 
@@ -66,11 +66,12 @@ function useEscapeStops({
   chatEnd,
 }: EscapeStops) {
   const replyId = chatOpen && chatEnd ? chatEnd.id : activeReplyId
-  const live = useLiveReply(replyId)
 
-  const status =
-    live?.status ??
-    (replyId === null ? null : index.replyById.get(replyId))?.status
+  const shown = useReply(
+    replyId === null ? null : (index.replyById.get(replyId) ?? null)
+  )
+
+  const status = shown?.status
 
   const streaming = status === 'streaming' ? replyId : null
   const {stop} = useStop(treeId, streaming)

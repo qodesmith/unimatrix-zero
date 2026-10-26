@@ -1,13 +1,12 @@
 import type {StopState} from './stop/machine'
 import type {QueryClient} from '@tanstack/react-query'
-import type {CommandResult} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {ReplyEvent, StreamingReply} from '@uz/contract/turns'
 
 import {Store} from '@tanstack/react-store'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 
-export type Turns = CommandResult<'tree.turns'>
+import {updateSavedReply, withProgress} from './saved-turns'
 
 /** A run of the Model's reasoning; display only, never stored. */
 export interface ThinkingBlock {
@@ -32,10 +31,6 @@ export type ReplyStore = Store<LiveState>
 
 export function createReplyStore(): ReplyStore {
   return new Store<LiveState>({replies: {}, thinking: {}, stops: {}})
-}
-
-export function turnsKey(treeId: string) {
-  return ['turns', treeId] as const
 }
 
 function without<T>(byReply: Record<string, T>, replyId: string) {
@@ -143,27 +138,7 @@ export function applyLiveEvent(
   const nextStops = stopsAfter(stops, event)
 
   if (event.type === 'RUN_FINISHED') {
-    const {status, content, contextSize, contextWindow, failure} = next
-
-    queryClient.setQueryData<Turns>(turnsKey(treeId), turns =>
-      turns
-        ? {
-            ...turns,
-            replies: turns.replies.map(reply =>
-              reply.id === replyId
-                ? {
-                    ...reply,
-                    status,
-                    content,
-                    contextSize,
-                    contextWindow,
-                    failure,
-                  }
-                : reply
-            ),
-          }
-        : turns
-    )
+    updateSavedReply(queryClient, event, saved => withProgress(saved, next))
     store.setState(() => ({
       replies: without(replies, replyId),
       thinking: nextThinking,
