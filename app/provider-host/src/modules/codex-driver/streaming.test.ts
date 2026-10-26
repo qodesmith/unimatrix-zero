@@ -407,14 +407,6 @@ it('stops a Reply where it is, records it, and continues the Provider session af
   expect(report?.ended).toBe('input-closed')
 })
 
-it('stops nothing for a Reply it isn’t writing', async () => {
-  const codex = await setUp(['started.ndjson'])
-
-  await expect(codex.driver.stop(crypto.randomUUID())).resolves.toBeUndefined()
-
-  expect(codex.reports()).toEqual([])
-})
-
 it('rewinds the loaded thread to the Reply a Retry answers, keeping both rollouts', async () => {
   const codex = await setUp(['reverted.ndjson'])
 
@@ -538,6 +530,22 @@ it('fails the Reply as a crash, keeping its text, when Codex stops mid-stream', 
   )
   expect(events.some(event => event.type === 'REPLY_RECORDED')).toBe(false)
   expect(codex.reports()).toHaveLength(1)
+})
+
+it('fails the Reply when the app can’t save its rollout, and still closes Codex once idle', async () => {
+  const codex = await setUp(['started.ndjson'], {
+    store: fakeStore({'save-files': 'database or disk is full'}),
+  })
+
+  const events = await codex.reply(FIRST_PROMPT)
+
+  expect(events.some(event => event.type === 'REPLY_RECORDED')).toBe(false)
+  expect(events.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'failed',
+    failure: {code: 'disk-full'},
+  })
+  await codex.allClosed()
 })
 
 it('names when a limit lifts by the full window Codex reported', async () => {

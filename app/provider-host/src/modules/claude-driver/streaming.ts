@@ -1,3 +1,4 @@
+import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {ClaudeSession, QueryFn} from './session'
 import type {
@@ -6,10 +7,11 @@ import type {
   SpawnOptions,
   SpawnedProcess,
 } from '@anthropic-ai/claude-agent-sdk'
-import type {ReplyRecorded, ReplyRequest, SessionFile} from '@uz/contract/host'
-import type {ReplyEvent, RunFailure} from '@uz/contract/turns'
+import type {ReplyRequest, SessionFile} from '@uz/contract/host'
+import type {RunFailure} from '@uz/contract/turns'
 
 import {failureOf} from '#modules/failures/main'
+import {createReplyRuns} from '#modules/reply-runs/main'
 
 import {claudeEnvironment} from './environment'
 import {createReplyMapper} from './replies'
@@ -141,25 +143,19 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     })
   }
 
-  /** A stop asked before `claude` has the Prompt waits in `stopAsked`. */
-  const writing = new Map<string, {session: Live | null; stopAsked: boolean}>()
-
+  /** Stop interrupts `claude` once it has the Prompt. */
   async function* attempt(
     session: Live,
     mapper: Mapper,
-    {replyId, prompt}: ReplyRequest
-  ): AsyncGenerator<ReplyEvent, Outcome> {
+    {prompt}: ReplyRequest,
+    run: ReplyRun
+  ): AsyncGenerator<ContentEvent, Outcome> {
     let heard = false
-    const entry = writing.get(replyId)
+    let unstoppable: (() => void) | null = null
 
     try {
       for await (const message of session.send(prompt.text)) {
-        if (!heard && entry) {
-          entry.session = session
-
-          if (entry.stopAsked) void session.interrupt().catch(() => undefined)
-        }
-
+        unstoppable ??= run.stoppable(async () => session.interrupt())
         heard = true
 
         if (message.type === 'result') return {result: message}
@@ -177,7 +173,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       // Once heard, the only thing that throws is `claude` going away.
       return {failure: heard ? crashed(message) : failureOf(message), heard}
     } finally {
-      if (entry) entry.session = null
+      unstoppable?.()
     }
   }
 
@@ -199,28 +195,6 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     )
 
     for (const file of files) session.saved.add(file.path)
-  }
-
-  /**
-   * Main refusing the save fails the Reply: `disk-full` when the disk is full,
-   * else the app's own error.
-   */
-  async function saveFailure(
-    session: Live,
-    sessionId: string
-  ): Promise<RunFailure | null> {
-    try {
-      await saveToolResults(session, sessionId)
-
-      return null
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      const failure = failureOf(message)
-
-      return failure.code === 'disk-full'
-        ? failure
-        : {code: 'driver-error', message}
-    }
   }
 
   /** A rewind can't take the warm session: it has gone past that Reply. */
@@ -247,12 +221,13 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
    */
   async function* answer(
     request: ReplyRequest,
-    mapper: Mapper
-  ): AsyncGenerator<ReplyEvent, {session: Live; outcome: Outcome}> {
+    mapper: Mapper,
+    run: ReplyRun
+  ): AsyncGenerator<ContentEvent, {session: Live; outcome: Outcome}> {
     const claimed = claimable(request)
 
     if (claimed) {
-      const outcome = yield* attempt(claimed, mapper, request)
+      const outcome = yield* attempt(claimed, mapper, request, run)
 
       if (!('failure' in outcome) || outcome.heard || !claimed.ended) {
         return {session: claimed, outcome}
@@ -263,7 +238,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     const session = await open(request, request.session ? 'store' : 'none')
     warm.add(session)
-    const outcome = yield* attempt(session, mapper, request)
+    const outcome = yield* attempt(session, mapper, request, run)
     const refused = !session.started && session.restore === 'store'
 
     if (!refused || !request.session) return {session, outcome}
@@ -283,91 +258,60 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     return {
       session: fallback,
-      outcome: yield* attempt(fallback, mapper, request),
+      outcome: yield* attempt(fallback, mapper, request, run),
     }
   }
 
-  async function* startReply(
-    request: ReplyRequest
-  ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
-    writing.set(request.replyId, {session: null, stopAsked: false})
-
-    try {
-      yield* write(request)
-    } finally {
-      writing.delete(request.replyId)
-    }
-  }
-
+  /** A failed Reply's `claude` closes; a refused save fails the Reply too. */
   async function* write(
-    request: ReplyRequest
-  ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
+    request: ReplyRequest,
+    run: ReplyRun
+  ): AsyncGenerator<ContentEvent, Ending> {
     const {treeId, replyId} = request
     const ids = {treeId, replyId}
     const mapper = createReplyMapper(ids)
+    const {session, outcome} = yield* answer(request, mapper, run)
 
-    yield {...ids, type: 'RUN_STARTED'}
-
-    const {session, outcome} = yield* answer(request, mapper)
+    run.afterward(status => {
+      if (status === 'failed' || session.ended) warm.drop(session)
+      else warm.release(session)
+    })
 
     if ('failure' in outcome) {
-      warm.drop(session)
-      yield {
-        ...ids,
-        type: 'RUN_FINISHED',
-        status: 'failed',
-        failure: outcome.failure,
+      return {
+        finished: {
+          ...ids,
+          type: 'RUN_FINISHED',
+          status: 'failed',
+          failure: outcome.failure,
+        },
       }
-
-      return
     }
 
     const finished = mapper.finished(outcome.result)
+
+    if (finished.status === 'failed') return {finished}
+
     const recorded = mapper.recorded()
     const {sessionId} = session
 
-    if (finished.status === 'failed') {
-      warm.drop(session)
-      yield finished
-
-      return
-    }
-
-    const unsaved = sessionId && (await saveFailure(session, sessionId))
-
-    if (unsaved) {
-      warm.drop(session)
-      yield {...ids, type: 'RUN_FINISHED', status: 'failed', failure: unsaved}
-
-      return
-    }
+    if (sessionId) await saveToolResults(session, sessionId)
 
     session.messageId = recorded?.uuid ?? null
 
-    if (recorded && sessionId) {
-      yield {
-        ...ids,
-        type: 'REPLY_RECORDED',
-        model: recorded.model,
-        session: {sessionId, messageId: recorded.uuid},
-      }
+    return {
+      finished,
+      recorded:
+        recorded && sessionId
+          ? {
+              ...ids,
+              type: 'REPLY_RECORDED',
+              model: recorded.model,
+              session: {sessionId, messageId: recorded.uuid},
+            }
+          : null,
     }
-
-    if (session.ended) warm.drop(session)
-    else warm.release(session)
-
-    yield finished
   }
 
-  /** The Reply's stream still goes on to its `RUN_FINISHED`. */
-  async function stop(replyId: string) {
-    const entry = writing.get(replyId)
-
-    if (!entry) return
-
-    if (entry.session) await entry.session.interrupt()
-    else entry.stopAsked = true
-  }
-
-  return {startReply, stop}
+  return createReplyRuns(write)
 }

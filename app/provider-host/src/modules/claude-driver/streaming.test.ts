@@ -676,8 +676,6 @@ it('passes on a stop asked before claude has the Prompt', async () => {
 it('stops a Reply where it is, records it, and continues the Thread warm from it', async () => {
   const claude = await setUp(['stopped.ndjson'])
 
-  await expect(claude.driver.stop(crypto.randomUUID())).resolves.toBeUndefined()
-
   const stopped = await claude.reply(COUNT_PROMPT, null, {stopAfterDeltas: 5})
 
   expect(textOf(stopped)).toBe(

@@ -4,6 +4,7 @@ import type {EventEmitter} from 'node:events'
 import type {Readable, Writable} from 'node:stream'
 import type {z} from 'zod'
 
+import {ProgramCrashed} from '#modules/reply-runs/main'
 import {once} from 'node:events'
 import {createInterface} from 'node:readline'
 import {setTimeout as delay} from 'node:timers/promises'
@@ -17,7 +18,7 @@ import {
 
 const CLOSE_TIMEOUT_MS = 10_000
 
-export const STOPPED_BEFORE_ANSWERING = 'Codex stopped before it answered.'
+const STOPPED_BEFORE_ANSWERING = 'Codex stopped before it answered.'
 
 export interface CodexCommand {
   command: string
@@ -95,7 +96,7 @@ export async function startAppServer(
     hasExited = true
 
     for (const waiting of pending.values()) {
-      waiting.reject(new Error(STOPPED_BEFORE_ANSWERING))
+      waiting.reject(new ProgramCrashed(STOPPED_BEFORE_ANSWERING))
     }
 
     pending.clear()

@@ -1,3 +1,4 @@
+import type {ContentEvent} from '#modules/reply-runs/main'
 import type {
   ModelUsage,
   SDKAssistantMessage,
@@ -39,7 +40,7 @@ export function createReplyMapper(ids: ReplyIds) {
   /** When the limit refusing Claude's requests lifts; undefined while none does. */
   let limitLifts: number | undefined
 
-  function replace(text: string): ReplyEvent[] {
+  function replace(text: string): ContentEvent[] {
     if (text === shown) return []
 
     shown = text
@@ -47,7 +48,7 @@ export function createReplyMapper(ids: ReplyIds) {
     return [{...ids, type: 'TEXT_REPLACE', text}]
   }
 
-  function onDelta(delta: BlockDelta): ReplyEvent[] {
+  function onDelta(delta: BlockDelta): ContentEvent[] {
     if (delta.type === 'text_delta') {
       block = (block ?? '') + delta.text
       shown += delta.text
@@ -63,7 +64,7 @@ export function createReplyMapper(ids: ReplyIds) {
   }
 
   /** As this request's own usage reports it: what it sent and wrote. */
-  function tokens(usage: MessageUsage): ReplyEvent {
+  function tokens(usage: MessageUsage): ContentEvent {
     const inputTokens =
       (usage.input_tokens ?? 0) +
       (usage.cache_creation_input_tokens ?? 0) +
@@ -78,7 +79,7 @@ export function createReplyMapper(ids: ReplyIds) {
     }
   }
 
-  function onStreamEvent(event: StreamEvent): ReplyEvent[] {
+  function onStreamEvent(event: StreamEvent): ContentEvent[] {
     if (event.type === 'message_start') {
       // A message that never stopped was cut off and is being sent again.
       const resent = messageOpen ? replace(atMessageStart) : []
@@ -122,7 +123,7 @@ export function createReplyMapper(ids: ReplyIds) {
       : undefined
   }
 
-  function onAssistant({message, uuid}: SDKAssistantMessage): ReplyEvent[] {
+  function onAssistant({message, uuid}: SDKAssistantMessage): ContentEvent[] {
     if (message.model === SYNTHETIC_MODEL) return []
 
     lastMessage = {uuid, model: message.model}
@@ -147,7 +148,7 @@ export function createReplyMapper(ids: ReplyIds) {
   }
 
   return {
-    map(message: SDKMessage): ReplyEvent[] {
+    map(message: SDKMessage): ContentEvent[] {
       if (message.type === 'system' && message.subtype === 'mirror_error') {
         mirrorFailed = true
       }

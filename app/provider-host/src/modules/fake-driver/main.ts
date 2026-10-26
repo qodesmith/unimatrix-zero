@@ -1,10 +1,7 @@
-import type {
-  ProviderDriver,
-  ReplyRecorded,
-  ReplyRequest,
-} from '@uz/contract/host'
-import type {ReplyEvent} from '@uz/contract/turns'
+import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
+import type {ProviderDriver, ReplyRequest} from '@uz/contract/host'
 
+import {createReplyRuns} from '#modules/reply-runs/main'
 import {randomUUID} from 'node:crypto'
 
 import {createFakeSignIn} from './sign-in'
@@ -94,11 +91,11 @@ export function createFakeDriver({
   delayMs = 40,
   signInAnswerMs = 3000,
 }: FakeDriverOptions = {}): ProviderDriver {
-  const running = new Map<string, AbortController>()
-
-  async function* startReply(
-    request: ReplyRequest
-  ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
+  /** Stop aborts the canned stream, which then ends as `stopped`. */
+  async function* write(
+    request: ReplyRequest,
+    run: ReplyRun
+  ): AsyncGenerator<ContentEvent, Ending> {
     const {treeId, replyId} = request
     const ids = {treeId, replyId}
     const controller = new AbortController()
@@ -106,26 +103,22 @@ export function createFakeDriver({
     const behavior = behaviorOf(request.prompt.text)
     let written = 0
 
-    running.set(replyId, controller)
+    run.stoppable(async () => controller.abort())
 
-    function stopped(): ReplyEvent {
-      return {...ids, type: 'RUN_FINISHED', status: 'stopped'}
+    const stopped: Ending = {
+      finished: {...ids, type: 'RUN_FINISHED', status: 'stopped'},
     }
 
-    /** Returns false once the Reply is stopped, having ended it. */
+    /** Returns false once the Reply is stopped. */
     async function* streamWords(
       type: 'TEXT_DELTA' | 'REASONING_DELTA',
       text: string,
       limit?: number
-    ): AsyncGenerator<ReplyEvent, boolean> {
+    ): AsyncGenerator<ContentEvent, boolean> {
       for (const word of words(text).slice(0, limit)) {
         await sleep(delayMs, signal)
 
-        if (signal.aborted) {
-          yield stopped()
-
-          return false
-        }
+        if (signal.aborted) return false
 
         yield {...ids, type, delta: word}
 
@@ -135,21 +128,19 @@ export function createFakeDriver({
       return true
     }
 
-    try {
-      yield {...ids, type: 'RUN_STARTED'}
+    if (!(yield* streamWords('REASONING_DELTA', THINKING))) return stopped
 
-      if (!(yield* streamWords('REASONING_DELTA', THINKING))) return
+    const opened = yield* streamWords(
+      'TEXT_DELTA',
+      OPENING,
+      behavior === 'complete' ? undefined : WORDS_BEFORE_TROUBLE
+    )
 
-      const opened = yield* streamWords(
-        'TEXT_DELTA',
-        OPENING,
-        behavior === 'complete' ? undefined : WORDS_BEFORE_TROUBLE
-      )
+    if (!opened) return stopped
 
-      if (!opened) return
-
-      if (behavior === 'fail') {
-        yield {
+    if (behavior === 'fail') {
+      return {
+        finished: {
           ...ids,
           type: 'RUN_FINISHED',
           status: 'failed',
@@ -157,55 +148,57 @@ export function createFakeDriver({
             code: 'fake-failure',
             message: 'The fake Provider failed on purpose.',
           },
-        }
+        },
+      }
+    }
 
-        return
+    if (behavior === 'hang') {
+      if (!signal.aborted) {
+        await new Promise(resolve => {
+          signal.addEventListener('abort', resolve, {once: true})
+        })
       }
 
-      if (behavior === 'hang') {
-        if (!signal.aborted) {
-          await new Promise(resolve => {
-            signal.addEventListener('abort', resolve, {once: true})
-          })
-        }
+      return stopped
+    }
 
-        yield stopped()
+    const toolCallId = randomUUID()
+    const toolCall = {...ids, toolCallId}
 
-        return
-      }
+    yield {...toolCall, type: 'TOOL_CALL_START', toolName: 'search'}
+    yield {
+      ...toolCall,
+      type: 'TOOL_CALL_ARGS',
+      delta: JSON.stringify({query: request.prompt.text.slice(0, 80)}),
+    }
+    yield {...toolCall, type: 'TOOL_CALL_END'}
+    await sleep(delayMs * 10, signal)
+    yield {
+      ...toolCall,
+      type: 'TOOL_RESULT',
+      content: 'Three canned results.',
+      isError: false,
+    }
 
-      const toolCallId = randomUUID()
-      const toolCall = {...ids, toolCallId}
+    if (!(yield* streamWords('REASONING_DELTA', THINKING_AFTER_TOOL))) {
+      return stopped
+    }
 
-      yield {...toolCall, type: 'TOOL_CALL_START', toolName: 'search'}
-      yield {
-        ...toolCall,
-        type: 'TOOL_CALL_ARGS',
-        delta: JSON.stringify({query: request.prompt.text.slice(0, 80)}),
-      }
-      yield {...toolCall, type: 'TOOL_CALL_END'}
-      await sleep(delayMs * 10, signal)
-      yield {
-        ...toolCall,
-        type: 'TOOL_RESULT',
-        content: 'Three canned results.',
-        isError: false,
-      }
+    if (!(yield* streamWords('TEXT_DELTA', CLOSING))) return stopped
 
-      if (!(yield* streamWords('REASONING_DELTA', THINKING_AFTER_TOOL))) return
+    const inputTokens = words(request.prompt.text).length
+    yield {
+      ...ids,
+      type: 'TOKENS',
+      inputTokens,
+      outputTokens: written,
+      contextSize: inputTokens + written,
+      contextWindow: 200_000,
+    }
 
-      if (!(yield* streamWords('TEXT_DELTA', CLOSING))) return
-
-      const inputTokens = words(request.prompt.text).length
-      yield {
-        ...ids,
-        type: 'TOKENS',
-        inputTokens,
-        outputTokens: written,
-        contextSize: inputTokens + written,
-        contextWindow: 200_000,
-      }
-      yield {
+    return {
+      finished: {...ids, type: 'RUN_FINISHED', status: 'complete'},
+      recorded: {
         ...ids,
         type: 'REPLY_RECORDED',
         model: 'fake',
@@ -216,10 +209,7 @@ export function createFakeDriver({
               : randomUUID(),
           messageId: randomUUID(),
         },
-      }
-      yield {...ids, type: 'RUN_FINISHED', status: 'complete'}
-    } finally {
-      running.delete(replyId)
+      },
     }
   }
 
@@ -238,10 +228,7 @@ export function createFakeDriver({
     listModels: async () => [{id: 'fake', name: 'Fake model'}],
     readUsage: async () => ({windows: []}),
     ...createFakeSignIn({delayMs, answerMs: signInAnswerMs}),
-    startReply,
-    stop: async replyId => {
-      running.get(replyId)?.abort()
-    },
+    ...createReplyRuns(write),
     answerApproval: async () => undefined,
     forkSession: async () => ({sessionId: randomUUID(), messageId: null}),
     rebuildSession: async () => ({sessionId: randomUUID(), messageId: null}),

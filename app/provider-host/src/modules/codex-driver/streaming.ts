@@ -1,17 +1,12 @@
+import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
 import type {Notification, ParamsOf, RateLimits} from './wire'
-import type {
-  ReplyRecorded,
-  ReplyRequest,
-  SignInRequest,
-} from '@uz/contract/host'
-import type {ReplyEvent, RunFailure} from '@uz/contract/turns'
+import type {ReplyRequest, SignInRequest} from '@uz/contract/host'
 
-import {failureOf} from '#modules/failures/main'
 import {createInbox} from '#modules/inbox/main'
+import {ProgramCrashed, createReplyRuns} from '#modules/reply-runs/main'
 
-import {STOPPED_BEFORE_ANSWERING} from './app-server'
 import {createReplyMapper, threadOf, turnOf} from './replies'
 import {folderOf, readRollouts, writeRolloutsBack} from './rollouts'
 
@@ -19,15 +14,6 @@ import {folderOf, readRollouts, writeRolloutsBack} from './rollouts'
 export const DEFAULT_MODEL = 'default'
 
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
-
-const STOPPED_BEFORE_FINISHING = 'Codex stopped before finishing this Reply.'
-
-function failureFrom(message: string, resetsAt?: number): RunFailure {
-  return message === STOPPED_BEFORE_FINISHING ||
-    message === STOPPED_BEFORE_ANSWERING
-    ? {code: 'program-crashed', message}
-    : failureOf(message, resetsAt)
-}
 
 /** When all full windows lift, in seconds since the epoch; else undefined. */
 function limitLifts({primary, secondary}: RateLimits) {
@@ -65,21 +51,6 @@ interface LoadedThread {
   turns: string[]
 }
 
-interface CodexTurn {
-  server: AppServer
-  threadId: string
-  turnId: string
-}
-
-interface Writing {
-  turn: CodexTurn | null
-  stopAsked: boolean
-}
-
-async function interrupt({server, threadId, turnId}: CodexTurn) {
-  await server.request('turn/interrupt', {threadId, turnId})
-}
-
 async function dropAfter(
   server: AppServer,
   thread: LoadedThread,
@@ -102,7 +73,6 @@ async function dropAfter(
 export function createCodexReplies(deps: CodexRepliesDeps) {
   let current: Running | null = null
   let starting: Promise<Running> | null = null
-  const writing = new Map<string, Writing>()
   let limits: RateLimits = {primary: null, secondary: null}
 
   function onRateLimits(notification: Notification) {
@@ -239,11 +209,13 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     )
   }
 
+  /** Stop interrupts the turn once Codex has started it. */
   async function* send(
     running: Running,
     request: ReplyRequest,
-    thread: LoadedThread
-  ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
+    thread: LoadedThread,
+    run: ReplyRun
+  ): AsyncGenerator<ContentEvent, Ending> {
     const ids = {treeId: request.treeId, replyId: request.replyId}
     const {server} = running
     const inbox = createInbox<Notification | {method: 'exited'}>()
@@ -253,6 +225,8 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       if (threadOf(notification) === thread.id) inbox.push(notification)
     })
 
+    let unstoppable: (() => void) | null = null
+
     try {
       const started = await server.request('turn/start', {
         threadId: thread.id,
@@ -261,13 +235,10 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
 
       const turnId = started.turn.id
       thread.turns.push(turnId)
-      const entry = writing.get(request.replyId)
 
-      if (entry) {
-        entry.turn = {server, threadId: thread.id, turnId}
-
-        if (entry.stopAsked) void interrupt(entry.turn).catch(() => undefined)
-      }
+      unstoppable = run.stoppable(async () => {
+        await server.request('turn/interrupt', {threadId: thread.id, turnId})
+      })
 
       const mapper = createReplyMapper(ids)
 
@@ -275,7 +246,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
         const notification = await inbox.next()
 
         if (notification.method === 'exited') {
-          throw new Error(STOPPED_BEFORE_FINISHING)
+          throw new ProgramCrashed('Codex stopped before finishing this Reply.')
         }
 
         // Resuming repeats the last turn's token count, for instance.
@@ -290,60 +261,50 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
           limitLifts(limits)
         )
 
-        // A stopped turn stays in the thread as a completed one does.
-        if (finished.status !== 'failed') {
-          const {configDir} = request.vendorProgram
-          const files = await readRollouts(server, configDir, thread.id)
-          await deps.store.saveFiles(folderOf(thread.id), files)
+        if (finished.status === 'failed') return {finished}
 
-          yield {
+        // A stopped turn stays in the thread as a completed one does.
+        const {configDir} = request.vendorProgram
+        const files = await readRollouts(server, configDir, thread.id)
+        await deps.store.saveFiles(folderOf(thread.id), files)
+
+        return {
+          finished,
+          recorded: {
             ...ids,
             type: 'REPLY_RECORDED',
             model: thread.model,
             session: {sessionId: thread.id, messageId: turnId},
-          }
+          },
         }
-
-        yield finished
-
-        return
       }
     } finally {
-      const entry = writing.get(request.replyId)
-
-      if (entry) entry.turn = null
-
+      unstoppable?.()
       unlisten()
     }
   }
 
-  /** Interrupts the Reply's turn; the stream then ends as `stopped`. */
-  async function stop(replyId: string) {
-    const entry = writing.get(replyId)
-
-    if (!entry) return
-
-    if (entry.turn) await interrupt(entry.turn)
-    else entry.stopAsked = true
-  }
-
   /** An app-server that exited while idle answers nothing: retry once. */
   async function* write(
-    request: ReplyRequest
-  ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
+    request: ReplyRequest,
+    run: ReplyRun
+  ): AsyncGenerator<ContentEvent, Ending> {
     for (let attempt = 1; ; attempt++) {
       const running = await claim(request.vendorProgram)
       let heard = false
 
       try {
         const thread = await threadFor(running, request)
+        const sent = send(running, request, thread, run)
 
-        for await (const event of send(running, request, thread)) {
+        for (;;) {
+          const step = await sent.next()
+
+          if (step.done) return step.value
+
           heard = true
-          yield event
+          yield step.value
         }
-
-        return
       } catch (error) {
         if (heard || attempt === 2 || !running.server.hasExited) throw error
 
@@ -354,30 +315,5 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     }
   }
 
-  async function* startReply(
-    request: ReplyRequest
-  ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
-    const ids = {treeId: request.treeId, replyId: request.replyId}
-    writing.set(request.replyId, {turn: null, stopAsked: false})
-
-    yield {...ids, type: 'RUN_STARTED'}
-
-    try {
-      yield* write(request)
-    } catch (error) {
-      yield {
-        ...ids,
-        type: 'RUN_FINISHED',
-        status: 'failed',
-        failure: failureFrom(
-          error instanceof Error ? error.message : String(error),
-          limitLifts(limits)
-        ),
-      }
-    } finally {
-      writing.delete(request.replyId)
-    }
-  }
-
-  return {startReply, stop}
+  return createReplyRuns(write, {limitLifts: () => limitLifts(limits)})
 }

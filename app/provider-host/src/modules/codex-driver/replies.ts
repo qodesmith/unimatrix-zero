@@ -1,3 +1,4 @@
+import type {ContentEvent} from '#modules/reply-runs/main'
 import type {Notification} from './wire'
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
@@ -47,7 +48,7 @@ export function createReplyMapper(ids: ReplyIds) {
   const messages = new Map<string, {before: string; text: string}>()
   let last: string | null = null
 
-  function onDelta(itemId: string, delta: string): ReplyEvent[] {
+  function onDelta(itemId: string, delta: string): ContentEvent[] {
     const message = messages.get(itemId) ?? {before: shown, text: ''}
     message.text += delta
     messages.set(itemId, message)
@@ -57,7 +58,7 @@ export function createReplyMapper(ids: ReplyIds) {
     return [{...ids, type: 'TEXT_DELTA', delta}]
   }
 
-  function onMessage(itemId: string, text: string): ReplyEvent[] {
+  function onMessage(itemId: string, text: string): ContentEvent[] {
     const message = messages.get(itemId)
 
     if (!message) {
@@ -78,7 +79,7 @@ export function createReplyMapper(ids: ReplyIds) {
   }
 
   return {
-    map(notification: Notification): ReplyEvent[] {
+    map(notification: Notification): ContentEvent[] {
       const {method, params} = notification
 
       if (method === 'item/agentMessage/delta') {
@@ -104,7 +105,7 @@ export function createReplyMapper(ids: ReplyIds) {
 
       const {last: usage, modelContextWindow} = params.tokenUsage
 
-      const tokens: ReplyEvent = {
+      const tokens: ContentEvent = {
         ...ids,
         type: 'TOKENS',
         inputTokens: usage.inputTokens,
