@@ -33,7 +33,7 @@ const transitions = {
     sent: (state, {replyId}) => ({...state, followReplyId: replyId}),
     arrived: (state, {replyId}) =>
       replyId === state.followReplyId
-        ? {status: 'open', turnId: replyId, followReplyId: null}
+        ? opened(state, {turnId: replyId})
         : state,
   },
   closing: {

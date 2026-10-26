@@ -1,7 +1,5 @@
 # Testing
 
-Load this file when you write, run or fix a test.
-
 ## Put a test beside its unit
 
 - A test sits beside the file it tests, named `<unit>.test.ts` or `<unit>.test.tsx`.

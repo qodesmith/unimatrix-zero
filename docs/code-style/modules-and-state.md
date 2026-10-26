@@ -1,7 +1,5 @@
 # Modules and state
 
-Load this file when you add or change a module, import across modules, write local state or a state machine, read browser state in a component, or change main's SQLite schema.
-
 ## Keep each module deep. Enforced by: uz/module-boundaries, uz/tsx-under-ui
 
 The layout, and why only `@uz/contract` crosses between processes, are in [README.md](../../README.md), sections Layout and Modules.
@@ -14,7 +12,7 @@ The layout, and why only `@uz/contract` crosses between processes, are in [READM
 ## Give every row a UUIDv7, and migrate through Drizzle
 
 - Ids are UUIDv7 strings, never SQLite integers ([ADR 0002](../adr/0002-uuidv7-ids.md)).
-- A change to `app/main/src/modules/database/schema.ts` ships with its migration: run `bun run --filter @uz/main db:generate` and commit the new folder under `app/main/drizzle/` ([ADR 0003](../adr/0003-migration-foreign-key-guard.md)).
+- A change to main's SQLite schema ships with its migration: the steps are in [README.md](../../README.md), section Layout ([ADR 0003](../adr/0003-migration-foreign-key-guard.md)).
 
 ## Read browser state through a store
 

@@ -1,7 +1,5 @@
 # Styling and color
 
-Load this file when you write a class name, a CSS rule or a color.
-
 ## Style with Tailwind utilities at the call site
 
 - Express styling as Tailwind utilities at the call site. Tailwind v4 covers more than it looks like it does: gradients, arbitrary stop positions and color mixes all have utilities, so "the design needs real CSS" is usually wrong.
