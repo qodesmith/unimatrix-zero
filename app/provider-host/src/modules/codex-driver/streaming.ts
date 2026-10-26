@@ -1,3 +1,4 @@
+import type {WhenIdle} from '#modules/idle/main'
 import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
@@ -34,14 +35,15 @@ function limitLifts({primary, secondary}: RateLimits) {
 export interface CodexRepliesDeps {
   store: SessionStoreClient
   open: OpenAppServer
-  idleMs: number
+  whenIdle: WhenIdle
 }
 
 interface Running {
   server: AppServer
   threads: Map<string, LoadedThread>
   writing: number
-  idle: ReturnType<typeof setTimeout> | undefined
+  /** Calls off the idle close. */
+  wake: (() => void) | undefined
 }
 
 interface LoadedThread {
@@ -88,7 +90,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
 
   async function forgetOnExit(running: Running) {
     await running.server.exited
-    clearTimeout(running.idle)
+    running.wake?.()
 
     if (current === running) current = null
   }
@@ -101,7 +103,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       server,
       threads: new Map(),
       writing: 0,
-      idle: undefined,
+      wake: undefined,
     }
 
     void forgetOnExit(running)
@@ -118,7 +120,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
         starting = null
       })))
 
-    clearTimeout(running.idle)
+    running.wake?.()
     running.writing += 1
 
     return running
@@ -129,11 +131,11 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
 
     if (running.writing > 0) return
 
-    running.idle = setTimeout(() => {
+    running.wake = deps.whenIdle(() => {
       if (current === running) current = null
 
       void running.server.close()
-    }, deps.idleMs)
+    })
   }
 
   function load(

@@ -1,6 +1,7 @@
 import type {ClaudeRepliesDeps} from './streaming'
 import type {ProviderDriver} from '@uz/contract/host'
 
+import {idleFor} from '#modules/idle/main'
 import {getProgramReady} from '#modules/vendor-program/main'
 import {query} from '@anthropic-ai/claude-agent-sdk'
 import {spawn} from 'node:child_process'
@@ -31,7 +32,7 @@ export function createClaudeDriver({
       windowsHide: true,
     }),
   env = process.env,
-  idleMs = IDLE_CLOSE_MS,
+  whenIdle = idleFor(IDLE_CLOSE_MS),
   maxWarm = MAX_WARM,
 }: ClaudeDriverOptions): ProviderDriver {
   const replies = createClaudeReplies({
@@ -39,7 +40,7 @@ export function createClaudeDriver({
     query: run,
     spawn: start,
     env,
-    idleMs,
+    whenIdle,
     maxWarm,
   })
 

@@ -11,6 +11,7 @@
 import type {ReplyRecorded, SessionRef} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {idleFor} from '#modules/idle/main'
 import {fakeStore} from '#modules/test-store/main'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -61,7 +62,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       return createCodexDriver({
         store: store.client,
         ...(recording ? {spawn: recorder.spawn} : {}),
-        idleMs: IDLE_MS,
+        whenIdle: idleFor(IDLE_MS),
       })
     }
 
@@ -185,7 +186,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       return createCodexDriver({
         store: store.client,
         ...(recording ? {spawn: recorder.spawn} : {}),
-        idleMs: IDLE_MS,
+        whenIdle: idleFor(IDLE_MS),
       })
     }
 

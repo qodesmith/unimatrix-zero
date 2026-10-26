@@ -1,7 +1,9 @@
+import type {WhenIdle} from '#modules/idle/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {CodexCommand, SpawnCodex} from './app-server'
 import type {ProviderDriver, SignInRequest} from '@uz/contract/host'
 
+import {idleFor} from '#modules/idle/main'
 import {getProgramReady, programOf} from '#modules/vendor-program/main'
 import {spawn} from 'node:child_process'
 import fs from 'node:fs'
@@ -21,7 +23,7 @@ interface CodexDriverOptions {
   spawn?: SpawnCodex
   commandFor?: (path: string) => CodexCommand
   env?: NodeJS.ProcessEnv
-  idleMs?: number
+  whenIdle?: WhenIdle
   timeoutMs?: number
 }
 
@@ -37,7 +39,7 @@ export function createCodexDriver({
     }),
   commandFor = path => ({command: path, args: []}),
   env = process.env,
-  idleMs = IDLE_CLOSE_MS,
+  whenIdle = idleFor(IDLE_CLOSE_MS),
   timeoutMs = SIGN_IN_TIMEOUT_MS,
 }: CodexDriverOptions): ProviderDriver {
   async function open({program, configDir}: SignInRequest) {
@@ -54,7 +56,7 @@ export function createCodexDriver({
     )
   }
 
-  const replies = createCodexReplies({store, open, idleMs})
+  const replies = createCodexReplies({store, open, whenIdle})
 
   return {
     capabilities: {

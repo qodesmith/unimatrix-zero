@@ -1,3 +1,4 @@
+import type {WhenIdle} from '#modules/idle/main'
 import type {SessionRef} from '@uz/contract/host'
 
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
@@ -11,24 +12,24 @@ export interface WarmSession {
 }
 
 interface WarmOptions {
-  idleMs: number
+  whenIdle: WhenIdle
   max: number
 }
 
 /**
- * Idle sessions close after `idleMs`, longest idle first past `max`. One
+ * Idle sessions close when `whenIdle` says, longest idle first past `max`. One
  * writing a Reply never closes, so more than `max` can be open.
  */
 export function createWarmSessions<Session extends WarmSession>({
-  idleMs,
+  whenIdle,
   max,
 }: WarmOptions) {
   const open = new Set<Session>()
-  /** The idle ones, longest idle first, each with its close timer. */
-  const idle = new Map<Session, ReturnType<typeof setTimeout>>()
+  /** The idle ones, longest idle first, each with what calls off its close. */
+  const idle = new Map<Session, () => void>()
 
   function forget(session: Session) {
-    clearTimeout(idle.get(session))
+    idle.get(session)?.()
     idle.delete(session)
     open.delete(session)
   }
@@ -53,7 +54,7 @@ export function createWarmSessions<Session extends WarmSession>({
         if (session.sessionId !== ref.sessionId) continue
 
         if (session.messageId === ref.messageId) {
-          clearTimeout(idle.get(session))
+          idle.get(session)?.()
           idle.delete(session)
 
           return session
@@ -75,7 +76,7 @@ export function createWarmSessions<Session extends WarmSession>({
 
       idle.set(
         session,
-        setTimeout(() => close(session), idleMs)
+        whenIdle(() => close(session))
       )
       trim()
     },

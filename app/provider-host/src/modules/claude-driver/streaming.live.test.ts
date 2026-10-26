@@ -12,6 +12,7 @@
 import type {ReplyRecorded, ReplyRequest, SessionRef} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {idleFor} from '#modules/idle/main'
 import {fakeStore} from '#modules/test-store/main'
 import {spawn} from 'node:child_process'
 import fs from 'node:fs'
@@ -75,7 +76,7 @@ function liveDriver(files: string[]) {
   const driver = createClaudeDriver({
     store: fakeStore().client,
     ...(recording ? {spawn: recorder.spawn} : {}),
-    idleMs: IDLE_MS,
+    whenIdle: idleFor(IDLE_MS),
   })
 
   const treeId = crypto.randomUUID()

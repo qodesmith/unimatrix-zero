@@ -3,6 +3,7 @@ import type {SDKPartialAssistantMessage} from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRecorded, SessionRef} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import fs from 'node:fs'
@@ -33,11 +34,6 @@ const TEAL_MESSAGE = '90b7a04e-36fa-4aa1-84e8-66380ab18fe0'
 const OTTER_MESSAGE = '52786f10-3dd8-4f5b-995f-c5f9c5a27a0e'
 const REWOUND_MESSAGE = '18fb8495-3399-43a8-bc37-573286cfc9ed'
 const MODEL = 'claude-haiku-5-5'
-
-const IDLE_MS = 300
-
-/** Outlasts starting a second `claude` on a slow runner, which IDLE_MS doesn't. */
-const LONG_IDLE_MS = 1500
 
 type Streamed = ReplyEvent | ReplyRecorded
 
@@ -95,13 +91,13 @@ function edited(name: string, edit: (lines: RecordedLine[]) => RecordedLine[]) {
 async function setUp(
   recordings: string[],
   env: Record<string, string> = {},
-  store = fakeStore(),
-  idleMs = IDLE_MS
+  store = fakeStore()
 ) {
   const fake = await replayClaude()
   cleanUps.push(fake.cleanUp)
   const configDir = folder('uz-claude-config-')
   const reports = folder('uz-claude-reports-')
+  const idle = heldIdle()
 
   const driver = createClaudeDriver({
     store: store.client,
@@ -115,7 +111,7 @@ async function setUp(
       FAKE_CLAUDE_REPORTS: reports,
       ...env,
     },
-    idleMs,
+    whenIdle: idle.whenIdle,
   })
 
   const treeId = crypto.randomUUID()
@@ -173,7 +169,9 @@ async function setUp(
       )
   }
 
+  /** Lets idle time pass, then waits for every `claude` to end. */
   async function allClosed() {
+    idle.pass()
     await vi.waitFor(
       () => {
         expect(reportsSoFar().every(report => report.ended !== null)).toBe(true)
@@ -320,13 +318,7 @@ it('resumes a cold session from the app’s copy alone', async () => {
 })
 
 it('forks the session through a mid-Thread Reply into a new session, leaving the warm one alone', async () => {
-  const claude = await setUp(
-    ['warm.ndjson', 'resumed.ndjson', 'forked.ndjson'],
-    {},
-    fakeStore(),
-    LONG_IDLE_MS
-  )
-
+  const claude = await setUp(['warm.ndjson', 'resumed.ndjson', 'forked.ndjson'])
   const session = await warmThread(claude)
   await claude.reply(THIRD_PROMPT, session)
 
@@ -346,6 +338,7 @@ it('forks the session through a mid-Thread Reply into a new session, leaving the
 
   const [, resumed, fork] = claude.reports()
 
+  // No idle time has passed, so only the fork could have closed it.
   expect(resumed?.ended).toBeNull()
   expect(fork?.args).toEqual(
     expect.arrayContaining([
@@ -366,7 +359,7 @@ it('forks the session through a mid-Thread Reply into a new session, leaving the
     'input-closed',
     'input-closed',
   ])
-}, 10_000)
+})
 
 it('resumes from the app’s copy when the warm session’s `claude` exited while idle', async () => {
   const claude = await setUp(['warm.ndjson', 'resumed.ndjson'], {

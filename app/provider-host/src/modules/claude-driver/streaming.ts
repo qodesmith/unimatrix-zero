@@ -1,3 +1,4 @@
+import type {WhenIdle} from '#modules/idle/main'
 import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {ClaudeSession, QueryFn} from './session'
@@ -33,7 +34,7 @@ export interface ClaudeRepliesDeps {
   query: QueryFn
   spawn: (options: SpawnOptions) => SpawnedProcess
   env: NodeJS.ProcessEnv
-  idleMs: number
+  whenIdle: WhenIdle
   maxWarm: number
 }
 
@@ -74,7 +75,7 @@ function crashed(message: string): RunFailure {
 /** Replies from a warm `claude`, or a new one that resumes, forks or starts. */
 export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   const warm = createWarmSessions<Live>({
-    idleMs: deps.idleMs,
+    whenIdle: deps.whenIdle,
     max: deps.maxWarm,
   })
 

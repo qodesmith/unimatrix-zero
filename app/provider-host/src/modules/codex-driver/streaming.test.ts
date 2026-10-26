@@ -1,6 +1,7 @@
 import type {ReplyRecorded, SessionRef} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import fs from 'node:fs'
@@ -37,8 +38,6 @@ const BYE_TURN = '01a170aa-0e03-7b72-8de6-8e269c1f5388'
 const RETRIED_TURN = '01a170aa-1476-75b0-892c-bd4587e4d57b'
 const REWOUND_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-50-${REWOUND_THREAD_ID}.jsonl`
 const REVERTED_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-56-${REWOUND_THREAD_ID}_01a170aa-145c-7992-b8a7-bcfb762e8621.jsonl`
-
-const IDLE_MS = 300
 
 type Streamed = ReplyEvent | ReplyRecorded
 
@@ -97,6 +96,7 @@ async function setUp(
   cleanUps.push(fake.cleanUp)
   const configDir = folder('uz-codex-home-')
   const reports = folder('uz-codex-reports-')
+  const idle = heldIdle()
 
   const driver = createCodexDriver({
     store: store.client,
@@ -118,7 +118,7 @@ async function setUp(
       FAKE_CODEX_REPORTS: reports,
       ...env,
     },
-    idleMs: IDLE_MS,
+    whenIdle: idle.whenIdle,
   })
 
   const treeId = crypto.randomUUID()
@@ -175,7 +175,9 @@ async function setUp(
       )
   }
 
+  /** Lets idle time pass, then waits for every `codex` to end. */
   async function allClosed() {
+    idle.pass()
     await vi.waitFor(
       () => {
         expect(reportsSoFar().every(report => report.ended !== null)).toBe(true)
