@@ -1,4 +1,4 @@
-import type {StopState} from './stop/machine'
+import type {ReplyRunState} from './reply-run/machine'
 import type {QueryClient} from '@tanstack/react-query'
 import type {AppEvent} from '@uz/contract/events'
 import type {ReplyEvent, StreamingReply} from '@uz/contract/turns'
@@ -23,14 +23,14 @@ interface LiveState {
   replies: Record<string, StreamingReply>
   /** By Reply id, kept after the Reply finishes; only a reload clears it. */
   thinking: Record<string, ThinkingBlock[]>
-  /** By Reply id, from a Stop asked until its run finishes or starts again. */
-  stops: Record<string, StopState>
+  /** By Reply id, from a Stop or Retry asked until a run starts or finishes. */
+  runs: Record<string, ReplyRunState>
 }
 
 export type ReplyStore = Store<LiveState>
 
 export function createReplyStore(): ReplyStore {
-  return new Store<LiveState>({replies: {}, thinking: {}, stops: {}})
+  return new Store<LiveState>({replies: {}, thinking: {}, runs: {}})
 }
 
 function without<T>(byReply: Record<string, T>, replyId: string) {
@@ -99,11 +99,11 @@ function thinkingAfter(
   return nextBlocks === blocks ? thinking : {...thinking, [replyId]: nextBlocks}
 }
 
-/** A run that starts or finishes ends any Stop asked of its Reply. */
-function stopsAfter(stops: LiveState['stops'], event: ReplyEvent) {
+/** A run that starts or finishes ends what was asked of its Reply. */
+function runsAfter(runs: LiveState['runs'], event: ReplyEvent) {
   const ends = event.type === 'RUN_STARTED' || event.type === 'RUN_FINISHED'
 
-  return ends && event.replyId in stops ? without(stops, event.replyId) : stops
+  return ends && event.replyId in runs ? without(runs, event.replyId) : runs
 }
 
 /**
@@ -131,18 +131,18 @@ export function applyLiveEvent(
   if (!('replyId' in event)) return
 
   const {treeId, replyId} = event
-  const {replies, thinking, stops} = store.state
+  const {replies, thinking, runs} = store.state
   const current = replies[replyId] ?? {...NEW_REPLY, treeId, replyId}
   const next = foldReplyEvent(current, event)
   const nextThinking = thinkingAfter(thinking, event, current, now())
-  const nextStops = stopsAfter(stops, event)
+  const nextRuns = runsAfter(runs, event)
 
   if (event.type === 'RUN_FINISHED') {
     updateSavedReply(queryClient, event, saved => withProgress(saved, next))
     store.setState(() => ({
       replies: without(replies, replyId),
       thinking: nextThinking,
-      stops: nextStops,
+      runs: nextRuns,
     }))
 
     return
@@ -150,11 +150,11 @@ export function applyLiveEvent(
 
   const changed = next !== current || !(replyId in replies)
 
-  if (changed || nextThinking !== thinking || nextStops !== stops) {
+  if (changed || nextThinking !== thinking || nextRuns !== runs) {
     store.setState(() => ({
       replies: changed ? {...replies, [replyId]: next} : replies,
       thinking: nextThinking,
-      stops: nextStops,
+      runs: nextRuns,
     }))
   }
 }

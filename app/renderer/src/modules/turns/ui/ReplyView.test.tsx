@@ -548,7 +548,7 @@ it.each([
   }
 )
 
-it('gates every failed Reply on one subscription to main', async () => {
+it('gates every failed Reply on one subscription to the Provider statuses', async () => {
   let subscriptions = 0
   globalThis.window.uz = {
     ...main,

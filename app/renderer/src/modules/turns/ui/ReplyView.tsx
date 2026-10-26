@@ -11,12 +11,11 @@ import {useProviderStatus} from '#modules/connections/main'
 import {ReplyMarkdown} from '#modules/markdown/main'
 import {Button} from '#modules/shadcn/main'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
-import {Fragment, useState} from 'react'
+import {Fragment} from 'react'
 
-import {useStop} from '../stop/use-stop'
+import {useReplyRun} from '../reply-run/use-reply-run'
 import {useReply, useThinking} from '../use-live-reply'
 import {useOnline} from '../use-online'
-import {useRetryReply} from '../use-turns'
 
 type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 
@@ -99,24 +98,11 @@ function retryHeldBecause(
   return NOT_READY[status](PROVIDER_NAMES[provider])
 }
 
-/** Mounted only while the Reply has failed, so a retry that takes resets it. */
 function RetryControls({reply}: {reply: Reply}) {
-  const retryReply = useRetryReply(reply.treeId)
+  const {state, retry} = useReplyRun(reply.treeId, reply.id)
   const online = useOnline()
   const providerStatus = useProviderStatus(reply.provider)
-  const [retrying, setRetrying] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const held = retryHeldBecause(online, providerStatus, reply.provider)
-
-  async function retry() {
-    setRetrying(true)
-    setError(null)
-    const outcome = await retryReply(reply.id)
-
-    setRetrying(false)
-
-    if (!outcome.ok) setError(outcome.error)
-  }
 
   return (
     <div className="flex items-center gap-3">
@@ -124,22 +110,24 @@ function RetryControls({reply}: {reply: Reply}) {
         size="sm"
         variant="outline"
         className="h-6 px-2 text-xs"
-        disabled={held !== null || retrying}
-        onClick={() => void retry()}
+        disabled={held !== null || state.status === 'retrying'}
+        onClick={retry}
       >
         Retry
       </Button>
       {held ? (
         <span className="text-xs text-muted-foreground">{held}</span>
       ) : (
-        error && <span className="text-xs text-destructive">{error}</span>
+        state.status === 'retryRefused' && (
+          <span className="text-xs text-destructive">{state.error}</span>
+        )
       )}
     </div>
   )
 }
 
 function StopButton({treeId, replyId}: {treeId: string; replyId: string}) {
-  const {state, stop} = useStop(treeId, replyId)
+  const {state, stop} = useReplyRun(treeId, replyId)
 
   return (
     <>
@@ -152,7 +140,7 @@ function StopButton({treeId, replyId}: {treeId: string; replyId: string}) {
       >
         {state.status === 'stopping' ? 'Stopping…' : 'Stop'}
       </Button>
-      {state.status === 'refused' && (
+      {state.status === 'stopRefused' && (
         <span className="text-xs text-destructive">{state.error}</span>
       )}
     </>

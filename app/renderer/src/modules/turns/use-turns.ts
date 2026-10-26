@@ -3,7 +3,7 @@ import type {Reply} from '@uz/contract/turns'
 import {bridge} from '#modules/bridge/main'
 import {useQuery, useQueryClient} from '@tanstack/react-query'
 
-import {addSent, turnsKey, updateSavedReply} from './saved-turns'
+import {addSent, turnsKey} from './saved-turns'
 
 /** A Tree's saved Prompts and Replies. */
 export function useTurns(treeId: string) {
@@ -42,25 +42,5 @@ export function useSendPrompt(treeId: string, parentReplyId: string | null) {
     void queryClient.invalidateQueries({queryKey: turnsKey(treeId)})
 
     return {ok: true, reply: outcome.value.reply}
-  }
-}
-
-export type RetryOutcome = {ok: true} | {ok: false; error: string}
-
-/**
- * Runs a failed Reply's Prompt again. Main hands back the same Reply id,
- * streaming from nothing, which takes the old one's place in the saved Turns.
- */
-export function useRetryReply(treeId: string) {
-  const queryClient = useQueryClient()
-
-  return async (replyId: string): Promise<RetryOutcome> => {
-    const outcome = await bridge().send({type: 'reply.retry', treeId, replyId})
-
-    if (!outcome.ok) return {ok: false, error: outcome.error.message}
-
-    updateSavedReply(queryClient, {treeId, replyId}, () => outcome.value.reply)
-
-    return {ok: true}
   }
 }

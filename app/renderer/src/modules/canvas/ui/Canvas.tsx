@@ -6,7 +6,7 @@ import type {CanvasOrientation} from '@uz/contract/settings'
 import type {Reply} from '@uz/contract/turns'
 
 import {useSettings, useUpdateSettings} from '#modules/settings/main'
-import {useReply, useStop, useTurns} from '#modules/turns/main'
+import {useReply, useReplyRun, useTurns} from '#modules/turns/main'
 import {ReactFlowProvider} from '@xyflow/react'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 
@@ -74,7 +74,7 @@ function useEscapeStops({
   const status = shown?.status
 
   const streaming = status === 'streaming' ? replyId : null
-  const {stop} = useStop(treeId, streaming)
+  const {stop} = useReplyRun(treeId, streaming)
 
   useEffect(() => {
     if (streaming === null) return undefined
