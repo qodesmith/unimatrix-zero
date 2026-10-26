@@ -75,8 +75,9 @@ function writeEntries(file: string, entries: SessionEntry[]) {
 }
 
 /**
- * Writes the kept transcripts back where `claude` reads them. A plain write,
- * so the files are new and no cleanup sweep takes them.
+ * The fallback restore (ADR 0004): writes the kept transcripts back where
+ * `claude` reads them. A plain write, so the files are new and no cleanup
+ * sweep takes them.
  */
 export async function writeTranscriptBack(
   store: SessionStoreClient,

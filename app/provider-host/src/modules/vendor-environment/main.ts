@@ -1,6 +1,6 @@
 /**
  * Variables that would make a vendor program answer to something other than
- * the connected subscription, or read the user's own setup.
+ * the connected subscription, or read the user's own setup (ADR 0014).
  */
 const STRIPPED_PREFIXES = ['ANTHROPIC_', 'CLAUDE_', 'OPENAI_', 'CODEX_']
 

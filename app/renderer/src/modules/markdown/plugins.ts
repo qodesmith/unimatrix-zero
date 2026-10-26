@@ -32,7 +32,10 @@ function codeThemes(): [BundledTheme, BundledTheme] {
   return [bundledTheme(light), bundledTheme(dark)]
 }
 
-/** Streamdown's rehype plugins minus `rehype-raw`, so HTML stays text. */
+/**
+ * Streamdown's rehype plugins minus `rehype-raw`, so HTML stays text
+ * (ADR 0014).
+ */
 function withoutRawHtml(): NonNullable<StreamdownProps['rehypePlugins']> {
   const {sanitize, harden} = defaultRehypePlugins
 
@@ -48,8 +51,9 @@ function withoutRawHtml(): NonNullable<StreamdownProps['rehypePlugins']> {
 export const rehypePlugins = withoutRawHtml()
 
 /**
- * `trust: false` is the only gate on KaTeX's output: Streamdown runs the math
- * plugin after the rehype plugins above, so the sanitizer never sees it.
+ * `trust: false` is the only gate on KaTeX's output (ADR 0014): Streamdown
+ * runs the math plugin after the rehype plugins above, so the sanitizer never
+ * sees it.
  * remark-math's default accepts a single `$`, turning "$5 and $10" into math.
  */
 const math: MathPlugin = {
@@ -86,7 +90,8 @@ const IMAGE_NODE = /@\{[^}]*\bimg\s*:/u
 
 /**
  * Mermaid's image shape fetches its URL as soon as the diagram draws, and
- * strict mode does not stop it, so such a diagram is an error instead.
+ * strict mode does not stop it. A Reply never reaches the network on its own
+ * (ADR 0014), so such a diagram is an error instead.
  */
 function withoutImages(plugin: DiagramPlugin): DiagramPlugin {
   return {

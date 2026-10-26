@@ -1,6 +1,9 @@
 import type {MermaidErrorComponentProps} from 'streamdown'
 
-/** Replaces Streamdown's Mermaid error panel, which ships Tailwind's reds. */
+/**
+ * Replaces Streamdown's Mermaid error panel, which ships Tailwind's reds:
+ * every color in the window is a Theme token (ADR 0009).
+ */
 export function DiagramError({chart, error}: MermaidErrorComponentProps) {
   return (
     <div

@@ -16,6 +16,11 @@ Four keepers, and nothing else:
   _"This Checkbox spreads external props over its own click handler, so an `onClick` here would replace the toggle rather than compose with it."_
 - **Contract**: an invariant, a unit, or an order that the code does not show.
   _"`riskCells` stays row-major; the heatmap rebuilds its axes from that order."_
+  A contract that comes from an ADR may end by citing it, for example `(ADR 0014)`: an ADR changes only when its decision does, so the citation stays true.
+  _"Mermaid's image shape fetches its URL as soon as the diagram draws, so such a diagram is an error: a Reply never reaches the network on its own (ADR 0014)."_
+  The comment still states the rule, and the citation says where its reason lives and where to change it.
+  Cite at the code that enforces the decision, and leave the places that only touch it bare.
+  Apply the test to the comment with its citation removed: a citation rides on a keeper and earns nothing alone.
 - **Directive**: text the tooling reads, for example `oxlint-disable`, `eslint-disable`, `use no memo`, `@ts-expect-error`, `@vitest-environment`, or `prettier-ignore`.
   These are machinery, not prose.
   Keep every one, and shorten a long trailing rationale to a clause.
@@ -38,7 +43,7 @@ These are noise by construction, whatever they say:
 - Restating the line, the function name, or the type below it
 - A per-field description on a type where the field name already says it
 - A file-header essay, and a divider over a single logical unit or a section the code already labels
-- A design-doc or issue reference, for example `#116`, "matches the design", or "see inventory section 9"
+- An issue, PR, or design-doc reference that records history or stands in for a reason, for example `#116`, "matches the design", or "see inventory section 9"
 - Narration of mock and fixture data
 - Arrange, act, and assert steps, or a comment that restates the `it(...)` description
 - Commented-out code

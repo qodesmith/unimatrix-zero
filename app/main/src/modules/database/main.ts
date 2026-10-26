@@ -85,7 +85,7 @@ function appliedMigrations(client: DatabaseSync): string[] {
 /**
  * Drizzle wraps each migration in a transaction, where `PRAGMA foreign_keys` is
  * a no-op, so a table rebuild would cascade-delete child rows
- * (drizzle-orm#5782).
+ * (drizzle-orm#5782). ADR 0003 says when the guard can go.
  */
 function runGuarded(
   client: DatabaseSync,

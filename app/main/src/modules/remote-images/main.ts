@@ -129,7 +129,8 @@ async function fetchImage(
 
 /**
  * Node's fetch rather than the window session's, so the session's http
- * backstop stays absolute and no cookie jar or referrer travels with it.
+ * backstop stays absolute and no cookie jar or referrer travels with it
+ * (ADR 0014).
  */
 export function createRemoteImages(
   fetch: typeof globalThis.fetch,

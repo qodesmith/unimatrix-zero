@@ -156,8 +156,9 @@ function exchangeGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
 }
 
 /**
- * A tidy tree from the Tree's structure and measured sizes alone: Branches keep
- * the order they were started in, and a Fork sits centered over its Branches.
+ * A tidy tree from the Tree's structure and measured sizes alone (ADR 0019):
+ * Branches keep the order they were started in, and a Fork sits centered over
+ * its Branches.
  */
 export function layoutTree(
   index: TreeIndex,

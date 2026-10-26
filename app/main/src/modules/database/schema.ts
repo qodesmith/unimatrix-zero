@@ -89,7 +89,10 @@ function sessionKey() {
   }
 }
 
-/** Every entry as the vendor program wrote it, in order, never parsed or edited. */
+/**
+ * Every entry as the vendor program wrote it, in order, never parsed or edited
+ * (ADR 0004).
+ */
 export const sessionEntries = sqliteTable(
   'session_entries',
   {

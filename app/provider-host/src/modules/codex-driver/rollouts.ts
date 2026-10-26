@@ -18,7 +18,10 @@ function relativeIn(home: string, file: string) {
   return relative.split(path.sep).join('/')
 }
 
-/** The thread's and its fork ancestors' rollouts, by path in `CODEX_HOME`. */
+/**
+ * The thread's and its fork ancestors' rollouts, by path in `CODEX_HOME`. Codex
+ * reports each one's file and parent, so the files are never read (ADR 0004).
+ */
 export async function readRollouts(
   server: Pick<AppServer, 'request'>,
   codexHome: string,
