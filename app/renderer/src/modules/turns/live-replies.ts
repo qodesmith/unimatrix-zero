@@ -40,6 +40,16 @@ function without<T>(byReply: Record<string, T>, replyId: string) {
   )
 }
 
+export function withRun(
+  runs: LiveState['runs'],
+  replyId: string,
+  state: ReplyRunState
+) {
+  return state.status === 'idle'
+    ? without(runs, replyId)
+    : {...runs, [replyId]: state}
+}
+
 const MOVES_ON: ReadonlySet<ReplyEvent['type']> = new Set([
   'TEXT_DELTA',
   'TEXT_REPLACE',
@@ -113,11 +123,7 @@ function runsAfter(runs: LiveState['runs'], event: ReplyEvent) {
 
   const after = replyRunTransition(before, runEvent)
 
-  if (after === before) return runs
-
-  return after.status === 'idle'
-    ? without(runs, event.replyId)
-    : {...runs, [event.replyId]: after}
+  return after === before ? runs : withRun(runs, event.replyId, after)
 }
 
 /**

@@ -1,4 +1,5 @@
 import type {Database} from '#modules/database/main'
+import type {Command, CommandResult} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {
   HostCommand,
@@ -7,7 +8,7 @@ import type {
   SignInRequest,
 } from '@uz/contract/host'
 import type {Model, ProviderId} from '@uz/contract/providers'
-import type {Prompt, Reply, ReplyEvent} from '@uz/contract/turns'
+import type {Reply, ReplyEvent} from '@uz/contract/turns'
 
 import {schema} from '#modules/database/main'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
@@ -36,12 +37,7 @@ export interface TurnsDeps {
   now: () => Date
 }
 
-export interface NewPrompt {
-  treeId: string
-  /** The Reply it answers; null for the root Prompt. */
-  parentReplyId: string | null
-  text: string
-}
+export type NewPrompt = Omit<Extract<Command, {type: 'prompt.send'}>, 'type'>
 
 export type Turns = ReturnType<typeof createTurns>
 
@@ -91,7 +87,7 @@ export function createTurns({
       treeId,
       parentReplyId,
       text,
-    }: NewPrompt): {prompt: Prompt; reply: Reply} | null {
+    }: NewPrompt): CommandResult<'prompt.send'> | null {
       const continued =
         parentReplyId === null ? null : continuation(db, treeId, parentReplyId)
 

@@ -1,6 +1,6 @@
 import type {QueryClient} from '@tanstack/react-query'
 import type {CommandResult} from '@uz/contract/commands'
-import type {Prompt, Reply, ReplyProgress} from '@uz/contract/turns'
+import type {Reply, ReplyProgress} from '@uz/contract/turns'
 
 export type Turns = CommandResult<'tree.turns'>
 
@@ -19,7 +19,7 @@ export function withProgress(
 export function addSent(
   queryClient: QueryClient,
   treeId: string,
-  {prompt, reply}: {prompt: Prompt; reply: Reply}
+  {prompt, reply}: CommandResult<'prompt.send'>
 ) {
   queryClient.setQueryData<Turns>(turnsKey(treeId), turns => ({
     prompts: [...(turns?.prompts ?? []), prompt],

@@ -5,6 +5,7 @@ import {useQueryClient} from '@tanstack/react-query'
 import {useSelector} from '@tanstack/react-store'
 import {useCallback} from 'react'
 
+import {withRun} from '../live-replies'
 import {useReplyStore} from '../use-live-reply'
 import {askToRetry, askToStop} from './actions'
 import {initialReplyRun, replyRunTransition} from './machine'
@@ -18,7 +19,7 @@ function sendRun(store: ReplyStore, replyId: string, event: ReplyRunEvent) {
 
   store.setState(state => ({
     ...state,
-    runs: {...state.runs, [replyId]: after},
+    runs: withRun(state.runs, replyId, after),
   }))
 
   return true
