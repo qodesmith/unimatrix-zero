@@ -9,7 +9,7 @@ You are the **orchestrator** of a gauntlet: up to N **rounds** of review → ver
 
 Every agent you launch uses `subagent_type: "general-purpose"`. Never `fork`: a fork inherits this conversation, and with it every earlier report.
 
-The gauntlet is **quiet**. Between setup and the final report, the only thing you say to the user is one line when a round ends, in the form `Round K: 3 changes, 2 open calls, commit <sha>`. Reviews, verified lists and implementer replies go to files, never to the user.
+The gauntlet is **quiet**. Between setup and the final report, the only thing you say to the user is one line when a round ends, in the form `Round K: 3 changes, 2 open calls, 4 dropped, commit <sha>`. Reviews, verified lists and implementer replies go to files, never to the user.
 
 ## 1. Set up
 
@@ -27,7 +27,7 @@ Round K runs from 1 to N.
 
 ### Review
 
-Invoke the `code-review` skill with fixed point `origin/<baseRefName>` and spec `$GAUNTLET/spec.md`. Its two reviewers are fresh agents. You run `code-review` yourself rather than handing it to an agent because it starts agents of its own, and an agent can't. Where it says to present the reports "verbatim or lightly cleaned", write them verbatim, both axes and the summary line, to `$GAUNTLET/round-K-review.md`.
+Invoke the `code-review` skill with fixed point `origin/<baseRefName>` and spec `$GAUNTLET/spec.md`. Its two reviewers are fresh agents. For its standards sources, read `CODE_STYLE.md` and follow its section Review a diff: name `CODE_STYLE.md` and every skill and topic file that section brings in for this diff, so every round reviews against the same standards. You run `code-review` yourself rather than handing it to an agent because it starts agents of its own, and an agent can't. Where it says to present the reports "verbatim or lightly cleaned", write them verbatim, both axes and the summary line, to `$GAUNTLET/round-K-review.md`.
 
 ### Verify
 
@@ -35,19 +35,21 @@ Launch a fresh agent with this prompt, filling in the paths and the diff command
 
 > A code review of this branch is in `<round-K-review.md>`. The diff it reviewed is `git diff origin/<base>...HEAD`, and the spec the PR implements is in `<spec.md>`.
 >
-> Sort the review into what needs to change, what needs a human, and what stays as is. Check every claim against the code and the spec yourself. The review is a lead to investigate, not evidence.
+> Answer one question about this review: does anything actually need to change? Check every claim against the code and the spec yourself. The review is a lead to investigate, not evidence.
 >
-> `<change-log.md>` lists what earlier rounds of this gauntlet changed or rejected, and why. A finding that would reverse one of those entries makes your list only if it is clearly better, not just a different preference.
+> Judge each finding fresh, on the evidence in the code. `<change-log.md>` lists the changes earlier rounds of this gauntlet made, and the ones the implementer skipped. A finding that would undo a change made there makes `## Changes` only if it is clearly better, not just a different preference.
 >
 > `<open-calls.md>` lists judgment calls earlier rounds left for a human. Re-judge every entry against the current code: keep it, drop it if a change since resolved it or it no longer holds, or merge it with a new finding that says the same thing. An entry marked `implementer skipped` is one where the implementer disagreed with the verifier before you; settle it if the code settles it, else keep it.
 >
-> Reply in two sections.
+> Every finding in the review lands in exactly one of three sections. Reply with all three.
 >
-> `## Changes`: numbered items, each `file:line`, the problem, the evidence you checked, why it matters, and the fix. An item makes this list only if it's a real bug, a real improvement to the code, or something that matters in a meaningful way, and the right fix is clear. If there are none, the section's whole body is exactly `NONE`.
+> `## Changes`: everything that should change and has a clear fix: bugs, nits, and improvements that could wait but cost little to make now. "Small" and "local" describe a fix, they are not reasons to skip it. Numbered items, each `file:line`, the problem, the evidence you checked, and the fix. If there are none, the section's whole body is exactly `NONE`.
 >
-> `## Open calls`: the full updated list, kept entries and new ones, numbered, each `file:line`, the question in one line, the two defensible answers, and `(since round J)` with J the round it first appeared (this one is round K). A call makes this list only if both answers are defensible and the choice changes behavior, an interface, or a documented standard; a style preference the owner would wave through either way stays off. If there are none, the section's whole body is exactly `NONE`.
+> `## Open calls`: the full updated list, kept entries and new ones, numbered, each `file:line`, the question in one line, the two defensible answers, and `(since round J)` with J the round it first appeared (this one is round K). A call makes this list only if both answers are defensible and the choice changes behavior, an interface, or a documented standard. If there are none, the section's whole body is exactly `NONE`.
+>
+> `## Dropped`: the findings that are noise: wrong once checked against the code, already handled in the current code, or a preference no documented standard backs. One line each, the finding and why it drops, citing the `file:line` that shows it. If there are none, the section's whole body is exactly `NONE`.
 
-Write the reply verbatim to `$GAUNTLET/round-K-verified.md`. Write the `## Changes` section alone to `$GAUNTLET/round-K-changes.md`, and the `## Open calls` section alone over `$GAUNTLET/open-calls.md`, replacing what was there. If `## Changes` is `NONE`, the gauntlet is done: go to step 3.
+Write the reply verbatim to `$GAUNTLET/round-K-verified.md`. Write the `## Changes` section alone to `$GAUNTLET/round-K-changes.md`, and the `## Open calls` section alone over `$GAUNTLET/open-calls.md`, replacing what was there. `## Dropped` stays in `round-K-verified.md` only: no later agent reads it, so a finding dropped this round is judged fresh if a later review raises it again. If `## Changes` is `NONE`, the gauntlet is done: go to step 3.
 
 ### Implement
 

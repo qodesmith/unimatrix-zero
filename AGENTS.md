@@ -16,6 +16,6 @@ Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/ag
 
 US English (color, behavior, labeled, organize) everywhere you write: code, docs, commits, issues and PRs. Installed skills under `.agents/skills/` and the vendored `tooling/oxlint/anti-slop/` keep their authors' spelling; `bun run lint` checks everything else.
 
-### Repo layout and module boundaries
+### Code style
 
-Packages are deep modules: read [README.md](./README.md) (Layout, Modules, Colors) before adding a package, importing across modules, or writing a color.
+Read [CODE_STYLE.md](./CODE_STYLE.md) before writing or reviewing code, a test or a doc: it names the skill and the topic file for each task.
