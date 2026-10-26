@@ -5,7 +5,7 @@ import {createContext, use} from 'react'
 
 export const ReplyStoreContext = createContext<ReplyStore | null>(null)
 
-function useReplyStore() {
+export function useReplyStore() {
   const store = use(ReplyStoreContext)
 
   if (!store)

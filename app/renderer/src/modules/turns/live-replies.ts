@@ -1,3 +1,4 @@
+import type {StopState} from './stop/machine'
 import type {QueryClient} from '@tanstack/react-query'
 import type {CommandResult} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
@@ -23,21 +24,23 @@ interface LiveState {
   replies: Record<string, StreamingReply>
   /** By Reply id, kept after the Reply finishes; only a reload clears it. */
   thinking: Record<string, ThinkingBlock[]>
+  /** By Reply id, from a Stop asked until its run finishes or starts again. */
+  stops: Record<string, StopState>
 }
 
 export type ReplyStore = Store<LiveState>
 
 export function createReplyStore(): ReplyStore {
-  return new Store<LiveState>({replies: {}, thinking: {}})
+  return new Store<LiveState>({replies: {}, thinking: {}, stops: {}})
 }
 
 export function turnsKey(treeId: string) {
   return ['turns', treeId] as const
 }
 
-function without(replies: Record<string, StreamingReply>, replyId: string) {
+function without<T>(byReply: Record<string, T>, replyId: string) {
   return Object.fromEntries(
-    Object.entries(replies).filter(([id]) => id !== replyId)
+    Object.entries(byReply).filter(([id]) => id !== replyId)
   )
 }
 
@@ -77,6 +80,37 @@ function foldThinking(
     : blocks
 }
 
+/** A Subagent's reasoning isn't the Reply's; a Retry thinks from nothing. */
+function thinkingAfter(
+  thinking: LiveState['thinking'],
+  event: ReplyEvent,
+  current: StreamingReply,
+  now: number
+) {
+  const {replyId} = event
+  const blocks = thinking[replyId] ?? []
+
+  if ('subagentId' in event && event.subagentId !== undefined) return thinking
+
+  const startsOver = event.type === 'RUN_STARTED' && blocks.length > 0
+
+  const nextBlocks = foldThinking(
+    startsOver ? [] : blocks,
+    event,
+    current.content.length,
+    now
+  )
+
+  return nextBlocks === blocks ? thinking : {...thinking, [replyId]: nextBlocks}
+}
+
+/** A run that starts or finishes ends any Stop asked of its Reply. */
+function stopsAfter(stops: LiveState['stops'], event: ReplyEvent) {
+  const ends = event.type === 'RUN_STARTED' || event.type === 'RUN_FINISHED'
+
+  return ends && event.replyId in stops ? without(stops, event.replyId) : stops
+}
+
 /**
  * A `SNAPSHOT` replaces the streaming Replies; at `RUN_FINISHED` the Reply
  * moves into the saved Turns, which main has just written the same way.
@@ -102,24 +136,11 @@ export function applyLiveEvent(
   if (!('replyId' in event)) return
 
   const {treeId, replyId} = event
-  const {replies, thinking} = store.state
+  const {replies, thinking, stops} = store.state
   const current = replies[replyId] ?? {...NEW_REPLY, treeId, replyId}
   const next = foldReplyEvent(current, event)
-  const blocks = thinking[replyId] ?? []
-  const startsOver = event.type === 'RUN_STARTED' && blocks.length > 0
-
-  const nextBlocks =
-    'subagentId' in event && event.subagentId !== undefined
-      ? blocks
-      : foldThinking(
-          startsOver ? [] : blocks,
-          event,
-          current.content.length,
-          now()
-        )
-
-  const nextThinking =
-    nextBlocks === blocks ? thinking : {...thinking, [replyId]: nextBlocks}
+  const nextThinking = thinkingAfter(thinking, event, current, now())
+  const nextStops = stopsAfter(stops, event)
 
   if (event.type === 'RUN_FINISHED') {
     const {status, content, contextSize, contextWindow, failure} = next
@@ -146,6 +167,7 @@ export function applyLiveEvent(
     store.setState(() => ({
       replies: without(replies, replyId),
       thinking: nextThinking,
+      stops: nextStops,
     }))
 
     return
@@ -153,10 +175,11 @@ export function applyLiveEvent(
 
   const changed = next !== current || !(replyId in replies)
 
-  if (changed || nextThinking !== thinking) {
+  if (changed || nextThinking !== thinking || nextStops !== stops) {
     store.setState(() => ({
       replies: changed ? {...replies, [replyId]: next} : replies,
       thinking: nextThinking,
+      stops: nextStops,
     }))
   }
 }

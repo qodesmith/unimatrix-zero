@@ -6,4 +6,6 @@ export {ReplyView} from './ui/ReplyView'
 
 export {useLiveReply} from './use-live-reply'
 
-export {stopReply, useSendPrompt, useTurns} from './use-turns'
+export {useStop} from './stop/use-stop'
+
+export {useSendPrompt, useTurns} from './use-turns'

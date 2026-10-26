@@ -50,13 +50,6 @@ export function useSendPrompt(treeId: string, parentReplyId: string | null) {
   }
 }
 
-/** Its `RUN_FINISHED` follows through the live events. */
-export async function stopReply(treeId: string, replyId: string) {
-  const outcome = await bridge().send({type: 'reply.stop', treeId, replyId})
-
-  return outcome.ok ? null : outcome.error.message
-}
-
 export type RetryOutcome = {ok: true} | {ok: false; error: string}
 
 /**

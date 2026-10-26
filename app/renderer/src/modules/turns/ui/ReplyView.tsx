@@ -13,9 +13,10 @@ import {Button} from '#modules/shadcn/main'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {Fragment, useState} from 'react'
 
+import {useStop} from '../stop/use-stop'
 import {useLiveReply, useThinking} from '../use-live-reply'
 import {useOnline} from '../use-online'
-import {stopReply, useRetryReply} from '../use-turns'
+import {useRetryReply} from '../use-turns'
 
 type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 
@@ -138,21 +139,8 @@ function RetryControls({reply}: {reply: Reply}) {
   )
 }
 
-/** Mounted only while the Reply streams, so a retry starts it fresh. */
 function StopButton({treeId, replyId}: {treeId: string; replyId: string}) {
-  const [stopping, setStopping] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function stop() {
-    setStopping(true)
-    setError(null)
-    const refused = await stopReply(treeId, replyId)
-
-    if (refused !== null) {
-      setError(refused)
-      setStopping(false)
-    }
-  }
+  const {state, stop} = useStop(treeId, replyId)
 
   return (
     <>
@@ -160,12 +148,14 @@ function StopButton({treeId, replyId}: {treeId: string; replyId: string}) {
         size="sm"
         variant="outline"
         className="h-6 px-2 text-xs"
-        disabled={stopping}
-        onClick={() => void stop()}
+        disabled={state.status === 'stopping'}
+        onClick={stop}
       >
-        {stopping ? 'Stopping…' : 'Stop'}
+        {state.status === 'stopping' ? 'Stopping…' : 'Stop'}
       </Button>
-      {error && <span className="text-xs text-destructive">{error}</span>}
+      {state.status === 'refused' && (
+        <span className="text-xs text-destructive">{state.error}</span>
+      )}
     </>
   )
 }

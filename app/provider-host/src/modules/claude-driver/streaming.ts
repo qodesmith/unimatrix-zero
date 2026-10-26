@@ -201,6 +201,28 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     for (const file of files) session.saved.add(file.path)
   }
 
+  /**
+   * Main refusing the save fails the Reply: `disk-full` when the disk is full,
+   * else the app's own error.
+   */
+  async function saveFailure(
+    session: Live,
+    sessionId: string
+  ): Promise<RunFailure | null> {
+    try {
+      await saveToolResults(session, sessionId)
+
+      return null
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const failure = failureOf(message)
+
+      return failure.code === 'disk-full'
+        ? failure
+        : {code: 'driver-error', message}
+    }
+  }
+
   /** A rewind can't take the warm session: it has gone past that Reply. */
   function claimable(request: ReplyRequest): Live | null {
     const {session} = request
@@ -311,7 +333,14 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       return
     }
 
-    if (sessionId) await saveToolResults(session, sessionId)
+    const unsaved = sessionId && (await saveFailure(session, sessionId))
+
+    if (unsaved) {
+      warm.drop(session)
+      yield {...ids, type: 'RUN_FINISHED', status: 'failed', failure: unsaved}
+
+      return
+    }
 
     session.messageId = recorded?.uuid ?? null
 

@@ -101,6 +101,8 @@ function fakeMain(saved: Saved) {
   const settings: Settings = {...DEFAULT_SETTINGS, ...saved.settings}
   const sent: Command[] = []
   const listeners = new Set<(event: AppEvent) => void>()
+  /** What main says when it refuses a Stop; null takes every Stop. */
+  const stops = {refusal: null as string | null}
 
   function publish(event: AppEvent) {
     for (const listener of listeners) listener(event)
@@ -145,7 +147,11 @@ function fakeMain(saved: Saved) {
         return {ok: true, value: {prompt: sentPrompt, reply: started}}
       }
 
-      if (command.type === 'reply.stop') return {ok: true, value: {}}
+      if (command.type === 'reply.stop') {
+        return stops.refusal === null
+          ? {ok: true, value: {}}
+          : {ok: false, error: {code: 'handler-failed', message: stops.refusal}}
+      }
 
       if (command.type === 'reply.retry') {
         const where = replies.findIndex(one => one.id === command.replyId)
@@ -185,7 +191,7 @@ function fakeMain(saved: Saved) {
     registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
   }
 
-  return {...bridge, sent, publish, replies}
+  return {...bridge, sent, publish, replies, stops}
 }
 
 function Providers({children}: {children: ReactNode}) {
@@ -1274,6 +1280,30 @@ it('stops the streaming Reply at the end of the Active Thread with Esc, unless t
   })
   await expect.element(page.getByText('Stopped')).toBeVisible()
   await expect.element(inputUnder('Stopped')).toBeInTheDocument()
+})
+
+it('shares a Stop from Esc with the Reply’s button: Stopping… until it ends, sent once, and a refusal shown', async () => {
+  const {main} = await renderCanvas(endingIn('streaming', ''))
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  main.stops.refusal = 'Claude is not running.'
+
+  await userEvent.keyboard('{Escape}')
+
+  await expect.element(page.getByText('Claude is not running.')).toBeVisible()
+  await expect.element(page.getByRole('button', {name: 'Stop'})).toBeEnabled()
+
+  main.stops.refusal = null
+  await userEvent.keyboard('{Escape}')
+  await expect
+    .element(page.getByRole('button', {name: 'Stopping…'}))
+    .toBeDisabled()
+  await userEvent.keyboard('{Escape}')
+
+  expect(main.sent.filter(command => command.type === 'reply.stop')).toEqual([
+    {type: 'reply.stop', treeId, replyId: uuid(12)},
+    {type: 'reply.stop', treeId, replyId: uuid(12)},
+  ])
+  expect(page.getByText('Claude is not running.').query()).toBeNull()
 })
 
 it('stops the slideout’s streaming Reply with Esc rather than closing the slideout', async () => {

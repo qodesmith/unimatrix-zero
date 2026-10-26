@@ -6,7 +6,7 @@ import type {CanvasOrientation} from '@uz/contract/settings'
 import type {Reply} from '@uz/contract/turns'
 
 import {useSettings, useUpdateSettings} from '#modules/settings/main'
-import {stopReply, useLiveReply, useTurns} from '#modules/turns/main'
+import {useLiveReply, useStop, useTurns} from '#modules/turns/main'
 import {ReactFlowProvider} from '@xyflow/react'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 
@@ -73,11 +73,10 @@ function useEscapeStops({
     (replyId === null ? null : index.replyById.get(replyId))?.status
 
   const streaming = status === 'streaming' ? replyId : null
+  const {stop} = useStop(treeId, streaming)
 
   useEffect(() => {
     if (streaming === null) return undefined
-
-    const replyToStop = streaming
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape' || event.defaultPrevented) return
@@ -87,13 +86,13 @@ function useEscapeStops({
       if (target instanceof Element && target.matches('input, textarea')) return
 
       event.preventDefault()
-      void stopReply(treeId, replyToStop)
+      stop()
     }
 
     globalThis.addEventListener('keydown', onKeyDown, true)
 
     return () => globalThis.removeEventListener('keydown', onKeyDown, true)
-  }, [treeId, streaming])
+  }, [streaming, stop])
 }
 
 /** One Tree on the canvas: a centered Input while it is empty, then its Turns. */

@@ -12,11 +12,14 @@ function keyText({projectKey, sessionId, subpath}: SessionKey) {
   return [projectKey, sessionId, subpath ?? ''].join('\n')
 }
 
+/** The ops main answers with an error, and the error's message. */
+type Refusals = Partial<Record<SessionStoreRequest['op'], string>>
+
 /**
  * Main's side of the session store, in memory for tests: entries deduplicated
  * on `uuid`, and answers a tick later, as from main.
  */
-export function fakeStore() {
+export function fakeStore(refuses: Refusals = {}) {
   const entries = new Map<string, SessionEntry[]>()
   const files = new Map<string, Map<string, SessionFile>>()
 
@@ -77,11 +80,15 @@ export function fakeStore() {
   const client = createSessionStoreClient(message => {
     if (message.type !== 'SESSION_STORE') return
 
+    const refused = refuses[message.request.op]
+
     setTimeout(() => {
-      client.settle(message.requestId, {
-        ok: true,
-        value: answer(message.request),
-      })
+      client.settle(
+        message.requestId,
+        refused === undefined
+          ? {ok: true, value: answer(message.request)}
+          : {ok: false, message: refused}
+      )
     }, 0)
   })
 

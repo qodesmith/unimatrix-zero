@@ -89,12 +89,15 @@ function edited(name: string, edit: (lines: RecordedLine[]) => RecordedLine[]) {
   return file
 }
 
-async function setUp(recordings: string[], env: Record<string, string> = {}) {
+async function setUp(
+  recordings: string[],
+  env: Record<string, string> = {},
+  store = fakeStore()
+) {
   const fake = await replayClaude()
   cleanUps.push(fake.cleanUp)
   const configDir = folder('uz-claude-config-')
   const reports = folder('uz-claude-reports-')
-  const store = fakeStore()
 
   const driver = createClaudeDriver({
     store: store.client,
@@ -417,6 +420,24 @@ it('keeps the files beside a session and puts them back when it resumes', async 
   await claude.allClosed()
 
   expect(claude.reports()[1]?.toolResults).toEqual(['toolu_1.txt'])
+})
+
+it('fails the Reply when the app can’t save its files, and closes its `claude`', async () => {
+  const claude = await setUp(
+    ['warm.ndjson'],
+    {FAKE_CLAUDE_TOOL_RESULT: 'toolu_1.txt'},
+    fakeStore({'save-files': 'database or disk is full'})
+  )
+
+  const events = await claude.reply(FIRST_PROMPT)
+
+  expect(events.map(event => event.type)).not.toContain('REPLY_RECORDED')
+  expect(events.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'failed',
+    failure: {code: 'disk-full'},
+  })
+  await claude.allClosed()
 })
 
 it('replaces the text when a broken stream is sent again', async () => {
