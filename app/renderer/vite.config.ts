@@ -1,4 +1,5 @@
 import tailwindcss from '@tailwindcss/vite'
+import {chromeTarget} from '@uz/tooling/vite'
 import react from '@vitejs/plugin-react'
 import {playwright} from '@vitest/browser-playwright'
 import {defineConfig} from 'vite'
@@ -9,7 +10,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    target: 'chrome152',
+    target: chromeTarget,
     sourcemap: true,
   },
   test: {

@@ -3,10 +3,19 @@ import type {Plugin, UserConfig} from 'vite'
 import {builtinModules} from 'node:module'
 import path from 'node:path'
 
+import runtime from '../electron-runtime.json' with {type: 'json'}
+
 const nodeBuiltins = [
   ...builtinModules,
   ...builtinModules.map(name => `node:${name}`),
 ]
+
+function major(version: string) {
+  return version.split('.')[0]
+}
+
+/** Electron's own Chromium, so the renderer build down-levels nothing. */
+export const chromeTarget = `chrome${major(runtime.chrome)}`
 
 interface NodeBundleOptions {
   root: string
@@ -45,7 +54,7 @@ export function nodeBundle({
     build: {
       outDir: path.join(root, 'dist'),
       emptyOutDir: true,
-      target: 'node24',
+      target: `node${major(runtime.node)}`,
       minify: false,
       sourcemap: true,
       copyPublicDir: false,
