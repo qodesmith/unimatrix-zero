@@ -14,6 +14,15 @@
 
 - Break the behavior by hand, see the test go red, then restore it.
 
+## Control every source of nondeterminism a test asserts on
+
+- A test controls every source of nondeterminism its assertions depend on: time, ordering, randomness, other processes. When it can't control one, it asserts nothing that depends on it.
+- Inject the clock the code waits on. `heldIdle()` in `#modules/test-idle/main` is the example: in a driver test no idle time passes until the test passes it, so a warm vendor program closes only when the test says.
+- Wait for something to happen with `vi.waitFor` or `expect.poll`. Its timeout only catches a hang.
+- Assert that something has not happened only when nothing but the code under test could make it happen. While a real timer runs, that assertion is a race.
+- A test that guards a race goes red on every run with the behavior broken, under CPU load too.
+- A failure on a commit that passes in another run is a bug. Find the race, make it fail every time, then remove it. The fix keeps every timeout as it was, and adds no sleep and no retry; Vitest's `retry` stays unset.
+
 ## Assert on what the unit produced, not on a value the test built. Enforced by: uz/no-fixture-assertion
 
 The lint message says what to assert instead.
