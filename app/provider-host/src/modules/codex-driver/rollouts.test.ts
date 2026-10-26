@@ -97,6 +97,29 @@ it('writes each rollout back under its own name', () => {
   ).toBe(true)
 })
 
+it('leaves a rollout Codex has carried past the saved copy as it is', () => {
+  const file = rollout('rollout-c.jsonl', 'saved\ninterrupted\n')
+
+  writeRolloutsBack(home, [
+    {path: 'sessions/2026/10/22/rollout-c.jsonl', base64: btoa('saved\n')},
+  ])
+
+  expect(fs.readFileSync(file, 'utf8')).toBe('saved\ninterrupted\n')
+})
+
+it('writes the saved copy over a rollout that is shorter or differs', () => {
+  const shorter = rollout('rollout-a.jsonl', 'sav')
+  const differs = rollout('rollout-b.jsonl', 'other\nturns\n')
+
+  writeRolloutsBack(home, [
+    {path: 'sessions/2026/10/22/rollout-a.jsonl', base64: btoa('saved\n')},
+    {path: 'sessions/2026/10/22/rollout-b.jsonl', base64: btoa('saved\n')},
+  ])
+
+  expect(fs.readFileSync(shorter, 'utf8')).toBe('saved\n')
+  expect(fs.readFileSync(differs, 'utf8')).toBe('saved\n')
+})
+
 it('leaves out a compressed rollout Codex has since rewritten plain', () => {
   writeRolloutsBack(home, [
     {path: 'sessions/rollout-c.jsonl.zst', base64: btoa('old')},

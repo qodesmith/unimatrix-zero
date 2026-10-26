@@ -311,6 +311,33 @@ it('resumes the Provider session from the app’s copy alone, written back under
   ])
 })
 
+it('resumes from Codex’s rollout when it carries the app’s copy further, as after a quit mid-Reply', async () => {
+  const opened = await setUp(['started.ndjson'])
+  const first = await opened.reply(FIRST_PROMPT)
+  const second = await opened.reply(SECOND_PROMPT, recordedIn(first))
+  await opened.allClosed()
+
+  const codex = await setUp(['resumed.ndjson'], {store: opened.store})
+  const {projectKey, sessionId} = folderOf(THREAD_ID)
+  const saved = opened.store.filesOf(projectKey, sessionId).get(ROLLOUT)
+  const onDisk = path.join(codex.configDir, ...ROLLOUT.split('/'))
+  fs.mkdirSync(path.dirname(onDisk), {recursive: true})
+  fs.writeFileSync(
+    onDisk,
+    `${atob(saved?.base64 ?? '')}${JSON.stringify({type: 'turn', id: 'interrupted'})}\n`
+  )
+
+  await codex.reply(THIRD_PROMPT, recordedIn(second))
+  const [report] = codex.reports()
+
+  expect(report?.resumedFrom.map(line => line.id)).toEqual([
+    THREAD_ID,
+    FIRST_TURN,
+    SECOND_TURN,
+    'interrupted',
+  ])
+})
+
 it('forks the Provider session through a mid-Thread Reply into a new thread, from the app’s copy alone', async () => {
   const opened = await setUp(['started.ndjson'])
   const first = await opened.reply(FIRST_PROMPT)

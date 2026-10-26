@@ -56,6 +56,16 @@ export async function readRollouts(
 }
 
 /**
+ * A plain rollout on disk that starts with the saved copy is the same thread
+ * carried further, such as by a turn the app quit in before saving.
+ */
+function carriedFurther(target: string, saved: Buffer) {
+  if (!fs.existsSync(target)) return false
+
+  return fs.readFileSync(target).subarray(0, saved.length).equals(saved)
+}
+
+/**
  * Codex rewrites a compressed rollout it resumes as plain `.jsonl`, so when
  * both names are kept the `.zst` is the older and left out.
  */
@@ -71,7 +81,11 @@ export function writeRolloutsBack(codexHome: string, files: SessionFile[]) {
 
     if (!target.startsWith(`${path.resolve(codexHome)}${path.sep}`)) continue
 
+    const saved = Buffer.from(file.base64, 'base64')
+
+    if (!file.path.endsWith('.zst') && carriedFurther(target, saved)) continue
+
     fs.mkdirSync(path.dirname(target), {recursive: true, mode: 0o700})
-    fs.writeFileSync(target, Buffer.from(file.base64, 'base64'), {mode: 0o600})
+    fs.writeFileSync(target, saved, {mode: 0o600})
   }
 }
