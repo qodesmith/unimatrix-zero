@@ -2,11 +2,6 @@ import type {Transitions} from '#modules/state-machine/main'
 
 import {machine} from '#modules/state-machine/main'
 
-/**
- * `turnId` is the Turn the slideout was opened at, kept while it slides away.
- * `followReplyId` is a Reply sent from the slideout, followed once the Tree
- * has it.
- */
 export type ChatState =
   | {status: 'closed'}
   | {status: 'open'; turnId: string; followReplyId: string | null}

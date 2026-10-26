@@ -12,14 +12,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 
 import {CanvasContext} from '../canvas-context'
 import {useChatSlideout} from '../chat-slideout/use-chat-slideout'
-import {
-  indexTurns,
-  isEmpty,
-  newestReply,
-  pathTo,
-  previousReply,
-  replyOf,
-} from '../tree'
+import {indexTurns, isEmpty, newestReply, pathTo, previousReply} from '../tree'
 import {ChatSlideout} from './ChatSlideout'
 import {Flow} from './Flow'
 import {PromptInput} from './PromptInput'
@@ -133,6 +126,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
 
   const {
     turnId: chatTurnId,
+    end: chatEnd,
     open: chatOpen,
     openAt: openChat,
     dismiss: closeChat,
@@ -170,8 +164,6 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
     chosenReplyId !== null && index.replyById.has(chosenReplyId)
       ? chosenReplyId
       : (newestReply(index)?.id ?? null)
-
-  const chatEnd = chatTurnId === null ? null : replyOf(index, chatTurnId)
 
   useEscapeStops({treeId, index, activeReplyId, chatOpen, chatEnd})
 

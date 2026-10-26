@@ -51,4 +51,4 @@ The layout, and why only `@uz/contract` crosses between processes, are in [READM
   - `machine.ts`: the state union, the event union, the initial state and the transition function.
   - `actions.ts`: only when an operation has effects.
   - The runner hook, when the runner is not the one component that reads the state. A runner component is `.tsx`, so it lives under the module's `ui/`.
-- The tests sit in the folder, beside their units. Testing a machine is in [testing](testing.md).
+- Testing a machine is in [testing](testing.md).

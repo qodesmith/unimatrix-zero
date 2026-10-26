@@ -2,8 +2,7 @@
 
 ## Keep functions small. Enforced by: complexity, max-lines
 
-- Keep functions and components small, easy to read and easy to change.
-  `complexity` and `max-lines` are the hard limits; reaching one means the code wants splitting, and the `lint-fixing` skill has the split.
+Reaching one means the code wants splitting, and the `lint-fixing` skill has the split.
 
 ## Parse rather than assert, and derive types from the schema. Enforced by: typescript/no-unsafe-type-assertion, anti-slop/no-runtime-typeof
 

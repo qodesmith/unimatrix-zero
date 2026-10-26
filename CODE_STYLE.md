@@ -1,7 +1,7 @@
 # Code style
 
 Style rules for this repo, for humans and agents, used while writing code and while reviewing it.
-Read this file first, then load the skill and the topic file for your task from `docs/code-style/`.
+Read this file first, then load the skill and the topic file that your task's line names.
 
 ## What this file holds
 

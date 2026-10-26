@@ -39,6 +39,7 @@ export function useChatSlideout(index: TreeIndex) {
 
   return {
     turnId: chat.status === 'closed' ? null : chat.turnId,
+    end: chat.status === 'closed' ? null : replyOf(index, chat.turnId),
     open: chat.status === 'open',
     openAt,
     dismiss,

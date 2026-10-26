@@ -20,7 +20,7 @@ The lint message says what to assert instead.
 
 ## Test every cell of a machine's transition table
 
-- A machine test sits beside the machine (`machine.test.ts`) and checks every cell of the transition table, ignored events included. `canvas/chat-slideout/machine.test.ts` is the example.
+- A machine test (`machine.test.ts`) checks every cell of the transition table, ignored events included. `canvas/chat-slideout/machine.test.ts` is the example.
 - An ignored event, and an accepted event that changes nothing, return the same state object. Assert it with `toBe`, not `toEqual`.
 - A state that the type must refuse gets a `@ts-expect-error` line in the test, so a later change that widens the type fails the typecheck.
 - Write a bug again as a list of events in the machine test, before the fix.
