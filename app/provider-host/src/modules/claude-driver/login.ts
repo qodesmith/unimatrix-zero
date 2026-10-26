@@ -1,6 +1,5 @@
 import {spawn} from 'node:child_process'
 
-/** How to run `claude`: the vendor program, or a stand-in in tests. */
 export interface ClaudeCommand {
   command: string
   args: string[]
@@ -9,30 +8,22 @@ export interface ClaudeCommand {
 export interface LoginEvents {
   /** The sign-in page that shows a code to paste, as `claude` printed it. */
   onUrl(url: string): void
-  /**
-   * `code` is null when `claude` didn't start; `output` is what it said on
-   * stderr.
-   */
+  /** `code` is null when `claude` didn't start; `output` is its stderr. */
   onExit(code: number | null, output: string): void
 }
 
 export interface Login {
-  /** Answers `claude`'s "Paste code here if prompted". */
   enterCode(code: string): void
   kill(): void
 }
 
-/**
- * The first whole link `claude` prints, without the terminal hyperlink escapes
- * it may wrap around it.
- */
+/** The first whole link `claude` prints, without terminal hyperlink escapes. */
 // oxlint-disable-next-line no-control-regex -- BEL and ESC end a terminal hyperlink
 const LINK = /https:\/\/[^\s\u0007\u001b]+(?=[\s\u0007\u001b])/
 
 /**
- * Runs the unmodified `claude auth login` with no terminal. It opens the
- * browser itself on a page that signs in through a local callback, and prints
- * a second page that shows a code instead; the code goes to its stdin.
+ * `claude auth login` opens the browser itself on a local-callback page, and
+ * prints a second page that shows a code instead; the code goes to its stdin.
  */
 export function startLogin(
   {command, args}: ClaudeCommand,
@@ -90,7 +81,6 @@ export function startLogin(
   }
 }
 
-/** Runs `claude auth logout`, which removes the sign-in from its folder. */
 export async function signOut(
   {command, args}: ClaudeCommand,
   env: Record<string, string>

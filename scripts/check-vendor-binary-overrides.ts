@@ -1,8 +1,6 @@
 /**
- * The Agent SDK pulls its per-platform `claude` binaries in as optional
- * dependencies, but the app downloads its own (ADR 0008). Every one the
- * installed SDK lists must be overridden to the empty stub, or a platform the
- * SDK adds later quietly installs a binary we never run.
+ * The app downloads its own `claude` binaries, so every per-platform one the
+ * Agent SDK lists as an optional dependency must be overridden to the stub.
  */
 import path from 'node:path'
 import {z} from 'zod'

@@ -9,7 +9,6 @@ import type {
 
 import {ProviderIdSchema} from '@uz/contract/providers'
 
-/** What one Provider's card shows. */
 export type Card =
   | {kind: 'idle'}
   | {kind: 'connecting'; step: SignInStep; pasting: boolean}
@@ -53,10 +52,7 @@ export function withFailure(
   return {...state, failures: {...state.failures, [provider]: failure}}
 }
 
-/**
- * Folds main's events into the cards. A `SNAPSHOT` replaces everything; the
- * failures it can't know about are dropped with it.
- */
+/** A `SNAPSHOT` replaces everything, dropping failures it can't know about. */
 export function applyConnectionEvent(
   state: ConnectionsState,
   event: AppEvent

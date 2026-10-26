@@ -35,10 +35,6 @@ afterEach(async () => {
   await claude.cleanUp()
 })
 
-/**
- * Deps whose `claude auth login` is the fake; the rest succeed unless
- * overridden.
- */
 function deps(overrides: Partial<ClaudeSignInDeps> = {}) {
   return {
     async *getProgramReady() {

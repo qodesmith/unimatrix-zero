@@ -27,7 +27,6 @@ function rollout(name: string, text: string) {
   return file
 }
 
-/** An app-server that reads threads from `threads`. */
 function reading(
   threads: Record<string, {path: string | null; forkedFromId: string | null}>
 ) {

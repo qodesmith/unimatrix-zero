@@ -1,19 +1,12 @@
 /**
- * Live: drives a real `codex app-server`, signed in to a real ChatGPT plan,
- * so it runs only when asked, on a machine where ChatGPT was connected in the
- * app:
+ * Live, against a real ChatGPT sign-in; runs only when asked:
  *
  * UZ_LIVE_CODEX_PROGRAM=<userData>/vendor/chatgpt/<version>\
  * UZ_LIVE_CODEX_HOME=<userData>/providers/chatgpt\
  * bun run test:node app/provider-host/src/modules/codex-driver/streaming.live
  *
- * It copies the sign-in into fresh folders and runs there, so the second
- * app-server of the first test has nothing but the app's copy of the rollouts
- * to resume from, and the third nothing but that copy to fork from.
- * With `UZ_RECORD=yes` it also writes what the driver and `codex` exchanged
- * into `recordings/`, which the driver tests replay. Each test writes its own
- * recordings, so record one at a time with `-t`: the ids the driver tests pin
- * change with every recording.
+ * `UZ_RECORD=yes` writes the `recordings/` the driver tests replay. Record one
+ * test at a time with `-t`: the ids the driver tests pin change each time.
  */
 import type {ReplyRecorded, SessionRef} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
@@ -148,7 +141,6 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
 
       await delay(IDLE_MS * 2)
 
-      // Through the first Reply only: the second never happened on this Branch.
       const forked = await reply(
         driver(),
         thirdHome,

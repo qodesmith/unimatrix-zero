@@ -21,10 +21,7 @@ import {isFork} from '../tree'
 import {CanvasControls} from './CanvasControls'
 import {ExchangeNode, PromptNode, ReplyNode} from './TurnNodes'
 
-/**
- * A request to bring a Reply to the center; each request has a new sequence
- * number.
- */
+/** A request to center a Reply; every request gets a new sequence. */
 export interface Focus {
   replyId: string
   sequence: number
@@ -39,7 +36,6 @@ interface FlowProps {
   focus: Focus | null
   /** Fit the whole Tree once it is measured; off for a Tree that starts here. */
   fitOnLoad: boolean
-  /** Turns glide to their new places while the orientation switches. */
   switching: boolean
   onHover: (turnId: string | null) => void
   onOpenChat: (turnId: string) => void
@@ -58,10 +54,7 @@ const nodeTypes = {prompt: PromptNode, reply: ReplyNode, exchange: ExchangeNode}
 /** Controls inside a Turn's box keep their clicks to themselves. */
 const CONTROLS = 'a, button, input, textarea, summary, [role="button"]'
 
-/**
- * The Turn a click landed on, read from the box it hit: an Exchange card
- * holds two. None for a click on a control or on the Input under a Reply.
- */
+/** Read from the box hit, not the node, since an Exchange card holds two Turns. */
 function clickedTurnId(target: EventTarget) {
   if (!(target instanceof Element) || target.closest(CONTROLS)) return null
 
@@ -74,10 +67,6 @@ function hoverIdOf(node: TurnNode) {
   return turn.kind === 'exchange' ? (turn.reply?.id ?? turn.prompt.id) : node.id
 }
 
-/**
- * React Flow with the Tree laid out from its structure and the boxes' measured
- * sizes. Scroll pans, pinch or ⌘-scroll zooms, and nothing can be dragged.
- */
 export function Flow({
   index,
   orientation,
@@ -102,7 +91,6 @@ export function Flow({
     [index, orientation, measured, collapsed.ids]
   )
 
-  // The node a Reply is drawn in: its own box, or its Exchange's card.
   const nodeIdOf = useCallback(
     (replyId: string) =>
       orientation === 'vertical'
@@ -210,7 +198,6 @@ export function Flow({
     [layout, thread]
   )
 
-  // Once: the first layout with real sizes shows the whole Tree.
   const fitted = useRef(!fitOnLoad)
 
   useEffect(() => {

@@ -15,8 +15,8 @@ function useReplyStore() {
 }
 
 /**
- * The Reply as it streams, or undefined once it isn't streaming here. Takes
- * null where there is no Reply yet, so a caller's hooks stay in order.
+ * Undefined once the Reply isn't streaming here. Takes null so a caller's hooks
+ * stay in order.
  */
 export function useLiveReply(replyId: string | null) {
   return useSelector(useReplyStore(), state =>

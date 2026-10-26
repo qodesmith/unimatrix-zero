@@ -10,9 +10,8 @@ type Send = (event: AppEvent) => void
 export type Hub = ReturnType<typeof createHub>
 
 /**
- * Main's event fan-out. A window that connects gets a `SNAPSHOT` and then every
- * event published after it; main is single-threaded, so nothing falls between
- * the two and nothing arrives twice.
+ * A window gets a `SNAPSHOT` and then every later event; main is
+ * single-threaded, so nothing falls between the two and nothing arrives twice.
  */
 export function createHub(snapshot: () => Snapshot) {
   const windows = new Map<number, Send>()

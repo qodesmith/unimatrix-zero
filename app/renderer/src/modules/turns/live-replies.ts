@@ -8,23 +8,18 @@ import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 
 export type Turns = CommandResult<'tree.turns'>
 
-/**
- * One contiguous run of the Model's reasoning, before a content part. Display
- * only, never stored, so it lives here until the window reloads. A Model thinks
- * before its first word and again between tool calls, so a Reply may hold
- * several.
- */
+/** A run of the Model's reasoning; display only, never stored. */
 export interface ThinkingBlock {
   text: string
-  /** The content part the thinking came before; the count of parts so far. */
+  /** The count of content parts before this thinking began. */
   beforePart: number
   startedAt: number
-  /** Set once the Reply moves on from thinking; null while it still thinks. */
+  /** Null while the Model still thinks. */
   endedAt: number | null
 }
 
 interface LiveState {
-  /** Replies being written, by Reply id. Saved Turns live in TanStack Query. */
+  /** Streaming Replies by Reply id; saved Turns live in TanStack Query. */
   replies: Record<string, StreamingReply>
   /** By Reply id, kept after the Reply finishes; only a reload clears it. */
   thinking: Record<string, ThinkingBlock[]>
@@ -46,7 +41,6 @@ function without(replies: Record<string, StreamingReply>, replyId: string) {
   )
 }
 
-/** The events that mean the Model has moved on from thinking. */
 const MOVES_ON: ReadonlySet<ReplyEvent['type']> = new Set([
   'TEXT_DELTA',
   'TEXT_REPLACE',
@@ -54,11 +48,7 @@ const MOVES_ON: ReadonlySet<ReplyEvent['type']> = new Set([
   'RUN_FINISHED',
 ])
 
-/**
- * A Thinking block stays open across bookkeeping such as `TOKENS`, which a
- * Provider may report mid-thought, and closes only once words, a tool call or
- * the end of the Reply arrive.
- */
+/** A Thinking block stays open across `TOKENS`, which can come mid-thought. */
 function foldThinking(
   blocks: ThinkingBlock[],
   event: ReplyEvent,
@@ -88,10 +78,8 @@ function foldThinking(
 }
 
 /**
- * Folds a live event into the streaming Replies. A `SNAPSHOT` replaces them
- * with what main has in progress; at `RUN_FINISHED` the Reply moves into the
- * saved Turns, which main has just written the same way. Thinking is folded
- * beside the Reply, since the Reply itself never holds it.
+ * A `SNAPSHOT` replaces the streaming Replies; at `RUN_FINISHED` the Reply
+ * moves into the saved Turns, which main has just written the same way.
  */
 export function applyLiveEvent(
   event: AppEvent,

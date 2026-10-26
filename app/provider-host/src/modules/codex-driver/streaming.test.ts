@@ -50,11 +50,8 @@ interface Report {
   methods: string[]
   prompts: string[]
   resumedFrom: {type: string; id: string}[]
-  /** The `lastTurnId` of a `thread/fork`. */
   forkedThrough: string | null
-  /** The `turnId` of a `turn/interrupt`. */
   interrupted: string | null
-  /** The `beforeTurnId` of a `thread/revert`. */
   reverted: string | null
   /** `input-closed`, `killed`, `refused`, `exited`, or what it didn't expect. */
   ended: string | null
@@ -77,7 +74,6 @@ function folder(prefix: string) {
   return made
 }
 
-/** A copy of the recording `name`, its text as `edit` changes it. */
 function edited(name: string, edit: (text: string) => string) {
   const text = fs.readFileSync(
     path.join(import.meta.dirname, 'recordings', name),
@@ -90,7 +86,6 @@ function edited(name: string, edit: (text: string) => string) {
   return file
 }
 
-/** Runs the Codex driver against the fake `codex`, which replays `recordings`. */
 async function setUp(
   recordings: string[],
   {
@@ -128,10 +123,7 @@ async function setUp(
 
   const treeId = crypto.randomUUID()
 
-  /**
-   * Streams a Reply to its end, stopping it after `stopAfter` text deltas; 0
-   * stops it as it starts.
-   */
+  /** Stops the Reply after `stopAfter` text deltas; 0 stops it as it starts. */
   async function reply(
     text: string,
     session: SessionRef | null = null,
@@ -183,7 +175,6 @@ async function setUp(
       )
   }
 
-  /** Waits until every `codex` started so far has ended. */
   async function allClosed() {
     await vi.waitFor(
       () => {
@@ -324,7 +315,6 @@ it('forks the Provider session through a mid-Thread Reply into a new thread, fro
     fork: true,
   })
 
-  // The second Reply never happened on this Branch.
   expect(textOf(forked)).toBe('You asked: “Say hi in three words.”')
   expect(recordedIn(forked)).toEqual({
     sessionId: FORKED_THREAD_ID,
@@ -342,7 +332,7 @@ it('forks the Provider session through a mid-Thread Reply into a new thread, fro
     SECOND_TURN,
   ])
 
-  // The fork's rollout, and the original's it points into, are kept under the fork.
+  // The fork's rollout points into the original's, so both are kept under it.
   const fork = folderOf(FORKED_THREAD_ID)
 
   expect([

@@ -1,8 +1,4 @@
-/**
- * Oxlint ships new rules most weeks, and a bump nobody reads turns the linter
- * into a stranger. The installed oxlint must be the version whose rule changes
- * `reviewed-oxlint-version` in package.json says someone read.
- */
+/** Fails until someone has read the rule changes up to the installed oxlint. */
 import path from 'node:path'
 import {z} from 'zod'
 

@@ -37,10 +37,7 @@ export const ThemeSetSchema = z.object({
   shiki: z.string(),
 })
 
-/**
- * A Theme is token values only, with a light set, a dark set, or both. Unknown
- * keys are dropped.
- */
+/** Token values only; unknown keys are dropped. */
 export const ThemeSchema = z
   .object({
     version: z.literal(1),

@@ -21,16 +21,10 @@ export class DatabaseOpenError extends Error {
 }
 
 interface OpenOptions {
-  /** A file path, or `:memory:` for tests. */
   file: string
   migrationsFolder: string
 }
 
-/**
- * Opens the app's database and brings it up to date: a database written by a
- * newer app is refused, and pending migrations run behind a backup and the
- * foreign-key guard (ADR 0003).
- */
 export function openDatabase({file, migrationsFolder}: OpenOptions): Database {
   const onDisk = file !== ':memory:'
 
@@ -89,10 +83,9 @@ function appliedMigrations(client: DatabaseSync): string[] {
 }
 
 /**
- * Drizzle wraps each migration in a transaction, where `PRAGMA foreign_keys`
- * is a no-op, so a table rebuild would cascade-delete child rows
- * (drizzle-orm#5782). Turning the pragma off first and checking afterward
- * avoids that.
+ * Drizzle wraps each migration in a transaction, where `PRAGMA foreign_keys` is
+ * a no-op, so a table rebuild would cascade-delete child rows
+ * (drizzle-orm#5782).
  */
 function runGuarded(
   client: DatabaseSync,
@@ -121,7 +114,6 @@ function backupsFolder(file: string) {
   return path.join(path.dirname(file), 'backups')
 }
 
-/** Copies the database before migrating, keeping only the newest few copies. */
 function backUp(client: DatabaseSync, file: string): string {
   const folder = backupsFolder(file)
   fs.mkdirSync(folder, {recursive: true, mode: 0o700})

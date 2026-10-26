@@ -17,10 +17,7 @@ interface NodeBundleOptions {
   plugins?: Plugin[]
 }
 
-/**
- * One fully bundled Node-side build (main, preload, Provider hosts, shell):
- * every dependency inlined, only `electron` and Node's own modules external.
- */
+/** One fully bundled Node-side build (main, preload, Provider hosts, shell). */
 export function nodeBundle({
   root,
   entry,
@@ -66,9 +63,8 @@ export function nodeBundle({
 }
 
 /**
- * The preload runs inside a sandboxed renderer, where only
- * `require('electron')` exists. Fail the build if the bundle leans on anything
- * else.
+ * A sandboxed preload can only `require('electron')`, so fail the build if the
+ * bundle leans on anything else.
  */
 export function selfContainedPreload(): Plugin {
   return {

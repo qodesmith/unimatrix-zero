@@ -18,11 +18,7 @@ async function notYet(): Promise<never> {
 type ClaudeDriverOptions = Pick<ClaudeRepliesDeps, 'store'> &
   Partial<Omit<ClaudeRepliesDeps, 'store'>>
 
-/**
- * Claude through its unmodified vendor program: connecting, and Replies that
- * stream from `claude` in streaming-input mode, written by the plan's default
- * Model.
- */
+/** Claude through its unmodified vendor program. */
 export function createClaudeDriver({
   store,
   query: run = query,

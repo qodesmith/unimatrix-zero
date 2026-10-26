@@ -18,7 +18,6 @@ interface ChatSlideoutProps {
   open: boolean
   onClose: () => void
   onClosed: () => void
-  /** The user is in the Input: its Thread becomes the Active Thread. */
   onFocus: (replyId: string) => void
   /** A Prompt was sent from the Input and main started this Reply for it. */
   onSent: (replyId: string) => void
@@ -172,10 +171,7 @@ interface ChatInputProps {
   onSent: (replyId: string) => void
 }
 
-/**
- * The Input at the end of the Thread, once its Reply is done, sharing its draft
- * with that Reply's Input on the canvas. A failed Reply has Retry instead.
- */
+/** Shares its draft with the same Reply's Input on the canvas. */
 function ChatInput({end, onFocus, onSent}: ChatInputProps) {
   const {treeId, drafts, setDraft} = useCanvas()
   const status = useLiveReply(end.id)?.status ?? end.status

@@ -2,7 +2,6 @@ import type {ProviderId, SignInFailure} from '@uz/contract/providers'
 
 import {PROVIDER_NAMES} from '@uz/contract/providers'
 
-/** How each Provider's card names its plans, its company and its program. */
 export const ABOUT: Record<
   ProviderId,
   {
@@ -44,7 +43,6 @@ const FAILURE_LINES: Record<
   failed: (_provider, failure) => failure.message,
 }
 
-/** Why connecting failed, in plain words for the card. */
 export function failureLine(provider: ProviderId, failure: SignInFailure) {
   return FAILURE_LINES[failure.reason](provider, failure)
 }

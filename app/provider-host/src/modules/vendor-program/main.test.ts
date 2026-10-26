@@ -27,7 +27,6 @@ afterEach(async () => {
   await fs.rm(folder, {recursive: true, force: true})
 })
 
-/** A server that sends `body` in 100-byte chunks. */
 function serving(body: Uint8Array, status = 200) {
   return vi.fn<typeof fetch>(
     async () =>
@@ -132,7 +131,6 @@ interface TarEntry {
   type?: string
 }
 
-/** A tar.gz as a vendor's release packs one. */
 function tarGz(entries: TarEntry[]) {
   const blocks = entries.flatMap(({name, body = '', mode = 0o644, type}) => {
     const header = Buffer.alloc(512)

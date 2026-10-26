@@ -13,11 +13,8 @@ import type {TurnError} from './protocol/v2/TurnError'
 
 import {z} from 'zod'
 
-/*
- * What the driver reads of the app-server protocol, parsed as it arrives.
- * Each schema `satisfies` the generated type it reads from, so a Codex bump
- * that changes one of those fields fails typecheck here.
- */
+// Each schema `satisfies` the generated type it reads from, so a Codex bump
+// that changes one of those fields fails typecheck here.
 
 const ThreadSchema = z.looseObject({
   id: z.string(),
@@ -37,10 +34,7 @@ const TurnSchema = z.looseObject({
   Pick<Turn, 'id' | 'status'> & {error: Pick<TurnError, 'message'> | null}
 >
 
-/**
- * The signed-in account. Only a ChatGPT account has an email and a plan,
- * which is one of `PlanType` or a plan this Codex doesn't know yet.
- */
+/** `planType` may be a plan this Codex doesn't know yet, so it stays a string. */
 const AccountSchema = z.looseObject({
   type: z.string(),
   email: z.string().nullable().optional(),
@@ -49,16 +43,11 @@ const AccountSchema = z.looseObject({
   Partial<Pick<Extract<Account, {type: 'chatgpt'}>, 'email'>>
 >
 
-/**
- * A Provider session opened by `thread/start`, `thread/resume` or
- * `thread/fork`, and its Model.
- */
 const OpenedThreadSchema = z.looseObject({
   thread: ThreadSchema,
   model: z.string(),
 })
 
-/** The answer the driver reads to each request it sends. */
 export const RESPONSES = {
   initialize: z.looseObject({}),
   'account/login/start': z.looseObject({
@@ -106,7 +95,6 @@ const ThreadTokenUsageSchema = z.looseObject({
   modelContextWindow: z.number().nullable().catch(null),
 }) satisfies z.ZodType<Pick<ThreadTokenUsage, 'modelContextWindow'>>
 
-/** A message the AI wrote; every other item is passed over. */
 export const AgentMessageItemSchema = z.looseObject({
   type: z.literal('agentMessage'),
   id: z.string(),
@@ -118,7 +106,6 @@ const RateLimitWindowSchema = z.looseObject({
   resetsAt: z.number().nullable(),
 }) satisfies z.ZodType<Pick<RateLimitWindow, 'usedPercent' | 'resetsAt'>>
 
-/** The account's windows; one unknown or malformed reads as unreported. */
 const RateLimitsSchema = z.looseObject({
   primary: RateLimitWindowSchema.nullable().catch(null),
   secondary: RateLimitWindowSchema.nullable().catch(null),
@@ -133,7 +120,6 @@ function notification<
   return z.looseObject({method: z.literal(method), params})
 }
 
-/** The notifications the driver reads; it ignores the rest. */
 export const NotificationSchema = z.discriminatedUnion('method', [
   notification(
     'account/login/completed',
@@ -184,13 +170,11 @@ export const NotificationSchema = z.discriminatedUnion('method', [
 
 export type Notification = z.infer<typeof NotificationSchema>
 
-/** A request from the app-server, which asks the app something. */
 export const ServerRequestSchema = z.looseObject({
   id: z.union([z.string(), z.number()]),
   method: z.string(),
 })
 
-/** The app-server's answer to one of the driver's requests. */
 export const AnswerSchema = z.looseObject({
   id: z.number(),
   result: z.unknown().optional(),

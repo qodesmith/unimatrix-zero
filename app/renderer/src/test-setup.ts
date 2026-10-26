@@ -1,3 +1,2 @@
-// The window's stylesheet, so a test sees the layout the user does: heights,
-// capped boxes and what Tailwind hides.
+// So a test sees the user's layout: heights, capped boxes, what Tailwind hides.
 import './styles.css'

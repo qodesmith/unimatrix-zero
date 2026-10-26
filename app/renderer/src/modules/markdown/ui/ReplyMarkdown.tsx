@@ -50,10 +50,8 @@ interface ReplyMarkdownProps {
 }
 
 /**
- * One text part of a Reply as rich Markdown: highlighted code, math, a
- * diagram when there is one, and nothing that reaches the network on its own.
- * Links open in the default browser through main's link rule; remote images
- * are chips until clicked.
+ * Never reaches the network on its own: links open through main's link rule,
+ * and remote images are chips until clicked.
  */
 export function ReplyMarkdown({text, streaming}: ReplyMarkdownProps) {
   const mermaid = useMermaid(hasDiagram(text))

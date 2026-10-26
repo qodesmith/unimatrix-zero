@@ -89,10 +89,7 @@ function sessionKey() {
   }
 }
 
-/**
- * The app's own copy of each Provider session's transcript (ADR 0004): every
- * entry as the vendor program wrote it, in order, never parsed or edited.
- */
+/** Every entry as the vendor program wrote it, in order, never parsed or edited. */
 export const sessionEntries = sqliteTable(
   'session_entries',
   {
@@ -124,7 +121,6 @@ export const sessionEntries = sqliteTable(
   ]
 )
 
-/** Files the vendor program keeps beside a session, such as large tool results. */
 export const sessionFiles = sqliteTable(
   'session_files',
   {
@@ -144,7 +140,6 @@ export const sessionFiles = sqliteTable(
   ]
 )
 
-/** A connected Provider and the account its vendor program signed in with. */
 export const providers = sqliteTable(
   'providers',
   {

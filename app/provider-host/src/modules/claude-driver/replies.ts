@@ -18,29 +18,20 @@ type MessageUsage = Extract<StreamEvent, {type: 'message_delta'}>['usage']
 
 type RunFinished = Extract<ReplyEvent, {type: 'RUN_FINISHED'}>
 
-/**
- * What `claude` names the Model of a message it made up itself, such as an
- * error.
- */
+/** What `claude` names the Model of a message it made up, such as an error. */
 const SYNTHETIC_MODEL = '<synthetic>'
 
 type ReplyIds = Pick<ReplyRequest, 'treeId' | 'replyId'>
 
 /**
- * Turns one Reply's SDK messages into contract events. Text streams as
- * deltas; when the stream turns out not to be what Claude wrote, because it
- * broke and was silently sent again, the text part's text is replaced
- * instead. Thinking is passed on for display and never kept. A Subagent's
- * messages are left out.
+ * Turns one Reply's SDK messages into contract events. A stream that broke and
+ * was silently resent has its text replaced; Subagent messages are left out.
  */
 export function createReplyMapper(ids: ReplyIds) {
   /** The current text part's text, as the events so far show it. */
   let shown = ''
-  /** `shown` when the message being streamed began. */
   let atMessageStart = ''
-  /** `shown` when the text block being streamed began. */
   let atBlockStart = ''
-  /** The text block being streamed, or null outside one. */
   let block: string | null = null
   let messageOpen = false
   let mirrorFailed = false
@@ -116,10 +107,7 @@ export function createReplyMapper(ids: ReplyIds) {
     return []
   }
 
-  /**
-   * The window of the Model that wrote the Reply, which `claude` reports only
-   * with the result, per Model. Omitted when no entry can be told apart.
-   */
+  /** `claude` reports the context window only with the result, per Model. */
   function contextWindowOf(modelUsage: Record<string, ModelUsage>) {
     const entries = Object.values(modelUsage)
 
@@ -134,10 +122,6 @@ export function createReplyMapper(ids: ReplyIds) {
       : undefined
   }
 
-  /**
-   * The finished block as Claude wrote it. When it differs from what
-   * streamed, it replaces it; when it never streamed, it is added whole.
-   */
   function onAssistant({message, uuid}: SDKAssistantMessage): ReplyEvent[] {
     if (message.model === SYNTHETIC_MODEL) return []
 
@@ -184,7 +168,6 @@ export function createReplyMapper(ids: ReplyIds) {
       return []
     },
 
-    /** How the Reply ended, as its last event. */
     finished(result: SDKResultMessage): RunFinished {
       const contextWindow = contextWindowOf(result.modelUsage)
       const windowField = contextWindow === undefined ? {} : {contextWindow}
@@ -222,10 +205,7 @@ export function createReplyMapper(ids: ReplyIds) {
       }
     },
 
-    /**
-     * Claude's last message of the Reply and its Model, once every entry
-     * reached the app's copy of the session; null when one didn't.
-     */
+    /** Null when an entry didn't reach the app's copy of the session. */
     recorded() {
       return mirrorFailed ? null : lastMessage
     },

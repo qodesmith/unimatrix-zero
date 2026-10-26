@@ -2,7 +2,7 @@ import type {Theme} from '@uz/contract/theme'
 
 const font = "'Figtree Variable', ui-sans-serif, system-ui, sans-serif"
 
-/** The default Theme: calm, warm neutral, one clay accent. */
+/** The default Theme. */
 export const hearth: Theme = {
   version: 1,
   name: 'Hearth',

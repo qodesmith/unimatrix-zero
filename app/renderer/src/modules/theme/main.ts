@@ -28,10 +28,7 @@ function applyThemeSet(
   root.style.colorScheme = mode
 }
 
-/**
- * Writes the Theme's tokens onto `:root` for the system's mode and keeps
- * following the system.
- */
+/** Writes the Theme's tokens onto `:root` and follows the system's mode. */
 export function followSystemMode(
   theme: Theme = hearth,
   window: Window = globalThis.window

@@ -21,8 +21,8 @@ export function useSettings(): Settings {
 }
 
 /**
- * Changes some Settings. The window shows the change at once; main's answer,
- * or its refusal, settles what every window shows.
+ * Shows the change at once; main's answer, or its refusal, settles what every
+ * window shows.
  */
 export function useUpdateSettings() {
   const store = useSettingsStore()

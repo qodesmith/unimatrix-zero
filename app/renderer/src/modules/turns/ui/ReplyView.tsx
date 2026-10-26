@@ -19,10 +19,7 @@ import {stopReply, useRetryReply} from '../use-turns'
 
 type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 
-/**
- * A Reply's content, live while it streams: the box around it belongs to
- * whoever shows it. Re-renders only when this Reply changes.
- */
+/** A Reply's content, live while it streams; the caller owns its box. */
 export function ReplyView({reply}: {reply: Reply}) {
   const live = useLiveReply(reply.id)
   const blocks = useThinking(reply.id)
@@ -85,8 +82,8 @@ const NOT_READY: Record<
 }
 
 /**
- * Why Retry is held right now, or null when it may run. Held without a
- * reason until main has said where the Provider stands.
+ * Why Retry is held, or null when it may run; '' until main reports the
+ * Provider's status.
  */
 function retryHeldBecause(
   online: boolean,
@@ -102,10 +99,7 @@ function retryHeldBecause(
   return NOT_READY[status](PROVIDER_NAMES[provider])
 }
 
-/**
- * Mounted only while the Reply has failed, so a retry that takes starts it
- * fresh.
- */
+/** Mounted only while the Reply has failed, so a retry that takes resets it. */
 function RetryControls({reply}: {reply: Reply}) {
   const retryReply = useRetryReply(reply.treeId)
   const online = useOnline()
@@ -203,7 +197,6 @@ function describeFailure(failure: RunFailure, provider: ProviderId) {
   return FAILURE_LINES[failure.code](failure, PROVIDER_NAMES[provider])
 }
 
-/** How a Reply ended, when it did not simply finish. */
 function StatusLine({
   status,
   failure,
@@ -240,7 +233,6 @@ function describeDuration(ms: number) {
   return `${Math.round(ms / 60_000)}m`
 }
 
-/** One Thinking block, collapsed, with how long it took once the Model moved on. */
 function ThinkingBlockView({block}: {block: ThinkingBlock}) {
   const {text, startedAt, endedAt} = block
 
@@ -256,7 +248,6 @@ function ThinkingBlockView({block}: {block: ThinkingBlock}) {
   )
 }
 
-/** The arguments as JSON when they parse, otherwise as the Provider sent them. */
 function prettyArgs(args: string) {
   try {
     return JSON.stringify(JSON.parse(args), null, 2)
@@ -265,7 +256,6 @@ function prettyArgs(args: string) {
   }
 }
 
-/** A tool call where it happened: its name, arguments and result. */
 function ToolCallView({part}: {part: ToolCall}) {
   const {toolName, args, result} = part
 

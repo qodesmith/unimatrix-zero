@@ -2,10 +2,8 @@ import type {CommandResult} from '@uz/contract/commands'
 
 export const IMAGE_SIZE_LIMIT = 20 * 1024 * 1024
 
-/** A server that never answers hands the chip back to the user. */
 const TIMEOUT_MS = 30_000
 
-/** Image CDNs redirect once or twice; more than this is a loop. */
 export const REDIRECT_LIMIT = 5
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
@@ -22,7 +20,6 @@ function tooLarge() {
   )
 }
 
-/** Where a redirect points, or null when the response is the image itself. */
 function redirectTarget(from: URL, response: Response) {
   const location = response.headers.get('Location')
 
@@ -32,9 +29,8 @@ function redirectTarget(from: URL, response: Response) {
 }
 
 /**
- * The user's click agreed to the address on the chip. A redirect may move the
- * image to another host, as image CDNs do, but never off the web, and never
- * off https when the chip was https.
+ * A redirect may move the image to another host, but never off the web, and
+ * never off https when the chip was https.
  */
 function refusedHop(requested: URL, next: URL) {
   if (next.protocol === 'https:') return null
@@ -49,10 +45,8 @@ function refusedHop(requested: URL, next: URL) {
 }
 
 /**
- * Follows redirects one hop at a time, checking each address before any
- * request goes to it, so a secure chip never produces a request in the clear.
- * Node's own `redirect: 'follow'` would make the request first and only then
- * reveal where it ended up.
+ * Checks each hop before requesting it. Node's `redirect: 'follow'` would make
+ * the request first, so a secure chip could produce a request in the clear.
  */
 async function follow(
   fetch: typeof globalThis.fetch,
@@ -87,9 +81,8 @@ async function follow(
 }
 
 /**
- * Reads the body and stops the moment it passes the limit, so a server that
- * sends no size, or lies about it, still cannot fill main's memory. Leaving
- * the loop cancels the stream, which closes the connection.
+ * Enforces the limit while reading, since a server may send no size or lie
+ * about it. Leaving the loop cancels the stream, which closes the connection.
  */
 async function readWithin(body: ReadableStream<Uint8Array>) {
   const chunks: Uint8Array[] = []
@@ -135,9 +128,8 @@ async function fetchImage(
 }
 
 /**
- * Loads the remote images a Reply links, one click each (ADR 0014). Node's
- * fetch rather than the window session's, so the session's http backstop
- * stays absolute and no cookie jar or referrer ever travels with the request.
+ * Node's fetch rather than the window session's, so the session's http
+ * backstop stays absolute and no cookie jar or referrer travels with it.
  */
 export function createRemoteImages(
   fetch: typeof globalThis.fetch,

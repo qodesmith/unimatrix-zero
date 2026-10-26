@@ -7,9 +7,8 @@ import {useEffect, useState} from 'react'
 import {applyEvent} from './apply-event'
 
 /**
- * The Trees list: `tree.list` once, then live events. Main answers and sends
- * on one ordered channel, so events folded in before the list arrives are
- * already part of it.
+ * Main answers and sends on one ordered channel, so events folded in before
+ * `tree.list` answers are already part of the list.
  */
 export function useTrees() {
   const [trees, setTrees] = useState<Tree[]>([])
@@ -33,7 +32,6 @@ export function useTrees() {
     return unsubscribe
   }, [])
 
-  /** Sends a command, shows its error if it fails, and returns its value. */
   async function run<C extends Command>(command: C) {
     const outcome = await bridge().send(command)
     setError(outcome.ok ? null : outcome.error.message)

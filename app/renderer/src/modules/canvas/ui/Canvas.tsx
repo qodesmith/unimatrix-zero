@@ -17,10 +17,8 @@ import {ChatSlideout} from './ChatSlideout'
 import {Flow} from './Flow'
 import {PromptInput} from './PromptInput'
 
-/** How long Turns take to glide to their places in the other orientation. */
 const SWITCH_MS = 400
 
-/** The set with one id added when it was out, or taken out when it was in. */
 function toggled(id: string) {
   return (current: ReadonlySet<string>) => {
     const next = new Set(current)
@@ -31,10 +29,7 @@ function toggled(id: string) {
   }
 }
 
-/**
- * The Forks on a Thread unfolded, so the Turn after it is on the canvas; the
- * topmost, the one still on screen, keeps its place.
- */
+/** Unfolds the Forks over a Turn; the topmost, still on screen, keeps its place. */
 function unfoldedOver(index: TreeIndex, replyId: string) {
   return (current: Collapsed): Collapsed => {
     const folded = pathTo(index, replyId).filter(id => current.ids.has(id))
@@ -60,9 +55,8 @@ interface EscapeStops {
 }
 
 /**
- * Esc stops the streaming Reply the user is looking at: the open slideout's
- * end, else the Active Thread's. It takes the key before the slideout closes
- * on it. Esc in a field belongs to that field.
+ * Esc stops the streaming Reply in view, the slideout's end else the Active
+ * Thread's, capturing the key before the slideout closes on it.
  */
 function useEscapeStops({
   treeId,
@@ -167,7 +161,6 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
 
   useEscapeStops({treeId, index, activeReplyId, chatOpen, chatEnd})
 
-  // Hovering redraws the highlight only while the pointer is on the Turn.
   const highlightedTurnId =
     hoverTurnId ?? (chatOpen ? chatEnd?.id : null) ?? activeReplyId
 

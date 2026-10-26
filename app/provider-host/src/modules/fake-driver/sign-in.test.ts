@@ -13,7 +13,6 @@ import {
 
 const request = {program: null, configDir: '/nowhere'}
 
-/** Connects, letting `react` act on each update as the user would. */
 async function connect(
   driver: ProviderDriver,
   react: (update: SignInUpdate) => void = () => undefined

@@ -40,9 +40,8 @@ type Restore = 'none' | 'store' | 'file'
 
 interface Live extends ClaudeSession {
   restore: Restore
-  /** Where `claude` files the session. */
   projectKey: string
-  /** The configuration folder `claude` runs with: the SDK's own on a restore. */
+  /** The SDK swaps in its own configuration folder on a restore. */
   activeConfigDir: () => string
   /** Tool result files already in the app's copy. */
   saved: Set<string>
@@ -50,11 +49,7 @@ interface Live extends ClaudeSession {
 
 type Mapper = ReturnType<typeof createReplyMapper>
 
-/**
- * How `claude` takes up the Provider session: as it stands, forked through
- * the Reply answered into a new session, or cut back to that Reply for a
- * rewind. `upTo` is the last message kept, when it is cut.
- */
+/** `upTo` is the last message kept, when a fork or rewind cuts the session. */
 function resumption(session: ReplyRequest['session'], restore: Restore) {
   if (!session || restore === 'none') {
     return {resume: null, fork: false, upTo: null}
@@ -74,13 +69,7 @@ function crashed(message: string): RunFailure {
   return {code: 'program-crashed', message}
 }
 
-/**
- * Claude's Replies: each Prompt goes to the warm session standing at the
- * Reply it answers, or to a `claude` that resumes the Provider session from
- * the app's copy, or that starts a new one. A Prompt that starts a Branch
- * goes to a `claude` that forks the session through the Reply it answers,
- * into a new session; the warm `claude` of the other Branch keeps going.
- */
+/** Replies from a warm `claude`, or a new one that resumes, forks or starts. */
 export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   const warm = createWarmSessions<Live>({
     idleMs: deps.idleMs,
@@ -152,10 +141,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     })
   }
 
-  /**
-   * Each Reply being written: its session once `claude` has the Prompt, and
-   * whether a stop came before then, to pass on as soon as it does.
-   */
+  /** A stop asked before `claude` has the Prompt waits in `stopAsked`. */
   const writing = new Map<string, {session: Live | null; stopAsked: boolean}>()
 
   async function* attempt(
@@ -195,7 +181,6 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     }
   }
 
-  /** Keeps the session's new tool result files in the app's copy. */
   async function saveToolResults(session: Live, sessionId: string) {
     const files = readNewToolResults(
       {
@@ -216,11 +201,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     for (const file of files) session.saved.add(file.path)
   }
 
-  /**
-   * The warm session standing at the Reply the Prompt answers, when the
-   * Prompt can go to it. A fork never takes one, and a rewind can't: the
-   * session it finds there has gone past that Reply, so it is closed.
-   */
+  /** A rewind can't take the warm session: it has gone past that Reply. */
   function claimable(request: ReplyRequest): Live | null {
     const {session} = request
 
@@ -238,13 +219,9 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   }
 
   /**
-   * Sends the Prompt and streams Claude's answer, from the warm session
-   * standing at the Reply answered, else a new `claude`. A warm one whose
-   * `claude` exited while idle answers nothing, so a new one resumes in its
-   * place. When the restore from the store doesn't get `claude` going, the
-   * transcript is written back and it goes again from there. A fork always
-   * gets a new `claude`: no warm session is claimed, and none is closed. So
-   * does a rewind, which resumes the session cut back to the Reply answered.
+   * A warm `claude` that exited while idle answers nothing, so a new one
+   * resumes in its place. When the restore from the store doesn't get
+   * `claude` going, the transcript is written back and it goes again.
    */
   async function* answer(
     request: ReplyRequest,
@@ -353,12 +330,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     yield finished
   }
 
-  /**
-   * Interrupts the turn writing the Reply, once `claude` has taken the
-   * request; the Reply's stream goes on to its `RUN_FINISHED`. A stop before
-   * `claude` has the Prompt is passed on as soon as it does. Nothing when no
-   * Reply by that id is being written.
-   */
+  /** The Reply's stream still goes on to its `RUN_FINISHED`. */
   async function stop(replyId: string) {
     const entry = writing.get(replyId)
 

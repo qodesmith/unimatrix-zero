@@ -24,7 +24,6 @@ import {z} from 'zod'
 
 import {continuation, recovery} from './continuation'
 
-/** How long partial text may go unsaved while a Reply streams. */
 export const PARTIAL_SAVE_MS = 1000
 
 const ContentSchema = z.array(ReplyPartSchema)
@@ -89,11 +88,9 @@ interface NewPrompt {
 export type Turns = ReturnType<typeof createTurns>
 
 /**
- * Prompts and Replies. A streaming Reply is folded here, saved, and only then
- * published, so a window never shows what main has not saved or is not about
- * to save: the row at start, at each finished part, at most a second behind
- * for partial text, and at the end. Nothing streams before this runs, so a
- * Reply still `streaming` was left so when the app last quit: it becomes
+ * A streaming Reply is saved before it is published, so a window never shows
+ * what main has not saved or is not about to save. Nothing streams before this
+ * runs, so a Reply still `streaming` was left by the last quit: it becomes
  * `interrupted` here, once per launch.
  */
 export function createTurns(db: Database, publish: (event: AppEvent) => void) {
@@ -120,10 +117,6 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
     entry.saveTimer ??= setTimeout(() => save(entry), PARTIAL_SAVE_MS)
   }
 
-  /**
-   * Folds an event from a Provider host into its Reply, saves when due, then
-   * publishes it. Events for a Reply that host isn't writing are dropped.
-   */
   function apply(provider: ProviderId, event: ReplyEvent) {
     const entry = inFlight.get(event.replyId)
 
@@ -146,7 +139,6 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
     publish(event)
   }
 
-  /** Saves and publishes the Reply as failed, with the text it last showed. */
   function fail(entry: InFlight, failure: RunFailure) {
     const {treeId, replyId} = entry.reply
 
@@ -159,10 +151,6 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
     })
   }
 
-  /**
-   * The Provider saved the Reply in its session: keeps where, and the Model
-   * that wrote it. Ignored for a Reply of another Provider or Tree.
-   */
   function record(provider: ProviderId, recorded: ReplyRecorded) {
     const {treeId, replyId, model, session} = recorded
 
@@ -182,7 +170,6 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
       .run()
   }
 
-  /** The System prompt's id, saving it first if no Reply has used it. */
   function saveSystemPrompt(text: string) {
     const hash = createHash('sha256').update(text).digest('hex')
 
@@ -225,10 +212,7 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
     recovery: (treeId: string, replyId: string) =>
       recovery(db, treeId, replyId),
 
-    /**
-     * Starts the Reply over, in place: streaming again from nothing, with
-     * its failure cleared. Its Provider host is asked for it separately.
-     */
+    /** Resets the Reply in place; its Provider host is asked for it separately. */
     restart(replyId: string): Reply {
       const row = db
         .update(replies)
@@ -248,7 +232,6 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
       return toReply(row)
     },
 
-    /** The Provider whose host is writing this Reply; throws when none is. */
     writer(treeId: string, replyId: string): ProviderId {
       const entry = inFlight.get(replyId)
 
@@ -259,10 +242,6 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
       return entry.provider
     },
 
-    /**
-     * Saves a Prompt answering a Reply, or the root Prompt of an empty Tree,
-     * and its Reply, which starts out streaming.
-     */
     start(next: NewPrompt): {prompt: Prompt; reply: Reply} {
       const systemPromptId = saveSystemPrompt(next.systemPrompt)
       const {treeId, parentReplyId} = next
@@ -316,7 +295,6 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
 
     record,
 
-    /** Fails one streaming Reply and returns it as saved. */
     fail(replyId: string, failure: RunFailure): Reply {
       const entry = inFlight.get(replyId)
 
@@ -329,10 +307,6 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
       return toReply(row)
     },
 
-    /**
-     * The host for this Provider is gone: each of its Replies is saved as
-     * failed with the text it last showed. Nothing is re-run.
-     */
     failAll(provider: ProviderId, failure: RunFailure) {
       for (const entry of inFlight.values()) {
         if (entry.provider === provider) fail(entry, failure)
@@ -346,7 +320,6 @@ export function createTurns(db: Database, publish: (event: AppEvent) => void) {
       }
     },
 
-    /** Every Reply being written, as last published. */
     streaming(): StreamingReply[] {
       return [...inFlight.values()].map(entry => entry.reply)
     },

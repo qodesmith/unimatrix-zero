@@ -16,7 +16,6 @@ const request = {
   session: null,
 }
 
-/** Main as the host sees it: sends commands and keeps what it was sent. */
 function fakeMain() {
   const sent: HostMessage[] = []
   const listeners: ((event: {data: unknown}) => void)[] = []

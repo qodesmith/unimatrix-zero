@@ -23,10 +23,7 @@ const LABELS: Record<CanvasOrientation, string> = {
   horizontal: 'Horizontal',
 }
 
-/**
- * The canvas's one control at bottom-left: what needs attention, the minimap,
- * zoom, and the orientation toggle, which is a shortcut to the Setting.
- */
+/** The orientation toggle is a shortcut to the Setting. */
 export function CanvasControls({
   orientation,
   onOrientation,

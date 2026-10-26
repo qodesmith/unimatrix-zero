@@ -23,12 +23,8 @@ interface ConnectionsOptions {
   db: Database
   hosts: Pick<ProviderHosts, 'connect' | 'send' | 'stop'>
   publish: (event: AppEvent) => void
-  /**
-   * What connecting the Provider needs, or null when it can't be connected
-   * here.
-   */
+  /** Null when the Provider can't be connected here. */
   requestFor: (provider: ProviderId) => SignInRequest | null
-  /** Opens a Provider's sign-in page in the default browser. */
   openExternal: (url: string) => void
   now: () => Date
 }
@@ -36,10 +32,8 @@ interface ConnectionsOptions {
 export type Connections = ReturnType<typeof createConnections>
 
 /**
- * Which Providers are connected, and the one being connected. Its host does
- * the connecting; main keeps the latest step, so a window that connects
- * mid-way picks it up, and saves the account once it is connected. A host
- * started only to connect is stopped again if connecting doesn't finish.
+ * Main keeps the latest sign-in step for windows that connect mid-way. A host
+ * started only to connect is stopped if connecting doesn't finish.
  */
 export function createConnections({
   db,
@@ -89,7 +83,6 @@ export function createConnections({
       .run()
   }
 
-  /** Ends connecting; a host that has nothing connected is stopped. */
   function finish(provider: ProviderId, update: SignInFinished) {
     signIn = null
 
@@ -118,7 +111,6 @@ export function createConnections({
       return {providers: ProviderIdSchema.options.map(statusOf), signIn}
     },
 
-    /** Starts the hosts of the Providers connected before. */
     startConnected() {
       for (const {provider} of db
         .select({provider: providers.provider})
@@ -128,7 +120,6 @@ export function createConnections({
       }
     },
 
-    /** Starts connecting a Provider; only one connects at a time. */
     connect(provider: ProviderId) {
       const name = PROVIDER_NAMES[provider]
 
@@ -152,7 +143,6 @@ export function createConnections({
       publish(signIn)
     },
 
-    /** Opens the sign-in page again; that page shows a code to paste. */
     openPage(provider: ProviderId) {
       const {url} = connecting(provider)
 
@@ -172,7 +162,6 @@ export function createConnections({
       hosts.send(provider, {type: 'sign-in.cancel'})
     },
 
-    /** A step, or the end, of connecting, from the Provider's host. */
     applySignInUpdate(provider: ProviderId, update: SignInUpdate) {
       if (signIn?.provider !== provider) return
 
@@ -196,7 +185,6 @@ export function createConnections({
       if (accountOf(provider)) publishStatus(provider)
     },
 
-    /** The Provider's host died; connecting it, if it was, has failed. */
     hostCrashed(provider: ProviderId) {
       if (signIn?.provider !== provider) return
 

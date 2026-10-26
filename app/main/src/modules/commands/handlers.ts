@@ -47,10 +47,6 @@ function found(tree: Tree | null): Tree {
   return tree
 }
 
-/**
- * Asks the Provider's host to write the Reply. One that can't be reached
- * fails the Reply instead, with the text it has, which is none yet.
- */
 function startOnHost(
   {turns, hosts}: Pick<HandlerDeps, 'turns' | 'hosts'>,
   provider: ProviderId,

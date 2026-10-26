@@ -14,7 +14,6 @@ import {CappedText} from './CappedText'
 import {ContextMeter, ContextSizeBadge} from './ContextSize'
 import {PromptInput} from './PromptInput'
 
-/** Every box on the canvas is one of these, typed by the Turn it shows. */
 export type TurnNode = Node<{turn: LayoutNode}, LayoutNode['kind']>
 
 const hiddenHandle = 'opacity-0!'
@@ -34,7 +33,6 @@ function PromptText({prompt}: {prompt: Prompt}) {
   )
 }
 
-/** The Reply's content with its Context size, live while it streams. */
 function ReplyBody({reply}: {reply: Reply}) {
   const {
     index,
@@ -83,7 +81,6 @@ function ReplyBody({reply}: {reply: Reply}) {
   )
 }
 
-/** A Fork's pill, folding its Branches away and bringing them back. */
 function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
   const {collapsedReplyIds, toggleCollapsed} = useCanvas()
   const collapsed = collapsedReplyIds.has(replyId)
@@ -105,12 +102,7 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
   )
 }
 
-/**
- * The Input answering a Reply, mounted once the Reply is done with its space
- * kept, so revealing it shifts nothing. Revealed at the end of the Active
- * Thread, while the Reply's box is hovered or holds focus, and while it holds
- * a draft. A failed Reply has Retry instead.
- */
+/** Hidden by opacity, not unmounted, so revealing it shifts nothing. */
 function ReplyInput({reply, hovered}: {reply: Reply; hovered: boolean}) {
   const {treeId, activeReplyId, onInputFocus, onSent, drafts, setDraft} =
     useCanvas()

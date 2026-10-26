@@ -23,9 +23,8 @@ export function useTurns(treeId: string) {
 export type SendOutcome = {ok: true; reply: Reply} | {ok: false; error: string}
 
 /**
- * Sends a Prompt answering a Reply, or the root Prompt when `parentReplyId`
- * is null. Its Reply streams in through the live events; the saved Turns are
- * fetched again in case it finished before the send returned.
+ * Sends the root Prompt when `parentReplyId` is null. The saved Turns are
+ * fetched again in case the Reply finished before the send returned.
  */
 export function useSendPrompt(treeId: string, parentReplyId: string | null) {
   const queryClient = useQueryClient()
@@ -51,10 +50,7 @@ export function useSendPrompt(treeId: string, parentReplyId: string | null) {
   }
 }
 
-/**
- * Asks main to stop a streaming Reply; its `RUN_FINISHED` follows through the
- * live events.
- */
+/** Its `RUN_FINISHED` follows through the live events. */
 export async function stopReply(treeId: string, replyId: string) {
   const outcome = await bridge().send({type: 'reply.stop', treeId, replyId})
 
@@ -64,9 +60,8 @@ export async function stopReply(treeId: string, replyId: string) {
 export type RetryOutcome = {ok: true} | {ok: false; error: string}
 
 /**
- * Runs a failed Reply's Prompt again. Main hands back the same Reply,
- * streaming from nothing, which takes the old one's place in the saved
- * Turns; its events then stream in as usual.
+ * Runs a failed Reply's Prompt again. Main hands back the same Reply id,
+ * streaming from nothing, which takes the old one's place in the saved Turns.
  */
 export function useRetryReply(treeId: string) {
   const queryClient = useQueryClient()

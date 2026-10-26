@@ -1,7 +1,4 @@
-/**
- * Oxlint covers TS and TSX; this covers the stylesheets: every color in the
- * renderer's CSS has to be a Theme token, never a literal or a palette class.
- */
+/** Oxlint covers TS and TSX; this holds the renderer's CSS to Theme tokens. */
 import {Glob} from 'bun'
 import path from 'node:path'
 

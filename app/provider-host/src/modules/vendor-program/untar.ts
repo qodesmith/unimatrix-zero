@@ -42,7 +42,6 @@ function byteReader(source: AsyncIterable<Buffer>) {
       return bytes
     },
 
-    /** The next `size` bytes, in pieces as they arrive. */
     async *pieces(size: number) {
       let left = size
 
@@ -113,9 +112,8 @@ function inside(folder: string, name: string) {
 }
 
 /**
- * Unpacks a tar.gz into `folder`, keeping each file's permission bits.
- * Vendor archives hold only files, folders and pax headers; anything else,
- * or a path outside the folder, throws.
+ * Keeps each file's permission bits. Anything but files, folders and pax
+ * headers, or a path outside `folder`, throws.
  */
 export async function untar(
   archive: string,

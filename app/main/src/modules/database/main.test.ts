@@ -29,7 +29,6 @@ afterEach(() => {
   fs.rmSync(folder, {recursive: true, force: true})
 })
 
-/** Ships one more migration, as a later app version would. */
 function addMigration(name: string, sql: string) {
   fs.mkdirSync(path.join(migrationsFolder, name))
   fs.writeFileSync(path.join(migrationsFolder, name, 'migration.sql'), sql)

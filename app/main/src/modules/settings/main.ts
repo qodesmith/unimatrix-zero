@@ -14,11 +14,7 @@ const KEYS = Object.keys(SettingsSchema.shape).filter(isSettingKey)
 
 export type SettingsStore = ReturnType<typeof createSettings>
 
-/**
- * The user's global Settings, one row per key. A row whose value no longer
- * fits its schema reads as the default, so an older app's value or a hand
- * edit never breaks the window.
- */
+/** One row per key; a value that no longer fits its schema reads as the default. */
 export function createSettings(db: Database) {
   const {settings} = schema
 

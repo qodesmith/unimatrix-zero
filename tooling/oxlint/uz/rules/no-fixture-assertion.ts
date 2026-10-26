@@ -1,7 +1,3 @@
-/**
- * A test that asserts on a value it built itself passes whatever the unit
- * does.
- */
 import type {ESTree, Rule} from '@oxlint/plugins'
 
 import {defineRule} from '@oxlint/plugins'
@@ -117,8 +113,8 @@ function parentMap(root: Node) {
 }
 
 /**
- * The `const` bindings a scope starts with an object literal. An array literal
- * is left out: a test hands `const seen = []` to a fake to record into.
+ * Each `const` binding, and whether it starts as an object literal. Arrays
+ * don't count: a test hands `const seen = []` to a fake to record into.
  */
 function literalBindings(root: Node, into: Map<string, boolean>) {
   for (const node of walk(root)) {
@@ -133,7 +129,6 @@ function literalBindings(root: Node, into: Map<string, boolean>) {
   return into
 }
 
-/** An identifier that names a property or declares a binding, not a read of one. */
 function isNameOnly(node: Node, parent: Node | undefined) {
   if (parent === undefined) return false
 
@@ -147,9 +142,8 @@ function isNameOnly(node: Node, parent: Node | undefined) {
 }
 
 /**
- * The bindings `root` uses anywhere but as an assertion's subject or expected
- * value: a call argument, a prop, a spread, a callback, a hook. The unit may
- * write a binding it can reach, as it does a `ref`.
+ * Bindings used anywhere but inside `expect(...)`: the unit may write any
+ * binding it can reach, as it does a `ref`.
  */
 function escaping(root: Node, parents: Map<Node, Node>) {
   const names = new Set<string>()
@@ -225,12 +219,9 @@ function testsIn(program: ESTree.Program) {
   return tests
 }
 
-/**
- * Whether `node` is built from literals and the given fixtures alone, so it
- * holds nothing the unit produced.
- */
+/** Built from literals and fixtures alone: nothing the unit produced. */
 function isConstant(node: Node, fixtures: Map<string, boolean>): boolean {
-  // oxlint-disable-next-line typescript/switch-exhaustiveness-check -- a handful of the ~160 node kinds can be constant; every other kind is not
+  // oxlint-disable-next-line typescript/switch-exhaustiveness-check -- only a handful of node kinds can be constant
   switch (node.type) {
     case 'Literal':
       return true

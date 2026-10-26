@@ -53,7 +53,6 @@ async function isInPlace(target: ProgramTarget) {
   }
 }
 
-/** Unpacks a checked archive and moves the folder into place. */
 async function unpackInPlace(
   archive: string,
   {path: folder, build}: ProgramTarget,
@@ -74,11 +73,8 @@ async function unpackInPlace(
 }
 
 /**
- * Makes sure the exact build named in the manifest is at `path`, downloading
- * it if not. The download goes beside it first and is moved into place, or
- * unpacked there when it is a folder's archive, only once its size and hash
- * match; anything else throws and leaves nothing behind. Yields the
- * download's progress.
+ * The download goes beside `path` and is moved or unpacked into place only once
+ * its size and hash match; anything else throws and leaves nothing behind.
  */
 export async function* getProgramReady(
   target: ProgramTarget,

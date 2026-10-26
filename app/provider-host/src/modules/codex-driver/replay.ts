@@ -3,19 +3,15 @@ import os from 'node:os'
 import path from 'node:path'
 import {z} from 'zod'
 
-/** The recordings the fake `codex` replays, one per app-server that ran. */
+/** One recording per app-server that ran. */
 export const RECORDINGS = path.join(import.meta.dirname, 'recordings')
 
 /** What a recording says in place of the `CODEX_HOME` it ran with. */
 export const CODEX_HOME_STAND_IN = '/codex-home'
 
-/** One JSON-RPC message the driver and `codex` exchanged, opaque to the fake. */
 export const RecordedMessageSchema = z.looseObject({})
 
-/**
- * One line of a recording: what the driver wrote to `codex`'s stdin, what
- * `codex` wrote to its stdout, and the end of its stdin.
- */
+/** `in` is what the driver wrote to `codex`; `out`, what it wrote back. */
 const RecordedLineSchema = z.discriminatedUnion('kind', [
   z.strictObject({kind: z.literal('start')}),
   z.strictObject({kind: z.literal('in'), message: RecordedMessageSchema}),
@@ -26,16 +22,9 @@ const RecordedLineSchema = z.discriminatedUnion('kind', [
 export type RecordedLine = z.infer<typeof RecordedLineSchema>
 
 /**
- * A `codex app-server` that replays a recording: the nth one started replays
- * the nth of `FAKE_CODEX_RECORDINGS`. Each message the driver writes must be
- * the next one recorded, by method, with request ids mapped onto this run;
- * it answers with what `codex` wrote after it, in this run's `CODEX_HOME`.
- * Like `codex`, it writes each thread's rollout, a line per finished turn,
- * and resumes or forks only a thread whose rollout is in place under
- * `sessions/`. It writes what it saw to `FAKE_CODEX_REPORTS/<n>.json`.
- * `FAKE_CODEX_EXIT_AT=<method>` exits instead of answering that request, or
- * instead of writing that notification, in each run or only the first
- * `FAKE_CODEX_EXITS`.
+ * The nth `codex app-server` started replays the nth of
+ * `FAKE_CODEX_RECORDINGS`, matching each message by method. Like `codex`, it
+ * resumes or forks only a thread whose rollout is in place under `sessions/`.
  */
 const SCRIPT = `
 import fs from 'node:fs'

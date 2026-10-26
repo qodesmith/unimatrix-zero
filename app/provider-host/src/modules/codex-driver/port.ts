@@ -1,9 +1,6 @@
 import {createServer} from 'node:net'
 
-/**
- * Whether nothing listens on `port` on 127.0.0.1. Only `EADDRINUSE` counts
- * as taken; any other error is left for Codex to report when it binds.
- */
+/** Only `EADDRINUSE` is taken; Codex reports other errors when it binds. */
 export async function portFree(port: number) {
   const server = createServer()
   const {promise, resolve} = Promise.withResolvers<boolean>()

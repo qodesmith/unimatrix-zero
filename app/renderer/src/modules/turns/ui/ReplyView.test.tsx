@@ -17,7 +17,6 @@ import {createReplay} from '../replay'
 import {ReplyStoreContext} from '../use-live-reply'
 import {ReplyView} from './ReplyView'
 
-/** The fake driver's Reply, as `record-fake-reply` recorded it. */
 const events: AppEvent[] = recording.map(event => EventSchema.parse(event))
 
 const [first] = events
@@ -42,10 +41,6 @@ const reply: Reply = {
 
 const sent: Command[] = []
 
-/**
- * Main as a Reply sees it: `image.load` on a click, `reply.stop` and
- * `reply.retry` from its buttons, and Claude's status in the SNAPSHOT.
- */
 function fakeMain(claude: ProviderStatus['status'] = 'ready'): Bridge {
   return {
     send: (async (command: Command) => {
@@ -118,9 +113,8 @@ function before(type: AppEvent['type'], nth = 0) {
 }
 
 /**
- * Renders the Reply and replays the fake driver's events into it, up to the
- * end by default: `RUN_FINISHED` hands the Reply to the saved Turns, which
- * `<TreeView>` reads and this test does not.
+ * Stops before `RUN_FINISHED`, which hands the Reply to the saved Turns this
+ * test does not render.
  */
 async function replay(upTo = before('RUN_FINISHED')) {
   const live = createReplay()
@@ -137,7 +131,6 @@ async function replay(upTo = before('RUN_FINISHED')) {
   return screen
 }
 
-/** A saved Reply, as the Tree's Turns hold it, with nothing streaming. */
 async function renderSaved(changes: Partial<Reply>) {
   const live = createReplay()
 
@@ -157,10 +150,6 @@ function failed(failure: RunFailure): Partial<Reply> {
   }
 }
 
-/**
- * The Reply's paragraphs, thinking and tool calls in page order, by their first
- * words.
- */
 function visibleOrder(article: Element) {
   return [...article.querySelectorAll('p, details')].map(node =>
     node.textContent.slice(0, 20)
@@ -474,7 +463,6 @@ it('shows why main refused a retry, beside the button', async () => {
     .toBeEnabled()
 })
 
-/** The browser's view of the connection, as `navigator.onLine` reports it. */
 function goOffline() {
   Object.defineProperty(navigator, 'onLine', {
     configurable: true,

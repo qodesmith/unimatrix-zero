@@ -15,10 +15,7 @@ const Report = z.looseObject({
 
 type Diagnostic = z.output<typeof Report>['diagnostics'][number]
 
-/**
- * The real oxlint over fixture files in a fresh folder, with this repo's JS
- * plugins loaded and only `rules` turned on.
- */
+/** The real oxlint over fixture files, with only `rules` turned on. */
 export function lintFixture(
   rules: readonly string[],
   files: Readonly<Record<string, string>>
@@ -59,7 +56,6 @@ export function lintFixture(
   }
 }
 
-/** The rule codes reported for one file, in the order oxlint gave them. */
 export function codesFor(diagnostics: Diagnostic[], filename: string) {
   return diagnostics
     .values()

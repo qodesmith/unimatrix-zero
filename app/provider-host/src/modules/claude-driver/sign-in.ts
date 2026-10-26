@@ -14,7 +14,6 @@ import {SIGN_IN_CANCELED, signInFailed} from '@uz/contract/providers'
 import {planOf} from './account'
 import {claudeEnvironment} from './environment'
 
-/** How long the sign-in page may take before connecting gives up. */
 export const SIGN_IN_TIMEOUT_MS = 15 * 60 * 1000
 
 type Input =
@@ -24,7 +23,6 @@ type Input =
 
 type PageStep = Extract<SignInUpdate, {type: 'SIGN_IN_STEP'}>
 
-/** The sign-in page as the user has seen it so far. */
 interface Page {
   /** Which run of `claude auth login` is current. */
   run: number
@@ -32,11 +30,9 @@ interface Page {
   /** Opened again by the app, so it shows a code. */
   opened: boolean
   pasted: boolean
-  /** Claude refused the last code. */
   refused: boolean
 }
 
-/** What one input does: an update to show, or the end of signing in. */
 interface Reaction {
   update?: SignInUpdate
   end?: SignInFinished | 'signed-in'
@@ -47,7 +43,6 @@ export interface ClaudeSignInDeps {
     target: ProgramTarget,
     options: {signal: AbortSignal}
   ) => AsyncIterable<DownloadProgress>
-  /** How to run the vendor program at `path`. */
   commandFor: (path: string) => ClaudeCommand
   startLogin: (
     command: ClaudeCommand,
@@ -67,10 +62,7 @@ export interface ClaudeSignInDeps {
   timeoutMs: number
 }
 
-/**
- * Whether a pasted code belongs to this sign-in: Claude's page shows the code
- * followed by `#` and the state in the page's own link.
- */
+/** Claude's page shows the code followed by `#` and the state in its own link. */
 function belongsTo(code: string, url: string) {
   const state = new URL(url).searchParams.get('state')
 
@@ -81,10 +73,7 @@ function belongsTo(code: string, url: string) {
   )
 }
 
-/**
- * The step the sign-in page is at, for the card; without a link while a new
- * login replaces one whose code Claude refused.
- */
+/** Without a link while a new login replaces one whose code Claude refused. */
 function pageStep({url, opened, refused}: Page): PageStep {
   const step: PageStep = {
     type: 'SIGN_IN_STEP',
@@ -98,17 +87,9 @@ function pageStep({url, opened, refused}: Page): PageStep {
   return step
 }
 
-/**
- * Connecting Claude: the exact vendor program is put in place, then the
- * unmodified `claude auth login` signs in on Claude's own page, and one
- * session reports the account and its plan. A free account is signed out
- * again, so trying again can use a different one.
- */
+/** Connecting Claude: the program, `claude auth login`, then the account's plan. */
 export function createClaudeSignIn(deps: ClaudeSignInDeps) {
-  /**
-   * Runs `claude auth login` until it signs in; the update to end with if it
-   * doesn't.
-   */
+  /** Null once signed in, else the update to end with. */
   async function* signInOnPage(
     {inbox}: Attempt<Input>,
     command: ClaudeCommand,
@@ -170,9 +151,8 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
         }
       }
 
-      // Claude refused the code, and this login can't take another: a new
-      // one opens its own page and prints a new one. The old page is dead
-      // from here, so the card loses its link until then.
+      // This login can't take another code: a new one opens its own page,
+      // and the old page is dead, so the card loses its link until then.
       Object.assign(page, {pasted: false, refused: true, url: null})
       login = start()
 
@@ -281,8 +261,7 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
     const plan = planOf(account.subscriptionType)
 
     if (!plan) {
-      // Signed out so another account can be used; if that fails, the
-      // next sign-in replaces this one anyway.
+      // Signed out so another account can be used; a failure is harmless.
       await deps.signOut(command, env).catch(() => undefined)
       yield signInFailed(
         'plan-refused',

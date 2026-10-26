@@ -16,10 +16,6 @@ const ID =
 
 const MACHINE = /"(serverName|userAgent)":"[^"]*"/g
 
-/**
- * A recording fit to keep in the repo: `CODEX_HOME`, the account's email and
- * ids, and the machine's name replaced by stand-ins.
- */
 function scrub(lines: RecordedLine[], codexHome: string) {
   const homes = [fs.realpathSync(codexHome), codexHome].map(home =>
     JSON.stringify(home).slice(1, -1)
@@ -41,11 +37,7 @@ function scrub(lines: RecordedLine[], codexHome: string) {
     .join('')
 }
 
-/**
- * Spawns the real `codex app-server`, writing what the driver and it
- * exchanged into the next of `files` once it exits: one recording per
- * process.
- */
+/** Records each real `codex app-server` process into the next of `files`. */
 export function createRecorder(files: string[]) {
   let run = 0
 

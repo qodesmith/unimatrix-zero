@@ -15,15 +15,13 @@ import {STOPPED_BEFORE_ANSWERING} from './app-server'
 import {createReplyMapper, threadOf, turnOf} from './replies'
 import {folderOf, readRollouts, writeRolloutsBack} from './rollouts'
 
-/** The Model id that leaves the choice to Codex: the plan's default. */
+/** The Model id that leaves the choice to Codex. */
 export const DEFAULT_MODEL = 'default'
 
-/** The app-server closes after this long without a Reply to write. */
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
 
 const STOPPED_BEFORE_FINISHING = 'Codex stopped before finishing this Reply.'
 
-/** Why a Reply failed, by the message of the error that ended it. */
 function failureFrom(message: string, resetsAt?: number): RunFailure {
   return message === STOPPED_BEFORE_FINISHING ||
     message === STOPPED_BEFORE_ANSWERING
@@ -31,10 +29,7 @@ function failureFrom(message: string, resetsAt?: number): RunFailure {
     : failureOf(message, resetsAt)
 }
 
-/**
- * When the account's full windows have all lifted, in seconds since the
- * epoch; undefined with none full.
- */
+/** When all full windows lift, in seconds since the epoch; else undefined. */
 function limitLifts({primary, secondary}: RateLimits) {
   const now = Date.now() / 1000
 
@@ -56,11 +51,9 @@ export interface CodexRepliesDeps {
   idleMs: number
 }
 
-/** The app-server writing Replies, and the threads loaded in it. */
 interface Running {
   server: AppServer
   threads: Map<string, LoadedThread>
-  /** How many Replies it is writing. */
   writing: number
   idle: ReturnType<typeof setTimeout> | undefined
 }
@@ -68,24 +61,16 @@ interface Running {
 interface LoadedThread {
   id: string
   model: string
-  /**
-   * The turns this driver knows of it, oldest first: the one it was opened
-   * at, then each one started here, whether it completed, stopped or failed.
-   */
+  /** Oldest first: the turn it was opened at, then each one started here. */
   turns: string[]
 }
 
-/** Where a Reply's turn is, for a stop to reach it. */
 interface CodexTurn {
   server: AppServer
   threadId: string
   turnId: string
 }
 
-/**
- * A Reply being written: its turn once Codex has started it, and whether a
- * stop came before then, to pass on as soon as it has.
- */
 interface Writing {
   turn: CodexTurn | null
   stopAsked: boolean
@@ -95,7 +80,6 @@ async function interrupt({server, threadId, turnId}: CodexTurn) {
   await server.request('turn/interrupt', {threadId, turnId})
 }
 
-/** Drops the turns after `messageId` from the thread, for a Retry. */
 async function dropAfter(
   server: AppServer,
   thread: LoadedThread,
@@ -114,24 +98,11 @@ async function dropAfter(
   thread.turns.length = at + 1
 }
 
-/**
- * ChatGPT's Replies through one `codex app-server`, which every Thread
- * shares: a Prompt continues its Codex thread where it is loaded, or else
- * resumes it from the app's own copy of its rollouts, or starts a new one.
- * A Prompt that starts a Branch forks the thread through the Reply it
- * answers, into a new thread; the thread the other Branch continues in is
- * left as it is. A Retry drops the turns after the Reply it answers from the
- * loaded thread first; a thread that isn't loaded resumes from the app's
- * copy, which ends at that Reply.
- */
+/** ChatGPT's Replies through one `codex app-server` that every Thread shares. */
 export function createCodexReplies(deps: CodexRepliesDeps) {
   let current: Running | null = null
   let starting: Promise<Running> | null = null
   const writing = new Map<string, Writing>()
-  /**
-   * The account's windows as Codex last reported them; one an update leaves
-   * out keeps what it was.
-   */
   let limits: RateLimits = {primary: null, secondary: null}
 
   function onRateLimits(notification: Notification) {
@@ -170,7 +141,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     return running
   }
 
-  /** The app-server, started if it isn't running, now writing a Reply. */
   async function claim(vendorProgram: SignInRequest) {
     const running =
       current ??
@@ -207,7 +177,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     return thread
   }
 
-  /** The Codex thread the Prompt goes to, loaded in the app-server. */
   async function threadFor(
     running: Running,
     request: ReplyRequest
@@ -270,7 +239,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     )
   }
 
-  /** Sends the Prompt and streams Codex's answer, to its end. */
   async function* send(
     running: Running,
     request: ReplyRequest,
@@ -349,10 +317,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     }
   }
 
-  /**
-   * Interrupts the Reply's turn; the stream then ends as `stopped`. A stop
-   * before Codex has started the turn is passed on as soon as it has.
-   */
+  /** Interrupts the Reply's turn; the stream then ends as `stopped`. */
   async function stop(replyId: string) {
     const entry = writing.get(replyId)
 
@@ -362,10 +327,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     else entry.stopAsked = true
   }
 
-  /**
-   * Writes the Reply in the running app-server. One that exited while idle
-   * answers nothing, so a new one takes the Prompt in its place, once.
-   */
+  /** An app-server that exited while idle answers nothing: retry once. */
   async function* write(
     request: ReplyRequest
   ): AsyncGenerator<ReplyEvent | ReplyRecorded> {

@@ -89,7 +89,6 @@ function edited(name: string, edit: (lines: RecordedLine[]) => RecordedLine[]) {
   return file
 }
 
-/** Runs the Claude driver against the fake `claude`, which replays `recordings`. */
 async function setUp(recordings: string[], env: Record<string, string> = {}) {
   const fake = await replayClaude()
   cleanUps.push(fake.cleanUp)
@@ -117,10 +116,7 @@ async function setUp(recordings: string[], env: Record<string, string> = {}) {
   interface ReplyOptions {
     fork?: boolean
     rewind?: boolean
-    /**
-     * Stops the Reply once this many text deltas have streamed; 0 stops it as
-     * it starts.
-     */
+    /** 0 stops the Reply as it starts. */
     stopAfterDeltas?: number
   }
 
@@ -170,7 +166,6 @@ async function setUp(recordings: string[], env: Record<string, string> = {}) {
       )
   }
 
-  /** Waits until every `claude` started so far has ended. */
   async function allClosed() {
     await vi.waitFor(
       () => {
@@ -249,7 +244,6 @@ it('streams a Reply, records where Claude saved it, and reports its Context size
     }),
   ])
   expect(shown(events).contextWindow).toBe(1_000_000)
-  // In the app's copy before it was recorded.
   expect(
     claude.store
       .entriesOf(claude.projectKey, SESSION_ID)
@@ -281,7 +275,6 @@ it('continues a Thread in the warm session, then closes it gracefully once idle'
   expect(report?.ended).toBe('input-closed')
 })
 
-/** Both Replies of `warm.ndjson`, then waits for its `claude` to close. */
 async function warmThread(claude: Awaited<ReturnType<typeof setUp>>) {
   const first = await claude.reply(FIRST_PROMPT)
   const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
@@ -327,13 +320,11 @@ it('forks the session through a mid-Thread Reply into a new session, leaving the
   const first = {sessionId: SESSION_ID, messageId: FIRST_MESSAGE}
   const forked = await claude.reply(FORK_PROMPT, first, {fork: true})
 
-  // The second Reply never happened on this Branch.
   expect(textOf(forked)).toBe('TEAL')
   expect(recordedIn(forked)).toEqual({
     sessionId: FORKED_SESSION_ID,
     messageId: FORKED_MESSAGE,
   })
-  // In the app's copy under its own id, whole, so it resumes on its own.
   expect(
     claude.store
       .entriesOf(claude.projectKey, FORKED_SESSION_ID)
@@ -342,7 +333,6 @@ it('forks the session through a mid-Thread Reply into a new session, leaving the
 
   const [, resumed, fork] = claude.reports()
 
-  // The warm `claude` at the end of the other Branch keeps going.
   expect(resumed?.ended).toBeNull()
   expect(fork?.args).toEqual(
     expect.arrayContaining([
@@ -470,7 +460,6 @@ it('replaces the text when a broken stream is sent again', async () => {
   await claude.allClosed()
 })
 
-/** A stream event `claude` could have written in the recorded session. */
 function streamed(event: SDKPartialAssistantMessage['event']): RecordedLine {
   return {
     kind: 'out',
@@ -557,7 +546,6 @@ it('fails the Reply with Claude’s reason, without recording it', async () => {
       failure: {code: 'provider-error', message: 'Prompt is too long'},
     })
   )
-  // Not kept warm, so no later Prompt goes to it.
   await claude.allClosed()
   expect(claude.reports()).toHaveLength(1)
 })
@@ -671,7 +659,6 @@ it('stops a Reply where it is, records it, and continues the Thread warm from it
 
   const stopped = await claude.reply(COUNT_PROMPT, null, {stopAfterDeltas: 5})
 
-  // What Claude had written when the interrupt reached it, as it saved it.
   expect(textOf(stopped)).toBe(
     Array.from({length: 30}, (_, index) => index + 1).join('\n')
   )

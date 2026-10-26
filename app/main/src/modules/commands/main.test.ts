@@ -75,7 +75,6 @@ beforeEach(() => {
   }
 })
 
-/** Commands, plus the malformed ones a hostile page could send. */
 type Sent =
   | Command
   | {type: 'app.nope'}
@@ -317,7 +316,6 @@ describe('the root Prompt', () => {
   })
 })
 
-/** A Tree with its root Prompt, its Reply still streaming. */
 async function sendRoot() {
   const tree = await createTree()
 

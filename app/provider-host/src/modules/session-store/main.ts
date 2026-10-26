@@ -19,11 +19,7 @@ interface Pending {
   reject: (error: Error) => void
 }
 
-/**
- * The host's way to the app's copy of its sessions, which main keeps in the
- * database: each request is posted to main, and its promise settles with
- * main's answer.
- */
+/** The host's way to its sessions, which main keeps in the database. */
 export function createSessionStoreClient(post: (message: HostMessage) => void) {
   const pending = new Map<string, Pending>()
 
@@ -46,7 +42,6 @@ export function createSessionStoreClient(post: (message: HostMessage) => void) {
       )
     },
 
-    /** Null when nothing was ever kept for the key. */
     async load(key: SessionKey) {
       return SESSION_STORE_RESULTS.load.parse(await ask({op: 'load', key}))
     },

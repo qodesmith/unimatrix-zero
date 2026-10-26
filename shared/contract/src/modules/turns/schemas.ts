@@ -52,7 +52,6 @@ export type ReplyStatus = z.infer<typeof ReplyStatusSchema>
 
 const FinishedStatusSchema = ReplyStatusSchema.exclude(['streaming'])
 
-/** Why a Reply failed, as the Provider host or main tells it. */
 export const RunFailureSchema = z.strictObject({
   code: z.enum([
     'connection-lost',
@@ -78,7 +77,6 @@ export const ReplyProgressSchema = z.strictObject({
   content: z.array(ReplyPartSchema),
   contextSize: z.number().int().nonnegative().nullable(),
   contextWindow: z.number().int().positive().nullable(),
-  /** Set once the Reply has failed. */
   failure: RunFailureSchema.nullable(),
 })
 

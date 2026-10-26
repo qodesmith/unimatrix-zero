@@ -80,7 +80,6 @@
   --xy-minimap-node-stroke-color: transparent;
 }
 
-/* The highlighted Thread's connections. */
 .react-flow__edge.on-thread .react-flow__edge-path {
   stroke: var(--thread-highlight);
   stroke-width: 2.5;
@@ -92,9 +91,8 @@
   z-index: 1000 !important;
 }
 
-/* Switching orientation: Turns glide to their new places, or jump there under
-   reduced motion, and the connections, which jump, stay out of sight until
-   they have arrived. */
+/* While orientation switches, the connections, which jump, stay hidden until
+   the Turns have arrived. */
 @media (prefers-reduced-motion: no-preference) {
   .canvas-switching .react-flow__node {
     transition: transform 400ms ease;

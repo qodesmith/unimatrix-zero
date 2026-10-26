@@ -13,9 +13,8 @@ function keyText({projectKey, sessionId, subpath}: SessionKey) {
 }
 
 /**
- * Main's side of the session store, kept in memory for tests: entries in
- * order, deduplicated on `uuid`, and files by path. Answers come back a tick
- * later, as they would from main.
+ * Main's side of the session store, in memory for tests: entries deduplicated
+ * on `uuid`, and answers a tick later, as from main.
  */
 export function fakeStore() {
   const entries = new Map<string, SessionEntry[]>()
@@ -88,7 +87,6 @@ export function fakeStore() {
 
   return {
     client,
-    /** The entries kept for a session's own transcript. */
     entriesOf(projectKey: string, sessionId: string) {
       return entries.get(keyText({projectKey, sessionId})) ?? []
     },

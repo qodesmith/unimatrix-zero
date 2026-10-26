@@ -9,10 +9,8 @@ import {randomUUID} from 'node:crypto'
 
 import {createFakeSignIn} from './sign-in'
 
-/** Streamed as thinking before the first word: shown live, never stored. */
 const THINKING = `The user wants to see the fake Provider at work. I'll open with a line about the stream, look something up with the search tool, then close with code, math, a diagram and a picture.`
 
-/** A Model thinks again once a tool has answered, so the fake does too. */
 const THINKING_AFTER_TOOL = `The search answered with three results. Time to close with the list, the code, the math, the diagram and the picture.`
 
 const OPENING = `Here is a **canned** Reply from the fake Provider. It streams word by word, the way a real one would, so the whole path from the Provider host to the window can be tried without an account.
@@ -46,7 +44,6 @@ flowchart LR
 
 That's the end of the fake Reply.`
 
-/** How many words a `/fail` or `/hang` Reply writes before it misbehaves. */
 const WORDS_BEFORE_TROUBLE = 12
 
 /** Words with the whitespace after them, so the deltas join back exactly. */
@@ -86,18 +83,13 @@ function behaviorOf(prompt: string): Behavior {
 }
 
 interface FakeDriverOptions {
-  /** The pause before each word, and between connect steps. */
+  /** Before each word, and between connect steps. */
   delayMs?: number
-  /** When the fake sign-in page answers by itself; null: never. */
+  /** Null: the fake sign-in page never answers by itself. */
   signInAnswerMs?: number | null
 }
 
-/**
- * A driver with no vendor behind it: canned Markdown with a tool call in the
- * middle, streamed with delays. A Prompt containing `/fail` or `/hang` makes
- * the Reply fail or go quiet partway through. Connecting goes through every
- * step without an account.
- */
+/** A driver with no vendor; `/fail` or `/hang` in a Prompt misbehaves. */
 export function createFakeDriver({
   delayMs = 40,
   signInAnswerMs = 3000,
@@ -120,10 +112,7 @@ export function createFakeDriver({
       return {...ids, type: 'RUN_FINISHED', status: 'stopped'}
     }
 
-    /**
-     * Streams the words up to `limit`. When the Reply is stopped meanwhile,
-     * ends it and returns false, so the caller only has to return.
-     */
+    /** Returns false once the Reply is stopped, having ended it. */
     async function* streamWords(
       type: 'TEXT_DELTA' | 'REASONING_DELTA',
       text: string,

@@ -1,8 +1,6 @@
 /**
- * Bun reads neither `.bun-version` nor `devEngines`: it runs whatever version
- * is on PATH. `.bun-version` is what CI and version managers install, so the
- * Bun running the checks must be that version, or a contributor's local pass
- * says nothing about CI.
+ * Bun reads neither `.bun-version` nor `devEngines`, but CI installs
+ * `.bun-version`, so a local pass on another Bun says nothing about CI.
  */
 import path from 'node:path'
 

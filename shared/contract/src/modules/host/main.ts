@@ -29,11 +29,7 @@ export type SessionRef = z.infer<typeof SessionRefSchema>
 
 /** What a driver needs to connect its Provider. */
 export const SignInRequestSchema = z.strictObject({
-  /**
-   * Where the vendor program goes, the folder for an archive, and what to
-   * download. Null when the manifest names none for the Provider, which only
-   * the fake driver accepts.
-   */
+  /** Null when the manifest names none; only the fake driver accepts that. */
   program: z
     .strictObject({path: z.string().min(1), build: VendorBuildSchema})
     .nullable(),
@@ -49,15 +45,12 @@ export const ReplyRequestSchema = z.strictObject({
   model: z.string().min(1),
   systemPrompt: z.string(),
   prompt: z.strictObject({text: z.string()}),
-  /** The vendor program and its configuration folder, as when connecting. */
   vendorProgram: SignInRequestSchema,
   /**
-   * The session to continue, at the Reply being answered; null starts one.
-   * `fork` says the Reply already has a Prompt after it, so the Provider
-   * forks its session there and this Reply continues in the fork; the
-   * session the other Branch continues in is never rewound. `rewind` says
-   * the session may go on past `messageId`, with a turn that failed, and
-   * the Provider drops that before answering; never set with `fork`.
+   * At the Reply being answered; null starts a session. `fork`: the Reply
+   * already has a Prompt after it, so the Provider forks there and the other
+   * Branch's session is never rewound. `rewind`: the session may run past
+   * `messageId` with a failed turn, dropped first; never set with `fork`.
    */
   session: SessionRefSchema.extend({
     fork: z.boolean(),
@@ -67,11 +60,7 @@ export const ReplyRequestSchema = z.strictObject({
 
 export type ReplyRequest = z.infer<typeof ReplyRequestSchema>
 
-/**
- * The Provider has saved the Reply in its session: where it sits there, and
- * the Model that wrote it. Main keeps both on the Reply; the window never
- * sees this.
- */
+/** Main keeps this on the Reply; the window never sees it. */
 export const ReplyRecordedMessage = z.strictObject({
   type: z.literal('REPLY_RECORDED'),
   treeId: z.uuid(),
@@ -89,18 +78,11 @@ export const ThreadSchema = z.array(
 
 export type Thread = z.infer<typeof ThreadSchema>
 
-/**
- * One Provider, one account. Each runs inside its Provider host and turns the
- * vendor's SDK into the contract's events; nothing outside the host sees the
- * vendor's types.
- */
+/** One Provider, one account; no vendor SDK type leaves its Provider host. */
 export interface ProviderDriver {
   readonly capabilities: Capabilities
   readConnection(): Promise<Connection>
-  /**
-   * Gets the vendor program ready, signs in and checks the plan. Ends with
-   * `SIGN_IN_FINISHED`, including after `cancelSignIn`.
-   */
+  /** Ends with `SIGN_IN_FINISHED`, including after `cancelSignIn`. */
   signIn(request: SignInRequest): AsyncIterable<SignInUpdate>
   /** The app opened the sign-in page again; that page shows a code. */
   signInPageOpened(): void
@@ -141,7 +123,6 @@ export const HostCommandSchema = z.discriminatedUnion('type', [
   z.strictObject({type: z.literal('sign-in.page-opened')}),
   z.strictObject({type: z.literal('sign-in.code'), code: z.string()}),
   z.strictObject({type: z.literal('sign-in.cancel')}),
-  /** Main's answer to a `SESSION_STORE` request. */
   z.strictObject({
     type: z.literal('session-store.result'),
     requestId: z.string(),

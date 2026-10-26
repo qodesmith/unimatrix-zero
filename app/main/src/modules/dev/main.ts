@@ -3,16 +3,13 @@ declare const __UZ_DEV__: boolean
 export interface DevRun {
   vitePort: number
   scriptNonce: string
-  /**
-   * `bun run dev --fake`: every Provider is the fake driver, which connects
-   * without an account or a download.
-   */
+  /** `bun run dev --fake`: every Provider is the fake driver. */
   fakeProvider: boolean
 }
 
 /**
- * The dev script sets these. A production build defines `__UZ_DEV__` as
- * false, so a packaged main never reads them.
+ * A production build defines `__UZ_DEV__` as false, so a packaged main never
+ * reads these.
  */
 export function readDevRun(env: NodeJS.ProcessEnv): DevRun | null {
   if (!__UZ_DEV__ || env.UZ_DEV !== '1') return null

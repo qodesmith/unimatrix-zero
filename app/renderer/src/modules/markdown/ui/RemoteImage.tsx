@@ -21,15 +21,13 @@ function hostOf(url: string) {
   return new URL(url).host
 }
 
-/** The image's address when it is a remote one; anything else has no chip. */
 function remoteUrl(src: ImageProps['src']): string | null {
   return src !== undefined && /^https?:/iu.test(src) ? src : null
 }
 
 /**
- * A remote image in a Reply is a chip until the user clicks it: nothing in a
- * Reply reaches the network on its own (ADR 0014). The click fetches it
- * through main, without cookies or a referrer.
+ * A chip until clicked; the click fetches the image through main, without
+ * cookies or a referrer.
  */
 export function RemoteImage({src, alt, title}: ImageProps) {
   const url = remoteUrl(src)

@@ -4,7 +4,6 @@ import type {SignInUpdate} from '@uz/contract/providers'
 import {createSignIn} from '#modules/sign-in/main'
 import {SIGN_IN_CANCELED, signInFailed} from '@uz/contract/providers'
 
-/** The size the fake vendor program pretends to download. */
 const PROGRAM_BYTES = 100_000_000
 
 const DOWNLOAD_STEPS = 25
@@ -13,22 +12,17 @@ export const FAKE_SIGN_IN_URL = 'https://example.com/fake-sign-in'
 
 export const FAKE_CODE = 'fake-code'
 
-/** A code that signs in to an account on a free plan. */
 export const FAKE_FREE_CODE = 'fake-free'
 
 export const FAKE_ACCOUNT = {email: 'fake@example.com', plan: 'Max'}
 
-/** The page answering by itself. */
 interface Input {
   kind: 'answered'
 }
 
 export interface FakeSignInOptions {
   delayMs: number
-  /**
-   * When the page the browser opened answers by itself, as Claude's does
-   * through its local callback. Null: it never does, so only a code finishes.
-   */
+  /** Null: the page never answers by itself, so only a code finishes. */
   answerMs: number | null
 }
 
@@ -40,17 +34,9 @@ async function pause(ms: number) {
   })
 }
 
-/**
- * Connecting with no vendor behind it: a fake download, then a sign-in page
- * that answers by itself after a while, or takes a code once it is opened
- * again. `FAKE_CODE` signs in, `FAKE_FREE_CODE` signs in on a free plan, and
- * any other code is wrong.
- */
+/** Connecting with no vendor: a fake download, then a fake sign-in page. */
 export function createFakeSignIn({delayMs, answerMs}: FakeSignInOptions) {
-  /**
-   * Waits for the page or the user; the plan they signed in on, or null if
-   * canceled.
-   */
+  /** The plan signed in on, or null if canceled. */
   async function* signInOnPage({
     inbox,
   }: Attempt<Input>): AsyncGenerator<SignInUpdate, string | null> {

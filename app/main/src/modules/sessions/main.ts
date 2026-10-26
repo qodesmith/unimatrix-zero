@@ -23,7 +23,6 @@ function decode(blob: Uint8Array): SessionEntry {
   return SessionEntrySchema.parse(JSON.parse(Buffer.from(blob).toString()))
 }
 
-/** Rows of one Provider session, in either table. */
 function inFolder(
   table: typeof sessionEntries | typeof sessionFiles,
   provider: ProviderId,
@@ -43,11 +42,7 @@ function whereKey(provider: ProviderId, key: SessionKey) {
   )
 }
 
-/**
- * The app's own copy of every Provider session (ADR 0004), as the hosts send
- * it: transcript entries in the order they were written and the files kept
- * beside them, so a session can be restored exactly however old it is.
- */
+/** The app's own copy of every Provider session, so any can be restored exactly. */
 export function createSessions(db: Database) {
   /** Appends in order, skipping entries whose `uuid` is already kept. */
   function append(
@@ -110,7 +105,6 @@ export function createSessions(db: Database) {
       .filter(subpath => subpath !== '')
   }
 
-  /** Keeps each file, replacing the copy kept before. */
   function saveFiles(
     provider: ProviderId,
     projectKey: string,
@@ -154,7 +148,6 @@ export function createSessions(db: Database) {
       }))
   }
 
-  /** Answers one request from a Provider host. */
   function handle(
     provider: ProviderId,
     request: SessionStoreRequest

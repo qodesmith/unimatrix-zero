@@ -36,10 +36,7 @@ function shallowEqual(a: MachineState, b: MachineState) {
   )
 }
 
-/**
- * The pure transition function. Ignored events, and results shallow-equal to
- * the input, return the input object.
- */
+/** Ignored events and results shallow-equal to the input return the input. */
 export function machine<S extends MachineState, E extends MachineEvent>(
   transitions: Transitions<S, E>
 ) {

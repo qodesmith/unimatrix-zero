@@ -1,14 +1,13 @@
 /**
- * Live: drives a real `claude`, signed in to a real Claude plan, so it runs
- * only when asked, on a machine where Claude was connected in the app:
+ * Live: drives a real `claude` on a real Claude plan, so it runs only when
+ * asked, on a machine where Claude was connected in the app:
  *
  * UZ_LIVE_CLAUDE_PROGRAM=<userData>/vendor/claude/<version>/claude\
  * UZ_LIVE_CLAUDE_CONFIG=<userData>/providers/claude\
  * bun run test:node app/provider-host/src/modules/claude-driver/streaming.live
  *
- * With `UZ_RECORD=yes` it also writes what `claude` and the SDK exchanged
- * into `recordings/`, which the driver tests replay. Each `it` records its
- * own files, so run one with `-t` to re-record only those.
+ * `UZ_RECORD=yes` also writes `recordings/`, which the driver tests replay;
+ * run one `it` with `-t` to re-record only its files.
  */
 import type {ReplyRecorded, ReplyRequest, SessionRef} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
@@ -48,14 +47,12 @@ function recordedIn(events: Streamed[]) {
   return recorded
 }
 
-/** Idle long enough for every warm `claude` to close. */
 async function idle() {
   await new Promise(resolve => {
     setTimeout(resolve, IDLE_MS * 3)
   })
 }
 
-/** Without `claude`'s own transcript, so only the app's copy can bring it back. */
 function forgetTranscript(sessionId: string) {
   fs.rmSync(
     path.join(
@@ -68,7 +65,6 @@ function forgetTranscript(sessionId: string) {
   )
 }
 
-/** The driver on the live `claude`, recording each one it starts into `files`. */
 function liveDriver(files: string[]) {
   const recorder = createRecorder(
     ({command, args, cwd, env, signal}) =>
@@ -217,7 +213,6 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await idle()
     forgetTranscript(first.recorded.session.sessionId)
 
-    // Back to before OTTER, on the same session rather than a fork.
     const rewound = await live.reply(
       'Which word did you reply with? Just the word.',
       {...first.recorded.session, fork: false, rewind: true}

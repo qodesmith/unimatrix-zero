@@ -19,17 +19,13 @@ async function notYet(): Promise<never> {
 interface CodexDriverOptions {
   store: SessionStoreClient
   spawn?: SpawnCodex
-  /** How to run the program at `path`. */
   commandFor?: (path: string) => CodexCommand
   env?: NodeJS.ProcessEnv
   idleMs?: number
   timeoutMs?: number
 }
 
-/**
- * ChatGPT through Codex's unmodified `codex app-server`: connecting, and
- * Replies that stream from it, written by the plan's default Model.
- */
+/** ChatGPT through Codex's unmodified `codex app-server`. */
 export function createCodexDriver({
   store,
   spawn: start = ({command, args}, {cwd, env}) =>
