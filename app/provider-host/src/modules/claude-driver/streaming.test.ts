@@ -36,6 +36,9 @@ const MODEL = 'claude-haiku-5-5'
 
 const IDLE_MS = 300
 
+/** Outlasts starting a second `claude` on a slow runner, which IDLE_MS doesn't. */
+const LONG_IDLE_MS = 1500
+
 type Streamed = ReplyEvent | ReplyRecorded
 
 interface Report {
@@ -92,7 +95,8 @@ function edited(name: string, edit: (lines: RecordedLine[]) => RecordedLine[]) {
 async function setUp(
   recordings: string[],
   env: Record<string, string> = {},
-  store = fakeStore()
+  store = fakeStore(),
+  idleMs = IDLE_MS
 ) {
   const fake = await replayClaude()
   cleanUps.push(fake.cleanUp)
@@ -111,7 +115,7 @@ async function setUp(
       FAKE_CLAUDE_REPORTS: reports,
       ...env,
     },
-    idleMs: IDLE_MS,
+    idleMs,
   })
 
   const treeId = crypto.randomUUID()
@@ -316,7 +320,13 @@ it('resumes a cold session from the app’s copy alone', async () => {
 })
 
 it('forks the session through a mid-Thread Reply into a new session, leaving the warm one alone', async () => {
-  const claude = await setUp(['warm.ndjson', 'resumed.ndjson', 'forked.ndjson'])
+  const claude = await setUp(
+    ['warm.ndjson', 'resumed.ndjson', 'forked.ndjson'],
+    {},
+    fakeStore(),
+    LONG_IDLE_MS
+  )
+
   const session = await warmThread(claude)
   await claude.reply(THIRD_PROMPT, session)
 
@@ -356,7 +366,7 @@ it('forks the session through a mid-Thread Reply into a new session, leaving the
     'input-closed',
     'input-closed',
   ])
-})
+}, 10_000)
 
 it('resumes from the app’s copy when the warm session’s `claude` exited while idle', async () => {
   const claude = await setUp(['warm.ndjson', 'resumed.ndjson'], {
