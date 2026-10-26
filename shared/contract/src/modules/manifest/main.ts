@@ -12,10 +12,7 @@ export const PlatformSchema = z.enum([
 
 export type Platform = z.infer<typeof PlatformSchema>
 
-/**
- * One vendor program build, downloaded from its vendor and checked by hash:
- * the program file itself, or an archive of the folder it runs from.
- */
+/** The program file itself, or an archive of the folder it runs from. */
 export const VendorBuildSchema = z.strictObject({
   url: z.url({protocol: /^https$/}),
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
@@ -37,10 +34,7 @@ export const VendorProgramSchema = z.strictObject({
   builds: z.record(PlatformSchema, VendorBuildSchema),
 })
 
-/**
- * What an app bundle runs: the exact vendor program builds (ADR 0008). The
- * signed manifest (ADR 0007) carries this beside the bundles.
- */
+/** The exact vendor program builds an app bundle runs. */
 export const ManifestSchema = z.strictObject({
   vendorPrograms: z.strictObject({
     claude: VendorProgramSchema,

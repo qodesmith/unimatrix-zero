@@ -8,15 +8,11 @@ import {ProviderCard} from './ProviderCard'
 
 interface ConnectionsProps {
   connections: ConnectionsControls
-  /**
-   * First launch: the introduction, and "Start chatting" once one Provider
-   * is connected. Without it, the same cards with a way back.
-   */
+  /** First launch only: the introduction, and "Start chatting" once ready. */
   onStart?: () => void
   onBack?: () => void
 }
 
-/** Claude and ChatGPT side by side, each connected from its own card. */
 export function Connections({connections, onStart, onBack}: ConnectionsProps) {
   const {state} = connections
   const connecting = state.signIn?.provider ?? null

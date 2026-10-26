@@ -10,11 +10,7 @@ const EXIT_TIMEOUT_MS = 30_000
 
 const PREFIX = 'Claude '
 
-/**
- * `accountInfo()` names the plan the way `claude` shows it: "Claude Pro",
- * "Claude Max", "Claude Team", "Claude Enterprise" or the server's own
- * "Claude <name>" for a paid plan, and "Claude API" for an account with none.
- */
+/** `accountInfo()` names a paid plan "Claude <name>", and no plan "Claude API". */
 const NO_PLAN = 'Claude API'
 
 /** The plan's name, or null when the account has no paid plan. */
@@ -32,11 +28,7 @@ interface SessionOptions {
   cwd: string
 }
 
-/**
- * Opens one Claude session without sending it anything and asks it who is
- * signed in. The session ends by closing its input, which lets `claude`
- * finish a token refresh before it exits; this waits until it has.
- */
+/** Waits for `claude` to exit, so it can finish a token refresh. */
 export async function readAccount({
   program,
   env,

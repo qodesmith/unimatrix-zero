@@ -15,7 +15,6 @@ type RecordedMessage = z.infer<typeof RecordedMessageSchema>
 
 const STAND_IN_UUID = '00000000-0000-4000-8000-000000000000'
 
-/** `claude`'s answer to the SDK's initialize request, naming the account. */
 const InitializeAnswerSchema = z.looseObject({
   type: z.literal('control_response'),
   response: z.looseObject({
@@ -30,7 +29,6 @@ const SessionInitSchema = z.looseObject({
 
 const ACCOUNT_ID = /"(?:organization|account)_?uuid":"([^"]+)"/gi
 
-/** Without the account's own commands, agents, skills and plugins. */
 function withoutAccountLists(message: RecordedMessage): RecordedMessage {
   const answer = InitializeAnswerSchema.safeParse(message)
 
@@ -51,10 +49,7 @@ function withoutAccountLists(message: RecordedMessage): RecordedMessage {
   return {...message, slash_commands: [], agents: [], skills: [], plugins: []}
 }
 
-/**
- * A recording fit to keep in the repo: the account's email, name, ids and
- * home folder replaced with stand-ins, and its own lists emptied.
- */
+/** Replaces the account's email, name, ids and home folder with stand-ins. */
 function scrub(lines: RecordedLine[]) {
   const texts = lines.map(line =>
     JSON.stringify(
@@ -97,10 +92,7 @@ function scrub(lines: RecordedLine[]) {
     .join('')
 }
 
-/**
- * A spawn that records what the SDK and each `claude` exchange, into
- * `files` in the order they start, each written once its `claude` exits.
- */
+/** Records each `claude` into `files` in the order they start, once it exits. */
 export function createRecorder(
   spawn: (options: SpawnOptions) => SpawnedProcess,
   files: string[]
@@ -153,7 +145,6 @@ export function createRecorder(
 
   return {
     spawn: record,
-    /** Waits until every recorded `claude` has exited and been written. */
     async done() {
       await Promise.all(written)
     },

@@ -1,8 +1,3 @@
-/**
- * Every file in the repo is written in US English, except the skills installed
- * from `skills-lock.json` and the vendored anti-slop plugin, which keep their
- * authors' spelling.
- */
 import {$} from 'bun'
 import path from 'node:path'
 

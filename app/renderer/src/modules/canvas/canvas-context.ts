@@ -2,9 +2,7 @@ import type {TreeIndex} from './tree'
 
 import {createContext, use} from 'react'
 
-/** Forks folded through their pill, and the one toggled last. */
 export interface Collapsed {
-  /** Their Branches are left off the canvas. */
   ids: ReadonlySet<string>
   /** Kept where it was on screen as the layout changes around it. */
   toggledReplyId: string | null
@@ -15,25 +13,16 @@ export interface CanvasState {
   treeId: string
   index: TreeIndex
   activeReplyId: string | null
-  /**
-   * A Reply's Input on the canvas took focus: its Thread becomes the Active
-   * Thread and the slideout closes.
-   */
+  /** Its Thread becomes the Active Thread and the slideout closes. */
   onInputFocus: (replyId: string) => void
   /** A Prompt was sent into a Reply's Input and main started this Reply for it. */
   onSent: (replyId: string, parentReplyId: string) => void
-  /**
-   * Turns the user let out of their capped height; kept here so they survive an
-   * orientation switch.
-   */
+  /** Kept here, not in the node, so it survives an orientation switch. */
   expandedTurnIds: ReadonlySet<string>
   toggleExpanded: (turnId: string) => void
   collapsedReplyIds: ReadonlySet<string>
   toggleCollapsed: (replyId: string) => void
-  /**
-   * What is typed into each Reply's Input, by Reply id; kept here so a draft
-   * outlives its box being folded away or redrawn in the other orientation.
-   */
+  /** By Reply id; kept here so a draft outlives its box folding or redrawing. */
   drafts: ReadonlyMap<string, string>
   setDraft: (replyId: string, draft: string) => void
   limitTurnHeight: boolean

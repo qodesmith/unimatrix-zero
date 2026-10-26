@@ -20,10 +20,7 @@ function djb2(text: string) {
   return Math.abs(hash).toString(36)
 }
 
-/**
- * The project key `claude` files a session under when it runs in `cwd`, as
- * the SDK computes it for its session store.
- */
+/** The project key `claude` files a session under in `cwd`, as the SDK does. */
 export function projectKeyOf(cwd: string) {
   const real = fs.realpathSync(path.resolve(cwd))
 
@@ -43,11 +40,7 @@ function keyOf({projectKey, sessionId, subpath}: SessionKey) {
     : {projectKey, sessionId, subpath}
 }
 
-/**
- * The SDK's session store over the app's copy in main's database: `claude`'s
- * transcript entries are kept as it writes them, and a session resumes from
- * them however long ago `claude` deleted its own.
- */
+/** The SDK's session store over the app's copy, which outlives `claude`'s own. */
 export function appSessionStore(store: SessionStoreClient): SessionStore {
   return {
     append: async (key, entries) => store.append(keyOf(key), entries),
@@ -58,11 +51,9 @@ export function appSessionStore(store: SessionStoreClient): SessionStore {
 }
 
 type SessionPlace = SessionFolder & {
-  /** The configuration folder `claude` runs with. */
   configDir: string
 }
 
-/** The folder `claude` keeps a session's own files in. */
 function sessionFolder({configDir, projectKey, sessionId}: SessionPlace) {
   return path.join(configDir, 'projects', projectKey, sessionId)
 }
@@ -84,11 +75,9 @@ function writeEntries(file: string, entries: SessionEntry[]) {
 }
 
 /**
- * The fallback restore (ADR 0004): writes the kept transcript, and each
- * Subagent's, back where `claude` reads them, as the SDK does for its store.
- * A plain write, so the files are new and no cleanup sweep takes them. A
- * Subagent whose subpath would land outside the session's folder is skipped.
- * False when nothing was kept for the session.
+ * The fallback restore (ADR 0004): writes the kept transcripts back where
+ * `claude` reads them. A plain write, so the files are new and no cleanup
+ * sweep takes them.
  */
 export async function writeTranscriptBack(
   store: SessionStoreClient,
@@ -129,10 +118,7 @@ export async function writeTranscriptBack(
 /** The folder beside a session that `claude` spills large tool results into. */
 const TOOL_RESULTS = 'tool-results'
 
-/**
- * The session's tool result files not saved before, relative to its folder.
- * None when it has written none.
- */
+/** The session's tool result files not saved before, relative to its folder. */
 export function readNewToolResults(
   place: SessionPlace,
   saved: ReadonlySet<string>
@@ -158,10 +144,6 @@ export function readNewToolResults(
     }))
 }
 
-/**
- * Puts kept files back beside a session. A path that would land outside the
- * session's folder is skipped.
- */
 export function restoreFiles(place: SessionPlace, files: SessionFile[]) {
   const folder = sessionFolder(place)
 

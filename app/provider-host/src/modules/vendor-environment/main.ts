@@ -4,10 +4,7 @@
  */
 const STRIPPED_PREFIXES = ['ANTHROPIC_', 'CLAUDE_', 'OPENAI_', 'CODEX_']
 
-/**
- * The host's environment minus anything that could outrank the subscription,
- * for any vendor program; each driver adds its own folders to it.
- */
+/** Each driver adds its own folders to this. */
 export function vendorEnvironment(base: NodeJS.ProcessEnv) {
   const kept = Object.entries(base).filter(
     (entry): entry is [string, string] =>

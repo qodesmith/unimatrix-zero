@@ -20,10 +20,7 @@ export interface BundleFile {
   mimeType: string
 }
 
-/**
- * Maps a request path onto a file inside the bundle folder, or nothing. The SPA
- * fallback applies only to extensionless paths, so a missing asset is a 404.
- */
+/** The SPA fallback applies only to extensionless paths, so a missing asset is a 404. */
 export function resolveBundleFile(
   bundleDir: string,
   pathname: string

@@ -14,10 +14,7 @@ interface WindowOptions {
   packaged: boolean
 }
 
-/**
- * The one window type. Every `webPreferences` value is explicit, the window
- * never navigates, and new windows and webviews are refused.
- */
+/** Every `webPreferences` value is explicit, not left to Electron's defaults. */
 export function createWindow({
   session,
   preloadPath,
@@ -75,7 +72,6 @@ function lockNavigation(contents: WebContents, appUrl: string) {
   contents.on('will-attach-webview', event => event.preventDefault())
 }
 
-/** Opens a link in the default browser, if the link rule allows it. */
 export function openLink(url: string) {
   if (isOpenableExternally(url)) void shell.openExternal(url)
 }

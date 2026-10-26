@@ -12,9 +12,8 @@ interface Served {
 }
 
 /**
- * The network as main sees it, keeping every request it was sent. Addresses
- * in `redirects` answer with a 302 to where they point; any other serves the
- * image.
+ * Addresses in `redirects` answer with a 302 to where they point; any other
+ * serves the image.
  */
 function fakeFetch(
   {status = 200, type = 'image/png', length, body = png}: Served,
@@ -172,14 +171,12 @@ it('says when the server refused', async () => {
   )
 })
 
-/** Rejects once the request is aborted, as a fetch that is cut off does. */
 async function untilAborted(signal: AbortSignal | null | undefined) {
   return new Promise<never>((_resolve, reject) => {
     signal?.addEventListener('abort', () => reject(signal.reason))
   })
 }
 
-/** A server that never answers; the request ends only when it is aborted. */
 async function stalled(...[, init]: Parameters<typeof globalThis.fetch>) {
   return untilAborted(init?.signal)
 }
@@ -192,7 +189,6 @@ it('gives up on a server that never answers', async () => {
   )
 })
 
-/** A server that sends the headers and then never finishes the body. */
 async function stalledBody(...[, init]: Parameters<typeof globalThis.fetch>) {
   const body = new ReadableStream<Uint8Array>({
     async pull() {

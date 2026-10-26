@@ -5,7 +5,6 @@ import type {SessionFile, SessionFolder} from '@uz/contract/host'
 import fs from 'node:fs'
 import path from 'node:path'
 
-/** Where the app keeps Codex's Provider sessions: one folder for each. */
 export function folderOf(threadId: string): SessionFolder {
   return {projectKey: 'codex', sessionId: threadId}
 }
@@ -20,9 +19,8 @@ function relativeIn(home: string, file: string) {
 }
 
 /**
- * The thread's rollout and the rollout of every ancestor a fork points into,
- * as Codex has them now, by their names under `CODEX_HOME` (ADR 0004). Codex
- * reports each one's file and parent; the files are never read for either.
+ * The thread's and its fork ancestors' rollouts, by path in `CODEX_HOME`. Codex
+ * reports each one's file and parent, so the files are never read (ADR 0004).
  */
 export async function readRollouts(
   server: Pick<AppServer, 'request'>,
@@ -58,10 +56,8 @@ export async function readRollouts(
 }
 
 /**
- * Writes the kept rollouts back under their original names before Codex
- * resumes the thread. Codex rewrites a compressed rollout it resumes as plain
- * `.jsonl`, so when both names are kept the plain one is the newer and the
- * `.zst` is left out. A path that would land outside `CODEX_HOME` is skipped.
+ * Codex rewrites a compressed rollout it resumes as plain `.jsonl`, so when
+ * both names are kept the `.zst` is the older and left out.
  */
 export function writeRolloutsBack(codexHome: string, files: SessionFile[]) {
   const names = new Set(files.map(file => file.path))

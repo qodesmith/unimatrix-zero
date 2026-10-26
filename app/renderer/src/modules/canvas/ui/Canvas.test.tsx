@@ -64,15 +64,7 @@ function reply(n: number, promptN: number, text: string): Reply {
   }
 }
 
-/**
- * A Tree with two Forks, each Turn's text naming it:
- *
- * ```text
- * P1 - R1 - P2 - R2 - P4 - R4
- *         |         - P5 - R5
- *         - P3 - R3
- * ```
- */
+/** Reply one forks into Prompts two and three, Reply two into four and five. */
 function forkedTree(): Saved {
   clock = 0
 
@@ -94,8 +86,6 @@ function forkedTree(): Saved {
   }
 }
 
-/** Main as the canvas sees it. */
-/** Every Provider, as main's SNAPSHOT lists them: Claude connected and ready. */
 const PROVIDERS: ProviderStatus[] = [
   {
     provider: 'claude',
@@ -111,6 +101,8 @@ function fakeMain(saved: Saved) {
   const settings: Settings = {...DEFAULT_SETTINGS, ...saved.settings}
   const sent: Command[] = []
   const listeners = new Set<(event: AppEvent) => void>()
+  /** What main says when it refuses a Stop; null takes every Stop. */
+  const stops = {refusal: null as string | null}
 
   function publish(event: AppEvent) {
     for (const listener of listeners) listener(event)
@@ -155,7 +147,11 @@ function fakeMain(saved: Saved) {
         return {ok: true, value: {prompt: sentPrompt, reply: started}}
       }
 
-      if (command.type === 'reply.stop') return {ok: true, value: {}}
+      if (command.type === 'reply.stop') {
+        return stops.refusal === null
+          ? {ok: true, value: {}}
+          : {ok: false, error: {code: 'handler-failed', message: stops.refusal}}
+      }
 
       if (command.type === 'reply.retry') {
         const where = replies.findIndex(one => one.id === command.replyId)
@@ -195,7 +191,7 @@ function fakeMain(saved: Saved) {
     registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
   }
 
-  return {...bridge, sent, publish, replies}
+  return {...bridge, sent, publish, replies, stops}
 }
 
 function Providers({children}: {children: ReactNode}) {
@@ -220,7 +216,6 @@ async function renderCanvas(saved: Saved) {
   return {main, screen}
 }
 
-/** The ids of the connections drawn on the highlighted Thread. */
 function highlightedEdges() {
   return [...document.querySelectorAll('.react-flow__edge.on-thread')]
     .map(drawn => drawn.getAttribute('data-id'))
@@ -231,21 +226,18 @@ function edge(source: number, target: number) {
   return `${uuid(source)}-${uuid(target)}`
 }
 
-/** Where the canvas is panned to, as React Flow writes it. */
 function viewport() {
   return (
     document.querySelector('.react-flow__viewport')?.getAttribute('style') ?? ''
   )
 }
 
-/** The canvas's zoom, as React Flow writes it. */
 function zoomOf() {
   const scale = /scale\(([\d.]+)\)/.exec(viewport())?.[1]
 
   return scale === undefined ? Number.NaN : Number(scale)
 }
 
-/** The viewport once it has stopped moving: the same two reads 100ms apart. */
 async function settledViewport() {
   let last: string | null = null
 
@@ -265,7 +257,6 @@ async function settledViewport() {
   return last
 }
 
-/** Pointer off every Turn. */
 async function hoverAway() {
   await page.getByRole('group', {name: 'Orientation'}).hover()
 }
@@ -279,7 +270,6 @@ function canvas() {
   return page.elementLocator(flow)
 }
 
-/** The box a Turn is drawn in. */
 function nodeOf(turnText: string) {
   const box = canvas()
     .getByText(turnText)
@@ -291,12 +281,10 @@ function nodeOf(turnText: string) {
   return page.elementLocator(box)
 }
 
-/** The Input under a Reply's box. */
 function inputUnder(replyText: string) {
   return nodeOf(replyText).getByRole('textbox', {name: 'Prompt'})
 }
 
-/** Whether a Reply's Input is shown, as the canvas marks it. */
 function revealed(replyText: string) {
   return inputUnder(replyText)
     .element()
@@ -455,7 +443,6 @@ it('moves the highlight to the Reply a leaf Input sends for, and keeps hovering 
     .toEqual([edge(1, 11), edge(11, 2), edge(2, 12), edge(12, 4)].toSorted())
 })
 
-/** Where a Turn's text is drawn. */
 function rect(turnText: string) {
   return page.getByText(turnText).element().getBoundingClientRect()
 }
@@ -489,7 +476,6 @@ it('branches: a Prompt sent into an answered Reply lands beside the old Branches
     .toBe(true)
 })
 
-/** One Thread: `P1 - R1 - P2 - R2`. */
 function linearTree(): Saved {
   clock = 0
 
@@ -508,7 +494,6 @@ async function sendInto(replyText: string, text: string) {
 it('zooms out just enough to show the whole Tree on its first Fork, and keeps the zoom on every other send', async () => {
   await renderCanvas(linearTree())
   await expect.element(page.getByText('Reply two')).toBeVisible()
-  // Fitting the Tree on load moves it off the origin.
   await expect.poll(viewport).not.toContain('translate(0px, 0px)')
   await settledViewport()
 
@@ -722,7 +707,6 @@ it('opens with the orientation the Setting says', async () => {
 
 const longText = Array.from({length: 40}, (_, i) => `Line ${i + 1}`).join('\n')
 
-/** The root Prompt as drawn, the first Turn on the canvas. */
 function rootPrompt() {
   return document.querySelector(`[data-turn="${uuid(1)}"]`)
 }
@@ -938,14 +922,12 @@ function slideout() {
   return page.getByRole('complementary', {name: 'Chat'})
 }
 
-/** The Turn texts the slideout shows, top to bottom. */
 function chatTurns() {
   return [...slideout().element().querySelectorAll('[data-chat-turn]')].map(
     turn => turn.textContent.trim()
   )
 }
 
-/** The connections from the root down to Reply four. */
 function threadToReplyFour() {
   return [
     edge(1, 11),
@@ -1076,7 +1058,6 @@ it('opens nothing on a clicked Prompt with no Reply yet, even once its Reply arr
   await expect.element(slideout()).not.toBeInTheDocument()
 })
 
-/** Whether a transition is moving the slideout across the canvas right now. */
 function sliding(aside: Element) {
   return aside
     .getAnimations()
@@ -1103,7 +1084,7 @@ it('slides the slideout in as it opens and out as it closes', async () => {
   await expect.poll(() => aside.isConnected).toBe(false)
 })
 
-/** The OS's reduced motion setting as Chromium reports it; '' is no preference. */
+/** '' clears the emulation: no preference. */
 async function emulateReducedMotion(value: 'reduce' | '') {
   await cdp().send('Emulation.setEmulatedMedia', {
     features: [{name: 'prefers-reduced-motion', value}],
@@ -1188,7 +1169,6 @@ it('scrolls the slideout to the clicked Turn, expands to cover the canvas, and c
   await expect.element(slideout()).not.toBeInTheDocument()
 })
 
-/** `P1 - R1 - P2 - R2`, with Reply two as `status` says. */
 function endingIn(status: Reply['status'], text = 'Reply two'): Saved {
   clock = 0
 
@@ -1267,7 +1247,6 @@ it('retries a failed Reply in place: the same Reply streams again from nothing',
   await expect.element(page.getByText('Second try')).toBeVisible()
 })
 
-/** A field outside the canvas, like a Tree's name in the sidebar. */
 function fieldElsewhere() {
   const field = document.createElement('input')
 
@@ -1301,6 +1280,30 @@ it('stops the streaming Reply at the end of the Active Thread with Esc, unless t
   })
   await expect.element(page.getByText('Stopped')).toBeVisible()
   await expect.element(inputUnder('Stopped')).toBeInTheDocument()
+})
+
+it('shares a Stop from Esc with the Reply’s button: Stopping… until it ends, sent once, and a refusal shown', async () => {
+  const {main} = await renderCanvas(endingIn('streaming', ''))
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  main.stops.refusal = 'Claude is not running.'
+
+  await userEvent.keyboard('{Escape}')
+
+  await expect.element(page.getByText('Claude is not running.')).toBeVisible()
+  await expect.element(page.getByRole('button', {name: 'Stop'})).toBeEnabled()
+
+  main.stops.refusal = null
+  await userEvent.keyboard('{Escape}')
+  await expect
+    .element(page.getByRole('button', {name: 'Stopping…'}))
+    .toBeDisabled()
+  await userEvent.keyboard('{Escape}')
+
+  expect(main.sent.filter(command => command.type === 'reply.stop')).toEqual([
+    {type: 'reply.stop', treeId, replyId: uuid(12)},
+    {type: 'reply.stop', treeId, replyId: uuid(12)},
+  ])
+  expect(page.getByText('Claude is not running.').query()).toBeNull()
 })
 
 it('stops the slideout’s streaming Reply with Esc rather than closing the slideout', async () => {

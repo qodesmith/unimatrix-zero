@@ -6,8 +6,7 @@ import {utilityProcess} from 'electron'
 import path from 'node:path'
 
 /**
- * Starts a Provider's host bundle as an Electron utility process. A crash
- * shows up as the process's own `exit`, which Electron emits beside
+ * A crash shows up as the process's own `exit`, which Electron emits beside
  * `child-process-gone` and which names this exact process.
  */
 export function utilityHost(hostsFolder: string, args: string[]) {

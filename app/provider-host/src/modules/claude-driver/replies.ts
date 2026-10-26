@@ -1,3 +1,4 @@
+import type {ContentEvent} from '#modules/reply-runs/main'
 import type {
   ModelUsage,
   SDKAssistantMessage,
@@ -18,29 +19,20 @@ type MessageUsage = Extract<StreamEvent, {type: 'message_delta'}>['usage']
 
 type RunFinished = Extract<ReplyEvent, {type: 'RUN_FINISHED'}>
 
-/**
- * What `claude` names the Model of a message it made up itself, such as an
- * error.
- */
+/** What `claude` names the Model of a message it made up, such as an error. */
 const SYNTHETIC_MODEL = '<synthetic>'
 
 type ReplyIds = Pick<ReplyRequest, 'treeId' | 'replyId'>
 
 /**
- * Turns one Reply's SDK messages into contract events. Text streams as
- * deltas; when the stream turns out not to be what Claude wrote, because it
- * broke and was silently sent again, the text part's text is replaced
- * instead. Thinking is passed on for display and never kept. A Subagent's
- * messages are left out.
+ * Turns one Reply's SDK messages into contract events. A stream that broke and
+ * was silently resent has its text replaced; Subagent messages are left out.
  */
 export function createReplyMapper(ids: ReplyIds) {
   /** The current text part's text, as the events so far show it. */
   let shown = ''
-  /** `shown` when the message being streamed began. */
   let atMessageStart = ''
-  /** `shown` when the text block being streamed began. */
   let atBlockStart = ''
-  /** The text block being streamed, or null outside one. */
   let block: string | null = null
   let messageOpen = false
   let mirrorFailed = false
@@ -48,7 +40,7 @@ export function createReplyMapper(ids: ReplyIds) {
   /** When the limit refusing Claude's requests lifts; undefined while none does. */
   let limitLifts: number | undefined
 
-  function replace(text: string): ReplyEvent[] {
+  function replace(text: string): ContentEvent[] {
     if (text === shown) return []
 
     shown = text
@@ -56,7 +48,7 @@ export function createReplyMapper(ids: ReplyIds) {
     return [{...ids, type: 'TEXT_REPLACE', text}]
   }
 
-  function onDelta(delta: BlockDelta): ReplyEvent[] {
+  function onDelta(delta: BlockDelta): ContentEvent[] {
     if (delta.type === 'text_delta') {
       block = (block ?? '') + delta.text
       shown += delta.text
@@ -72,7 +64,7 @@ export function createReplyMapper(ids: ReplyIds) {
   }
 
   /** As this request's own usage reports it: what it sent and wrote. */
-  function tokens(usage: MessageUsage): ReplyEvent {
+  function tokens(usage: MessageUsage): ContentEvent {
     const inputTokens =
       (usage.input_tokens ?? 0) +
       (usage.cache_creation_input_tokens ?? 0) +
@@ -87,7 +79,7 @@ export function createReplyMapper(ids: ReplyIds) {
     }
   }
 
-  function onStreamEvent(event: StreamEvent): ReplyEvent[] {
+  function onStreamEvent(event: StreamEvent): ContentEvent[] {
     if (event.type === 'message_start') {
       // A message that never stopped was cut off and is being sent again.
       const resent = messageOpen ? replace(atMessageStart) : []
@@ -116,10 +108,7 @@ export function createReplyMapper(ids: ReplyIds) {
     return []
   }
 
-  /**
-   * The window of the Model that wrote the Reply, which `claude` reports only
-   * with the result, per Model. Omitted when no entry can be told apart.
-   */
+  /** `claude` reports the context window only with the result, per Model. */
   function contextWindowOf(modelUsage: Record<string, ModelUsage>) {
     const entries = Object.values(modelUsage)
 
@@ -134,11 +123,7 @@ export function createReplyMapper(ids: ReplyIds) {
       : undefined
   }
 
-  /**
-   * The finished block as Claude wrote it. When it differs from what
-   * streamed, it replaces it; when it never streamed, it is added whole.
-   */
-  function onAssistant({message, uuid}: SDKAssistantMessage): ReplyEvent[] {
+  function onAssistant({message, uuid}: SDKAssistantMessage): ContentEvent[] {
     if (message.model === SYNTHETIC_MODEL) return []
 
     lastMessage = {uuid, model: message.model}
@@ -163,7 +148,7 @@ export function createReplyMapper(ids: ReplyIds) {
   }
 
   return {
-    map(message: SDKMessage): ReplyEvent[] {
+    map(message: SDKMessage): ContentEvent[] {
       if (message.type === 'system' && message.subtype === 'mirror_error') {
         mirrorFailed = true
       }
@@ -184,7 +169,6 @@ export function createReplyMapper(ids: ReplyIds) {
       return []
     },
 
-    /** How the Reply ended, as its last event. */
     finished(result: SDKResultMessage): RunFinished {
       const contextWindow = contextWindowOf(result.modelUsage)
       const windowField = contextWindow === undefined ? {} : {contextWindow}
@@ -222,10 +206,7 @@ export function createReplyMapper(ids: ReplyIds) {
       }
     },
 
-    /**
-     * Claude's last message of the Reply and its Model, once every entry
-     * reached the app's copy of the session; null when one didn't.
-     */
+    /** Null when an entry didn't reach the app's copy of the session. */
     recorded() {
       return mirrorFailed ? null : lastMessage
     },

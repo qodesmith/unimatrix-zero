@@ -19,19 +19,13 @@ interface Saved {
   trees?: Tree[]
   prompts?: Prompt[]
   replies?: Reply[]
-  /** What main has in progress, for the SNAPSHOT. */
   streaming?: StreamingReply[]
-  /** Claude is connected unless this is a first launch. */
   firstLaunch?: boolean
   settings?: Partial<Settings>
 }
 
 const account = {email: 'sam@example.com', plan: 'Max'}
 
-/**
- * Main as the window sees it: answers commands, sends what it saved, and keeps
- * every command it was sent. `publish` stands in for a Provider host's events.
- */
 function fakeMain(saved: Saved = {}) {
   const trees = [...(saved.trees ?? [])]
   const prompts = [...(saved.prompts ?? [])]
@@ -164,7 +158,7 @@ function fakeMain(saved: Saved = {}) {
   return {...bridge, sent, replies, publish}
 }
 
-/** The window at its full height, which the canvas fills. */
+/** The canvas fills its parent, so it needs one with a height. */
 function FullHeight({children}: {children: ReactNode}) {
   return <div style={{height: '100vh'}}>{children}</div>
 }
@@ -173,7 +167,6 @@ async function renderApp() {
   return render(<App />, {wrapper: FullHeight})
 }
 
-/** The ids of the first Reply main started. */
 function firstReply(main: ReturnType<typeof fakeMain>) {
   const [reply] = main.replies
 
@@ -290,7 +283,6 @@ it('continues the Thread from its last Reply once that Reply has finished', asyn
     .not.toBeInTheDocument()
 
   main.publish({...first, type: 'RUN_FINISHED', status: 'complete'})
-  // As main saved it, for the Turns fetched again after the next send.
   const [saved] = main.replies
 
   if (!saved) throw new Error('No Reply was started')
@@ -345,7 +337,6 @@ it('shows a streaming Reply where it was after a reload, and keeps going', async
     provider: 'claude',
     model: 'fake',
     status: 'streaming',
-    // Saved up to a second before the reload.
     content: [{type: 'text', text: 'Once'}],
     contextSize: null,
     contextWindow: null,

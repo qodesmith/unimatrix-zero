@@ -8,7 +8,6 @@ interface PromptInputProps {
   treeId: string
   /** The Reply it continues from; null for an empty Tree's root Prompt. */
   parentReplyId: string | null
-  /** The user is in this Input: its Thread becomes the active one. */
   onFocus?: () => void
   /** The Reply main started for the sent Prompt. */
   onSent?: (replyId: string) => void

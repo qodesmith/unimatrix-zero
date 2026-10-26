@@ -27,7 +27,6 @@ export const ModelSchema = z.strictObject({
 
 export type Model = z.infer<typeof ModelSchema>
 
-/** The account a Provider is signed in with, as its vendor program reports it. */
 export const AccountSchema = z.strictObject({
   email: z.string(),
   plan: z.string(),
@@ -54,10 +53,7 @@ export const UsageSchema = z.strictObject({
 
 export type Usage = z.infer<typeof UsageSchema>
 
-/**
- * Where a Provider stands. `account` is set once it is connected; the other
- * statuses are its host's.
- */
+/** `account` is set once connected; the other statuses are its host's. */
 export const ProviderStatusSchema = z.strictObject({
   provider: ProviderIdSchema,
   status: z.enum([
@@ -96,7 +92,6 @@ export const ModelsChangedEvent = z.strictObject({
   models: z.array(ModelSchema),
 })
 
-/** A step of connecting a Provider, as its host reports it. */
 export const SignInStepUpdate = z.strictObject({
   type: z.literal('SIGN_IN_STEP'),
   step: z.enum(['get-ready', 'sign-in-page', 'paste-code', 'check-plan']),
@@ -109,12 +104,8 @@ export const SignInStepUpdate = z.strictObject({
       totalBytes: z.int().min(0),
     })
     .optional(),
-  /** The pasted code was not the one the sign-in page showed. */
   wrongCode: z.literal(true).optional(),
-  /**
-   * Main opens `url` in the browser now, because the vendor program doesn't
-   * open it itself. Main doesn't pass it on to the window.
-   */
+  /** Main opens `url`, as the vendor program won't; the window never gets it. */
   openPage: z.literal(true).optional(),
 })
 

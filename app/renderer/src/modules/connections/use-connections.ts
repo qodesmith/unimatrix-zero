@@ -22,10 +22,7 @@ export function useConnectionsStore() {
   return store
 }
 
-/**
- * Which Providers are connected, and the one being connected, as main reports
- * them. A command main refuses shows on the Provider's card.
- */
+/** As main reports them; a refused command shows on the Provider's card. */
 export function useConnections() {
   const store = useConnectionsStore()
   const state = useSelector(store, current => current)

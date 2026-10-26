@@ -1,10 +1,9 @@
 import {vendorEnvironment} from '#modules/vendor-environment/main'
 
 /**
- * What `codex app-server` runs with beside its own `CODEX_HOME`: its
- * self-updater off, and no `AGENTS.md` read into a Thread. A project's
- * `.codex/config.toml` loads only for a project trusted in `CODEX_HOME`'s
- * `config.toml`, which the app never writes.
+ * `project_doc_max_bytes=0` keeps `AGENTS.md` out of a Thread. A project's
+ * `.codex/config.toml` loads only if `CODEX_HOME`'s `config.toml` trusts it,
+ * which the app never writes.
  */
 export const CODEX_ARGS = [
   '-c',

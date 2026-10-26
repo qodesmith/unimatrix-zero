@@ -1,8 +1,4 @@
-/**
- * Things that happen while a driver waits, in the order they happened: the
- * user's input, a program's output, a timer. The driver takes them one at a
- * time.
- */
+/** What happens while a driver waits, taken one at a time in order. */
 export function createInbox<T extends object>() {
   const items: T[] = []
   let waiting: ((item: T) => void) | null = null

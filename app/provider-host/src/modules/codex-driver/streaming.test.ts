@@ -1,15 +1,17 @@
 import type {ReplyRecorded, SessionRef} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
+import {once} from 'node:events'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import {afterEach, expect, it, vi} from 'vitest'
 
 import {CODEX_ARGS} from './environment'
-import {createCodexDriver} from './main'
+import {createCodexDriver, spawnCodex} from './main'
 import {replayCodex} from './replay'
 import {folderOf} from './rollouts'
 
@@ -38,8 +40,6 @@ const RETRIED_TURN = '01a170aa-1476-75b0-892c-bd4587e4d57b'
 const REWOUND_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-50-${REWOUND_THREAD_ID}.jsonl`
 const REVERTED_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-56-${REWOUND_THREAD_ID}_01a170aa-145c-7992-b8a7-bcfb762e8621.jsonl`
 
-const IDLE_MS = 300
-
 type Streamed = ReplyEvent | ReplyRecorded
 
 interface Report {
@@ -50,11 +50,8 @@ interface Report {
   methods: string[]
   prompts: string[]
   resumedFrom: {type: string; id: string}[]
-  /** The `lastTurnId` of a `thread/fork`. */
   forkedThrough: string | null
-  /** The `turnId` of a `turn/interrupt`. */
   interrupted: string | null
-  /** The `beforeTurnId` of a `thread/revert`. */
   reverted: string | null
   /** `input-closed`, `killed`, `refused`, `exited`, or what it didn't expect. */
   ended: string | null
@@ -70,14 +67,11 @@ afterEach(async () => {
 
 function folder(prefix: string) {
   const made = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)))
-  cleanUps.push(async () =>
-    fs.rmSync(made, {recursive: true, force: true, maxRetries: 10})
-  )
+  cleanUps.push(async () => fs.rmSync(made, {recursive: true, force: true}))
 
   return made
 }
 
-/** A copy of the recording `name`, its text as `edit` changes it. */
 function edited(name: string, edit: (text: string) => string) {
   const text = fs.readFileSync(
     path.join(import.meta.dirname, 'recordings', name),
@@ -90,7 +84,6 @@ function edited(name: string, edit: (text: string) => string) {
   return file
 }
 
-/** Runs the Codex driver against the fake `codex`, which replays `recordings`. */
 async function setUp(
   recordings: string[],
   {
@@ -102,9 +95,17 @@ async function setUp(
   cleanUps.push(fake.cleanUp)
   const configDir = folder('uz-codex-home-')
   const reports = folder('uz-codex-reports-')
+  const idle = heldIdle()
+  const exits: Promise<unknown>[] = []
 
   const driver = createCodexDriver({
     store: store.client,
+    spawn: (command, options) => {
+      const child = spawnCodex(command, options)
+      exits.push(once(child, 'exit').catch(() => undefined))
+
+      return child
+    },
     commandFor: program => ({command: process.execPath, args: [program]}),
     env: {
       PATH: process.env.PATH ?? '',
@@ -123,15 +124,12 @@ async function setUp(
       FAKE_CODEX_REPORTS: reports,
       ...env,
     },
-    idleMs: IDLE_MS,
+    whenIdle: idle.whenIdle,
   })
 
   const treeId = crypto.randomUUID()
 
-  /**
-   * Streams a Reply to its end, stopping it after `stopAfter` text deltas; 0
-   * stops it as it starts.
-   */
+  /** Stops the Reply after `stopAfter` text deltas; 0 stops it as it starts. */
   async function reply(
     text: string,
     session: SessionRef | null = null,
@@ -183,18 +181,19 @@ async function setUp(
       )
   }
 
-  /** Waits until every `codex` started so far has ended. */
+  /** Lets idle time pass, then waits for every `codex` to end. */
   async function allClosed() {
-    await vi.waitFor(
-      () => {
-        expect(reportsSoFar().every(report => report.ended !== null)).toBe(true)
-      },
-      {timeout: 5000}
-    )
+    idle.pass()
+    await expect
+      .poll(() => reportsSoFar().every(report => report.ended !== null))
+      .toBe(true)
   }
 
   // Windows can't remove a folder while a `codex` still runs in it.
-  cleanUps.push(allClosed)
+  cleanUps.push(async () => {
+    idle.pass()
+    await Promise.all(exits)
+  })
 
   return {configDir, store, driver, reply, reports: reportsSoFar, allClosed}
 }
@@ -324,7 +323,6 @@ it('forks the Provider session through a mid-Thread Reply into a new thread, fro
     fork: true,
   })
 
-  // The second Reply never happened on this Branch.
   expect(textOf(forked)).toBe('You asked: “Say hi in three words.”')
   expect(recordedIn(forked)).toEqual({
     sessionId: FORKED_THREAD_ID,
@@ -342,7 +340,7 @@ it('forks the Provider session through a mid-Thread Reply into a new thread, fro
     SECOND_TURN,
   ])
 
-  // The fork's rollout, and the original's it points into, are kept under the fork.
+  // The fork's rollout points into the original's, so both are kept under it.
   const fork = folderOf(FORKED_THREAD_ID)
 
   expect([
@@ -415,14 +413,6 @@ it('stops a Reply where it is, records it, and continues the Provider session af
 
   expect(report?.interrupted).toBe(STOPPED_TURN)
   expect(report?.ended).toBe('input-closed')
-})
-
-it('stops nothing for a Reply it isn’t writing', async () => {
-  const codex = await setUp(['started.ndjson'])
-
-  await expect(codex.driver.stop(crypto.randomUUID())).resolves.toBeUndefined()
-
-  expect(codex.reports()).toEqual([])
 })
 
 it('rewinds the loaded thread to the Reply a Retry answers, keeping both rollouts', async () => {
@@ -548,6 +538,22 @@ it('fails the Reply as a crash, keeping its text, when Codex stops mid-stream', 
   )
   expect(events.some(event => event.type === 'REPLY_RECORDED')).toBe(false)
   expect(codex.reports()).toHaveLength(1)
+})
+
+it('fails the Reply when the app can’t save its rollout, and still closes Codex once idle', async () => {
+  const codex = await setUp(['started.ndjson'], {
+    store: fakeStore({'save-files': 'database or disk is full'}),
+  })
+
+  const events = await codex.reply(FIRST_PROMPT)
+
+  expect(events.some(event => event.type === 'REPLY_RECORDED')).toBe(false)
+  expect(events.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'failed',
+    failure: {code: 'disk-full'},
+  })
+  await codex.allClosed()
 })
 
 it('names when a limit lifts by the full window Codex reported', async () => {

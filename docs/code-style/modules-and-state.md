@@ -37,6 +37,7 @@ The layout, and why only `@uz/contract` crosses between processes, are in [READM
 
 - When one component reads the state and needs nothing more than `send`, that component calls `useStateMachine`.
 - When the runner also reads data beside the machine, or hands callbacks to other components, it is a hook beside the machine, `use-<machine>.ts`, returning its own object. `canvas/chat-slideout/use-chat-slideout.ts` is the example: it sends `arrived` once the Tree has the Reply it follows.
+- When a machine is kept per entity, and other components and main's events share its state, its states live in a store keyed by that entity, and its runner hook runs `machine()`'s transition on that store. `turns/reply-run/use-reply-run.ts` is the example.
 - In a compound, the provider runs the machine, and `MachineContext<State, Actions, Meta>` in `state-machine/machine.ts` types its context. The first compound that needs it exports it from the module's `main.ts`.
 
 ## Put effects in an actions file, and only when an operation has one

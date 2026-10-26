@@ -9,10 +9,7 @@ export const electronPath = z
   .string()
   .parse(createRequire(import.meta.url)('electron'))
 
-/**
- * Runs Electron's binary as plain Node: the exact Node and SQLite the app ships
- * with.
- */
+/** Electron's binary as plain Node: the exact Node and SQLite the app ships. */
 export function runElectronAsNode(
   args: string[],
   options: SpawnSyncOptions = {}

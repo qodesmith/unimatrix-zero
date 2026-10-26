@@ -11,10 +11,7 @@ function refused(
   return {ok: false, error: {code, message}}
 }
 
-/**
- * Real paths enter main only here, handed over by the preload; the page gets an
- * id.
- */
+/** Real paths enter main only here, from the preload; the page gets an id. */
 export function createDroppedFiles() {
   const paths = new Map<string, string>()
 

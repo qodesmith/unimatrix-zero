@@ -1,11 +1,14 @@
 import type {ReplyStore} from './live-replies'
+import type {Reply} from '@uz/contract/turns'
 
 import {useSelector} from '@tanstack/react-store'
-import {createContext, use} from 'react'
+import {createContext, use, useMemo} from 'react'
+
+import {withProgress} from './saved-turns'
 
 export const ReplyStoreContext = createContext<ReplyStore | null>(null)
 
-function useReplyStore() {
+export function useReplyStore() {
   const store = use(ReplyStoreContext)
 
   if (!store)
@@ -15,12 +18,19 @@ function useReplyStore() {
 }
 
 /**
- * The Reply as it streams, or undefined once it isn't streaming here. Takes
- * null where there is no Reply yet, so a caller's hooks stay in order.
+ * The Reply as it shows now: as far as it has streamed in this window, else
+ * as saved. Takes null so a caller's hooks stay in order.
  */
-export function useLiveReply(replyId: string | null) {
-  return useSelector(useReplyStore(), state =>
-    replyId === null ? undefined : state.replies[replyId]
+export function useReply(reply: Reply): Reply
+export function useReply(reply: Reply | null): Reply | null
+export function useReply(reply: Reply | null) {
+  const live = useSelector(useReplyStore(), state =>
+    reply === null ? undefined : state.replies[reply.id]
+  )
+
+  return useMemo(
+    () => (reply && live ? withProgress(reply, live) : reply),
+    [reply, live]
   )
 }
 

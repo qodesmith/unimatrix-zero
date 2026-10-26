@@ -2,7 +2,7 @@ import type {HostPort} from './main'
 import type {HostMessage, ProviderDriver} from '@uz/contract/host'
 
 import {createFakeDriver} from '#modules/fake-driver/main'
-import {expect, it, vi} from 'vitest'
+import {expect, it} from 'vitest'
 
 import {runHost} from './main'
 
@@ -16,7 +16,6 @@ const request = {
   session: null,
 }
 
-/** Main as the host sees it: sends commands and keeps what it was sent. */
 function fakeMain() {
   const sent: HostMessage[] = []
   const listeners: ((event: {data: unknown}) => void)[] = []
@@ -34,16 +33,8 @@ function fakeMain() {
   return {port, sent, command}
 }
 
-async function tick() {
-  await new Promise(resolve => {
-    setTimeout(resolve, 10)
-  })
-}
-
 async function finished(sent: HostMessage[]) {
-  await vi.waitFor(() => {
-    expect(sent.at(-1)?.type).toBe('RUN_FINISHED')
-  })
+  await expect.poll(() => sent.at(-1)?.type).toBe('RUN_FINISHED')
 }
 
 it('says it is ready with the driver’s Models', async () => {
@@ -78,11 +69,11 @@ it('stops a Reply on main’s word, keeping the text so far', async () => {
     type: 'reply.start',
     request: {...request, prompt: {text: 'Please /hang'}},
   })
-  await vi.waitFor(() => {
-    expect(
-      main.sent.filter(message => message.type === 'TEXT_DELTA').length
-    ).toBeGreaterThan(3)
-  })
+  await expect
+    .poll(
+      () => main.sent.filter(message => message.type === 'TEXT_DELTA').length
+    )
+    .toBeGreaterThan(3)
 
   main.command({type: 'reply.stop', replyId: request.replyId})
   await finished(main.sent)
@@ -94,10 +85,18 @@ it('drops a command that does not parse', async () => {
   const main = fakeMain()
   await runHost(main.port, () => createFakeDriver({delayMs: 0}))
 
-  main.command({type: 'reply.start', request: {...request, extra: true}})
-  await tick()
+  const next = {...request, replyId: '01a16096-00af-7d3b-8205-6b76ddc26ce0'}
 
-  expect(main.sent.map(message => message.type)).toEqual(['HOST_READY'])
+  main.command({type: 'reply.start', request: {...request, extra: true}})
+  main.command({type: 'reply.start', request: next})
+  await finished(main.sent)
+
+  // Had it run, the dropped command would have streamed first.
+  expect(
+    main.sent.filter(
+      message => 'replyId' in message && message.replyId !== next.replyId
+    )
+  ).toEqual([])
 })
 
 it('fails the Reply when the driver throws', async () => {
@@ -128,15 +127,11 @@ it('fails the Reply when the driver throws', async () => {
 const signInRequest = {program: null, configDir: '/nowhere'}
 
 async function lastStep(sent: HostMessage[], step: string) {
-  await vi.waitFor(() => {
-    expect(sent.at(-1)).toMatchObject({step})
-  })
+  await expect.poll(() => sent.at(-1)).toMatchObject({step})
 }
 
 async function signInFinished(sent: HostMessage[]) {
-  await vi.waitFor(() => {
-    expect(sent.at(-1)?.type).toBe('SIGN_IN_FINISHED')
-  })
+  await expect.poll(() => sent.at(-1)?.type).toBe('SIGN_IN_FINISHED')
 }
 
 it('streams each step of connecting back to main', async () => {

@@ -1,11 +1,14 @@
-import type {Turns} from './live-replies'
+import type {ReplyRunState} from './reply-run/machine'
+import type {Turns} from './saved-turns'
 import type {AppEvent} from '@uz/contract/events'
 import type {Reply} from '@uz/contract/turns'
 
 import {expect, it} from 'vitest'
 
-import {turnsKey} from './live-replies'
+import {withRun} from './live-replies'
 import {createReplay} from './replay'
+import {replyRunTransition} from './reply-run/machine'
+import {turnsKey} from './saved-turns'
 
 const ids = {treeId: 'tree-1', replyId: 'reply-1'}
 
@@ -109,4 +112,27 @@ it('starts a retried Reply over, dropping the thinking of its first run', () => 
   ])
 
   expect(blocks).toEqual([])
+})
+
+it('keeps a Stop asked before a retried run starts until that run finishes', () => {
+  const live = createReplay()
+
+  live.store.setState(state => ({
+    ...state,
+    runs: {[ids.replyId]: {status: 'stopping'}},
+  }))
+  live.replay([{...ids, type: 'RUN_STARTED'}])
+
+  expect(live.store.state.runs[ids.replyId]).toEqual({status: 'stopping'})
+
+  live.replay([{...ids, type: 'RUN_FINISHED', status: 'stopped'}])
+
+  expect(live.store.state.runs[ids.replyId]).toBeUndefined()
+})
+
+it('holds no run for a Reply once main accepts its Retry', () => {
+  const retrying: ReplyRunState = {status: 'retrying'}
+  const accepted = replyRunTransition(retrying, {type: 'retryAccepted'})
+
+  expect(withRun({[ids.replyId]: retrying}, ids.replyId, accepted)).toEqual({})
 })

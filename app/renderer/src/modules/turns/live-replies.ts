@@ -1,52 +1,55 @@
+import type {ReplyRunEvent, ReplyRunState} from './reply-run/machine'
 import type {QueryClient} from '@tanstack/react-query'
-import type {CommandResult} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {ReplyEvent, StreamingReply} from '@uz/contract/turns'
 
 import {Store} from '@tanstack/react-store'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 
-export type Turns = CommandResult<'tree.turns'>
+import {replyRunTransition} from './reply-run/machine'
+import {updateSavedReply, withProgress} from './saved-turns'
 
-/**
- * One contiguous run of the Model's reasoning, before a content part. Display
- * only, never stored, so it lives here until the window reloads. A Model thinks
- * before its first word and again between tool calls, so a Reply may hold
- * several.
- */
+/** A run of the Model's reasoning; display only, never stored. */
 export interface ThinkingBlock {
   text: string
-  /** The content part the thinking came before; the count of parts so far. */
+  /** The count of content parts before this thinking began. */
   beforePart: number
   startedAt: number
-  /** Set once the Reply moves on from thinking; null while it still thinks. */
+  /** Null while the Model still thinks. */
   endedAt: number | null
 }
 
 interface LiveState {
-  /** Replies being written, by Reply id. Saved Turns live in TanStack Query. */
+  /** Streaming Replies by Reply id; saved Turns live in TanStack Query. */
   replies: Record<string, StreamingReply>
   /** By Reply id, kept after the Reply finishes; only a reload clears it. */
   thinking: Record<string, ThinkingBlock[]>
+  /** By Reply id, from a Stop or Retry asked until the machine is idle again. */
+  runs: Record<string, ReplyRunState>
 }
 
 export type ReplyStore = Store<LiveState>
 
 export function createReplyStore(): ReplyStore {
-  return new Store<LiveState>({replies: {}, thinking: {}})
+  return new Store<LiveState>({replies: {}, thinking: {}, runs: {}})
 }
 
-export function turnsKey(treeId: string) {
-  return ['turns', treeId] as const
-}
-
-function without(replies: Record<string, StreamingReply>, replyId: string) {
+function without<T>(byReply: Record<string, T>, replyId: string) {
   return Object.fromEntries(
-    Object.entries(replies).filter(([id]) => id !== replyId)
+    Object.entries(byReply).filter(([id]) => id !== replyId)
   )
 }
 
-/** The events that mean the Model has moved on from thinking. */
+export function withRun(
+  runs: LiveState['runs'],
+  replyId: string,
+  state: ReplyRunState
+) {
+  return state.status === 'idle'
+    ? without(runs, replyId)
+    : {...runs, [replyId]: state}
+}
+
 const MOVES_ON: ReadonlySet<ReplyEvent['type']> = new Set([
   'TEXT_DELTA',
   'TEXT_REPLACE',
@@ -54,11 +57,7 @@ const MOVES_ON: ReadonlySet<ReplyEvent['type']> = new Set([
   'RUN_FINISHED',
 ])
 
-/**
- * A Thinking block stays open across bookkeeping such as `TOKENS`, which a
- * Provider may report mid-thought, and closes only once words, a tool call or
- * the end of the Reply arrive.
- */
+/** A Thinking block stays open across `TOKENS`, which can come mid-thought. */
 function foldThinking(
   blocks: ThinkingBlock[],
   event: ReplyEvent,
@@ -87,11 +86,49 @@ function foldThinking(
     : blocks
 }
 
+/** A Subagent's reasoning isn't the Reply's; a Retry thinks from nothing. */
+function thinkingAfter(
+  thinking: LiveState['thinking'],
+  event: ReplyEvent,
+  current: StreamingReply,
+  now: number
+) {
+  const {replyId} = event
+  const blocks = thinking[replyId] ?? []
+
+  if ('subagentId' in event && event.subagentId !== undefined) return thinking
+
+  const startsOver = event.type === 'RUN_STARTED' && blocks.length > 0
+
+  const nextBlocks = foldThinking(
+    startsOver ? [] : blocks,
+    event,
+    current.content.length,
+    now
+  )
+
+  return nextBlocks === blocks ? thinking : {...thinking, [replyId]: nextBlocks}
+}
+
+const RUN_EVENTS: Partial<Record<ReplyEvent['type'], ReplyRunEvent>> = {
+  RUN_STARTED: {type: 'runStarted'},
+  RUN_FINISHED: {type: 'runFinished'},
+}
+
+function runsAfter(runs: LiveState['runs'], event: ReplyEvent) {
+  const before = runs[event.replyId]
+  const runEvent = RUN_EVENTS[event.type]
+
+  if (!before || !runEvent) return runs
+
+  const after = replyRunTransition(before, runEvent)
+
+  return after === before ? runs : withRun(runs, event.replyId, after)
+}
+
 /**
- * Folds a live event into the streaming Replies. A `SNAPSHOT` replaces them
- * with what main has in progress; at `RUN_FINISHED` the Reply moves into the
- * saved Turns, which main has just written the same way. Thinking is folded
- * beside the Reply, since the Reply itself never holds it.
+ * A `SNAPSHOT` replaces the streaming Replies; at `RUN_FINISHED` the Reply
+ * moves into the saved Turns, which main has just written the same way.
  */
 export function applyLiveEvent(
   event: AppEvent,
@@ -114,50 +151,18 @@ export function applyLiveEvent(
   if (!('replyId' in event)) return
 
   const {treeId, replyId} = event
-  const {replies, thinking} = store.state
+  const {replies, thinking, runs} = store.state
   const current = replies[replyId] ?? {...NEW_REPLY, treeId, replyId}
   const next = foldReplyEvent(current, event)
-  const blocks = thinking[replyId] ?? []
-  const startsOver = event.type === 'RUN_STARTED' && blocks.length > 0
-
-  const nextBlocks =
-    'subagentId' in event && event.subagentId !== undefined
-      ? blocks
-      : foldThinking(
-          startsOver ? [] : blocks,
-          event,
-          current.content.length,
-          now()
-        )
-
-  const nextThinking =
-    nextBlocks === blocks ? thinking : {...thinking, [replyId]: nextBlocks}
+  const nextThinking = thinkingAfter(thinking, event, current, now())
+  const nextRuns = runsAfter(runs, event)
 
   if (event.type === 'RUN_FINISHED') {
-    const {status, content, contextSize, contextWindow, failure} = next
-
-    queryClient.setQueryData<Turns>(turnsKey(treeId), turns =>
-      turns
-        ? {
-            ...turns,
-            replies: turns.replies.map(reply =>
-              reply.id === replyId
-                ? {
-                    ...reply,
-                    status,
-                    content,
-                    contextSize,
-                    contextWindow,
-                    failure,
-                  }
-                : reply
-            ),
-          }
-        : turns
-    )
+    updateSavedReply(queryClient, event, saved => withProgress(saved, next))
     store.setState(() => ({
       replies: without(replies, replyId),
       thinking: nextThinking,
+      runs: nextRuns,
     }))
 
     return
@@ -165,10 +170,11 @@ export function applyLiveEvent(
 
   const changed = next !== current || !(replyId in replies)
 
-  if (changed || nextThinking !== thinking) {
+  if (changed || nextThinking !== thinking || nextRuns !== runs) {
     store.setState(() => ({
       replies: changed ? {...replies, [replyId]: next} : replies,
       thinking: nextThinking,
+      runs: nextRuns,
     }))
   }
 }

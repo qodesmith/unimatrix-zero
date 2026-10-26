@@ -6,18 +6,14 @@ import path from 'node:path'
 
 export const FAKE_STATE = 'fake-state'
 
-/** The page `claude auth login` prints, which shows a code. */
 export const FAKE_CODE_PAGE = `https://claude.com/cai/oauth/authorize?code=true&state=${FAKE_STATE}`
 
 export const FAKE_CODE = `the-code#${FAKE_STATE}`
 
 /**
- * `claude auth login` as observed from 2.1.307 with no terminal: it prints the
- * code page wrapped in a terminal hyperlink, then reads codes from stdin. The
- * right code signs in; another one with a state fails the login, as Claude's
- * server refuses it; one without a state is refused and it waits again.
- * `FAKE_SIGN_IN_ANSWERS=yes` makes it sign in by itself, as the browser's
- * local callback does; `no` makes it fail, as when the page is declined.
+ * `claude auth login` as observed in 2.1.307 with no terminal: a wrong code
+ * with a state fails the login; one without a state is refused and it waits.
+ * `FAKE_SIGN_IN_ANSWERS=yes` signs in as the local callback does; `no` fails.
  */
 const SCRIPT = `
 const [, , ...args] = process.argv
@@ -58,7 +54,6 @@ process.stdin.on('data', chunk => {
 })
 `
 
-/** Writes the fake into a fresh folder; run it with this Node. */
 export async function fakeClaude(): Promise<
   ClaudeCommand & {cleanUp: () => Promise<void>}
 > {

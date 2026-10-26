@@ -23,13 +23,7 @@ function resetsAtIn(message: string): string | undefined {
   return Number.isNaN(at) ? undefined : new Date(at).toISOString()
 }
 
-/**
- * The failure a Provider's error message amounts to, by what the window can
- * say about it: the connection, a limit, or the disk. Anything else is a
- * `provider-error`, shown by its message. A limit lifts at `resetsAt`, in
- * seconds since the epoch, when the Provider reported it apart from the
- * message, or else at a time the message states.
- */
+/** `resetsAt` is in seconds since the epoch; it wins over the message's time. */
 export function failureOf(message: string, resetsAt?: number): RunFailure {
   if (CONNECTION_LOST.test(message)) return {code: 'connection-lost', message}
 

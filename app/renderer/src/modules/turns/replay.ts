@@ -4,11 +4,7 @@ import {QueryClient} from '@tanstack/react-query'
 
 import {applyLiveEvent, createReplyStore} from './live-replies'
 
-/**
- * A live store for a test to replay events into, with a clock that starts at
- * 1000 and moves 100 ms per event, so thinking durations come out the same
- * every run.
- */
+/** A live store whose clock starts at 1000 and moves 100 ms per event. */
 export function createReplay() {
   const store = createReplyStore()
   const queryClient = new QueryClient()

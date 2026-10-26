@@ -1,3 +1,4 @@
+import {idleFor} from '#modules/idle/main'
 import {afterEach, beforeEach, expect, it, vi} from 'vitest'
 
 import {createWarmSessions} from './warm'
@@ -22,7 +23,7 @@ afterEach(() => {
 })
 
 it('gives back the idle session standing at that Reply', () => {
-  const warm = createWarmSessions({idleMs: 1000, max: 6})
+  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
   const one = session('s1', 'm1')
   warm.add(one)
   warm.release(one)
@@ -32,7 +33,7 @@ it('gives back the idle session standing at that Reply', () => {
 })
 
 it('closes one standing elsewhere in the session instead of giving it back', () => {
-  const warm = createWarmSessions({idleMs: 1000, max: 6})
+  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
   const one = session('s1', 'm2')
   warm.add(one)
   warm.release(one)
@@ -43,7 +44,7 @@ it('closes one standing elsewhere in the session instead of giving it back', () 
 })
 
 it('closes a session once it has been idle long enough, not before', () => {
-  const warm = createWarmSessions({idleMs: 1000, max: 6})
+  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
   const one = session('s1', 'm1')
   warm.add(one)
   warm.release(one)
@@ -56,7 +57,7 @@ it('closes a session once it has been idle long enough, not before', () => {
 })
 
 it('starts the idle wait over after each Reply', () => {
-  const warm = createWarmSessions({idleMs: 1000, max: 6})
+  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
   const one = session('s1', 'm1')
   warm.add(one)
   warm.release(one)
@@ -72,7 +73,7 @@ it('starts the idle wait over after each Reply', () => {
 })
 
 it('closes the longest idle when more than the most are open', () => {
-  const warm = createWarmSessions({idleMs: 1000, max: 2})
+  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 2})
   const one = session('s1', 'm')
   const two = session('s2', 'm')
   const three = session('s3', 'm')
@@ -89,7 +90,7 @@ it('closes the longest idle when more than the most are open', () => {
 })
 
 it('never closes a session writing a Reply to make room', () => {
-  const warm = createWarmSessions({idleMs: 1000, max: 1})
+  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 1})
   const one = session('s1', 'm')
   const two = session('s2', 'm')
 

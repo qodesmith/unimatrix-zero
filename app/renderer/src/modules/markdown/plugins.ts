@@ -33,8 +33,8 @@ function codeThemes(): [BundledTheme, BundledTheme] {
 }
 
 /**
- * Streamdown's rehype pipeline without `rehype-raw`: the sanitizer and the
- * hardening pass stay, so HTML written into a Reply is text (ADR 0014).
+ * Streamdown's rehype plugins minus `rehype-raw`, so HTML stays text
+ * (ADR 0014).
  */
 function withoutRawHtml(): NonNullable<StreamdownProps['rehypePlugins']> {
   const {sanitize, harden} = defaultRehypePlugins
@@ -51,13 +51,10 @@ function withoutRawHtml(): NonNullable<StreamdownProps['rehypePlugins']> {
 export const rehypePlugins = withoutRawHtml()
 
 /**
- * KaTeX in untrusted mode: `\url`, `\href`, `\includegraphics` and raw HTML
- * commands render as errors rather than markup (ADR 0014). This is the only
- * gate on KaTeX's output: Streamdown runs the math plugin after the rehype
- * plugins above, so the sanitizer never sees it.
- *
- * Inline math needs `$$`, as in `@streamdown/math`. remark-math's own default
- * accepts a single `$`, which turns "$5 and $10" into an equation.
+ * `trust: false` is the only gate on KaTeX's output (ADR 0014): Streamdown
+ * runs the math plugin after the rehype plugins above, so the sanitizer never
+ * sees it.
+ * remark-math's default accepts a single `$`, turning "$5 and $10" into math.
  */
 const math: MathPlugin = {
   name: 'katex',
@@ -84,7 +81,6 @@ export function hasDiagram(markdown: string) {
 let mermaid: DiagramPlugin | null = null
 let loading: Promise<DiagramPlugin> | null = null
 
-/** The Mermaid plugin once it has loaded, or null before the first load. */
 export function loadedMermaid() {
   return mermaid
 }
@@ -117,11 +113,7 @@ function withoutImages(plugin: DiagramPlugin): DiagramPlugin {
   }
 }
 
-/**
- * Mermaid is the heaviest thing a Reply can show, so its bundle loads the
- * first time a Reply contains a diagram and never otherwise. Strict mode: no
- * click handlers, scripts or HTML labels in a diagram.
- */
+/** Loads the Mermaid bundle once, the first time a Reply contains a diagram. */
 export async function loadMermaid(): Promise<DiagramPlugin> {
   loading ??= import('@streamdown/mermaid').then(({createMermaidPlugin}) => {
     mermaid = withoutImages(

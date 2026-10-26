@@ -4,6 +4,7 @@ import type {EventEmitter} from 'node:events'
 import type {Readable, Writable} from 'node:stream'
 import type {z} from 'zod'
 
+import {ProgramCrashed} from '#modules/reply-runs/main'
 import {once} from 'node:events'
 import {createInterface} from 'node:readline'
 import {setTimeout as delay} from 'node:timers/promises'
@@ -15,19 +16,15 @@ import {
   ServerRequestSchema,
 } from './wire'
 
-/** How long `codex` may take to exit once its input ends. */
 const CLOSE_TIMEOUT_MS = 10_000
 
-/** What every request still waiting fails with once `codex` has exited. */
-export const STOPPED_BEFORE_ANSWERING = 'Codex stopped before it answered.'
+const STOPPED_BEFORE_ANSWERING = 'Codex stopped before it answered.'
 
-/** How to run one vendor program. */
 export interface CodexCommand {
   command: string
   args: string[]
 }
 
-/** A running vendor program, as much of a child process as the driver uses. */
 export interface CodexProcess extends EventEmitter {
   stdin: Writable
   stdout: Readable
@@ -46,37 +43,29 @@ interface Pending {
   reject: (error: Error) => void
 }
 
-/** What the driver writes to the app-server. */
 type Outgoing =
   | {id: number; method: Method; params: unknown}
   | {method: 'initialized'}
   | {id: Answer['id'] | string; error: {code: number; message: string}}
 
-/**
- * One running `codex app-server`, spoken to in its JSON-RPC over stdio: one
- * JSON object per line, without a `jsonrpc` field.
- */
+/** `codex app-server` over stdio: an object per line, no `jsonrpc` field. */
 export interface AppServer {
   request<M extends Method>(
     method: M,
     params: ParamsOf<M>
   ): Promise<ResponseOf<M>>
-  /** Calls `listener` with each notification the driver reads, until undone. */
   listen(listener: (notification: Notification) => void): () => void
-  /** Settles once `codex` has exited, by itself or by `close`. */
   readonly exited: Promise<void>
   readonly hasExited: boolean
-  /** Ends `codex`'s input and waits for it to exit; one that is stuck is killed. */
+  /** Ends `codex`'s input and waits for it to exit, killing it if stuck. */
   close(): Promise<void>
 }
 
-/** The answer's result, parsed as the method answers it. */
 function resultOf<M extends Method>(method: M, answer: Answer): ResponseOf<M> {
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- caller-typed lookup: RESPONSES[method] parses exactly ResponseOf<M>
   return RESPONSES[method].parse(answer.result) as ResponseOf<M>
 }
 
-/** Starts `codex app-server` from the vendor program in place. */
 export type OpenAppServer = (vendorProgram: SignInRequest) => Promise<AppServer>
 
 /** Starts `codex app-server` and introduces the app to it. */
@@ -107,7 +96,7 @@ export async function startAppServer(
     hasExited = true
 
     for (const waiting of pending.values()) {
-      waiting.reject(new Error(STOPPED_BEFORE_ANSWERING))
+      waiting.reject(new ProgramCrashed(STOPPED_BEFORE_ANSWERING))
     }
 
     pending.clear()

@@ -11,22 +11,18 @@ import {useProviderStatus} from '#modules/connections/main'
 import {ReplyMarkdown} from '#modules/markdown/main'
 import {Button} from '#modules/shadcn/main'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
-import {Fragment, useState} from 'react'
+import {Fragment} from 'react'
 
-import {useLiveReply, useThinking} from '../use-live-reply'
+import {useReplyRun} from '../reply-run/use-reply-run'
+import {useReply, useThinking} from '../use-live-reply'
 import {useOnline} from '../use-online'
-import {stopReply, useRetryReply} from '../use-turns'
 
 type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 
-/**
- * A Reply's content, live while it streams: the box around it belongs to
- * whoever shows it. Re-renders only when this Reply changes.
- */
+/** A Reply's content, live while it streams; the caller owns its box. */
 export function ReplyView({reply}: {reply: Reply}) {
-  const live = useLiveReply(reply.id)
   const blocks = useThinking(reply.id)
-  const {status, content, failure} = live ?? reply
+  const {status, content, failure} = useReply(reply)
   const streaming = status === 'streaming'
 
   function thinkingBefore(part: number) {
@@ -85,8 +81,8 @@ const NOT_READY: Record<
 }
 
 /**
- * Why Retry is held right now, or null when it may run. Held without a
- * reason until main has said where the Provider stands.
+ * Why Retry is held, or null when it may run; '' until main reports the
+ * Provider's status.
  */
 function retryHeldBecause(
   online: boolean,
@@ -102,27 +98,11 @@ function retryHeldBecause(
   return NOT_READY[status](PROVIDER_NAMES[provider])
 }
 
-/**
- * Mounted only while the Reply has failed, so a retry that takes starts it
- * fresh.
- */
 function RetryControls({reply}: {reply: Reply}) {
-  const retryReply = useRetryReply(reply.treeId)
+  const {state, retry} = useReplyRun(reply.treeId, reply.id)
   const online = useOnline()
   const providerStatus = useProviderStatus(reply.provider)
-  const [retrying, setRetrying] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const held = retryHeldBecause(online, providerStatus, reply.provider)
-
-  async function retry() {
-    setRetrying(true)
-    setError(null)
-    const outcome = await retryReply(reply.id)
-
-    setRetrying(false)
-
-    if (!outcome.ok) setError(outcome.error)
-  }
 
   return (
     <div className="flex items-center gap-3">
@@ -130,35 +110,24 @@ function RetryControls({reply}: {reply: Reply}) {
         size="sm"
         variant="outline"
         className="h-6 px-2 text-xs"
-        disabled={held !== null || retrying}
-        onClick={() => void retry()}
+        disabled={held !== null || state.status === 'retrying'}
+        onClick={retry}
       >
         Retry
       </Button>
       {held ? (
         <span className="text-xs text-muted-foreground">{held}</span>
       ) : (
-        error && <span className="text-xs text-destructive">{error}</span>
+        state.status === 'retryRefused' && (
+          <span className="text-xs text-destructive">{state.error}</span>
+        )
       )}
     </div>
   )
 }
 
-/** Mounted only while the Reply streams, so a retry starts it fresh. */
 function StopButton({treeId, replyId}: {treeId: string; replyId: string}) {
-  const [stopping, setStopping] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function stop() {
-    setStopping(true)
-    setError(null)
-    const refused = await stopReply(treeId, replyId)
-
-    if (refused !== null) {
-      setError(refused)
-      setStopping(false)
-    }
-  }
+  const {state, stop} = useReplyRun(treeId, replyId)
 
   return (
     <>
@@ -166,12 +135,14 @@ function StopButton({treeId, replyId}: {treeId: string; replyId: string}) {
         size="sm"
         variant="outline"
         className="h-6 px-2 text-xs"
-        disabled={stopping}
-        onClick={() => void stop()}
+        disabled={state.status === 'stopping'}
+        onClick={stop}
       >
-        {stopping ? 'Stopping…' : 'Stop'}
+        {state.status === 'stopping' ? 'Stopping…' : 'Stop'}
       </Button>
-      {error && <span className="text-xs text-destructive">{error}</span>}
+      {state.status === 'stopRefused' && (
+        <span className="text-xs text-destructive">{state.error}</span>
+      )}
     </>
   )
 }
@@ -203,7 +174,6 @@ function describeFailure(failure: RunFailure, provider: ProviderId) {
   return FAILURE_LINES[failure.code](failure, PROVIDER_NAMES[provider])
 }
 
-/** How a Reply ended, when it did not simply finish. */
 function StatusLine({
   status,
   failure,
@@ -240,7 +210,6 @@ function describeDuration(ms: number) {
   return `${Math.round(ms / 60_000)}m`
 }
 
-/** One Thinking block, collapsed, with how long it took once the Model moved on. */
 function ThinkingBlockView({block}: {block: ThinkingBlock}) {
   const {text, startedAt, endedAt} = block
 
@@ -256,7 +225,6 @@ function ThinkingBlockView({block}: {block: ThinkingBlock}) {
   )
 }
 
-/** The arguments as JSON when they parse, otherwise as the Provider sent them. */
 function prettyArgs(args: string) {
   try {
     return JSON.stringify(JSON.parse(args), null, 2)
@@ -265,7 +233,6 @@ function prettyArgs(args: string) {
   }
 }
 
-/** A tool call where it happened: its name, arguments and result. */
 function ToolCallView({part}: {part: ToolCall}) {
   const {toolName, args, result} = part
 

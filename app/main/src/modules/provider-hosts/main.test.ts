@@ -20,7 +20,6 @@ const textDelta = {
   delta: 'Hi',
 } as const
 
-/** A host process main can drive and the test can make talk or crash. */
 function fakeProcess() {
   const received: HostCommand[] = []
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- HostProcess hands main whatever the host sent

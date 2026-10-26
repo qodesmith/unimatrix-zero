@@ -23,10 +23,9 @@ const request: SignInRequest = {
   configDir: '/data/providers/chatgpt',
 }
 
-/** Each method's answer; a method with none fails, as when `codex` stops. */
+/** A method with no answer fails, as when `codex` stops. */
 type Answers = {[M in Method]?: ResponseOf<M>}
 
-/** An app-server that answers each request from `answers`. */
 function fakeServer(answers: Answers) {
   const listeners = new Set<(notification: Notification) => void>()
   const requests: {method: Method; params: unknown}[] = []
@@ -120,11 +119,10 @@ function setUp(
     return updates
   }
 
-  /** Waits until the sign-in page is up. */
   async function onPage() {
-    await vi.waitFor(() => {
-      expect(updates.at(-1)).toMatchObject({step: 'sign-in-page'})
-    })
+    await expect
+      .poll(() => updates.at(-1))
+      .toMatchObject({step: 'sign-in-page'})
   }
 
   return {...fake, signIn, open, updates, run, onPage}

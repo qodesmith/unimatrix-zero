@@ -23,8 +23,7 @@ it.each([['Claude API'], ['pro'], ['Claude '], ['']])(
 )
 
 /**
- * A session `claude` that answers the SDK's initialize request with an account
- * and, once its input closes, takes longer to exit than the SDK's 2 s, as one
+ * Once its input closes, takes longer to exit than the SDK's 2 s, as one
  * finishing a token refresh would. It writes how it ended to `FAKE_ENDED`.
  */
 const SESSION = `
@@ -78,4 +77,4 @@ it('waits for claude to exit by itself after reading the account', async () => {
   } finally {
     await fs.rm(folder, {recursive: true, force: true})
   }
-}, 15_000)
+})

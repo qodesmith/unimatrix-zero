@@ -4,10 +4,7 @@ export const CanvasOrientationSchema = z.enum(['vertical', 'horizontal'])
 
 export type CanvasOrientation = z.infer<typeof CanvasOrientationSchema>
 
-/**
- * The user's global preferences. Visual and behavior Settings are
- * never per Tree; a Setting changes nothing about what the AI does.
- */
+/** Global, never per Tree; a Setting changes nothing about what the AI does. */
 export const SettingsSchema = z.strictObject({
   canvasOrientation: CanvasOrientationSchema,
   /** Long Prompts and Replies scroll inside a capped height. */
@@ -24,7 +21,6 @@ export const DEFAULT_SETTINGS: Settings = {
   contextSizeMeter: true,
 }
 
-/** The Settings a command changes; the rest keep their values. */
 export const SettingsUpdateSchema = SettingsSchema.partial()
 
 export type SettingsUpdate = z.infer<typeof SettingsUpdateSchema>

@@ -24,7 +24,6 @@ export function createTrees(db: Database) {
       return toTree(db.insert(trees).values({createdAt: now}).returning().get())
     },
 
-    /** Newest first. */
     list(): Tree[] {
       return db
         .select()

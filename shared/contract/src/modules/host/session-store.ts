@@ -10,16 +10,14 @@ export type SessionFolder = z.infer<typeof SessionFolderSchema>
 
 /** One Provider session's transcript, or a Subagent's inside it. */
 export const SessionKeySchema = SessionFolderSchema.extend({
-  /** Set for a Subagent's transcript; absent for the session's own. */
   subpath: z.string().min(1).optional(),
 })
 
 export type SessionKey = z.infer<typeof SessionKeySchema>
 
 /**
- * One transcript entry as the vendor program wrote it. Opaque: kept and given
- * back unchanged, read only for the `uuid` it is deduplicated on and the
- * `type` the vendor's SDK files it by.
+ * Opaque: kept and given back unchanged, read only for the `uuid` it is
+ * deduplicated on and the `type` the vendor's SDK files it by.
  */
 export const SessionEntrySchema = z.looseObject({
   type: z.string(),
@@ -61,7 +59,6 @@ export type SessionStoreRequest = z.infer<typeof SessionStoreRequestSchema>
 
 type SessionStoreOp = SessionStoreRequest['op']
 
-/** What main answers to each request. */
 export const SESSION_STORE_RESULTS = {
   append: z.null(),
   /** Null when nothing was ever kept for the key. */
@@ -71,10 +68,6 @@ export const SESSION_STORE_RESULTS = {
   'load-files': z.array(SessionFileSchema),
 } as const satisfies Record<SessionStoreOp, z.ZodType>
 
-/**
- * Any request's answer; each op's own schema in `SESSION_STORE_RESULTS` tells
- * which.
- */
 export const SessionStoreValueSchema = z.union(
   Object.values(SESSION_STORE_RESULTS)
 )

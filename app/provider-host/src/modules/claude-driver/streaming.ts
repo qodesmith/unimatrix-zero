@@ -1,3 +1,5 @@
+import type {WhenIdle} from '#modules/idle/main'
+import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {ClaudeSession, QueryFn} from './session'
 import type {
@@ -6,10 +8,11 @@ import type {
   SpawnOptions,
   SpawnedProcess,
 } from '@anthropic-ai/claude-agent-sdk'
-import type {ReplyRecorded, ReplyRequest, SessionFile} from '@uz/contract/host'
-import type {ReplyEvent, RunFailure} from '@uz/contract/turns'
+import type {ReplyRequest, SessionFile} from '@uz/contract/host'
+import type {RunFailure} from '@uz/contract/turns'
 
 import {failureOf} from '#modules/failures/main'
+import {createReplyRuns} from '#modules/reply-runs/main'
 
 import {claudeEnvironment} from './environment'
 import {createReplyMapper} from './replies'
@@ -31,7 +34,7 @@ export interface ClaudeRepliesDeps {
   query: QueryFn
   spawn: (options: SpawnOptions) => SpawnedProcess
   env: NodeJS.ProcessEnv
-  idleMs: number
+  whenIdle: WhenIdle
   maxWarm: number
 }
 
@@ -40,9 +43,8 @@ type Restore = 'none' | 'store' | 'file'
 
 interface Live extends ClaudeSession {
   restore: Restore
-  /** Where `claude` files the session. */
   projectKey: string
-  /** The configuration folder `claude` runs with: the SDK's own on a restore. */
+  /** The SDK swaps in its own configuration folder on a restore. */
   activeConfigDir: () => string
   /** Tool result files already in the app's copy. */
   saved: Set<string>
@@ -50,11 +52,7 @@ interface Live extends ClaudeSession {
 
 type Mapper = ReturnType<typeof createReplyMapper>
 
-/**
- * How `claude` takes up the Provider session: as it stands, forked through
- * the Reply answered into a new session, or cut back to that Reply for a
- * rewind. `upTo` is the last message kept, when it is cut.
- */
+/** `upTo` is the last message kept, when a fork or rewind cuts the session. */
 function resumption(session: ReplyRequest['session'], restore: Restore) {
   if (!session || restore === 'none') {
     return {resume: null, fork: false, upTo: null}
@@ -74,16 +72,10 @@ function crashed(message: string): RunFailure {
   return {code: 'program-crashed', message}
 }
 
-/**
- * Claude's Replies: each Prompt goes to the warm session standing at the
- * Reply it answers, or to a `claude` that resumes the Provider session from
- * the app's copy, or that starts a new one. A Prompt that starts a Branch
- * goes to a `claude` that forks the session through the Reply it answers,
- * into a new session; the warm `claude` of the other Branch keeps going.
- */
+/** Replies from a warm `claude`, or a new one that resumes, forks or starts. */
 export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   const warm = createWarmSessions<Live>({
-    idleMs: deps.idleMs,
+    whenIdle: deps.whenIdle,
     max: deps.maxWarm,
   })
 
@@ -152,28 +144,19 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     })
   }
 
-  /**
-   * Each Reply being written: its session once `claude` has the Prompt, and
-   * whether a stop came before then, to pass on as soon as it does.
-   */
-  const writing = new Map<string, {session: Live | null; stopAsked: boolean}>()
-
+  /** Stop interrupts `claude` once it has the Prompt. */
   async function* attempt(
     session: Live,
     mapper: Mapper,
-    {replyId, prompt}: ReplyRequest
-  ): AsyncGenerator<ReplyEvent, Outcome> {
+    {prompt}: ReplyRequest,
+    run: ReplyRun
+  ): AsyncGenerator<ContentEvent, Outcome> {
     let heard = false
-    const entry = writing.get(replyId)
+    let unstoppable: (() => void) | null = null
 
     try {
       for await (const message of session.send(prompt.text)) {
-        if (!heard && entry) {
-          entry.session = session
-
-          if (entry.stopAsked) void session.interrupt().catch(() => undefined)
-        }
-
+        unstoppable ??= run.stoppable(async () => session.interrupt())
         heard = true
 
         if (message.type === 'result') return {result: message}
@@ -191,11 +174,10 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       // Once heard, the only thing that throws is `claude` going away.
       return {failure: heard ? crashed(message) : failureOf(message), heard}
     } finally {
-      if (entry) entry.session = null
+      unstoppable?.()
     }
   }
 
-  /** Keeps the session's new tool result files in the app's copy. */
   async function saveToolResults(session: Live, sessionId: string) {
     const files = readNewToolResults(
       {
@@ -216,11 +198,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     for (const file of files) session.saved.add(file.path)
   }
 
-  /**
-   * The warm session standing at the Reply the Prompt answers, when the
-   * Prompt can go to it. A fork never takes one, and a rewind can't: the
-   * session it finds there has gone past that Reply, so it is closed.
-   */
+  /** A rewind can't take the warm session: it has gone past that Reply. */
   function claimable(request: ReplyRequest): Live | null {
     const {session} = request
 
@@ -238,22 +216,19 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   }
 
   /**
-   * Sends the Prompt and streams Claude's answer, from the warm session
-   * standing at the Reply answered, else a new `claude`. A warm one whose
-   * `claude` exited while idle answers nothing, so a new one resumes in its
-   * place. When the restore from the store doesn't get `claude` going, the
-   * transcript is written back and it goes again from there. A fork always
-   * gets a new `claude`: no warm session is claimed, and none is closed. So
-   * does a rewind, which resumes the session cut back to the Reply answered.
+   * A warm `claude` that exited while idle answers nothing, so a new one
+   * resumes in its place. When the restore from the store doesn't get
+   * `claude` going, the transcript is written back and it goes again.
    */
   async function* answer(
     request: ReplyRequest,
-    mapper: Mapper
-  ): AsyncGenerator<ReplyEvent, {session: Live; outcome: Outcome}> {
+    mapper: Mapper,
+    run: ReplyRun
+  ): AsyncGenerator<ContentEvent, {session: Live; outcome: Outcome}> {
     const claimed = claimable(request)
 
     if (claimed) {
-      const outcome = yield* attempt(claimed, mapper, request)
+      const outcome = yield* attempt(claimed, mapper, request, run)
 
       if (!('failure' in outcome) || outcome.heard || !claimed.ended) {
         return {session: claimed, outcome}
@@ -264,7 +239,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     const session = await open(request, request.session ? 'store' : 'none')
     warm.add(session)
-    const outcome = yield* attempt(session, mapper, request)
+    const outcome = yield* attempt(session, mapper, request, run)
     const refused = !session.started && session.restore === 'store'
 
     if (!refused || !request.session) return {session, outcome}
@@ -284,89 +259,60 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     return {
       session: fallback,
-      outcome: yield* attempt(fallback, mapper, request),
+      outcome: yield* attempt(fallback, mapper, request, run),
     }
   }
 
-  async function* startReply(
-    request: ReplyRequest
-  ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
-    writing.set(request.replyId, {session: null, stopAsked: false})
-
-    try {
-      yield* write(request)
-    } finally {
-      writing.delete(request.replyId)
-    }
-  }
-
+  /** A failed Reply's `claude` closes; a refused save fails the Reply too. */
   async function* write(
-    request: ReplyRequest
-  ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
+    request: ReplyRequest,
+    run: ReplyRun
+  ): AsyncGenerator<ContentEvent, Ending> {
     const {treeId, replyId} = request
     const ids = {treeId, replyId}
     const mapper = createReplyMapper(ids)
+    const {session, outcome} = yield* answer(request, mapper, run)
 
-    yield {...ids, type: 'RUN_STARTED'}
-
-    const {session, outcome} = yield* answer(request, mapper)
+    run.afterward(status => {
+      if (status === 'failed' || session.ended) warm.drop(session)
+      else warm.release(session)
+    })
 
     if ('failure' in outcome) {
-      warm.drop(session)
-      yield {
-        ...ids,
-        type: 'RUN_FINISHED',
-        status: 'failed',
-        failure: outcome.failure,
+      return {
+        finished: {
+          ...ids,
+          type: 'RUN_FINISHED',
+          status: 'failed',
+          failure: outcome.failure,
+        },
       }
-
-      return
     }
 
     const finished = mapper.finished(outcome.result)
+
+    if (finished.status === 'failed') return {finished}
+
     const recorded = mapper.recorded()
     const {sessionId} = session
-
-    if (finished.status === 'failed') {
-      warm.drop(session)
-      yield finished
-
-      return
-    }
 
     if (sessionId) await saveToolResults(session, sessionId)
 
     session.messageId = recorded?.uuid ?? null
 
-    if (recorded && sessionId) {
-      yield {
-        ...ids,
-        type: 'REPLY_RECORDED',
-        model: recorded.model,
-        session: {sessionId, messageId: recorded.uuid},
-      }
+    return {
+      finished,
+      recorded:
+        recorded && sessionId
+          ? {
+              ...ids,
+              type: 'REPLY_RECORDED',
+              model: recorded.model,
+              session: {sessionId, messageId: recorded.uuid},
+            }
+          : null,
     }
-
-    if (session.ended) warm.drop(session)
-    else warm.release(session)
-
-    yield finished
   }
 
-  /**
-   * Interrupts the turn writing the Reply, once `claude` has taken the
-   * request; the Reply's stream goes on to its `RUN_FINISHED`. A stop before
-   * `claude` has the Prompt is passed on as soon as it does. Nothing when no
-   * Reply by that id is being written.
-   */
-  async function stop(replyId: string) {
-    const entry = writing.get(replyId)
-
-    if (!entry) return
-
-    if (entry.session) await entry.session.interrupt()
-    else entry.stopAsked = true
-  }
-
-  return {startReply, stop}
+  return createReplyRuns(write)
 }

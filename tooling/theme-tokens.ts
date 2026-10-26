@@ -4,10 +4,7 @@ const palette =
 const utilities =
   'bg|text|border|ring|fill|stroke|from|via|to|outline|decoration|accent|caret|divide|placeholder|shadow|inset-ring|inset-shadow'
 
-/**
- * A Tailwind palette class (`bg-zinc-900`, `text-red-500/50`) instead of a
- * token class.
- */
+/** A Tailwind palette class (`bg-zinc-900`) instead of a token class. */
 export const paletteClass = new RegExp(
   `(?:^|\\s|:)(?:${utilities})-(?:${palette})(?:-\\d{2,3})?(?:/\\d+)?(?=\\s|$)`
 )

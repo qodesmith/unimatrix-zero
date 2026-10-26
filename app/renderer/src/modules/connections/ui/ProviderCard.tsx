@@ -24,7 +24,6 @@ interface ProviderCardProps extends CardActions {
   waitingFor: ProviderId | null
 }
 
-/** One Provider: Connect, the checklist while it connects, then its account. */
 export function ProviderCard({
   provider,
   card,
@@ -357,10 +356,6 @@ function CardAction({
   )
 }
 
-/**
- * Each step of connecting: its label in the checklist, the line under it, and
- * what shows below the label while it is the current step.
- */
 const STEPS: Record<
   Step,
   {

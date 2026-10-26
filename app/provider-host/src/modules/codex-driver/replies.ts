@@ -1,3 +1,4 @@
+import type {ContentEvent} from '#modules/reply-runs/main'
 import type {Notification} from './wire'
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
@@ -10,7 +11,6 @@ type ReplyIds = Pick<ReplyRequest, 'treeId' | 'replyId'>
 
 type RunFinished = Extract<ReplyEvent, {type: 'RUN_FINISHED'}>
 
-/** Codex's record of the request that wrote the Reply. */
 type CodexTurn = Extract<
   Notification,
   {method: 'turn/completed'}
@@ -24,12 +24,10 @@ function aboutTheAccount(
   return notification.method.startsWith('account/')
 }
 
-/** The thread a notification belongs to; null for one outside any. */
 export function threadOf(notification: Notification) {
   return aboutTheAccount(notification) ? null : notification.params.threadId
 }
 
-/** The turn a notification belongs to; null for one outside any turn. */
 export function turnOf(notification: Notification) {
   if (notification.method === 'turn/completed') {
     return notification.params.turn.id
@@ -41,18 +39,16 @@ export function turnOf(notification: Notification) {
 }
 
 /**
- * Turns one Reply's notifications into contract events. Each message's text
- * streams as deltas; when the finished message differs from what streamed,
- * its text replaces it. Reasoning is passed on for display and never kept.
+ * When a finished message differs from what streamed, its text replaces it.
+ * Reasoning is passed on for display and never kept.
  */
 export function createReplyMapper(ids: ReplyIds) {
-  /** The text part's text, as the events so far show it. */
   let shown = ''
-  /** Each message so far: `shown` when it began, and its own text. */
+  /** `before` is `shown` when the message began. */
   const messages = new Map<string, {before: string; text: string}>()
   let last: string | null = null
 
-  function onDelta(itemId: string, delta: string): ReplyEvent[] {
+  function onDelta(itemId: string, delta: string): ContentEvent[] {
     const message = messages.get(itemId) ?? {before: shown, text: ''}
     message.text += delta
     messages.set(itemId, message)
@@ -62,7 +58,7 @@ export function createReplyMapper(ids: ReplyIds) {
     return [{...ids, type: 'TEXT_DELTA', delta}]
   }
 
-  function onMessage(itemId: string, text: string): ReplyEvent[] {
+  function onMessage(itemId: string, text: string): ContentEvent[] {
     const message = messages.get(itemId)
 
     if (!message) {
@@ -83,8 +79,7 @@ export function createReplyMapper(ids: ReplyIds) {
   }
 
   return {
-    /** The events a notification of this turn makes; none for most. */
-    map(notification: Notification): ReplyEvent[] {
+    map(notification: Notification): ContentEvent[] {
       const {method, params} = notification
 
       if (method === 'item/agentMessage/delta') {
@@ -110,7 +105,7 @@ export function createReplyMapper(ids: ReplyIds) {
 
       const {last: usage, modelContextWindow} = params.tokenUsage
 
-      const tokens: ReplyEvent = {
+      const tokens: ContentEvent = {
         ...ids,
         type: 'TOKENS',
         inputTokens: usage.inputTokens,
@@ -125,10 +120,7 @@ export function createReplyMapper(ids: ReplyIds) {
       ]
     },
 
-    /**
-     * How the Reply ended, as its last event; a limit lifts at `resetsAt`, in
-     * seconds since the epoch, when Codex reported one.
-     */
+    /** `resetsAt` is in seconds since the epoch. */
     finished(turn: CodexTurn, resetsAt?: number): RunFinished {
       if (turn.status === 'completed') {
         return {...ids, type: 'RUN_FINISHED', status: 'complete'}

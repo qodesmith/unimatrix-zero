@@ -17,7 +17,6 @@ interface Point {
 /** Every Turn is drawn this wide, in both orientations. */
 export const TURN_WIDTH = 440
 
-/** The box React Flow draws before it has measured a node. */
 const DEFAULT_SIZE: Size = {width: TURN_WIDTH, height: 80}
 
 interface PromptTurn {
@@ -79,7 +78,6 @@ function edge(source: string, target: string): LayoutEdge {
   return {id: `${source}-${target}`, source, target}
 }
 
-/** A collapsed Reply keeps its Branches out of the layout. */
 type CollapsedReplyIds = ReadonlySet<string>
 
 const NONE_COLLAPSED: CollapsedReplyIds = new Set()
@@ -158,10 +156,9 @@ function exchangeGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
 }
 
 /**
- * Where each Turn goes, from the Tree's structure and the boxes' measured
- * sizes alone (ADR 0019): a tidy tree in which every subtree gets the room it
- * needs across the reading direction, Branches keep the order they were
- * started in, and a Fork sits centered over its Branches.
+ * A tidy tree from the Tree's structure and measured sizes alone (ADR 0019):
+ * Branches keep the order they were started in, and a Fork sits centered over
+ * its Branches.
  */
 export function layoutTree(
   index: TreeIndex,

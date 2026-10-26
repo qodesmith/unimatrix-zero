@@ -14,18 +14,16 @@ export type UserInput =
 
 /** One go at connecting, from Connect to its end. */
 export interface Attempt<Input extends object> {
-  /** The user's input, and the driver's own `Input`. */
   inbox: Inbox<Input | UserInput>
-  /** Aborted by cancel, to stop work under way such as a download. */
+  /** Aborted by cancel. */
   signal: AbortSignal
   /** A function so it is read afresh after each wait. */
   canceled: () => boolean
 }
 
 /**
- * The `get-ready` step: puts the vendor program in place, passing its
- * download's progress on. The update to end with when that failed or the
- * user canceled; null once the program is ready.
+ * Returns the update to end with when the download failed or the user
+ * canceled; null once the program is ready.
  */
 export async function* getReady(
   attempt: Pick<Attempt<object>, 'canceled'>,
@@ -49,10 +47,7 @@ export async function* getReady(
   return attempt.canceled() ? SIGN_IN_CANCELED : null
 }
 
-/**
- * A driver's `signIn` and the controls that reach it: each `signIn` is a new
- * go at connecting, and the user's input goes to the latest.
- */
+/** Each `signIn` is a new go at connecting; the user's input goes to the latest. */
 export function createSignIn<Input extends object>(
   connect: (
     attempt: Attempt<Input>,

@@ -1,18 +1,13 @@
-import type {
-  ProviderDriver,
-  ReplyRecorded,
-  ReplyRequest,
-} from '@uz/contract/host'
-import type {ReplyEvent} from '@uz/contract/turns'
+import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
+import type {ProviderDriver, ReplyRequest} from '@uz/contract/host'
 
+import {createReplyRuns} from '#modules/reply-runs/main'
 import {randomUUID} from 'node:crypto'
 
 import {createFakeSignIn} from './sign-in'
 
-/** Streamed as thinking before the first word: shown live, never stored. */
 const THINKING = `The user wants to see the fake Provider at work. I'll open with a line about the stream, look something up with the search tool, then close with code, math, a diagram and a picture.`
 
-/** A Model thinks again once a tool has answered, so the fake does too. */
 const THINKING_AFTER_TOOL = `The search answered with three results. Time to close with the list, the code, the math, the diagram and the picture.`
 
 const OPENING = `Here is a **canned** Reply from the fake Provider. It streams word by word, the way a real one would, so the whole path from the Provider host to the window can be tried without an account.
@@ -46,7 +41,6 @@ flowchart LR
 
 That's the end of the fake Reply.`
 
-/** How many words a `/fail` or `/hang` Reply writes before it misbehaves. */
 const WORDS_BEFORE_TROUBLE = 12
 
 /** Words with the whitespace after them, so the deltas join back exactly. */
@@ -86,27 +80,22 @@ function behaviorOf(prompt: string): Behavior {
 }
 
 interface FakeDriverOptions {
-  /** The pause before each word, and between connect steps. */
+  /** Before each word, and between connect steps. */
   delayMs?: number
-  /** When the fake sign-in page answers by itself; null: never. */
+  /** Null: the fake sign-in page never answers by itself. */
   signInAnswerMs?: number | null
 }
 
-/**
- * A driver with no vendor behind it: canned Markdown with a tool call in the
- * middle, streamed with delays. A Prompt containing `/fail` or `/hang` makes
- * the Reply fail or go quiet partway through. Connecting goes through every
- * step without an account.
- */
+/** A driver with no vendor program; `/fail` or `/hang` in a Prompt misbehaves. */
 export function createFakeDriver({
   delayMs = 40,
   signInAnswerMs = 3000,
 }: FakeDriverOptions = {}): ProviderDriver {
-  const running = new Map<string, AbortController>()
-
-  async function* startReply(
-    request: ReplyRequest
-  ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
+  /** Stop aborts the canned stream, which then ends as `stopped`. */
+  async function* write(
+    request: ReplyRequest,
+    run: ReplyRun
+  ): AsyncGenerator<ContentEvent, Ending> {
     const {treeId, replyId} = request
     const ids = {treeId, replyId}
     const controller = new AbortController()
@@ -114,29 +103,22 @@ export function createFakeDriver({
     const behavior = behaviorOf(request.prompt.text)
     let written = 0
 
-    running.set(replyId, controller)
+    run.stoppable(async () => controller.abort())
 
-    function stopped(): ReplyEvent {
-      return {...ids, type: 'RUN_FINISHED', status: 'stopped'}
+    const stopped: Ending = {
+      finished: {...ids, type: 'RUN_FINISHED', status: 'stopped'},
     }
 
-    /**
-     * Streams the words up to `limit`. When the Reply is stopped meanwhile,
-     * ends it and returns false, so the caller only has to return.
-     */
+    /** Returns false once the Reply is stopped. */
     async function* streamWords(
       type: 'TEXT_DELTA' | 'REASONING_DELTA',
       text: string,
       limit?: number
-    ): AsyncGenerator<ReplyEvent, boolean> {
+    ): AsyncGenerator<ContentEvent, boolean> {
       for (const word of words(text).slice(0, limit)) {
         await sleep(delayMs, signal)
 
-        if (signal.aborted) {
-          yield stopped()
-
-          return false
-        }
+        if (signal.aborted) return false
 
         yield {...ids, type, delta: word}
 
@@ -146,21 +128,19 @@ export function createFakeDriver({
       return true
     }
 
-    try {
-      yield {...ids, type: 'RUN_STARTED'}
+    if (!(yield* streamWords('REASONING_DELTA', THINKING))) return stopped
 
-      if (!(yield* streamWords('REASONING_DELTA', THINKING))) return
+    const opened = yield* streamWords(
+      'TEXT_DELTA',
+      OPENING,
+      behavior === 'complete' ? undefined : WORDS_BEFORE_TROUBLE
+    )
 
-      const opened = yield* streamWords(
-        'TEXT_DELTA',
-        OPENING,
-        behavior === 'complete' ? undefined : WORDS_BEFORE_TROUBLE
-      )
+    if (!opened) return stopped
 
-      if (!opened) return
-
-      if (behavior === 'fail') {
-        yield {
+    if (behavior === 'fail') {
+      return {
+        finished: {
           ...ids,
           type: 'RUN_FINISHED',
           status: 'failed',
@@ -168,55 +148,57 @@ export function createFakeDriver({
             code: 'fake-failure',
             message: 'The fake Provider failed on purpose.',
           },
-        }
+        },
+      }
+    }
 
-        return
+    if (behavior === 'hang') {
+      if (!signal.aborted) {
+        await new Promise(resolve => {
+          signal.addEventListener('abort', resolve, {once: true})
+        })
       }
 
-      if (behavior === 'hang') {
-        if (!signal.aborted) {
-          await new Promise(resolve => {
-            signal.addEventListener('abort', resolve, {once: true})
-          })
-        }
+      return stopped
+    }
 
-        yield stopped()
+    const toolCallId = randomUUID()
+    const toolCall = {...ids, toolCallId}
 
-        return
-      }
+    yield {...toolCall, type: 'TOOL_CALL_START', toolName: 'search'}
+    yield {
+      ...toolCall,
+      type: 'TOOL_CALL_ARGS',
+      delta: JSON.stringify({query: request.prompt.text.slice(0, 80)}),
+    }
+    yield {...toolCall, type: 'TOOL_CALL_END'}
+    await sleep(delayMs * 10, signal)
+    yield {
+      ...toolCall,
+      type: 'TOOL_RESULT',
+      content: 'Three canned results.',
+      isError: false,
+    }
 
-      const toolCallId = randomUUID()
-      const toolCall = {...ids, toolCallId}
+    if (!(yield* streamWords('REASONING_DELTA', THINKING_AFTER_TOOL))) {
+      return stopped
+    }
 
-      yield {...toolCall, type: 'TOOL_CALL_START', toolName: 'search'}
-      yield {
-        ...toolCall,
-        type: 'TOOL_CALL_ARGS',
-        delta: JSON.stringify({query: request.prompt.text.slice(0, 80)}),
-      }
-      yield {...toolCall, type: 'TOOL_CALL_END'}
-      await sleep(delayMs * 10, signal)
-      yield {
-        ...toolCall,
-        type: 'TOOL_RESULT',
-        content: 'Three canned results.',
-        isError: false,
-      }
+    if (!(yield* streamWords('TEXT_DELTA', CLOSING))) return stopped
 
-      if (!(yield* streamWords('REASONING_DELTA', THINKING_AFTER_TOOL))) return
+    const inputTokens = words(request.prompt.text).length
+    yield {
+      ...ids,
+      type: 'TOKENS',
+      inputTokens,
+      outputTokens: written,
+      contextSize: inputTokens + written,
+      contextWindow: 200_000,
+    }
 
-      if (!(yield* streamWords('TEXT_DELTA', CLOSING))) return
-
-      const inputTokens = words(request.prompt.text).length
-      yield {
-        ...ids,
-        type: 'TOKENS',
-        inputTokens,
-        outputTokens: written,
-        contextSize: inputTokens + written,
-        contextWindow: 200_000,
-      }
-      yield {
+    return {
+      finished: {...ids, type: 'RUN_FINISHED', status: 'complete'},
+      recorded: {
         ...ids,
         type: 'REPLY_RECORDED',
         model: 'fake',
@@ -227,10 +209,7 @@ export function createFakeDriver({
               : randomUUID(),
           messageId: randomUUID(),
         },
-      }
-      yield {...ids, type: 'RUN_FINISHED', status: 'complete'}
-    } finally {
-      running.delete(replyId)
+      },
     }
   }
 
@@ -249,10 +228,7 @@ export function createFakeDriver({
     listModels: async () => [{id: 'fake', name: 'Fake model'}],
     readUsage: async () => ({windows: []}),
     ...createFakeSignIn({delayMs, answerMs: signInAnswerMs}),
-    startReply,
-    stop: async replyId => {
-      running.get(replyId)?.abort()
-    },
+    ...createReplyRuns(write),
     answerApproval: async () => undefined,
     forkSession: async () => ({sessionId: randomUUID(), messageId: null}),
     rebuildSession: async () => ({sessionId: randomUUID(), messageId: null}),

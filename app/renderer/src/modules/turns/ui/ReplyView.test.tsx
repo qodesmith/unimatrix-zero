@@ -9,15 +9,12 @@ import {ConnectionsProvider} from '#modules/connections/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {EventSchema} from '@uz/contract/events'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
-import {beforeEach, expect, it, onTestFinished} from 'vitest'
+import {afterEach, beforeEach, expect, it, onTestFinished, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
 
 import recording from '../fake-reply.json'
-import {createReplay} from '../replay'
-import {ReplyStoreContext} from '../use-live-reply'
-import {ReplyView} from './ReplyView'
+import {LiveReplies, ReplyView, useTurns} from '../main'
 
-/** The fake driver's Reply, as `record-fake-reply` recorded it. */
 const events: AppEvent[] = recording.map(event => EventSchema.parse(event))
 
 const [first] = events
@@ -42,14 +39,19 @@ const reply: Reply = {
 
 const sent: Command[] = []
 
-/**
- * Main as a Reply sees it: `image.load` on a click, `reply.stop` and
- * `reply.retry` from its buttons, and Claude's status in the SNAPSHOT.
- */
-function fakeMain(claude: ProviderStatus['status'] = 'ready'): Bridge {
-  return {
+/** The Tree's saved Replies, as main answers `tree.turns`. */
+let saved: Reply[] = []
+
+function fakeMain(claude: ProviderStatus['status'] = 'ready') {
+  const listeners = new Set<(event: AppEvent) => void>()
+
+  const bridge: Bridge = {
     send: (async (command: Command) => {
       sent.push(command)
+
+      if (command.type === 'tree.turns') {
+        return {ok: true, value: {prompts: [], replies: [...saved]}}
+      }
 
       if (command.type === 'image.load') {
         return {
@@ -64,10 +66,16 @@ function fakeMain(claude: ProviderStatus['status'] = 'ready'): Bridge {
       if (command.type === 'reply.stop') return {ok: true, value: {}}
 
       if (command.type === 'reply.retry') {
-        return {
-          ok: true,
-          value: {reply: {...reply, status: 'streaming', content: []}},
+        const again: Reply = {
+          ...reply,
+          status: 'streaming',
+          content: [],
+          failure: null,
         }
+
+        saved = saved.map(one => (one.id === command.replyId ? again : one))
+
+        return {ok: true, value: {reply: again}}
       }
 
       return {
@@ -76,6 +84,7 @@ function fakeMain(claude: ProviderStatus['status'] = 'ready'): Bridge {
       }
     }) as Bridge['send'],
     subscribe: listener => {
+      listeners.add(listener)
       listener({
         type: 'SNAPSHOT',
         app: {version: '0.0.0'},
@@ -88,25 +97,75 @@ function fakeMain(claude: ProviderStatus['status'] = 'ready'): Bridge {
         settings: DEFAULT_SETTINGS,
       })
 
-      return () => undefined
+      return () => listeners.delete(listener)
     },
     registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
   }
+
+  function publish(event: AppEvent) {
+    for (const listener of listeners) listener(event)
+  }
+
+  return {...bridge, publish}
 }
 
-const main = fakeMain()
+let main = fakeMain()
 
 beforeEach(() => {
   sent.length = 0
+  saved = []
+  main = fakeMain()
   globalThis.window.uz = main
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 function Providers({children}: {children: ReactNode}) {
   return (
     <QueryClientProvider client={new QueryClient()}>
-      <ConnectionsProvider>{children}</ConnectionsProvider>
+      <ConnectionsProvider>
+        <LiveReplies>{children}</LiveReplies>
+      </ConnectionsProvider>
     </QueryClientProvider>
   )
+}
+
+/** Every saved Reply of the Tree, as the canvas shows them. */
+function SavedReplies() {
+  const turns = useTurns(treeId)
+
+  return turns.data?.replies.map(one => <ReplyView key={one.id} reply={one} />)
+}
+
+function savedReply(id: string, changes: Partial<Reply>): Reply {
+  return {...reply, id, ...changes}
+}
+
+/** Saves the Replies, then renders them once main has handed them over. */
+async function renderSaved(...replies: Partial<Reply>[]) {
+  saved = replies.map((changes, nth) =>
+    savedReply(nth === 0 ? replyId : crypto.randomUUID(), changes)
+  )
+
+  const screen = await render(<SavedReplies />, {wrapper: Providers})
+
+  await expect
+    .element(screen.getByRole('article', {name: 'Reply'}).first())
+    .toBeInTheDocument()
+
+  return screen
+}
+
+/** Events from main, the clock moving 100 ms per event from 1000. */
+function stream(published: AppEvent[]) {
+  vi.useFakeTimers({toFake: ['Date']})
+
+  for (const [nth, event] of published.entries()) {
+    vi.setSystemTime(1000 + 100 * (nth + 1))
+    main.publish(event)
+  }
 }
 
 function before(type: AppEvent['type'], nth = 0) {
@@ -117,36 +176,13 @@ function before(type: AppEvent['type'], nth = 0) {
   )
 }
 
-/**
- * Renders the Reply and replays the fake driver's events into it, up to the
- * end by default: `RUN_FINISHED` hands the Reply to the saved Turns, which
- * `<TreeView>` reads and this test does not.
- */
+/** Stops before `RUN_FINISHED`, so the Reply is still streaming. */
 async function replay(upTo = before('RUN_FINISHED')) {
-  const live = createReplay()
+  const screen = await renderSaved({})
 
-  const screen = await render(
-    <ReplyStoreContext value={live.store}>
-      <ReplyView reply={reply} />
-    </ReplyStoreContext>,
-    {wrapper: Providers}
-  )
-
-  live.replay(events.slice(0, upTo))
+  stream(events.slice(0, upTo))
 
   return screen
-}
-
-/** A saved Reply, as the Tree's Turns hold it, with nothing streaming. */
-async function renderSaved(changes: Partial<Reply>) {
-  const live = createReplay()
-
-  return render(
-    <ReplyStoreContext value={live.store}>
-      <ReplyView reply={{...reply, ...changes}} />
-    </ReplyStoreContext>,
-    {wrapper: Providers}
-  )
 }
 
 function failed(failure: RunFailure): Partial<Reply> {
@@ -157,10 +193,6 @@ function failed(failure: RunFailure): Partial<Reply> {
   }
 }
 
-/**
- * The Reply's paragraphs, thinking and tool calls in page order, by their first
- * words.
- */
 function visibleOrder(article: Element) {
   return [...article.querySelectorAll('p, details')].map(node =>
     node.textContent.slice(0, 20)
@@ -270,17 +302,21 @@ it('draws the Mermaid diagram once its bundle has loaded', async () => {
     .toContain('Prompt')
 }, 20_000)
 
+function imageLoads() {
+  return sent.filter(command => command.type === 'image.load')
+}
+
 it('shows a remote image as a chip, and loads it through main on a click', async () => {
   const screen = await replay()
   const chip = screen.getByText('Image from example.com')
 
   await expect.element(chip).toBeVisible()
   expect(screen.getByRole('article').element().querySelector('img')).toBeNull()
-  expect(sent).toEqual([])
+  expect(imageLoads()).toEqual([])
 
   await screen.getByRole('button', {name: 'Load'}).click()
 
-  expect(sent).toEqual([
+  expect(imageLoads()).toEqual([
     {type: 'image.load', url: 'https://example.com/fake-reply-path.png'},
   ])
   await expect
@@ -291,13 +327,16 @@ it('shows a remote image as a chip, and loads it through main on a click', async
 it('says why an image could not load, and offers to try again', async () => {
   globalThis.window.uz = {
     ...main,
-    send: async () => ({
-      ok: false,
-      error: {
-        code: 'handler-failed',
-        message: 'The image could not be loaded (404).',
-      },
-    }),
+    send: (async (command: Command) =>
+      command.type === 'image.load'
+        ? {
+            ok: false,
+            error: {
+              code: 'handler-failed',
+              message: 'The image could not be loaded (404).',
+            },
+          }
+        : main.send(command)) as Bridge['send'],
   }
   const screen = await replay()
 
@@ -386,60 +425,38 @@ it('says only that the limit was reached when the Provider gave no reset time', 
 })
 
 it('stops a streaming Reply from its button, which waits as Stopping… until the Reply ends', async () => {
-  const live = createReplay()
-
-  const screen = await render(
-    <ReplyStoreContext value={live.store}>
-      <ReplyView reply={reply} />
-    </ReplyStoreContext>,
-    {wrapper: Providers}
-  )
-
-  live.replay(events.slice(0, before('TOOL_CALL_START')))
+  const screen = await replay(before('TOOL_CALL_START'))
 
   await expect.element(screen.getByText('Writing…')).toBeVisible()
   await screen.getByRole('button', {name: 'Stop'}).click()
 
-  expect(sent).toEqual([{type: 'reply.stop', treeId, replyId}])
+  expect(sent.filter(command => command.type === 'reply.stop')).toEqual([
+    {type: 'reply.stop', treeId, replyId},
+  ])
   await expect
     .element(screen.getByRole('button', {name: 'Stopping…'}))
     .toBeDisabled()
 
-  live.replay([{type: 'RUN_FINISHED', treeId, replyId, status: 'stopped'}])
-  await screen.rerender(
-    <ReplyStoreContext value={live.store}>
-      <ReplyView
-        reply={{
-          ...reply,
-          status: 'stopped',
-          content: [{type: 'text', text: 'Let me look'}],
-        }}
-      />
-    </ReplyStoreContext>
-  )
+  main.publish({type: 'RUN_FINISHED', treeId, replyId, status: 'stopped'})
 
   await expect.element(screen.getByText('Stopped')).toBeVisible()
+  await expect.element(screen.getByText(/Let me look/)).toBeVisible()
   expect(screen.getByRole('button', {name: /Stop/}).query()).toBeNull()
 })
 
 const lost: RunFailure = {code: 'connection-lost', message: 'ECONNRESET'}
 
 it('retries a failed Reply in place: it streams again from nothing', async () => {
-  const live = createReplay()
-
-  const screen = await render(
-    <ReplyStoreContext value={live.store}>
-      <ReplyView reply={{...reply, ...failed(lost)}} />
-    </ReplyStoreContext>,
-    {wrapper: Providers}
-  )
+  const screen = await renderSaved(failed(lost))
 
   await expect.element(screen.getByText('Connection lost')).toBeVisible()
   await screen.getByRole('button', {name: 'Retry'}).click()
 
-  expect(sent).toEqual([{type: 'reply.retry', treeId, replyId}])
+  expect(sent.filter(command => command.type === 'reply.retry')).toEqual([
+    {type: 'reply.retry', treeId, replyId},
+  ])
 
-  live.replay([{type: 'RUN_STARTED', treeId, replyId}])
+  main.publish({type: 'RUN_STARTED', treeId, replyId})
   await expect.element(screen.getByText('Writing…')).toBeVisible()
   expect(screen.getByText('Half an answer').query()).toBeNull()
   expect(screen.getByText('Connection lost').query()).toBeNull()
@@ -457,10 +474,16 @@ it('offers no Retry on a Reply the app quit on: it goes on like a stopped one', 
 it('shows why main refused a retry, beside the button', async () => {
   globalThis.window.uz = {
     ...main,
-    send: async () => ({
-      ok: false,
-      error: {code: 'handler-failed', message: 'Connect Claude to retry.'},
-    }),
+    send: (async (command: Command) =>
+      command.type === 'reply.retry'
+        ? {
+            ok: false,
+            error: {
+              code: 'handler-failed',
+              message: 'Connect Claude to retry.',
+            },
+          }
+        : main.send(command)) as Bridge['send'],
   }
   const screen = await renderSaved(failed(lost))
 
@@ -474,7 +497,6 @@ it('shows why main refused a retry, beside the button', async () => {
     .toBeEnabled()
 })
 
-/** The browser's view of the connection, as `navigator.onLine` reports it. */
 function goOffline() {
   Object.defineProperty(navigator, 'onLine', {
     configurable: true,
@@ -515,7 +537,8 @@ it.each([
 ] satisfies [ProviderStatus['status'], string][])(
   'holds Retry while Claude is %s: "%s"',
   async (status, reason) => {
-    globalThis.window.uz = fakeMain(status)
+    main = fakeMain(status)
+    globalThis.window.uz = main
     const screen = await renderSaved(failed(lost))
 
     await expect
@@ -525,7 +548,7 @@ it.each([
   }
 )
 
-it('gates every failed Reply on one subscription to main', async () => {
+it('gates every failed Reply on one subscription to the Provider statuses', async () => {
   let subscriptions = 0
   globalThis.window.uz = {
     ...main,
@@ -535,18 +558,11 @@ it('gates every failed Reply on one subscription to main', async () => {
       return main.subscribe(listener)
     },
   }
-  const live = createReplay()
-
-  const screen = await render(
-    <ReplyStoreContext value={live.store}>
-      <ReplyView reply={{...reply, ...failed(lost)}} />
-      <ReplyView reply={{...reply, ...failed(lost), id: crypto.randomUUID()}} />
-    </ReplyStoreContext>,
-    {wrapper: Providers}
-  )
+  const screen = await renderSaved(failed(lost), failed(lost))
 
   await expect
     .element(screen.getByRole('button', {name: 'Retry'}).nth(1))
     .toBeEnabled()
-  expect(subscriptions).toBe(1)
+  // One for the live Replies, one for the Provider statuses.
+  expect(subscriptions).toBe(2)
 })

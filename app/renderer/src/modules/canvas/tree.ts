@@ -1,7 +1,7 @@
 import type {Turns} from '#modules/turns/main'
 import type {Prompt, Reply} from '@uz/contract/turns'
 
-/** Oldest first; ids (UUIDv7, ADR 0002) break a tie the same way every time. */
+/** Oldest first; ids (UUIDv7) break a tie the same way every time. */
 function oldestFirst<T extends {createdAt: string; id: string}>(a: T, b: T) {
   return a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)
 }
@@ -47,10 +47,7 @@ export function branchesOf(index: TreeIndex, replyId: string | null): Prompt[] {
   return index.promptsByParent.get(replyId) ?? []
 }
 
-/**
- * The Thread up to a Turn: every Turn id from the root to it, in order. Empty
- * when the Tree has no such Turn.
- */
+/** Every Turn id from the root to a Turn, in order; empty for an unknown Turn. */
 export function pathTo(index: TreeIndex, turnId: string): string[] {
   const path: string[] = []
   let current: string | null = turnId
@@ -96,10 +93,7 @@ export function newestReply(index: TreeIndex): Reply | null {
   return index.replies.at(-1) ?? null
 }
 
-/**
- * The Reply a Turn stands for: a Reply itself, or a Prompt's Reply. Null for a
- * Prompt main has not started one for yet, or a Turn the Tree does not have.
- */
+/** A Reply itself or a Prompt's Reply; null for a Prompt without one yet. */
 export function replyOf(index: TreeIndex, turnId: string): Reply | null {
   return index.replyById.get(turnId) ?? index.replyByPrompt.get(turnId) ?? null
 }

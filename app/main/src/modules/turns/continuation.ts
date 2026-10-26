@@ -11,16 +11,12 @@ const {prompts, replies, systemPrompts} = schema
 /** A Reply ended early with its text kept; its Provider may not have saved it. */
 const CUT_SHORT = new Set<Reply['status']>(['stopped', 'interrupted'])
 
-/**
- * Where a Thread continues: a Reply's Provider, and its session there; null
- * session when the Provider has nothing of the Thread, so it starts one.
- */
+/** A null session means the Provider has nothing of the Thread and starts one. */
 export interface Continuation {
   provider: ProviderId
   session: ReplyRequest['session']
 }
 
-/** How a Reply runs again: its Prompt, and the session it goes to. */
 export interface Recovery {
   provider: ProviderId
   model: string
@@ -29,7 +25,6 @@ export interface Recovery {
   session: Continuation['session']
 }
 
-/** Whether a Prompt other than `except` answers the Reply. */
 function answered(db: Database, replyId: string, except?: string) {
   const prompt = db
     .select({id: prompts.id})
@@ -46,13 +41,10 @@ function answered(db: Database, replyId: string, except?: string) {
 }
 
 /**
- * Where a Thread continues from this Reply: its Provider and session,
- * which the next Prompt forks when the Reply already has a Prompt after
- * it, other than `except`, the Prompt being run again. A Reply stopped or
- * interrupted before its Provider saved it continues from the Reply its
- * own Prompt answers, since the Provider session stands there with the
- * Prompt in it; a Prompt after the cut-short Reply forks that session all
- * the same. Null when the Tree has no such Reply.
+ * Forks when the Reply already has a Prompt after it other than `except`, the
+ * Prompt being run again. A Reply cut short before its Provider saved it
+ * continues from the Reply its own Prompt answers, whose session holds that
+ * Prompt.
  */
 export function continuation(
   db: Database,
@@ -115,12 +107,9 @@ export function continuation(
 }
 
 /**
- * How a failed Reply runs again: its Prompt, to the same Provider and
- * Model, in the session rewound to the Reply its Prompt answers. A Prompt
- * that started a Branch forks again instead, and one answering a Reply its
- * Provider never saved goes on without a rewind, which would drop that
- * Reply's Prompt too. Null when the Tree has no such Reply; throws for one
- * that didn't fail.
+ * Rewinds the session to the Reply its Prompt answers. A Prompt that started a
+ * Branch forks again instead, and one answering a Reply its Provider never
+ * saved skips the rewind, which would drop that Reply's Prompt too.
  */
 export function recovery(
   db: Database,

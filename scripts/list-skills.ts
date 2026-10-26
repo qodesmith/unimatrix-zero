@@ -1,10 +1,7 @@
 import {$} from 'bun'
 /**
- * Lists the skills a repo exposes as JSON: `{name, description, path}[]`,
- * where `path` is the skill's directory relative to the repo root.
- *
- * Mirrors `discoverSkills()` from vercel-labs/skills (src/skills.ts), minus
- * plugin-manifest handling.
+ * Lists a repo's skills as JSON `{name, description, path}[]`, `path` relative
+ * to the repo root. Mirrors `discoverSkills()` from vercel-labs/skills.
  *
  * Usage:
  * bun scripts/list-skills.ts <owner/repo | git URL | local path> [--full-depth]
@@ -175,8 +172,6 @@ export async function discoverSkills(
   const parsedDirs = new Set<string>()
   const lockedNames = await readLockedSkillNames(basePath)
 
-  // Skills already installed into this repo (tracked by skills-lock.json) are
-  // not the repo's own source skills.
   function isInstalledProjectSkill(skill: Skill) {
     if (lockedNames.size === 0) return false
     const relativeDir = relative(basePath, skill.path).split(sep).join('/')
@@ -242,7 +237,6 @@ export async function discoverSkills(
     }
   }
 
-  // The repo root is walked one level deep; known skill containers go deeper.
   await walkSkillDirs(basePath, 1)
 
   const containerDirs = [

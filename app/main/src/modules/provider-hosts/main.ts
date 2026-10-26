@@ -14,7 +14,6 @@ import type {ReplyEvent} from '@uz/contract/turns'
 
 import {HostMessageSchema} from '@uz/contract/host'
 
-/** One running Provider host, as main drives it. */
 export interface HostProcess {
   post(command: HostCommand): void
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the process boundary: HostMessageSchema parses it
@@ -59,11 +58,7 @@ interface ProviderHostsOptions {
 
 export type ProviderHosts = ReturnType<typeof createProviderHosts>
 
-/**
- * One utility process per connected Provider. A host that crashes is
- * restarted after each delay in turn; one that then stays up long enough
- * starts the count over.
- */
+/** One utility process per connected Provider, restarted after a crash. */
 export function createProviderHosts({
   spawn,
   onReplyEvent,
@@ -176,7 +171,6 @@ export function createProviderHosts({
   }
 
   return {
-    /** Starts the Provider's host, unless it is already running. */
     connect(provider: ProviderId) {
       if (hosts.has(provider)) return
 
@@ -191,10 +185,7 @@ export function createProviderHosts({
       start(provider, host)
     },
 
-    /**
-     * The given Provider, or else the first one, whose host is ready, with
-     * its default Model.
-     */
+    /** A ready host's Provider (`only`, if given) and its default Model. */
     ready(only?: ProviderId): {provider: ProviderId; model: Model} | null {
       for (const [provider, host] of hosts) {
         const model = host.models?.[0]
@@ -217,7 +208,6 @@ export function createProviderHosts({
 
     stop,
 
-    /** Stops every host on purpose, so none of them counts as a crash. */
     stopAll() {
       for (const provider of hosts.keys()) stop(provider)
     },

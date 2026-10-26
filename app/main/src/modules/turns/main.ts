@@ -1,354 +1,184 @@
 import type {Database} from '#modules/database/main'
+import type {Command, CommandResult} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
-import type {ReplyRecorded} from '@uz/contract/host'
-import type {ProviderId} from '@uz/contract/providers'
 import type {
-  Prompt,
-  Reply,
-  ReplyEvent,
-  ReplyProgress,
-  RunFailure,
-  StreamingReply,
-} from '@uz/contract/turns'
+  HostCommand,
+  ReplyRecorded,
+  ReplyRequest,
+  SignInRequest,
+} from '@uz/contract/host'
+import type {Model, ProviderId} from '@uz/contract/providers'
+import type {Reply, ReplyEvent} from '@uz/contract/turns'
 
 import {schema} from '#modules/database/main'
-import {
-  NEW_REPLY,
-  ReplyPartSchema,
-  RunFailureSchema,
-  foldReplyEvent,
-} from '@uz/contract/turns'
-import {and, asc, eq, isNull} from 'drizzle-orm'
-import {createHash} from 'node:crypto'
-import {z} from 'zod'
+import {PROVIDER_NAMES} from '@uz/contract/providers'
+import {eq} from 'drizzle-orm'
 
 import {continuation, recovery} from './continuation'
+import {createInFlight} from './in-flight'
+import {insertExchange, listTurns, resetReply, savedReply} from './rows'
 
-/** How long partial text may go unsaved while a Reply streams. */
-export const PARTIAL_SAVE_MS = 1000
+export {PARTIAL_SAVE_MS} from './in-flight'
 
-const ContentSchema = z.array(ReplyPartSchema)
-
-const FailureSchema = RunFailureSchema.nullable()
-
-type PromptRow = typeof schema.prompts.$inferSelect
-
-type ReplyRow = typeof schema.replies.$inferSelect
-
-function toPrompt(row: PromptRow): Prompt {
-  return {
-    id: row.id,
-    treeId: row.treeId,
-    parentReplyId: row.parentReplyId,
-    text: row.text,
-    createdAt: row.createdAt.toISOString(),
-  }
+/** What a Reply needs of the Provider hosts. */
+export interface ReplyHosts {
+  /** A ready host's Provider (`only`, if given) and its default Model. */
+  ready(only?: ProviderId): {provider: ProviderId; model: Model} | null
+  /** Throws when the host can't be reached. */
+  send(provider: ProviderId, command: HostCommand): void
 }
 
-function toReply(row: ReplyRow): Reply {
-  return {
-    id: row.id,
-    treeId: row.treeId,
-    promptId: row.promptId,
-    provider: row.provider,
-    model: row.model,
-    status: row.status,
-    content: ContentSchema.parse(row.content),
-    contextSize: row.contextSize,
-    contextWindow: row.contextWindow,
-    failure: FailureSchema.parse(row.failure ?? null),
-    createdAt: row.createdAt.toISOString(),
-  }
+export interface TurnsDeps {
+  db: Database
+  publish: (event: AppEvent) => void
+  hosts: ReplyHosts
+  /** The vendor program and configuration folder a Provider's Replies use. */
+  vendorProgramFor: (provider: ProviderId) => SignInRequest
+  now: () => Date
 }
 
-/** Parts before the last are done; the last is done once a tool answers it. */
-function finishedParts({content}: ReplyProgress) {
-  const last = content.at(-1)
-  const lastDone = last?.type === 'tool-call' && last.result !== null
-
-  return Math.max(content.length - 1, 0) + (lastDone ? 1 : 0)
-}
-
-interface InFlight {
-  provider: ProviderId
-  reply: StreamingReply
-  saveTimer: ReturnType<typeof setTimeout> | null
-}
-
-interface NewPrompt {
-  treeId: string
-  /** The Reply it answers; null for the root Prompt. */
-  parentReplyId: string | null
-  text: string
-  provider: ProviderId
-  model: string
-  systemPrompt: string
-  now: Date
-}
+export type NewPrompt = Omit<Extract<Command, {type: 'prompt.send'}>, 'type'>
 
 export type Turns = ReturnType<typeof createTurns>
 
 /**
- * Prompts and Replies. A streaming Reply is folded here, saved, and only then
- * published, so a window never shows what main has not saved or is not about
- * to save: the row at start, at each finished part, at most a second behind
- * for partial text, and at the end. Nothing streams before this runs, so a
- * Reply still `streaming` was left so when the app last quit: it becomes
- * `interrupted` here, once per launch.
+ * A Tree's Prompts and Replies, and every Reply's run from its Prompt to its
+ * end. Nothing streams before this runs, so a Reply still `streaming` was left
+ * by the last quit: it becomes `interrupted` here, once per launch.
  */
-export function createTurns(db: Database, publish: (event: AppEvent) => void) {
-  const {prompts, replies, systemPrompts} = schema
-  const inFlight = new Map<string, InFlight>()
+export function createTurns({
+  db,
+  publish,
+  hosts,
+  vendorProgramFor,
+  now,
+}: TurnsDeps) {
+  const inFlight = createInFlight(db, publish)
 
-  db.update(replies)
+  db.update(schema.replies)
     .set({status: 'interrupted'})
-    .where(eq(replies.status, 'streaming'))
+    .where(eq(schema.replies.status, 'streaming'))
     .run()
 
-  function save(entry: InFlight) {
-    if (entry.saveTimer) clearTimeout(entry.saveTimer)
-    entry.saveTimer = null
+  /** The Reply as it now stands: failed when its host can't be reached. */
+  function startOnHost(provider: ProviderId, request: ReplyRequest): Reply {
+    inFlight.track(provider, request.treeId, request.replyId)
 
-    const {status, content, contextSize, contextWindow, failure} = entry.reply
-    db.update(replies)
-      .set({status, content, contextSize, contextWindow, failure})
-      .where(eq(replies.id, entry.reply.replyId))
-      .run()
-  }
-
-  function saveSoon(entry: InFlight) {
-    entry.saveTimer ??= setTimeout(() => save(entry), PARTIAL_SAVE_MS)
-  }
-
-  /**
-   * Folds an event from a Provider host into its Reply, saves when due, then
-   * publishes it. Events for a Reply that host isn't writing are dropped.
-   */
-  function apply(provider: ProviderId, event: ReplyEvent) {
-    const entry = inFlight.get(event.replyId)
-
-    if (entry?.provider !== provider || entry.reply.treeId !== event.treeId) {
-      return
-    }
-
-    const before = entry.reply
-    entry.reply = foldReplyEvent(before, event)
-
-    if (event.type === 'RUN_FINISHED') {
-      inFlight.delete(event.replyId)
-      save(entry)
-    } else if (finishedParts(entry.reply) > finishedParts(before)) {
-      save(entry)
-    } else if (entry.reply !== before) {
-      saveSoon(entry)
-    }
-
-    publish(event)
-  }
-
-  /** Saves and publishes the Reply as failed, with the text it last showed. */
-  function fail(entry: InFlight, failure: RunFailure) {
-    const {treeId, replyId} = entry.reply
-
-    apply(entry.provider, {
-      type: 'RUN_FINISHED',
-      treeId,
-      replyId,
-      status: 'failed',
-      failure,
-    })
-  }
-
-  /**
-   * The Provider saved the Reply in its session: keeps where, and the Model
-   * that wrote it. Ignored for a Reply of another Provider or Tree.
-   */
-  function record(provider: ProviderId, recorded: ReplyRecorded) {
-    const {treeId, replyId, model, session} = recorded
-
-    db.update(replies)
-      .set({
-        model,
-        sessionId: session.sessionId,
-        sessionMessageId: session.messageId,
+    try {
+      hosts.send(provider, {type: 'reply.start', request})
+    } catch {
+      inFlight.fail(request.replyId, {
+        code: 'host-unreachable',
+        message: `${PROVIDER_NAMES[provider]} could not be reached.`,
       })
-      .where(
-        and(
-          eq(replies.id, replyId),
-          eq(replies.treeId, treeId),
-          eq(replies.provider, provider)
-        )
-      )
-      .run()
-  }
+    }
 
-  /** The System prompt's id, saving it first if no Reply has used it. */
-  function saveSystemPrompt(text: string) {
-    const hash = createHash('sha256').update(text).digest('hex')
-
-    db.insert(systemPrompts).values({hash, text}).onConflictDoNothing().run()
-
-    const row = db
-      .select({id: systemPrompts.id})
-      .from(systemPrompts)
-      .where(eq(systemPrompts.hash, hash))
-      .get()
-
-    if (!row) throw new Error('The System prompt was not saved.')
-
-    return row.id
+    return savedReply(db, request.replyId)
   }
 
   return {
-    list(treeId: string) {
+    list: (treeId: string) => listTurns(db, treeId),
+
+    /** For a window that connects mid-stream. */
+    streaming: () => inFlight.streaming(),
+
+    /** Null when the Reply it answers is gone. */
+    sendPrompt({
+      treeId,
+      parentReplyId,
+      text,
+    }: NewPrompt): CommandResult<'prompt.send'> | null {
+      const continued =
+        parentReplyId === null ? null : continuation(db, treeId, parentReplyId)
+
+      if (parentReplyId !== null && !continued) return null
+
+      const ready = hosts.ready(continued?.provider)
+
+      if (!ready) {
+        throw new Error(
+          continued
+            ? `Connect ${PROVIDER_NAMES[continued.provider]} to continue this Thread.`
+            : 'Connect a Provider to send a Prompt.'
+        )
+      }
+
+      const {provider, model} = ready
+      const systemPrompt = ''
+
+      const {prompt, reply} = insertExchange(db, {
+        treeId,
+        parentReplyId,
+        text,
+        provider,
+        model: model.id,
+        systemPrompt,
+        now: now(),
+      })
+
       return {
-        prompts: db
-          .select()
-          .from(prompts)
-          .where(eq(prompts.treeId, treeId))
-          .orderBy(asc(prompts.createdAt), asc(prompts.id))
-          .all()
-          .map(toPrompt),
-        replies: db
-          .select()
-          .from(replies)
-          .where(eq(replies.treeId, treeId))
-          .orderBy(asc(replies.createdAt), asc(replies.id))
-          .all()
-          .map(toReply),
+        prompt,
+        reply: startOnHost(provider, {
+          treeId,
+          replyId: reply.id,
+          model: model.id,
+          systemPrompt,
+          prompt: {text},
+          vendorProgram: vendorProgramFor(provider),
+          session: continued?.session ?? null,
+        }),
       }
     },
 
-    continuation: (treeId: string, replyId: string) =>
-      continuation(db, treeId, replyId),
+    /** Runs a failed Reply's Prompt again in place; null when it's gone. */
+    retry(treeId: string, replyId: string): Reply | null {
+      const recovered = recovery(db, treeId, replyId)
 
-    recovery: (treeId: string, replyId: string) =>
-      recovery(db, treeId, replyId),
+      if (!recovered) return null
 
-    /**
-     * Starts the Reply over, in place: streaming again from nothing, with
-     * its failure cleared. Its Provider host is asked for it separately.
-     */
-    restart(replyId: string): Reply {
-      const row = db
-        .update(replies)
-        .set({...NEW_REPLY, sessionId: null, sessionMessageId: null})
-        .where(eq(replies.id, replyId))
-        .returning()
-        .get()
+      const {provider, model, systemPrompt, text, session} = recovered
 
-      if (!row) throw new Error('That Reply was not saved.')
+      if (!hosts.ready(provider)) {
+        throw new Error(`Connect ${PROVIDER_NAMES[provider]} to retry.`)
+      }
 
-      inFlight.set(replyId, {
-        provider: row.provider,
-        reply: {...NEW_REPLY, treeId: row.treeId, replyId},
-        saveTimer: null,
+      resetReply(db, replyId)
+
+      return startOnHost(provider, {
+        treeId,
+        replyId,
+        model,
+        systemPrompt,
+        prompt: {text},
+        vendorProgram: vendorProgramFor(provider),
+        session,
       })
-
-      return toReply(row)
     },
 
-    /** The Provider whose host is writing this Reply; throws when none is. */
-    writer(treeId: string, replyId: string): ProviderId {
-      const entry = inFlight.get(replyId)
+    /** Its `RUN_FINISHED` comes from the host. */
+    stop(treeId: string, replyId: string) {
+      const provider = inFlight.writer(treeId, replyId)
 
-      if (!entry || entry.reply.treeId !== treeId) {
-        throw new Error('That Reply isn’t being written.')
-      }
+      if (!provider) throw new Error('That Reply isn’t being written.')
 
-      return entry.provider
+      hosts.send(provider, {type: 'reply.stop', replyId})
     },
 
-    /**
-     * Saves a Prompt answering a Reply, or the root Prompt of an empty Tree,
-     * and its Reply, which starts out streaming.
-     */
-    start(next: NewPrompt): {prompt: Prompt; reply: Reply} {
-      const systemPromptId = saveSystemPrompt(next.systemPrompt)
-      const {treeId, parentReplyId} = next
+    hostEvent: (provider: ProviderId, event: ReplyEvent) =>
+      inFlight.apply(provider, event),
 
-      const saved = db.transaction(tx => {
-        const root =
-          parentReplyId === null &&
-          tx
-            .select({id: prompts.id})
-            .from(prompts)
-            .where(
-              and(eq(prompts.treeId, treeId), isNull(prompts.parentReplyId))
-            )
-            .get()
+    hostRecorded: (provider: ProviderId, recorded: ReplyRecorded) =>
+      inFlight.record(provider, recorded),
 
-        if (root) throw new Error('This Tree already has its first Prompt.')
-
-        const prompt = tx
-          .insert(prompts)
-          .values({treeId, parentReplyId, text: next.text, createdAt: next.now})
-          .returning()
-          .get()
-
-        const reply = tx
-          .insert(replies)
-          .values({
-            treeId,
-            promptId: prompt.id,
-            provider: next.provider,
-            model: next.model,
-            ...NEW_REPLY,
-            systemPromptId,
-            createdAt: next.now,
-          })
-          .returning()
-          .get()
-
-        return {prompt: toPrompt(prompt), reply: toReply(reply)}
+    /** Fails the host's Replies with the text they last showed. */
+    hostCrashed(provider: ProviderId) {
+      inFlight.failAll(provider, {
+        code: 'host-crashed',
+        message: `${PROVIDER_NAMES[provider]} stopped unexpectedly.`,
       })
-
-      inFlight.set(saved.reply.id, {
-        provider: next.provider,
-        reply: {...NEW_REPLY, treeId, replyId: saved.reply.id},
-        saveTimer: null,
-      })
-
-      return saved
     },
 
-    apply,
-
-    record,
-
-    /** Fails one streaming Reply and returns it as saved. */
-    fail(replyId: string, failure: RunFailure): Reply {
-      const entry = inFlight.get(replyId)
-
-      if (entry) fail(entry, failure)
-
-      const row = db.select().from(replies).where(eq(replies.id, replyId)).get()
-
-      if (!row) throw new Error('That Reply was not saved.')
-
-      return toReply(row)
-    },
-
-    /**
-     * The host for this Provider is gone: each of its Replies is saved as
-     * failed with the text it last showed. Nothing is re-run.
-     */
-    failAll(provider: ProviderId, failure: RunFailure) {
-      for (const entry of inFlight.values()) {
-        if (entry.provider === provider) fail(entry, failure)
-      }
-    },
-
-    /** Saves any partial text still waiting on its timer, before quitting. */
-    saveAll() {
-      for (const entry of inFlight.values()) {
-        if (entry.saveTimer) save(entry)
-      }
-    },
-
-    /** Every Reply being written, as last published. */
-    streaming(): StreamingReply[] {
-      return [...inFlight.values()].map(entry => entry.reply)
-    },
+    /** Saves partial text still waiting on its timer, after the hosts stop. */
+    quitting: () => inFlight.saveAll(),
   }
 }

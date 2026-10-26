@@ -16,18 +16,11 @@ interface Machine {
   arch: string
 }
 
-/** The vendor program each Provider runs. */
 const PROGRAMS = {
   claude: 'claude',
   chatgpt: 'codex',
 } as const satisfies Record<ProviderId, keyof Manifest['vendorPrograms']>
 
-/**
- * What connecting a Provider needs on this machine: where its exact vendor
- * program goes under `userData`, what to download, and its own configuration
- * folder. A program downloaded as a folder goes in its version's folder. The
- * program is null when the manifest names none for this machine.
- */
 export function signInRequestFor(
   provider: ProviderId,
   {userData, platform, arch}: Machine,

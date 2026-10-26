@@ -2,8 +2,7 @@ import {readFile} from 'node:fs/promises'
 import {join} from 'node:path'
 import {z} from 'zod'
 
-// The `skills` CLI writes this file and isn't pinned, so entries stay loose:
-// only their names are read.
+// The unpinned `skills` CLI writes this file, so only entry names are read.
 const SkillsLock = z.looseObject({
   skills: z.record(z.string(), z.looseObject({})),
 })

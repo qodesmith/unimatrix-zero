@@ -70,8 +70,7 @@ interface DevServer {
 }
 
 /**
- * `app-dev://` proxies the Vite dev server, so the window keeps the same
- * origin rules in dev as in a packaged build and no check needs a localhost
+ * Dev keeps the packaged build's origin rules, so no check needs a localhost
  * exception. The HMR socket is the one thing the page reaches directly.
  */
 export function proxyDevServer(target: Protocol, dev: DevServer) {

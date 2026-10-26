@@ -16,10 +16,7 @@ const RECORDED_IDS = {
   replyId: '01a16096-00ae-7d3b-8205-6b76ddc26ce0',
 }
 
-/**
- * Plays the fake driver's complete Reply through at full speed and keeps its
- * Reply events, with tool call ids numbered so two recordings are the same.
- */
+/** Tool call ids are numbered so two recordings come out the same. */
 export async function recordFakeReply(): Promise<ReplyEvent[]> {
   const driver = createFakeDriver({delayMs: 0})
   const toolCallIds = new Map<string, string>()

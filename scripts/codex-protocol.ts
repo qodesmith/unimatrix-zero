@@ -1,10 +1,8 @@
 /**
- * Regenerates the Codex driver's app-server types with `codex app-server
- * generate-ts`, from the Codex version the manifest pins. The standalone
- * `codex-app-server` the app runs can't generate them, so this takes the full
- * `codex`: the one on PATH, or the path given.
+ * The standalone `codex-app-server` the app runs can't generate its types, so
+ * this takes the full `codex`: the one on PATH, or the path given.
  *
- * Bun run codex-protocol [path/to/codex]
+ * Usage: bun run codex-protocol [path/to/codex]
  */
 import {spawnSync} from 'node:child_process'
 import fs from 'node:fs'

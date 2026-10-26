@@ -33,17 +33,6 @@ function reply(id: string, promptId: string): Reply {
   }
 }
 
-/**
- * Two Forks: the root Reply has two Branches, and the first Branch's Reply
- * has three.
- *
- * ```text
- * P1 - R1 - P2 - R2 - P4 - R4
- *         |         - P5 - R5
- *         |         - P6 - R6
- *         - P3 - R3
- * ```
- */
 function forkedTree() {
   clock = 0
 
@@ -74,7 +63,6 @@ function sized(heights: Record<string, number>) {
   return (id: string) => ({width, height: heights[id] ?? 80})
 }
 
-/** Where the layout put a node, by id. */
 function positions(layout: ReturnType<typeof layoutTree>) {
   const byId = new Map(layout.nodes.map(node => [node.id, node.position]))
 

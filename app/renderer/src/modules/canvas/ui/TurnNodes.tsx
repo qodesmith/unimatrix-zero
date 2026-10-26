@@ -3,7 +3,7 @@ import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Node, NodeProps} from '@xyflow/react'
 
 import {cn} from '#modules/shadcn/main'
-import {ReplyView, useLiveReply} from '#modules/turns/main'
+import {ReplyView, useReply} from '#modules/turns/main'
 import {Handle, Position} from '@xyflow/react'
 import {useState} from 'react'
 
@@ -14,7 +14,6 @@ import {CappedText} from './CappedText'
 import {ContextMeter, ContextSizeBadge} from './ContextSize'
 import {PromptInput} from './PromptInput'
 
-/** Every box on the canvas is one of these, typed by the Turn it shows. */
 export type TurnNode = Node<{turn: LayoutNode}, LayoutNode['kind']>
 
 const hiddenHandle = 'opacity-0!'
@@ -34,7 +33,6 @@ function PromptText({prompt}: {prompt: Prompt}) {
   )
 }
 
-/** The Reply's content with its Context size, live while it streams. */
 function ReplyBody({reply}: {reply: Reply}) {
   const {
     index,
@@ -44,10 +42,7 @@ function ReplyBody({reply}: {reply: Reply}) {
     toggleExpanded,
   } = useCanvas()
 
-  const live = useLiveReply(reply.id)
-  const status = live?.status ?? reply.status
-  const contextSize = live?.contextSize ?? reply.contextSize
-  const contextWindow = live?.contextWindow ?? reply.contextWindow
+  const {status, contextSize, contextWindow} = useReply(reply)
   const previous = previousReply(index, reply)
 
   return (
@@ -83,7 +78,6 @@ function ReplyBody({reply}: {reply: Reply}) {
   )
 }
 
-/** A Fork's pill, folding its Branches away and bringing them back. */
 function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
   const {collapsedReplyIds, toggleCollapsed} = useCanvas()
   const collapsed = collapsedReplyIds.has(replyId)
@@ -105,17 +99,12 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
   )
 }
 
-/**
- * The Input answering a Reply, mounted once the Reply is done with its space
- * kept, so revealing it shifts nothing. Revealed at the end of the Active
- * Thread, while the Reply's box is hovered or holds focus, and while it holds
- * a draft. A failed Reply has Retry instead.
- */
+/** Hidden by opacity, not unmounted, so revealing it shifts nothing. */
 function ReplyInput({reply, hovered}: {reply: Reply; hovered: boolean}) {
   const {treeId, activeReplyId, onInputFocus, onSent, drafts, setDraft} =
     useCanvas()
 
-  const status = useLiveReply(reply.id)?.status ?? reply.status
+  const {status} = useReply(reply)
 
   if (status === 'streaming' || status === 'failed') return null
 
@@ -209,7 +198,7 @@ export function ReplyNode({data}: NodeProps<TurnNode>) {
 }
 
 function ReplyTurn({reply}: {reply: Reply}) {
-  const status = useLiveReply(reply.id)?.status ?? reply.status
+  const {status} = useReply(reply)
 
   return (
     <div data-turn={reply.id} className={replyFrame(status)}>
@@ -240,8 +229,7 @@ export function ExchangeNode({data}: NodeProps<TurnNode>) {
 }
 
 function ExchangeTurns({prompt, reply}: {prompt: Prompt; reply: Reply | null}) {
-  const live = useLiveReply(reply?.id ?? null)
-  const status = live?.status ?? reply?.status ?? 'complete'
+  const status = useReply(reply)?.status ?? 'complete'
 
   return (
     <div className={cn('overflow-hidden', replyFrame(status))}>

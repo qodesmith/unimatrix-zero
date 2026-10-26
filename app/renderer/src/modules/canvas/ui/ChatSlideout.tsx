@@ -2,7 +2,7 @@ import type {Prompt, Reply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
 
 import {Button, cn} from '#modules/shadcn/main'
-import {ReplyView, useLiveReply} from '#modules/turns/main'
+import {ReplyView, useReply} from '#modules/turns/main'
 import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 
 import {useCanvas} from '../canvas-context'
@@ -18,7 +18,6 @@ interface ChatSlideoutProps {
   open: boolean
   onClose: () => void
   onClosed: () => void
-  /** The user is in the Input: its Thread becomes the Active Thread. */
   onFocus: (replyId: string) => void
   /** A Prompt was sent from the Input and main started this Reply for it. */
   onSent: (replyId: string) => void
@@ -150,7 +149,7 @@ function ChatPrompt({prompt}: {prompt: Prompt}) {
 }
 
 function ChatReply({reply}: {reply: Reply}) {
-  const status = useLiveReply(reply.id)?.status ?? reply.status
+  const {status} = useReply(reply)
 
   return (
     <div
@@ -172,13 +171,10 @@ interface ChatInputProps {
   onSent: (replyId: string) => void
 }
 
-/**
- * The Input at the end of the Thread, once its Reply is done, sharing its draft
- * with that Reply's Input on the canvas. A failed Reply has Retry instead.
- */
+/** Shares its draft with the same Reply's Input on the canvas. */
 function ChatInput({end, onFocus, onSent}: ChatInputProps) {
   const {treeId, drafts, setDraft} = useCanvas()
-  const status = useLiveReply(end.id)?.status ?? end.status
+  const {status} = useReply(end)
 
   if (status === 'streaming' || status === 'failed') return null
 

@@ -6,7 +6,7 @@ import type {CanvasOrientation} from '@uz/contract/settings'
 import type {Reply} from '@uz/contract/turns'
 
 import {useSettings, useUpdateSettings} from '#modules/settings/main'
-import {stopReply, useLiveReply, useTurns} from '#modules/turns/main'
+import {useReply, useReplyRun, useTurns} from '#modules/turns/main'
 import {ReactFlowProvider} from '@xyflow/react'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 
@@ -17,10 +17,9 @@ import {ChatSlideout} from './ChatSlideout'
 import {Flow} from './Flow'
 import {PromptInput} from './PromptInput'
 
-/** How long Turns take to glide to their places in the other orientation. */
+/** The length of `.canvas-switching`'s transform transition in styles.css. */
 const SWITCH_MS = 400
 
-/** The set with one id added when it was out, or taken out when it was in. */
 function toggled(id: string) {
   return (current: ReadonlySet<string>) => {
     const next = new Set(current)
@@ -31,10 +30,7 @@ function toggled(id: string) {
   }
 }
 
-/**
- * The Forks on a Thread unfolded, so the Turn after it is on the canvas; the
- * topmost, the one still on screen, keeps its place.
- */
+/** Unfolds the Forks over a Turn; the topmost, still on screen, keeps its place. */
 function unfoldedOver(index: TreeIndex, replyId: string) {
   return (current: Collapsed): Collapsed => {
     const folded = pathTo(index, replyId).filter(id => current.ids.has(id))
@@ -60,9 +56,8 @@ interface EscapeStops {
 }
 
 /**
- * Esc stops the streaming Reply the user is looking at: the open slideout's
- * end, else the Active Thread's. It takes the key before the slideout closes
- * on it. Esc in a field belongs to that field.
+ * Esc stops the streaming Reply in view, the slideout's end else the Active
+ * Thread's, capturing the key before the slideout closes on it.
  */
 function useEscapeStops({
   treeId,
@@ -72,18 +67,18 @@ function useEscapeStops({
   chatEnd,
 }: EscapeStops) {
   const replyId = chatOpen && chatEnd ? chatEnd.id : activeReplyId
-  const live = useLiveReply(replyId)
 
-  const status =
-    live?.status ??
-    (replyId === null ? null : index.replyById.get(replyId))?.status
+  const shown = useReply(
+    replyId === null ? null : (index.replyById.get(replyId) ?? null)
+  )
+
+  const status = shown?.status
 
   const streaming = status === 'streaming' ? replyId : null
+  const {stop} = useReplyRun(treeId, streaming)
 
   useEffect(() => {
     if (streaming === null) return undefined
-
-    const replyToStop = streaming
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape' || event.defaultPrevented) return
@@ -93,13 +88,13 @@ function useEscapeStops({
       if (target instanceof Element && target.matches('input, textarea')) return
 
       event.preventDefault()
-      void stopReply(treeId, replyToStop)
+      stop()
     }
 
     globalThis.addEventListener('keydown', onKeyDown, true)
 
     return () => globalThis.removeEventListener('keydown', onKeyDown, true)
-  }, [treeId, streaming])
+  }, [streaming, stop])
 }
 
 /** One Tree on the canvas: a centered Input while it is empty, then its Turns. */
@@ -167,7 +162,6 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
 
   useEscapeStops({treeId, index, activeReplyId, chatOpen, chatEnd})
 
-  // Hovering redraws the highlight only while the pointer is on the Turn.
   const highlightedTurnId =
     hoverTurnId ?? (chatOpen ? chatEnd?.id : null) ?? activeReplyId
 

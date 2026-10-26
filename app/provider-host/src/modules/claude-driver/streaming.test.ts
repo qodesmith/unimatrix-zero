@@ -3,14 +3,16 @@ import type {SDKPartialAssistantMessage} from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRecorded, SessionRef} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
+import {once} from 'node:events'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import {afterEach, expect, it, vi} from 'vitest'
+import {afterEach, expect, it} from 'vitest'
 
-import {createClaudeDriver} from './main'
+import {createClaudeDriver, spawnClaude} from './main'
 import {RECORDINGS, RecordedLineSchema, replayClaude} from './replay'
 import {projectKeyOf} from './transcripts'
 
@@ -33,8 +35,6 @@ const TEAL_MESSAGE = '90b7a04e-36fa-4aa1-84e8-66380ab18fe0'
 const OTTER_MESSAGE = '52786f10-3dd8-4f5b-995f-c5f9c5a27a0e'
 const REWOUND_MESSAGE = '18fb8495-3399-43a8-bc37-573286cfc9ed'
 const MODEL = 'claude-haiku-5-5'
-
-const IDLE_MS = 300
 
 type Streamed = ReplyEvent | ReplyRecorded
 
@@ -61,9 +61,7 @@ afterEach(async () => {
 
 function folder(prefix: string) {
   const made = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)))
-  cleanUps.push(async () =>
-    fs.rmSync(made, {recursive: true, force: true, maxRetries: 10})
-  )
+  cleanUps.push(async () => fs.rmSync(made, {recursive: true, force: true}))
 
   return made
 }
@@ -89,16 +87,26 @@ function edited(name: string, edit: (lines: RecordedLine[]) => RecordedLine[]) {
   return file
 }
 
-/** Runs the Claude driver against the fake `claude`, which replays `recordings`. */
-async function setUp(recordings: string[], env: Record<string, string> = {}) {
+async function setUp(
+  recordings: string[],
+  env: Record<string, string> = {},
+  store = fakeStore()
+) {
   const fake = await replayClaude()
   cleanUps.push(fake.cleanUp)
   const configDir = folder('uz-claude-config-')
   const reports = folder('uz-claude-reports-')
-  const store = fakeStore()
+  const idle = heldIdle()
+  const exits: Promise<unknown>[] = []
 
   const driver = createClaudeDriver({
     store: store.client,
+    spawn: options => {
+      const child = spawnClaude(options)
+      exits.push(once(child, 'exit').catch(() => undefined))
+
+      return child
+    },
     env: {
       PATH: process.env.PATH ?? '',
       FAKE_CLAUDE_RECORDINGS: recordings
@@ -109,7 +117,7 @@ async function setUp(recordings: string[], env: Record<string, string> = {}) {
       FAKE_CLAUDE_REPORTS: reports,
       ...env,
     },
-    idleMs: IDLE_MS,
+    whenIdle: idle.whenIdle,
   })
 
   const treeId = crypto.randomUUID()
@@ -117,10 +125,7 @@ async function setUp(recordings: string[], env: Record<string, string> = {}) {
   interface ReplyOptions {
     fork?: boolean
     rewind?: boolean
-    /**
-     * Stops the Reply once this many text deltas have streamed; 0 stops it as
-     * it starts.
-     */
+    /** 0 stops the Reply as it starts. */
     stopAfterDeltas?: number
   }
 
@@ -170,18 +175,19 @@ async function setUp(recordings: string[], env: Record<string, string> = {}) {
       )
   }
 
-  /** Waits until every `claude` started so far has ended. */
+  /** Lets idle time pass, then waits for every `claude` to end. */
   async function allClosed() {
-    await vi.waitFor(
-      () => {
-        expect(reportsSoFar().every(report => report.ended !== null)).toBe(true)
-      },
-      {timeout: 5000}
-    )
+    idle.pass()
+    await expect
+      .poll(() => reportsSoFar().every(report => report.ended !== null))
+      .toBe(true)
   }
 
   // Windows can't remove a folder while a `claude` still runs in it.
-  cleanUps.push(allClosed)
+  cleanUps.push(async () => {
+    idle.pass()
+    await Promise.all(exits)
+  })
 
   return {
     driver,
@@ -249,7 +255,6 @@ it('streams a Reply, records where Claude saved it, and reports its Context size
     }),
   ])
   expect(shown(events).contextWindow).toBe(1_000_000)
-  // In the app's copy before it was recorded.
   expect(
     claude.store
       .entriesOf(claude.projectKey, SESSION_ID)
@@ -281,7 +286,6 @@ it('continues a Thread in the warm session, then closes it gracefully once idle'
   expect(report?.ended).toBe('input-closed')
 })
 
-/** Both Replies of `warm.ndjson`, then waits for its `claude` to close. */
 async function warmThread(claude: Awaited<ReturnType<typeof setUp>>) {
   const first = await claude.reply(FIRST_PROMPT)
   const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
@@ -327,13 +331,11 @@ it('forks the session through a mid-Thread Reply into a new session, leaving the
   const first = {sessionId: SESSION_ID, messageId: FIRST_MESSAGE}
   const forked = await claude.reply(FORK_PROMPT, first, {fork: true})
 
-  // The second Reply never happened on this Branch.
   expect(textOf(forked)).toBe('TEAL')
   expect(recordedIn(forked)).toEqual({
     sessionId: FORKED_SESSION_ID,
     messageId: FORKED_MESSAGE,
   })
-  // In the app's copy under its own id, whole, so it resumes on its own.
   expect(
     claude.store
       .entriesOf(claude.projectKey, FORKED_SESSION_ID)
@@ -342,7 +344,7 @@ it('forks the session through a mid-Thread Reply into a new session, leaving the
 
   const [, resumed, fork] = claude.reports()
 
-  // The warm `claude` at the end of the other Branch keeps going.
+  // No idle time has passed, so only the fork could have closed it.
   expect(resumed?.ended).toBeNull()
   expect(fork?.args).toEqual(
     expect.arrayContaining([
@@ -373,9 +375,7 @@ it('resumes from the app’s copy when the warm session’s `claude` exited whil
   const first = await claude.reply(FIRST_PROMPT)
   const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
 
-  await vi.waitFor(() => {
-    expect(claude.reports()[0]?.ended).toBe('exited')
-  })
+  await expect.poll(() => claude.reports()[0]?.ended).toBe('exited')
 
   const third = await claude.reply(THIRD_PROMPT, recordedIn(second))
 
@@ -429,6 +429,24 @@ it('keeps the files beside a session and puts them back when it resumes', async 
   expect(claude.reports()[1]?.toolResults).toEqual(['toolu_1.txt'])
 })
 
+it('fails the Reply when the app can’t save its files, and closes its `claude`', async () => {
+  const claude = await setUp(
+    ['warm.ndjson'],
+    {FAKE_CLAUDE_TOOL_RESULT: 'toolu_1.txt'},
+    fakeStore({'save-files': 'database or disk is full'})
+  )
+
+  const events = await claude.reply(FIRST_PROMPT)
+
+  expect(events.map(event => event.type)).not.toContain('REPLY_RECORDED')
+  expect(events.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'failed',
+    failure: {code: 'disk-full'},
+  })
+  await claude.allClosed()
+})
+
 it('replaces the text when a broken stream is sent again', async () => {
   const resent = edited('warm.ndjson', lines => {
     const start = lines.findIndex(
@@ -470,7 +488,6 @@ it('replaces the text when a broken stream is sent again', async () => {
   await claude.allClosed()
 })
 
-/** A stream event `claude` could have written in the recorded session. */
 function streamed(event: SDKPartialAssistantMessage['event']): RecordedLine {
   return {
     kind: 'out',
@@ -557,7 +574,6 @@ it('fails the Reply with Claude’s reason, without recording it', async () => {
       failure: {code: 'provider-error', message: 'Prompt is too long'},
     })
   )
-  // Not kept warm, so no later Prompt goes to it.
   await claude.allClosed()
   expect(claude.reports()).toHaveLength(1)
 })
@@ -667,11 +683,8 @@ it('passes on a stop asked before claude has the Prompt', async () => {
 it('stops a Reply where it is, records it, and continues the Thread warm from it', async () => {
   const claude = await setUp(['stopped.ndjson'])
 
-  await expect(claude.driver.stop(crypto.randomUUID())).resolves.toBeUndefined()
-
   const stopped = await claude.reply(COUNT_PROMPT, null, {stopAfterDeltas: 5})
 
-  // What Claude had written when the interrupt reached it, as it saved it.
   expect(textOf(stopped)).toBe(
     Array.from({length: 30}, (_, index) => index + 1).join('\n')
   )
@@ -760,12 +773,13 @@ it('never rewinds in the warm session standing there: it closes, and a new `clau
 
   expect(textOf(rewound)).toBe('TEAL')
   expect(recordedIn(rewound).sessionId).toBe(REWOUND_SESSION_ID)
+  // No idle time has passed, so only the rewind could have closed it.
+  await expect.poll(() => claude.reports()[0]?.ended).not.toBeNull()
 
   await claude.allClosed()
   const [warm, rewind] = claude.reports()
 
   expect(warm?.prompts).toEqual([FIRST_PROMPT])
-  expect(warm?.ended).not.toBeNull()
   expect(rewind?.args).toContain(`--resume-session-at=${TEAL_MESSAGE}`)
   expect(rewind?.prompts).toEqual([FORK_PROMPT])
 })

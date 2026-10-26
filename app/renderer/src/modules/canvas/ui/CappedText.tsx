@@ -7,13 +7,9 @@ interface CappedTextProps {
   /** Off: the text takes its full height and there is nothing to show more of. */
   limit: boolean
   maxHeightClass: string
-  /** Let out of the cap by Show more. */
   expanded: boolean
   onToggle: () => void
-  /**
-   * Still being written: the box stays on the newest text until the user
-   * scrolls up.
-   */
+  /** The box stays on the newest text until the user scrolls up. */
   streaming?: boolean
   className?: string
   children: ReactNode
@@ -22,11 +18,7 @@ interface CappedTextProps {
 /** How close to the bottom still counts as reading the newest text, in px. */
 const AT_BOTTOM = 24
 
-/**
- * Long text scrolls inside a capped height, with Show more to let it out and
- * Show less to cap it again. Scrolling inside scrolls the text, not the
- * canvas.
- */
+/** `nowheel` makes the wheel scroll capped text instead of panning the canvas. */
 export function CappedText({
   limit,
   maxHeightClass,

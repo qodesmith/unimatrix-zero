@@ -47,15 +47,11 @@ export const TreeTurnsResult = z.strictObject({
   replies: z.array(ReplySchema),
 })
 
-/**
- * A Prompt answering a Reply, or the root Prompt of an empty Tree, answered
- * by a connected Provider. Into a Reply that already has a Prompt after it,
- * the Prompt starts a Branch.
- */
+/** Into a Reply that already has a Prompt after it, the Prompt starts a Branch. */
 export const PromptSendCommand = z.strictObject({
   type: z.literal('prompt.send'),
   treeId: z.uuid(),
-  /** The Reply it answers; null for the root Prompt. */
+  /** Null for the root Prompt. */
   parentReplyId: z.uuid().nullable(),
   text: z.string().trim().min(1),
 })
@@ -66,8 +62,8 @@ export const PromptSendResult = z.strictObject({
 })
 
 /**
- * Stops a streaming Reply, keeping the text so far. The Reply ends with its
- * `RUN_FINISHED` once the Provider has let go of the turn.
+ * Keeps the text so far. The Reply ends with its `RUN_FINISHED` once the
+ * Provider has let go of the turn.
  */
 export const ReplyStopCommand = z.strictObject({
   type: z.literal('reply.stop'),
@@ -75,10 +71,7 @@ export const ReplyStopCommand = z.strictObject({
   replyId: z.uuid(),
 })
 
-/**
- * Runs a failed Reply's Prompt again, in place: the Reply streams again
- * from nothing, in the Provider session rewound to before it.
- */
+/** In place: the Reply streams afresh in the session rewound to before it. */
 export const ReplyRetryCommand = z.strictObject({
   type: z.literal('reply.retry'),
   treeId: z.uuid(),
@@ -112,10 +105,7 @@ export const SignInCancelCommand = z.strictObject({
   provider: ProviderIdSchema,
 })
 
-/**
- * A remote image a Reply linked, loaded on the user's click: main fetches it
- * without cookies or a referrer and answers with a `data:` URL (ADR 0014).
- */
+/** Fetched without cookies or a referrer; answered with a `data:` URL. */
 export const ImageLoadCommand = z.strictObject({
   type: z.literal('image.load'),
   url: z.url({protocol: /^https?$/u}),

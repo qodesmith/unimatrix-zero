@@ -21,12 +21,7 @@ export interface HostPort {
   on(event: 'message', listener: (event: {data: unknown}) => void): void
 }
 
-/**
- * Runs one driver behind the port: tells main it is ready with the driver's
- * Models, then streams each requested Reply, and each step of connecting,
- * back as it happens. The driver reaches the app's copy of its sessions
- * through the same port. Commands that don't parse are dropped.
- */
+/** Runs one driver behind the port; commands that don't parse are dropped. */
 export async function runHost(
   port: HostPort,
   createDriver: (store: SessionStoreClient) => ProviderDriver

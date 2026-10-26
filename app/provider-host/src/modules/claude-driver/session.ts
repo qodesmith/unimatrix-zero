@@ -18,30 +18,18 @@ export type QueryFn = (params: {
 
 type Input = {kind: 'prompt'; text: string} | {kind: 'end'}
 
-/**
- * One `claude` in streaming-input mode: a Provider session kept open between
- * Prompts. Its session id is known once `claude` starts; `messageId` is
- * Claude's last message, where the session's next Prompt continues from.
- */
+/** One `claude` kept open between Prompts; `messageId` is where it continues. */
 export interface ClaudeSession {
   readonly sessionId: string | null
   messageId: string | null
   /** Whether `claude` has started; false while it may still refuse to. */
   readonly started: boolean
-  /** Whether `claude` has ended, by itself or by `close`. */
   readonly ended: boolean
-  /** Sends a Prompt and yields what comes back, up to its `result`. */
+  /** Yields up to the Prompt's `result`. */
   send(text: string): AsyncGenerator<SDKMessage>
-  /**
-   * Asks `claude` to end the turn it is on; resolves once it has taken the
-   * request. The turn's `result` still follows on `send`, and `claude` stays
-   * open for the next Prompt.
-   */
+  /** Resolves once `claude` takes it; the `result` still follows on `send`. */
   interrupt(): Promise<void>
-  /**
-   * Ends `claude`'s input and waits for it to exit by itself, so it can
-   * finish writing; one that is stuck is stopped.
-   */
+  /** Waits for `claude` to exit by itself, to finish writing; else stops it. */
   close(): Promise<void>
 }
 
@@ -80,7 +68,6 @@ export function openSession(query: QueryFn, options: Options): ClaudeSession {
     }
   }
 
-  /** Reads to the end, which comes once `claude` has exited. */
   async function drain() {
     while (!ended) await next()
   }

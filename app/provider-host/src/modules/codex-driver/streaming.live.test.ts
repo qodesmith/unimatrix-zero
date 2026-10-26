@@ -1,38 +1,30 @@
 /**
- * Live: drives a real `codex app-server`, signed in to a real ChatGPT plan,
- * so it runs only when asked, on a machine where ChatGPT was connected in the
- * app:
+ * Live, against a real ChatGPT sign-in; runs only when asked:
  *
  * UZ_LIVE_CODEX_PROGRAM=<userData>/vendor/chatgpt/<version>\
  * UZ_LIVE_CODEX_HOME=<userData>/providers/chatgpt\
  * bun run test:node app/provider-host/src/modules/codex-driver/streaming.live
  *
- * It copies the sign-in into fresh folders and runs there, so the second
- * app-server of the first test has nothing but the app's copy of the rollouts
- * to resume from, and the third nothing but that copy to fork from.
- * With `UZ_RECORD=yes` it also writes what the driver and `codex` exchanged
- * into `recordings/`, which the driver tests replay. Each test writes its own
- * recordings, so record one at a time with `-t`: the ids the driver tests pin
- * change with every recording.
+ * `UZ_RECORD=yes` writes the `recordings/` the driver tests replay. Record one
+ * test at a time with `-t`: the ids the driver tests pin change each time.
  */
 import type {ReplyRecorded, SessionRef} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
+import {once} from 'node:events'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import {setTimeout as delay} from 'node:timers/promises'
 import {describe, expect, it} from 'vitest'
 
-import {createCodexDriver} from './main'
+import {createCodexDriver, spawnCodex} from './main'
 import {createRecorder} from './recording'
 import {RECORDINGS} from './replay'
 
 const folder = process.env.UZ_LIVE_CODEX_PROGRAM
 const signedIn = process.env.UZ_LIVE_CODEX_HOME
-
-const IDLE_MS = 2000
 
 function homeFrom(source: string) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-codex-'))
@@ -64,12 +56,27 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     const homes = [homeFrom(signedIn), homeFrom(signedIn), homeFrom(signedIn)]
     const treeId = crypto.randomUUID()
 
+    const idle = heldIdle()
+    const exits: Promise<unknown>[] = []
+    const start = recording ? recorder.spawn : spawnCodex
+
     function driver() {
       return createCodexDriver({
         store: store.client,
-        ...(recording ? {spawn: recorder.spawn} : {}),
-        idleMs: IDLE_MS,
+        spawn: (command, options) => {
+          const child = start(command, options)
+          exits.push(once(child, 'exit').catch(() => undefined))
+
+          return child
+        },
+        whenIdle: idle.whenIdle,
       })
+    }
+
+    /** Lets idle time pass, then waits for every `codex` to exit. */
+    async function closed() {
+      idle.pass()
+      await Promise.all(exits)
     }
 
     async function reply(
@@ -133,7 +140,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         opened.recorded.session.sessionId
       )
 
-      await delay(IDLE_MS * 2)
+      await closed()
 
       const resumed = await reply(
         driver(),
@@ -146,9 +153,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         opened.recorded.session.sessionId
       )
 
-      await delay(IDLE_MS * 2)
+      await closed()
 
-      // Through the first Reply only: the second never happened on this Branch.
       const forked = await reply(
         driver(),
         thirdHome,
@@ -168,7 +174,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       expect(answer).toMatch(/hi/i)
       expect(answer).not.toMatch(/bye/i)
 
-      await delay(IDLE_MS * 2)
+      await closed()
     } finally {
       for (const home of homes) fs.rmSync(home, {recursive: true, force: true})
     }
@@ -189,12 +195,27 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     const homes = [homeFrom(signedIn), homeFrom(signedIn)]
     const treeId = crypto.randomUUID()
 
+    const idle = heldIdle()
+    const exits: Promise<unknown>[] = []
+    const start = recording ? recorder.spawn : spawnCodex
+
     function driver() {
       return createCodexDriver({
         store: store.client,
-        ...(recording ? {spawn: recorder.spawn} : {}),
-        idleMs: IDLE_MS,
+        spawn: (command, options) => {
+          const child = start(command, options)
+          exits.push(once(child, 'exit').catch(() => undefined))
+
+          return child
+        },
+        whenIdle: idle.whenIdle,
       })
+    }
+
+    /** Lets idle time pass, then waits for every `codex` to exit. */
+    async function closed() {
+      idle.pass()
+      await Promise.all(exits)
     }
 
     async function reply(
@@ -279,7 +300,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         stopped.recorded.session.sessionId
       )
 
-      await delay(IDLE_MS * 2)
+      await closed()
 
       const second = driver()
       const hi = await reply(second, otherHome, 'Say hi in three words.', null)
@@ -310,7 +331,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       expect(retried.answer).toMatch(/hi/i)
       expect(retried.answer).not.toMatch(/bye/i)
 
-      await delay(IDLE_MS * 2)
+      await closed()
     } finally {
       for (const home of homes) fs.rmSync(home, {recursive: true, force: true})
     }

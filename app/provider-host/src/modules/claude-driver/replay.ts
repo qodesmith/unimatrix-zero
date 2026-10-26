@@ -3,17 +3,11 @@ import os from 'node:os'
 import path from 'node:path'
 import {z} from 'zod'
 
-/** The recordings the fake `claude` replays, one per `claude` that ran. */
 export const RECORDINGS = path.join(import.meta.dirname, 'recordings')
 
-/** One line `claude` and the SDK exchanged, opaque but for its `type`. */
 export const RecordedMessageSchema = z.looseObject({type: z.string()})
 
-/**
- * One line of a recording: what the SDK wrote to `claude`'s stdin, what
- * `claude` wrote to its stdout, and the end of its stdin. The first line says
- * where it ran.
- */
+/** One line of a recording; the first is `start`, saying where it ran. */
 export const RecordedLineSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('start'),
@@ -28,17 +22,11 @@ export const RecordedLineSchema = z.discriminatedUnion('kind', [
 export type RecordedLine = z.infer<typeof RecordedLineSchema>
 
 /**
- * A `claude` that replays a recording: the nth one started replays the nth
- * of `FAKE_CLAUDE_RECORDINGS`. Each line the SDK writes must be the next one
- * recorded, with control request ids and transcript paths mapped onto this
- * run; it answers with what `claude` wrote after it. Like `claude`, it
- * resumes only a session whose transcript is in place, and writes the
- * transcript entries it reports. It writes what it saw to
- * `FAKE_CLAUDE_REPORTS/<n>.json`. `FAKE_CLAUDE_TOOL_RESULT` names a tool
- * result file it writes beside the session; `FAKE_CLAUDE_REFUSE_STORE=yes`
- * refuses to resume from the SDK's temporary folder, as if the store broke;
- * `FAKE_CLAUDE_EXIT_AFTER=<n>` exits once it has answered the nth Prompt, as
- * if it died while idle.
+ * The nth `claude` started replays the nth of `FAKE_CLAUDE_RECORDINGS` and
+ * reports to `FAKE_CLAUDE_REPORTS/<n>.json`; each line the SDK writes must be
+ * the next one recorded. `FAKE_CLAUDE_TOOL_RESULT` names a tool result file to
+ * write, `FAKE_CLAUDE_REFUSE_STORE=yes` refuses the SDK's temporary folder,
+ * and `FAKE_CLAUDE_EXIT_AFTER=<n>` exits after the nth Prompt.
  */
 const SCRIPT = `
 import fs from 'node:fs'
@@ -159,7 +147,7 @@ process.stdin.on('end', () => {
 })
 `
 
-/** Writes the fake into a fresh folder; the SDK runs it with `node`. */
+/** The SDK runs the fake with `node`. */
 export async function replayClaude() {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'uz-replay-claude-'))
   const program = path.join(folder, 'claude.mjs')

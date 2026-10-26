@@ -1,6 +1,8 @@
 import type {ClaudeRepliesDeps} from './streaming'
+import type {SpawnOptions} from '@anthropic-ai/claude-agent-sdk'
 import type {ProviderDriver} from '@uz/contract/host'
 
+import {idleFor} from '#modules/idle/main'
 import {getProgramReady} from '#modules/vendor-program/main'
 import {query} from '@anthropic-ai/claude-agent-sdk'
 import {spawn} from 'node:child_process'
@@ -15,27 +17,26 @@ async function notYet(): Promise<never> {
   throw new Error('Claude can’t do this yet.')
 }
 
+export function spawnClaude({command, args, cwd, env, signal}: SpawnOptions) {
+  return spawn(command, args, {
+    cwd,
+    env,
+    signal,
+    stdio: ['pipe', 'pipe', 'ignore'],
+    windowsHide: true,
+  })
+}
+
 type ClaudeDriverOptions = Pick<ClaudeRepliesDeps, 'store'> &
   Partial<Omit<ClaudeRepliesDeps, 'store'>>
 
-/**
- * Claude through its unmodified vendor program: connecting, and Replies that
- * stream from `claude` in streaming-input mode, written by the plan's default
- * Model.
- */
+/** Claude through its unmodified vendor program. */
 export function createClaudeDriver({
   store,
   query: run = query,
-  spawn: start = ({command, args, cwd, env, signal}) =>
-    spawn(command, args, {
-      cwd,
-      env,
-      signal,
-      stdio: ['pipe', 'pipe', 'ignore'],
-      windowsHide: true,
-    }),
+  spawn: start = spawnClaude,
   env = process.env,
-  idleMs = IDLE_CLOSE_MS,
+  whenIdle = idleFor(IDLE_CLOSE_MS),
   maxWarm = MAX_WARM,
 }: ClaudeDriverOptions): ProviderDriver {
   const replies = createClaudeReplies({
@@ -43,7 +44,7 @@ export function createClaudeDriver({
     query: run,
     spawn: start,
     env,
-    idleMs,
+    whenIdle,
     maxWarm,
   })
 
