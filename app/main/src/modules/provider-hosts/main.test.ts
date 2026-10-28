@@ -1,6 +1,7 @@
 import type {HostProcess, HostStatus} from './main'
 import type {
   HostCommand,
+  PromptRecorded,
   ReplyRecorded,
   SessionStoreRequest,
 } from '@uz/contract/host'
@@ -52,6 +53,7 @@ function fakeProcess() {
 let spawned: ReturnType<typeof fakeProcess>[]
 let events: ReplyEvent[]
 let recorded: ReplyRecorded[]
+let promptsRecorded: PromptRecorded[]
 let storeRequests: SessionStoreRequest[]
 let signInUpdates: SignInUpdate[]
 let statuses: HostStatus[]
@@ -66,6 +68,7 @@ function setUp() {
       return child.process
     },
     onReplyEvent: (_provider, event) => events.push(event),
+    onPromptRecorded: (_provider, message) => promptsRecorded.push(message),
     onReplyRecorded: (_provider, message) => recorded.push(message),
     onSignInUpdate: (_provider, update) => signInUpdates.push(update),
     onSessionStore: (_provider, request) => {
@@ -93,6 +96,7 @@ beforeEach(() => {
   spawned = []
   events = []
   recorded = []
+  promptsRecorded = []
   storeRequests = []
   signInUpdates = []
   statuses = []
@@ -168,6 +172,24 @@ it('passes on where the Provider saved a Reply', () => {
   latest().say(message)
 
   expect(recorded).toEqual([message])
+  expect(events).toEqual([])
+})
+
+it('passes on where the Provider session holds a Reply’s Prompt', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+  const {treeId, replyId} = textDelta
+
+  const message = {
+    type: 'PROMPT_RECORDED',
+    treeId,
+    replyId,
+    session: {sessionId: 's1', messageId: 'p1'},
+  } as const
+
+  latest().say(message)
+
+  expect(promptsRecorded).toEqual([message])
   expect(events).toEqual([])
 })
 
@@ -358,6 +380,7 @@ it('does not restart a host that was stopped while its crash was handled', () =>
       return child.process
     },
     onReplyEvent: () => undefined,
+    onPromptRecorded: () => undefined,
     onReplyRecorded: () => undefined,
     onSignInUpdate: () => undefined,
     onSessionStore: () => null,

@@ -1,4 +1,5 @@
 import type {
+  PromptRecorded,
   ProviderDriver,
   ReplyRecorded,
   ReplyRequest,
@@ -40,7 +41,7 @@ export interface ReplyRun {
 export type WriteReply = (
   request: ReplyRequest,
   run: ReplyRun
-) => AsyncGenerator<ContentEvent, Ending>
+) => AsyncGenerator<ContentEvent | PromptRecorded, Ending>
 
 interface Writing {
   interrupt: (() => Promise<void>) | null
@@ -84,7 +85,7 @@ export function createReplyRuns(
   async function* ended(
     request: ReplyRequest,
     entry: Writing
-  ): AsyncGenerator<ContentEvent, Ending> {
+  ): AsyncGenerator<ContentEvent | PromptRecorded, Ending> {
     let endedAs: FinishedStatus = 'failed'
 
     try {
@@ -118,7 +119,7 @@ export function createReplyRuns(
 
   async function* startReply(
     request: ReplyRequest
-  ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
+  ): AsyncGenerator<ReplyEvent | PromptRecorded | ReplyRecorded> {
     const entry: Writing = {interrupt: null, stopAsked: false, cleanUps: []}
 
     writing.set(request.replyId, entry)

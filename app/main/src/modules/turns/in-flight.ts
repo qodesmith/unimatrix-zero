@@ -1,6 +1,6 @@
 import type {Database} from '#modules/database/main'
 import type {AppEvent} from '@uz/contract/events'
-import type {ReplyRecorded} from '@uz/contract/host'
+import type {PromptRecorded, ReplyRecorded} from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
 import type {
   ReplyEvent,
@@ -101,6 +101,21 @@ export function createInFlight(
     },
 
     apply,
+
+    recordPrompt(provider: ProviderId, recorded: PromptRecorded) {
+      const {treeId, replyId, session} = recorded
+
+      db.update(replies)
+        .set({sessionId: session.sessionId, sessionPromptId: session.messageId})
+        .where(
+          and(
+            eq(replies.id, replyId),
+            eq(replies.treeId, treeId),
+            eq(replies.provider, provider)
+          )
+        )
+        .run()
+    },
 
     record(provider: ProviderId, recorded: ReplyRecorded) {
       const {treeId, replyId, model, session} = recorded

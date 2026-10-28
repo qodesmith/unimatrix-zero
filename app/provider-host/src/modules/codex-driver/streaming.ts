@@ -3,13 +3,17 @@ import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
 import type {Notification, ParamsOf, RateLimits} from './wire'
-import type {ReplyRequest, SignInRequest} from '@uz/contract/host'
+import type {
+  PromptRecorded,
+  ReplyRequest,
+  SignInRequest,
+} from '@uz/contract/host'
 
 import {createInbox} from '#modules/inbox/main'
 import {ProgramCrashed, createReplyRuns} from '#modules/reply-runs/main'
 
 import {createReplyMapper, threadOf, turnOf} from './replies'
-import {folderOf, readRollouts, writeRolloutsBack} from './rollouts'
+import {folderOf, readRollouts, rolloutAt, writeRolloutsBack} from './rollouts'
 
 /** The Model id that leaves the choice to Codex. */
 export const DEFAULT_MODEL = 'default'
@@ -51,24 +55,8 @@ interface LoadedThread {
   model: string
   /** Oldest first: the turn it was opened at, then each one started here. */
   turns: string[]
-}
-
-async function dropAfter(
-  server: AppServer,
-  thread: LoadedThread,
-  messageId: string | null
-) {
-  const at = messageId === null ? -1 : thread.turns.indexOf(messageId)
-  const next = at === -1 ? undefined : thread.turns[at + 1]
-
-  if (next === undefined) return
-
-  await server.request('thread/revert', {
-    threadId: thread.id,
-    beforeTurnId: next,
-  })
-
-  thread.turns.length = at + 1
+  /** Its rollout, which a revert leaves for a new one. */
+  path: string | null
 }
 
 /** ChatGPT's Replies through one `codex app-server` that every Thread shares. */
@@ -138,12 +126,55 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     })
   }
 
+  /**
+   * Drops `beforeTurnId` and every turn after it. The new rollout points into
+   * the old one, maybe past the app's copy, so the old one is saved again.
+   */
+  async function revert(
+    running: Running,
+    thread: LoadedThread,
+    beforeTurnId: string,
+    configDir: string
+  ) {
+    const {thread: reverted} = await running.server.request('thread/revert', {
+      threadId: thread.id,
+      beforeTurnId,
+    })
+
+    const old = thread.path === null ? null : rolloutAt(configDir, thread.path)
+
+    if (old) await deps.store.saveFiles(folderOf(thread.id), [old])
+
+    thread.path = reverted.path
+    const at = thread.turns.indexOf(beforeTurnId)
+
+    if (at !== -1) thread.turns.length = at
+  }
+
+  async function dropAfter(
+    running: Running,
+    thread: LoadedThread,
+    messageId: string | null,
+    configDir: string
+  ) {
+    const at = messageId === null ? -1 : thread.turns.indexOf(messageId)
+    const next = at === -1 ? undefined : thread.turns[at + 1]
+
+    if (next !== undefined) await revert(running, thread, next, configDir)
+  }
+
   function load(
     running: Running,
-    opened: {thread: {id: string}; model: string},
+    opened: {thread: {id: string; path: string | null}; model: string},
     turns: string[]
   ): LoadedThread {
-    const thread = {id: opened.thread.id, model: opened.model, turns}
+    const thread = {
+      id: opened.thread.id,
+      model: opened.model,
+      turns,
+      path: opened.thread.path,
+    }
+
     running.threads.set(thread.id, thread)
 
     return thread
@@ -171,12 +202,14 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       )
     }
 
-    const {sessionId: id, messageId, fork, rewind} = request.session
+    const {sessionId: id, messageId, fork, rewind, retryCut} = request.session
     const loaded = running.threads.get(id)
     const openedAt = messageId === null ? [] : [messageId]
+    const dropFrom = retryCut?.dropFrom ?? null
 
     if (loaded && !fork) {
-      if (rewind) await dropAfter(running.server, loaded, messageId)
+      if (rewind) await dropAfter(running, loaded, messageId, configDir)
+      else if (dropFrom) await revert(running, loaded, dropFrom, configDir)
 
       return loaded
     }
@@ -202,7 +235,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       )
     }
 
-    return load(
+    const resumed = load(
       running,
       await running.server.request('thread/resume', {
         threadId: id,
@@ -211,6 +244,11 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       }),
       openedAt
     )
+
+    // The rollout on disk was kept: it holds the Reply cut short.
+    if (dropFrom) await revert(running, resumed, dropFrom, configDir)
+
+    return resumed
   }
 
   /** Stop interrupts the turn once Codex has started it. */
@@ -219,7 +257,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     request: ReplyRequest,
     thread: LoadedThread,
     run: ReplyRun
-  ): AsyncGenerator<ContentEvent, Ending> {
+  ): AsyncGenerator<ContentEvent | PromptRecorded, Ending> {
     const ids = {treeId: request.treeId, replyId: request.replyId}
     const {server} = running
     const inbox = createInbox<Notification | {method: 'exited'}>()
@@ -239,6 +277,13 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
 
       const turnId = started.turn.id
       thread.turns.push(turnId)
+
+      // Codex has the turn on disk by now; a Retry reverts before it.
+      yield {
+        ...ids,
+        type: 'PROMPT_RECORDED',
+        session: {sessionId: thread.id, messageId: turnId},
+      }
 
       unstoppable = run.stoppable(async () => {
         await server.request('turn/interrupt', {threadId: thread.id, turnId})
@@ -292,7 +337,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   async function* write(
     request: ReplyRequest,
     run: ReplyRun
-  ): AsyncGenerator<ContentEvent, Ending> {
+  ): AsyncGenerator<ContentEvent | PromptRecorded, Ending> {
     for (let attempt = 1; ; attempt++) {
       const running = await claim(request.vendorProgram)
       let heard = false

@@ -151,11 +151,11 @@ export function recovery(
     throw new Error('The Reply this one’s Prompt answers no longer exists.')
   }
 
-  const answeredAt =
+  const parent =
     prompt.parentReplyId === null
       ? undefined
       : db
-          .select({messageId: replies.sessionMessageId})
+          .select()
           .from(replies)
           .where(eq(replies.id, prompt.parentReplyId))
           .get()
@@ -166,12 +166,41 @@ export function recovery(
     systemPrompt: systemPrompt.text,
     text: prompt.text,
     session: continued?.session
-      ? {
-          ...continued.session,
-          rewind:
-            !continued.session.fork &&
-            answeredAt?.messageId === continued.session.messageId,
-        }
+      ? rewound(continued.session, parent, row)
       : null,
   }
+}
+
+type ReplyRow = typeof replies.$inferSelect
+
+type ContinuedSession = NonNullable<Continuation['session']>
+
+function promptIn(session: ContinuedSession, reply: ReplyRow | undefined) {
+  return reply?.sessionId === session.sessionId
+    ? (reply.sessionPromptId ?? null)
+    : null
+}
+
+/**
+ * Rewinds to the Reply answered once its Provider saved it. One cut short
+ * before then left only its Prompt in the session, so the cut goes after that
+ * Prompt and before the failed attempt's own.
+ */
+function rewound(
+  session: ContinuedSession,
+  parent: ReplyRow | undefined,
+  failed: ReplyRow
+): ContinuedSession {
+  if (session.fork) return {...session, rewind: false}
+
+  if (parent?.sessionMessageId === session.messageId) {
+    return {...session, rewind: true}
+  }
+
+  const keepThrough = promptIn(session, parent)
+  const dropFrom = promptIn(session, failed)
+
+  return keepThrough === null && dropFrom === null
+    ? {...session, rewind: false}
+    : {...session, rewind: false, retryCut: {keepThrough, dropFrom}}
 }

@@ -9,7 +9,12 @@
  * `UZ_RECORD=yes` also writes `recordings/`, which the driver tests replay;
  * run one `it` with `-t` to re-record only its files.
  */
-import type {ReplyRecorded, ReplyRequest, SessionRef} from '@uz/contract/host'
+import type {
+  PromptRecorded,
+  ReplyRecorded,
+  ReplyRequest,
+  SessionRef,
+} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {heldIdle} from '#modules/test-idle/main'
@@ -28,7 +33,7 @@ const program = process.env.UZ_LIVE_CLAUDE_PROGRAM ?? ''
 const configDir = process.env.UZ_LIVE_CLAUDE_CONFIG ?? ''
 const recording = process.env.UZ_RECORD === 'yes'
 
-type Streamed = ReplyEvent | ReplyRecorded
+type Streamed = ReplyEvent | PromptRecorded | ReplyRecorded
 
 function textOf(events: Streamed[]) {
   return events

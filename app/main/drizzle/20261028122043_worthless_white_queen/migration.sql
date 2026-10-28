@@ -1,0 +1,1 @@
+ALTER TABLE `replies` ADD `session_prompt_id` text;

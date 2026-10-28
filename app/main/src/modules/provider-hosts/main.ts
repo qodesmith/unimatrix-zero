@@ -1,5 +1,6 @@
 import type {
   HostCommand,
+  PromptRecorded,
   ReplyRecorded,
   SessionStoreRequest,
   SessionStoreValue,
@@ -44,6 +45,7 @@ export type HostStatus = Extract<
 interface ProviderHostsOptions {
   spawn: (provider: ProviderId) => HostProcess
   onReplyEvent: (provider: ProviderId, event: ReplyEvent) => void
+  onPromptRecorded: (provider: ProviderId, recorded: PromptRecorded) => void
   onReplyRecorded: (provider: ProviderId, recorded: ReplyRecorded) => void
   onSignInUpdate: (provider: ProviderId, update: SignInUpdate) => void
   /** Answers a host's request about its sessions; throws if it can't. */
@@ -62,6 +64,7 @@ export type ProviderHosts = ReturnType<typeof createProviderHosts>
 export function createProviderHosts({
   spawn,
   onReplyEvent,
+  onPromptRecorded,
   onReplyRecorded,
   onSignInUpdate,
   onSessionStore,
@@ -119,6 +122,8 @@ export function createProviderHosts({
         message.type === 'SIGN_IN_FINISHED'
       ) {
         onSignInUpdate(provider, message)
+      } else if (message.type === 'PROMPT_RECORDED') {
+        onPromptRecorded(provider, message)
       } else if (message.type === 'REPLY_RECORDED') {
         onReplyRecorded(provider, message)
       } else if (message.type === 'SESSION_STORE') {

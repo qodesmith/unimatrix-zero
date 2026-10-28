@@ -1,4 +1,9 @@
-import type {ReplyRecorded, SessionRef} from '@uz/contract/host'
+import type {
+  PromptRecorded,
+  ReplyRecorded,
+  ReplyRequest,
+  SessionRef,
+} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {heldIdle} from '#modules/test-idle/main'
@@ -40,7 +45,7 @@ const RETRIED_TURN = '01a170aa-1476-75b0-892c-bd4587e4d57b'
 const REWOUND_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-50-${REWOUND_THREAD_ID}.jsonl`
 const REVERTED_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-56-${REWOUND_THREAD_ID}_01a170aa-145c-7992-b8a7-bcfb762e8621.jsonl`
 
-type Streamed = ReplyEvent | ReplyRecorded
+type Streamed = ReplyEvent | PromptRecorded | ReplyRecorded
 
 interface Report {
   args: string[]
@@ -87,7 +92,7 @@ function edited(name: string, edit: (text: string) => string) {
 function extendSavedRollout(
   store: ReturnType<typeof fakeStore>,
   configDir: string,
-  turnId: string
+  ...turnIds: string[]
 ) {
   const {projectKey, sessionId} = folderOf(THREAD_ID)
   const saved = store.filesOf(projectKey, sessionId).get(ROLLOUT)
@@ -100,9 +105,13 @@ function extendSavedRollout(
     file,
     Buffer.concat([
       Buffer.from(saved.base64, 'base64'),
-      Buffer.from(`${JSON.stringify({type: 'turn', id: turnId})}\n`),
+      ...turnIds.map(id =>
+        Buffer.from(`${JSON.stringify({type: 'turn', id})}\n`)
+      ),
     ])
   )
+
+  return file
 }
 
 async function setUp(
@@ -154,7 +163,17 @@ async function setUp(
   async function reply(
     text: string,
     session: SessionRef | null = null,
-    {fork = false, rewind = false, stopAfter = Infinity} = {}
+    {
+      fork = false,
+      rewind = false,
+      retryCut,
+      stopAfter = Infinity,
+    }: {
+      fork?: boolean
+      rewind?: boolean
+      retryCut?: NonNullable<ReplyRequest['session']>['retryCut']
+      stopAfter?: number
+    } = {}
   ) {
     const replyId = crypto.randomUUID()
     const events: Streamed[] = []
@@ -178,7 +197,7 @@ async function setUp(
         },
         configDir,
       },
-      session: session && {...session, fork, rewind},
+      session: session && {...session, fork, rewind, retryCut},
     })) {
       events.push(event)
 
@@ -229,9 +248,22 @@ function recordedIn(events: Streamed[]) {
   return recorded.session
 }
 
+function promptRecordedIn(events: Streamed[]) {
+  const recorded = events.find(
+    (event): event is PromptRecorded => event.type === 'PROMPT_RECORDED'
+  )
+
+  if (!recorded) throw new Error('The Prompt was not recorded')
+
+  return recorded.session
+}
+
 function shown(events: Streamed[]) {
   return events
-    .filter((event): event is ReplyEvent => event.type !== 'REPLY_RECORDED')
+    .filter(
+      (event): event is ReplyEvent =>
+        event.type !== 'PROMPT_RECORDED' && event.type !== 'REPLY_RECORDED'
+    )
     .reduce(foldReplyEvent, NEW_REPLY)
 }
 
@@ -523,6 +555,108 @@ it('resumes a Retry from the app’s copy when the thread isn’t loaded, with n
   ])
 })
 
+it('cuts a Retry’s loaded thread before the failed turn, keeping the Reply cut short', async () => {
+  const codex = await setUp(['reverted.ndjson'])
+
+  const hi = await codex.reply(FIRST_PROMPT)
+  const bye = await codex.reply(SECOND_PROMPT, recordedIn(hi))
+
+  await codex.reply(
+    'What was the last thing I asked you? Just the words.',
+    recordedIn(hi),
+    {retryCut: {keepThrough: null, dropFrom: promptRecordedIn(bye).messageId}}
+  )
+
+  const [report] = codex.reports()
+
+  expect(report?.reverted).toBe(BYE_TURN)
+})
+
+it('cuts a Retry’s unloaded thread before the failed turn, from Codex’s longer rollout, and keeps that rollout', async () => {
+  const opened = await setUp(['started.ndjson'])
+  const first = await opened.reply(FIRST_PROMPT)
+  const second = await opened.reply(SECOND_PROMPT, recordedIn(first))
+  await opened.allClosed()
+
+  const reverted = ROLLOUT.replace('.jsonl', '_reverted.jsonl')
+
+  // Codex reports the new rollout once the thread is reverted.
+  const resumedThenReverted = edited('resumed.ndjson', text => {
+    const lines = text
+      .split('\n')
+      .map(line =>
+        line.includes('"id":4,"result"')
+          ? line.replace(path.basename(ROLLOUT), path.basename(reverted))
+          : line
+      )
+
+    const resumed = lines.findIndex(line => line.includes('"id":2,"result"'))
+
+    return lines
+      .toSpliced(
+        resumed + 1,
+        0,
+        JSON.stringify({
+          kind: 'in',
+          message: {
+            id: 99,
+            method: 'thread/revert',
+            params: {threadId: THREAD_ID, beforeTurnId: 'failed'},
+          },
+        }),
+        JSON.stringify({
+          kind: 'out',
+          message: {
+            id: 99,
+            result: {
+              thread: {
+                id: THREAD_ID,
+                path: `/codex-home/${reverted}`,
+                forkedFromId: null,
+              },
+              turnsBackwardsCursor: null,
+              itemsBackwardsCursor: null,
+            },
+          },
+        })
+      )
+      .join('\n')
+  })
+
+  const codex = await setUp([resumedThenReverted], {store: opened.store})
+
+  const rollout = extendSavedRollout(
+    opened.store,
+    codex.configDir,
+    'interrupted',
+    'failed'
+  )
+
+  const onDisk = fs.readFileSync(rollout)
+
+  const retried = await codex.reply(THIRD_PROMPT, recordedIn(second), {
+    retryCut: {keepThrough: 'interrupted', dropFrom: 'failed'},
+  })
+
+  expect(retried.at(-1)).toMatchObject({status: 'complete'})
+
+  const [report] = codex.reports()
+
+  expect(report?.resumedFrom.map(line => line.id)).toEqual([
+    THREAD_ID,
+    FIRST_TURN,
+    SECOND_TURN,
+    'interrupted',
+    'failed',
+  ])
+  expect(report?.reverted).toBe('failed')
+  const {projectKey, sessionId} = folderOf(THREAD_ID)
+  const saved = codex.store.filesOf(projectKey, sessionId).get(ROLLOUT)
+  expect(
+    Buffer.from(saved?.base64 ?? '', 'base64').subarray(0, onDisk.length)
+  ).toEqual(onDisk)
+})
+
 it('fails the Reply when the app has no copy of the Provider session', async () => {
   const codex = await setUp(['resumed.ndjson'])
 
@@ -574,6 +708,10 @@ it('fails the Reply as a crash, keeping its text, when Codex stops mid-stream', 
   const events = await codex.reply(FIRST_PROMPT)
 
   expect(textOf(events)).toBe('Hi there, friend!')
+  expect(promptRecordedIn(events)).toEqual({
+    sessionId: THREAD_ID,
+    messageId: FIRST_TURN,
+  })
   expect(events.at(-1)).toEqual(
     expect.objectContaining({
       status: 'failed',

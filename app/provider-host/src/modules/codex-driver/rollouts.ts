@@ -18,6 +18,19 @@ function relativeIn(home: string, file: string) {
   return relative.split(path.sep).join('/')
 }
 
+/** The rollout at `file` as it stands on disk; null outside `codexHome`. */
+export function rolloutAt(codexHome: string, file: string): SessionFile | null {
+  const home = fs.realpathSync(codexHome)
+  const relative = relativeIn(home, file)
+
+  if (relative === null) return null
+
+  return {
+    path: relative,
+    base64: fs.readFileSync(path.join(home, relative)).toString('base64'),
+  }
+}
+
 /**
  * The thread's and its fork ancestors' rollouts, by path in `CODEX_HOME`. Codex
  * reports each one's file and parent, so the files are never read (ADR 0004).
@@ -27,7 +40,6 @@ export async function readRollouts(
   codexHome: string,
   threadId: string
 ): Promise<SessionFile[]> {
-  const home = fs.realpathSync(codexHome)
   const files: SessionFile[] = []
   const seen = new Set<string>()
   let next: string | null = threadId
@@ -40,14 +52,9 @@ export async function readRollouts(
       {threadId: next}
     )
 
-    const relative = thread.path === null ? null : relativeIn(home, thread.path)
+    const file = thread.path === null ? null : rolloutAt(codexHome, thread.path)
 
-    if (relative !== null) {
-      files.push({
-        path: relative,
-        base64: fs.readFileSync(path.join(home, relative)).toString('base64'),
-      })
-    }
+    if (file !== null) files.push(file)
 
     next = thread.forkedFromId
   }

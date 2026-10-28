@@ -8,11 +8,13 @@ import type {
   SpawnOptions,
   SpawnedProcess,
 } from '@anthropic-ai/claude-agent-sdk'
-import type {ReplyRequest, SessionFile} from '@uz/contract/host'
+import type {PromptRecorded, ReplyRequest, SessionFile} from '@uz/contract/host'
 import type {RunFailure} from '@uz/contract/turns'
+import type {UUID} from 'node:crypto'
 
 import {failureOf} from '#modules/failures/main'
 import {createReplyRuns} from '#modules/reply-runs/main'
+import {randomUUID} from 'node:crypto'
 
 import {claudeEnvironment} from './environment'
 import {createReplyMapper} from './replies'
@@ -48,9 +50,15 @@ interface Live extends ClaudeSession {
   activeConfigDir: () => string
   /** Tool result files already in the app's copy. */
   saved: Set<string>
+  /** The session the app's copy holds this entry in, once it does. */
+  storedIn(uuid: string): string | null
+  /** Waits for the entries on their way to the app's copy. */
+  stored(): Promise<void>
 }
 
 type Mapper = ReturnType<typeof createReplyMapper>
+
+type Recording = Generator<PromptRecorded, void>
 
 /** `upTo` is the last message kept, when a fork or rewind cuts the session. */
 function resumption(session: ReplyRequest['session'], restore: Restore) {
@@ -60,7 +68,9 @@ function resumption(session: ReplyRequest['session'], restore: Restore) {
 
   const {sessionId: resume, fork, rewind, messageId} = session
 
-  return {resume, fork, upTo: fork || rewind ? messageId : null}
+  const cutAt = session.retryCut?.keepThrough ?? null
+
+  return {resume, fork, upTo: fork || rewind ? messageId : cutAt}
 }
 
 /** `heard` says whether `claude` sent anything back to the Prompt. */
@@ -91,10 +101,17 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     const {resume, fork, upTo} = resumption(request.session, restore)
     let files: SessionFile[] = []
     let activeConfigDir = configDir
+    const storedIn = new Map<string, string>()
+    const storing = new Set<Promise<void>>()
 
     if (resume) {
       files = await deps.store.loadFiles({projectKey, sessionId: resume})
     }
+
+    const store =
+      restore === 'file'
+        ? {...sessionStore, load: async () => null, listSubkeys: async () => []}
+        : sessionStore
 
     const options: Options = {
       pathToClaudeCodeExecutable: program.path,
@@ -113,14 +130,25 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       ...(fork ? {forkSession: true} : {}),
       ...(upTo ? {resumeSessionAt: upTo} : {}),
       // The fallback resumes from the transcript written back, not the store.
-      sessionStore:
-        restore === 'file'
-          ? {
-              ...sessionStore,
-              load: async () => null,
-              listSubkeys: async () => [],
-            }
-          : sessionStore,
+      sessionStore: {
+        ...store,
+        append: async (key, entries) => {
+          const appending = store.append(key, entries)
+          storing.add(appending)
+
+          try {
+            await appending
+          } finally {
+            storing.delete(appending)
+          }
+
+          if (key.subpath !== undefined) return
+
+          for (const {uuid} of entries) {
+            if (uuid !== undefined) storedIn.set(uuid, key.sessionId)
+          }
+        },
+      },
       // Each entry reaches the app as it is written, not at the result, so a
       // Reply the app quits in keeps its Prompt.
       sessionStoreFlush: 'eager',
@@ -144,23 +172,29 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       activeConfigDir: () => activeConfigDir,
       // A fork is a new session, with nothing of its own saved yet.
       saved: new Set(fork ? [] : files.map(file => file.path)),
+      storedIn: (uuid: string) => storedIn.get(uuid) ?? null,
+      stored: async () => {
+        await Promise.allSettled(storing)
+      },
     })
   }
 
   /** Stop interrupts `claude` once it has the Prompt. */
-  async function* attempt(
+  async function* reply(
     session: Live,
     mapper: Mapper,
     {prompt}: ReplyRequest,
-    run: ReplyRun
-  ): AsyncGenerator<ContentEvent, Outcome> {
+    run: ReplyRun,
+    {uuid, recordPrompt}: {uuid: UUID; recordPrompt: () => Recording}
+  ): AsyncGenerator<ContentEvent | PromptRecorded, Outcome> {
     let heard = false
     let unstoppable: (() => void) | null = null
 
     try {
-      for await (const message of session.send(prompt.text)) {
+      for await (const message of session.send(prompt.text, uuid)) {
         unstoppable ??= run.stoppable(async () => session.interrupt())
         heard = true
+        yield* recordPrompt()
 
         if (message.type === 'result') return {result: message}
 
@@ -179,6 +213,44 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     } finally {
       unstoppable?.()
     }
+  }
+
+  /**
+   * The Prompt goes out as a `uuid` of the driver's own, and is recorded once
+   * the app's copy holds it, however the Reply ends: a Retry cuts there.
+   */
+  async function* attempt(
+    session: Live,
+    mapper: Mapper,
+    request: ReplyRequest,
+    run: ReplyRun
+  ): AsyncGenerator<ContentEvent | PromptRecorded, Outcome> {
+    const uuid = randomUUID()
+    let recorded = false
+
+    function* recordPrompt(): Recording {
+      const sessionId = recorded ? null : session.storedIn(uuid)
+
+      if (sessionId === null) return
+
+      recorded = true
+      yield {
+        type: 'PROMPT_RECORDED',
+        treeId: request.treeId,
+        replyId: request.replyId,
+        session: {sessionId, messageId: uuid},
+      }
+    }
+
+    const outcome = yield* reply(session, mapper, request, run, {
+      uuid,
+      recordPrompt,
+    })
+
+    await session.stored()
+    yield* recordPrompt()
+
+    return outcome
   }
 
   async function saveToolResults(session: Live, sessionId: string) {
@@ -227,7 +299,10 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     request: ReplyRequest,
     mapper: Mapper,
     run: ReplyRun
-  ): AsyncGenerator<ContentEvent, {session: Live; outcome: Outcome}> {
+  ): AsyncGenerator<
+    ContentEvent | PromptRecorded,
+    {session: Live; outcome: Outcome}
+  > {
     const claimed = claimable(request)
 
     if (claimed) {
@@ -270,7 +345,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   async function* write(
     request: ReplyRequest,
     run: ReplyRun
-  ): AsyncGenerator<ContentEvent, Ending> {
+  ): AsyncGenerator<ContentEvent | PromptRecorded, Ending> {
     const {treeId, replyId} = request
     const ids = {treeId, replyId}
     const mapper = createReplyMapper(ids)

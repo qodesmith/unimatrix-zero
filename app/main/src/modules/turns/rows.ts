@@ -145,7 +145,12 @@ export function insertExchange(
 export function resetReply(db: Database, replyId: string): void {
   const row = db
     .update(replies)
-    .set({...NEW_REPLY, sessionId: null, sessionMessageId: null})
+    .set({
+      ...NEW_REPLY,
+      sessionId: null,
+      sessionMessageId: null,
+      sessionPromptId: null,
+    })
     .where(eq(replies.id, replyId))
     .returning()
     .get()

@@ -1,6 +1,11 @@
 import type {RecordedLine} from './replay'
 import type {SDKPartialAssistantMessage} from '@anthropic-ai/claude-agent-sdk'
-import type {ReplyRecorded, SessionRef} from '@uz/contract/host'
+import type {
+  PromptRecorded,
+  ReplyRecorded,
+  ReplyRequest,
+  SessionRef,
+} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {heldIdle} from '#modules/test-idle/main'
@@ -36,7 +41,7 @@ const OTTER_MESSAGE = '52786f10-3dd8-4f5b-995f-c5f9c5a27a0e'
 const REWOUND_MESSAGE = '18fb8495-3399-43a8-bc37-573286cfc9ed'
 const MODEL = 'claude-haiku-5-5'
 
-type Streamed = ReplyEvent | ReplyRecorded
+type Streamed = ReplyEvent | PromptRecorded | ReplyRecorded
 
 interface Report {
   args: string[]
@@ -125,6 +130,7 @@ async function setUp(
   interface ReplyOptions {
     fork?: boolean
     rewind?: boolean
+    retryCut?: NonNullable<ReplyRequest['session']>['retryCut']
     /** 0 stops the Reply as it starts. */
     stopAfterDeltas?: number
     replyId?: string
@@ -136,6 +142,7 @@ async function setUp(
     {
       fork = false,
       rewind = false,
+      retryCut,
       stopAfterDeltas,
       replyId = crypto.randomUUID(),
     }: ReplyOptions = {}
@@ -156,7 +163,7 @@ async function setUp(
         },
         configDir,
       },
-      session: session && {...session, fork, rewind},
+      session: session && {...session, fork, rewind, retryCut},
     })) {
       events.push(event)
 
@@ -215,9 +222,20 @@ function recordedIn(events: Streamed[]) {
   return recorded.session
 }
 
+function promptRecordedIn(events: Streamed[]) {
+  const recorded = events.find(
+    (event): event is PromptRecorded => event.type === 'PROMPT_RECORDED'
+  )
+
+  if (!recorded) throw new Error('The Prompt was not recorded')
+
+  return recorded.session
+}
+
 function replyEvents(events: Streamed[]) {
   return events.filter(
-    (event): event is ReplyEvent => event.type !== 'REPLY_RECORDED'
+    (event): event is ReplyEvent =>
+      event.type !== 'PROMPT_RECORDED' && event.type !== 'REPLY_RECORDED'
   )
 }
 
@@ -664,6 +682,7 @@ it('fails the Reply as a crash when `claude` exits before its result, keeping th
 
   expect(textOf(events)).toBe('TEAL')
   expect(events.map(event => event.type)).not.toContain('REPLY_RECORDED')
+  expect(promptRecordedIn(events).sessionId).toBe(SESSION_ID)
   expect(events.at(-1)).toMatchObject({
     type: 'RUN_FINISHED',
     status: 'failed',
@@ -691,6 +710,32 @@ it('saves the Prompt while the Reply streams, so a quit mid-Reply keeps it', asy
     await claude.driver.stop(replyId)
     await replying
   }
+})
+
+it('records the Prompt once the app’s copy of the session holds it, under the id the driver gave it', async () => {
+  const claude = await setUp(['warm.ndjson'])
+
+  const events = await claude.reply(FIRST_PROMPT)
+  const recorded = promptRecordedIn(events)
+
+  expect(recorded.sessionId).toBe(SESSION_ID)
+  expect(
+    claude.store
+      .entriesOf(claude.projectKey, SESSION_ID)
+      .flatMap(entry => (entry.type === 'user' ? [entry.uuid] : []))
+  ).toEqual([recorded.messageId])
+})
+
+it('records no Prompt when the app’s copy of the session never got it', async () => {
+  const claude = await setUp(
+    ['warm.ndjson'],
+    {},
+    fakeStore({append: 'database or disk is full'})
+  )
+
+  const events = await claude.reply(FIRST_PROMPT)
+
+  expect(events.map(event => event.type)).not.toContain('PROMPT_RECORDED')
 })
 
 it('passes on a stop asked before claude has the Prompt', async () => {
@@ -807,4 +852,29 @@ it('never rewinds in the warm session standing there: it closes, and a new `clau
   expect(warm?.prompts).toEqual([FIRST_PROMPT])
   expect(rewind?.args).toContain(`--resume-session-at=${TEAL_MESSAGE}`)
   expect(rewind?.prompts).toEqual([FORK_PROMPT])
+})
+
+it('cuts a Retry’s session after the Prompt of the Reply cut short, which `claude` resumes at', async () => {
+  const claude = await setUp(['rewound-warm.ndjson', 'rewound.ndjson'])
+
+  const first = await claude.reply(FIRST_PROMPT)
+  const cutShort = await claude.reply(SECOND_PROMPT, recordedIn(first))
+  await claude.allClosed()
+  const keepThrough = promptRecordedIn(cutShort).messageId
+
+  await claude.reply(FORK_PROMPT, recordedIn(first), {
+    retryCut: {keepThrough, dropFrom: null},
+  })
+
+  await claude.allClosed()
+  const [, retry] = claude.reports()
+
+  expect(retry?.args).toEqual(
+    expect.arrayContaining([
+      `--resume=${REWOUND_SESSION_ID}`,
+      `--resume-session-at=${keepThrough}`,
+    ])
+  )
+  expect(retry?.args).not.toContain('--fork-session')
+  expect(retry?.prompts).toEqual([FORK_PROMPT])
 })
