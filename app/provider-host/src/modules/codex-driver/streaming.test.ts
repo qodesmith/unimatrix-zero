@@ -580,7 +580,6 @@ it('cuts a Retry’s unloaded thread before the failed turn, from Codex’s long
 
   const reverted = ROLLOUT.replace('.jsonl', '_reverted.jsonl')
 
-  // Codex reports the new rollout once the thread is reverted.
   const resumedThenReverted = edited('resumed.ndjson', text => {
     const lines = text
       .split('\n')

@@ -60,7 +60,10 @@ type Mapper = ReturnType<typeof createReplyMapper>
 
 type Recording = Generator<PromptRecorded, void>
 
-/** `upTo` is the last message kept, when a fork or rewind cuts the session. */
+/**
+ * `upTo` is the last message kept, when a fork, a rewind or a Retry's cut cuts
+ * the session.
+ */
 function resumption(session: ReplyRequest['session'], restore: Restore) {
   if (!session || restore === 'none') {
     return {resume: null, fork: false, upTo: null}
@@ -108,6 +111,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       files = await deps.store.loadFiles({projectKey, sessionId: resume})
     }
 
+    // The fallback resumes from the transcript written back, not the store.
     const store =
       restore === 'file'
         ? {...sessionStore, load: async () => null, listSubkeys: async () => []}
@@ -129,7 +133,6 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       ...(resume ? {resume} : {}),
       ...(fork ? {forkSession: true} : {}),
       ...(upTo ? {resumeSessionAt: upTo} : {}),
-      // The fallback resumes from the transcript written back, not the store.
       sessionStore: {
         ...store,
         append: async (key, entries) => {
@@ -273,7 +276,10 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     for (const file of files) session.saved.add(file.path)
   }
 
-  /** A rewind can't take the warm session: it has gone past that Reply. */
+  /**
+   * A rewind or a Retry's cut can't take the warm session: it has gone past
+   * the message the cut keeps, and only a new `claude` resumes at it.
+   */
   function claimable(request: ReplyRequest): Live | null {
     const {session} = request
 
@@ -281,7 +287,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     const claimed = warm.claim(session)
 
-    if (claimed && session.rewind) {
+    if (claimed && (session.rewind || session.retryCut?.keepThrough)) {
       warm.drop(claimed)
 
       return null
