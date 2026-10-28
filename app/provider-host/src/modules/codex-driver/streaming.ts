@@ -4,6 +4,7 @@ import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
 import type {Notification, ParamsOf, RateLimits} from './wire'
 import type {
+  PromptDropped,
   PromptRecorded,
   ReplyRequest,
   SignInRequest,
@@ -180,10 +181,12 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     return thread
   }
 
+  /** `dropped`: it cut the session before `dropFrom`. */
   async function threadFor(
     running: Running,
-    request: ReplyRequest
-  ): Promise<LoadedThread> {
+    request: ReplyRequest,
+    dropFrom: string | null
+  ): Promise<{thread: LoadedThread; dropped: boolean}> {
     const {configDir} = request.vendorProgram
 
     const settings = {
@@ -195,23 +198,33 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     } satisfies ParamsOf<'thread/start'>
 
     if (!request.session) {
-      return load(
+      const thread = load(
         running,
         await running.server.request('thread/start', settings),
         []
       )
+
+      return {thread, dropped: false}
     }
 
-    const {sessionId: id, messageId, fork, rewind, retryCut} = request.session
+    const {sessionId: id, messageId, fork, rewind} = request.session
     const loaded = running.threads.get(id)
     const openedAt = messageId === null ? [] : [messageId]
-    const dropFrom = retryCut?.dropFrom ?? null
+
+    async function cut(thread: LoadedThread) {
+      if (dropFrom === null) return {thread, dropped: false}
+
+      await revert(running, thread, dropFrom, configDir)
+
+      return {thread, dropped: true}
+    }
 
     if (loaded && !fork) {
-      if (rewind) await dropAfter(running, loaded, messageId, configDir)
-      else if (dropFrom) await revert(running, loaded, dropFrom, configDir)
+      if (!rewind) return cut(loaded)
 
-      return loaded
+      await dropAfter(running, loaded, messageId, configDir)
+
+      return {thread: loaded, dropped: false}
     }
 
     // Codex forks and resumes from the rollout on disk, which only a loaded
@@ -223,7 +236,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     }
 
     if (fork) {
-      return load(
+      const thread = load(
         running,
         await running.server.request('thread/fork', {
           threadId: id,
@@ -233,6 +246,8 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
         }),
         openedAt
       )
+
+      return {thread, dropped: false}
     }
 
     const resumed = load(
@@ -246,9 +261,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     )
 
     // The rollout on disk was kept: it holds the Reply cut short.
-    if (dropFrom) await revert(running, resumed, dropFrom, configDir)
-
-    return resumed
+    return cut(resumed)
   }
 
   /** Stop interrupts the turn once Codex has started it. */
@@ -333,17 +346,32 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     }
   }
 
-  /** An app-server that exited while idle answers nothing: retry once. */
+  /**
+   * An app-server that exited while idle answers nothing: retry once. Codex
+   * keeps a cut on disk, so the retry doesn't cut again.
+   */
   async function* write(
     request: ReplyRequest,
     run: ReplyRun
-  ): AsyncGenerator<ContentEvent | PromptRecorded, Ending> {
+  ): AsyncGenerator<ContentEvent | PromptRecorded | PromptDropped, Ending> {
+    let dropFrom = request.session?.retryCut?.dropFrom ?? null
+
     for (let attempt = 1; ; attempt++) {
       const running = await claim(request.vendorProgram)
       let heard = false
 
       try {
-        const thread = await threadFor(running, request)
+        const {thread, dropped} = await threadFor(running, request, dropFrom)
+
+        if (dropped) {
+          dropFrom = null
+          yield {
+            type: 'PROMPT_DROPPED',
+            treeId: request.treeId,
+            replyId: request.replyId,
+          }
+        }
+
         const sent = send(running, request, thread, run)
 
         for (;;) {

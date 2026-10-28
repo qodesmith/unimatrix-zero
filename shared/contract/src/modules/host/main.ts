@@ -95,6 +95,15 @@ export const PromptRecordedMessage = z.strictObject({
 
 export type PromptRecorded = z.infer<typeof PromptRecordedMessage>
 
+/** A Retry's cut dropped the Prompt recorded for this Reply. */
+export const PromptDroppedMessage = z.strictObject({
+  type: z.literal('PROMPT_DROPPED'),
+  treeId: z.uuid(),
+  replyId: z.uuid(),
+})
+
+export type PromptDropped = z.infer<typeof PromptDroppedMessage>
+
 /** A Thread as any Provider can take it: each Prompt and the Reply to it. */
 export const ThreadSchema = z.array(
   z.strictObject({prompt: z.string(), reply: z.array(ReplyPartSchema)})
@@ -115,13 +124,14 @@ export interface ProviderDriver {
   listModels(): Promise<Model[]>
   readUsage(): Promise<Usage>
   /**
-   * Ends with `RUN_FINISHED`, including after `stop`. `PROMPT_RECORDED` comes
-   * once the Provider session holds the Prompt, and `REPLY_RECORDED` before
-   * the end once the Provider has saved the Reply.
+   * Ends with `RUN_FINISHED`, including after `stop`. `PROMPT_DROPPED` comes
+   * once a Retry's cut drops `dropFrom`, `PROMPT_RECORDED` once the Provider
+   * session holds the Prompt, and `REPLY_RECORDED` before the end once the
+   * Provider has saved the Reply.
    */
   startReply(
     request: ReplyRequest
-  ): AsyncIterable<ReplyEvent | PromptRecorded | ReplyRecorded>
+  ): AsyncIterable<ReplyEvent | PromptRecorded | PromptDropped | ReplyRecorded>
   stop(replyId: string): Promise<void>
   answerApproval(approvalId: string, answer: ApprovalAnswer): Promise<void>
   forkSession(input: {
@@ -180,6 +190,7 @@ export const HostMessageSchema = z.discriminatedUnion('type', [
   HostReadyMessage,
   ReplyEventSchema,
   PromptRecordedMessage,
+  PromptDroppedMessage,
   ReplyRecordedMessage,
   SignInUpdateSchema,
   SessionStoreMessage,

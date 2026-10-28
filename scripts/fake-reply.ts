@@ -42,7 +42,11 @@ export async function recordFakeReply(): Promise<ReplyEvent[]> {
     vendorProgram: {program: null, configDir: '/fake'},
     session: null,
   })) {
-    if (event.type === 'PROMPT_RECORDED' || event.type === 'REPLY_RECORDED') {
+    if (
+      event.type === 'PROMPT_RECORDED' ||
+      event.type === 'PROMPT_DROPPED' ||
+      event.type === 'REPLY_RECORDED'
+    ) {
       continue
     }
 

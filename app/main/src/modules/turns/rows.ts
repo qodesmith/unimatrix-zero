@@ -141,16 +141,14 @@ export function insertExchange(
   })
 }
 
-/** Back to streaming from nothing, in no session. */
+/**
+ * Back to streaming from nothing. Its Prompt stays recorded until the Provider
+ * drops it, since a Retry that fails first still has to cut there.
+ */
 export function resetReply(db: Database, replyId: string): void {
   const row = db
     .update(replies)
-    .set({
-      ...NEW_REPLY,
-      sessionId: null,
-      sessionMessageId: null,
-      sessionPromptId: null,
-    })
+    .set({...NEW_REPLY, sessionMessageId: null})
     .where(eq(replies.id, replyId))
     .returning()
     .get()

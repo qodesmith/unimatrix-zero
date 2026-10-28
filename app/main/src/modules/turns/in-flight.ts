@@ -1,6 +1,10 @@
 import type {Database} from '#modules/database/main'
 import type {AppEvent} from '@uz/contract/events'
-import type {PromptRecorded, ReplyRecorded} from '@uz/contract/host'
+import type {
+  PromptDropped,
+  PromptRecorded,
+  ReplyRecorded,
+} from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
 import type {
   ReplyEvent,
@@ -23,6 +27,15 @@ function finishedParts({content}: ReplyProgress) {
   const lastDone = last?.type === 'tool-call' && last.result !== null
 
   return Math.max(content.length - 1, 0) + (lastDone ? 1 : 0)
+}
+
+/** The Reply, when it is that Provider's to write. */
+function written(provider: ProviderId, treeId: string, replyId: string) {
+  return and(
+    eq(replies.id, replyId),
+    eq(replies.treeId, treeId),
+    eq(replies.provider, provider)
+  )
 }
 
 interface Entry {
@@ -107,13 +120,14 @@ export function createInFlight(
 
       db.update(replies)
         .set({sessionId: session.sessionId, sessionPromptId: session.messageId})
-        .where(
-          and(
-            eq(replies.id, replyId),
-            eq(replies.treeId, treeId),
-            eq(replies.provider, provider)
-          )
-        )
+        .where(written(provider, treeId, replyId))
+        .run()
+    },
+
+    dropPrompt(provider: ProviderId, {treeId, replyId}: PromptDropped) {
+      db.update(replies)
+        .set({sessionPromptId: null})
+        .where(written(provider, treeId, replyId))
         .run()
     },
 
@@ -126,13 +140,7 @@ export function createInFlight(
           sessionId: session.sessionId,
           sessionMessageId: session.messageId,
         })
-        .where(
-          and(
-            eq(replies.id, replyId),
-            eq(replies.treeId, treeId),
-            eq(replies.provider, provider)
-          )
-        )
+        .where(written(provider, treeId, replyId))
         .run()
     },
 

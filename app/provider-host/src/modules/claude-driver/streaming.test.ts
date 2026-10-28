@@ -1,6 +1,7 @@
 import type {RecordedLine} from './replay'
 import type {SDKPartialAssistantMessage} from '@anthropic-ai/claude-agent-sdk'
 import type {
+  PromptDropped,
   PromptRecorded,
   ReplyRecorded,
   ReplyRequest,
@@ -41,7 +42,7 @@ const OTTER_MESSAGE = '52786f10-3dd8-4f5b-995f-c5f9c5a27a0e'
 const REWOUND_MESSAGE = '18fb8495-3399-43a8-bc37-573286cfc9ed'
 const MODEL = 'claude-haiku-5-5'
 
-type Streamed = ReplyEvent | PromptRecorded | ReplyRecorded
+type Streamed = ReplyEvent | PromptRecorded | PromptDropped | ReplyRecorded
 
 interface Report {
   args: string[]
@@ -235,7 +236,9 @@ function promptRecordedIn(events: Streamed[]) {
 function replyEvents(events: Streamed[]) {
   return events.filter(
     (event): event is ReplyEvent =>
-      event.type !== 'PROMPT_RECORDED' && event.type !== 'REPLY_RECORDED'
+      event.type !== 'PROMPT_RECORDED' &&
+      event.type !== 'PROMPT_DROPPED' &&
+      event.type !== 'REPLY_RECORDED'
   )
 }
 

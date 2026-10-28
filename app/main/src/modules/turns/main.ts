@@ -3,6 +3,7 @@ import type {Command, CommandResult} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {
   HostCommand,
+  PromptDropped,
   PromptRecorded,
   ReplyRecorded,
   ReplyRequest,
@@ -170,6 +171,9 @@ export function createTurns({
 
     hostPromptRecorded: (provider: ProviderId, recorded: PromptRecorded) =>
       inFlight.recordPrompt(provider, recorded),
+
+    hostPromptDropped: (provider: ProviderId, dropped: PromptDropped) =>
+      inFlight.dropPrompt(provider, dropped),
 
     hostRecorded: (provider: ProviderId, recorded: ReplyRecorded) =>
       inFlight.record(provider, recorded),

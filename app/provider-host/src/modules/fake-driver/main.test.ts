@@ -1,4 +1,8 @@
-import type {PromptRecorded, ReplyRecorded} from '@uz/contract/host'
+import type {
+  PromptDropped,
+  PromptRecorded,
+  ReplyRecorded,
+} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
@@ -15,7 +19,7 @@ const request = {
   session: null,
 }
 
-type Streamed = ReplyEvent | PromptRecorded | ReplyRecorded
+type Streamed = ReplyEvent | PromptRecorded | PromptDropped | ReplyRecorded
 
 async function collect(events: AsyncIterable<Streamed>) {
   return Array.fromAsync(events)
@@ -24,7 +28,9 @@ async function collect(events: AsyncIterable<Streamed>) {
 function textOf(events: Streamed[]) {
   return events
     .flatMap(event =>
-      event.type === 'PROMPT_RECORDED' || event.type === 'REPLY_RECORDED'
+      event.type === 'PROMPT_RECORDED' ||
+      event.type === 'PROMPT_DROPPED' ||
+      event.type === 'REPLY_RECORDED'
         ? []
         : [event]
     )

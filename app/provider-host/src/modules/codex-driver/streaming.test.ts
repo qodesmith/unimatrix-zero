@@ -1,4 +1,5 @@
 import type {
+  PromptDropped,
   PromptRecorded,
   ReplyRecorded,
   ReplyRequest,
@@ -45,7 +46,7 @@ const RETRIED_TURN = '01a170aa-1476-75b0-892c-bd4587e4d57b'
 const REWOUND_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-50-${REWOUND_THREAD_ID}.jsonl`
 const REVERTED_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-56-${REWOUND_THREAD_ID}_01a170aa-145c-7992-b8a7-bcfb762e8621.jsonl`
 
-type Streamed = ReplyEvent | PromptRecorded | ReplyRecorded
+type Streamed = ReplyEvent | PromptRecorded | PromptDropped | ReplyRecorded
 
 interface Report {
   args: string[]
@@ -258,11 +259,17 @@ function promptRecordedIn(events: Streamed[]) {
   return recorded.session
 }
 
+function droppedIn(events: Streamed[]) {
+  return events.some(event => event.type === 'PROMPT_DROPPED')
+}
+
 function shown(events: Streamed[]) {
   return events
     .filter(
       (event): event is ReplyEvent =>
-        event.type !== 'PROMPT_RECORDED' && event.type !== 'REPLY_RECORDED'
+        event.type !== 'PROMPT_RECORDED' &&
+        event.type !== 'PROMPT_DROPPED' &&
+        event.type !== 'REPLY_RECORDED'
     )
     .reduce(foldReplyEvent, NEW_REPLY)
 }
@@ -561,7 +568,7 @@ it('cuts a Retry’s loaded thread before the failed turn, keeping the Reply cut
   const hi = await codex.reply(FIRST_PROMPT)
   const bye = await codex.reply(SECOND_PROMPT, recordedIn(hi))
 
-  await codex.reply(
+  const retried = await codex.reply(
     'What was the last thing I asked you? Just the words.',
     recordedIn(hi),
     {retryCut: {keepThrough: null, dropFrom: promptRecordedIn(bye).messageId}}
@@ -570,17 +577,14 @@ it('cuts a Retry’s loaded thread before the failed turn, keeping the Reply cut
   const [report] = codex.reports()
 
   expect(report?.reverted).toBe(BYE_TURN)
+  expect(droppedIn(retried)).toBe(true)
 })
 
-it('cuts a Retry’s unloaded thread before the failed turn, from Codex’s longer rollout, and keeps that rollout', async () => {
-  const opened = await setUp(['started.ndjson'])
-  const first = await opened.reply(FIRST_PROMPT)
-  const second = await opened.reply(SECOND_PROMPT, recordedIn(first))
-  await opened.allClosed()
-
+/** `resumed.ndjson` with a `thread/revert` before the turn named `failed`. */
+function resumedThenReverted() {
   const reverted = ROLLOUT.replace('.jsonl', '_reverted.jsonl')
 
-  const resumedThenReverted = edited('resumed.ndjson', text => {
+  return edited('resumed.ndjson', text => {
     const lines = text
       .split('\n')
       .map(line =>
@@ -621,8 +625,15 @@ it('cuts a Retry’s unloaded thread before the failed turn, from Codex’s long
       )
       .join('\n')
   })
+}
 
-  const codex = await setUp([resumedThenReverted], {store: opened.store})
+it('cuts a Retry’s unloaded thread before the failed turn, from Codex’s longer rollout, and keeps that rollout', async () => {
+  const opened = await setUp(['started.ndjson'])
+  const first = await opened.reply(FIRST_PROMPT)
+  const second = await opened.reply(SECOND_PROMPT, recordedIn(first))
+  await opened.allClosed()
+
+  const codex = await setUp([resumedThenReverted()], {store: opened.store})
 
   const rollout = extendSavedRollout(
     opened.store,
@@ -654,6 +665,31 @@ it('cuts a Retry’s unloaded thread before the failed turn, from Codex’s long
   expect(
     Buffer.from(saved?.base64 ?? '', 'base64').subarray(0, onDisk.length)
   ).toEqual(onDisk)
+})
+
+it('doesn’t cut again when Codex stops after the cut and a new app-server takes the Retry', async () => {
+  const opened = await setUp(['started.ndjson'])
+  const first = await opened.reply(FIRST_PROMPT)
+  const second = await opened.reply(SECOND_PROMPT, recordedIn(first))
+  await opened.allClosed()
+
+  const codex = await setUp([resumedThenReverted(), 'resumed.ndjson'], {
+    store: opened.store,
+    env: {FAKE_CODEX_EXIT_AT: 'turn/start', FAKE_CODEX_EXITS: '1'},
+  })
+
+  extendSavedRollout(opened.store, codex.configDir, 'interrupted', 'failed')
+
+  const retried = await codex.reply(THIRD_PROMPT, recordedIn(second), {
+    retryCut: {keepThrough: 'interrupted', dropFrom: 'failed'},
+  })
+
+  expect(retried.at(-1)).toMatchObject({status: 'complete'})
+  expect(droppedIn(retried)).toBe(true)
+  const [cut, fresh] = codex.reports()
+
+  expect(cut?.reverted).toBe('failed')
+  expect(fresh?.methods).not.toContain('thread/revert')
 })
 
 it('fails the Reply when the app has no copy of the Provider session', async () => {

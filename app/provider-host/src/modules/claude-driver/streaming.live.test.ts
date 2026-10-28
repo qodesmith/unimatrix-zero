@@ -10,6 +10,7 @@
  * run one `it` with `-t` to re-record only its files.
  */
 import type {
+  PromptDropped,
   PromptRecorded,
   ReplyRecorded,
   ReplyRequest,
@@ -33,7 +34,7 @@ const program = process.env.UZ_LIVE_CLAUDE_PROGRAM ?? ''
 const configDir = process.env.UZ_LIVE_CLAUDE_CONFIG ?? ''
 const recording = process.env.UZ_RECORD === 'yes'
 
-type Streamed = ReplyEvent | PromptRecorded | ReplyRecorded
+type Streamed = ReplyEvent | PromptRecorded | PromptDropped | ReplyRecorded
 
 function textOf(events: Streamed[]) {
   return events
