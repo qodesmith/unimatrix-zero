@@ -56,7 +56,7 @@ export async function readRollouts(
 }
 
 /** A rollout on disk that starts with the saved copy is the same one, longer. */
-function carriedFurther(target: string, saved: Buffer) {
+function startsWithSaved(target: string, saved: Buffer) {
   if (!fs.existsSync(target)) return false
 
   return fs.readFileSync(target).subarray(0, saved.length).equals(saved)
@@ -86,7 +86,7 @@ export function writeRolloutsBack(
 
     const saved = Buffer.from(file.base64, 'base64')
 
-    if (!rewind && carriedFurther(target, saved)) continue
+    if (!rewind && startsWithSaved(target, saved)) continue
 
     fs.mkdirSync(path.dirname(target), {recursive: true, mode: 0o700})
     fs.writeFileSync(target, saved, {mode: 0o600})

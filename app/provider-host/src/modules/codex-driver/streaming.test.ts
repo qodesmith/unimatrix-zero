@@ -84,8 +84,7 @@ function edited(name: string, edit: (text: string) => string) {
   return file
 }
 
-/** Codex's rollout in `configDir`: the app's copy, then one turn more. */
-function carriedPast(
+function extendSavedRollout(
   store: ReturnType<typeof fakeStore>,
   configDir: string,
   turnId: string
@@ -340,7 +339,7 @@ it('resumes from Codex’s rollout when it carries the app’s copy further, as 
   await opened.allClosed()
 
   const codex = await setUp(['resumed.ndjson'], {store: opened.store})
-  carriedPast(opened.store, codex.configDir, 'interrupted')
+  extendSavedRollout(opened.store, codex.configDir, 'interrupted')
 
   await codex.reply(THIRD_PROMPT, recordedIn(second))
   const [report] = codex.reports()
@@ -503,7 +502,7 @@ it('resumes a Retry from the app’s copy when the thread isn’t loaded, with n
   await opened.allClosed()
 
   const codex = await setUp(['resumed.ndjson'], {store: opened.store})
-  carriedPast(opened.store, codex.configDir, 'failed')
+  extendSavedRollout(opened.store, codex.configDir, 'failed')
 
   const third = await codex.reply(THIRD_PROMPT, recordedIn(second), {
     rewind: true,
