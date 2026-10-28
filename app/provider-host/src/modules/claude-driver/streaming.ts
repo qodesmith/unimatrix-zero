@@ -121,6 +121,9 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
               listSubkeys: async () => [],
             }
           : sessionStore,
+      // Each entry reaches the app as it is written, not at the result, so a
+      // Reply the app quits in keeps its Prompt.
+      sessionStoreFlush: 'eager',
       spawnClaudeCodeProcess: spawnOptions => {
         activeConfigDir = spawnOptions.env.CLAUDE_CONFIG_DIR ?? configDir
 

@@ -184,7 +184,9 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     // Codex forks and resumes from the rollout on disk, which only a loaded
     // thread is sure to have written here.
     if (!loaded) {
-      writeRolloutsBack(configDir, await deps.store.loadFiles(folderOf(id)))
+      writeRolloutsBack(configDir, await deps.store.loadFiles(folderOf(id)), {
+        rewind,
+      })
     }
 
     if (fork) {

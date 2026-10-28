@@ -84,6 +84,27 @@ function edited(name: string, edit: (text: string) => string) {
   return file
 }
 
+function extendSavedRollout(
+  store: ReturnType<typeof fakeStore>,
+  configDir: string,
+  turnId: string
+) {
+  const {projectKey, sessionId} = folderOf(THREAD_ID)
+  const saved = store.filesOf(projectKey, sessionId).get(ROLLOUT)
+
+  if (!saved) throw new Error('The app has no copy of the rollout')
+
+  const file = path.join(configDir, ...ROLLOUT.split('/'))
+  fs.mkdirSync(path.dirname(file), {recursive: true})
+  fs.writeFileSync(
+    file,
+    Buffer.concat([
+      Buffer.from(saved.base64, 'base64'),
+      Buffer.from(`${JSON.stringify({type: 'turn', id: turnId})}\n`),
+    ])
+  )
+}
+
 async function setUp(
   recordings: string[],
   {
@@ -311,6 +332,26 @@ it('resumes the Provider session from the app’s copy alone, written back under
   ])
 })
 
+it('resumes from Codex’s rollout when it carries the app’s copy further, as after a quit mid-Reply', async () => {
+  const opened = await setUp(['started.ndjson'])
+  const first = await opened.reply(FIRST_PROMPT)
+  const second = await opened.reply(SECOND_PROMPT, recordedIn(first))
+  await opened.allClosed()
+
+  const codex = await setUp(['resumed.ndjson'], {store: opened.store})
+  extendSavedRollout(opened.store, codex.configDir, 'interrupted')
+
+  await codex.reply(THIRD_PROMPT, recordedIn(second))
+  const [report] = codex.reports()
+
+  expect(report?.resumedFrom.map(line => line.id)).toEqual([
+    THREAD_ID,
+    FIRST_TURN,
+    SECOND_TURN,
+    'interrupted',
+  ])
+})
+
 it('forks the Provider session through a mid-Thread Reply into a new thread, from the app’s copy alone', async () => {
   const opened = await setUp(['started.ndjson'])
   const first = await opened.reply(FIRST_PROMPT)
@@ -461,6 +502,7 @@ it('resumes a Retry from the app’s copy when the thread isn’t loaded, with n
   await opened.allClosed()
 
   const codex = await setUp(['resumed.ndjson'], {store: opened.store})
+  extendSavedRollout(opened.store, codex.configDir, 'failed')
 
   const third = await codex.reply(THIRD_PROMPT, recordedIn(second), {
     rewind: true,
@@ -474,6 +516,11 @@ it('resumes a Retry from the app’s copy when the thread isn’t loaded, with n
   expect(report?.methods).toContain('thread/resume')
   expect(report?.methods).not.toContain('thread/revert')
   expect(report?.reverted).toBeNull()
+  expect(report?.resumedFrom.map(line => line.id)).toEqual([
+    THREAD_ID,
+    FIRST_TURN,
+    SECOND_TURN,
+  ])
 })
 
 it('fails the Reply when the app has no copy of the Provider session', async () => {

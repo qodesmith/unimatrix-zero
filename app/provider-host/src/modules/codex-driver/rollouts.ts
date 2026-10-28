@@ -55,11 +55,24 @@ export async function readRollouts(
   return files
 }
 
+/** A rollout on disk that starts with the saved copy is the same one, longer. */
+function startsWithSaved(target: string, saved: Buffer) {
+  if (!fs.existsSync(target)) return false
+
+  return fs.readFileSync(target).subarray(0, saved.length).equals(saved)
+}
+
 /**
  * Codex rewrites a compressed rollout it resumes as plain `.jsonl`, so when
- * both names are kept the `.zst` is the older and left out.
+ * both names are kept the `.zst` is the older and left out. A rollout Codex
+ * carried past the saved copy, as through an interrupted Reply, is kept,
+ * unless a rewind is to drop what it carried.
  */
-export function writeRolloutsBack(codexHome: string, files: SessionFile[]) {
+export function writeRolloutsBack(
+  codexHome: string,
+  files: SessionFile[],
+  {rewind}: {rewind: boolean}
+) {
   const names = new Set(files.map(file => file.path))
 
   for (const file of files) {
@@ -71,7 +84,11 @@ export function writeRolloutsBack(codexHome: string, files: SessionFile[]) {
 
     if (!target.startsWith(`${path.resolve(codexHome)}${path.sep}`)) continue
 
+    const saved = Buffer.from(file.base64, 'base64')
+
+    if (!rewind && startsWithSaved(target, saved)) continue
+
     fs.mkdirSync(path.dirname(target), {recursive: true, mode: 0o700})
-    fs.writeFileSync(target, Buffer.from(file.base64, 'base64'), {mode: 0o600})
+    fs.writeFileSync(target, saved, {mode: 0o600})
   }
 }

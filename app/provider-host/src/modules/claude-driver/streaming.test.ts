@@ -127,14 +127,19 @@ async function setUp(
     rewind?: boolean
     /** 0 stops the Reply as it starts. */
     stopAfterDeltas?: number
+    replyId?: string
   }
 
   async function reply(
     text: string,
     session: SessionRef | null = null,
-    {fork = false, rewind = false, stopAfterDeltas}: ReplyOptions = {}
+    {
+      fork = false,
+      rewind = false,
+      stopAfterDeltas,
+      replyId = crypto.randomUUID(),
+    }: ReplyOptions = {}
   ) {
-    const replyId = crypto.randomUUID()
     const events: Streamed[] = []
     let deltas = 0
 
@@ -666,6 +671,26 @@ it('fails the Reply as a crash when `claude` exits before its result, keeping th
   })
   await claude.allClosed()
   expect(claude.reports()[0]?.ended).toBe('exited')
+})
+
+it('saves the Prompt while the Reply streams, so a quit mid-Reply keeps it', async () => {
+  // The recording streams up to the Stop it waits for, with no result yet.
+  const claude = await setUp(['stopped.ndjson'])
+  const replyId = crypto.randomUUID()
+  const replying = claude.reply(COUNT_PROMPT, null, {replyId})
+
+  try {
+    await expect
+      .poll(() =>
+        claude.store
+          .entriesOf(claude.projectKey, STOPPED_SESSION_ID)
+          .map(entry => entry.type)
+      )
+      .toContain('user')
+  } finally {
+    await claude.driver.stop(replyId)
+    await replying
+  }
 })
 
 it('passes on a stop asked before claude has the Prompt', async () => {
