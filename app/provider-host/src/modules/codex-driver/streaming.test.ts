@@ -1,9 +1,9 @@
 import type {
-  PromptDropped,
   PromptRecorded,
   ReplyRecorded,
   ReplyRequest,
   SessionRef,
+  StartReplyEvent,
 } from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
@@ -46,7 +46,7 @@ const RETRIED_TURN = '01a170aa-1476-75b0-892c-bd4587e4d57b'
 const REWOUND_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-50-${REWOUND_THREAD_ID}.jsonl`
 const REVERTED_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-56-${REWOUND_THREAD_ID}_01a170aa-145c-7992-b8a7-bcfb762e8621.jsonl`
 
-type Streamed = ReplyEvent | PromptRecorded | PromptDropped | ReplyRecorded
+type Streamed = StartReplyEvent
 
 interface Report {
   args: string[]

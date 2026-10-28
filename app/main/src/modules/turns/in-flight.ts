@@ -29,8 +29,7 @@ function finishedParts({content}: ReplyProgress) {
   return Math.max(content.length - 1, 0) + (lastDone ? 1 : 0)
 }
 
-/** The Reply, when it is that Provider's to write. */
-function written(provider: ProviderId, treeId: string, replyId: string) {
+function providersReply(provider: ProviderId, treeId: string, replyId: string) {
   return and(
     eq(replies.id, replyId),
     eq(replies.treeId, treeId),
@@ -120,14 +119,14 @@ export function createInFlight(
 
       db.update(replies)
         .set({sessionId: session.sessionId, sessionPromptId: session.messageId})
-        .where(written(provider, treeId, replyId))
+        .where(providersReply(provider, treeId, replyId))
         .run()
     },
 
     dropPrompt(provider: ProviderId, {treeId, replyId}: PromptDropped) {
       db.update(replies)
         .set({sessionPromptId: null})
-        .where(written(provider, treeId, replyId))
+        .where(providersReply(provider, treeId, replyId))
         .run()
     },
 
@@ -140,7 +139,7 @@ export function createInFlight(
           sessionId: session.sessionId,
           sessionMessageId: session.messageId,
         })
-        .where(written(provider, treeId, replyId))
+        .where(providersReply(provider, treeId, replyId))
         .run()
     },
 

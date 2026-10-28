@@ -1,10 +1,14 @@
 import type {WhenIdle} from '#modules/idle/main'
-import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
+import type {
+  ContentEvent,
+  Ending,
+  ReplyRun,
+  WriteReplyEvent,
+} from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
 import type {Notification, ParamsOf, RateLimits} from './wire'
 import type {
-  PromptDropped,
   PromptRecorded,
   ReplyRequest,
   SignInRequest,
@@ -181,7 +185,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     return thread
   }
 
-  /** `dropped`: it cut the session before `dropFrom`. */
   async function threadFor(
     running: Running,
     request: ReplyRequest,
@@ -353,7 +356,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   async function* write(
     request: ReplyRequest,
     run: ReplyRun
-  ): AsyncGenerator<ContentEvent | PromptRecorded | PromptDropped, Ending> {
+  ): AsyncGenerator<WriteReplyEvent, Ending> {
     let dropFrom = request.session?.retryCut?.dropFrom ?? null
 
     for (let attempt = 1; ; attempt++) {

@@ -1,9 +1,4 @@
-import type {
-  PromptDropped,
-  PromptRecorded,
-  ReplyRecorded,
-} from '@uz/contract/host'
-import type {ReplyEvent} from '@uz/contract/turns'
+import type {StartReplyEvent} from '@uz/contract/host'
 
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {expect, it} from 'vitest'
@@ -19,7 +14,7 @@ const request = {
   session: null,
 }
 
-type Streamed = ReplyEvent | PromptRecorded | PromptDropped | ReplyRecorded
+type Streamed = StartReplyEvent
 
 async function collect(events: AsyncIterable<Streamed>) {
   return Array.fromAsync(events)

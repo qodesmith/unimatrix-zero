@@ -9,12 +9,10 @@
  * test at a time with `-t`: the ids the driver tests pin change each time.
  */
 import type {
-  PromptDropped,
-  PromptRecorded,
   ReplyRecorded,
   SessionRef,
+  StartReplyEvent,
 } from '@uz/contract/host'
-import type {ReplyEvent} from '@uz/contract/turns'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -38,7 +36,7 @@ function homeFrom(source: string) {
   return home
 }
 
-type Streamed = ReplyEvent | PromptRecorded | PromptDropped | ReplyRecorded
+type Streamed = StartReplyEvent
 
 function expectComplete(events: Streamed[]) {
   const last = events.at(-1)

@@ -58,7 +58,7 @@ interface Live extends ClaudeSession {
 
 type Mapper = ReturnType<typeof createReplyMapper>
 
-type Recording = Generator<PromptRecorded, void>
+type PromptRecords = Generator<PromptRecorded, void>
 
 /**
  * `upTo` is the last message kept, when a fork, a rewind or a Retry's cut cuts
@@ -188,7 +188,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     mapper: Mapper,
     {prompt}: ReplyRequest,
     run: ReplyRun,
-    {uuid, recordPrompt}: {uuid: UUID; recordPrompt: () => Recording}
+    {uuid, recordPrompt}: {uuid: UUID; recordPrompt: () => PromptRecords}
   ): AsyncGenerator<ContentEvent | PromptRecorded, Outcome> {
     let heard = false
     let unstoppable: (() => void) | null = null
@@ -231,7 +231,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     const uuid = randomUUID()
     let recorded = false
 
-    function* recordPrompt(): Recording {
+    function* recordPrompt(): PromptRecords {
       const sessionId = recorded ? null : session.storedIn(uuid)
 
       if (sessionId === null) return

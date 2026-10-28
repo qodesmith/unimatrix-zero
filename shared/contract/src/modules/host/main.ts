@@ -111,6 +111,12 @@ export const ThreadSchema = z.array(
 
 export type Thread = z.infer<typeof ThreadSchema>
 
+export type StartReplyEvent =
+  | ReplyEvent
+  | PromptRecorded
+  | PromptDropped
+  | ReplyRecorded
+
 /** One Provider, one account; no vendor SDK type leaves its Provider host. */
 export interface ProviderDriver {
   readonly capabilities: Capabilities
@@ -129,9 +135,7 @@ export interface ProviderDriver {
    * session holds the Prompt, and `REPLY_RECORDED` before the end once the
    * Provider has saved the Reply.
    */
-  startReply(
-    request: ReplyRequest
-  ): AsyncIterable<ReplyEvent | PromptRecorded | PromptDropped | ReplyRecorded>
+  startReply(request: ReplyRequest): AsyncIterable<StartReplyEvent>
   stop(replyId: string): Promise<void>
   answerApproval(approvalId: string, answer: ApprovalAnswer): Promise<void>
   forkSession(input: {
