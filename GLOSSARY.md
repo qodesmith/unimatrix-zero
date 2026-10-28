@@ -77,7 +77,7 @@ The AI's Turn in response to one Prompt, however many internal messages, tool ca
 _Avoid_: Response, answer, completion
 
 **Stop**:
-Ending a streaming Reply early, by its button or Esc. The Provider is asked to end the turn and keeps its session; the app keeps the text shown so far and tags the Reply _stopped_. A stopped Reply can be continued or branched from. A Reply the app itself left streaming, because it quit, is tagged _interrupted_ at the next launch and behaves like a stopped one.
+Ending a streaming Reply early, by its button or Esc. The Provider is asked to end the turn and keeps its session; the app keeps the text shown so far and tags the Reply _stopped_. A stopped Reply can be continued or branched from. A Reply the app itself left streaming, because it quit, is tagged _interrupted_ at the next launch. Like a stopped one, it can be continued or branched from, but the AI remembers only its Prompt: the text shown so far never reached the Provider session.
 _Avoid_: Cancel, abort, interrupt (the Providers' word for what Stop asks of them)
 
 **Retry**:
