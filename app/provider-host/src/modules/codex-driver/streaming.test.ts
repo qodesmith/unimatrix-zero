@@ -685,6 +685,116 @@ it('doesn’t cut again when Codex stops after the cut and a new app-server take
   expect(fresh?.methods).not.toContain('thread/revert')
 })
 
+/**
+ * `resumed.ndjson` where Codex refuses the `thread/revert` before the turn
+ * named `failed`, then lists `turnIds` as the thread's turns.
+ */
+function resumedThenRevertRefused(turnIds: string[]) {
+  return edited('resumed.ndjson', text => {
+    const lines = text.split('\n')
+    const resumed = lines.findIndex(line => line.includes('"id":2,"result"'))
+
+    return lines
+      .toSpliced(
+        resumed + 1,
+        0,
+        ...[
+          {
+            kind: 'in',
+            message: {
+              id: 99,
+              method: 'thread/revert',
+              params: {threadId: THREAD_ID, beforeTurnId: 'failed'},
+            },
+          },
+          {
+            kind: 'out',
+            message: {
+              id: 99,
+              error: {code: -32600, message: 'turn not found: failed'},
+            },
+          },
+          {
+            kind: 'in',
+            message: {
+              id: 100,
+              method: 'thread/turns/list',
+              params: {
+                threadId: THREAD_ID,
+                cursor: null,
+                itemsView: 'notLoaded',
+              },
+            },
+          },
+          {
+            kind: 'out',
+            message: {
+              id: 100,
+              result: {
+                data: turnIds.map(id => ({id})),
+                nextCursor: null,
+                backwardsCursor: null,
+              },
+            },
+          },
+        ].map(step => JSON.stringify(step))
+      )
+      .join('\n')
+  })
+}
+
+it('counts a Retry’s cut as made when Codex no longer has the failed turn', async () => {
+  const opened = await setUp(['started.ndjson'])
+  const first = await opened.reply(FIRST_PROMPT)
+  const second = await opened.reply(SECOND_PROMPT, recordedIn(first))
+  await opened.allClosed()
+
+  const codex = await setUp(
+    [resumedThenRevertRefused([FIRST_TURN, SECOND_TURN, 'interrupted'])],
+    {store: opened.store}
+  )
+
+  extendSavedRollout(opened.store, codex.configDir, 'interrupted')
+
+  const retried = await codex.reply(THIRD_PROMPT, recordedIn(second), {
+    retryCut: {keepThrough: 'interrupted', dropFrom: 'failed'},
+  })
+
+  expect(retried.at(-1)).toMatchObject({status: 'complete'})
+  expect(droppedIn(retried)).toBe(true)
+})
+
+it('fails a Retry whose cut Codex refuses while it still has the failed turn', async () => {
+  const opened = await setUp(['started.ndjson'])
+  const first = await opened.reply(FIRST_PROMPT)
+  const second = await opened.reply(SECOND_PROMPT, recordedIn(first))
+  await opened.allClosed()
+
+  const codex = await setUp(
+    [
+      resumedThenRevertRefused([
+        FIRST_TURN,
+        SECOND_TURN,
+        'interrupted',
+        'failed',
+      ]),
+    ],
+    {store: opened.store}
+  )
+
+  extendSavedRollout(opened.store, codex.configDir, 'interrupted', 'failed')
+
+  const retried = await codex.reply(THIRD_PROMPT, recordedIn(second), {
+    retryCut: {keepThrough: 'interrupted', dropFrom: 'failed'},
+  })
+
+  expect(retried.at(-1)).toMatchObject({
+    status: 'failed',
+    failure: {message: 'turn not found: failed'},
+  })
+  expect(droppedIn(retried)).toBe(false)
+})
+
 it('fails the Reply when the app has no copy of the Provider session', async () => {
   const codex = await setUp(['resumed.ndjson'])
 

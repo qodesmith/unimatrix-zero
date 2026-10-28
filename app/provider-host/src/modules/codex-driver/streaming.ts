@@ -7,7 +7,7 @@ import type {
 } from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
-import type {Notification, ParamsOf, RateLimits} from './wire'
+import type {Notification, ParamsOf, RateLimits, ResponseOf} from './wire'
 import type {
   PromptRecorded,
   ReplyRequest,
@@ -131,6 +131,45 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     })
   }
 
+  async function holdsTurn(running: Running, threadId: string, turnId: string) {
+    let cursor: string | null = null
+
+    do {
+      const page: ResponseOf<'thread/turns/list'> =
+        await running.server.request('thread/turns/list', {
+          threadId,
+          cursor,
+          itemsView: 'notLoaded',
+        })
+
+      if (page.data.some(turn => turn.id === turnId)) return true
+
+      cursor = page.nextCursor
+    } while (cursor !== null)
+
+    return false
+  }
+
+  /** Null when Codex no longer has `beforeTurnId`, so nothing is left to drop. */
+  async function requestRevert(
+    running: Running,
+    threadId: string,
+    beforeTurnId: string
+  ) {
+    try {
+      return await running.server.request('thread/revert', {
+        threadId,
+        beforeTurnId,
+      })
+    } catch (error) {
+      if (running.server.hasExited) throw error
+
+      if (await holdsTurn(running, threadId, beforeTurnId)) throw error
+
+      return null
+    }
+  }
+
   /**
    * Drops `beforeTurnId` and every turn after it. The new rollout points into
    * the old one, maybe past the app's copy, so the old one is saved again.
@@ -141,16 +180,17 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     beforeTurnId: string,
     configDir: string
   ) {
-    const {thread: reverted} = await running.server.request('thread/revert', {
-      threadId: thread.id,
-      beforeTurnId,
-    })
+    const answer = await requestRevert(running, thread.id, beforeTurnId)
 
-    const old = thread.path === null ? null : rolloutAt(configDir, thread.path)
+    if (answer) {
+      const old =
+        thread.path === null ? null : rolloutAt(configDir, thread.path)
 
-    if (old) await deps.store.saveFiles(folderOf(thread.id), [old])
+      if (old) await deps.store.saveFiles(folderOf(thread.id), [old])
 
-    thread.path = reverted.path
+      thread.path = answer.thread.path
+    }
+
     const at = thread.turns.indexOf(beforeTurnId)
 
     if (at !== -1) thread.turns.length = at
