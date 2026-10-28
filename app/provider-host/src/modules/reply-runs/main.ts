@@ -1,7 +1,10 @@
 import type {
+  PromptDropped,
+  PromptRecorded,
   ProviderDriver,
   ReplyRecorded,
   ReplyRequest,
+  StartReplyEvent,
 } from '@uz/contract/host'
 import type {ReplyEvent, RunFailure} from '@uz/contract/turns'
 
@@ -36,11 +39,13 @@ export interface ReplyRun {
   afterward(cleanUp: (status: FinishedStatus) => void): void
 }
 
+export type WriteReplyEvent = ContentEvent | PromptRecorded | PromptDropped
+
 /** The vendor program's part of one Reply: its content, then how it ended. */
 export type WriteReply = (
   request: ReplyRequest,
   run: ReplyRun
-) => AsyncGenerator<ContentEvent, Ending>
+) => AsyncGenerator<WriteReplyEvent, Ending>
 
 interface Writing {
   interrupt: (() => Promise<void>) | null
@@ -84,7 +89,7 @@ export function createReplyRuns(
   async function* ended(
     request: ReplyRequest,
     entry: Writing
-  ): AsyncGenerator<ContentEvent, Ending> {
+  ): AsyncGenerator<WriteReplyEvent, Ending> {
     let endedAs: FinishedStatus = 'failed'
 
     try {
@@ -118,7 +123,7 @@ export function createReplyRuns(
 
   async function* startReply(
     request: ReplyRequest
-  ): AsyncGenerator<ReplyEvent | ReplyRecorded> {
+  ): AsyncGenerator<StartReplyEvent> {
     const entry: Writing = {interrupt: null, stopAsked: false, cleanUps: []}
 
     writing.set(request.replyId, entry)

@@ -74,6 +74,11 @@ export const replies = sqliteTable(
       .references(() => systemPrompts.id),
     sessionId: text('session_id'),
     sessionMessageId: text('session_message_id'),
+    /**
+     * Its Prompt in the Provider session, kept even when the Reply never
+     * finished.
+     */
+    sessionPromptId: text('session_prompt_id'),
     contextSize: integer('context_size'),
     contextWindow: integer('context_window'),
     createdAt: createdAt(),

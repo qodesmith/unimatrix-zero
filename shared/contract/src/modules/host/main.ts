@@ -51,10 +51,21 @@ export const ReplyRequestSchema = z.strictObject({
    * already has a Prompt after it, so the Provider forks there and the other
    * Branch's session is never rewound. `rewind`: the session may run past
    * `messageId` with a failed turn, dropped first; never set with `fork`.
+   * `retryCut`: a Retry whose Prompt answers a Reply cut short before its
+   * Provider saved it. The session keeps everything through `keepThrough`,
+   * that Reply's Prompt, and drops `dropFrom`, the failed attempt's own Prompt,
+   * with all after it. Each Provider cuts at the one it can; a null one leaves
+   * the session as it is.
    */
   session: SessionRefSchema.extend({
     fork: z.boolean(),
     rewind: z.boolean(),
+    retryCut: z
+      .strictObject({
+        keepThrough: z.string().nullable(),
+        dropFrom: z.string().nullable(),
+      })
+      .optional(),
   }).nullable(),
 })
 
@@ -71,12 +82,48 @@ export const ReplyRecordedMessage = z.strictObject({
 
 export type ReplyRecorded = z.infer<typeof ReplyRecordedMessage>
 
+/**
+ * The Provider session holds the Reply's Prompt, as `messageId`, though the
+ * Reply may never finish. Main keeps it on the Reply for a Retry's cut.
+ */
+export const PromptRecordedMessage = z.strictObject({
+  type: z.literal('PROMPT_RECORDED'),
+  treeId: z.uuid(),
+  replyId: z.uuid(),
+  session: SessionRefSchema.extend({messageId: z.string()}),
+})
+
+export type PromptRecorded = z.infer<typeof PromptRecordedMessage>
+
+/** A Retry's cut dropped the Prompt recorded for this Reply. */
+export const PromptDroppedMessage = z.strictObject({
+  type: z.literal('PROMPT_DROPPED'),
+  treeId: z.uuid(),
+  replyId: z.uuid(),
+})
+
+export type PromptDropped = z.infer<typeof PromptDroppedMessage>
+
 /** A Thread as any Provider can take it: each Prompt and the Reply to it. */
 export const ThreadSchema = z.array(
   z.strictObject({prompt: z.string(), reply: z.array(ReplyPartSchema)})
 )
 
 export type Thread = z.infer<typeof ThreadSchema>
+
+export type StartReplyEvent =
+  | ReplyEvent
+  | PromptRecorded
+  | PromptDropped
+  | ReplyRecorded
+
+const replyEventTypes = new Set<StartReplyEvent['type']>(
+  ReplyEventSchema.options.map(option => option.shape.type.value)
+)
+
+export function isReplyEvent(event: StartReplyEvent): event is ReplyEvent {
+  return replyEventTypes.has(event.type)
+}
 
 /** One Provider, one account; no vendor SDK type leaves its Provider host. */
 export interface ProviderDriver {
@@ -91,10 +138,12 @@ export interface ProviderDriver {
   listModels(): Promise<Model[]>
   readUsage(): Promise<Usage>
   /**
-   * Ends with `RUN_FINISHED`, including after `stop`. `REPLY_RECORDED` comes
-   * before it once the Provider has saved the Reply.
+   * Ends with `RUN_FINISHED`, including after `stop`. `PROMPT_DROPPED` comes
+   * once a Retry's cut drops `dropFrom`, `PROMPT_RECORDED` once the Provider
+   * session holds the Prompt, and `REPLY_RECORDED` before the end once the
+   * Provider has saved the Reply.
    */
-  startReply(request: ReplyRequest): AsyncIterable<ReplyEvent | ReplyRecorded>
+  startReply(request: ReplyRequest): AsyncIterable<StartReplyEvent>
   stop(replyId: string): Promise<void>
   answerApproval(approvalId: string, answer: ApprovalAnswer): Promise<void>
   forkSession(input: {
@@ -152,6 +201,8 @@ export const SessionStoreMessage = z.strictObject({
 export const HostMessageSchema = z.discriminatedUnion('type', [
   HostReadyMessage,
   ReplyEventSchema,
+  PromptRecordedMessage,
+  PromptDroppedMessage,
   ReplyRecordedMessage,
   SignInUpdateSchema,
   SessionStoreMessage,

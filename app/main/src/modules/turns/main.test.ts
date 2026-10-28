@@ -90,6 +90,15 @@ function record(replyId: string) {
   })
 }
 
+function recordPrompt(replyId: string, messageId: string, sessionId = 's1') {
+  turns.hostPromptRecorded('claude', {
+    type: 'PROMPT_RECORDED',
+    treeId,
+    replyId,
+    session: {sessionId, messageId},
+  })
+}
+
 function finish(replyId: string) {
   fromHost(replyId, {type: 'RUN_FINISHED', status: 'complete'})
 }
@@ -631,6 +640,109 @@ describe('retrying a Reply', () => {
 
     expect(sessionsStarted()).toEqual([
       {sessionId: 's1', messageId: 'm1', fork: false, rewind: false},
+    ])
+  })
+
+  it('cuts the session after the interrupted Reply’s Prompt and before the failed one’s, when both were recorded', () => {
+    const replyId = savedRoot()
+    const interrupted = sendPrompt(replyId, 'And then?')
+    recordPrompt(interrupted, 'p-interrupted')
+    turns.quitting()
+    turns = launch()
+    const failed = sendPrompt(interrupted, 'Go on')
+    recordPrompt(failed, 'p-failed')
+    fail(failed)
+
+    turns.retry(treeId, failed)
+
+    expect(sessionsStarted()).toEqual([
+      {
+        sessionId: 's1',
+        messageId: 'm1',
+        fork: false,
+        rewind: false,
+        retryCut: {keepThrough: 'p-interrupted', dropFrom: 'p-failed'},
+      },
+    ])
+  })
+
+  it('leaves out a recorded Prompt that went into another session', () => {
+    const replyId = savedRoot()
+    const interrupted = sendPrompt(replyId, 'And then?')
+    recordPrompt(interrupted, 'p-interrupted', 's-other')
+    turns.quitting()
+    turns = launch()
+    const failed = sendPrompt(interrupted, 'Go on')
+    recordPrompt(failed, 'p-failed')
+    fail(failed)
+
+    turns.retry(treeId, failed)
+
+    expect(sessionsStarted()).toEqual([
+      {
+        sessionId: 's1',
+        messageId: 'm1',
+        fork: false,
+        rewind: false,
+        retryCut: {keepThrough: null, dropFrom: 'p-failed'},
+      },
+    ])
+  })
+
+  it('still cuts before the failed attempt’s Prompt when the last Retry failed before cutting', () => {
+    const replyId = savedRoot()
+    const interrupted = sendPrompt(replyId, 'And then?')
+    recordPrompt(interrupted, 'p-interrupted')
+    turns.quitting()
+    turns = launch()
+    const failed = sendPrompt(interrupted, 'Go on')
+    recordPrompt(failed, 'p-failed')
+    fail(failed)
+    turns.retry(treeId, failed)
+    fail(failed)
+    hostCommands = []
+
+    turns.retry(treeId, failed)
+
+    expect(sessionsStarted()).toEqual([
+      {
+        sessionId: 's1',
+        messageId: 'm1',
+        fork: false,
+        rewind: false,
+        retryCut: {keepThrough: 'p-interrupted', dropFrom: 'p-failed'},
+      },
+    ])
+  })
+
+  it('cuts only after the interrupted Reply’s Prompt once the Provider dropped the failed attempt’s', () => {
+    const replyId = savedRoot()
+    const interrupted = sendPrompt(replyId, 'And then?')
+    recordPrompt(interrupted, 'p-interrupted')
+    turns.quitting()
+    turns = launch()
+    const failed = sendPrompt(interrupted, 'Go on')
+    recordPrompt(failed, 'p-failed')
+    fail(failed)
+    turns.retry(treeId, failed)
+    turns.hostPromptDropped('claude', {
+      type: 'PROMPT_DROPPED',
+      treeId,
+      replyId: failed,
+    })
+    fail(failed)
+    hostCommands = []
+
+    turns.retry(treeId, failed)
+
+    expect(sessionsStarted()).toEqual([
+      {
+        sessionId: 's1',
+        messageId: 'm1',
+        fork: false,
+        rewind: false,
+        retryCut: {keepThrough: 'p-interrupted', dropFrom: null},
+      },
     ])
   })
 

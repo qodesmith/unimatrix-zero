@@ -94,6 +94,10 @@ function openWindow(db: Database) {
   const hosts = createProviderHosts({
     spawn: utilityHost(hostsDist, dev?.fakeProvider ? ['--fake'] : []),
     onReplyEvent: (provider, event) => turns.hostEvent(provider, event),
+    onPromptRecorded: (provider, recorded) =>
+      turns.hostPromptRecorded(provider, recorded),
+    onPromptDropped: (provider, dropped) =>
+      turns.hostPromptDropped(provider, dropped),
     onReplyRecorded: (provider, recorded) =>
       turns.hostRecorded(provider, recorded),
     onSessionStore: sessions.handle,

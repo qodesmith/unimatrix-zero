@@ -7,6 +7,7 @@ import type {LoginAccountResponse} from './protocol/v2/LoginAccountResponse'
 import type {RateLimitWindow} from './protocol/v2/RateLimitWindow'
 import type {Thread} from './protocol/v2/Thread'
 import type {ThreadTokenUsage} from './protocol/v2/ThreadTokenUsage'
+import type {ThreadTurnsListResponse} from './protocol/v2/ThreadTurnsListResponse'
 import type {TokenUsageBreakdown} from './protocol/v2/TokenUsageBreakdown'
 import type {Turn} from './protocol/v2/Turn'
 import type {TurnError} from './protocol/v2/TurnError'
@@ -64,6 +65,14 @@ export const RESPONSES = {
   'thread/fork': OpenedThreadSchema,
   'thread/read': z.looseObject({thread: ThreadSchema}),
   'thread/revert': z.looseObject({thread: ThreadSchema}),
+  'thread/turns/list': z.looseObject({
+    data: z.array(z.looseObject({id: z.string()})),
+    nextCursor: z.string().nullable(),
+  }) satisfies z.ZodType<
+    Pick<ThreadTurnsListResponse, 'nextCursor'> & {
+      data: Pick<Turn, 'id'>[]
+    }
+  >,
   'turn/start': z.looseObject({turn: z.looseObject({id: z.string()})}),
   'turn/interrupt': z.looseObject({}),
 } satisfies Partial<Record<ClientRequest['method'], z.ZodType>>

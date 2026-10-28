@@ -1,6 +1,10 @@
 import type {Database} from '#modules/database/main'
 import type {AppEvent} from '@uz/contract/events'
-import type {ReplyRecorded} from '@uz/contract/host'
+import type {
+  PromptDropped,
+  PromptRecorded,
+  ReplyRecorded,
+} from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
 import type {
   ReplyEvent,
@@ -23,6 +27,14 @@ function finishedParts({content}: ReplyProgress) {
   const lastDone = last?.type === 'tool-call' && last.result !== null
 
   return Math.max(content.length - 1, 0) + (lastDone ? 1 : 0)
+}
+
+function providersReply(provider: ProviderId, treeId: string, replyId: string) {
+  return and(
+    eq(replies.id, replyId),
+    eq(replies.treeId, treeId),
+    eq(replies.provider, provider)
+  )
 }
 
 interface Entry {
@@ -102,6 +114,22 @@ export function createInFlight(
 
     apply,
 
+    recordPrompt(provider: ProviderId, recorded: PromptRecorded) {
+      const {treeId, replyId, session} = recorded
+
+      db.update(replies)
+        .set({sessionId: session.sessionId, sessionPromptId: session.messageId})
+        .where(providersReply(provider, treeId, replyId))
+        .run()
+    },
+
+    dropPrompt(provider: ProviderId, {treeId, replyId}: PromptDropped) {
+      db.update(replies)
+        .set({sessionPromptId: null})
+        .where(providersReply(provider, treeId, replyId))
+        .run()
+    },
+
     record(provider: ProviderId, recorded: ReplyRecorded) {
       const {treeId, replyId, model, session} = recorded
 
@@ -111,13 +139,7 @@ export function createInFlight(
           sessionId: session.sessionId,
           sessionMessageId: session.messageId,
         })
-        .where(
-          and(
-            eq(replies.id, replyId),
-            eq(replies.treeId, treeId),
-            eq(replies.provider, provider)
-          )
-        )
+        .where(providersReply(provider, treeId, replyId))
         .run()
     },
 

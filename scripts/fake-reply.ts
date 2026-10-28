@@ -1,5 +1,6 @@
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {isReplyEvent} from '@uz/contract/host'
 import {createFakeDriver} from '@uz/provider-host/fake-driver'
 import path from 'node:path'
 
@@ -42,7 +43,7 @@ export async function recordFakeReply(): Promise<ReplyEvent[]> {
     vendorProgram: {program: null, configDir: '/fake'},
     session: null,
   })) {
-    if (event.type === 'REPLY_RECORDED') continue
+    if (!isReplyEvent(event)) continue
 
     events.push(
       'toolCallId' in event && event.toolCallId !== undefined

@@ -4,6 +4,7 @@ import type {
   SDKMessage,
   SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk'
+import type {UUID} from 'node:crypto'
 
 import {createInbox} from '#modules/inbox/main'
 import {setTimeout as delay} from 'node:timers/promises'
@@ -16,7 +17,7 @@ export type QueryFn = (params: {
   options: Options
 }) => Query
 
-type Input = {kind: 'prompt'; text: string} | {kind: 'end'}
+type Input = {kind: 'prompt'; text: string; uuid: UUID} | {kind: 'end'}
 
 /** One `claude` kept open between Prompts; `messageId` is where it continues. */
 export interface ClaudeSession {
@@ -25,8 +26,8 @@ export interface ClaudeSession {
   /** Whether `claude` has started; false while it may still refuse to. */
   readonly started: boolean
   readonly ended: boolean
-  /** Yields up to the Prompt's `result`. */
-  send(text: string): AsyncGenerator<SDKMessage>
+  /** Yields up to the Prompt's `result`; `claude` stores it as `uuid`. */
+  send(text: string, uuid: UUID): AsyncGenerator<SDKMessage>
   /** Resolves once `claude` takes it; the `result` still follows on `send`. */
   interrupt(): Promise<void>
   /** Waits for `claude` to exit by itself, to finish writing; else stops it. */
@@ -46,6 +47,7 @@ export function openSession(query: QueryFn, options: Options): ClaudeSession {
         type: 'user',
         message: {role: 'user', content: input.text},
         parent_tool_use_id: null,
+        uuid: input.uuid,
       }
     }
   }
@@ -84,8 +86,8 @@ export function openSession(query: QueryFn, options: Options): ClaudeSession {
       return ended
     },
 
-    async *send(text) {
-      inbox.push({kind: 'prompt', text})
+    async *send(text, uuid) {
+      inbox.push({kind: 'prompt', text, uuid})
 
       for (;;) {
         const step = await next()

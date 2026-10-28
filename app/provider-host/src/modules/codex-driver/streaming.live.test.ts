@@ -8,8 +8,11 @@
  * `UZ_RECORD=yes` writes the `recordings/` the driver tests replay. Record one
  * test at a time with `-t`: the ids the driver tests pin change each time.
  */
-import type {ReplyRecorded, SessionRef} from '@uz/contract/host'
-import type {ReplyEvent} from '@uz/contract/turns'
+import type {
+  ReplyRecorded,
+  SessionRef,
+  StartReplyEvent,
+} from '@uz/contract/host'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -33,7 +36,9 @@ function homeFrom(source: string) {
   return home
 }
 
-function expectComplete(events: (ReplyEvent | ReplyRecorded)[]) {
+type Streamed = StartReplyEvent
+
+function expectComplete(events: Streamed[]) {
   const last = events.at(-1)
 
   expect(last?.type === 'RUN_FINISHED' && last.failure).toBeFalsy()
@@ -226,7 +231,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       {rewind = false, stopAfter = Infinity} = {}
     ) {
       const replyId = crypto.randomUUID()
-      const events: (ReplyEvent | ReplyRecorded)[] = []
+      const events: Streamed[] = []
       let deltas = 0
 
       for await (const event of on.startReply({

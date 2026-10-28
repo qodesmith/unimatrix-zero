@@ -26,7 +26,8 @@ export type RecordedLine = z.infer<typeof RecordedLineSchema>
  * reports to `FAKE_CLAUDE_REPORTS/<n>.json`; each line the SDK writes must be
  * the next one recorded. `FAKE_CLAUDE_TOOL_RESULT` names a tool result file to
  * write, `FAKE_CLAUDE_REFUSE_STORE=yes` refuses the SDK's temporary folder,
- * and `FAKE_CLAUDE_EXIT_AFTER=<n>` exits after the nth Prompt.
+ * and `FAKE_CLAUDE_EXIT_AFTER=<n>` exits after the nth Prompt. A Prompt sent
+ * with a `uuid` is stored under it, as `claude` does.
  */
 const SCRIPT = `
 import fs from 'node:fs'
@@ -73,7 +74,21 @@ if (resume) {
 save()
 
 const requestIds = new Map()
+const renamed = new Map()
+let promptUuid = null
 let at = 0
+
+function rename(entry) {
+  if (promptUuid && entry.type === 'user' && entry.uuid) {
+    renamed.set(entry.uuid, promptUuid)
+    promptUuid = null
+  }
+  return {
+    ...entry,
+    uuid: renamed.get(entry.uuid) ?? entry.uuid,
+    parentUuid: renamed.get(entry.parentUuid) ?? entry.parentUuid,
+  }
+}
 
 function write(message) {
   if (message.type === 'control_response') {
@@ -81,9 +96,10 @@ function write(message) {
   }
   if (message.type === 'transcript_mirror') {
     const filePath = path.join(projects, path.relative(recordedProjects, message.filePath))
+    const entries = message.entries.map(rename)
     fs.mkdirSync(path.dirname(filePath), {recursive: true})
-    fs.appendFileSync(filePath, message.entries.map(entry => JSON.stringify(entry) + '\\n').join(''))
-    message = {...message, filePath}
+    fs.appendFileSync(filePath, entries.map(entry => JSON.stringify(entry) + '\\n').join(''))
+    message = {...message, filePath, entries}
   }
   if (message.type === 'result' && process.env.FAKE_CLAUDE_TOOL_RESULT) {
     const folder = path.join(projects, message.session_id, 'tool-results')
@@ -126,7 +142,10 @@ process.stdin.on('data', chunk => {
       recorded.type === message.type &&
       (message.type !== 'control_request' || recorded.request.subtype === message.request.subtype))
     if (message.type === 'control_request') requestIds.set(step.message.request_id, message.request_id)
-    if (message.type === 'user') report.prompts.push(message.message.content)
+    if (message.type === 'user') {
+      report.prompts.push(message.message.content)
+      promptUuid = message.uuid ?? null
+    }
     save()
     answer()
     if (message.type === 'user' && report.prompts.length === Number(process.env.FAKE_CLAUDE_EXIT_AFTER)) {
