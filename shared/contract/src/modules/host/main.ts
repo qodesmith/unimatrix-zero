@@ -117,6 +117,14 @@ export type StartReplyEvent =
   | PromptDropped
   | ReplyRecorded
 
+const replyEventTypes = new Set<StartReplyEvent['type']>(
+  ReplyEventSchema.options.map(option => option.shape.type.value)
+)
+
+export function isReplyEvent(event: StartReplyEvent): event is ReplyEvent {
+  return replyEventTypes.has(event.type)
+}
+
 /** One Provider, one account; no vendor SDK type leaves its Provider host. */
 export interface ProviderDriver {
   readonly capabilities: Capabilities

@@ -350,8 +350,9 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   }
 
   /**
-   * An app-server that exited while idle answers nothing: retry once. Codex
-   * keeps a cut on disk, so the retry doesn't cut again.
+   * An app-server that exited while idle answers nothing: try once more on a
+   * new one. Codex keeps a cut on disk, so the second attempt doesn't cut
+   * again.
    */
   async function* write(
     request: ReplyRequest,

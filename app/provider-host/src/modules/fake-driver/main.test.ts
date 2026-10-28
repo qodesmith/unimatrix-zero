@@ -1,5 +1,6 @@
 import type {StartReplyEvent} from '@uz/contract/host'
 
+import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {expect, it} from 'vitest'
 
@@ -22,13 +23,7 @@ async function collect(events: AsyncIterable<Streamed>) {
 
 function textOf(events: Streamed[]) {
   return events
-    .flatMap(event =>
-      event.type === 'PROMPT_RECORDED' ||
-      event.type === 'PROMPT_DROPPED' ||
-      event.type === 'REPLY_RECORDED'
-        ? []
-        : [event]
-    )
+    .filter(isReplyEvent)
     .reduce(foldReplyEvent, NEW_REPLY)
     .content.flatMap(part => (part.type === 'text' ? [part.text] : []))
     .join('')

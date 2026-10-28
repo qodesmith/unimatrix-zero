@@ -5,10 +5,10 @@ import type {
   SessionRef,
   StartReplyEvent,
 } from '@uz/contract/host'
-import type {ReplyEvent} from '@uz/contract/turns'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
+import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {once} from 'node:events'
 import fs from 'node:fs'
@@ -264,14 +264,7 @@ function droppedIn(events: Streamed[]) {
 }
 
 function shown(events: Streamed[]) {
-  return events
-    .filter(
-      (event): event is ReplyEvent =>
-        event.type !== 'PROMPT_RECORDED' &&
-        event.type !== 'PROMPT_DROPPED' &&
-        event.type !== 'REPLY_RECORDED'
-    )
-    .reduce(foldReplyEvent, NEW_REPLY)
+  return events.filter(isReplyEvent).reduce(foldReplyEvent, NEW_REPLY)
 }
 
 function textOf(events: Streamed[]) {
