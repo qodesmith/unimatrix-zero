@@ -775,3 +775,24 @@ it('takes the Prompt to a new app-server when the last one stopped unheard', asy
   expect(stopped?.ended).toBe('exited')
   expect(fresh?.prompts).toEqual([FIRST_PROMPT])
 })
+
+it('fails the Reply rather than send the Prompt again when Codex stops after accepting it', async () => {
+  const codex = await setUp(['started.ndjson', 'started.ndjson'], {
+    env: {FAKE_CODEX_EXIT_AT: 'turn/started', FAKE_CODEX_EXITS: '1'},
+  })
+
+  const events = await codex.reply(FIRST_PROMPT)
+
+  expect(promptRecordedIn(events)).toEqual({
+    sessionId: THREAD_ID,
+    messageId: FIRST_TURN,
+  })
+  expect(events.at(-1)).toMatchObject({
+    status: 'failed',
+    failure: {code: 'program-crashed'},
+  })
+  const reports = codex.reports()
+
+  expect(reports).toHaveLength(1)
+  expect(reports[0]?.prompts).toEqual([FIRST_PROMPT])
+})
