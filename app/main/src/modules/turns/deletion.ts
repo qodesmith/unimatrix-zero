@@ -1,5 +1,5 @@
 import type {Database} from '#modules/database/main'
-import type {PromptRecorded, SessionCutDone} from '@uz/contract/host'
+import type {PromptRecorded, SessionCutReport} from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
 
 import {schema} from '#modules/database/main'
@@ -66,34 +66,32 @@ export function deleteBelow(db: Database, treeId: string, promptId: string) {
     )
   }
 
-  const answer = deleted.replies.find(reply => reply.promptId === promptId)
-  const needed = cutBelow(db, treeId, prompt, answer)
+  const cut = cutBelow(db, treeId, prompt, deleted.replies)
 
   db.transaction(tx => {
-    if (needed) {
+    if (cut) {
       tx.update(replies)
-        .set({sessionDropFrom: needed.cut.dropFrom})
-        .where(eq(replies.id, needed.replyId))
+        .set({sessionDropFrom: cut.session.dropFrom})
+        .where(eq(replies.id, cut.replyId))
         .run()
     }
 
-    // Provider session data stays: the Storage cleanup removes what no Reply
-    // references (ADR 0004). The Turns below go by cascade.
+    // The Turns below go by cascade. Their Provider session data stays.
     tx.delete(prompts).where(eq(prompts.id, promptId)).run()
   })
 
   return {
     promptIds: deleted.promptIds,
     replyIds: deleted.replies.map(reply => reply.id),
-    needed,
+    cut,
   }
 }
 
 /** A newer deletion below the Reply keeps its own cut. */
-export function sessionCut(
+export function clearCutOnReport(
   db: Database,
   provider: ProviderId,
-  {treeId, replyId, dropFrom}: SessionCutDone
+  {treeId, replyId, dropFrom}: SessionCutReport
 ) {
   db.update(replies)
     .set({sessionDropFrom: null})
@@ -109,7 +107,7 @@ export function sessionCut(
 }
 
 /** The Reply that the Reply's Prompt answers, and that Prompt. */
-function answering(db: Database, treeId: string, replyId: string) {
+function parentOf(db: Database, treeId: string, replyId: string) {
   const row = db
     .select({promptId: prompts.id, parentReplyId: prompts.parentReplyId})
     .from(replies)
@@ -122,7 +120,7 @@ function answering(db: Database, treeId: string, replyId: string) {
   return row && parentReplyId !== null ? {...row, parentReplyId} : null
 }
 
-function uncut(db: Database, replyId: string) {
+function clearCut(db: Database, replyId: string) {
   db.update(replies)
     .set({sessionDropFrom: null})
     .where(eq(replies.id, replyId))
@@ -133,11 +131,11 @@ function uncut(db: Database, replyId: string) {
  * The session holds the Prompt right after the Reply it answers, so any cut
  * there is made. A Prompt that went into a fork leaves the session as it was.
  */
-export function promptCut(
+export function clearCutOnPrompt(
   db: Database,
   {treeId, replyId, session}: PromptRecorded
 ) {
-  const prompt = answering(db, treeId, replyId)
+  const prompt = parentOf(db, treeId, replyId)
 
   if (!prompt) return
 
@@ -149,13 +147,13 @@ export function promptCut(
   )
 
   if (continued?.session?.sessionId === session.sessionId) {
-    uncut(db, prompt.parentReplyId)
+    clearCut(db, prompt.parentReplyId)
   }
 }
 
 /** Only a cut session drops a Prompt, so the cut is made. */
-export function dropCut(db: Database, treeId: string, replyId: string) {
-  const prompt = answering(db, treeId, replyId)
+export function clearCutOnDrop(db: Database, treeId: string, replyId: string) {
+  const prompt = parentOf(db, treeId, replyId)
 
-  if (prompt) uncut(db, prompt.parentReplyId)
+  if (prompt) clearCut(db, prompt.parentReplyId)
 }

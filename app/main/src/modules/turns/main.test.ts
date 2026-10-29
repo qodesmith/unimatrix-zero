@@ -1034,6 +1034,20 @@ describe('deleting a Prompt', () => {
     ])
   })
 
+  it('cuts from the first Prompt below that went on in the session, when the deleted one’s never reached it', () => {
+    const first = savedRoot()
+    const stopped = sendPrompt(first, 'And then?')
+    stopUnrecorded(stopped)
+    savedAt(stopped, 'm-below')
+    hostCommands = []
+
+    turns.deletePrompt(treeId, promptOf(stopped))
+
+    expect(cutsAsked()).toMatchObject([
+      {replyId: first, session: {...cutAtFirst, dropFrom: 'p-m-below'}},
+    ])
+  })
+
   it('cuts after a stopped Reply’s own Prompt when its Provider never saved it', () => {
     const first = savedRoot()
     const stopped = sendPrompt(first, 'And then?')

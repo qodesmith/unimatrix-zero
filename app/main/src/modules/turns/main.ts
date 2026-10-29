@@ -7,7 +7,7 @@ import type {
   PromptRecorded,
   ReplyRecorded,
   ReplyRequest,
-  SessionCutDone,
+  SessionCutReport,
   SignInRequest,
 } from '@uz/contract/host'
 import type {Model, ProviderId} from '@uz/contract/providers'
@@ -18,7 +18,12 @@ import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {eq} from 'drizzle-orm'
 
 import {continuation, recovery} from './continuation'
-import {deleteBelow, dropCut, promptCut, sessionCut} from './deletion'
+import {
+  clearCutOnDrop,
+  clearCutOnPrompt,
+  clearCutOnReport,
+  deleteBelow,
+} from './deletion'
 import {createInFlight} from './in-flight'
 import {insertExchange, listTurns, resetReply, savedReply} from './rows'
 
@@ -184,16 +189,16 @@ export function createTurns({
 
       if (!deleted) return null
 
-      const {promptIds, replyIds, needed} = deleted
+      const {promptIds, replyIds, cut} = deleted
 
-      if (needed && hosts.ready(needed.provider)) {
+      if (cut && hosts.ready(cut.provider)) {
         try {
-          hosts.send(needed.provider, {
+          hosts.send(cut.provider, {
             type: 'session.cut',
             treeId,
-            replyId: needed.replyId,
-            session: needed.cut,
-            vendorProgram: vendorProgramFor(needed.provider),
+            replyId: cut.replyId,
+            session: cut.session,
+            vendorProgram: vendorProgramFor(cut.provider),
           })
         } catch {
           // The next Prompt from that Reply cuts instead.
@@ -205,16 +210,16 @@ export function createTurns({
 
     hostPromptRecorded(provider: ProviderId, recorded: PromptRecorded) {
       inFlight.recordPrompt(provider, recorded)
-      promptCut(db, recorded)
+      clearCutOnPrompt(db, recorded)
     },
 
     hostPromptDropped(provider: ProviderId, dropped: PromptDropped) {
       inFlight.dropPrompt(provider, dropped)
-      dropCut(db, dropped.treeId, dropped.replyId)
+      clearCutOnDrop(db, dropped.treeId, dropped.replyId)
     },
 
-    hostSessionCut: (provider: ProviderId, cut: SessionCutDone) =>
-      sessionCut(db, provider, cut),
+    hostSessionCut: (provider: ProviderId, cut: SessionCutReport) =>
+      clearCutOnReport(db, provider, cut),
 
     hostRecorded: (provider: ProviderId, recorded: ReplyRecorded) =>
       inFlight.record(provider, recorded),

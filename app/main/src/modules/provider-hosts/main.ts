@@ -3,7 +3,7 @@ import type {
   PromptDropped,
   PromptRecorded,
   ReplyRecorded,
-  SessionCutDone,
+  SessionCutReport,
   SessionStoreRequest,
   SessionStoreValue,
 } from '@uz/contract/host'
@@ -49,7 +49,7 @@ interface ProviderHostsOptions {
   onReplyEvent: (provider: ProviderId, event: ReplyEvent) => void
   onPromptRecorded: (provider: ProviderId, recorded: PromptRecorded) => void
   onPromptDropped: (provider: ProviderId, dropped: PromptDropped) => void
-  onSessionCut: (provider: ProviderId, cut: SessionCutDone) => void
+  onSessionCut: (provider: ProviderId, cut: SessionCutReport) => void
   onReplyRecorded: (provider: ProviderId, recorded: ReplyRecorded) => void
   onSignInUpdate: (provider: ProviderId, update: SignInUpdate) => void
   /** Answers a host's request about its sessions; throws if it can't. */

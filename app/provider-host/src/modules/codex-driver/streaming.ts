@@ -9,9 +9,10 @@ import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
 import type {Notification, ParamsOf, RateLimits} from './wire'
 import type {
+  DeletionCut,
   PromptRecorded,
+  ProviderDriver,
   ReplyRequest,
-  SessionCut,
   SignInRequest,
 } from '@uz/contract/host'
 
@@ -48,6 +49,8 @@ export interface CodexRepliesDeps {
   open: OpenAppServer
   whenIdle: WhenIdle
 }
+
+type CutRequest = Parameters<ProviderDriver['cutSession']>[0]
 
 interface Running {
   server: AppServer
@@ -276,7 +279,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
 
   async function resume(
     running: Running,
-    session: SessionCut,
+    session: DeletionCut,
     configDir: string
   ) {
     const {sessionId: id, messageId} = session
@@ -297,14 +300,15 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   }
 
   /**
-   * The app's copy then holds the thread as reverted, so a resume from it alone
-   * leaves out what the cut dropped.
+   * After the thread's cut before it. The app's copy then holds the thread as
+   * reverted, so a resume from it alone leaves out what the cut dropped.
    */
   async function cutThread(
-    session: SessionCut,
-    dropFrom: string,
-    vendorProgram: SignInRequest
+    {session, vendorProgram}: CutRequest,
+    before: Promise<unknown> | undefined
   ) {
+    await before
+
     const {configDir} = vendorProgram
     const running = await claim(vendorProgram)
 
@@ -313,7 +317,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
         running.threads.get(session.sessionId) ??
         (await resume(running, session, configDir))
 
-      await revert(running, thread, dropFrom, configDir)
+      await revert(running, thread, session.dropFrom, configDir)
 
       const files = await readRollouts(running.server, configDir, thread.id)
 
@@ -325,33 +329,15 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     }
   }
 
-  async function cutAfter(
-    before: Promise<unknown> | undefined,
-    ...cut: Parameters<typeof cutThread>
-  ) {
-    await before
-
-    return cutThread(...cut)
-  }
-
   async function forgetCut(threadId: string, settled: Promise<unknown>) {
     await settled
 
     if (cuts.get(threadId) === settled) cuts.delete(threadId)
   }
 
-  async function cutSession({
-    session,
-    vendorProgram,
-  }: {
-    session: SessionCut
-    vendorProgram: SignInRequest
-  }) {
-    const {sessionId: id, dropFrom} = session
-
-    if (dropFrom === null) return false
-
-    const cutting = cutAfter(cuts.get(id), session, dropFrom, vendorProgram)
+  async function cutSession(request: CutRequest) {
+    const id = request.session.sessionId
+    const cutting = cutThread(request, cuts.get(id))
     const settled = cutting.catch(() => undefined)
 
     cuts.set(id, settled)

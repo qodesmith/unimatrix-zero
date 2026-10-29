@@ -54,6 +54,13 @@ export const SessionCutSchema = SessionRefSchema.extend({
 
 export type SessionCut = z.infer<typeof SessionCutSchema>
 
+/** Drops the first Prompt of Turns the Tree deleted, with all after it. */
+export const DeletionCutSchema = SessionCutSchema.extend({
+  dropFrom: z.string(),
+})
+
+export type DeletionCut = z.infer<typeof DeletionCutSchema>
+
 /** The Provider session a Reply is written in, at the Reply being answered. */
 export const ReplySessionSchema = z.discriminatedUnion('type', [
   SessionRefSchema.extend({type: z.literal('continue')}),
@@ -123,7 +130,7 @@ export const SessionCutMessage = z.strictObject({
   dropFrom: z.string(),
 })
 
-export type SessionCutDone = z.infer<typeof SessionCutMessage>
+export type SessionCutReport = z.infer<typeof SessionCutMessage>
 
 /** A Thread as any Provider can take it: each Prompt and the Reply to it. */
 export const ThreadSchema = z.array(
@@ -177,7 +184,7 @@ export interface ProviderDriver {
    * `dropFrom`; false when the cut waits for the next Reply in the session.
    */
   cutSession(input: {
-    session: SessionCut
+    session: DeletionCut
     vendorProgram: SignInRequest
   }): Promise<boolean>
   /** A tiny tool-free request outside any Tree: titles, Summaries. */
@@ -195,7 +202,7 @@ export const HostCommandSchema = z.discriminatedUnion('type', [
     type: z.literal('session.cut'),
     treeId: z.uuid(),
     replyId: z.uuid(),
-    session: SessionCutSchema.extend({dropFrom: z.string()}),
+    session: DeletionCutSchema,
     vendorProgram: SignInRequestSchema,
   }),
   z.strictObject({

@@ -4,7 +4,7 @@ import type {
   PromptDropped,
   PromptRecorded,
   ReplyRecorded,
-  SessionCutDone,
+  SessionCutReport,
   SessionStoreRequest,
 } from '@uz/contract/host'
 import type {ProviderId, SignInUpdate} from '@uz/contract/providers'
@@ -57,7 +57,7 @@ let events: ReplyEvent[]
 let recorded: ReplyRecorded[]
 let promptsRecorded: PromptRecorded[]
 let promptsDropped: PromptDropped[]
-let sessionsCut: SessionCutDone[]
+let sessionsCut: SessionCutReport[]
 let storeRequests: SessionStoreRequest[]
 let signInUpdates: SignInUpdate[]
 let statuses: HostStatus[]

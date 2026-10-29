@@ -66,10 +66,7 @@ export function createWarmSessions<Session extends WarmSession>({
   }
 
   return {
-    /**
-     * Closes it at any other point; `closed` says when that `claude` has
-     * ended, so the session is never run twice at once.
-     */
+    /** Closes it at any other point, so `claude` never runs a session twice. */
     claim(ref: SessionRef): Session | null {
       for (const session of idle.keys()) {
         if (session.sessionId !== ref.sessionId) continue

@@ -1,8 +1,8 @@
 import type {Database} from '#modules/database/main'
 import type {
+  DeletionCut,
   ReplyRequest,
   ReplySession,
-  SessionCut,
   SessionRef,
 } from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
@@ -106,7 +106,7 @@ function cutBack(
   row: ReplyRow,
   session: SessionRef,
   dropFrom: string
-): SessionCut & {dropFrom: string} {
+): DeletionCut {
   const keepThrough =
     row.sessionMessageId === null
       ? (promptIn(session, row) ?? session.messageId)
@@ -153,18 +153,18 @@ export function continuation(
 }
 
 /**
- * The cut that drops the deleted Reply from the session of the Reply its
- * Prompt answers, when it went on in that session; else null.
+ * The cut that drops the deleted Replies from the session of the Reply the
+ * deleted Prompt answers, from the first that went on in it; else null.
+ * `deleted` is in order from the top, and a Branch below forks a session of
+ * its own.
  */
 export function cutBelow(
   db: Database,
   treeId: string,
   prompt: {id: string; parentReplyId: string | null},
-  deleted: Pick<ReplyRow, 'sessionId' | 'sessionPromptId'> | undefined
+  deleted: Pick<ReplyRow, 'sessionId' | 'sessionPromptId'>[]
 ) {
-  const dropFrom = deleted?.sessionPromptId ?? null
-
-  if (prompt.parentReplyId === null || dropFrom === null) return null
+  if (prompt.parentReplyId === null) return null
 
   const row = db
     .select()
@@ -174,14 +174,18 @@ export function cutBelow(
 
   const session = row && resumed(db, treeId, row, prompt.id)
 
-  if (!row || !session || session.sessionId !== deleted?.sessionId) {
-    return null
-  }
+  const dropFrom =
+    deleted.find(
+      reply =>
+        reply.sessionId === session?.sessionId && reply.sessionPromptId !== null
+    )?.sessionPromptId ?? null
+
+  if (!row || !session || dropFrom === null) return null
 
   return {
     replyId: row.id,
     provider: row.provider,
-    cut: cutBack(row, session, dropFrom),
+    session: cutBack(row, session, dropFrom),
   }
 }
 
