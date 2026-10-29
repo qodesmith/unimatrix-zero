@@ -5,6 +5,7 @@ import type {Focus} from './Flow'
 import type {CanvasOrientation} from '@uz/contract/settings'
 import type {Reply} from '@uz/contract/turns'
 import type {XYPosition} from '@xyflow/react'
+import type {ReactNode} from 'react'
 
 import {useSettings, useUpdateSettings} from '#modules/settings/main'
 import {useReply, useReplyRun, useTurns} from '#modules/turns/main'
@@ -22,6 +23,7 @@ import {CanvasContext} from '../canvas-context'
 import {useChatSlideout} from '../chat-slideout/use-chat-slideout'
 import {TURN_WIDTH} from '../layout'
 import {indexTurns, isEmpty, newestReply, pathTo, previousReply} from '../tree'
+import {CanvasControls} from './CanvasControls'
 import {ChatSlideout} from './ChatSlideout'
 import {Flow} from './Flow'
 import {PromptInput} from './PromptInput'
@@ -145,20 +147,55 @@ function EmptyTree({treeId, onPlaced, onSent}: EmptyTreeProps) {
   )
 }
 
-/** One Tree on the canvas: a centered Input while it is empty, then its Turns. */
-export function Canvas({treeId}: {treeId: string}) {
-  const turns = useTurns(treeId)
-
-  if (turns.isPending) return null
-
-  if (turns.isError) {
-    return <p className="p-6 text-sm text-destructive">{turns.error.message}</p>
-  }
-
-  return <TreeCanvas treeId={treeId} turns={turns.data} />
+interface CanvasFrameProps {
+  title: ReactNode
+  controls?: ReactNode
+  children?: ReactNode
 }
 
-function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
+/** The Tree's name with the canvas controls beside it, over the canvas. */
+function CanvasFrame({title, controls, children}: CanvasFrameProps) {
+  return (
+    <div className="flex h-full flex-col">
+      <header className="flex min-h-12 shrink-0 items-center gap-3 px-4 pt-4 pb-2">
+        <h2 className="min-w-0 flex-1 truncate text-lg font-semibold">
+          {title}
+        </h2>
+        {controls}
+      </header>
+      <div className="relative min-h-0 flex-1">{children}</div>
+    </div>
+  )
+}
+
+interface CanvasProps {
+  treeId: string
+  /** The Tree's name, drawn in the row the controls share. */
+  title: ReactNode
+}
+
+/** One Tree on the canvas: a centered Input while it is empty, then its Turns. */
+export function Canvas({treeId, title}: CanvasProps) {
+  const turns = useTurns(treeId)
+
+  if (turns.isPending) return <CanvasFrame title={title} />
+
+  if (turns.isError) {
+    return (
+      <CanvasFrame title={title}>
+        <p className="p-6 text-sm text-destructive">{turns.error.message}</p>
+      </CanvasFrame>
+    )
+  }
+
+  return <TreeCanvas treeId={treeId} title={title} turns={turns.data} />
+}
+
+interface TreeCanvasProps extends CanvasProps {
+  turns: Turns
+}
+
+function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
   const index = useMemo(() => indexTurns(turns), [turns])
   const settings = useSettings()
   const {canvasOrientation, limitTurnHeight, contextSizeMeter} = settings
@@ -182,6 +219,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
   const [focus, setFocus] = useState<Focus | null>(null)
   const [switching, setSwitching] = useState(false)
   const [inputAt, setInputAt] = useState<XYPosition | null>(null)
+  const [showMap, setShowMap] = useState(false)
 
   const [expandedTurnIds, setExpandedTurnIds] = useState<ReadonlySet<string>>(
     () => new Set()
@@ -353,18 +391,41 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
 
   if (isEmpty(index)) {
     return (
-      <EmptyTree
-        treeId={treeId}
-        onPlaced={setInputAt}
-        onSent={replyId => sentFromInput(replyId, null)}
-      />
+      <CanvasFrame title={title}>
+        <EmptyTree
+          treeId={treeId}
+          onPlaced={setInputAt}
+          onSent={replyId => sentFromInput(replyId, null)}
+        />
+      </CanvasFrame>
     )
   }
 
+  const streaming = index.replies
+    .filter(reply => reply.status === 'streaming')
+    .map(reply => reply.id)
+
+  const failed = index.replies
+    .filter(reply => reply.status === 'failed')
+    .map(reply => reply.id)
+
   return (
     <CanvasContext value={state}>
-      <div className="relative h-full">
-        <ReactFlowProvider>
+      <ReactFlowProvider>
+        <CanvasFrame
+          title={title}
+          controls={
+            <CanvasControls
+              orientation={canvasOrientation}
+              onOrientation={onOrientation}
+              streaming={streaming}
+              failed={failed}
+              onJump={jumpTo}
+              showMap={showMap}
+              onToggleMap={() => setShowMap(shown => !shown)}
+            />
+          }
+        >
           <Flow
             index={index}
             orientation={canvasOrientation}
@@ -374,23 +435,22 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
             fitOnLoad={!startedEmpty}
             startAt={inputAt}
             switching={switching}
+            showMap={showMap}
             onHover={setHoverTurnId}
-            onOrientation={onOrientation}
-            onJump={jumpTo}
           />
-        </ReactFlowProvider>
-        {chatTurnId !== null && chatEnd && (
-          <ChatSlideout
-            end={chatEnd}
-            scrollToTurnId={chatTurnId}
-            open={chatOpen}
-            onClose={closeChat}
-            onClosed={chatClosed}
-            onFocus={setChosenReplyId}
-            onSent={sentFromChat}
-          />
-        )}
-      </div>
+          {chatTurnId !== null && chatEnd && (
+            <ChatSlideout
+              end={chatEnd}
+              scrollToTurnId={chatTurnId}
+              open={chatOpen}
+              onClose={closeChat}
+              onClosed={chatClosed}
+              onFocus={setChosenReplyId}
+              onSent={sentFromChat}
+            />
+          )}
+        </CanvasFrame>
+      </ReactFlowProvider>
     </CanvasContext>
   )
 }

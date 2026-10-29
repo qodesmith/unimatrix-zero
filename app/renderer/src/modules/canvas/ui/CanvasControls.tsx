@@ -3,8 +3,8 @@ import type {ReactNode} from 'react'
 
 import {Button, cn} from '#modules/shadcn/main'
 import {CanvasOrientationSchema} from '@uz/contract/settings'
-import {MiniMap, Panel, useReactFlow} from '@xyflow/react'
-import {useRef, useState} from 'react'
+import {useReactFlow} from '@xyflow/react'
+import {useRef} from 'react'
 
 import {useReducedMotion} from '../reduced-motion'
 
@@ -16,6 +16,8 @@ interface CanvasControlsProps {
   /** Replies that failed, oldest first. */
   failed: string[]
   onJump: (replyId: string) => void
+  showMap: boolean
+  onToggleMap: () => void
 }
 
 const LABELS: Record<CanvasOrientation, string> = {
@@ -23,28 +25,26 @@ const LABELS: Record<CanvasOrientation, string> = {
   horizontal: 'Horizontal',
 }
 
-/** The orientation toggle is a shortcut to the Setting. */
+/**
+ * One row beside the Tree's name, off the canvas so it never covers a Turn.
+ * The orientation toggle is a shortcut to the Setting.
+ */
 export function CanvasControls({
   orientation,
   onOrientation,
   streaming,
   failed,
   onJump,
+  showMap,
+  onToggleMap,
 }: CanvasControlsProps) {
   const flow = useReactFlow()
   const still = useReducedMotion()
-  const [showMap, setShowMap] = useState(false)
 
   return (
-    <Panel
-      position="bottom-left"
-      className="overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-md"
-    >
+    <div className="flex shrink-0 items-center gap-1 text-[11px]">
       {(streaming.length > 0 || failed.length > 0) && (
-        <div
-          role="status"
-          className="flex items-center gap-1 border-b border-border p-1 text-[11px]"
-        >
+        <div role="status" className="flex items-center gap-1">
           {streaming.length > 0 && (
             <JumpButton
               label={`${streaming.length} streaming`}
@@ -65,72 +65,60 @@ export function CanvasControls({
           )}
         </div>
       )}
-      {showMap && (
-        <MiniMap
-          pannable
-          zoomable
-          aria-label="Minimap"
-          className="border-b border-border"
-          style={{position: 'relative', margin: 0, width: 220, height: 130}}
-        />
-      )}
-      <div className="flex items-center gap-1 p-1.5">
-        <ToolButton
-          title="Zoom in"
-          onClick={() => void flow.zoomIn({duration: still ? 0 : 200})}
-        >
-          +
-        </ToolButton>
-        <ToolButton
-          title="Zoom out"
-          onClick={() => void flow.zoomOut({duration: still ? 0 : 200})}
-        >
-          −
-        </ToolButton>
-        <ToolButton
-          title="Fit the whole Tree"
-          onClick={() =>
-            void flow.fitView({
-              padding: 0.15,
-              maxZoom: 1,
-              duration: still ? 0 : 300,
-            })
-          }
-        >
-          ⤢
-        </ToolButton>
-        <ToolButton
-          title="Show the minimap"
-          pressed={showMap}
-          onClick={() => setShowMap(shown => !shown)}
-        >
-          <MapIcon />
-        </ToolButton>
-        <span className="flex-1" />
-        <div
-          role="group"
-          aria-label="Orientation"
-          className="flex rounded-lg bg-muted p-0.5 text-[11px]"
-        >
-          {CanvasOrientationSchema.options.map(value => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={orientation === value}
-              className={cn(
-                'rounded-md px-2 py-1',
-                orientation === value
-                  ? 'bg-card text-card-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-              onClick={() => onOrientation(value)}
-            >
-              {LABELS[value]}
-            </button>
-          ))}
-        </div>
+      <ToolButton
+        title="Zoom in"
+        onClick={() => void flow.zoomIn({duration: still ? 0 : 200})}
+      >
+        +
+      </ToolButton>
+      <ToolButton
+        title="Zoom out"
+        onClick={() => void flow.zoomOut({duration: still ? 0 : 200})}
+      >
+        −
+      </ToolButton>
+      <ToolButton
+        title="Fit the whole Tree"
+        onClick={() =>
+          void flow.fitView({
+            padding: 0.15,
+            maxZoom: 1,
+            duration: still ? 0 : 300,
+          })
+        }
+      >
+        ⤢
+      </ToolButton>
+      <ToolButton
+        title="Show the minimap"
+        pressed={showMap}
+        onClick={onToggleMap}
+      >
+        <MapIcon />
+      </ToolButton>
+      <div
+        role="group"
+        aria-label="Orientation"
+        className="ml-1 flex rounded-lg bg-muted p-0.5"
+      >
+        {CanvasOrientationSchema.options.map(value => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={orientation === value}
+            className={cn(
+              'rounded-md px-2 py-1',
+              orientation === value
+                ? 'bg-card text-card-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+            onClick={() => onOrientation(value)}
+          >
+            {LABELS[value]}
+          </button>
+        ))}
       </div>
-    </Panel>
+    </div>
   )
 }
 

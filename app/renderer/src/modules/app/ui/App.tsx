@@ -114,14 +114,13 @@ function AppLayout() {
             />
           </div>
         ) : openTree ? (
-          <>
-            <h2 className="shrink-0 px-4 pt-4 pb-2 text-lg font-semibold">
-              <TreeTitle tree={openTree} />
-            </h2>
-            <div className="min-h-0 flex-1">
-              <Canvas key={openTree.id} treeId={openTree.id} />
-            </div>
-          </>
+          <div className="min-h-0 flex-1">
+            <Canvas
+              key={openTree.id}
+              treeId={openTree.id}
+              title={<TreeTitle tree={openTree} />}
+            />
+          </div>
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-4">
             <Button onClick={() => void ping()}>Ping main</Button>

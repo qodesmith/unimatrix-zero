@@ -6,7 +6,7 @@ import type {CanvasOrientation} from '@uz/contract/settings'
 import type {Edge, NodeChange, XYPosition} from '@xyflow/react'
 
 import {cn} from '#modules/shadcn/main'
-import {Background, ReactFlow, useReactFlow} from '@xyflow/react'
+import {Background, MiniMap, ReactFlow, useReactFlow} from '@xyflow/react'
 import {
   useCallback,
   useEffect,
@@ -20,7 +20,6 @@ import {useFollow} from '../follow'
 import {layoutTree} from '../layout'
 import {useReducedMotion} from '../reduced-motion'
 import {isFork} from '../tree'
-import {CanvasControls} from './CanvasControls'
 import {ExchangeNode, PromptNode, ReplyNode} from './TurnNodes'
 
 /** A request to bring a Reply into view; every request gets a new sequence. */
@@ -43,9 +42,8 @@ interface FlowProps {
   /** Where the root Prompt is drawn at first, at full size. */
   startAt: XYPosition | null
   switching: boolean
+  showMap: boolean
   onHover: (turnId: string | null) => void
-  onOrientation: (orientation: CanvasOrientation) => void
-  onJump: (replyId: string) => void
 }
 
 type Sizes = Record<CanvasOrientation, Record<string, Size>>
@@ -90,9 +88,8 @@ export function Flow({
   fitOnLoad,
   startAt,
   switching,
+  showMap,
   onHover,
-  onOrientation,
-  onJump,
 }: FlowProps) {
   const flow = useReactFlow<TurnNode>()
   const panMs = useReducedMotion() ? 0 : 400
@@ -308,14 +305,6 @@ export function Flow({
     unfollow,
   ])
 
-  const streaming = index.replies
-    .filter(reply => reply.status === 'streaming')
-    .map(reply => reply.id)
-
-  const failed = index.replies
-    .filter(reply => reply.status === 'failed')
-    .map(reply => reply.id)
-
   return (
     <ReactFlow<TurnNode>
       nodes={nodes}
@@ -342,13 +331,16 @@ export function Flow({
       onNodeMouseLeave={() => onHover(null)}
     >
       <Background gap={24} />
-      <CanvasControls
-        orientation={orientation}
-        onOrientation={onOrientation}
-        streaming={streaming}
-        failed={failed}
-        onJump={onJump}
-      />
+      {showMap && (
+        <MiniMap
+          pannable
+          zoomable
+          ariaLabel="Minimap"
+          position="bottom-left"
+          className="overflow-hidden rounded-xl border border-border shadow-md"
+          style={{width: 220, height: 130}}
+        />
+      )}
     </ReactFlow>
   )
 }

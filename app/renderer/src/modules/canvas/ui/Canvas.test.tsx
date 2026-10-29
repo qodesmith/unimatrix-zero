@@ -211,7 +211,10 @@ function Providers({children}: {children: ReactNode}) {
 async function renderCanvas(saved: Saved) {
   const main = fakeMain(saved)
   globalThis.window.uz = main
-  const screen = await render(<Canvas treeId={treeId} />, {wrapper: Providers})
+
+  const screen = await render(<Canvas treeId={treeId} title="Tree" />, {
+    wrapper: Providers,
+  })
 
   return {main, screen}
 }
@@ -632,6 +635,21 @@ it('zooms out just enough to show the whole Tree on its first Fork, and keeps th
   await sendInto('Reply two', 'Yet another')
   await settledViewport()
   expect(zoomOf()).toBe(fitted)
+})
+
+it('keeps the controls beside the Tree’s name, off the canvas, with only the minimap drawn on it', async () => {
+  await renderCanvas(linearTree())
+  await expect.element(page.getByText('Reply two')).toBeVisible()
+
+  const title = page.getByRole('heading', {name: 'Tree'}).element()
+  const zoomIn = page.getByRole('button', {name: 'Zoom in'}).element()
+  expect(title.closest('header')?.contains(zoomIn)).toBe(true)
+  expect(canvas().element().contains(zoomIn)).toBe(false)
+
+  await page.getByRole('button', {name: 'Show the minimap'}).click()
+  await expect
+    .element(canvas().getByRole('img', {name: 'Minimap'}))
+    .toBeVisible()
 })
 
 function nodeCount() {
@@ -1063,10 +1081,11 @@ it('puts an empty Tree’s root Prompt where its Input was, as wide, with the ca
   await expect.element(canvas().getByText('Writing…')).toBeVisible()
   const held = await settledViewport()
 
+  // Centering can land the Input on a half pixel the canvas rounds away.
   const placed = nodeOf('Hello?').element().getBoundingClientRect()
-  expect(placed.left).toBeCloseTo(before.left, 0)
-  expect(placed.top).toBeCloseTo(before.top, 0)
-  expect(placed.width).toBeCloseTo(before.width, 0)
+  expect(Math.abs(placed.left - before.left)).toBeLessThanOrEqual(0.5)
+  expect(Math.abs(placed.top - before.top)).toBeLessThanOrEqual(0.5)
+  expect(placed.width).toBe(before.width)
   expect(stop()).toEqual([held])
 })
 
