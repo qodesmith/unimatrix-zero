@@ -81,7 +81,7 @@ export function createCodexDriver({
     answerApproval: notYet,
     forkSession: notYet,
     rebuildSession: notYet,
-    rewindSession: notYet,
+    cutSession: notYet,
     runOneShot: notYet,
     mcpSignIn: notYet,
   }
