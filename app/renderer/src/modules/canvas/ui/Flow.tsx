@@ -3,7 +3,7 @@ import type {Layout, Size} from '../layout'
 import type {TreeIndex} from '../tree'
 import type {Stem, TurnNode} from './TurnNodes'
 import type {CanvasOrientation} from '@uz/contract/settings'
-import type {Edge, NodeChange} from '@xyflow/react'
+import type {Edge, NodeChange, XYPosition} from '@xyflow/react'
 
 import {cn} from '#modules/shadcn/main'
 import {Background, ReactFlow, useReactFlow} from '@xyflow/react'
@@ -16,15 +16,18 @@ import {
   useState,
 } from 'react'
 
+import {useFollow} from '../follow'
 import {layoutTree} from '../layout'
 import {useReducedMotion} from '../reduced-motion'
 import {isFork} from '../tree'
 import {CanvasControls} from './CanvasControls'
 import {ExchangeNode, PromptNode, ReplyNode} from './TurnNodes'
 
-/** A request to center a Reply; every request gets a new sequence. */
+/** A request to bring a Reply into view; every request gets a new sequence. */
 export interface Focus {
   replyId: string
+  /** `follow` shows the Reply's bottom and keeps it shown while it streams. */
+  mode: 'center' | 'follow'
   sequence: number
 }
 
@@ -37,6 +40,8 @@ interface FlowProps {
   focus: Focus | null
   /** Fit the whole Tree once it is measured; off for a Tree that starts here. */
   fitOnLoad: boolean
+  /** Where the root Prompt is drawn at first, at full size. */
+  startAt: XYPosition | null
   switching: boolean
   onHover: (turnId: string | null) => void
   onOrientation: (orientation: CanvasOrientation) => void
@@ -83,6 +88,7 @@ export function Flow({
   collapsed,
   focus,
   fitOnLoad,
+  startAt,
   switching,
   onHover,
   onOrientation,
@@ -106,6 +112,14 @@ export function Flow({
         : (index.replyById.get(replyId)?.promptId ?? replyId),
     [orientation, index]
   )
+
+  const {follow, unfollow, onMoveStart, onMoveEnd} = useFollow({
+    index,
+    layout,
+    measured,
+    nodeIdOf,
+    panMs,
+  })
 
   const allMeasured =
     layout.nodes.length > 0 &&
@@ -232,16 +246,23 @@ export function Flow({
 
     if (focus) centered.current = focus.sequence
 
-    void flow.fitView({
-      padding: 0.15,
-      maxZoom: flow.getZoom(),
-      duration: panMs,
-    })
-  }, [hasFork, allMeasured, focus, flow, panMs])
+    async function fitAll() {
+      await flow.fitView({
+        padding: 0.15,
+        maxZoom: flow.getZoom(),
+        duration: panMs,
+      })
 
-  // Each focus pans to its Reply at the current zoom, once the Reply's box has
-  // a size; while the first Fork waits to be fitted, the fit takes it instead.
-  // A Reply folded away is not panned to, then or once it is unfolded.
+      if (focus?.mode === 'follow') follow(focus.replyId)
+    }
+
+    void fitAll()
+  }, [hasFork, allMeasured, focus, flow, panMs, follow])
+
+  // Each focus centers or follows its Reply at the current zoom, once the
+  // Reply's box has a size; while the first Fork waits to be fitted, the fit
+  // takes it instead. A Reply folded away is not panned to, then or once it is
+  // unfolded.
   useEffect(() => {
     if (!focus || centered.current === focus.sequence) return
 
@@ -261,12 +282,31 @@ export function Flow({
 
     centered.current = focus.sequence
     heldReplyId.current = null
+
+    if (focus.mode === 'follow') {
+      follow(focus.replyId)
+
+      return
+    }
+
+    unfollow()
     void flow.setCenter(
       node.position.x + size.width / 2,
       node.position.y + size.height / 2,
       {zoom: flow.getZoom(), duration: panMs, interpolate: 'linear'}
     )
-  }, [focus, hasFork, nodeIdOf, layout, index, measured, flow, panMs])
+  }, [
+    focus,
+    hasFork,
+    nodeIdOf,
+    layout,
+    index,
+    measured,
+    flow,
+    panMs,
+    follow,
+    unfollow,
+  ])
 
   const streaming = index.replies
     .filter(reply => reply.status === 'streaming')
@@ -282,6 +322,9 @@ export function Flow({
       edges={edges}
       nodeTypes={nodeTypes}
       onNodesChange={onNodesChange}
+      defaultViewport={startAt ? {...startAt, zoom: 1} : undefined}
+      onMoveStart={onMoveStart}
+      onMoveEnd={onMoveEnd}
       nodesDraggable={false}
       nodesConnectable={false}
       elementsSelectable={false}

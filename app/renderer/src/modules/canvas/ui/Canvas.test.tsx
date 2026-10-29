@@ -522,10 +522,11 @@ it('branches: a Prompt sent into an answered Reply lands beside the old Branches
       ]
 
       const lefts = row.map(box => box.left).toSorted((a, b) => a - b)
+      const width = row[0]?.width ?? 0
 
       return (
         row.every(box => box.top === row[0]?.top) &&
-        lefts.every((left, i) => i === 0 || left - (lefts[i - 1] ?? 0) >= 440)
+        lefts.every((left, i) => i === 0 || left - (lefts[i - 1] ?? 0) >= width)
       )
     })
     .toBe(true)
@@ -562,7 +563,8 @@ it('moves focus to the streaming Reply’s Input a Prompt was sent for, hiding t
     .toBeDisabled()
 })
 
-it('shows a loaded Tree only once it is fitted, never at full size first', async () => {
+/** Every viewport the canvas is painted at with a Turn showing, frame by frame. */
+function samplePainted() {
   const painted = new Set<string>()
   let sampling = true
 
@@ -580,16 +582,27 @@ it('shows a loaded Tree only once it is fitted, never at full size first', async
     if (sampling) requestAnimationFrame(sample)
   }
 
+  function stop() {
+    sampling = false
+
+    return [...painted]
+  }
+
   requestAnimationFrame(sample)
   onTestFinished(() => {
     sampling = false
   })
 
+  return stop
+}
+
+it('shows a loaded Tree only once it is fitted, never at full size first', async () => {
+  const stop = samplePainted()
+
   await renderCanvas(forkedTree())
   const fitted = await settledViewport()
-  sampling = false
 
-  expect([...painted]).toEqual([fitted])
+  expect(stop()).toEqual([fitted])
 })
 
 it('zooms out just enough to show the whole Tree on its first Fork, and keeps the zoom on every other send', async () => {
@@ -612,12 +625,11 @@ it('zooms out just enough to show the whole Tree on its first Fork, and keeps th
 
   await sendInto('Reply one', 'Another way')
   await expect.poll(viewport).not.toBe(continued)
-  const forked = await settledViewport()
+  await settledViewport()
   expect(zoomOf()).toBeLessThan(zoom)
   const fitted = zoomOf()
 
   await sendInto('Reply two', 'Yet another')
-  await expect.poll(viewport).not.toBe(forked)
   await settledViewport()
   expect(zoomOf()).toBe(fitted)
 })
@@ -1034,6 +1046,28 @@ it('shows one centered Input on an empty Tree and the Turns once it is sent', as
   await expect
     .poll(() => document.querySelectorAll('.react-flow__node').length)
     .toBe(2)
+})
+
+it('puts an empty Tree’s root Prompt where its Input was, as wide, with the canvas holding still', async () => {
+  await renderCanvas({prompts: [], replies: []})
+  const input = page.getByRole('textbox', {name: 'Prompt'})
+  await expect.element(input).toBeVisible()
+  const before = input.element().closest('form')?.getBoundingClientRect()
+
+  if (!before) throw new Error('The Input is not drawn')
+
+  const stop = samplePainted()
+  await input.fill('Hello?')
+  await userEvent.keyboard('{Enter}')
+  await expect.element(canvas().getByText('Hello?')).toBeVisible()
+  await expect.element(canvas().getByText('Writing…')).toBeVisible()
+  const held = await settledViewport()
+
+  const placed = nodeOf('Hello?').element().getBoundingClientRect()
+  expect(placed.left).toBeCloseTo(before.left, 0)
+  expect(placed.top).toBeCloseTo(before.top, 0)
+  expect(placed.width).toBeCloseTo(before.width, 0)
+  expect(stop()).toEqual([held])
 })
 
 function slideout() {
@@ -1483,4 +1517,60 @@ it('keeps the slideout on the newest text of a streaming Reply until the user sc
   await new Promise(requestAnimationFrame)
   await new Promise(requestAnimationFrame)
   expect(scroller.scrollTop).toBe(0)
+})
+
+function bottomOf(element: Element) {
+  return element.getBoundingClientRect().bottom
+}
+
+/** As the user does: the wheel over the canvas's empty space pans it. */
+async function wheelUp() {
+  const pane = document.querySelector('.react-flow__pane')
+
+  if (!pane) throw new Error('The canvas is not drawn')
+
+  pane.dispatchEvent(
+    new WheelEvent('wheel', {deltaY: -300, bubbles: true, cancelable: true})
+  )
+  await settledViewport()
+}
+
+it('keeps a streaming Reply’s bottom on the canvas as it grows, until the user scrolls up', async () => {
+  const {main} = await renderCanvas({
+    ...linearTree(),
+    settings: {limitTurnHeight: false},
+  })
+
+  await expect.element(page.getByText('Reply two')).toBeVisible()
+  await settledViewport()
+
+  await sendInto('Reply two', 'And then?')
+  await expect.element(canvas().getByText('Writing…')).toBeVisible()
+  const replyId = main.replies.at(-1)?.id
+
+  if (replyId === undefined) throw new Error('No Reply was started')
+
+  const ids = {treeId, replyId}
+  const pane = canvas().element()
+
+  main.publish({...ids, type: 'RUN_STARTED'})
+  main.publish({
+    ...ids,
+    type: 'TEXT_DELTA',
+    delta: longText.replaceAll('\n', '\n\n'),
+  })
+  await expect.element(canvas().getByText('Line 40')).toBeInTheDocument()
+  const streaming = nodeOf('Line 40').element()
+  await settledViewport()
+  expect(bottomOf(streaming)).toBeLessThanOrEqual(bottomOf(pane))
+  expect(streaming.getBoundingClientRect().top).toBeLessThan(0)
+
+  await wheelUp()
+  const scrolled = viewport()
+
+  main.publish({...ids, type: 'TEXT_DELTA', delta: '\n\nThe last line'})
+  await expect.element(canvas().getByText('The last line')).toBeInTheDocument()
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  expect(viewport()).toBe(scrolled)
 })
