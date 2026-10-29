@@ -11,7 +11,7 @@ import {useCanvas} from '../canvas-context'
 import {TURN_WIDTH} from '../layout'
 import {branchesOf, isFork, previousReply} from '../tree'
 import {CappedText} from './CappedText'
-import {ContextMeter, ContextSizeBadge} from './ContextSize'
+import {ContextMeter, ContextSize} from './ContextSize'
 import {PromptInput} from './PromptInput'
 
 export type TurnNode = Node<{turn: LayoutNode}, LayoutNode['kind']>
@@ -48,12 +48,11 @@ function ReplyBody({reply}: {reply: Reply}) {
   return (
     <>
       {contextSize !== null && (
-        <header className="flex justify-end px-3.5 pt-2">
-          <ContextSizeBadge
-            contextSize={contextSize}
-            previousContextSize={previous ? previous.contextSize : 0}
-          />
-        </header>
+        <ContextSize
+          contextSize={contextSize}
+          previousContextSize={previous ? previous.contextSize : 0}
+          contextWindow={contextWindow}
+        />
       )}
       <CappedText
         limit={limitTurnHeight}
@@ -146,7 +145,7 @@ function useHovered() {
 
 function replyFrame(status: Reply['status']) {
   return cn(
-    'rounded-xl border border-border bg-card text-card-foreground shadow-sm',
+    'overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-sm',
     status === 'failed' && 'border-destructive',
     status === 'streaming' && 'border-primary/50'
   )
@@ -201,7 +200,7 @@ function ReplyTurn({reply}: {reply: Reply}) {
   const {status} = useReply(reply)
 
   return (
-    <div data-turn={reply.id} className={replyFrame(status)}>
+    <div data-turn={reply.id} className={cn('relative', replyFrame(status))}>
       <ReplyBody reply={reply} />
     </div>
   )
@@ -232,7 +231,7 @@ function ExchangeTurns({prompt, reply}: {prompt: Prompt; reply: Reply | null}) {
   const status = useReply(reply)?.status ?? 'complete'
 
   return (
-    <div className={cn('overflow-hidden', replyFrame(status))}>
+    <div className={replyFrame(status)}>
       <div
         data-turn={prompt.id}
         className="border-b border-border bg-prompt px-3.5 py-2.5 text-prompt-foreground"
@@ -240,7 +239,7 @@ function ExchangeTurns({prompt, reply}: {prompt: Prompt; reply: Reply | null}) {
         <PromptText prompt={prompt} />
       </div>
       {reply && (
-        <div data-turn={reply.id}>
+        <div data-turn={reply.id} className="relative">
           <ReplyBody reply={reply} />
         </div>
       )}

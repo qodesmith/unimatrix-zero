@@ -779,7 +779,7 @@ it('lets long Turns take their full height when the Setting is off', async () =>
     .not.toBeInTheDocument()
 })
 
-it('shows each Reply’s Context size, what its Exchange added on hover, and the meter toward the Context window', async () => {
+it('shows each Reply’s Context size, its details in a drawer the info button opens and a click on the blurred Reply closes, and the meter toward the Context window', async () => {
   clock = 0
 
   const first = {
@@ -799,19 +799,31 @@ it('shows each Reply’s Context size, what its Exchange added on hover, and the
     replies: [first, second],
   })
 
-  const badge = page.getByText('12.3k ctx')
-  await expect.element(badge).toBeVisible()
-  await badge.hover()
-  await expect
-    .element(
-      page.getByRole('tooltip').filter({hasText: 'This Exchange: +2.3k'})
-    )
-    .toBeVisible()
-  await expect
-    .element(
-      page.getByRole('tooltip').filter({hasText: 'Thread up to here: 12.3k'})
-    )
-    .toBeVisible()
+  await expect.element(page.getByText('12.3k ctx')).toBeVisible()
+
+  const details = page
+    .getByRole('complementary', {
+      name: 'Context size details',
+      includeHidden: true,
+    })
+    .nth(1)
+
+  await expect.element(details).not.toBeVisible()
+  await page.getByRole('button', {name: 'Context size details'}).nth(1).click()
+  await expect.element(details).toBeVisible()
+  await expect.element(details).toMatchTextContent(/This Exchange\+2\.3k/)
+  await expect.element(details).toMatchTextContent(/Thread up to here12\.3k/)
+  await expect.element(details).toMatchTextContent(/Context window200\.0k/)
+  await details.getByRole('button', {name: 'Close'}).click()
+  await expect.element(details).not.toBeVisible()
+
+  const info = page.getByRole('button', {name: 'Context size details'}).nth(1)
+
+  await info.click()
+  await expect.element(details).toBeVisible()
+  await page.getByText('Reply two').click({force: true, position: {x: 4, y: 4}})
+  await expect.element(details).not.toBeVisible()
+  expect(slideout().query()).toBeNull()
 
   const meters = page.getByRole('meter', {
     name: 'Context size toward the Context window',
