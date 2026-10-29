@@ -7,10 +7,11 @@ import type {
 } from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
-import type {Notification, ParamsOf, RateLimits, ResponseOf} from './wire'
+import type {Notification, ParamsOf, RateLimits} from './wire'
 import type {
   PromptRecorded,
   ReplyRequest,
+  SessionCut,
   SignInRequest,
 } from '@uz/contract/host'
 
@@ -18,6 +19,7 @@ import {createInbox} from '#modules/inbox/main'
 import {ProgramCrashed, createReplyRuns} from '#modules/reply-runs/main'
 
 import {createReplyMapper, threadOf, turnOf} from './replies'
+import {requestRevert} from './revert'
 import {folderOf, readRollouts, rolloutAt, writeRolloutsBack} from './rollouts'
 
 /** The Model id that leaves the choice to Codex. */
@@ -69,6 +71,8 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   let current: Running | null = null
   let starting: Promise<Running> | null = null
   let limits: RateLimits = {primary: null, secondary: null}
+  /** Each thread's cuts so far: a Reply in it waits for them. */
+  const cuts = new Map<string, Promise<unknown>>()
 
   function onRateLimits(notification: Notification) {
     if (notification.method !== 'account/rateLimits/updated') return
@@ -131,45 +135,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     })
   }
 
-  async function holdsTurn(running: Running, threadId: string, turnId: string) {
-    let cursor: string | null = null
-
-    do {
-      const page: ResponseOf<'thread/turns/list'> =
-        await running.server.request('thread/turns/list', {
-          threadId,
-          cursor,
-          itemsView: 'notLoaded',
-        })
-
-      if (page.data.some(turn => turn.id === turnId)) return true
-
-      cursor = page.nextCursor
-    } while (cursor !== null)
-
-    return false
-  }
-
-  /** Null when Codex no longer has `beforeTurnId`, so nothing is left to drop. */
-  async function requestRevert(
-    running: Running,
-    threadId: string,
-    beforeTurnId: string
-  ) {
-    try {
-      return await running.server.request('thread/revert', {
-        threadId,
-        beforeTurnId,
-      })
-    } catch (error) {
-      if (running.server.hasExited) throw error
-
-      if (await holdsTurn(running, threadId, beforeTurnId)) throw error
-
-      return null
-    }
-  }
-
   /**
    * Drops `beforeTurnId` and every turn after it. The new rollout points into
    * the old one, maybe past the app's copy, so the old one is saved again.
@@ -180,7 +145,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     beforeTurnId: string,
     configDir: string
   ) {
-    const answer = await requestRevert(running, thread.id, beforeTurnId)
+    const answer = await requestRevert(running.server, thread.id, beforeTurnId)
 
     if (answer) {
       const old =
@@ -309,6 +274,92 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     return cut(resumed)
   }
 
+  async function resume(
+    running: Running,
+    session: SessionCut,
+    configDir: string
+  ) {
+    const {sessionId: id, messageId} = session
+
+    writeRolloutsBack(configDir, await deps.store.loadFiles(folderOf(id)), {
+      rewind: false,
+    })
+
+    const opened = await running.server.request('thread/resume', {
+      threadId: id,
+      cwd: configDir,
+      sandbox: 'read-only',
+      approvalPolicy: 'never',
+      excludeTurns: true,
+    })
+
+    return load(running, opened, messageId === null ? [] : [messageId])
+  }
+
+  /**
+   * The app's copy then holds the thread as reverted, so a resume from it alone
+   * leaves out what the cut dropped.
+   */
+  async function cutThread(
+    session: SessionCut,
+    dropFrom: string,
+    vendorProgram: SignInRequest
+  ) {
+    const {configDir} = vendorProgram
+    const running = await claim(vendorProgram)
+
+    try {
+      const thread =
+        running.threads.get(session.sessionId) ??
+        (await resume(running, session, configDir))
+
+      await revert(running, thread, dropFrom, configDir)
+
+      const files = await readRollouts(running.server, configDir, thread.id)
+
+      await deps.store.saveFiles(folderOf(thread.id), files)
+
+      return true
+    } finally {
+      release(running)
+    }
+  }
+
+  async function cutAfter(
+    before: Promise<unknown> | undefined,
+    ...cut: Parameters<typeof cutThread>
+  ) {
+    await before
+
+    return cutThread(...cut)
+  }
+
+  async function forgetCut(threadId: string, settled: Promise<unknown>) {
+    await settled
+
+    if (cuts.get(threadId) === settled) cuts.delete(threadId)
+  }
+
+  async function cutSession({
+    session,
+    vendorProgram,
+  }: {
+    session: SessionCut
+    vendorProgram: SignInRequest
+  }) {
+    const {sessionId: id, dropFrom} = session
+
+    if (dropFrom === null) return false
+
+    const cutting = cutAfter(cuts.get(id), session, dropFrom, vendorProgram)
+    const settled = cutting.catch(() => undefined)
+
+    cuts.set(id, settled)
+    void forgetCut(id, settled)
+
+    return cutting
+  }
+
   /** Stop interrupts the turn once Codex has started it. */
   async function* send(
     running: Running,
@@ -403,6 +454,8 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     const {session} = request
     let dropFrom = session?.type === 'cut' ? session.dropFrom : null
 
+    if (session) await cuts.get(session.sessionId)
+
     for (let attempt = 1; ; attempt++) {
       const running = await claim(request.vendorProgram)
       let heard = false
@@ -439,5 +492,8 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     }
   }
 
-  return createReplyRuns(write, {limitLifts: () => limitLifts(limits)})
+  return {
+    ...createReplyRuns(write, {limitLifts: () => limitLifts(limits)}),
+    cutSession,
+  }
 }

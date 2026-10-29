@@ -27,6 +27,8 @@ export function createWarmSessions<Session extends WarmSession>({
   const open = new Set<Session>()
   /** The idle ones, longest idle first, each with what calls off its close. */
   const idle = new Map<Session, () => void>()
+  /** Each session's `claude` still closing. */
+  const closing = new Map<string, Set<Promise<void>>>()
 
   function forget(session: Session) {
     idle.get(session)?.()
@@ -36,7 +38,23 @@ export function createWarmSessions<Session extends WarmSession>({
 
   function close(session: Session) {
     forget(session)
-    void session.close().catch(() => undefined)
+    const closed = session.close().catch(() => undefined)
+    const {sessionId} = session
+
+    if (sessionId !== null) void track(sessionId, closed)
+  }
+
+  async function track(sessionId: string, closed: Promise<void>) {
+    const all = closing.get(sessionId) ?? new Set()
+
+    all.add(closed)
+    closing.set(sessionId, all)
+    await closed
+    all.delete(closed)
+
+    if (all.size === 0 && closing.get(sessionId) === all) {
+      closing.delete(sessionId)
+    }
   }
 
   function trim() {
@@ -48,7 +66,10 @@ export function createWarmSessions<Session extends WarmSession>({
   }
 
   return {
-    /** Closes it at any other point, so `claude` never runs a session twice. */
+    /**
+     * Closes it at any other point; `closed` says when that `claude` has
+     * ended, so the session is never run twice at once.
+     */
     claim(ref: SessionRef): Session | null {
       for (const session of idle.keys()) {
         if (session.sessionId !== ref.sessionId) continue
@@ -83,6 +104,11 @@ export function createWarmSessions<Session extends WarmSession>({
 
     drop(session: Session) {
       close(session)
+    },
+
+    /** Resolves once every `claude` closing in the session has ended. */
+    async closed(sessionId: string) {
+      await Promise.all(closing.get(sessionId) ?? new Set<Promise<void>>())
     },
 
     get size() {

@@ -28,6 +28,9 @@ export type RecordedLine = z.infer<typeof RecordedLineSchema>
  * write, `FAKE_CLAUDE_REFUSE_STORE=yes` refuses the SDK's temporary folder,
  * and `FAKE_CLAUDE_EXIT_AFTER=<n>` exits after the nth Prompt. A Prompt sent
  * with a `uuid` is stored under it, as `claude` does.
+ * `FAKE_CLAUDE_HOLD_EXIT=<file>` keeps it going once its input closes, until
+ * that file exists. Its report names each `claude` still running as it
+ * started, and the entries it resumed with, up to `--resume-session-at`.
  */
 const SCRIPT = `
 import fs from 'node:fs'
@@ -36,6 +39,14 @@ import path from 'node:path'
 const reports = process.env.FAKE_CLAUDE_REPORTS
 const run = fs.readdirSync(reports).length
 const reportFile = path.join(reports, run + '.json')
+function stillRunning(file) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(reports, file), 'utf8')).ended == null
+  } catch {
+    return true
+  }
+}
+const runningAtStart = fs.readdirSync(reports).filter(stillRunning).map(file => Number.parseInt(file, 10))
 fs.writeFileSync(reportFile, '{}')
 const recording = process.env.FAKE_CLAUDE_RECORDINGS.split(path.delimiter)[run]
 const lines = fs.readFileSync(recording, 'utf8')
@@ -47,7 +58,8 @@ const projects = path.join(configDir, 'projects', projectKey)
 const recordedProjects = path.join(start.configDir, 'projects', start.projectKey)
 const args = process.argv.slice(2)
 const resume = args.find(arg => arg.startsWith('--resume='))?.slice('--resume='.length)
-const report = {args, configDir, prompts: [], resumedFrom: [], toolResults: [], ended: null}
+const resumeAt = args.find(arg => arg.startsWith('--resume-session-at='))?.slice('--resume-session-at='.length)
+const report = {args, configDir, runningAtStart, prompts: [], resumedFrom: [], resumedWith: [], toolResults: [], inputClosed: false, ended: null}
 
 function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
@@ -68,6 +80,8 @@ if (resume) {
   if (!fs.existsSync(transcript) || (temporary && process.env.FAKE_CLAUDE_REFUSE_STORE === 'yes')) refuse(resume)
   report.resumedFrom = fs.readFileSync(transcript, 'utf8').split('\\n').filter(Boolean)
     .map(line => JSON.parse(line).uuid).filter(Boolean)
+  const kept = resumeAt ? report.resumedFrom.indexOf(resumeAt) + 1 : report.resumedFrom.length
+  report.resumedWith = report.resumedFrom.slice(0, kept)
   const toolResults = path.join(projects, resume, 'tool-results')
   report.toolResults = fs.existsSync(toolResults) ? fs.readdirSync(toolResults) : []
 }
@@ -157,12 +171,26 @@ process.stdin.on('data', chunk => {
     }
   }
 })
-process.stdin.on('end', () => {
+function closeInput() {
   expected('end', () => true)
   answer()
   report.ended = 'input-closed'
   save()
   process.exit(0)
+}
+
+process.stdin.on('end', () => {
+  report.inputClosed = true
+  save()
+  const hold = process.env.FAKE_CLAUDE_HOLD_EXIT
+  if (!hold) closeInput()
+  else {
+    const waiting = setInterval(() => {
+      if (!fs.existsSync(hold)) return
+      clearInterval(waiting)
+      closeInput()
+    }, 10)
+  }
 })
 `
 

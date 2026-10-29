@@ -42,14 +42,26 @@ const OTTER_MESSAGE = '52786f10-3dd8-4f5b-995f-c5f9c5a27a0e'
 const REWOUND_MESSAGE = '18fb8495-3399-43a8-bc37-573286cfc9ed'
 const MODEL = 'claude-haiku-5-5'
 
+/** An entry `warmThrice()` repeats, under its new uuid. */
+function again(uuid: string) {
+  return `cccccccc${uuid.slice(8)}`
+}
+
+const THIRD_MESSAGE = again(SECOND_MESSAGE)
+
 type Streamed = StartReplyEvent
 
 interface Report {
   args: string[]
   configDir: string
+  /** The runs, by number, that hadn't ended as this one started. */
+  runningAtStart: number[]
   prompts: string[]
   resumedFrom: string[]
+  /** What `claude` goes on from: `resumedFrom` up to `--resume-session-at`. */
+  resumedWith: string[]
   toolResults: string[]
+  inputClosed: boolean
   ended:
     | 'input-closed'
     | 'killed'
@@ -871,4 +883,114 @@ it('cuts a Retry’s session after the Prompt of the Reply cut short, which `cla
   )
   expect(retry?.args).not.toContain('--fork-session')
   expect(retry?.prompts).toEqual([FORK_PROMPT])
+})
+
+const UUID = /[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}/g
+
+/**
+ * `warm.ndjson` with its second Prompt sent again, every entry under a new
+ * uuid.
+ */
+function warmThrice() {
+  return edited('warm.ndjson', lines => {
+    const second = lines.findLastIndex(
+      line => line.kind === 'in' && line.message.type === 'user'
+    )
+
+    const end = lines.findIndex(line => line.kind === 'end')
+
+    const repeated = lines
+      .slice(second, end)
+      .map(line =>
+        RecordedLineSchema.parse(
+          JSON.parse(
+            JSON.stringify(line).replaceAll(UUID, uuid =>
+              uuid === SESSION_ID ? uuid : again(uuid)
+            )
+          )
+        )
+      )
+
+    return lines.toSpliced(end, 0, ...repeated)
+  })
+}
+
+async function threeReplies(claude: Awaited<ReturnType<typeof setUp>>) {
+  const first = await claude.reply(FIRST_PROMPT)
+  const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
+  const third = await claude.reply(THIRD_PROMPT, recordedIn(second))
+
+  expect(recordedIn(third).messageId).toBe(THIRD_MESSAGE)
+
+  return {first: recordedIn(first), deleted: promptRecordedIn(second)}
+}
+
+it('leaves deleted Turns for the next Prompt, which resumes at the Reply it answers, so the AI’s context lacks them', async () => {
+  const claude = await setUp([warmThrice(), 'resumed.ndjson'])
+  const {first, deleted} = await threeReplies(claude)
+
+  const cut = {
+    ...first,
+    type: 'cut' as const,
+    keepThrough: first.messageId,
+    dropFrom: deleted.messageId,
+  }
+
+  await expect(
+    claude.driver.cutSession({
+      session: cut,
+      vendorProgram: {program: null, configDir: claude.configDir},
+    })
+  ).resolves.toBe(false)
+
+  const next = await claude.reply(FORK_PROMPT, cut)
+
+  expect(next.at(-1)).toMatchObject({status: 'complete'})
+  await claude.allClosed()
+  const [, resumed] = claude.reports()
+
+  expect(resumed?.args).toContain(`--resume-session-at=${FIRST_MESSAGE}`)
+  expect(resumed?.resumedFrom).toEqual(
+    expect.arrayContaining([deleted.messageId, SECOND_MESSAGE, THIRD_MESSAGE])
+  )
+  expect(resumed?.resumedWith.at(-1)).toBe(FIRST_MESSAGE)
+  expect(resumed?.resumedWith).not.toEqual(
+    expect.arrayContaining([deleted.messageId])
+  )
+})
+
+it('waits for the warm `claude` it closes to end before resuming that session at an earlier Reply', async () => {
+  const hold = path.join(folder('uz-claude-hold-'), 'go')
+
+  const claude = await setUp([warmThrice(), 'resumed.ndjson'], {
+    FAKE_CLAUDE_HOLD_EXIT: hold,
+  })
+
+  cleanUps.push(async () => fs.writeFileSync(hold, ''))
+
+  const {first, deleted} = await threeReplies(claude)
+  const askedBefore = claude.store.asked.length
+
+  const next = claude.reply(FORK_PROMPT, {
+    ...first,
+    type: 'cut',
+    keepThrough: first.messageId,
+    dropFrom: deleted.messageId,
+  })
+
+  await expect.poll(() => claude.reports()[0]?.inputClosed).toBe(true)
+  // The warm one holds on until told, so only the driver could have asked
+  // for the session to resume it by now.
+  expect(
+    claude.store.asked.slice(askedBefore).filter(op => op !== 'append')
+  ).toEqual([])
+  fs.writeFileSync(hold, '')
+
+  expect((await next).at(-1)).toMatchObject({status: 'complete'})
+  await claude.allClosed()
+  const [warm, resumed] = claude.reports()
+
+  expect(warm?.prompts).toEqual([FIRST_PROMPT, SECOND_PROMPT, THIRD_PROMPT])
+  expect(resumed?.args).toContain(`--resume-session-at=${FIRST_MESSAGE}`)
+  expect(resumed?.runningAtStart).toEqual([])
 })

@@ -24,7 +24,10 @@ export type RecordedLine = z.infer<typeof RecordedLineSchema>
 /**
  * The nth `codex app-server` started replays the nth of
  * `FAKE_CODEX_RECORDINGS`, matching each message by method. Like `codex`, it
- * resumes or forks only a thread whose rollout is in place under `sessions/`.
+ * resumes or forks only a thread whose rollout is in place under `sessions/`,
+ * and a revert writes the thread a new rollout that points into the old one
+ * just before the reverted turn. `contexts` holds, for each `turn/start`, the
+ * ids of what the thread's rollouts held then.
  */
 const SCRIPT = `
 import fs from 'node:fs'
@@ -40,19 +43,50 @@ const [, ...steps] = fs.readFileSync(recording, 'utf8')
 const home = process.env.CODEX_HOME
 const standIn = ${JSON.stringify(CODEX_HOME_STAND_IN)}
 const vendorVariables = Object.keys(process.env).filter(name => /^(OPENAI|CODEX|ANTHROPIC|CLAUDE)_/i.test(name))
-const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], resumedFrom: [], forkedThrough: null, interrupted: null, reverted: null, ended: null}
+const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], resumedFrom: [], contexts: [], forkedThrough: null, interrupted: null, reverted: null, ended: null}
 
 function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
 }
 save()
 
-function rolloutOf(threadId) {
+function rollouts() {
   const sessions = path.join(home, 'sessions')
-  if (!fs.existsSync(sessions)) return null
-  const name = fs.readdirSync(sessions, {recursive: true}).find(file => file.endsWith('-' + threadId + '.jsonl'))
-  return name ? path.join(sessions, name) : null
+  if (!fs.existsSync(sessions)) return []
+  return fs.readdirSync(sessions, {recursive: true}).filter(file => file.endsWith('.jsonl')).map(file => path.join(sessions, file))
 }
+
+function rolloutOf(threadId) {
+  const own = rollouts().filter(file => {
+    const name = path.basename(file)
+    return name.endsWith('-' + threadId + '.jsonl') || name.includes('-' + threadId + '_')
+  })
+  return own.toSorted((a, b) => path.basename(a) < path.basename(b) ? -1 : 1).at(-1) ?? null
+}
+
+function historyOf(file, end = Infinity) {
+  const lines = fs.readFileSync(file).subarray(0, end).toString('utf8').split('\\n').filter(Boolean).map(line => JSON.parse(line))
+  const base = lines[0]?.history_base
+  if (!base) return lines
+  const source = rollouts().find(other => path.basename(other) === base.rollout)
+  if (!source) throw new Error('missing source rollout')
+  if (fs.statSync(source).size < base.end_byte_offset) throw new Error('cutoff byte offset is past the source rollout')
+  return [...historyOf(source, base.end_byte_offset), ...lines.slice(1)]
+}
+
+function cutBefore(threadId, turnId) {
+  const rollout = rolloutOf(threadId)
+  if (!rollout) return null
+  const bytes = fs.readFileSync(rollout)
+  let offset = 0
+  for (const line of bytes.toString('utf8').split('\\n')) {
+    if (line && JSON.parse(line).id === turnId) break
+    offset += Buffer.byteLength(line) + 1
+  }
+  return {rollout: path.basename(rollout), end_byte_offset: Math.min(offset, bytes.length)}
+}
+
+let reverting = null
 
 const ids = new Map()
 let at = 0
@@ -69,8 +103,9 @@ function write(message) {
   const thread = message.result?.thread
   if (thread?.path && !fs.existsSync(thread.path)) {
     fs.mkdirSync(path.dirname(thread.path), {recursive: true})
-    fs.writeFileSync(thread.path, JSON.stringify({type: 'session_meta', id: thread.id}) + '\\n')
+    fs.writeFileSync(thread.path, JSON.stringify({type: 'session_meta', id: thread.id, ...(reverting && {history_base: reverting})}) + '\\n')
   }
+  if ('id' in message) reverting = null
   if (message.method === 'turn/completed') {
     const rollout = rolloutOf(message.params.threadId)
     fs.appendFileSync(rollout, JSON.stringify({type: 'turn', id: message.params.turn.id}) + '\\n')
@@ -111,16 +146,28 @@ process.stdin.on('data', chunk => {
     if (exitsHere(message.method)) end('exited', 1)
     if (message.method === 'thread/resume' || message.method === 'thread/fork') {
       const rollout = rolloutOf(message.params.threadId)
-      if (!rollout) {
-        process.stdout.write(JSON.stringify({id: message.id, error: {code: -32600, message: 'no rollout found for thread id ' + message.params.threadId}}) + '\\n')
+      let refusal = rollout ? null : 'no rollout found for thread id ' + message.params.threadId
+      try {
+        if (rollout) report.resumedFrom = historyOf(rollout)
+      } catch (error) {
+        refusal = error.message
+      }
+      if (refusal) {
+        process.stdout.write(JSON.stringify({id: message.id, error: {code: -32600, message: refusal}}) + '\\n')
         end('refused', 1)
       }
-      report.resumedFrom = fs.readFileSync(rollout, 'utf8').split('\\n').filter(Boolean).map(line => JSON.parse(line))
       if (message.method === 'thread/fork') report.forkedThrough = message.params.lastTurnId
     }
-    if (message.method === 'turn/start') report.prompts.push(message.params.input[0].text)
+    if (message.method === 'turn/start') {
+      report.prompts.push(message.params.input[0].text)
+      const rollout = rolloutOf(message.params.threadId)
+      report.contexts.push(rollout ? historyOf(rollout).map(line => line.id) : [])
+    }
     if (message.method === 'turn/interrupt') report.interrupted = message.params.turnId
-    if (message.method === 'thread/revert') report.reverted = message.params.beforeTurnId
+    if (message.method === 'thread/revert') {
+      report.reverted = message.params.beforeTurnId
+      reverting = cutBefore(message.params.threadId, message.params.beforeTurnId)
+    }
     const recorded = expected(message)
     if ('id' in message) ids.set(recorded.id, message.id)
     save()
