@@ -107,7 +107,7 @@ function AppLayout() {
       </aside>
       <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-canvas-background">
         {showConnections ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-4 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             <Connections
               connections={connections}
               onBack={() => setShowConnections(false)}

@@ -18,7 +18,7 @@ export function Connections({connections, onStart, onBack}: ConnectionsProps) {
   const connecting = state.signIn?.provider ?? null
 
   return (
-    <div className="relative flex min-h-full w-full flex-col items-center justify-center gap-8 bg-background p-8">
+    <div className="relative flex min-h-full w-full flex-col items-center gap-8 bg-background p-8">
       {onBack && (
         <Button
           variant="ghost"
@@ -45,7 +45,7 @@ export function Connections({connections, onStart, onBack}: ConnectionsProps) {
           </p>
         )}
       </div>
-      <div className="flex flex-wrap justify-center gap-6">
+      <div className="flex flex-wrap items-start justify-center gap-6">
         {ProviderIdSchema.options.map(provider => (
           <ProviderCard
             key={provider}
