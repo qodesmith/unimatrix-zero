@@ -108,9 +108,9 @@
   transition: none;
 }
 
-/* A loaded Tree stays hidden until it is fitted, so it never shows at full
-   size first. Opacity, not visibility: React Flow marks each measured node
-   visible, which overrides a hidden parent. */
+/* React Flow draws the viewport inside its own markup; Flow marks the canvas
+   `canvas-fitting` until it is fitted. Opacity, not visibility: React Flow
+   marks each measured node visible, which overrides a hidden parent. */
 .canvas-fitting .react-flow__viewport {
   opacity: 0;
 }
