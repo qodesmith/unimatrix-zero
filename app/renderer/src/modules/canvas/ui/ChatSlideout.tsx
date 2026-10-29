@@ -171,22 +171,39 @@ interface ChatInputProps {
   onSent: (replyId: string) => void
 }
 
-/** Shares its draft with the same Reply's Input on the canvas. */
+/**
+ * Shares its draft with the same Reply's Input on the canvas. Keyed by the
+ * Reply, so a send redraws it for the new one, which takes the focus over.
+ */
 function ChatInput({end, onFocus, onSent}: ChatInputProps) {
   const {treeId, drafts, setDraft} = useCanvas()
   const {status} = useReply(end)
+  const textarea = useRef<HTMLTextAreaElement>(null)
+  const sentFor = useRef<string | null>(null)
 
-  if (status === 'streaming' || status === 'failed') return null
+  useEffect(() => {
+    if (sentFor.current !== end.id) return
+
+    sentFor.current = null
+    textarea.current?.focus()
+  }, [end.id])
+
+  if (status === 'failed') return null
 
   return (
     <footer className="shrink-0 border-t border-border px-4 py-3">
       <div className="mx-auto max-w-180">
         <PromptInput
           key={end.id}
+          ref={textarea}
           treeId={treeId}
           parentReplyId={end.id}
+          canSend={status !== 'streaming'}
           onFocus={() => onFocus(end.id)}
-          onSent={onSent}
+          onSent={replyId => {
+            sentFor.current = replyId
+            onSent(replyId)
+          }}
           draft={drafts.get(end.id) ?? ''}
           onDraftChange={text => setDraft(end.id, text)}
         />

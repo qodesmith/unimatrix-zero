@@ -17,6 +17,8 @@ export interface CanvasState {
   onInputFocus: (replyId: string) => void
   /** A Prompt was sent into a Reply's Input and main started this Reply for it. */
   onSent: (replyId: string, parentReplyId: string) => void
+  /** The Reply whose Input takes focus once it is drawn: the one just sent for. */
+  inputToFocus: string | null
   /** Kept here, not in the node, so it survives an orientation switch. */
   expandedTurnIds: ReadonlySet<string>
   toggleExpanded: (turnId: string) => void

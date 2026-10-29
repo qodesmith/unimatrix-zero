@@ -5,7 +5,7 @@ import type {Node, NodeProps} from '@xyflow/react'
 import {cn} from '#modules/shadcn/main'
 import {ReplyView, useReply} from '#modules/turns/main'
 import {Handle, Position} from '@xyflow/react'
-import {useState} from 'react'
+import {useEffect, useRef, useState} from 'react'
 
 import {useCanvas} from '../canvas-context'
 import {TURN_WIDTH} from '../layout'
@@ -105,16 +105,14 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
 type InputState = 'none' | 'hidden' | 'revealed'
 
 /**
- * A Reply has no Input while it streams or after it failed; otherwise it
- * shows for the Active Thread, a draft or the pointer over the node.
+ * A failed Reply has no Input, Retry instead; any other shows it for the
+ * Active Thread, a draft or the pointer over the node.
  */
 function useInputState(reply: Reply | null, hovered: boolean): InputState {
   const {activeReplyId, drafts} = useCanvas()
   const live = useReply(reply)
 
-  if (!live || live.status === 'streaming' || live.status === 'failed') {
-    return 'none'
-  }
+  if (!live || live.status === 'failed') return 'none'
 
   const draft = drafts.get(live.id) ?? ''
 
@@ -129,15 +127,25 @@ function useInputState(reply: Reply | null, hovered: boolean): InputState {
  * it fills the corners as they square; the clip is open below for the shadow.
  */
 function ReplyInput({
-  replyId,
+  reply,
   revealed,
   stem = 'none',
 }: {
-  replyId: string
+  reply: Reply
   revealed: boolean
   stem?: Stem
 }) {
-  const {treeId, onInputFocus, onSent, drafts, setDraft} = useCanvas()
+  const {treeId, inputToFocus, onInputFocus, onSent, drafts, setDraft} =
+    useCanvas()
+
+  const {id: replyId, status} = useReply(reply)
+  const streaming = status === 'streaming'
+  const textarea = useRef<HTMLTextAreaElement>(null)
+
+  // On every render, since the node stays hidden until React Flow measures it.
+  useEffect(() => {
+    if (inputToFocus === replyId) textarea.current?.focus({preventScroll: true})
+  })
 
   return (
     <div className="relative flow-root">
@@ -158,12 +166,15 @@ function ReplyInput({
           data-revealed={revealed}
           className={cn(
             'rounded-b-xl border border-t-0 border-border bg-card px-3.5 pt-5.5 pb-2.5 shadow-sm transition-[translate] ease-out motion-reduce:transition-none',
+            streaming && 'border-primary/50',
             !revealed && '-translate-y-full focus-within:translate-y-0'
           )}
         >
           <PromptInput
+            ref={textarea}
             treeId={treeId}
             parentReplyId={replyId}
+            canSend={!streaming}
             onFocus={() => onInputFocus(replyId)}
             onSent={sent => onSent(sent, replyId)}
             draft={drafts.get(replyId) ?? ''}
@@ -243,7 +254,7 @@ export function ReplyNode({data}: NodeProps<TurnNode>) {
       <ReplyTurn reply={turn.reply} joined={input === 'revealed'} />
       {input !== 'none' && (
         <ReplyInput
-          replyId={turn.reply.id}
+          reply={turn.reply}
           revealed={input === 'revealed'}
           stem={data.stem}
         />
@@ -288,7 +299,7 @@ export function ExchangeNode({data}: NodeProps<TurnNode>) {
         joined={input === 'revealed'}
       />
       {turn.reply && input !== 'none' && (
-        <ReplyInput replyId={turn.reply.id} revealed={input === 'revealed'} />
+        <ReplyInput reply={turn.reply} revealed={input === 'revealed'} />
       )}
       <Handle
         type="source"

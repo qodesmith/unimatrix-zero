@@ -546,6 +546,22 @@ async function sendInto(replyText: string, text: string) {
   await expect.element(page.getByText(text)).toBeVisible()
 }
 
+it('moves focus to the streaming Reply’s Input a Prompt was sent for, hiding the one it was sent from', async () => {
+  await renderCanvas(linearTree())
+  await expect.element(page.getByText('Reply two')).toBeVisible()
+
+  await sendInto('Reply two', 'And then?')
+  await hoverAway()
+
+  const streaming = nodeOf('Writing…')
+  await expect.element(streaming.getByRole('textbox')).toHaveFocus()
+  await expect.poll(() => revealed('Writing…')).toBe('true')
+  await expect.poll(() => revealed('Reply two')).toBe('false')
+  await expect
+    .element(streaming.getByRole('button', {name: 'Send'}))
+    .toBeDisabled()
+})
+
 it('zooms out just enough to show the whole Tree on its first Fork, and keeps the zoom on every other send', async () => {
   await renderCanvas(linearTree())
   await expect.element(page.getByText('Reply two')).toBeVisible()
@@ -930,7 +946,7 @@ it('counts the Replies being written and the failed ones, and jumps to them', as
   const status = page.getByRole('status')
   await expect.element(status.getByText('1 streaming')).toBeVisible()
   await expect.element(status.getByText('1 failed')).toBeVisible()
-  expect(document.querySelectorAll('textarea')).toHaveLength(1)
+  expect(document.querySelectorAll('textarea')).toHaveLength(2)
 
   await expect.poll(viewport).toContain('translate')
   const before = viewport()
@@ -1086,7 +1102,12 @@ it('branches from the slideout into a Reply that already has a response, and fol
   await expect
     .poll(chatTurns)
     .toEqual(['Prompt one', 'Reply one', 'A third way', 'Writing…Stop'])
-  expect(slideout().getByRole('textbox').query()).toBeNull()
+  await expect
+    .element(slideout().getByRole('textbox', {name: 'Prompt'}))
+    .toHaveFocus()
+  await expect
+    .element(slideout().getByRole('button', {name: 'Send'}))
+    .toBeDisabled()
 
   const sentPromptId = nodeOf('A third way').element().getAttribute('data-id')
 

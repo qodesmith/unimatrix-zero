@@ -130,6 +130,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
   } = useChatSlideout(index)
 
   const [hoverTurnId, setHoverTurnId] = useState<string | null>(null)
+  const [inputToFocus, setInputToFocus] = useState<string | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const [switching, setSwitching] = useState(false)
 
@@ -212,9 +213,18 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
     [index, focusOn]
   )
 
+  const sentFromInput = useCallback(
+    (replyId: string, parentReplyId: string | null) => {
+      onSent(replyId, parentReplyId)
+      setInputToFocus(replyId)
+    },
+    [onSent]
+  )
+
   const onInputFocus = useCallback(
     (replyId: string) => {
       setChosenReplyId(replyId)
+      setInputToFocus(null)
       closeChat()
     },
     [closeChat]
@@ -260,7 +270,8 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       index,
       activeReplyId,
       onInputFocus,
-      onSent,
+      onSent: sentFromInput,
+      inputToFocus,
       expandedTurnIds,
       toggleExpanded,
       collapsedReplyIds: collapsed.ids,
@@ -275,7 +286,8 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       index,
       activeReplyId,
       onInputFocus,
-      onSent,
+      sentFromInput,
+      inputToFocus,
       expandedTurnIds,
       toggleExpanded,
       collapsed.ids,
@@ -294,7 +306,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
           <PromptInput
             treeId={treeId}
             parentReplyId={null}
-            onSent={replyId => onSent(replyId, null)}
+            onSent={replyId => sentFromInput(replyId, null)}
           />
         </div>
       </div>
