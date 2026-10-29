@@ -285,6 +285,12 @@ function inputUnder(replyText: string) {
   return nodeOf(replyText).getByRole('textbox', {name: 'Prompt'})
 }
 
+/** As the user does: the pointer comes over the Reply, sliding its Input out. */
+async function clickInputUnder(replyText: string) {
+  await canvas().getByText(replyText).hover()
+  await inputUnder(replyText).click()
+}
+
 function revealed(replyText: string) {
   return inputUnder(replyText)
     .element()
@@ -378,7 +384,7 @@ it('shows the Active Thread’s Input, reveals another Reply’s on hover, and k
   await expect.poll(() => revealed('Reply three')).toBe('false')
 
   await inputUnder('Reply one').fill('A draft')
-  await inputUnder('Reply five').click()
+  await clickInputUnder('Reply five')
   await hoverAway()
   await expect.poll(() => revealed('Reply five')).toBe('true')
   expect(revealed('Reply one')).toBe('true')
@@ -428,7 +434,7 @@ it('highlights the newest Thread until the user picks another by focusing its In
       ].toSorted()
     )
 
-  await inputUnder('Reply three').click()
+  await clickInputUnder('Reply three')
   await hoverAway()
 
   await expect
@@ -1050,7 +1056,7 @@ it('switches the slideout to another clicked Turn’s Thread, and closes it when
   await hoverAway()
   await expect.poll(highlightedEdges).toEqual(threadToReplyFour())
 
-  await inputUnder('Reply two').click()
+  await clickInputUnder('Reply two')
   await expect.element(slideout()).not.toBeInTheDocument()
   await hoverAway()
   await expect

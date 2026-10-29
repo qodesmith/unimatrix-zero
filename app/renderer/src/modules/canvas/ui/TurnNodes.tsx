@@ -102,28 +102,45 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
   )
 }
 
-/** Hidden by opacity, not unmounted, so revealing it shifts nothing. */
+type InputState = 'none' | 'hidden' | 'revealed'
+
+/**
+ * A Reply has no Input while it streams or after it failed; otherwise it
+ * shows for the Active Thread, a draft or the pointer over the node.
+ */
+function useInputState(reply: Reply | null, hovered: boolean): InputState {
+  const {activeReplyId, drafts} = useCanvas()
+  const live = useReply(reply)
+
+  if (!live || live.status === 'streaming' || live.status === 'failed') {
+    return 'none'
+  }
+
+  const draft = drafts.get(live.id) ?? ''
+
+  return activeReplyId === live.id || draft.trim() !== '' || hovered
+    ? 'revealed'
+    : 'hidden'
+}
+
+/**
+ * Slid up behind the box above, not unmounted, so revealing it shifts
+ * nothing. It starts a corner's radius up inside the box, padded to match, so
+ * it fills the corners as they square; the clip is open below for the shadow.
+ */
 function ReplyInput({
-  reply,
-  hovered,
+  replyId,
+  revealed,
   stem = 'none',
 }: {
-  reply: Reply
-  hovered: boolean
+  replyId: string
+  revealed: boolean
   stem?: Stem
 }) {
-  const {treeId, activeReplyId, onInputFocus, onSent, drafts, setDraft} =
-    useCanvas()
-
-  const {status} = useReply(reply)
-
-  if (status === 'streaming' || status === 'failed') return null
-
-  const draft = drafts.get(reply.id) ?? ''
-  const revealed = activeReplyId === reply.id || draft.trim() !== '' || hovered
+  const {treeId, onInputFocus, onSent, drafts, setDraft} = useCanvas()
 
   return (
-    <div className="relative pt-2">
+    <div className="relative flow-root">
       {stem !== 'none' && (
         <div
           aria-hidden
@@ -136,21 +153,23 @@ function ReplyInput({
           )}
         />
       )}
-      <div
-        data-revealed={revealed}
-        className={cn(
-          'relative transition-opacity',
-          !revealed && 'opacity-0 focus-within:opacity-100'
-        )}
-      >
-        <PromptInput
-          treeId={treeId}
-          parentReplyId={reply.id}
-          onFocus={() => onInputFocus(reply.id)}
-          onSent={replyId => onSent(replyId, reply.id)}
-          draft={draft}
-          onDraftChange={text => setDraft(reply.id, text)}
-        />
+      <div className="-mt-3 [clip-path:inset(0_-0.5rem_-0.5rem)]">
+        <div
+          data-revealed={revealed}
+          className={cn(
+            'rounded-b-xl border border-t-0 border-border bg-card px-3.5 pt-5.5 pb-2.5 shadow-sm transition-[translate] ease-out motion-reduce:transition-none',
+            !revealed && '-translate-y-full focus-within:translate-y-0'
+          )}
+        >
+          <PromptInput
+            treeId={treeId}
+            parentReplyId={replyId}
+            onFocus={() => onInputFocus(replyId)}
+            onSent={sent => onSent(sent, replyId)}
+            draft={drafts.get(replyId) ?? ''}
+            onDraftChange={text => setDraft(replyId, text)}
+          />
+        </div>
       </div>
     </div>
   )
@@ -169,11 +188,16 @@ function useHovered() {
   }
 }
 
-function replyFrame(status: Reply['status']) {
+/**
+ * `joined` squares the bottom corners and fades the bottom border, so the box
+ * runs on into the revealed Input under it.
+ */
+function replyFrame(status: Reply['status'], joined: boolean) {
   return cn(
-    'overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-sm',
+    'relative z-10 overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-sm transition-[border-radius,border-color] ease-out motion-reduce:transition-none',
     status === 'failed' && 'border-destructive',
-    status === 'streaming' && 'border-primary/50'
+    status === 'streaming' && 'border-primary/50',
+    joined && 'rounded-b-none border-b-transparent'
   )
 }
 
@@ -206,13 +230,24 @@ export function ReplyNode({data}: NodeProps<TurnNode>) {
   const {turn} = data
   const {hovered, hoverProps} = useHovered()
 
+  const input = useInputState(
+    turn.kind === 'reply' ? turn.reply : null,
+    hovered
+  )
+
   if (turn.kind !== 'reply') return null
 
   return (
     <div style={{width: TURN_WIDTH}} {...hoverProps}>
       <Handle type="target" position={Position.Top} className={hiddenHandle} />
-      <ReplyTurn reply={turn.reply} />
-      <ReplyInput reply={turn.reply} hovered={hovered} stem={data.stem} />
+      <ReplyTurn reply={turn.reply} joined={input === 'revealed'} />
+      {input !== 'none' && (
+        <ReplyInput
+          replyId={turn.reply.id}
+          revealed={input === 'revealed'}
+          stem={data.stem}
+        />
+      )}
       <Handle
         type="source"
         position={Position.Bottom}
@@ -222,11 +257,11 @@ export function ReplyNode({data}: NodeProps<TurnNode>) {
   )
 }
 
-function ReplyTurn({reply}: {reply: Reply}) {
+function ReplyTurn({reply, joined}: {reply: Reply; joined: boolean}) {
   const {status} = useReply(reply)
 
   return (
-    <div data-turn={reply.id} className={cn('relative', replyFrame(status))}>
+    <div data-turn={reply.id} className={replyFrame(status, joined)}>
       <ReplyBody reply={reply} />
     </div>
   )
@@ -237,13 +272,24 @@ export function ExchangeNode({data}: NodeProps<TurnNode>) {
   const {turn} = data
   const {hovered, hoverProps} = useHovered()
 
+  const input = useInputState(
+    turn.kind === 'exchange' ? turn.reply : null,
+    hovered
+  )
+
   if (turn.kind !== 'exchange') return null
 
   return (
     <div style={{width: TURN_WIDTH}} {...hoverProps}>
       <Handle type="target" position={Position.Left} className={hiddenHandle} />
-      <ExchangeTurns prompt={turn.prompt} reply={turn.reply} />
-      {turn.reply && <ReplyInput reply={turn.reply} hovered={hovered} />}
+      <ExchangeTurns
+        prompt={turn.prompt}
+        reply={turn.reply}
+        joined={input === 'revealed'}
+      />
+      {turn.reply && input !== 'none' && (
+        <ReplyInput replyId={turn.reply.id} revealed={input === 'revealed'} />
+      )}
       <Handle
         type="source"
         position={Position.Right}
@@ -253,11 +299,19 @@ export function ExchangeNode({data}: NodeProps<TurnNode>) {
   )
 }
 
-function ExchangeTurns({prompt, reply}: {prompt: Prompt; reply: Reply | null}) {
+function ExchangeTurns({
+  prompt,
+  reply,
+  joined,
+}: {
+  prompt: Prompt
+  reply: Reply | null
+  joined: boolean
+}) {
   const status = useReply(reply)?.status ?? 'complete'
 
   return (
-    <div className={replyFrame(status)}>
+    <div className={replyFrame(status, joined)}>
       <div
         data-turn={prompt.id}
         className="border-b border-border bg-prompt px-3.5 py-2.5 text-prompt-foreground"
