@@ -8,7 +8,8 @@ interface CappedTextProps {
   limit: boolean
   maxHeightClass: string
   expanded: boolean
-  onToggle: () => void
+  /** Gets how far the capped text was scrolled. */
+  onToggle: (scrolled: number) => void
   /** The box stays on the newest text until the user scrolls up. */
   streaming?: boolean
   className?: string
@@ -69,7 +70,7 @@ export function CappedText({
           <button
             type="button"
             className="text-xs text-primary hover:underline"
-            onClick={onToggle}
+            onClick={() => onToggle(box.current?.scrollTop ?? 0)}
           >
             {expanded ? 'Show less' : 'Show more'}
           </button>

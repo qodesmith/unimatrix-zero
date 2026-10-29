@@ -838,6 +838,9 @@ it('opens with the orientation the Setting says', async () => {
 
 const longText = Array.from({length: 40}, (_, i) => `Line ${i + 1}`).join('\n')
 
+// Markdown folds single newlines into one paragraph.
+const longReply = longText.replaceAll('\n', '\n\n')
+
 function rootPrompt() {
   return document.querySelector(`[data-turn="${uuid(1)}"]`)
 }
@@ -874,8 +877,7 @@ it('keeps a Reply let out by Show more open across an orientation switch', async
   clock = 0
   await renderCanvas({
     prompts: [prompt(1, null, 'Short')],
-    // Markdown folds single newlines into one paragraph.
-    replies: [reply(11, 1, longText.replaceAll('\n', '\n\n'))],
+    replies: [reply(11, 1, longReply)],
   })
 
   await page.getByRole('button', {name: 'Show more'}).click()
@@ -892,6 +894,76 @@ it('keeps a Reply let out by Show more open across an orientation switch', async
     .element(page.getByRole('button', {name: 'Show less'}))
     .toBeVisible()
   expect(page.getByRole('button', {name: 'Show more'}).query()).toBeNull()
+})
+
+function lineTop(line: string) {
+  return canvas()
+    .getByText(line, {exact: true})
+    .element()
+    .getBoundingClientRect().top
+}
+
+/** Scrolls the capped text holding `line` partway, then clicks its Show more. */
+async function showMoreScrolledTo(line: string) {
+  const text = canvas().getByText(line, {exact: true}).element()
+  const box = text.closest('.overflow-y-auto')
+  const capped = box?.parentElement
+
+  if (!box || !capped) throw new Error(`${line} is not in capped text`)
+
+  box.scrollTop = 150
+  const before = lineTop(line)
+
+  await page
+    .elementLocator(capped)
+    .getByRole('button', {name: 'Show more'})
+    .click()
+  await expect
+    .element(
+      page.elementLocator(capped).getByRole('button', {name: 'Show less'})
+    )
+    .toBeVisible()
+  await settledViewport()
+
+  return before
+}
+
+it('keeps the text a Reply was scrolled to where it is on screen as Show more lets it out', async () => {
+  clock = 0
+  await renderCanvas({
+    prompts: [prompt(1, null, 'Short')],
+    replies: [reply(11, 1, longReply)],
+  })
+
+  await expect.poll(viewport).not.toContain('translate(0px, 0px)')
+  await settledViewport()
+
+  const before = await showMoreScrolledTo('Line 12')
+  expect(lineTop('Line 12')).toBeCloseTo(before, 0)
+})
+
+it('keeps a scrolled Fork’s text put as Show more lets it out and its card re-centers over its Branches', async () => {
+  const saved = forkedTree()
+  const otherText = longReply.replaceAll('Line', 'Other')
+
+  const texts = new Map([
+    [uuid(11), longReply],
+    [uuid(12), otherText],
+    [uuid(13), otherText],
+  ])
+
+  saved.replies = saved.replies.map(one => {
+    const text = texts.get(one.id)
+
+    return text === undefined ? one : {...one, content: [{type: 'text', text}]}
+  })
+
+  await renderCanvas({...saved, settings: {canvasOrientation: 'horizontal'}})
+  await expect.poll(viewport).not.toContain('translate(0px, 0px)')
+  await settledViewport()
+
+  const before = await showMoreScrolledTo('Line 12')
+  expect(lineTop('Line 12')).toBeCloseTo(before, 0)
 })
 
 it('lets long Turns take their full height when the Setting is off', async () => {

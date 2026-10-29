@@ -1,5 +1,5 @@
 import type {Turns} from '#modules/turns/main'
-import type {CanvasState, Collapsed} from '../canvas-context'
+import type {CanvasState, Collapsed, Expanded} from '../canvas-context'
 import type {TreeIndex} from '../tree'
 import type {Focus} from './Flow'
 import type {CanvasOrientation} from '@uz/contract/settings'
@@ -221,9 +221,10 @@ function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
   const [inputAt, setInputAt] = useState<XYPosition | null>(null)
   const [showMap, setShowMap] = useState(false)
 
-  const [expandedTurnIds, setExpandedTurnIds] = useState<ReadonlySet<string>>(
-    () => new Set()
-  )
+  const [expanded, setExpanded] = useState<Expanded>(() => ({
+    ids: new Set(),
+    toggled: null,
+  }))
 
   const [collapsed, setCollapsed] = useState<Collapsed>(() => ({
     ids: new Set(),
@@ -266,8 +267,11 @@ function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
     }))
   }, [])
 
-  const toggleExpanded = useCallback((turnId: string) => {
-    setExpandedTurnIds(toggled(turnId))
+  const toggleExpanded = useCallback((turnId: string, scrolled: number) => {
+    setExpanded(current => ({
+      ids: toggled(turnId)(current.ids),
+      toggled: {turnId, scrolled},
+    }))
   }, [])
 
   const toggleCollapsed = useCallback((replyId: string) => {
@@ -361,7 +365,7 @@ function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
       onSent: sentFromInput,
       inputToFocus,
       openChat,
-      expandedTurnIds,
+      expandedTurnIds: expanded.ids,
       toggleExpanded,
       collapsedReplyIds: collapsed.ids,
       toggleCollapsed,
@@ -378,7 +382,7 @@ function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
       sentFromInput,
       inputToFocus,
       openChat,
-      expandedTurnIds,
+      expanded.ids,
       toggleExpanded,
       collapsed.ids,
       toggleCollapsed,
@@ -431,6 +435,7 @@ function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
             orientation={canvasOrientation}
             thread={thread}
             collapsed={collapsed}
+            expanded={expanded}
             focus={focus}
             fitOnLoad={!startedEmpty}
             startAt={inputAt}

@@ -30,7 +30,7 @@ function PromptText({prompt}: {prompt: Prompt}) {
       limit={limitTurnHeight}
       maxHeightClass="max-h-32"
       expanded={expandedTurnIds.has(prompt.id)}
-      onToggle={() => toggleExpanded(prompt.id)}
+      onToggle={scrolled => toggleExpanded(prompt.id, scrolled)}
     >
       <p className="text-sm whitespace-pre-wrap">{prompt.text}</p>
     </CappedText>
@@ -65,7 +65,7 @@ function ReplyBody({reply}: {reply: Reply}) {
         limit={limitTurnHeight}
         maxHeightClass="max-h-72"
         expanded={expandedTurnIds.has(reply.id)}
-        onToggle={() => toggleExpanded(reply.id)}
+        onToggle={scrolled => toggleExpanded(reply.id, scrolled)}
         streaming={status === 'streaming'}
         className="px-3.5 py-2"
       >

@@ -1,4 +1,4 @@
-import type {Collapsed} from '../canvas-context'
+import type {Collapsed, Expanded} from '../canvas-context'
 import type {Layout, Size} from '../layout'
 import type {TreeIndex} from '../tree'
 import type {Stem, TurnNode} from './TurnNodes'
@@ -36,6 +36,7 @@ interface FlowProps {
   /** The Turn ids on the highlighted Thread. */
   thread: ReadonlySet<string>
   collapsed: Collapsed
+  expanded: Expanded
   focus: Focus | null
   /** Fit the whole Tree once it is measured; off for a Tree that starts here. */
   fitOnLoad: boolean
@@ -73,6 +74,20 @@ function stemOf(
   return outgoing.some(edge => isOnThread(edge, thread)) ? 'on-thread' : 'plain'
 }
 
+/** A Turn kept where it is on screen while the layout changes around it. */
+interface Held {
+  turnId: string
+  /**
+   * Its box's size before its text was let out or capped, held until it
+   * changes.
+   */
+  resizing: Size | null
+}
+
+function settledSize(held: Held, size: Size | undefined) {
+  return held.resizing === null || size !== held.resizing
+}
+
 function hoverIdOf(node: TurnNode) {
   const {turn} = node.data
 
@@ -84,6 +99,7 @@ export function Flow({
   orientation,
   thread,
   collapsed,
+  expanded,
   focus,
   fitOnLoad,
   startAt,
@@ -124,10 +140,13 @@ export function Flow({
 
   // Folding or unfolding a Fork moves its Reply in the layout, and again as the
   // boxes it shows are measured; the viewport moves by the same amount, scaled,
-  // so the Reply stays where it is on screen. A pan lets it go.
+  // so the Reply stays where it is on screen. A pan lets it go. Letting out or
+  // capping a Turn's text holds its Turn the same way until its box is measured
+  // anew, and text the user scrolled to stays put as the box unscrolls.
   const lastLayout = useRef(layout)
   const lastCollapsed = useRef(collapsed)
-  const heldReplyId = useRef<string | null>(null)
+  const lastExpanded = useRef(expanded)
+  const held = useRef<Held | null>(null)
 
   useLayoutEffect(() => {
     const before = lastLayout.current
@@ -135,16 +154,30 @@ export function Flow({
 
     if (lastCollapsed.current !== collapsed) {
       lastCollapsed.current = collapsed
-      heldReplyId.current = collapsed.toggledReplyId
+      const turnId = collapsed.toggledReplyId
+      held.current = turnId === null ? null : {turnId, resizing: null}
     }
 
-    const replyId = heldReplyId.current
+    const toggled = lastExpanded.current === expanded ? null : expanded.toggled
+    lastExpanded.current = expanded
+    const scrolled = toggled?.scrolled ?? 0
 
-    if (replyId === null) return
+    if (toggled) {
+      held.current = {
+        turnId: toggled.turnId,
+        resizing: measured[nodeIdOf(toggled.turnId)] ?? null,
+      }
+    }
 
-    if (allMeasured) heldReplyId.current = null
+    const {current} = held
 
-    const nodeId = nodeIdOf(replyId)
+    if (current === null) return
+
+    const nodeId = nodeIdOf(current.turnId)
+
+    if (allMeasured && settledSize(current, measured[nodeId]))
+      held.current = null
+
     const from = before.nodes.find(node => node.id === nodeId)?.position
     const to = layout.nodes.find(node => node.id === nodeId)?.position
 
@@ -154,10 +187,10 @@ export function Flow({
 
     void flow.setViewport({
       x: x - (to.x - from.x) * zoom,
-      y: y - (to.y - from.y) * zoom,
+      y: y - (to.y - from.y + scrolled) * zoom,
       zoom,
     })
-  }, [layout, collapsed, allMeasured, nodeIdOf, flow])
+  }, [layout, collapsed, expanded, measured, allMeasured, nodeIdOf, flow])
 
   const onNodesChange = useCallback(
     (changes: NodeChange<TurnNode>[]) => {
@@ -278,7 +311,7 @@ export function Flow({
     if (!node || !size) return
 
     centered.current = focus.sequence
-    heldReplyId.current = null
+    held.current = null
 
     if (focus.mode === 'follow') {
       follow(focus.replyId)
