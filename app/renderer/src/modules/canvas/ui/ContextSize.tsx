@@ -88,7 +88,7 @@ function ContextSizeDrawer({
         !open && 'invisible -translate-x-full'
       )}
       onKeyDown={event => {
-        if (event.key === 'Escape') onClose()
+        if (event.key === 'Escape' && !event.defaultPrevented) onClose()
       }}
     >
       <div className="flex items-center justify-between border-b border-border py-1 pr-1 pl-3">

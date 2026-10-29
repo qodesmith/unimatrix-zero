@@ -1633,6 +1633,49 @@ it('stops the slideout’s streaming Reply with Esc rather than closing the slid
   await expect.element(slideout()).not.toBeInTheDocument()
 })
 
+it('stops the streaming Reply with Esc from the Context size drawer rather than closing the drawer', async () => {
+  const saved = endingIn('streaming', '')
+
+  saved.replies = saved.replies.map(one =>
+    one.id === uuid(11) ? {...one, contextSize: 10_000} : one
+  )
+
+  const {main} = await renderCanvas(saved)
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+
+  const details = page.getByRole('complementary', {
+    name: 'Context size details',
+    includeHidden: true,
+  })
+
+  const info = page.getByRole('button', {name: 'Context size details'})
+
+  await info.click()
+  const close = details.getByRole('button', {name: 'Close'})
+
+  await expect.element(close).toBeVisible()
+  close.element().focus()
+
+  await userEvent.keyboard('{Escape}')
+
+  expect(main.sent.filter(command => command.type === 'reply.stop')).toEqual([
+    {type: 'reply.stop', treeId, replyId: uuid(12)},
+  ])
+  await expect.element(info).toHaveAttribute('aria-expanded', 'true')
+
+  main.publish({
+    treeId,
+    replyId: uuid(12),
+    type: 'RUN_FINISHED',
+    status: 'stopped',
+  })
+  await expect.element(page.getByText('Stopped')).toBeVisible()
+
+  await userEvent.keyboard('{Escape}')
+  await expect.element(info).toHaveAttribute('aria-expanded', 'false')
+  await expect.element(details).not.toBeVisible()
+})
+
 it('keeps the slideout on the newest text of a streaming Reply until the user scrolls up', async () => {
   const {main} = await renderCanvas(endingIn('streaming', ''))
   await expect.element(page.getByText('Writing…')).toBeVisible()
