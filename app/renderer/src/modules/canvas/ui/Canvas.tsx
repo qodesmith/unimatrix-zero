@@ -223,7 +223,7 @@ function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
 
   const [expanded, setExpanded] = useState<Expanded>(() => ({
     ids: new Set(),
-    toggled: null,
+    toggledTurnId: null,
   }))
 
   const [collapsed, setCollapsed] = useState<Collapsed>(() => ({
@@ -267,10 +267,10 @@ function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
     }))
   }, [])
 
-  const toggleExpanded = useCallback((turnId: string, scrolled: number) => {
+  const toggleExpanded = useCallback((turnId: string) => {
     setExpanded(current => ({
       ids: toggled(turnId)(current.ids),
-      toggled: {turnId, scrolled},
+      toggledTurnId: turnId,
     }))
   }, [])
 

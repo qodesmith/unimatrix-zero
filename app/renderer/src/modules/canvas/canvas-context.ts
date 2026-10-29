@@ -10,8 +10,8 @@ export interface Collapsed {
 
 export interface Expanded {
   ids: ReadonlySet<string>
-  /** Its text stays where it was on screen as the layout changes around it. */
-  toggled: {turnId: string; scrolled: number} | null
+  /** Kept where it was on screen as the layout changes around it. */
+  toggledTurnId: string | null
 }
 
 /** What every Turn on the canvas needs, without carrying it in node data. */
@@ -29,8 +29,7 @@ export interface CanvasState {
   openChat: (replyId: string) => void
   /** Kept here, not in the node, so it survives an orientation switch. */
   expandedTurnIds: ReadonlySet<string>
-  /** `scrolled`: how far the user had scrolled its capped text. */
-  toggleExpanded: (turnId: string, scrolled: number) => void
+  toggleExpanded: (turnId: string) => void
   collapsedReplyIds: ReadonlySet<string>
   toggleCollapsed: (replyId: string) => void
   /** By Reply id; kept here so a draft outlives its box folding or redrawing. */

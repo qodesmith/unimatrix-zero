@@ -896,6 +896,18 @@ it('keeps a Reply let out by Show more open across an orientation switch', async
   expect(page.getByRole('button', {name: 'Show more'}).query()).toBeNull()
 })
 
+/** As the user does: the wheel over the canvas's empty space pans it. */
+async function wheel(deltaY: number) {
+  const pane = document.querySelector('.react-flow__pane')
+
+  if (!pane) throw new Error('The canvas is not drawn')
+
+  pane.dispatchEvent(
+    new WheelEvent('wheel', {deltaY, bubbles: true, cancelable: true})
+  )
+  await settledViewport()
+}
+
 function lineTop(line: string) {
   return canvas()
     .getByText(line, {exact: true})
@@ -964,6 +976,48 @@ it('keeps a scrolled Fork’s text put as Show more lets it out and its card re-
 
   const before = await showMoreScrolledTo('Line 12')
   expect(lineTop('Line 12')).toBeCloseTo(before, 0)
+})
+
+it('keeps the text at the canvas’s top edge where it is as Show less caps a Reply let out past it', async () => {
+  clock = 0
+  await renderCanvas({
+    prompts: [prompt(1, null, 'Short')],
+    replies: [reply(11, 1, longReply)],
+  })
+
+  await expect.poll(viewport).not.toContain('translate(0px, 0px)')
+  await settledViewport()
+  await page.getByRole('button', {name: 'Show more'}).click()
+  const less = page.getByRole('button', {name: 'Show less'})
+  await expect.element(less).toBeVisible()
+  await settledViewport()
+
+  await wheel(1600)
+  const canvasTop = canvas().element().getBoundingClientRect().top
+  const turn = nodeOf('Line 1').element().getBoundingClientRect()
+  expect(turn.top).toBeLessThan(canvasTop)
+
+  const read = [...nodeOf('Line 1').element().querySelectorAll('p')].find(
+    line => line.getBoundingClientRect().top >= canvasTop
+  )
+
+  if (!read) throw new Error('No line is at the canvas’s top edge')
+
+  const before = read.getBoundingClientRect().top
+
+  // Below the window: a pointer click would scroll it into view first.
+  less.element().dispatchEvent(new MouseEvent('click', {bubbles: true}))
+  await expect
+    .element(page.getByRole('button', {name: 'Show more'}))
+    .toBeVisible()
+  await settledViewport()
+
+  const line = read.getBoundingClientRect()
+  expect(line.top).toBeCloseTo(before, 0)
+
+  const capped = read.closest('.overflow-y-auto')?.getBoundingClientRect()
+  expect(capped?.top).toBeLessThanOrEqual(line.top)
+  expect(capped?.bottom).toBeGreaterThanOrEqual(line.bottom)
 })
 
 it('lets long Turns take their full height when the Setting is off', async () => {
@@ -1614,18 +1668,6 @@ function bottomOf(element: Element) {
   return element.getBoundingClientRect().bottom
 }
 
-/** As the user does: the wheel over the canvas's empty space pans it. */
-async function wheelUp() {
-  const pane = document.querySelector('.react-flow__pane')
-
-  if (!pane) throw new Error('The canvas is not drawn')
-
-  pane.dispatchEvent(
-    new WheelEvent('wheel', {deltaY: -300, bubbles: true, cancelable: true})
-  )
-  await settledViewport()
-}
-
 it('keeps a streaming Reply’s bottom on the canvas as it grows, until the user scrolls up', async () => {
   const {main} = await renderCanvas({
     ...linearTree(),
@@ -1656,7 +1698,7 @@ it('keeps a streaming Reply’s bottom on the canvas as it grows, until the user
   expect(bottomOf(streaming)).toBeLessThanOrEqual(bottomOf(pane))
   expect(streaming.getBoundingClientRect().top).toBeLessThan(0)
 
-  await wheelUp()
+  await wheel(-300)
   const scrolled = viewport()
 
   main.publish({...ids, type: 'TEXT_DELTA', delta: '\n\nThe last line'})

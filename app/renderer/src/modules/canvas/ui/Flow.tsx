@@ -142,7 +142,7 @@ export function Flow({
   // boxes it shows are measured; the viewport moves by the same amount, scaled,
   // so the Reply stays where it is on screen. A pan lets it go. Letting out or
   // capping a Turn's text holds its Turn the same way until its box is measured
-  // anew, and text the user scrolled to stays put as the box unscrolls.
+  // anew.
   const lastLayout = useRef(layout)
   const lastCollapsed = useRef(collapsed)
   const lastExpanded = useRef(expanded)
@@ -158,15 +158,14 @@ export function Flow({
       held.current = turnId === null ? null : {turnId, resizing: null}
     }
 
-    const toggled = lastExpanded.current === expanded ? null : expanded.toggled
-    lastExpanded.current = expanded
-    const scrolled = toggled?.scrolled ?? 0
+    if (lastExpanded.current !== expanded) {
+      lastExpanded.current = expanded
+      const turnId = expanded.toggledTurnId
 
-    if (toggled) {
-      held.current = {
-        turnId: toggled.turnId,
-        resizing: measured[nodeIdOf(toggled.turnId)] ?? null,
-      }
+      held.current =
+        turnId === null
+          ? null
+          : {turnId, resizing: measured[nodeIdOf(turnId)] ?? null}
     }
 
     const {current} = held
@@ -187,7 +186,7 @@ export function Flow({
 
     void flow.setViewport({
       x: x - (to.x - from.x) * zoom,
-      y: y - (to.y - from.y + scrolled) * zoom,
+      y: y - (to.y - from.y) * zoom,
       zoom,
     })
   }, [layout, collapsed, expanded, measured, allMeasured, nodeIdOf, flow])
