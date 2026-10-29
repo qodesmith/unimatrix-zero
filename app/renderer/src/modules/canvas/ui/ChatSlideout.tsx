@@ -28,6 +28,13 @@ const SCROLL_MARGIN = 12
 
 const SLIDE_MS = 300
 
+/** How close to the bottom still counts as reading the newest text, in px. */
+const AT_BOTTOM = 24
+
+function atBottom({scrollHeight, scrollTop, clientHeight}: HTMLElement) {
+  return scrollHeight - scrollTop - clientHeight < AT_BOTTOM
+}
+
 /** Chat mode: one Thread as a conventional chat in a slideout over the canvas. */
 export function ChatSlideout({
   end,
@@ -42,6 +49,8 @@ export function ChatSlideout({
   const [full, setFull] = useState(false)
   const aside = useRef<HTMLElement>(null)
   const body = useRef<HTMLDivElement>(null)
+  const content = useRef<HTMLDivElement>(null)
+  const pinned = useRef(true)
   const thread = pathTo(index, end.id)
 
   // Esc in a field elsewhere, like a Tree's name, belongs to that field.
@@ -87,7 +96,25 @@ export function ChatSlideout({
       turn.getBoundingClientRect().top -
       scroller.getBoundingClientRect().top -
       SCROLL_MARGIN
+    pinned.current = atBottom(scroller)
   }, [scrollToTurnId])
+
+  // The Thread stays on the newest text until the user scrolls up.
+  useEffect(() => {
+    const scroller = body.current
+    const inner = content.current
+
+    if (!scroller || !inner) return undefined
+
+    const observer = new ResizeObserver(() => {
+      if (pinned.current) scroller.scrollTop = scroller.scrollHeight
+    })
+
+    observer.observe(scroller)
+    observer.observe(inner)
+
+    return () => observer.disconnect()
+  }, [])
 
   return (
     <aside
@@ -115,8 +142,14 @@ export function ChatSlideout({
           </HeaderButton>
         </div>
       </header>
-      <div ref={body} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        <div className="mx-auto flex max-w-180 flex-col gap-3">
+      <div
+        ref={body}
+        onScroll={event => {
+          pinned.current = atBottom(event.currentTarget)
+        }}
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
+      >
+        <div ref={content} className="mx-auto flex max-w-180 flex-col gap-3">
           {thread.map(turnId => (
             <ChatTurn key={turnId} turnId={turnId} />
           ))}

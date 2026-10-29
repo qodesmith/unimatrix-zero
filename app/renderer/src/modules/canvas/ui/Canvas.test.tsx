@@ -1444,3 +1444,43 @@ it('stops the slideout’s streaming Reply with Esc rather than closing the slid
   await userEvent.keyboard('{Escape}')
   await expect.element(slideout()).not.toBeInTheDocument()
 })
+
+it('keeps the slideout on the newest text of a streaming Reply until the user scrolls up', async () => {
+  const {main} = await renderCanvas(endingIn('streaming', ''))
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+
+  await openChatAt('Writing…')
+  await expect.element(slideout().getByText('Writing…')).toBeVisible()
+
+  const scroller = slideout().element().querySelector('.overflow-y-auto')
+
+  if (!scroller) throw new Error('The slideout does not scroll')
+
+  const ids = {treeId, replyId: uuid(12)}
+
+  main.publish({...ids, type: 'RUN_STARTED'})
+  main.publish({
+    ...ids,
+    type: 'TEXT_DELTA',
+    delta: longText.replaceAll('\n', '\n\n'),
+  })
+  await expect.element(slideout().getByText('Line 40')).toBeVisible()
+  await expect.poll(() => scroller.scrollTop).toBeGreaterThan(0)
+  expect(
+    scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
+  ).toBeLessThan(1)
+
+  await new Promise(resolve => {
+    scroller.addEventListener('scroll', resolve, {once: true})
+    scroller.scrollTop = 0
+  })
+
+  main.publish({...ids, type: 'TEXT_DELTA', delta: '\n\nThe last line'})
+  await expect
+    .element(slideout().getByText('The last line'))
+    .toBeInTheDocument()
+  // Resize observers run after a frame's animation callbacks.
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  expect(scroller.scrollTop).toBe(0)
+})
