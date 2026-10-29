@@ -1,5 +1,5 @@
 import type {Database} from '#modules/database/main'
-import type {ReplyRequest} from '@uz/contract/host'
+import type {ReplyRequest, ReplySession} from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
 import type {Reply} from '@uz/contract/turns'
 
@@ -11,10 +11,12 @@ const {prompts, replies, systemPrompts} = schema
 /** A Reply ended early with its text kept; its Provider may not have saved it. */
 const CUT_SHORT = new Set<Reply['status']>(['stopped', 'interrupted'])
 
+type ContinuedSession = Extract<ReplySession, {type: 'continue' | 'fork'}>
+
 /** A null session means the Provider has nothing of the Thread and starts one. */
 export interface Continuation {
   provider: ProviderId
-  session: ReplyRequest['session']
+  session: ContinuedSession | null
 }
 
 export interface Recovery {
@@ -22,7 +24,7 @@ export interface Recovery {
   model: string
   systemPrompt: string
   text: string
-  session: Continuation['session']
+  session: ReplyRequest['session']
 }
 
 function answered(db: Database, replyId: string, except?: string) {
@@ -68,10 +70,9 @@ export function continuation(
     return {
       provider: row.provider,
       session: {
+        type: answered(db, replyId, except) ? 'fork' : 'continue',
         sessionId: row.sessionId,
         messageId: row.sessionMessageId,
-        fork: answered(db, replyId, except),
-        rewind: false,
       },
     }
   }
@@ -101,7 +102,10 @@ export function continuation(
     provider: row.provider,
     session: session && {
       ...session,
-      fork: session.fork || answered(db, replyId, except),
+      type:
+        session.type === 'fork' || answered(db, replyId, except)
+          ? 'fork'
+          : 'continue',
     },
   }
 }
@@ -173,8 +177,6 @@ export function recovery(
 
 type ReplyRow = typeof replies.$inferSelect
 
-type ContinuedSession = NonNullable<Continuation['session']>
-
 function promptIn(session: ContinuedSession, reply: ReplyRow | undefined) {
   return reply?.sessionId === session.sessionId
     ? (reply.sessionPromptId ?? null)
@@ -190,17 +192,19 @@ function rewound(
   session: ContinuedSession,
   parent: ReplyRow | undefined,
   failed: ReplyRow
-): ContinuedSession {
-  if (session.fork) return {...session, rewind: false}
+): ReplySession {
+  if (session.type === 'fork') return session
 
-  if (parent?.sessionMessageId === session.messageId) {
-    return {...session, rewind: true}
+  const {sessionId, messageId} = session
+
+  if (parent?.sessionMessageId === messageId) {
+    return {type: 'rewind', sessionId, messageId}
   }
 
   const keepThrough = promptIn(session, parent)
   const dropFrom = promptIn(session, failed)
 
   return keepThrough === null && dropFrom === null
-    ? {...session, rewind: false}
-    : {...session, rewind: false, retryCut: {keepThrough, dropFrom}}
+    ? session
+    : {type: 'cut', sessionId, messageId, keepThrough, dropFrom}
 }

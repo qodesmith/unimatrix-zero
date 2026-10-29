@@ -39,6 +39,32 @@ export const SignInRequestSchema = z.strictObject({
 
 export type SignInRequest = z.infer<typeof SignInRequestSchema>
 
+/** The Provider session a Reply is written in, at the Reply being answered. */
+export const ReplySessionSchema = z.discriminatedUnion('type', [
+  SessionRefSchema.extend({type: z.literal('continue')}),
+  /**
+   * The Reply already has a Prompt after it, so the Provider forks there and
+   * the other Branch's session is never rewound.
+   */
+  SessionRefSchema.extend({type: z.literal('fork')}),
+  /** The session may run past `messageId` with a failed turn, dropped first. */
+  SessionRefSchema.extend({type: z.literal('rewind')}),
+  /**
+   * A Retry whose Prompt answers a Reply cut short before its Provider saved
+   * it. The session keeps everything through `keepThrough`, that Reply's
+   * Prompt, and drops `dropFrom`, the failed attempt's own Prompt, with all
+   * after it. Each Provider cuts at the one it can; a null one leaves the
+   * session as it is.
+   */
+  SessionRefSchema.extend({
+    type: z.literal('cut'),
+    keepThrough: z.string().nullable(),
+    dropFrom: z.string().nullable(),
+  }),
+])
+
+export type ReplySession = z.infer<typeof ReplySessionSchema>
+
 export const ReplyRequestSchema = z.strictObject({
   treeId: z.uuid(),
   replyId: z.uuid(),
@@ -46,27 +72,8 @@ export const ReplyRequestSchema = z.strictObject({
   systemPrompt: z.string(),
   prompt: z.strictObject({text: z.string()}),
   vendorProgram: SignInRequestSchema,
-  /**
-   * At the Reply being answered; null starts a session. `fork`: the Reply
-   * already has a Prompt after it, so the Provider forks there and the other
-   * Branch's session is never rewound. `rewind`: the session may run past
-   * `messageId` with a failed turn, dropped first; never set with `fork`.
-   * `retryCut`: a Retry whose Prompt answers a Reply cut short before its
-   * Provider saved it. The session keeps everything through `keepThrough`,
-   * that Reply's Prompt, and drops `dropFrom`, the failed attempt's own Prompt,
-   * with all after it. Each Provider cuts at the one it can; a null one leaves
-   * the session as it is.
-   */
-  session: SessionRefSchema.extend({
-    fork: z.boolean(),
-    rewind: z.boolean(),
-    retryCut: z
-      .strictObject({
-        keepThrough: z.string().nullable(),
-        dropFrom: z.string().nullable(),
-      })
-      .optional(),
-  }).nullable(),
+  /** Null starts a session. */
+  session: ReplySessionSchema.nullable(),
 })
 
 export type ReplyRequest = z.infer<typeof ReplyRequestSchema>

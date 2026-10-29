@@ -250,7 +250,9 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       return {thread, dropped: false}
     }
 
-    const {sessionId: id, messageId, fork, rewind} = request.session
+    const {sessionId: id, messageId, type} = request.session
+    const fork = type === 'fork'
+    const rewind = type === 'rewind'
     const loaded = running.threads.get(id)
     const openedAt = messageId === null ? [] : [messageId]
 
@@ -398,7 +400,8 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     request: ReplyRequest,
     run: ReplyRun
   ): AsyncGenerator<WriteReplyEvent, Ending> {
-    let dropFrom = request.session?.retryCut?.dropFrom ?? null
+    const {session} = request
+    let dropFrom = session?.type === 'cut' ? session.dropFrom : null
 
     for (let attempt = 1; ; attempt++) {
       const running = await claim(request.vendorProgram)

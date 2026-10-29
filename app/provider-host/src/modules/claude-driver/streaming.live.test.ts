@@ -12,6 +12,7 @@
 import type {
   ReplyRecorded,
   ReplyRequest,
+  ReplySession,
   SessionRef,
   StartReplyEvent,
 } from '@uz/contract/host'
@@ -140,8 +141,8 @@ function liveDriver(files: string[]) {
   }
 }
 
-function continuing(session: SessionRef, fork = false) {
-  return {...session, fork, rewind: false}
+function continuing(session: SessionRef, fork = false): ReplySession {
+  return {...session, type: fork ? 'fork' : 'continue'}
 }
 
 describe.skipIf(!program || !configDir)('a live Claude', () => {
@@ -214,7 +215,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     const asked = await live.reply(
       'What did I ask you to do? Answer in five words.',
-      {...stopped.session, fork: false, rewind: false}
+      {...stopped.session, type: 'continue'}
     )
 
     expect(asked.recorded.session.sessionId).toBe(stopped.session.sessionId)
@@ -223,8 +224,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     await live.reply('Now reply with the single word OTTER.', {
       ...first.recorded.session,
-      fork: false,
-      rewind: false,
+      type: 'continue',
     })
 
     await live.closed()
@@ -232,7 +232,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     const rewound = await live.reply(
       'Which word did you reply with? Just the word.',
-      {...first.recorded.session, fork: false, rewind: true}
+      {...first.recorded.session, type: 'rewind'}
     )
 
     expect(rewound.recorded.session.sessionId).toBe(

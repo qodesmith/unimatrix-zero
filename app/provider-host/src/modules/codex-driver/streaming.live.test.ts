@@ -110,7 +110,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             },
             configDir: home,
           },
-          session: session && {...session, fork, rewind: false},
+          session: session && {...session, type: fork ? 'fork' : 'continue'},
         })
       )
 
@@ -252,7 +252,10 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           },
           configDir: home,
         },
-        session: session && {...session, fork: false, rewind},
+        session: session && {
+          ...session,
+          type: rewind ? 'rewind' : 'continue',
+        },
       })) {
         events.push(event)
 

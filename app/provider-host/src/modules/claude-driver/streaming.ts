@@ -8,7 +8,12 @@ import type {
   SpawnOptions,
   SpawnedProcess,
 } from '@anthropic-ai/claude-agent-sdk'
-import type {PromptRecorded, ReplyRequest, SessionFile} from '@uz/contract/host'
+import type {
+  PromptRecorded,
+  ReplyRequest,
+  ReplySession,
+  SessionFile,
+} from '@uz/contract/host'
 import type {RunFailure} from '@uz/contract/turns'
 import type {UUID} from 'node:crypto'
 
@@ -60,20 +65,31 @@ type Mapper = ReturnType<typeof createReplyMapper>
 
 type PromptRecords = Generator<PromptRecorded, void>
 
-/**
- * `upTo` is the last message kept, when a fork, a rewind or a Retry's cut cuts
- * the session.
- */
+/** The last message kept, when a fork, a rewind or a Retry's cut cuts it. */
+function cutAt(session: ReplySession) {
+  switch (session.type) {
+    case 'continue':
+      return null
+    case 'fork':
+    case 'rewind':
+      return session.messageId
+    case 'cut':
+      return session.keepThrough
+    default:
+      throw new Error('Unknown session.')
+  }
+}
+
 function resumption(session: ReplyRequest['session'], restore: Restore) {
   if (!session || restore === 'none') {
     return {resume: null, fork: false, upTo: null}
   }
 
-  const {sessionId: resume, fork, rewind, messageId} = session
-
-  const cutAt = session.retryCut?.keepThrough ?? null
-
-  return {resume, fork, upTo: fork || rewind ? messageId : cutAt}
+  return {
+    resume: session.sessionId,
+    fork: session.type === 'fork',
+    upTo: cutAt(session),
+  }
 }
 
 /** `heard` says whether `claude` sent anything back to the Prompt. */
@@ -283,11 +299,11 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   function claimable(request: ReplyRequest): Live | null {
     const {session} = request
 
-    if (!session || session.fork) return null
+    if (!session || session.type === 'fork') return null
 
     const claimed = warm.claim(session)
 
-    if (claimed && (session.rewind || session.retryCut?.keepThrough)) {
+    if (claimed && cutAt(session) !== null) {
       warm.drop(claimed)
 
       return null

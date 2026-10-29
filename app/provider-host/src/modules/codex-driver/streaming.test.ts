@@ -1,7 +1,7 @@
 import type {
   PromptRecorded,
   ReplyRecorded,
-  ReplyRequest,
+  ReplySession,
   SessionRef,
   StartReplyEvent,
 } from '@uz/contract/host'
@@ -163,18 +163,8 @@ async function setUp(
   /** Stops the Reply after `stopAfter` text deltas; 0 stops it as it starts. */
   async function reply(
     text: string,
-    session: SessionRef | null = null,
-    {
-      fork = false,
-      rewind = false,
-      retryCut,
-      stopAfter = Infinity,
-    }: {
-      fork?: boolean
-      rewind?: boolean
-      retryCut?: NonNullable<ReplyRequest['session']>['retryCut']
-      stopAfter?: number
-    } = {}
+    session: SessionRef | ReplySession | null = null,
+    {stopAfter = Infinity}: {stopAfter?: number} = {}
   ) {
     const replyId = crypto.randomUUID()
     const events: Streamed[] = []
@@ -198,7 +188,7 @@ async function setUp(
         },
         configDir,
       },
-      session: session && {...session, fork, rewind, retryCut},
+      session: session && {type: 'continue', ...session},
     })) {
       events.push(event)
 
@@ -392,8 +382,9 @@ it('forks the Provider session through a mid-Thread Reply into a new thread, fro
 
   const codex = await setUp(['forked.ndjson'], {store: opened.store})
 
-  const forked = await codex.reply(FORK_PROMPT, recordedIn(first), {
-    fork: true,
+  const forked = await codex.reply(FORK_PROMPT, {
+    ...recordedIn(first),
+    type: 'fork',
   })
 
   expect(textOf(forked)).toBe('You asked: “Say hi in three words.”')
@@ -505,8 +496,7 @@ it('rewinds the loaded thread to the Reply a Retry answers, keeping both rollout
 
   const retried = await codex.reply(
     'What was the last thing I asked you? Just the words.',
-    recordedIn(hi),
-    {rewind: true}
+    {...recordedIn(hi), type: 'rewind'}
   )
 
   expect(textOf(retried)).toBe('Say hi in three words.')
@@ -536,8 +526,9 @@ it('resumes a Retry from the app’s copy when the thread isn’t loaded, with n
   const codex = await setUp(['resumed.ndjson'], {store: opened.store})
   extendSavedRollout(opened.store, codex.configDir, 'failed')
 
-  const third = await codex.reply(THIRD_PROMPT, recordedIn(second), {
-    rewind: true,
+  const third = await codex.reply(THIRD_PROMPT, {
+    ...recordedIn(second),
+    type: 'rewind',
   })
 
   expect(textOf(third)).toBe('“Say hi in three words.”')
@@ -563,8 +554,12 @@ it('cuts a Retry’s loaded thread before the failed turn, keeping the Reply cut
 
   const retried = await codex.reply(
     'What was the last thing I asked you? Just the words.',
-    recordedIn(hi),
-    {retryCut: {keepThrough: null, dropFrom: promptRecordedIn(bye).messageId}}
+    {
+      ...recordedIn(hi),
+      type: 'cut',
+      keepThrough: null,
+      dropFrom: promptRecordedIn(bye).messageId,
+    }
   )
 
   const [report] = codex.reports()
@@ -637,8 +632,11 @@ it('cuts a Retry’s unloaded thread before the failed turn, from Codex’s long
 
   const onDisk = fs.readFileSync(rollout)
 
-  const retried = await codex.reply(THIRD_PROMPT, recordedIn(second), {
-    retryCut: {keepThrough: 'interrupted', dropFrom: 'failed'},
+  const retried = await codex.reply(THIRD_PROMPT, {
+    ...recordedIn(second),
+    type: 'cut',
+    keepThrough: 'interrupted',
+    dropFrom: 'failed',
   })
 
   expect(retried.at(-1)).toMatchObject({status: 'complete'})
@@ -673,8 +671,11 @@ it('doesn’t cut again when Codex stops after the cut and a new app-server take
 
   extendSavedRollout(opened.store, codex.configDir, 'interrupted', 'failed')
 
-  const retried = await codex.reply(THIRD_PROMPT, recordedIn(second), {
-    retryCut: {keepThrough: 'interrupted', dropFrom: 'failed'},
+  const retried = await codex.reply(THIRD_PROMPT, {
+    ...recordedIn(second),
+    type: 'cut',
+    keepThrough: 'interrupted',
+    dropFrom: 'failed',
   })
 
   expect(retried.at(-1)).toMatchObject({status: 'complete'})
@@ -756,8 +757,11 @@ it('counts a Retry’s cut as made when Codex no longer has the failed turn', as
 
   extendSavedRollout(opened.store, codex.configDir, 'interrupted')
 
-  const retried = await codex.reply(THIRD_PROMPT, recordedIn(second), {
-    retryCut: {keepThrough: 'interrupted', dropFrom: 'failed'},
+  const retried = await codex.reply(THIRD_PROMPT, {
+    ...recordedIn(second),
+    type: 'cut',
+    keepThrough: 'interrupted',
+    dropFrom: 'failed',
   })
 
   expect(retried.at(-1)).toMatchObject({status: 'complete'})
@@ -784,8 +788,11 @@ it('fails a Retry whose cut Codex refuses while it still has the failed turn', a
 
   extendSavedRollout(opened.store, codex.configDir, 'interrupted', 'failed')
 
-  const retried = await codex.reply(THIRD_PROMPT, recordedIn(second), {
-    retryCut: {keepThrough: 'interrupted', dropFrom: 'failed'},
+  const retried = await codex.reply(THIRD_PROMPT, {
+    ...recordedIn(second),
+    type: 'cut',
+    keepThrough: 'interrupted',
+    dropFrom: 'failed',
   })
 
   expect(retried.at(-1)).toMatchObject({
