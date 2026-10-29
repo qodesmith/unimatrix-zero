@@ -1,7 +1,7 @@
 import type {Collapsed} from '../canvas-context'
-import type {Size} from '../layout'
+import type {Layout, Size} from '../layout'
 import type {TreeIndex} from '../tree'
-import type {TurnNode} from './TurnNodes'
+import type {Stem, TurnNode} from './TurnNodes'
 import type {CanvasOrientation} from '@uz/contract/settings'
 import type {Edge, NodeChange} from '@xyflow/react'
 
@@ -59,6 +59,25 @@ function clickedTurnId(target: EventTarget) {
   if (!(target instanceof Element) || target.closest(CONTROLS)) return null
 
   return target.closest('[data-turn]')?.getAttribute('data-turn') ?? null
+}
+
+function isOnThread(
+  edge: Layout['edges'][number],
+  thread: ReadonlySet<string>
+) {
+  return thread.has(edge.source) && thread.has(edge.target)
+}
+
+function stemOf(
+  nodeId: string,
+  layout: Layout,
+  thread: ReadonlySet<string>
+): Stem {
+  const outgoing = layout.edges.filter(edge => edge.source === nodeId)
+
+  if (outgoing.length === 0) return 'none'
+
+  return outgoing.some(edge => isOnThread(edge, thread)) ? 'on-thread' : 'plain'
 }
 
 function hoverIdOf(node: TurnNode) {
@@ -175,18 +194,22 @@ export function Flow({
         id: turn.id,
         type: turn.kind,
         position: turn.position,
-        data: {turn},
+        data: {
+          turn,
+          stem:
+            turn.kind === 'reply' ? stemOf(turn.id, layout, thread) : 'none',
+        },
         measured: measured[turn.id],
         draggable: false,
         selectable: false,
       })),
-    [layout, measured]
+    [layout, measured, thread]
   )
 
   const edges = useMemo<Edge[]>(
     () =>
       layout.edges.map(edge => {
-        const highlighted = thread.has(edge.source) && thread.has(edge.target)
+        const highlighted = isOnThread(edge, thread)
 
         return {
           ...edge,

@@ -313,6 +313,55 @@ it('draws every Turn as its own box, top-down, with an Input under every Reply',
   expect(two.left).toBeLessThan(three.left)
 })
 
+/** The thin line in a Reply's node from its box down to the node's bottom. */
+function stemUnder(replyText: string) {
+  const node = nodeOf(replyText).element()
+  const box = page.getByText(replyText).element().closest('[data-turn]')
+
+  if (!box) throw new Error(`${replyText} has no box`)
+
+  const {bottom} = box.getBoundingClientRect()
+
+  const stem = [...node.querySelectorAll('div')].find(candidate => {
+    const {width, top} = candidate.getBoundingClientRect()
+
+    return width < 4 && Math.abs(top - bottom) < 1
+  })
+
+  if (!stem) throw new Error(`${replyText} has no stem`)
+
+  return stem
+}
+
+it('joins a Reply’s box to the Prompts under it with an unbroken line while its Input is hidden', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await hoverAway()
+  await expect.poll(() => revealed('Reply one')).toBe('false')
+
+  const node = nodeOf('Reply one').element().getBoundingClientRect()
+  const stem = stemUnder('Reply one')
+
+  expect(stem.getBoundingClientRect().bottom).toBeCloseTo(node.bottom, 0)
+  expect(getComputedStyle(stem).opacity).toBe('1')
+
+  const line = document
+    .querySelector(`.react-flow__edge[data-id="${edge(11, 2)}"] path`)
+    ?.getBoundingClientRect()
+
+  const two = page
+    .getByText('Prompt two')
+    .element()
+    .closest('[data-turn]')
+    ?.getBoundingClientRect()
+
+  expect(line?.top).toBeCloseTo(node.bottom, 0)
+  expect(line?.bottom).toBeCloseTo(two?.top ?? Number.NaN, 0)
+
+  await page.getByText('Reply one').hover()
+  await expect.poll(() => getComputedStyle(stem).opacity).toBe('0')
+})
+
 it('shows the Active Thread’s Input, reveals another Reply’s on hover, and keeps one holding a draft', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()

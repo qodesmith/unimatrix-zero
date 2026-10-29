@@ -14,9 +14,13 @@ import {CappedText} from './CappedText'
 import {ContextMeter, ContextSize} from './ContextSize'
 import {PromptInput} from './PromptInput'
 
-export type TurnNode = Node<{turn: LayoutNode}, LayoutNode['kind']>
+/** A vertical Reply's line down through its Input's space, drawn as its edge. */
+export type Stem = 'none' | 'plain' | 'on-thread'
 
-const hiddenHandle = 'opacity-0!'
+export type TurnNode = Node<{turn: LayoutNode; stem: Stem}, LayoutNode['kind']>
+
+/** Sized to nothing, so an edge meets the box's border. */
+const hiddenHandle = 'size-0! min-h-0! min-w-0! border-0! opacity-0!'
 
 function PromptText({prompt}: {prompt: Prompt}) {
   const {limitTurnHeight, expandedTurnIds, toggleExpanded} = useCanvas()
@@ -99,7 +103,15 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
 }
 
 /** Hidden by opacity, not unmounted, so revealing it shifts nothing. */
-function ReplyInput({reply, hovered}: {reply: Reply; hovered: boolean}) {
+function ReplyInput({
+  reply,
+  hovered,
+  stem = 'none',
+}: {
+  reply: Reply
+  hovered: boolean
+  stem?: Stem
+}) {
   const {treeId, activeReplyId, onInputFocus, onSent, drafts, setDraft} =
     useCanvas()
 
@@ -111,21 +123,35 @@ function ReplyInput({reply, hovered}: {reply: Reply; hovered: boolean}) {
   const revealed = activeReplyId === reply.id || draft.trim() !== '' || hovered
 
   return (
-    <div
-      data-revealed={revealed}
-      className={cn(
-        'mt-2 transition-opacity',
-        !revealed && 'opacity-0 focus-within:opacity-100'
+    <div className="relative pt-2">
+      {stem !== 'none' && (
+        <div
+          aria-hidden
+          className={cn(
+            'absolute inset-y-0 left-1/2 -translate-x-1/2 transition-opacity',
+            stem === 'on-thread'
+              ? 'w-[2.5px] bg-thread-highlight'
+              : 'w-[1.5px] bg-canvas-edge',
+            revealed && 'opacity-0'
+          )}
+        />
       )}
-    >
-      <PromptInput
-        treeId={treeId}
-        parentReplyId={reply.id}
-        onFocus={() => onInputFocus(reply.id)}
-        onSent={replyId => onSent(replyId, reply.id)}
-        draft={draft}
-        onDraftChange={text => setDraft(reply.id, text)}
-      />
+      <div
+        data-revealed={revealed}
+        className={cn(
+          'relative transition-opacity',
+          !revealed && 'opacity-0 focus-within:opacity-100'
+        )}
+      >
+        <PromptInput
+          treeId={treeId}
+          parentReplyId={reply.id}
+          onFocus={() => onInputFocus(reply.id)}
+          onSent={replyId => onSent(replyId, reply.id)}
+          draft={draft}
+          onDraftChange={text => setDraft(reply.id, text)}
+        />
+      </div>
     </div>
   )
 }
@@ -186,7 +212,7 @@ export function ReplyNode({data}: NodeProps<TurnNode>) {
     <div style={{width: TURN_WIDTH}} {...hoverProps}>
       <Handle type="target" position={Position.Top} className={hiddenHandle} />
       <ReplyTurn reply={turn.reply} />
-      <ReplyInput reply={turn.reply} hovered={hovered} />
+      <ReplyInput reply={turn.reply} hovered={hovered} stem={data.stem} />
       <Handle
         type="source"
         position={Position.Bottom}
