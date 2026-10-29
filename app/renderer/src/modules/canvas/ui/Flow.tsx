@@ -126,7 +126,7 @@ export function Flow({
     [orientation, index]
   )
 
-  const {follow, unfollow, onMoveStart, onMoveEnd} = useFollow({
+  const {follow, unfollow, letGo, onMoveStart, onMoveEnd} = useFollow({
     index,
     layout,
     measured,
@@ -142,7 +142,7 @@ export function Flow({
   // boxes it shows are measured; the viewport moves by the same amount, scaled,
   // so the Reply stays where it is on screen. A pan lets it go. Letting out or
   // capping a Turn's text holds its Turn the same way until its box is measured
-  // anew.
+  // anew, and lets a followed Reply go, so the text being read stays put.
   const lastLayout = useRef(layout)
   const lastCollapsed = useRef(collapsed)
   const lastExpanded = useRef(expanded)
@@ -166,6 +166,8 @@ export function Flow({
         turnId === null
           ? null
           : {turnId, resizing: measured[nodeIdOf(turnId)] ?? null}
+
+      if (turnId !== null) letGo()
     }
 
     const {current} = held
@@ -189,7 +191,16 @@ export function Flow({
       y: y - (to.y - from.y) * zoom,
       zoom,
     })
-  }, [layout, collapsed, expanded, measured, allMeasured, nodeIdOf, flow])
+  }, [
+    layout,
+    collapsed,
+    expanded,
+    measured,
+    allMeasured,
+    nodeIdOf,
+    flow,
+    letGo,
+  ])
 
   const onNodesChange = useCallback(
     (changes: NodeChange<TurnNode>[]) => {

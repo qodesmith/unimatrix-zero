@@ -1782,3 +1782,54 @@ it('keeps a streaming Reply’s bottom on the canvas as it grows, until the user
     .poll(() => bottomOf(streaming))
     .toBeLessThanOrEqual(bottomOf(pane))
 })
+
+it('lets a streaming Reply go when Show more, pressed from the keyboard, lets out the text being read above it', async () => {
+  clock = 0
+
+  const {main} = await renderCanvas({
+    prompts: [prompt(1, null, 'Prompt one')],
+    replies: [reply(11, 1, longReply)],
+  })
+
+  await expect.element(page.getByText('Line 40')).toBeInTheDocument()
+  await settledViewport()
+
+  await sendInto('Line 40', 'And then?')
+  await expect.element(canvas().getByText('Writing…')).toBeVisible()
+  await settledViewport()
+  const replyId = main.replies.at(-1)?.id
+
+  if (replyId === undefined) throw new Error('No Reply was started')
+
+  const ids = {treeId, replyId}
+  main.publish({...ids, type: 'RUN_STARTED'})
+
+  const box = canvas()
+    .getByText('Line 12', {exact: true})
+    .element()
+    .closest('.overflow-y-auto')
+
+  if (!box) throw new Error('Line 12 is not in capped text')
+
+  box.scrollTop = 150
+  const before = lineTop('Line 12')
+
+  // A pointer press on the canvas lets the Reply go before the click lands.
+  canvas().getByRole('button', {name: 'Show more'}).element().focus()
+  await userEvent.keyboard('{Enter}')
+  await expect
+    .element(canvas().getByRole('button', {name: 'Show less'}))
+    .toBeVisible()
+  await settledViewport()
+  expect(lineTop('Line 12')).toBeCloseTo(before, 0)
+
+  main.publish({
+    ...ids,
+    type: 'TEXT_DELTA',
+    delta: longReply.replaceAll('Line', 'Streamed'),
+  })
+  await expect.element(canvas().getByText('Streamed 40')).toBeInTheDocument()
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  expect(lineTop('Line 12')).toBeCloseTo(before, 0)
+})

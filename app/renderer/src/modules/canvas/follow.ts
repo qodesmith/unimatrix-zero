@@ -136,14 +136,21 @@ export function useFollow({
     followed.current = null
   }, [])
 
-  const onMoveStart = useCallback((event: MouseEvent | TouchEvent | null) => {
-    if (!event) return
-
-    glide.current = 0
-
+  /** As a pan does: panning the Reply's bottom back follows it again. */
+  const letGo = useCallback(() => {
     if (followed.current)
       followed.current = {...followed.current, pinned: false}
   }, [])
+
+  const onMoveStart = useCallback(
+    (event: MouseEvent | TouchEvent | null) => {
+      if (!event) return
+
+      glide.current = 0
+      letGo()
+    },
+    [letGo]
+  )
 
   const onMoveEnd = useCallback(
     (event: MouseEvent | TouchEvent | null) => {
@@ -165,5 +172,5 @@ export function useFollow({
     [boxOf, width, height]
   )
 
-  return {follow, unfollow, onMoveStart, onMoveEnd}
+  return {follow, unfollow, letGo, onMoveStart, onMoveEnd}
 }
