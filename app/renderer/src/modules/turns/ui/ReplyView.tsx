@@ -9,7 +9,7 @@ import type {
 
 import {useProviderStatus} from '#modules/connections/main'
 import {ReplyMarkdown} from '#modules/markdown/main'
-import {Button} from '#modules/shadcn/main'
+import {Button, cn} from '#modules/shadcn/main'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {Fragment} from 'react'
 
@@ -259,7 +259,10 @@ function ToolCallView({part}: {part: ToolCall}) {
             <dt className="text-muted-foreground">Result</dt>
             <dd>
               <pre
-                className={`overflow-x-auto whitespace-pre-wrap ${result.isError ? 'text-destructive' : ''}`}
+                className={cn(
+                  'overflow-x-auto whitespace-pre-wrap',
+                  result.isError && 'text-destructive'
+                )}
               >
                 {result.content}
               </pre>

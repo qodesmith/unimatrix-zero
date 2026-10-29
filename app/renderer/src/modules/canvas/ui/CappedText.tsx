@@ -60,7 +60,7 @@ export function CappedText({
           const {scrollHeight, scrollTop, clientHeight} = event.currentTarget
           pinned.current = scrollHeight - scrollTop - clientHeight < AT_BOTTOM
         }}
-        className={cn(capped && `nowheel overflow-y-auto ${maxHeightClass}`)}
+        className={cn(capped && ['nowheel overflow-y-auto', maxHeightClass])}
       >
         <div ref={content}>{children}</div>
       </div>

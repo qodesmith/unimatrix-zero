@@ -2,7 +2,7 @@ import type {Card} from '../cards'
 import type {ProviderId, SignInStep} from '@uz/contract/providers'
 import type {ReactNode} from 'react'
 
-import {Button} from '#modules/shadcn/main'
+import {Button, cn} from '#modules/shadcn/main'
 import {PROVIDER_NAMES, SignInStepEvent} from '@uz/contract/providers'
 import {useState} from 'react'
 
@@ -144,17 +144,20 @@ function Checklist({
               className="flex flex-col gap-1.5"
             >
               <span
-                className={`flex items-center gap-2 text-sm ${index === current ? 'font-medium' : 'text-muted-foreground'}`}
+                className={cn(
+                  'flex items-center gap-2 text-sm',
+                  index === current ? 'font-medium' : 'text-muted-foreground'
+                )}
               >
                 <span
                   aria-hidden
-                  className={`flex size-5 items-center justify-center rounded-full text-[11px] ${
-                    index < current
-                      ? 'bg-success text-primary-foreground'
-                      : index === current
-                        ? 'animate-pulse bg-primary text-primary-foreground'
-                        : 'bg-muted'
-                  }`}
+                  className={cn(
+                    'flex size-5 items-center justify-center rounded-full text-[11px]',
+                    index < current && 'bg-success text-primary-foreground',
+                    index === current &&
+                      'animate-pulse bg-primary text-primary-foreground',
+                    index > current && 'bg-muted'
+                  )}
                 >
                   {index < current ? '✓' : ''}
                 </span>
