@@ -4,7 +4,7 @@ import type {TreeIndex} from '../tree'
 import type {Focus} from './Flow'
 import type {CanvasOrientation} from '@uz/contract/settings'
 import type {Reply} from '@uz/contract/turns'
-import type {XYPosition} from '@xyflow/react'
+import type {Viewport} from '@xyflow/react'
 import type {ReactNode} from 'react'
 
 import {useSettings, useUpdateSettings} from '#modules/settings/main'
@@ -110,8 +110,11 @@ function useEscapeStops({
 
 interface EmptyTreeProps {
   treeId: string
-  /** Where the Input sits on the canvas, each time that changes. */
-  onPlaced: (at: XYPosition) => void
+  /**
+   * Where the Input sits on the canvas, and its width as a share of a Turn's,
+   * each time that changes.
+   */
+  onPlaced: (at: Viewport) => void
   onSent: (replyId: string) => void
 }
 
@@ -129,7 +132,11 @@ function EmptyTree({treeId, onPlaced, onSent}: EmptyTreeProps) {
     const observer = new ResizeObserver(() => {
       const from = outer.getBoundingClientRect()
       const to = inner.getBoundingClientRect()
-      onPlaced({x: to.left - from.left, y: to.top - from.top})
+      onPlaced({
+        x: to.left - from.left,
+        y: to.top - from.top,
+        zoom: Math.min(1, to.width / TURN_WIDTH),
+      })
     })
 
     observer.observe(outer)
@@ -218,7 +225,7 @@ function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
   const [inputToFocus, setInputToFocus] = useState<string | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const [switching, setSwitching] = useState(false)
-  const [inputAt, setInputAt] = useState<XYPosition | null>(null)
+  const [inputAt, setInputAt] = useState<Viewport | null>(null)
   const [showMap, setShowMap] = useState(false)
 
   const [expanded, setExpanded] = useState<Expanded>(() => ({

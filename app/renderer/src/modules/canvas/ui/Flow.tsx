@@ -3,7 +3,7 @@ import type {Layout, Size} from '../layout'
 import type {TreeIndex} from '../tree'
 import type {Stem, TurnNode} from './TurnNodes'
 import type {CanvasOrientation} from '@uz/contract/settings'
-import type {Edge, NodeChange, XYPosition} from '@xyflow/react'
+import type {Edge, NodeChange, Viewport} from '@xyflow/react'
 
 import {cn} from '#modules/shadcn/main'
 import {Background, MiniMap, ReactFlow, useReactFlow} from '@xyflow/react'
@@ -40,8 +40,8 @@ interface FlowProps {
   focus: Focus | null
   /** Fit the whole Tree once it is measured; off for a Tree that starts here. */
   fitOnLoad: boolean
-  /** Where the root Prompt is drawn at first, at full size. */
-  startAt: XYPosition | null
+  /** Where the root Prompt is drawn at first, and how far zoomed. */
+  startAt: Viewport | null
   switching: boolean
   showMap: boolean
   onHover: (turnId: string | null) => void
@@ -343,7 +343,7 @@ export function Flow({
       edges={edges}
       nodeTypes={nodeTypes}
       onNodesChange={onNodesChange}
-      defaultViewport={startAt ? {...startAt, zoom: 1} : undefined}
+      defaultViewport={startAt ?? undefined}
       onMoveStart={onMoveStart}
       onMoveEnd={onMoveEnd}
       nodesDraggable={false}

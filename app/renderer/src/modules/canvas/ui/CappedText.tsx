@@ -4,6 +4,8 @@ import {cn} from '#modules/shadcn/main'
 import {useReactFlow, useStoreApi} from '@xyflow/react'
 import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 
+import {atBottom} from '../at-bottom'
+
 interface CappedTextProps {
   /** Off: the text takes its full height and there is nothing to show more of. */
   limit: boolean
@@ -15,9 +17,6 @@ interface CappedTextProps {
   className?: string
   children: ReactNode
 }
-
-/** How close to the bottom still counts as reading the newest text, in px. */
-const AT_BOTTOM = 24
 
 /** The box's scroll on either side of a toggle, in canvas units. */
 interface Toggle {
@@ -102,8 +101,7 @@ export function CappedText({
       <div
         ref={box}
         onScroll={event => {
-          const {scrollHeight, scrollTop, clientHeight} = event.currentTarget
-          pinned.current = scrollHeight - scrollTop - clientHeight < AT_BOTTOM
+          pinned.current = atBottom(event.currentTarget)
         }}
         className={cn(capped && ['nowheel overflow-y-auto', maxHeightClass])}
       >

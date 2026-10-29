@@ -5,6 +5,7 @@ import {Button, cn} from '#modules/shadcn/main'
 import {ReplyView, useReply} from '#modules/turns/main'
 import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 
+import {atBottom} from '../at-bottom'
 import {useCanvas} from '../canvas-context'
 import {pathTo} from '../tree'
 import {PromptInput} from './PromptInput'
@@ -27,13 +28,6 @@ interface ChatSlideoutProps {
 const SCROLL_MARGIN = 12
 
 const SLIDE_MS = 300
-
-/** How close to the bottom still counts as reading the newest text, in px. */
-const AT_BOTTOM = 24
-
-function atBottom({scrollHeight, scrollTop, clientHeight}: HTMLElement) {
-  return scrollHeight - scrollTop - clientHeight < AT_BOTTOM
-}
 
 /** Chat mode: one Thread as a conventional chat in a slideout over the canvas. */
 export function ChatSlideout({

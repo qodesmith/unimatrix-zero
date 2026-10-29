@@ -13,7 +13,7 @@ import {SettingsProvider} from '#modules/settings/main'
 import {LiveReplies} from '#modules/turns/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
-import {expect, it, onTestFinished} from 'vitest'
+import {expect, it, onTestFinished, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {cdp, page, userEvent} from 'vitest/browser'
 
@@ -1192,28 +1192,37 @@ it('shows one centered Input on an empty Tree and the Turns once it is sent', as
     .toBe(2)
 })
 
-it('puts an empty Tree’s root Prompt where its Input was, as wide, with the canvas holding still', async () => {
-  await renderCanvas({prompts: [], replies: []})
-  const input = page.getByRole('textbox', {name: 'Prompt'})
-  await expect.element(input).toBeVisible()
-  const before = input.element().closest('form')?.getBoundingClientRect()
+// A 720px window, the narrowest, leaves the canvas about 464px beside the sidebar.
+it.each([
+  {pane: 'wide', width: 1280},
+  {pane: 'narrow', width: 464},
+])(
+  'puts an empty Tree’s root Prompt where its Input was, as wide, with the canvas holding still, on a $pane pane',
+  async ({width}) => {
+    await page.viewport(width, 800)
+    onTestFinished(async () => page.viewport(1280, 800))
+    await renderCanvas({prompts: [], replies: []})
+    const input = page.getByRole('textbox', {name: 'Prompt'})
+    await expect.element(input).toBeVisible()
+    const before = input.element().closest('form')?.getBoundingClientRect()
 
-  if (!before) throw new Error('The Input is not drawn')
+    if (!before) throw new Error('The Input is not drawn')
 
-  const stop = samplePainted()
-  await input.fill('Hello?')
-  await userEvent.keyboard('{Enter}')
-  await expect.element(canvas().getByText('Hello?')).toBeVisible()
-  await expect.element(canvas().getByText('Writing…')).toBeVisible()
-  const held = await settledViewport()
+    const stop = samplePainted()
+    await input.fill('Hello?')
+    await userEvent.keyboard('{Enter}')
+    await expect.element(canvas().getByText('Hello?')).toBeVisible()
+    await expect.element(canvas().getByText('Writing…')).toBeVisible()
+    const held = await settledViewport()
 
-  // Centering can land the Input on a half pixel the canvas rounds away.
-  const placed = nodeOf('Hello?').element().getBoundingClientRect()
-  expect(Math.abs(placed.left - before.left)).toBeLessThanOrEqual(0.5)
-  expect(Math.abs(placed.top - before.top)).toBeLessThanOrEqual(0.5)
-  expect(placed.width).toBe(before.width)
-  expect(stop()).toEqual([held])
-})
+    // Centering can land the Input on a half pixel the canvas rounds away.
+    const placed = nodeOf('Hello?').element().getBoundingClientRect()
+    expect(Math.abs(placed.left - before.left)).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(placed.top - before.top)).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(placed.width - before.width)).toBeLessThanOrEqual(0.5)
+    expect(stop()).toEqual([held])
+  }
+)
 
 function slideout() {
   return page.getByRole('complementary', {name: 'Chat'})
@@ -1425,8 +1434,8 @@ it('scrolls the slideout to the Reply it opened from, expands to cover the canva
     prompts: [prompt(1, null, 'Prompt one'), prompt(2, 11, 'Prompt two')],
     // Long enough for Reply two to reach the top.
     replies: [
-      reply(11, 1, `Reply one\n\n${longText.replaceAll('\n', '\n\n')}`),
-      reply(12, 2, `Reply two\n\n${longText.replaceAll('\n', '\n\n')}`),
+      reply(11, 1, `Reply one\n\n${longReply}`),
+      reply(12, 2, `Reply two\n\n${longReply}`),
     ],
   })
   await expect.element(page.getByText('Prompt two')).toBeVisible()
@@ -1641,7 +1650,7 @@ it('keeps the slideout on the newest text of a streaming Reply until the user sc
   main.publish({
     ...ids,
     type: 'TEXT_DELTA',
-    delta: longText.replaceAll('\n', '\n\n'),
+    delta: longReply,
   })
   await expect.element(slideout().getByText('Line 40')).toBeVisible()
   await expect.poll(() => scroller.scrollTop).toBeGreaterThan(0)
@@ -1668,7 +1677,18 @@ function bottomOf(element: Element) {
   return element.getBoundingClientRect().bottom
 }
 
-it('keeps a streaming Reply’s bottom on the canvas as it grows, until the user scrolls up', async () => {
+/** A wheel, then the end of its gesture, which the canvas waits a timer for. */
+async function wheelGesture(deltaY: number) {
+  vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']})
+  onTestFinished(() => {
+    vi.useRealTimers()
+  })
+  await wheel(deltaY)
+  vi.runOnlyPendingTimers()
+  vi.useRealTimers()
+}
+
+it('keeps a streaming Reply’s bottom on the canvas as it grows, until the user scrolls up and again once they scroll back', async () => {
   const {main} = await renderCanvas({
     ...linearTree(),
     settings: {limitTurnHeight: false},
@@ -1690,7 +1710,7 @@ it('keeps a streaming Reply’s bottom on the canvas as it grows, until the user
   main.publish({
     ...ids,
     type: 'TEXT_DELTA',
-    delta: longText.replaceAll('\n', '\n\n'),
+    delta: longReply,
   })
   await expect.element(canvas().getByText('Line 40')).toBeInTheDocument()
   const streaming = nodeOf('Line 40').element()
@@ -1698,7 +1718,7 @@ it('keeps a streaming Reply’s bottom on the canvas as it grows, until the user
   expect(bottomOf(streaming)).toBeLessThanOrEqual(bottomOf(pane))
   expect(streaming.getBoundingClientRect().top).toBeLessThan(0)
 
-  await wheel(-300)
+  await wheelGesture(-300)
   const scrolled = viewport()
 
   main.publish({...ids, type: 'TEXT_DELTA', delta: '\n\nThe last line'})
@@ -1706,4 +1726,16 @@ it('keeps a streaming Reply’s bottom on the canvas as it grows, until the user
   await new Promise(requestAnimationFrame)
   await new Promise(requestAnimationFrame)
   expect(viewport()).toBe(scrolled)
+
+  // Past where it was, since the Reply grew while it was let go.
+  await wheelGesture(500)
+  expect(bottomOf(streaming)).toBeLessThanOrEqual(bottomOf(pane))
+
+  main.publish({...ids, type: 'TEXT_DELTA', delta: `\n\n${longReply}`})
+  await expect
+    .poll(() => canvas().getByText('Line 40', {exact: true}).elements())
+    .toHaveLength(2)
+  await expect
+    .poll(() => bottomOf(streaming))
+    .toBeLessThanOrEqual(bottomOf(pane))
 })
