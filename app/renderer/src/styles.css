@@ -107,3 +107,10 @@
   opacity: 0;
   transition: none;
 }
+
+/* React Flow draws the viewport inside its own markup; Flow marks the canvas
+   `canvas-fitting` until it is fitted. Opacity, not visibility: React Flow
+   marks each measured node visible, which overrides a hidden parent. */
+.canvas-fitting .react-flow__viewport {
+  opacity: 0;
+}

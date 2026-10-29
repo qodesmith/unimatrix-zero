@@ -1,4 +1,4 @@
-import type {KeyboardEvent} from 'react'
+import type {KeyboardEvent, Ref} from 'react'
 
 import {Button} from '#modules/shadcn/main'
 import {useSendPrompt} from '#modules/turns/main'
@@ -15,6 +15,12 @@ interface PromptInputProps {
   draft?: string
   /** The draft as it changes; empty again once sent. */
   onDraftChange?: (draft: string) => void
+  /**
+   * False while the Reply it continues from streams: it takes a draft, not a
+   * send.
+   */
+  canSend?: boolean
+  ref?: Ref<HTMLTextAreaElement>
 }
 
 /** Where the user types the next Prompt. Enter sends; Shift+Enter breaks a line. */
@@ -25,6 +31,8 @@ export function PromptInput({
   onSent,
   draft: kept,
   onDraftChange,
+  canSend = true,
+  ref,
 }: PromptInputProps) {
   const sendPrompt = useSendPrompt(treeId, parentReplyId)
   const [ownDraft, setOwnDraft] = useState('')
@@ -38,7 +46,7 @@ export function PromptInput({
   }
 
   async function send() {
-    if (sending || draft.trim() === '') return
+    if (!canSend || sending || draft.trim() === '') return
 
     setSending(true)
     const outcome = await sendPrompt(draft)
@@ -71,6 +79,7 @@ export function PromptInput({
       }}
     >
       <textarea
+        ref={ref}
         aria-label="Prompt"
         rows={2}
         placeholder={parentReplyId === null ? 'Ask anything' : 'Reply…'}
@@ -85,7 +94,7 @@ export function PromptInput({
         <Button
           type="submit"
           size="sm"
-          disabled={sending || draft.trim() === ''}
+          disabled={!canSend || sending || draft.trim() === ''}
         >
           Send
         </Button>

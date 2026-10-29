@@ -15,7 +15,7 @@ interface Point {
 }
 
 /** Every Turn is drawn this wide, in both orientations. */
-export const TURN_WIDTH = 440
+export const TURN_WIDTH = 768
 
 const DEFAULT_SIZE: Size = {width: TURN_WIDTH, height: 80}
 

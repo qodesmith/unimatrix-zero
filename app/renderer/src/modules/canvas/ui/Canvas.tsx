@@ -1,18 +1,29 @@
 import type {Turns} from '#modules/turns/main'
-import type {CanvasState, Collapsed} from '../canvas-context'
+import type {CanvasState, Collapsed, Expanded} from '../canvas-context'
 import type {TreeIndex} from '../tree'
 import type {Focus} from './Flow'
 import type {CanvasOrientation} from '@uz/contract/settings'
 import type {Reply} from '@uz/contract/turns'
+import type {Viewport} from '@xyflow/react'
+import type {ReactNode} from 'react'
 
 import {useSettings, useUpdateSettings} from '#modules/settings/main'
 import {useReply, useReplyRun, useTurns} from '#modules/turns/main'
 import {ReactFlowProvider} from '@xyflow/react'
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
 import {CanvasContext} from '../canvas-context'
 import {useChatSlideout} from '../chat-slideout/use-chat-slideout'
+import {TURN_WIDTH} from '../layout'
 import {indexTurns, isEmpty, newestReply, pathTo, previousReply} from '../tree'
+import {CanvasControls} from './CanvasControls'
 import {ChatSlideout} from './ChatSlideout'
 import {Flow} from './Flow'
 import {PromptInput} from './PromptInput'
@@ -97,20 +108,101 @@ function useEscapeStops({
   }, [streaming, stop])
 }
 
-/** One Tree on the canvas: a centered Input while it is empty, then its Turns. */
-export function Canvas({treeId}: {treeId: string}) {
-  const turns = useTurns(treeId)
-
-  if (turns.isPending) return null
-
-  if (turns.isError) {
-    return <p className="p-6 text-sm text-destructive">{turns.error.message}</p>
-  }
-
-  return <TreeCanvas treeId={treeId} turns={turns.data} />
+interface EmptyTreeProps {
+  treeId: string
+  /**
+   * Where the Input sits on the canvas, and its width as a share of a Turn's,
+   * each time that changes.
+   */
+  onPlaced: (at: Viewport) => void
+  onSent: (replyId: string) => void
 }
 
-function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
+/** One centered Input, a Turn wide, so the root Prompt can take its place. */
+function EmptyTree({treeId, onPlaced, onSent}: EmptyTreeProps) {
+  const pane = useRef<HTMLDivElement>(null)
+  const box = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const outer = pane.current
+    const inner = box.current
+
+    if (!outer || !inner) return undefined
+
+    const observer = new ResizeObserver(() => {
+      const from = outer.getBoundingClientRect()
+      const to = inner.getBoundingClientRect()
+      onPlaced({
+        x: to.left - from.left,
+        y: to.top - from.top,
+        zoom: Math.min(1, to.width / TURN_WIDTH),
+      })
+    })
+
+    observer.observe(outer)
+    observer.observe(inner)
+
+    return () => observer.disconnect()
+  }, [onPlaced])
+
+  return (
+    <div ref={pane} className="flex h-full items-center justify-center p-6">
+      <div ref={box} className="max-w-full" style={{width: TURN_WIDTH}}>
+        <PromptInput treeId={treeId} parentReplyId={null} onSent={onSent} />
+      </div>
+    </div>
+  )
+}
+
+interface CanvasFrameProps {
+  title: ReactNode
+  controls?: ReactNode
+  children?: ReactNode
+}
+
+/** The Tree's name with the canvas controls beside it, over the canvas. */
+function CanvasFrame({title, controls, children}: CanvasFrameProps) {
+  return (
+    <div className="flex h-full flex-col">
+      <header className="flex min-h-12 shrink-0 items-center gap-3 px-4 pt-4 pb-2">
+        <h2 className="min-w-0 flex-1 truncate text-lg font-semibold">
+          {title}
+        </h2>
+        {controls}
+      </header>
+      <div className="relative min-h-0 flex-1">{children}</div>
+    </div>
+  )
+}
+
+interface CanvasProps {
+  treeId: string
+  /** The Tree's name, drawn in the row the controls share. */
+  title: ReactNode
+}
+
+/** One Tree on the canvas: a centered Input while it is empty, then its Turns. */
+export function Canvas({treeId, title}: CanvasProps) {
+  const turns = useTurns(treeId)
+
+  if (turns.isPending) return <CanvasFrame title={title} />
+
+  if (turns.isError) {
+    return (
+      <CanvasFrame title={title}>
+        <p className="p-6 text-sm text-destructive">{turns.error.message}</p>
+      </CanvasFrame>
+    )
+  }
+
+  return <TreeCanvas treeId={treeId} title={title} turns={turns.data} />
+}
+
+interface TreeCanvasProps extends CanvasProps {
+  turns: Turns
+}
+
+function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
   const index = useMemo(() => indexTurns(turns), [turns])
   const settings = useSettings()
   const {canvasOrientation, limitTurnHeight, contextSizeMeter} = settings
@@ -130,12 +222,16 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
   } = useChatSlideout(index)
 
   const [hoverTurnId, setHoverTurnId] = useState<string | null>(null)
+  const [inputToFocus, setInputToFocus] = useState<string | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const [switching, setSwitching] = useState(false)
+  const [inputAt, setInputAt] = useState<Viewport | null>(null)
+  const [showMap, setShowMap] = useState(false)
 
-  const [expandedTurnIds, setExpandedTurnIds] = useState<ReadonlySet<string>>(
-    () => new Set()
-  )
+  const [expanded, setExpanded] = useState<Expanded>(() => ({
+    ids: new Set(),
+    toggledTurnId: null,
+  }))
 
   const [collapsed, setCollapsed] = useState<Collapsed>(() => ({
     ids: new Set(),
@@ -170,15 +266,19 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
     [index, highlightedTurnId]
   )
 
-  const focusOn = useCallback((replyId: string) => {
+  const focusOn = useCallback((replyId: string, mode: Focus['mode']) => {
     setFocus(current => ({
       replyId,
+      mode,
       sequence: (current?.sequence ?? 0) + 1,
     }))
   }, [])
 
   const toggleExpanded = useCallback((turnId: string) => {
-    setExpandedTurnIds(toggled(turnId))
+    setExpanded(current => ({
+      ids: toggled(turnId)(current.ids),
+      toggledTurnId: turnId,
+    }))
   }, [])
 
   const toggleCollapsed = useCallback((replyId: string) => {
@@ -207,14 +307,23 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
         setCollapsed(unfoldedOver(index, parentReplyId))
       }
 
-      focusOn(replyId)
+      focusOn(replyId, 'follow')
     },
     [index, focusOn]
+  )
+
+  const sentFromInput = useCallback(
+    (replyId: string, parentReplyId: string | null) => {
+      onSent(replyId, parentReplyId)
+      setInputToFocus(replyId)
+    },
+    [onSent]
   )
 
   const onInputFocus = useCallback(
     (replyId: string) => {
       setChosenReplyId(replyId)
+      setInputToFocus(null)
       closeChat()
     },
     [closeChat]
@@ -236,7 +345,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
 
       if (parent) setCollapsed(unfoldedOver(index, parent.id))
 
-      focusOn(replyId)
+      focusOn(replyId, 'center')
     },
     [index, focusOn]
   )
@@ -251,7 +360,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
 
     switchTimer.current = setTimeout(() => setSwitching(false), SWITCH_MS)
 
-    if (activeReplyId) focusOn(activeReplyId)
+    if (activeReplyId) focusOn(activeReplyId, 'center')
   }
 
   const state = useMemo<CanvasState>(
@@ -260,8 +369,10 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       index,
       activeReplyId,
       onInputFocus,
-      onSent,
-      expandedTurnIds,
+      onSent: sentFromInput,
+      inputToFocus,
+      openChat,
+      expandedTurnIds: expanded.ids,
       toggleExpanded,
       collapsedReplyIds: collapsed.ids,
       toggleCollapsed,
@@ -275,8 +386,10 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       index,
       activeReplyId,
       onInputFocus,
-      onSent,
-      expandedTurnIds,
+      sentFromInput,
+      inputToFocus,
+      openChat,
+      expanded.ids,
       toggleExpanded,
       collapsed.ids,
       toggleCollapsed,
@@ -289,48 +402,67 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
 
   if (isEmpty(index)) {
     return (
-      <div className="flex h-full items-center justify-center p-6">
-        <div className="w-full max-w-xl">
-          <PromptInput
-            treeId={treeId}
-            parentReplyId={null}
-            onSent={replyId => onSent(replyId, null)}
-          />
-        </div>
-      </div>
+      <CanvasFrame title={title}>
+        <EmptyTree
+          treeId={treeId}
+          onPlaced={setInputAt}
+          onSent={replyId => sentFromInput(replyId, null)}
+        />
+      </CanvasFrame>
     )
   }
 
+  const streaming = index.replies
+    .filter(reply => reply.status === 'streaming')
+    .map(reply => reply.id)
+
+  const failed = index.replies
+    .filter(reply => reply.status === 'failed')
+    .map(reply => reply.id)
+
   return (
     <CanvasContext value={state}>
-      <div className="relative h-full">
-        <ReactFlowProvider>
+      <ReactFlowProvider>
+        <CanvasFrame
+          title={title}
+          controls={
+            <CanvasControls
+              orientation={canvasOrientation}
+              onOrientation={onOrientation}
+              streaming={streaming}
+              failed={failed}
+              onJump={jumpTo}
+              showMap={showMap}
+              onToggleMap={() => setShowMap(shown => !shown)}
+            />
+          }
+        >
           <Flow
             index={index}
             orientation={canvasOrientation}
             thread={thread}
             collapsed={collapsed}
+            expanded={expanded}
             focus={focus}
             fitOnLoad={!startedEmpty}
+            startAt={inputAt}
             switching={switching}
+            showMap={showMap}
             onHover={setHoverTurnId}
-            onOpenChat={openChat}
-            onOrientation={onOrientation}
-            onJump={jumpTo}
           />
-        </ReactFlowProvider>
-        {chatTurnId !== null && chatEnd && (
-          <ChatSlideout
-            end={chatEnd}
-            scrollToTurnId={chatTurnId}
-            open={chatOpen}
-            onClose={closeChat}
-            onClosed={chatClosed}
-            onFocus={setChosenReplyId}
-            onSent={sentFromChat}
-          />
-        )}
-      </div>
+          {chatTurnId !== null && chatEnd && (
+            <ChatSlideout
+              end={chatEnd}
+              scrollToTurnId={chatTurnId}
+              open={chatOpen}
+              onClose={closeChat}
+              onClosed={chatClosed}
+              onFocus={setChosenReplyId}
+              onSent={sentFromChat}
+            />
+          )}
+        </CanvasFrame>
+      </ReactFlowProvider>
     </CanvasContext>
   )
 }

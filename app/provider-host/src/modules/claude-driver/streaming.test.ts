@@ -3,7 +3,7 @@ import type {SDKPartialAssistantMessage} from '@anthropic-ai/claude-agent-sdk'
 import type {
   PromptRecorded,
   ReplyRecorded,
-  ReplyRequest,
+  ReplySession,
   SessionRef,
   StartReplyEvent,
 } from '@uz/contract/host'
@@ -129,9 +129,6 @@ async function setUp(
   const treeId = crypto.randomUUID()
 
   interface ReplyOptions {
-    fork?: boolean
-    rewind?: boolean
-    retryCut?: NonNullable<ReplyRequest['session']>['retryCut']
     /** 0 stops the Reply as it starts. */
     stopAfterDeltas?: number
     replyId?: string
@@ -139,14 +136,8 @@ async function setUp(
 
   async function reply(
     text: string,
-    session: SessionRef | null = null,
-    {
-      fork = false,
-      rewind = false,
-      retryCut,
-      stopAfterDeltas,
-      replyId = crypto.randomUUID(),
-    }: ReplyOptions = {}
+    session: SessionRef | ReplySession | null = null,
+    {stopAfterDeltas, replyId = crypto.randomUUID()}: ReplyOptions = {}
   ) {
     const events: Streamed[] = []
     let deltas = 0
@@ -164,7 +155,7 @@ async function setUp(
         },
         configDir,
       },
-      session: session && {...session, fork, rewind, retryCut},
+      session: session && {type: 'continue', ...session},
     })) {
       events.push(event)
 
@@ -350,7 +341,7 @@ it('forks the session through a mid-Thread Reply into a new session, leaving the
   await claude.reply(THIRD_PROMPT, session)
 
   const first = {sessionId: SESSION_ID, messageId: FIRST_MESSAGE}
-  const forked = await claude.reply(FORK_PROMPT, first, {fork: true})
+  const forked = await claude.reply(FORK_PROMPT, {...first, type: 'fork'})
 
   expect(textOf(forked)).toBe('TEAL')
   expect(recordedIn(forked)).toEqual({
@@ -803,8 +794,9 @@ it('rewinds a cold session to an earlier Reply and goes on from there, in the sa
     force: true,
   })
 
-  const rewound = await claude.reply(FORK_PROMPT, recordedIn(first), {
-    rewind: true,
+  const rewound = await claude.reply(FORK_PROMPT, {
+    ...recordedIn(first),
+    type: 'rewind',
   })
 
   expect(textOf(rewound)).toBe('TEAL')
@@ -835,8 +827,9 @@ it('never rewinds in the warm session standing there: it closes, and a new `clau
 
   const first = await claude.reply(FIRST_PROMPT)
 
-  const rewound = await claude.reply(FORK_PROMPT, recordedIn(first), {
-    rewind: true,
+  const rewound = await claude.reply(FORK_PROMPT, {
+    ...recordedIn(first),
+    type: 'rewind',
   })
 
   expect(textOf(rewound)).toBe('TEAL')
@@ -860,8 +853,11 @@ it('cuts a Retry’s session after the Prompt of the Reply cut short, which `cla
   await claude.allClosed()
   const keepThrough = promptRecordedIn(cutShort).messageId
 
-  await claude.reply(FORK_PROMPT, recordedIn(first), {
-    retryCut: {keepThrough, dropFrom: null},
+  await claude.reply(FORK_PROMPT, {
+    ...recordedIn(first),
+    type: 'cut',
+    keepThrough,
+    dropFrom: null,
   })
 
   await claude.allClosed()

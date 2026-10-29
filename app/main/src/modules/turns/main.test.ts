@@ -430,8 +430,7 @@ describe('a Prompt answering a Reply', () => {
           session: {
             sessionId: 's1',
             messageId: 'm1',
-            fork: false,
-            rewind: false,
+            type: 'continue',
           },
         },
       },
@@ -466,8 +465,8 @@ describe('a Prompt answering a Reply', () => {
     turns.sendPrompt({treeId, parentReplyId: replyId, text: 'Or instead?'})
 
     expect(sessionsStarted()).toEqual([
-      {sessionId: 's1', messageId: 'm1', fork: false, rewind: false},
-      {sessionId: 's1', messageId: 'm1', fork: true, rewind: false},
+      {sessionId: 's1', messageId: 'm1', type: 'continue'},
+      {sessionId: 's1', messageId: 'm1', type: 'fork'},
     ])
   })
 
@@ -516,7 +515,7 @@ describe('continuing from a Reply its Provider never saved', () => {
     turns.sendPrompt({treeId, parentReplyId: cutShort, text: 'Go on'})
 
     expect(sessionsStarted()).toEqual([
-      {sessionId: 's1', messageId: 'm1', fork: false, rewind: false},
+      {sessionId: 's1', messageId: 'm1', type: 'continue'},
     ])
   })
 
@@ -529,8 +528,8 @@ describe('continuing from a Reply its Provider never saved', () => {
     turns.sendPrompt({treeId, parentReplyId: cutShort, text: 'Or instead?'})
 
     expect(sessionsStarted()).toEqual([
-      {sessionId: 's1', messageId: 'm1', fork: false, rewind: false},
-      {sessionId: 's1', messageId: 'm1', fork: true, rewind: false},
+      {sessionId: 's1', messageId: 'm1', type: 'continue'},
+      {sessionId: 's1', messageId: 'm1', type: 'fork'},
     ])
   })
 
@@ -625,7 +624,7 @@ describe('retrying a Reply', () => {
     turns.retry(treeId, failed)
 
     expect(sessionsStarted()).toEqual([
-      {sessionId: 's1', messageId: 'm1', fork: false, rewind: true},
+      {sessionId: 's1', messageId: 'm1', type: 'rewind'},
     ])
   })
 
@@ -639,7 +638,7 @@ describe('retrying a Reply', () => {
     turns.retry(treeId, failed)
 
     expect(sessionsStarted()).toEqual([
-      {sessionId: 's1', messageId: 'm1', fork: false, rewind: false},
+      {sessionId: 's1', messageId: 'm1', type: 'continue'},
     ])
   })
 
@@ -659,9 +658,9 @@ describe('retrying a Reply', () => {
       {
         sessionId: 's1',
         messageId: 'm1',
-        fork: false,
-        rewind: false,
-        retryCut: {keepThrough: 'p-interrupted', dropFrom: 'p-failed'},
+        type: 'cut',
+        keepThrough: 'p-interrupted',
+        dropFrom: 'p-failed',
       },
     ])
   })
@@ -682,9 +681,9 @@ describe('retrying a Reply', () => {
       {
         sessionId: 's1',
         messageId: 'm1',
-        fork: false,
-        rewind: false,
-        retryCut: {keepThrough: null, dropFrom: 'p-failed'},
+        type: 'cut',
+        keepThrough: null,
+        dropFrom: 'p-failed',
       },
     ])
   })
@@ -708,9 +707,9 @@ describe('retrying a Reply', () => {
       {
         sessionId: 's1',
         messageId: 'm1',
-        fork: false,
-        rewind: false,
-        retryCut: {keepThrough: 'p-interrupted', dropFrom: 'p-failed'},
+        type: 'cut',
+        keepThrough: 'p-interrupted',
+        dropFrom: 'p-failed',
       },
     ])
   })
@@ -739,9 +738,9 @@ describe('retrying a Reply', () => {
       {
         sessionId: 's1',
         messageId: 'm1',
-        fork: false,
-        rewind: false,
-        retryCut: {keepThrough: 'p-interrupted', dropFrom: null},
+        type: 'cut',
+        keepThrough: 'p-interrupted',
+        dropFrom: null,
       },
     ])
   })
@@ -755,7 +754,7 @@ describe('retrying a Reply', () => {
     turns.retry(treeId, failed)
 
     expect(sessionsStarted()).toEqual([
-      {sessionId: 's1', messageId: 'm1', fork: true, rewind: false},
+      {sessionId: 's1', messageId: 'm1', type: 'fork'},
     ])
   })
 

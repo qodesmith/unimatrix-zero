@@ -8,6 +8,12 @@ export interface Collapsed {
   toggledReplyId: string | null
 }
 
+export interface Expanded {
+  ids: ReadonlySet<string>
+  /** Kept where it was on screen as the layout changes around it. */
+  toggledTurnId: string | null
+}
+
 /** What every Turn on the canvas needs, without carrying it in node data. */
 export interface CanvasState {
   treeId: string
@@ -17,6 +23,10 @@ export interface CanvasState {
   onInputFocus: (replyId: string) => void
   /** A Prompt was sent into a Reply's Input and main started this Reply for it. */
   onSent: (replyId: string, parentReplyId: string) => void
+  /** The Reply whose Input takes focus once it is drawn: the one just sent for. */
+  inputToFocus: string | null
+  /** Chat mode on the Thread ending at this Reply. */
+  openChat: (replyId: string) => void
   /** Kept here, not in the node, so it survives an orientation switch. */
   expandedTurnIds: ReadonlySet<string>
   toggleExpanded: (turnId: string) => void

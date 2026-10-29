@@ -3,7 +3,7 @@ import type {ReactNode} from 'react'
 
 import {Button, cn} from '#modules/shadcn/main'
 import {CanvasOrientationSchema} from '@uz/contract/settings'
-import {MiniMap, Panel, useReactFlow} from '@xyflow/react'
+import {useReactFlow} from '@xyflow/react'
 import {useRef} from 'react'
 
 import {useReducedMotion} from '../reduced-motion'
@@ -16,6 +16,8 @@ interface CanvasControlsProps {
   /** Replies that failed, oldest first. */
   failed: string[]
   onJump: (replyId: string) => void
+  showMap: boolean
+  onToggleMap: () => void
 }
 
 const LABELS: Record<CanvasOrientation, string> = {
@@ -23,27 +25,26 @@ const LABELS: Record<CanvasOrientation, string> = {
   horizontal: 'Horizontal',
 }
 
-/** The orientation toggle is a shortcut to the Setting. */
+/**
+ * One row beside the Tree's name, off the canvas so it never covers a Turn.
+ * The orientation toggle is a shortcut to the Setting.
+ */
 export function CanvasControls({
   orientation,
   onOrientation,
   streaming,
   failed,
   onJump,
+  showMap,
+  onToggleMap,
 }: CanvasControlsProps) {
   const flow = useReactFlow()
   const still = useReducedMotion()
 
   return (
-    <Panel
-      position="bottom-left"
-      className="overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-md"
-    >
+    <div className="flex shrink-0 items-center gap-1 text-[11px]">
       {(streaming.length > 0 || failed.length > 0) && (
-        <div
-          role="status"
-          className="flex items-center gap-1 border-b border-border p-1 text-[11px]"
-        >
+        <div role="status" className="flex items-center gap-1">
           {streaming.length > 0 && (
             <JumpButton
               label={`${streaming.length} streaming`}
@@ -64,62 +65,60 @@ export function CanvasControls({
           )}
         </div>
       )}
-      <MiniMap
-        pannable
-        zoomable
-        aria-label="Minimap"
-        style={{position: 'relative', margin: 0, width: 220, height: 130}}
-      />
-      <div className="flex items-center gap-1 border-t border-border p-1.5">
-        <ToolButton
-          title="Zoom in"
-          onClick={() => void flow.zoomIn({duration: still ? 0 : 200})}
-        >
-          +
-        </ToolButton>
-        <ToolButton
-          title="Zoom out"
-          onClick={() => void flow.zoomOut({duration: still ? 0 : 200})}
-        >
-          −
-        </ToolButton>
-        <ToolButton
-          title="Fit the whole Tree"
-          onClick={() =>
-            void flow.fitView({
-              padding: 0.15,
-              maxZoom: 1,
-              duration: still ? 0 : 300,
-            })
-          }
-        >
-          ⤢
-        </ToolButton>
-        <span className="flex-1" />
-        <div
-          role="group"
-          aria-label="Orientation"
-          className="flex rounded-lg bg-muted p-0.5 text-[11px]"
-        >
-          {CanvasOrientationSchema.options.map(value => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={orientation === value}
-              className={cn(
-                'rounded-md px-2 py-1',
-                orientation === value
-                  ? 'bg-card text-card-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-              onClick={() => onOrientation(value)}
-            >
-              {LABELS[value]}
-            </button>
-          ))}
-        </div>
+      <ToolButton
+        title="Zoom in"
+        onClick={() => void flow.zoomIn({duration: still ? 0 : 200})}
+      >
+        +
+      </ToolButton>
+      <ToolButton
+        title="Zoom out"
+        onClick={() => void flow.zoomOut({duration: still ? 0 : 200})}
+      >
+        −
+      </ToolButton>
+      <ToolButton
+        title="Fit the whole Tree"
+        onClick={() =>
+          void flow.fitView({
+            padding: 0.15,
+            maxZoom: 1,
+            duration: still ? 0 : 300,
+          })
+        }
+      >
+        ⤢
+      </ToolButton>
+      <ToolButton
+        title="Show the minimap"
+        pressed={showMap}
+        onClick={onToggleMap}
+      >
+        <MapIcon />
+      </ToolButton>
+      <div
+        role="group"
+        aria-label="Orientation"
+        className="ml-1 flex rounded-lg bg-muted p-0.5"
+      >
+        {CanvasOrientationSchema.options.map(value => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={orientation === value}
+            className={cn(
+              'rounded-md px-2 py-1',
+              orientation === value
+                ? 'bg-card text-card-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+            onClick={() => onOrientation(value)}
+          >
+            {LABELS[value]}
+          </button>
+        ))}
       </div>
-    </Panel>
+    </div>
   )
 }
 
@@ -161,10 +160,12 @@ function JumpButton({label, title, ids, onJump, dotClass}: JumpButtonProps) {
 
 function ToolButton({
   title,
+  pressed,
   onClick,
   children,
 }: {
   title: string
+  pressed?: boolean
   onClick: () => void
   children: ReactNode
 }) {
@@ -174,10 +175,30 @@ function ToolButton({
       size="icon"
       title={title}
       aria-label={title}
-      className="size-7"
+      aria-pressed={pressed}
+      className={cn('size-7', pressed && 'bg-accent text-accent-foreground')}
       onClick={onClick}
     >
       {children}
     </Button>
+  )
+}
+
+function MapIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-3.5"
+    >
+      <path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" />
+      <path d="M15 5.764v15" />
+      <path d="M9 3.236v15" />
+    </svg>
   )
 }

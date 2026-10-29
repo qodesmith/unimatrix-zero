@@ -1,11 +1,12 @@
-import type {Collapsed} from '../canvas-context'
-import type {Size} from '../layout'
+import type {Collapsed, Expanded} from '../canvas-context'
+import type {Layout, Size} from '../layout'
 import type {TreeIndex} from '../tree'
-import type {TurnNode} from './TurnNodes'
+import type {Stem, TurnNode} from './TurnNodes'
 import type {CanvasOrientation} from '@uz/contract/settings'
-import type {Edge, NodeChange} from '@xyflow/react'
+import type {Edge, NodeChange, Viewport} from '@xyflow/react'
 
-import {Background, ReactFlow, useReactFlow} from '@xyflow/react'
+import {cn} from '#modules/shadcn/main'
+import {Background, MiniMap, ReactFlow, useReactFlow} from '@xyflow/react'
 import {
   useCallback,
   useEffect,
@@ -15,15 +16,17 @@ import {
   useState,
 } from 'react'
 
+import {useFollow} from '../follow'
 import {layoutTree} from '../layout'
 import {useReducedMotion} from '../reduced-motion'
 import {isFork} from '../tree'
-import {CanvasControls} from './CanvasControls'
 import {ExchangeNode, PromptNode, ReplyNode} from './TurnNodes'
 
-/** A request to center a Reply; every request gets a new sequence. */
+/** A request to bring a Reply into view; every request gets a new sequence. */
 export interface Focus {
   replyId: string
+  /** `follow` shows the Reply's bottom and keeps it shown while it streams. */
+  mode: 'center' | 'follow'
   sequence: number
 }
 
@@ -33,14 +36,15 @@ interface FlowProps {
   /** The Turn ids on the highlighted Thread. */
   thread: ReadonlySet<string>
   collapsed: Collapsed
+  expanded: Expanded
   focus: Focus | null
   /** Fit the whole Tree once it is measured; off for a Tree that starts here. */
   fitOnLoad: boolean
+  /** Where the root Prompt is drawn at first, and how far zoomed. */
+  startAt: Viewport | null
   switching: boolean
+  showMap: boolean
   onHover: (turnId: string | null) => void
-  onOpenChat: (turnId: string) => void
-  onOrientation: (orientation: CanvasOrientation) => void
-  onJump: (replyId: string) => void
 }
 
 type Sizes = Record<CanvasOrientation, Record<string, Size>>
@@ -51,14 +55,37 @@ const FIT = {padding: 0.15, maxZoom: 1}
 
 const nodeTypes = {prompt: PromptNode, reply: ReplyNode, exchange: ExchangeNode}
 
-/** Controls inside a Turn's box keep their clicks to themselves. */
-const CONTROLS = 'a, button, input, textarea, summary, [role="button"]'
+function isOnThread(
+  edge: Layout['edges'][number],
+  thread: ReadonlySet<string>
+) {
+  return thread.has(edge.source) && thread.has(edge.target)
+}
 
-/** Read from the box hit, not the node, since an Exchange card holds two Turns. */
-function clickedTurnId(target: EventTarget) {
-  if (!(target instanceof Element) || target.closest(CONTROLS)) return null
+function stemOf(
+  nodeId: string,
+  layout: Layout,
+  thread: ReadonlySet<string>
+): Stem {
+  const outgoing = layout.edges.filter(edge => edge.source === nodeId)
 
-  return target.closest('[data-turn]')?.getAttribute('data-turn') ?? null
+  if (outgoing.length === 0) return 'none'
+
+  return outgoing.some(edge => isOnThread(edge, thread)) ? 'on-thread' : 'plain'
+}
+
+/** A Turn kept where it is on screen while the layout changes around it. */
+interface Held {
+  turnId: string
+  /**
+   * Its box's size before its text was let out or capped, held until it
+   * changes.
+   */
+  resizing: Size | null
+}
+
+function settledSize(held: Held, size: Size | undefined) {
+  return held.resizing === null || size !== held.resizing
 }
 
 function hoverIdOf(node: TurnNode) {
@@ -72,13 +99,13 @@ export function Flow({
   orientation,
   thread,
   collapsed,
+  expanded,
   focus,
   fitOnLoad,
+  startAt,
   switching,
+  showMap,
   onHover,
-  onOpenChat,
-  onOrientation,
-  onJump,
 }: FlowProps) {
   const flow = useReactFlow<TurnNode>()
   const panMs = useReducedMotion() ? 0 : 400
@@ -99,16 +126,27 @@ export function Flow({
     [orientation, index]
   )
 
+  const {follow, unfollow, letGo, onMoveStart, onMoveEnd} = useFollow({
+    index,
+    layout,
+    measured,
+    nodeIdOf,
+    panMs,
+  })
+
   const allMeasured =
     layout.nodes.length > 0 &&
     layout.nodes.every(node => measured[node.id] !== undefined)
 
   // Folding or unfolding a Fork moves its Reply in the layout, and again as the
   // boxes it shows are measured; the viewport moves by the same amount, scaled,
-  // so the Reply stays where it is on screen. A pan lets it go.
+  // so the Reply stays where it is on screen. A pan lets it go. Letting out or
+  // capping a Turn's text holds its Turn the same way until its box is measured
+  // anew, and lets a followed Reply go, so the text being read stays put.
   const lastLayout = useRef(layout)
   const lastCollapsed = useRef(collapsed)
-  const heldReplyId = useRef<string | null>(null)
+  const lastExpanded = useRef(expanded)
+  const held = useRef<Held | null>(null)
 
   useLayoutEffect(() => {
     const before = lastLayout.current
@@ -116,16 +154,31 @@ export function Flow({
 
     if (lastCollapsed.current !== collapsed) {
       lastCollapsed.current = collapsed
-      heldReplyId.current = collapsed.toggledReplyId
+      const turnId = collapsed.toggledReplyId
+      held.current = turnId === null ? null : {turnId, resizing: null}
     }
 
-    const replyId = heldReplyId.current
+    if (lastExpanded.current !== expanded) {
+      lastExpanded.current = expanded
+      const turnId = expanded.toggledTurnId
 
-    if (replyId === null) return
+      held.current =
+        turnId === null
+          ? null
+          : {turnId, resizing: measured[nodeIdOf(turnId)] ?? null}
 
-    if (allMeasured) heldReplyId.current = null
+      if (turnId !== null) letGo()
+    }
 
-    const nodeId = nodeIdOf(replyId)
+    const {current} = held
+
+    if (current === null) return
+
+    const nodeId = nodeIdOf(current.turnId)
+
+    if (allMeasured && settledSize(current, measured[nodeId]))
+      held.current = null
+
     const from = before.nodes.find(node => node.id === nodeId)?.position
     const to = layout.nodes.find(node => node.id === nodeId)?.position
 
@@ -138,7 +191,16 @@ export function Flow({
       y: y - (to.y - from.y) * zoom,
       zoom,
     })
-  }, [layout, collapsed, allMeasured, nodeIdOf, flow])
+  }, [
+    layout,
+    collapsed,
+    expanded,
+    measured,
+    allMeasured,
+    nodeIdOf,
+    flow,
+    letGo,
+  ])
 
   const onNodesChange = useCallback(
     (changes: NodeChange<TurnNode>[]) => {
@@ -175,18 +237,22 @@ export function Flow({
         id: turn.id,
         type: turn.kind,
         position: turn.position,
-        data: {turn},
+        data: {
+          turn,
+          stem:
+            turn.kind === 'reply' ? stemOf(turn.id, layout, thread) : 'none',
+        },
         measured: measured[turn.id],
         draggable: false,
         selectable: false,
       })),
-    [layout, measured]
+    [layout, measured, thread]
   )
 
   const edges = useMemo<Edge[]>(
     () =>
       layout.edges.map(edge => {
-        const highlighted = thread.has(edge.source) && thread.has(edge.target)
+        const highlighted = isOnThread(edge, thread)
 
         return {
           ...edge,
@@ -198,14 +264,13 @@ export function Flow({
     [layout, thread]
   )
 
-  const fitted = useRef(!fitOnLoad)
+  const [fitted, setFitted] = useState(!fitOnLoad)
 
   useEffect(() => {
-    if (fitted.current || !allMeasured) return
+    if (fitted || !allMeasured) return
 
-    fitted.current = true
-    void flow.fitView(FIT)
-  }, [allMeasured, flow])
+    void flow.fitView(FIT).then(() => setFitted(true))
+  }, [fitted, allMeasured, flow])
 
   const hasFork = index.replies.some(reply => isFork(index, reply.id))
 
@@ -221,16 +286,23 @@ export function Flow({
 
     if (focus) centered.current = focus.sequence
 
-    void flow.fitView({
-      padding: 0.15,
-      maxZoom: flow.getZoom(),
-      duration: panMs,
-    })
-  }, [hasFork, allMeasured, focus, flow, panMs])
+    async function fitAll() {
+      await flow.fitView({
+        padding: 0.15,
+        maxZoom: flow.getZoom(),
+        duration: panMs,
+      })
 
-  // Each focus pans to its Reply at the current zoom, once the Reply's box has
-  // a size; while the first Fork waits to be fitted, the fit takes it instead.
-  // A Reply folded away is not panned to, then or once it is unfolded.
+      if (focus?.mode === 'follow') follow(focus.replyId)
+    }
+
+    void fitAll()
+  }, [hasFork, allMeasured, focus, flow, panMs, follow])
+
+  // Each focus centers or follows its Reply at the current zoom, once the
+  // Reply's box has a size; while the first Fork waits to be fitted, the fit
+  // takes it instead. A Reply folded away is not panned to, then or once it is
+  // unfolded.
   useEffect(() => {
     if (!focus || centered.current === focus.sequence) return
 
@@ -249,21 +321,32 @@ export function Flow({
     if (!node || !size) return
 
     centered.current = focus.sequence
-    heldReplyId.current = null
+    held.current = null
+
+    if (focus.mode === 'follow') {
+      follow(focus.replyId)
+
+      return
+    }
+
+    unfollow()
     void flow.setCenter(
       node.position.x + size.width / 2,
       node.position.y + size.height / 2,
       {zoom: flow.getZoom(), duration: panMs, interpolate: 'linear'}
     )
-  }, [focus, hasFork, nodeIdOf, layout, index, measured, flow, panMs])
-
-  const streaming = index.replies
-    .filter(reply => reply.status === 'streaming')
-    .map(reply => reply.id)
-
-  const failed = index.replies
-    .filter(reply => reply.status === 'failed')
-    .map(reply => reply.id)
+  }, [
+    focus,
+    hasFork,
+    nodeIdOf,
+    layout,
+    index,
+    measured,
+    flow,
+    panMs,
+    follow,
+    unfollow,
+  ])
 
   return (
     <ReactFlow<TurnNode>
@@ -271,6 +354,9 @@ export function Flow({
       edges={edges}
       nodeTypes={nodeTypes}
       onNodesChange={onNodesChange}
+      defaultViewport={startAt ?? undefined}
+      onMoveStart={onMoveStart}
+      onMoveEnd={onMoveEnd}
       nodesDraggable={false}
       nodesConnectable={false}
       elementsSelectable={false}
@@ -280,23 +366,24 @@ export function Flow({
       minZoom={0.1}
       maxZoom={1.5}
       proOptions={{hideAttribution: true}}
-      className={switching ? 'canvas-switching' : undefined}
+      className={cn(
+        switching && 'canvas-switching',
+        !fitted && 'canvas-fitting'
+      )}
       onNodeMouseEnter={(_event, node) => onHover(hoverIdOf(node))}
       onNodeMouseLeave={() => onHover(null)}
-      onNodeClick={event => {
-        const turnId = clickedTurnId(event.target)
-
-        if (turnId !== null) onOpenChat(turnId)
-      }}
     >
       <Background gap={24} />
-      <CanvasControls
-        orientation={orientation}
-        onOrientation={onOrientation}
-        streaming={streaming}
-        failed={failed}
-        onJump={onJump}
-      />
+      {showMap && (
+        <MiniMap
+          pannable
+          zoomable
+          ariaLabel="Minimap"
+          position="bottom-left"
+          className="overflow-hidden rounded-xl border border-border shadow-md"
+          style={{width: 220, height: 130}}
+        />
+      )}
     </ReactFlow>
   )
 }

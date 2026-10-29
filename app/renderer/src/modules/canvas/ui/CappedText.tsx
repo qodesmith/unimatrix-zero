@@ -1,7 +1,10 @@
 import type {ReactNode} from 'react'
 
 import {cn} from '#modules/shadcn/main'
-import {useEffect, useRef, useState} from 'react'
+import {useReactFlow, useStoreApi} from '@xyflow/react'
+import {useEffect, useLayoutEffect, useRef, useState} from 'react'
+
+import {atBottom} from '../at-bottom'
 
 interface CappedTextProps {
   /** Off: the text takes its full height and there is nothing to show more of. */
@@ -15,10 +18,18 @@ interface CappedTextProps {
   children: ReactNode
 }
 
-/** How close to the bottom still counts as reading the newest text, in px. */
-const AT_BOTTOM = 24
+/** The box's scroll on either side of a toggle, in canvas units. */
+interface Toggle {
+  from: number
+  to: number
+}
 
-/** `nowheel` makes the wheel scroll capped text instead of panning the canvas. */
+/**
+ * `nowheel` makes the wheel scroll capped text instead of panning the canvas.
+ * Show more and Show less keep the text being read where it is on screen:
+ * capping scrolls the box to the text at the canvas's top edge, and the canvas
+ * moves by however far the box's scroll changed.
+ */
 export function CappedText({
   limit,
   maxHeightClass,
@@ -32,7 +43,40 @@ export function CappedText({
   const box = useRef<HTMLDivElement>(null)
   const content = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
+  const toggle = useRef<Toggle | null>(null)
+  const flow = useReactFlow()
+  const store = useStoreApi()
   const capped = limit && !expanded
+
+  // On every render, since a toggle is waiting only for the one it causes.
+  useLayoutEffect(() => {
+    const outer = box.current
+    const {current} = toggle
+
+    if (!outer || !current) return
+
+    toggle.current = null
+    outer.scrollTop = current.to
+
+    const {x, y, zoom} = flow.getViewport()
+    const moved = outer.scrollTop - current.from
+
+    if (moved !== 0) void flow.setViewport({x, y: y + moved * zoom, zoom})
+  })
+
+  function onClick() {
+    const outer = box.current
+
+    if (!outer) return
+
+    const pane = store.getState().domNode?.getBoundingClientRect().top ?? 0
+    const above = (pane - outer.getBoundingClientRect().top) / flow.getZoom()
+
+    toggle.current = expanded
+      ? {from: 0, to: Math.max(0, above)}
+      : {from: outer.scrollTop, to: 0}
+    onToggle()
+  }
 
   useEffect(() => {
     const outer = box.current
@@ -57,10 +101,9 @@ export function CappedText({
       <div
         ref={box}
         onScroll={event => {
-          const {scrollHeight, scrollTop, clientHeight} = event.currentTarget
-          pinned.current = scrollHeight - scrollTop - clientHeight < AT_BOTTOM
+          pinned.current = atBottom(event.currentTarget)
         }}
-        className={cn(capped && `nowheel overflow-y-auto ${maxHeightClass}`)}
+        className={cn(capped && ['nowheel overflow-y-auto', maxHeightClass])}
       >
         <div ref={content}>{children}</div>
       </div>
@@ -69,7 +112,7 @@ export function CappedText({
           <button
             type="button"
             className="text-xs text-primary hover:underline"
-            onClick={onToggle}
+            onClick={onClick}
           >
             {expanded ? 'Show less' : 'Show more'}
           </button>

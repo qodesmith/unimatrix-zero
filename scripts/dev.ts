@@ -10,6 +10,7 @@ const root = path.resolve(import.meta.dirname, '..')
 
 const worktree = createHash('sha256').update(root).digest('hex').slice(0, 8)
 const vitePort = 5173 + (parseInt(worktree, 16) % 2000)
+const debugPort = 9222 + (parseInt(worktree, 16) % 1000)
 const fakeProvider = process.argv.includes('--fake')
 
 // A fake connection saved in the real data would pass for a real one.
@@ -77,22 +78,29 @@ let electron: ReturnType<typeof Bun.spawn> | null = null
 let stopping = false
 
 function startElectron() {
-  electron = Bun.spawn([electronPath, fromRoot('shell/dist/index.cjs')], {
-    stdio: ['ignore', 'inherit', 'inherit'],
-    env: {
-      ...process.env,
-      UZ_DEV: '1',
-      UZ_DEV_VITE_PORT: String(vitePort),
-      UZ_DEV_NONCE: scriptNonce,
-      UZ_DEV_DATA_FOLDER: dataFolder,
-      UZ_DEV_FAKE: fakeProvider ? '1' : '0',
-    },
-    onExit: (_proc, code) => {
-      if (stopping || restarting) return
-      console.log(`Electron exited (${code}); stopping dev.`)
-      void shutdown()
-    },
-  })
+  electron = Bun.spawn(
+    [
+      electronPath,
+      `--remote-debugging-port=${debugPort}`,
+      fromRoot('shell/dist/index.cjs'),
+    ],
+    {
+      stdio: ['ignore', 'inherit', 'inherit'],
+      env: {
+        ...process.env,
+        UZ_DEV: '1',
+        UZ_DEV_VITE_PORT: String(vitePort),
+        UZ_DEV_NONCE: scriptNonce,
+        UZ_DEV_DATA_FOLDER: dataFolder,
+        UZ_DEV_FAKE: fakeProvider ? '1' : '0',
+      },
+      onExit: (_proc, code) => {
+        if (stopping || restarting) return
+        console.log(`Electron exited (${code}); stopping dev.`)
+        void shutdown()
+      },
+    }
+  )
 }
 
 let restarting = false
@@ -139,7 +147,7 @@ process.on('SIGINT', () => void shutdown())
 process.on('SIGTERM', () => void shutdown())
 
 console.log(
-  `Unimatrix Zero dev: renderer on app-dev:// (Vite :${vitePort}), data in ${dataFolder}${fakeProvider ? ', fake Provider' : ''}`
+  `Unimatrix Zero dev: renderer on app-dev:// (Vite :${vitePort}), CDP on :${debugPort}, data in ${dataFolder}${fakeProvider ? ', fake Provider' : ''}`
 )
 
 startElectron()

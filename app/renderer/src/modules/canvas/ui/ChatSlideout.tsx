@@ -5,6 +5,7 @@ import {Button, cn} from '#modules/shadcn/main'
 import {ReplyView, useReply} from '#modules/turns/main'
 import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 
+import {atBottom} from '../at-bottom'
 import {useCanvas} from '../canvas-context'
 import {pathTo} from '../tree'
 import {PromptInput} from './PromptInput'
@@ -42,6 +43,8 @@ export function ChatSlideout({
   const [full, setFull] = useState(false)
   const aside = useRef<HTMLElement>(null)
   const body = useRef<HTMLDivElement>(null)
+  const content = useRef<HTMLDivElement>(null)
+  const pinned = useRef(true)
   const thread = pathTo(index, end.id)
 
   // Esc in a field elsewhere, like a Tree's name, belongs to that field.
@@ -87,7 +90,25 @@ export function ChatSlideout({
       turn.getBoundingClientRect().top -
       scroller.getBoundingClientRect().top -
       SCROLL_MARGIN
+    pinned.current = atBottom(scroller)
   }, [scrollToTurnId])
+
+  // The Thread stays on the newest text until the user scrolls up.
+  useEffect(() => {
+    const scroller = body.current
+    const inner = content.current
+
+    if (!scroller || !inner) return undefined
+
+    const observer = new ResizeObserver(() => {
+      if (pinned.current) scroller.scrollTop = scroller.scrollHeight
+    })
+
+    observer.observe(scroller)
+    observer.observe(inner)
+
+    return () => observer.disconnect()
+  }, [])
 
   return (
     <aside
@@ -115,8 +136,14 @@ export function ChatSlideout({
           </HeaderButton>
         </div>
       </header>
-      <div ref={body} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        <div className="mx-auto flex max-w-180 flex-col gap-3">
+      <div
+        ref={body}
+        onScroll={event => {
+          pinned.current = atBottom(event.currentTarget)
+        }}
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
+      >
+        <div ref={content} className="mx-auto flex max-w-180 flex-col gap-3">
           {thread.map(turnId => (
             <ChatTurn key={turnId} turnId={turnId} />
           ))}
@@ -171,22 +198,39 @@ interface ChatInputProps {
   onSent: (replyId: string) => void
 }
 
-/** Shares its draft with the same Reply's Input on the canvas. */
+/**
+ * Shares its draft with the same Reply's Input on the canvas. Keyed by the
+ * Reply, so a send redraws it for the new one, which takes the focus over.
+ */
 function ChatInput({end, onFocus, onSent}: ChatInputProps) {
   const {treeId, drafts, setDraft} = useCanvas()
   const {status} = useReply(end)
+  const textarea = useRef<HTMLTextAreaElement>(null)
+  const sentFor = useRef<string | null>(null)
 
-  if (status === 'streaming' || status === 'failed') return null
+  useEffect(() => {
+    if (sentFor.current !== end.id) return
+
+    sentFor.current = null
+    textarea.current?.focus()
+  }, [end.id])
+
+  if (status === 'failed') return null
 
   return (
     <footer className="shrink-0 border-t border-border px-4 py-3">
       <div className="mx-auto max-w-180">
         <PromptInput
           key={end.id}
+          ref={textarea}
           treeId={treeId}
           parentReplyId={end.id}
+          canSend={status !== 'streaming'}
           onFocus={() => onFocus(end.id)}
-          onSent={onSent}
+          onSent={replyId => {
+            sentFor.current = replyId
+            onSent(replyId)
+          }}
           draft={drafts.get(end.id) ?? ''}
           onDraftChange={text => setDraft(end.id, text)}
         />

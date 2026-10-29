@@ -13,7 +13,7 @@ import {SettingsProvider} from '#modules/settings/main'
 import {LiveReplies} from '#modules/turns/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
-import {expect, it, onTestFinished} from 'vitest'
+import {expect, it, onTestFinished, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {cdp, page, userEvent} from 'vitest/browser'
 
@@ -211,7 +211,10 @@ function Providers({children}: {children: ReactNode}) {
 async function renderCanvas(saved: Saved) {
   const main = fakeMain(saved)
   globalThis.window.uz = main
-  const screen = await render(<Canvas treeId={treeId} />, {wrapper: Providers})
+
+  const screen = await render(<Canvas treeId={treeId} title="Tree" />, {
+    wrapper: Providers,
+  })
 
   return {main, screen}
 }
@@ -285,6 +288,12 @@ function inputUnder(replyText: string) {
   return nodeOf(replyText).getByRole('textbox', {name: 'Prompt'})
 }
 
+/** As the user does: the pointer comes over the Reply, sliding its Input out. */
+async function clickInputUnder(replyText: string) {
+  await canvas().getByText(replyText).hover()
+  await inputUnder(replyText).click()
+}
+
 function revealed(replyText: string) {
   return inputUnder(replyText)
     .element()
@@ -313,6 +322,55 @@ it('draws every Turn as its own box, top-down, with an Input under every Reply',
   expect(two.left).toBeLessThan(three.left)
 })
 
+/** The thin line in a Reply's node from its box down to the node's bottom. */
+function stemUnder(replyText: string) {
+  const node = nodeOf(replyText).element()
+  const box = page.getByText(replyText).element().closest('[data-turn]')
+
+  if (!box) throw new Error(`${replyText} has no box`)
+
+  const {bottom} = box.getBoundingClientRect()
+
+  const stem = [...node.querySelectorAll('div')].find(candidate => {
+    const {width, top} = candidate.getBoundingClientRect()
+
+    return width < 4 && Math.abs(top - bottom) < 1
+  })
+
+  if (!stem) throw new Error(`${replyText} has no stem`)
+
+  return stem
+}
+
+it('joins a Reply’s box to the Prompts under it with an unbroken line while its Input is hidden', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await hoverAway()
+  await expect.poll(() => revealed('Reply one')).toBe('false')
+
+  const node = nodeOf('Reply one').element().getBoundingClientRect()
+  const stem = stemUnder('Reply one')
+
+  expect(stem.getBoundingClientRect().bottom).toBeCloseTo(node.bottom, 0)
+  expect(getComputedStyle(stem).opacity).toBe('1')
+
+  const line = document
+    .querySelector(`.react-flow__edge[data-id="${edge(11, 2)}"] path`)
+    ?.getBoundingClientRect()
+
+  const two = page
+    .getByText('Prompt two')
+    .element()
+    .closest('[data-turn]')
+    ?.getBoundingClientRect()
+
+  expect(line?.top).toBeCloseTo(node.bottom, 0)
+  expect(line?.bottom).toBeCloseTo(two?.top ?? Number.NaN, 0)
+
+  await page.getByText('Reply one').hover()
+  await expect.poll(() => getComputedStyle(stem).opacity).toBe('0')
+})
+
 it('shows the Active Thread’s Input, reveals another Reply’s on hover, and keeps one holding a draft', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
@@ -329,7 +387,7 @@ it('shows the Active Thread’s Input, reveals another Reply’s on hover, and k
   await expect.poll(() => revealed('Reply three')).toBe('false')
 
   await inputUnder('Reply one').fill('A draft')
-  await inputUnder('Reply five').click()
+  await clickInputUnder('Reply five')
   await hoverAway()
   await expect.poll(() => revealed('Reply five')).toBe('true')
   expect(revealed('Reply one')).toBe('true')
@@ -379,7 +437,7 @@ it('highlights the newest Thread until the user picks another by focusing its In
       ].toSorted()
     )
 
-  await inputUnder('Reply three').click()
+  await clickInputUnder('Reply three')
   await hoverAway()
 
   await expect
@@ -467,10 +525,11 @@ it('branches: a Prompt sent into an answered Reply lands beside the old Branches
       ]
 
       const lefts = row.map(box => box.left).toSorted((a, b) => a - b)
+      const width = row[0]?.width ?? 0
 
       return (
         row.every(box => box.top === row[0]?.top) &&
-        lefts.every((left, i) => i === 0 || left - (lefts[i - 1] ?? 0) >= 440)
+        lefts.every((left, i) => i === 0 || left - (lefts[i - 1] ?? 0) >= width)
       )
     })
     .toBe(true)
@@ -490,6 +549,64 @@ async function sendInto(replyText: string, text: string) {
   await userEvent.keyboard('{Enter}')
   await expect.element(page.getByText(text)).toBeVisible()
 }
+
+it('moves focus to the streaming Reply’s Input a Prompt was sent for, hiding the one it was sent from', async () => {
+  await renderCanvas(linearTree())
+  await expect.element(page.getByText('Reply two')).toBeVisible()
+
+  await sendInto('Reply two', 'And then?')
+  await hoverAway()
+
+  const streaming = nodeOf('Writing…')
+  await expect.element(streaming.getByRole('textbox')).toHaveFocus()
+  await expect.poll(() => revealed('Writing…')).toBe('true')
+  await expect.poll(() => revealed('Reply two')).toBe('false')
+  await expect
+    .element(streaming.getByRole('button', {name: 'Send'}))
+    .toBeDisabled()
+})
+
+/** Every viewport the canvas is painted at with a Turn showing, frame by frame. */
+function samplePainted() {
+  const painted = new Set<string>()
+  let sampling = true
+
+  function sample() {
+    const drawn = document.querySelector('.react-flow__viewport')
+
+    const shown = [...document.querySelectorAll('.react-flow__node')].some(
+      node => getComputedStyle(node).visibility === 'visible'
+    )
+
+    if (drawn && shown && getComputedStyle(drawn).opacity !== '0') {
+      painted.add(viewport())
+    }
+
+    if (sampling) requestAnimationFrame(sample)
+  }
+
+  function stop() {
+    sampling = false
+
+    return [...painted]
+  }
+
+  requestAnimationFrame(sample)
+  onTestFinished(() => {
+    sampling = false
+  })
+
+  return stop
+}
+
+it('shows a loaded Tree only once it is fitted, never at full size first', async () => {
+  const stop = samplePainted()
+
+  await renderCanvas(forkedTree())
+  const fitted = await settledViewport()
+
+  expect(stop()).toEqual([fitted])
+})
 
 it('zooms out just enough to show the whole Tree on its first Fork, and keeps the zoom on every other send', async () => {
   await renderCanvas(linearTree())
@@ -511,14 +628,28 @@ it('zooms out just enough to show the whole Tree on its first Fork, and keeps th
 
   await sendInto('Reply one', 'Another way')
   await expect.poll(viewport).not.toBe(continued)
-  const forked = await settledViewport()
+  await settledViewport()
   expect(zoomOf()).toBeLessThan(zoom)
   const fitted = zoomOf()
 
   await sendInto('Reply two', 'Yet another')
-  await expect.poll(viewport).not.toBe(forked)
   await settledViewport()
   expect(zoomOf()).toBe(fitted)
+})
+
+it('keeps the controls beside the Tree’s name, off the canvas, with only the minimap drawn on it', async () => {
+  await renderCanvas(linearTree())
+  await expect.element(page.getByText('Reply two')).toBeVisible()
+
+  const title = page.getByRole('heading', {name: 'Tree'}).element()
+  const zoomIn = page.getByRole('button', {name: 'Zoom in'}).element()
+  expect(title.closest('header')?.contains(zoomIn)).toBe(true)
+  expect(canvas().element().contains(zoomIn)).toBe(false)
+
+  await page.getByRole('button', {name: 'Show the minimap'}).click()
+  await expect
+    .element(canvas().getByRole('img', {name: 'Minimap'}))
+    .toBeVisible()
 })
 
 function nodeCount() {
@@ -707,6 +838,9 @@ it('opens with the orientation the Setting says', async () => {
 
 const longText = Array.from({length: 40}, (_, i) => `Line ${i + 1}`).join('\n')
 
+// Markdown folds single newlines into one paragraph.
+const longReply = longText.replaceAll('\n', '\n\n')
+
 function rootPrompt() {
   return document.querySelector(`[data-turn="${uuid(1)}"]`)
 }
@@ -743,8 +877,7 @@ it('keeps a Reply let out by Show more open across an orientation switch', async
   clock = 0
   await renderCanvas({
     prompts: [prompt(1, null, 'Short')],
-    // Markdown folds single newlines into one paragraph.
-    replies: [reply(11, 1, longText.replaceAll('\n', '\n\n'))],
+    replies: [reply(11, 1, longReply)],
   })
 
   await page.getByRole('button', {name: 'Show more'}).click()
@@ -763,6 +896,130 @@ it('keeps a Reply let out by Show more open across an orientation switch', async
   expect(page.getByRole('button', {name: 'Show more'}).query()).toBeNull()
 })
 
+/** As the user does: the wheel over the canvas's empty space pans it. */
+async function wheel(deltaY: number) {
+  const pane = document.querySelector('.react-flow__pane')
+
+  if (!pane) throw new Error('The canvas is not drawn')
+
+  pane.dispatchEvent(
+    new WheelEvent('wheel', {deltaY, bubbles: true, cancelable: true})
+  )
+  await settledViewport()
+}
+
+function lineTop(line: string) {
+  return canvas()
+    .getByText(line, {exact: true})
+    .element()
+    .getBoundingClientRect().top
+}
+
+/** Scrolls the capped text holding `line` partway, then clicks its Show more. */
+async function showMoreScrolledTo(line: string) {
+  const text = canvas().getByText(line, {exact: true}).element()
+  const box = text.closest('.overflow-y-auto')
+  const capped = box?.parentElement
+
+  if (!box || !capped) throw new Error(`${line} is not in capped text`)
+
+  box.scrollTop = 150
+  const before = lineTop(line)
+
+  await page
+    .elementLocator(capped)
+    .getByRole('button', {name: 'Show more'})
+    .click()
+  await expect
+    .element(
+      page.elementLocator(capped).getByRole('button', {name: 'Show less'})
+    )
+    .toBeVisible()
+  await settledViewport()
+
+  return before
+}
+
+it('keeps the text a Reply was scrolled to where it is on screen as Show more lets it out', async () => {
+  clock = 0
+  await renderCanvas({
+    prompts: [prompt(1, null, 'Short')],
+    replies: [reply(11, 1, longReply)],
+  })
+
+  await expect.poll(viewport).not.toContain('translate(0px, 0px)')
+  await settledViewport()
+
+  const before = await showMoreScrolledTo('Line 12')
+  expect(lineTop('Line 12')).toBeCloseTo(before, 0)
+})
+
+it('keeps a scrolled Fork’s text put as Show more lets it out and its card re-centers over its Branches', async () => {
+  const saved = forkedTree()
+  const otherText = longReply.replaceAll('Line', 'Other')
+
+  const texts = new Map([
+    [uuid(11), longReply],
+    [uuid(12), otherText],
+    [uuid(13), otherText],
+  ])
+
+  saved.replies = saved.replies.map(one => {
+    const text = texts.get(one.id)
+
+    return text === undefined ? one : {...one, content: [{type: 'text', text}]}
+  })
+
+  await renderCanvas({...saved, settings: {canvasOrientation: 'horizontal'}})
+  await expect.poll(viewport).not.toContain('translate(0px, 0px)')
+  await settledViewport()
+
+  const before = await showMoreScrolledTo('Line 12')
+  expect(lineTop('Line 12')).toBeCloseTo(before, 0)
+})
+
+it('keeps the text at the canvas’s top edge where it is as Show less caps a Reply let out past it', async () => {
+  clock = 0
+  await renderCanvas({
+    prompts: [prompt(1, null, 'Short')],
+    replies: [reply(11, 1, longReply)],
+  })
+
+  await expect.poll(viewport).not.toContain('translate(0px, 0px)')
+  await settledViewport()
+  await page.getByRole('button', {name: 'Show more'}).click()
+  const less = page.getByRole('button', {name: 'Show less'})
+  await expect.element(less).toBeVisible()
+  await settledViewport()
+
+  await wheel(1600)
+  const canvasTop = canvas().element().getBoundingClientRect().top
+  const turn = nodeOf('Line 1').element().getBoundingClientRect()
+  expect(turn.top).toBeLessThan(canvasTop)
+
+  const read = [...nodeOf('Line 1').element().querySelectorAll('p')].find(
+    line => line.getBoundingClientRect().top >= canvasTop
+  )
+
+  if (!read) throw new Error('No line is at the canvas’s top edge')
+
+  const before = read.getBoundingClientRect().top
+
+  // Below the window: a pointer click would scroll it into view first.
+  less.element().dispatchEvent(new MouseEvent('click', {bubbles: true}))
+  await expect
+    .element(page.getByRole('button', {name: 'Show more'}))
+    .toBeVisible()
+  await settledViewport()
+
+  const line = read.getBoundingClientRect()
+  expect(line.top).toBeCloseTo(before, 0)
+
+  const capped = read.closest('.overflow-y-auto')?.getBoundingClientRect()
+  expect(capped?.top).toBeLessThanOrEqual(line.top)
+  expect(capped?.bottom).toBeGreaterThanOrEqual(line.bottom)
+})
+
 it('lets long Turns take their full height when the Setting is off', async () => {
   clock = 0
   await renderCanvas({
@@ -779,7 +1036,7 @@ it('lets long Turns take their full height when the Setting is off', async () =>
     .not.toBeInTheDocument()
 })
 
-it('shows each Reply’s Context size, what its Exchange added on hover, and the meter toward the Context window', async () => {
+it('shows each Reply’s Context size, its details in a drawer the info button opens and a click on the blurred Reply closes, and the meter toward the Context window', async () => {
   clock = 0
 
   const first = {
@@ -799,19 +1056,36 @@ it('shows each Reply’s Context size, what its Exchange added on hover, and the
     replies: [first, second],
   })
 
-  const badge = page.getByText('12.3k ctx')
-  await expect.element(badge).toBeVisible()
-  await badge.hover()
-  await expect
-    .element(
-      page.getByRole('tooltip').filter({hasText: 'This Exchange: +2.3k'})
-    )
-    .toBeVisible()
-  await expect
-    .element(
-      page.getByRole('tooltip').filter({hasText: 'Thread up to here: 12.3k'})
-    )
-    .toBeVisible()
+  await expect.element(page.getByText('12.3k ctx')).toBeVisible()
+
+  const details = page
+    .getByRole('complementary', {
+      name: 'Context size details',
+      includeHidden: true,
+    })
+    .nth(1)
+
+  await expect.element(details).not.toBeVisible()
+  await page.getByRole('button', {name: 'Context size details'}).nth(1).click()
+  await expect.element(details).toBeVisible()
+  await expect.element(details).toMatchTextContent(/This Exchange\+2\.3k/)
+  await expect.element(details).toMatchTextContent(/Thread up to here12\.3k/)
+  await expect.element(details).toMatchTextContent(/Context window200\.0k/)
+  await details.getByRole('button', {name: 'Close'}).click()
+  await expect.element(details).not.toBeVisible()
+
+  const info = page.getByRole('button', {name: 'Context size details'}).nth(1)
+
+  await info.click()
+  await expect.element(details).toBeVisible()
+  const replyTwo = page.getByText('Reply two')
+
+  // The drawer covers the Reply's left, so the click lands on its right.
+  await replyTwo.click({
+    force: true,
+    position: {x: replyTwo.element().clientWidth - 4, y: 4},
+  })
+  await expect.element(details).not.toBeVisible()
 
   const meters = page.getByRole('meter', {
     name: 'Context size toward the Context window',
@@ -863,7 +1137,7 @@ it('counts the Replies being written and the failed ones, and jumps to them', as
   const status = page.getByRole('status')
   await expect.element(status.getByText('1 streaming')).toBeVisible()
   await expect.element(status.getByText('1 failed')).toBeVisible()
-  expect(document.querySelectorAll('textarea')).toHaveLength(1)
+  expect(document.querySelectorAll('textarea')).toHaveLength(2)
 
   await expect.poll(viewport).toContain('translate')
   const before = viewport()
@@ -918,6 +1192,38 @@ it('shows one centered Input on an empty Tree and the Turns once it is sent', as
     .toBe(2)
 })
 
+// A 720px window, the narrowest, leaves the canvas about 464px beside the sidebar.
+it.each([
+  {pane: 'wide', width: 1280},
+  {pane: 'narrow', width: 464},
+])(
+  'puts an empty Tree’s root Prompt where its Input was, as wide, with the canvas holding still, on a $pane pane',
+  async ({width}) => {
+    await page.viewport(width, 800)
+    onTestFinished(async () => page.viewport(1280, 800))
+    await renderCanvas({prompts: [], replies: []})
+    const input = page.getByRole('textbox', {name: 'Prompt'})
+    await expect.element(input).toBeVisible()
+    const before = input.element().closest('form')?.getBoundingClientRect()
+
+    if (!before) throw new Error('The Input is not drawn')
+
+    const stop = samplePainted()
+    await input.fill('Hello?')
+    await userEvent.keyboard('{Enter}')
+    await expect.element(canvas().getByText('Hello?')).toBeVisible()
+    await expect.element(canvas().getByText('Writing…')).toBeVisible()
+    const held = await settledViewport()
+
+    // Centering can land the Input on a half pixel the canvas rounds away.
+    const placed = nodeOf('Hello?').element().getBoundingClientRect()
+    expect(Math.abs(placed.left - before.left)).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(placed.top - before.top)).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(placed.width - before.width)).toBeLessThanOrEqual(0.5)
+    expect(stop()).toEqual([held])
+  }
+)
+
 function slideout() {
   return page.getByRole('complementary', {name: 'Chat'})
 }
@@ -938,15 +1244,21 @@ function threadToReplyFour() {
   ].toSorted()
 }
 
+async function openChatAt(replyText: string) {
+  return nodeOf(replyText)
+    .getByRole('button', {name: 'Open in Chat mode'})
+    .click()
+}
+
 function slideoutWidth() {
   return slideout().element().getBoundingClientRect().width
 }
 
-it('opens the slideout on a clicked Turn’s Thread, with one Input at its end and that Thread highlighted', async () => {
+it('opens the slideout on a Reply’s Thread from its button, with one Input at its end and that Thread highlighted', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
-  await canvas().getByText('Prompt four').click()
+  await openChatAt('Reply four')
   await expect.element(slideout()).toBeVisible()
 
   expect(chatTurns()).toEqual([
@@ -965,16 +1277,16 @@ it('opens the slideout on a clicked Turn’s Thread, with one Input at its end a
   await expect.poll(highlightedEdges).toEqual(threadToReplyFour())
 })
 
-it('switches the slideout to another clicked Turn’s Thread, and closes it when a canvas Input takes focus', async () => {
+it('switches the slideout to another Reply’s Thread, and closes it when a canvas Input takes focus', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
   // The slideout covers the right of the canvas: the Branch on the left stays clickable.
-  await canvas().getByText('Reply three').click()
+  await openChatAt('Reply three')
   await expect
     .poll(chatTurns)
     .toEqual(['Prompt one', 'Reply one', 'Prompt three', 'Reply three'])
-  await canvas().getByText('Prompt four').click()
+  await openChatAt('Reply four')
 
   await expect
     .poll(chatTurns)
@@ -989,7 +1301,7 @@ it('switches the slideout to another clicked Turn’s Thread, and closes it when
   await hoverAway()
   await expect.poll(highlightedEdges).toEqual(threadToReplyFour())
 
-  await inputUnder('Reply two').click()
+  await clickInputUnder('Reply two')
   await expect.element(slideout()).not.toBeInTheDocument()
   await hoverAway()
   await expect
@@ -1001,7 +1313,7 @@ it('branches from the slideout into a Reply that already has a response, and fol
   const {main} = await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
-  await canvas().getByText('Prompt one').click()
+  await openChatAt('Reply one')
   await expect.poll(chatTurns).toEqual(['Prompt one', 'Reply one'])
 
   await slideout().getByRole('textbox', {name: 'Prompt'}).fill('A third way')
@@ -1019,7 +1331,12 @@ it('branches from the slideout into a Reply that already has a response, and fol
   await expect
     .poll(chatTurns)
     .toEqual(['Prompt one', 'Reply one', 'A third way', 'Writing…Stop'])
-  expect(slideout().getByRole('textbox').query()).toBeNull()
+  await expect
+    .element(slideout().getByRole('textbox', {name: 'Prompt'}))
+    .toHaveFocus()
+  await expect
+    .element(slideout().getByRole('button', {name: 'Send'}))
+    .toBeDisabled()
 
   const sentPromptId = nodeOf('A third way').element().getAttribute('data-id')
 
@@ -1032,29 +1349,12 @@ it('branches from the slideout into a Reply that already has a response, and fol
   expect(highlightedEdges()).toHaveLength(3)
 })
 
-it('opens nothing on a clicked Prompt with no Reply yet, even once its Reply arrives', async () => {
-  clock = 0
+it('opens nothing on a click on a Turn’s box', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
 
-  const {main} = await renderCanvas({
-    prompts: [prompt(1, null, 'Prompt one'), prompt(2, 11, 'Prompt two')],
-    replies: [reply(11, 1, 'Reply one')],
-  })
-
-  await expect.element(page.getByText('Prompt two')).toBeVisible()
-
-  await canvas().getByText('Prompt two').click()
-  await expect.element(slideout()).not.toBeInTheDocument()
-
-  main.replies.push(reply(12, 2, 'Reply two'))
-  main.publish({
-    type: 'SNAPSHOT',
-    app: {version: '0.0.0'},
-    replies: [],
-    providers: PROVIDERS,
-    signIn: null,
-    settings: DEFAULT_SETTINGS,
-  })
-  await expect.element(canvas().getByText('Reply two')).toBeVisible()
+  await canvas().getByText('Prompt five').click()
+  await canvas().getByText('Reply five').click()
   await expect.element(slideout()).not.toBeInTheDocument()
 })
 
@@ -1072,7 +1372,7 @@ it('slides the slideout in as it opens and out as it closes', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
-  await canvas().getByText('Prompt four').click()
+  await openChatAt('Reply four')
   await expect.element(slideout()).toBeInTheDocument()
   const aside = slideout().element()
   expect(sliding(aside)).toBe(true)
@@ -1097,7 +1397,7 @@ it('opens and closes the slideout without sliding when the OS asks for reduced m
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
-  await canvas().getByText('Prompt four').click()
+  await openChatAt('Reply four')
   await expect.element(slideout()).toBeInTheDocument()
   const aside = slideout().element()
   expect(sliding(aside)).toBe(false)
@@ -1128,23 +1428,23 @@ it('zooms and switches orientation without gliding when the OS asks for reduced 
   expect(gliding).toEqual([])
 })
 
-it('scrolls the slideout to the clicked Turn, expands to cover the canvas, and closes with Esc or its close control', async () => {
+it('scrolls the slideout to the Reply it opened from, expands to cover the canvas, and closes with Esc or its close control', async () => {
   clock = 0
   await renderCanvas({
     prompts: [prompt(1, null, 'Prompt one'), prompt(2, 11, 'Prompt two')],
-    // Long enough below Prompt two for it to reach the top.
+    // Long enough for Reply two to reach the top.
     replies: [
-      reply(11, 1, longText.replaceAll('\n', '\n\n')),
-      reply(12, 2, longText.replaceAll('\n', '\n\n')),
+      reply(11, 1, `Reply one\n\n${longReply}`),
+      reply(12, 2, `Reply two\n\n${longReply}`),
     ],
   })
   await expect.element(page.getByText('Prompt two')).toBeVisible()
 
-  await canvas().getByText('Prompt two').click()
+  await openChatAt('Reply two')
   await expect.element(slideout()).toBeVisible()
 
   const scroller = slideout().element().querySelector('.overflow-y-auto')
-  const turn = slideout().getByText('Prompt two').element()
+  const turn = slideout().getByText('Reply two').element()
 
   if (!scroller) throw new Error('The slideout does not scroll')
 
@@ -1164,7 +1464,7 @@ it('scrolls the slideout to the clicked Turn, expands to cover the canvas, and c
   await userEvent.keyboard('{Escape}')
   await expect.element(slideout()).not.toBeInTheDocument()
 
-  await canvas().getByText('Prompt one').click()
+  await openChatAt('Reply one')
   await slideout().getByRole('button', {name: 'Close'}).click()
   await expect.element(slideout()).not.toBeInTheDocument()
 })
@@ -1216,7 +1516,7 @@ it('gives a stopped Reply an Input and a failed one Retry instead, on the canvas
     .element(nodeOf('Reply three').getByRole('button', {name: 'Retry'}))
     .toBeVisible()
 
-  await canvas().getByText('Prompt three').click()
+  await openChatAt('Reply three')
   await expect.element(slideout()).toBeVisible()
   expect(slideout().getByRole('textbox').query()).toBeNull()
   await expect
@@ -1310,7 +1610,7 @@ it('stops the slideout’s streaming Reply with Esc rather than closing the slid
   const {main} = await renderCanvas(endingIn('streaming', ''))
   await expect.element(page.getByText('Writing…')).toBeVisible()
 
-  await canvas().getByText('Prompt two').click()
+  await openChatAt('Writing…')
   await expect.element(slideout()).toBeVisible()
   await expect.element(slideout().getByText('Writing…')).toBeVisible()
 
@@ -1331,4 +1631,205 @@ it('stops the slideout’s streaming Reply with Esc rather than closing the slid
 
   await userEvent.keyboard('{Escape}')
   await expect.element(slideout()).not.toBeInTheDocument()
+})
+
+it('stops the streaming Reply with Esc from the Context size drawer rather than closing the drawer', async () => {
+  const saved = endingIn('streaming', '')
+
+  saved.replies = saved.replies.map(one =>
+    one.id === uuid(11) ? {...one, contextSize: 10_000} : one
+  )
+
+  const {main} = await renderCanvas(saved)
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+
+  const details = page.getByRole('complementary', {
+    name: 'Context size details',
+    includeHidden: true,
+  })
+
+  const info = page.getByRole('button', {name: 'Context size details'})
+
+  await info.click()
+  const close = details.getByRole('button', {name: 'Close'})
+
+  await expect.element(close).toBeVisible()
+  close.element().focus()
+
+  await userEvent.keyboard('{Escape}')
+
+  expect(main.sent.filter(command => command.type === 'reply.stop')).toEqual([
+    {type: 'reply.stop', treeId, replyId: uuid(12)},
+  ])
+  await expect.element(info).toHaveAttribute('aria-expanded', 'true')
+
+  main.publish({
+    treeId,
+    replyId: uuid(12),
+    type: 'RUN_FINISHED',
+    status: 'stopped',
+  })
+  await expect.element(page.getByText('Stopped')).toBeVisible()
+
+  await userEvent.keyboard('{Escape}')
+  await expect.element(info).toHaveAttribute('aria-expanded', 'false')
+  await expect.element(details).not.toBeVisible()
+})
+
+it('keeps the slideout on the newest text of a streaming Reply until the user scrolls up', async () => {
+  const {main} = await renderCanvas(endingIn('streaming', ''))
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+
+  await openChatAt('Writing…')
+  await expect.element(slideout().getByText('Writing…')).toBeVisible()
+
+  const scroller = slideout().element().querySelector('.overflow-y-auto')
+
+  if (!scroller) throw new Error('The slideout does not scroll')
+
+  const ids = {treeId, replyId: uuid(12)}
+
+  main.publish({...ids, type: 'RUN_STARTED'})
+  main.publish({
+    ...ids,
+    type: 'TEXT_DELTA',
+    delta: longReply,
+  })
+  await expect.element(slideout().getByText('Line 40')).toBeVisible()
+  await expect.poll(() => scroller.scrollTop).toBeGreaterThan(0)
+  expect(
+    scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
+  ).toBeLessThan(1)
+
+  await new Promise(resolve => {
+    scroller.addEventListener('scroll', resolve, {once: true})
+    scroller.scrollTop = 0
+  })
+
+  main.publish({...ids, type: 'TEXT_DELTA', delta: '\n\nThe last line'})
+  await expect
+    .element(slideout().getByText('The last line'))
+    .toBeInTheDocument()
+  // Resize observers run after a frame's animation callbacks.
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  expect(scroller.scrollTop).toBe(0)
+})
+
+function bottomOf(element: Element) {
+  return element.getBoundingClientRect().bottom
+}
+
+/** A wheel, then the end of its gesture, which the canvas waits a timer for. */
+async function wheelGesture(deltaY: number) {
+  vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']})
+  onTestFinished(() => {
+    vi.useRealTimers()
+  })
+  await wheel(deltaY)
+  vi.runOnlyPendingTimers()
+  vi.useRealTimers()
+}
+
+it('keeps a streaming Reply’s bottom on the canvas as it grows, until the user scrolls up and again once they scroll back', async () => {
+  const {main} = await renderCanvas({
+    ...linearTree(),
+    settings: {limitTurnHeight: false},
+  })
+
+  await expect.element(page.getByText('Reply two')).toBeVisible()
+  await settledViewport()
+
+  await sendInto('Reply two', 'And then?')
+  await expect.element(canvas().getByText('Writing…')).toBeVisible()
+  const replyId = main.replies.at(-1)?.id
+
+  if (replyId === undefined) throw new Error('No Reply was started')
+
+  const ids = {treeId, replyId}
+  const pane = canvas().element()
+
+  main.publish({...ids, type: 'RUN_STARTED'})
+  main.publish({
+    ...ids,
+    type: 'TEXT_DELTA',
+    delta: longReply,
+  })
+  await expect.element(canvas().getByText('Line 40')).toBeInTheDocument()
+  const streaming = nodeOf('Line 40').element()
+  await settledViewport()
+  expect(bottomOf(streaming)).toBeLessThanOrEqual(bottomOf(pane))
+  expect(streaming.getBoundingClientRect().top).toBeLessThan(0)
+
+  await wheelGesture(-300)
+  const scrolled = viewport()
+
+  main.publish({...ids, type: 'TEXT_DELTA', delta: '\n\nThe last line'})
+  await expect.element(canvas().getByText('The last line')).toBeInTheDocument()
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  expect(viewport()).toBe(scrolled)
+
+  // Past where it was, since the Reply grew while it was let go.
+  await wheelGesture(500)
+  expect(bottomOf(streaming)).toBeLessThanOrEqual(bottomOf(pane))
+
+  main.publish({...ids, type: 'TEXT_DELTA', delta: `\n\n${longReply}`})
+  await expect
+    .poll(() => canvas().getByText('Line 40', {exact: true}).elements())
+    .toHaveLength(2)
+  await expect
+    .poll(() => bottomOf(streaming))
+    .toBeLessThanOrEqual(bottomOf(pane))
+})
+
+it('lets a streaming Reply go when Show more, pressed from the keyboard, lets out the text being read above it', async () => {
+  clock = 0
+
+  const {main} = await renderCanvas({
+    prompts: [prompt(1, null, 'Prompt one')],
+    replies: [reply(11, 1, longReply)],
+  })
+
+  await expect.element(page.getByText('Line 40')).toBeInTheDocument()
+  await settledViewport()
+
+  await sendInto('Line 40', 'And then?')
+  await expect.element(canvas().getByText('Writing…')).toBeVisible()
+  await settledViewport()
+  const replyId = main.replies.at(-1)?.id
+
+  if (replyId === undefined) throw new Error('No Reply was started')
+
+  const ids = {treeId, replyId}
+  main.publish({...ids, type: 'RUN_STARTED'})
+
+  const box = canvas()
+    .getByText('Line 12', {exact: true})
+    .element()
+    .closest('.overflow-y-auto')
+
+  if (!box) throw new Error('Line 12 is not in capped text')
+
+  box.scrollTop = 150
+  const before = lineTop('Line 12')
+
+  // A pointer press on the canvas lets the Reply go before the click lands.
+  canvas().getByRole('button', {name: 'Show more'}).element().focus()
+  await userEvent.keyboard('{Enter}')
+  await expect
+    .element(canvas().getByRole('button', {name: 'Show less'}))
+    .toBeVisible()
+  await settledViewport()
+  expect(lineTop('Line 12')).toBeCloseTo(before, 0)
+
+  main.publish({
+    ...ids,
+    type: 'TEXT_DELTA',
+    delta: longReply.replaceAll('Line', 'Streamed'),
+  })
+  await expect.element(canvas().getByText('Streamed 40')).toBeInTheDocument()
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  expect(lineTop('Line 12')).toBeCloseTo(before, 0)
 })
