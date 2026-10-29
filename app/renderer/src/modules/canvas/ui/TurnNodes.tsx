@@ -2,7 +2,7 @@ import type {LayoutNode} from '../layout'
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Node, NodeProps} from '@xyflow/react'
 
-import {cn} from '#modules/shadcn/main'
+import {Button, cn} from '#modules/shadcn/main'
 import {ReplyView, useReply} from '#modules/turns/main'
 import {Handle, Position} from '@xyflow/react'
 import {useEffect, useRef, useState} from 'react'
@@ -51,13 +51,16 @@ function ReplyBody({reply}: {reply: Reply}) {
 
   return (
     <>
-      {contextSize !== null && (
-        <ContextSize
-          contextSize={contextSize}
-          previousContextSize={previous ? previous.contextSize : 0}
-          contextWindow={contextWindow}
-        />
-      )}
+      <header className="flex items-center gap-1 pt-2 pr-2 pl-3.5">
+        {contextSize !== null && (
+          <ContextSize
+            contextSize={contextSize}
+            previousContextSize={previous ? previous.contextSize : 0}
+            contextWindow={contextWindow}
+          />
+        )}
+        <OpenChatButton replyId={reply.id} />
+      </header>
       <CappedText
         limit={limitTurnHeight}
         maxHeightClass="max-h-72"
@@ -78,6 +81,34 @@ function ReplyBody({reply}: {reply: Reply}) {
         <ContextMeter contextSize={contextSize} contextWindow={contextWindow} />
       )}
     </>
+  )
+}
+
+function OpenChatButton({replyId}: {replyId: string}) {
+  const {openChat} = useCanvas()
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      title="Open in Chat mode"
+      aria-label="Open in Chat mode"
+      className="ml-auto size-6 text-muted-foreground"
+      onClick={() => openChat(replyId)}
+    >
+      <svg
+        aria-hidden
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="size-4"
+      >
+        <path d="m9 18 6-6-6-6" />
+      </svg>
+    </Button>
   )
 }
 

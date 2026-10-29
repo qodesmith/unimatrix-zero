@@ -122,7 +122,7 @@ _Avoid_: The Model's limit, the Model's window, max tokens (that is output)
 The app's main view: a whole Tree laid out spatially on an infinite canvas, in one of two orientations, vertical (top-down, the default) or horizontal (left-to-right). Orientation is a global preference, not per Tree.
 
 **Chat mode**:
-One Thread of a Tree shown as a conventional vertical chat, in a slideout over canvas mode that opens when you click any Turn and can expand to full screen. It is not a separate view; to switch Threads, click another Turn on the canvas.
+One Thread of a Tree shown as a conventional vertical chat, in a slideout over canvas mode that opens from any Reply and can expand to full screen. It is not a separate view; to switch Threads, open it from another Reply on the canvas.
 _Avoid_: Drawer, chat view
 
 **Input**:

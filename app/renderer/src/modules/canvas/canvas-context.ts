@@ -19,6 +19,8 @@ export interface CanvasState {
   onSent: (replyId: string, parentReplyId: string) => void
   /** The Reply whose Input takes focus once it is drawn: the one just sent for. */
   inputToFocus: string | null
+  /** Chat mode on the Thread ending at this Reply. */
+  openChat: (replyId: string) => void
   /** Kept here, not in the node, so it survives an orientation switch. */
   expandedTurnIds: ReadonlySet<string>
   toggleExpanded: (turnId: string) => void

@@ -272,6 +272,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       onInputFocus,
       onSent: sentFromInput,
       inputToFocus,
+      openChat,
       expandedTurnIds,
       toggleExpanded,
       collapsedReplyIds: collapsed.ids,
@@ -288,6 +289,7 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
       onInputFocus,
       sentFromInput,
       inputToFocus,
+      openChat,
       expandedTurnIds,
       toggleExpanded,
       collapsed.ids,
@@ -326,7 +328,6 @@ function TreeCanvas({treeId, turns}: {treeId: string; turns: Turns}) {
             fitOnLoad={!startedEmpty}
             switching={switching}
             onHover={setHoverTurnId}
-            onOpenChat={openChat}
             onOrientation={onOrientation}
             onJump={jumpTo}
           />

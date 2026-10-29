@@ -38,7 +38,6 @@ interface FlowProps {
   fitOnLoad: boolean
   switching: boolean
   onHover: (turnId: string | null) => void
-  onOpenChat: (turnId: string) => void
   onOrientation: (orientation: CanvasOrientation) => void
   onJump: (replyId: string) => void
 }
@@ -50,16 +49,6 @@ const NO_SIZES: Sizes = {vertical: {}, horizontal: {}}
 const FIT = {padding: 0.15, maxZoom: 1}
 
 const nodeTypes = {prompt: PromptNode, reply: ReplyNode, exchange: ExchangeNode}
-
-/** Controls inside a Turn's box keep their clicks to themselves. */
-const CONTROLS = 'a, button, input, textarea, summary, [role="button"]'
-
-/** Read from the box hit, not the node, since an Exchange card holds two Turns. */
-function clickedTurnId(target: EventTarget) {
-  if (!(target instanceof Element) || target.closest(CONTROLS)) return null
-
-  return target.closest('[data-turn]')?.getAttribute('data-turn') ?? null
-}
 
 function isOnThread(
   edge: Layout['edges'][number],
@@ -95,7 +84,6 @@ export function Flow({
   fitOnLoad,
   switching,
   onHover,
-  onOpenChat,
   onOrientation,
   onJump,
 }: FlowProps) {
@@ -306,11 +294,6 @@ export function Flow({
       className={switching ? 'canvas-switching' : undefined}
       onNodeMouseEnter={(_event, node) => onHover(hoverIdOf(node))}
       onNodeMouseLeave={() => onHover(null)}
-      onNodeClick={event => {
-        const turnId = clickedTurnId(event.target)
-
-        if (turnId !== null) onOpenChat(turnId)
-      }}
     >
       <Background gap={24} />
       <CanvasControls

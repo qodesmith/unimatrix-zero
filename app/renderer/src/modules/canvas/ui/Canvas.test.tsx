@@ -892,9 +892,14 @@ it('shows each Reply’s Context size, its details in a drawer the info button o
 
   await info.click()
   await expect.element(details).toBeVisible()
-  await page.getByText('Reply two').click({force: true, position: {x: 4, y: 4}})
+  const replyTwo = page.getByText('Reply two')
+
+  // The drawer covers the Reply's left, so the click lands on its right.
+  await replyTwo.click({
+    force: true,
+    position: {x: replyTwo.element().clientWidth - 4, y: 4},
+  })
   await expect.element(details).not.toBeVisible()
-  expect(slideout().query()).toBeNull()
 
   const meters = page.getByRole('meter', {
     name: 'Context size toward the Context window',
@@ -1021,15 +1026,21 @@ function threadToReplyFour() {
   ].toSorted()
 }
 
+async function openChatAt(replyText: string) {
+  return nodeOf(replyText)
+    .getByRole('button', {name: 'Open in Chat mode'})
+    .click()
+}
+
 function slideoutWidth() {
   return slideout().element().getBoundingClientRect().width
 }
 
-it('opens the slideout on a clicked Turn’s Thread, with one Input at its end and that Thread highlighted', async () => {
+it('opens the slideout on a Reply’s Thread from its button, with one Input at its end and that Thread highlighted', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
-  await canvas().getByText('Prompt four').click()
+  await openChatAt('Reply four')
   await expect.element(slideout()).toBeVisible()
 
   expect(chatTurns()).toEqual([
@@ -1048,16 +1059,16 @@ it('opens the slideout on a clicked Turn’s Thread, with one Input at its end a
   await expect.poll(highlightedEdges).toEqual(threadToReplyFour())
 })
 
-it('switches the slideout to another clicked Turn’s Thread, and closes it when a canvas Input takes focus', async () => {
+it('switches the slideout to another Reply’s Thread, and closes it when a canvas Input takes focus', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
   // The slideout covers the right of the canvas: the Branch on the left stays clickable.
-  await canvas().getByText('Reply three').click()
+  await openChatAt('Reply three')
   await expect
     .poll(chatTurns)
     .toEqual(['Prompt one', 'Reply one', 'Prompt three', 'Reply three'])
-  await canvas().getByText('Prompt four').click()
+  await openChatAt('Reply four')
 
   await expect
     .poll(chatTurns)
@@ -1084,7 +1095,7 @@ it('branches from the slideout into a Reply that already has a response, and fol
   const {main} = await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
-  await canvas().getByText('Prompt one').click()
+  await openChatAt('Reply one')
   await expect.poll(chatTurns).toEqual(['Prompt one', 'Reply one'])
 
   await slideout().getByRole('textbox', {name: 'Prompt'}).fill('A third way')
@@ -1120,29 +1131,12 @@ it('branches from the slideout into a Reply that already has a response, and fol
   expect(highlightedEdges()).toHaveLength(3)
 })
 
-it('opens nothing on a clicked Prompt with no Reply yet, even once its Reply arrives', async () => {
-  clock = 0
+it('opens nothing on a click on a Turn’s box', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
 
-  const {main} = await renderCanvas({
-    prompts: [prompt(1, null, 'Prompt one'), prompt(2, 11, 'Prompt two')],
-    replies: [reply(11, 1, 'Reply one')],
-  })
-
-  await expect.element(page.getByText('Prompt two')).toBeVisible()
-
-  await canvas().getByText('Prompt two').click()
-  await expect.element(slideout()).not.toBeInTheDocument()
-
-  main.replies.push(reply(12, 2, 'Reply two'))
-  main.publish({
-    type: 'SNAPSHOT',
-    app: {version: '0.0.0'},
-    replies: [],
-    providers: PROVIDERS,
-    signIn: null,
-    settings: DEFAULT_SETTINGS,
-  })
-  await expect.element(canvas().getByText('Reply two')).toBeVisible()
+  await canvas().getByText('Prompt five').click()
+  await canvas().getByText('Reply five').click()
   await expect.element(slideout()).not.toBeInTheDocument()
 })
 
@@ -1160,7 +1154,7 @@ it('slides the slideout in as it opens and out as it closes', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
-  await canvas().getByText('Prompt four').click()
+  await openChatAt('Reply four')
   await expect.element(slideout()).toBeInTheDocument()
   const aside = slideout().element()
   expect(sliding(aside)).toBe(true)
@@ -1185,7 +1179,7 @@ it('opens and closes the slideout without sliding when the OS asks for reduced m
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
-  await canvas().getByText('Prompt four').click()
+  await openChatAt('Reply four')
   await expect.element(slideout()).toBeInTheDocument()
   const aside = slideout().element()
   expect(sliding(aside)).toBe(false)
@@ -1216,23 +1210,23 @@ it('zooms and switches orientation without gliding when the OS asks for reduced 
   expect(gliding).toEqual([])
 })
 
-it('scrolls the slideout to the clicked Turn, expands to cover the canvas, and closes with Esc or its close control', async () => {
+it('scrolls the slideout to the Reply it opened from, expands to cover the canvas, and closes with Esc or its close control', async () => {
   clock = 0
   await renderCanvas({
     prompts: [prompt(1, null, 'Prompt one'), prompt(2, 11, 'Prompt two')],
-    // Long enough below Prompt two for it to reach the top.
+    // Long enough for Reply two to reach the top.
     replies: [
-      reply(11, 1, longText.replaceAll('\n', '\n\n')),
-      reply(12, 2, longText.replaceAll('\n', '\n\n')),
+      reply(11, 1, `Reply one\n\n${longText.replaceAll('\n', '\n\n')}`),
+      reply(12, 2, `Reply two\n\n${longText.replaceAll('\n', '\n\n')}`),
     ],
   })
   await expect.element(page.getByText('Prompt two')).toBeVisible()
 
-  await canvas().getByText('Prompt two').click()
+  await openChatAt('Reply two')
   await expect.element(slideout()).toBeVisible()
 
   const scroller = slideout().element().querySelector('.overflow-y-auto')
-  const turn = slideout().getByText('Prompt two').element()
+  const turn = slideout().getByText('Reply two').element()
 
   if (!scroller) throw new Error('The slideout does not scroll')
 
@@ -1252,7 +1246,7 @@ it('scrolls the slideout to the clicked Turn, expands to cover the canvas, and c
   await userEvent.keyboard('{Escape}')
   await expect.element(slideout()).not.toBeInTheDocument()
 
-  await canvas().getByText('Prompt one').click()
+  await openChatAt('Reply one')
   await slideout().getByRole('button', {name: 'Close'}).click()
   await expect.element(slideout()).not.toBeInTheDocument()
 })
@@ -1304,7 +1298,7 @@ it('gives a stopped Reply an Input and a failed one Retry instead, on the canvas
     .element(nodeOf('Reply three').getByRole('button', {name: 'Retry'}))
     .toBeVisible()
 
-  await canvas().getByText('Prompt three').click()
+  await openChatAt('Reply three')
   await expect.element(slideout()).toBeVisible()
   expect(slideout().getByRole('textbox').query()).toBeNull()
   await expect
@@ -1398,7 +1392,7 @@ it('stops the slideout’s streaming Reply with Esc rather than closing the slid
   const {main} = await renderCanvas(endingIn('streaming', ''))
   await expect.element(page.getByText('Writing…')).toBeVisible()
 
-  await canvas().getByText('Prompt two').click()
+  await openChatAt('Writing…')
   await expect.element(slideout()).toBeVisible()
   await expect.element(slideout().getByText('Writing…')).toBeVisible()
 

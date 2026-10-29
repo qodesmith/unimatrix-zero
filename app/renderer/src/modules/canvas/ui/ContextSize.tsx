@@ -17,8 +17,7 @@ function signed(tokens: number) {
 
 /**
  * The badge and its details drawer, which with its blur covers the nearest
- * positioned ancestor: the Reply's box. Their clicks stop short of the canvas,
- * which would open the Thread.
+ * positioned ancestor: the Reply's box.
  */
 export function ContextSize({
   contextSize,
@@ -35,34 +34,29 @@ export function ContextSize({
 
   return (
     <>
-      <header className="flex items-center justify-end gap-1 px-3.5 pt-2">
-        <span
-          aria-label={`Context size ${formatTokens(contextSize)}`}
-          className="cursor-default rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
-        >
-          {formatTokens(contextSize)} ctx
-        </span>
-        <button
-          ref={info}
-          type="button"
-          aria-label="Context size details"
-          aria-expanded={open}
-          className="rounded-full text-muted-foreground hover:text-foreground"
-          onClick={() => setOpen(!open)}
-        >
-          <InfoIcon />
-        </button>
-      </header>
+      <span
+        aria-label={`Context size ${formatTokens(contextSize)}`}
+        className="cursor-default rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
+      >
+        {formatTokens(contextSize)} ctx
+      </span>
+      <button
+        ref={info}
+        type="button"
+        aria-label="Context size details"
+        aria-expanded={open}
+        className="rounded-full text-muted-foreground hover:text-foreground"
+        onClick={() => setOpen(!open)}
+      >
+        <InfoIcon />
+      </button>
       <div
         aria-hidden
         className={cn(
           'absolute inset-0 z-10 bg-card/40 backdrop-blur-sm transition-[opacity,visibility] ease-out motion-reduce:transition-none',
           !open && 'invisible opacity-0'
         )}
-        onClick={event => {
-          event.stopPropagation()
-          close()
-        }}
+        onClick={close}
       />
       <ContextSizeDrawer
         open={open}
@@ -90,10 +84,9 @@ function ContextSizeDrawer({
     <aside
       aria-label="Context size details"
       className={cn(
-        'absolute inset-y-0 right-0 z-10 w-56 border-l border-border bg-popover text-popover-foreground transition-[translate,visibility] ease-out motion-reduce:transition-none',
-        !open && 'invisible translate-x-full'
+        'absolute inset-y-0 left-0 z-10 w-56 border-r border-border bg-popover text-popover-foreground transition-[translate,visibility] ease-out motion-reduce:transition-none',
+        !open && 'invisible -translate-x-full'
       )}
-      onClick={event => event.stopPropagation()}
       onKeyDown={event => {
         if (event.key === 'Escape') onClose()
       }}
