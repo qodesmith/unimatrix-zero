@@ -42,9 +42,17 @@ interface FlowProps {
   fitOnLoad: boolean
   /** Where the root Prompt is drawn at first, and how far zoomed. */
   startAt: Viewport | null
+  /** A new one each time a Prompt and every Turn below it are deleted. */
+  deleted: Deleted | null
   switching: boolean
   showMap: boolean
   onHover: (turnId: string | null) => void
+}
+
+interface Deleted {
+  parentReplyId: string | null
+  /** Its box changes size once it is measured again. */
+  resizes: boolean
 }
 
 type Sizes = Record<CanvasOrientation, Record<string, Size>>
@@ -103,6 +111,7 @@ export function Flow({
   focus,
   fitOnLoad,
   startAt,
+  deleted,
   switching,
   showMap,
   onHover,
@@ -143,10 +152,28 @@ export function Flow({
   // so the Reply stays where it is on screen. A pan lets it go. Letting out or
   // capping a Turn's text holds its Turn the same way until its box is measured
   // anew, and lets a followed Reply go, so the text being read stays put.
+  // Deleting Turns from below a Reply holds the Reply too.
   const lastLayout = useRef(layout)
   const lastCollapsed = useRef(collapsed)
   const lastExpanded = useRef(expanded)
+  const lastDeleted = useRef(deleted)
   const held = useRef<Held | null>(null)
+
+  // Declared before the effect that moves the viewport for the held Turn, so it
+  // runs first in the render the Turns go.
+  useLayoutEffect(() => {
+    if (lastDeleted.current === deleted) return
+
+    lastDeleted.current = deleted
+    const turnId = deleted?.parentReplyId ?? null
+
+    if (deleted === null || turnId === null) return
+
+    held.current = {
+      turnId,
+      resizing: deleted.resizes ? (measured[nodeIdOf(turnId)] ?? null) : null,
+    }
+  }, [deleted, measured, nodeIdOf])
 
   useLayoutEffect(() => {
     const before = lastLayout.current
