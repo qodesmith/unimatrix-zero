@@ -1,0 +1,1 @@
+ALTER TABLE `replies` ADD `session_drop_from` text;

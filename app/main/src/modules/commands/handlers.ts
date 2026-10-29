@@ -75,6 +75,16 @@ export const handlers: Handlers = {
     return sent
   },
 
+  'prompt.delete': ({treeId, promptId}, {trees, turns}) => {
+    found(trees.get(treeId))
+
+    const deleted = turns.deletePrompt(treeId, promptId)
+
+    if (!deleted) throw new NotFoundError('That Prompt no longer exists.')
+
+    return deleted
+  },
+
   'reply.stop': ({treeId, replyId}, {turns}) => {
     turns.stop(treeId, replyId)
 

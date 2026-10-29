@@ -79,6 +79,12 @@ export const replies = sqliteTable(
      * finished.
      */
     sessionPromptId: text('session_prompt_id'),
+    /**
+     * Where its Provider session still holds Turns the Tree deleted from below
+     * it: their first Prompt there. The next Prompt from it cuts the session
+     * there, unless its Provider cut first.
+     */
+    sessionDropFrom: text('session_drop_from'),
     contextSize: integer('context_size'),
     contextWindow: integer('context_window'),
     createdAt: createdAt(),
