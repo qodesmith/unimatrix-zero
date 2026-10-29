@@ -562,6 +562,36 @@ it('moves focus to the streaming Reply’s Input a Prompt was sent for, hiding t
     .toBeDisabled()
 })
 
+it('shows a loaded Tree only once it is fitted, never at full size first', async () => {
+  const painted = new Set<string>()
+  let sampling = true
+
+  function sample() {
+    const drawn = document.querySelector('.react-flow__viewport')
+
+    const shown = [...document.querySelectorAll('.react-flow__node')].some(
+      node => getComputedStyle(node).visibility === 'visible'
+    )
+
+    if (drawn && shown && getComputedStyle(drawn).opacity !== '0') {
+      painted.add(viewport())
+    }
+
+    if (sampling) requestAnimationFrame(sample)
+  }
+
+  requestAnimationFrame(sample)
+  onTestFinished(() => {
+    sampling = false
+  })
+
+  await renderCanvas(forkedTree())
+  const fitted = await settledViewport()
+  sampling = false
+
+  expect([...painted]).toEqual([fitted])
+})
+
 it('zooms out just enough to show the whole Tree on its first Fork, and keeps the zoom on every other send', async () => {
   await renderCanvas(linearTree())
   await expect.element(page.getByText('Reply two')).toBeVisible()

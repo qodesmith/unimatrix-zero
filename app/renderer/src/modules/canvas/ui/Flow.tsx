@@ -5,6 +5,7 @@ import type {Stem, TurnNode} from './TurnNodes'
 import type {CanvasOrientation} from '@uz/contract/settings'
 import type {Edge, NodeChange} from '@xyflow/react'
 
+import {cn} from '#modules/shadcn/main'
 import {Background, ReactFlow, useReactFlow} from '@xyflow/react'
 import {
   useCallback,
@@ -209,14 +210,13 @@ export function Flow({
     [layout, thread]
   )
 
-  const fitted = useRef(!fitOnLoad)
+  const [fitted, setFitted] = useState(!fitOnLoad)
 
   useEffect(() => {
-    if (fitted.current || !allMeasured) return
+    if (fitted || !allMeasured) return
 
-    fitted.current = true
-    void flow.fitView(FIT)
-  }, [allMeasured, flow])
+    void flow.fitView(FIT).then(() => setFitted(true))
+  }, [fitted, allMeasured, flow])
 
   const hasFork = index.replies.some(reply => isFork(index, reply.id))
 
@@ -291,7 +291,10 @@ export function Flow({
       minZoom={0.1}
       maxZoom={1.5}
       proOptions={{hideAttribution: true}}
-      className={switching ? 'canvas-switching' : undefined}
+      className={cn(
+        switching && 'canvas-switching',
+        !fitted && 'canvas-fitting'
+      )}
       onNodeMouseEnter={(_event, node) => onHover(hoverIdOf(node))}
       onNodeMouseLeave={() => onHover(null)}
     >

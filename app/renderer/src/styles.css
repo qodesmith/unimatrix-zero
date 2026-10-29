@@ -107,3 +107,10 @@
   opacity: 0;
   transition: none;
 }
+
+/* A loaded Tree stays hidden until it is fitted, so it never shows at full
+   size first. Opacity, not visibility: React Flow marks each measured node
+   visible, which overrides a hidden parent. */
+.canvas-fitting .react-flow__viewport {
+  opacity: 0;
+}
