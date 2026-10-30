@@ -12,7 +12,7 @@ Reaching one means the code wants splitting, and the `lint-fixing` skill has the
 
 ## Edit only the code this repo owns
 
-- A skill listed in `skills-lock.json` is installed from upstream, and `bun run skills:update` overwrites it. Change it upstream, or wrap it in a skill of our own.
+- A skill listed in `skills-lock.json` is installed from upstream, and `bun run skills:update` overwrites it. To add to one, put the rule in the topic file that `CODE_STYLE.md` names beside it; other skills call it by name and would skip a wrapper, while `CODE_STYLE.md` sends every task that loads it to the topic too. Change the skill itself upstream, or wrap it in a skill of our own when no topic fits.
   The skills in `.agents/skills/` that `skills-lock.json` does not list are ours, and we edit them in place.
 - `tooling/oxlint/anti-slop/` is a vendored copy of upstream, and the `install-anti-slop` skill updates it. Its `UPSTREAM.md` records the source commit, the local changes and the update steps.
 
