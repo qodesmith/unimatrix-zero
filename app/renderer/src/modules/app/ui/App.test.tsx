@@ -188,7 +188,7 @@ it('shows the pong main sends back', async () => {
     .toBeVisible()
 })
 
-it('opens Settings from the sidebar gear, and leaves it for the Tree picked there', async () => {
+it('opens Settings from the sidebar, and leaves it for the Tree picked there', async () => {
   globalThis.window.uz = fakeMain({
     trees: [
       {id: crypto.randomUUID(), title: 'Trip planning', createdAt: receivedAt},
@@ -196,7 +196,10 @@ it('opens Settings from the sidebar gear, and leaves it for the Tree picked ther
   })
   await renderApp()
 
-  await page.getByRole('button', {name: 'Settings'}).click()
+  await page
+    .getByRole('complementary')
+    .getByRole('button', {name: 'Settings'})
+    .click()
   await expect
     .element(page.getByRole('heading', {name: 'Appearance'}))
     .toBeVisible()

@@ -30,7 +30,7 @@ function applyThemeSet(
 
 /**
  * Writes the Theme's tokens onto `:root` for the mode `prefers-color-scheme`
- * reports: main points it at the mode Setting, `system` by default.
+ * reports: main points it at the mode Setting.
  */
 export function followColorScheme(
   theme: Theme = hearth,
