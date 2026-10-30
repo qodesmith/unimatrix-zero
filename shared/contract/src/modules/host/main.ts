@@ -39,6 +39,28 @@ export const SignInRequestSchema = z.strictObject({
 
 export type SignInRequest = z.infer<typeof SignInRequestSchema>
 
+/**
+ * The session keeps everything through `keepThrough` and drops `dropFrom`,
+ * with all after it. That is a Retry's failed attempt, when the Reply its
+ * Prompt answers was cut short before its Provider saved it, or Turns the Tree
+ * deleted. Each Provider cuts at the one it can; a null one leaves the session
+ * as it is.
+ */
+export const SessionCutSchema = SessionRefSchema.extend({
+  type: z.literal('cut'),
+  keepThrough: z.string().nullable(),
+  dropFrom: z.string().nullable(),
+})
+
+export type SessionCut = z.infer<typeof SessionCutSchema>
+
+/** Drops the first Prompt of Turns the Tree deleted, with all after it. */
+export const DeletionCutSchema = SessionCutSchema.extend({
+  dropFrom: z.string(),
+})
+
+export type DeletionCut = z.infer<typeof DeletionCutSchema>
+
 /** The Provider session a Reply is written in, at the Reply being answered. */
 export const ReplySessionSchema = z.discriminatedUnion('type', [
   SessionRefSchema.extend({type: z.literal('continue')}),
@@ -49,18 +71,7 @@ export const ReplySessionSchema = z.discriminatedUnion('type', [
   SessionRefSchema.extend({type: z.literal('fork')}),
   /** The session may run past `messageId` with a failed turn, dropped first. */
   SessionRefSchema.extend({type: z.literal('rewind')}),
-  /**
-   * A Retry whose Prompt answers a Reply cut short before its Provider saved
-   * it. The session keeps everything through `keepThrough`, that Reply's
-   * Prompt, and drops `dropFrom`, the failed attempt's own Prompt, with all
-   * after it. Each Provider cuts at the one it can; a null one leaves the
-   * session as it is.
-   */
-  SessionRefSchema.extend({
-    type: z.literal('cut'),
-    keepThrough: z.string().nullable(),
-    dropFrom: z.string().nullable(),
-  }),
+  SessionCutSchema,
 ])
 
 export type ReplySession = z.infer<typeof ReplySessionSchema>
@@ -111,6 +122,16 @@ export const PromptDroppedMessage = z.strictObject({
 
 export type PromptDropped = z.infer<typeof PromptDroppedMessage>
 
+/** The Provider session no longer holds `dropFrom`, past the Reply `replyId`. */
+export const SessionCutMessage = z.strictObject({
+  type: z.literal('SESSION_CUT'),
+  treeId: z.uuid(),
+  replyId: z.uuid(),
+  dropFrom: z.string(),
+})
+
+export type SessionCutReport = z.infer<typeof SessionCutMessage>
+
 /** A Thread as any Provider can take it: each Prompt and the Reply to it. */
 export const ThreadSchema = z.array(
   z.strictObject({prompt: z.string(), reply: z.array(ReplyPartSchema)})
@@ -158,10 +179,14 @@ export interface ProviderDriver {
     atMessageId: string
   }): Promise<SessionRef>
   rebuildSession(input: {thread: Thread}): Promise<SessionRef>
-  rewindSession(input: {
-    session: SessionRef
-    toMessageId: string
-  }): Promise<void>
+  /**
+   * Drops Turns the Tree deleted. True once the session no longer holds
+   * `dropFrom`; false when the cut waits for the next Reply in the session.
+   */
+  cutSession(input: {
+    session: DeletionCut
+    vendorProgram: SignInRequest
+  }): Promise<boolean>
   /** A tiny tool-free request outside any Tree: titles, Summaries. */
   runOneShot(input: {model: string; prompt: string}): Promise<string>
   mcpSignIn(serverId: string): Promise<void>
@@ -172,6 +197,14 @@ export const HostCommandSchema = z.discriminatedUnion('type', [
   z.strictObject({type: z.literal('reply.start'), request: ReplyRequestSchema}),
   /** Interrupts the Reply's turn; its `RUN_FINISHED` follows. */
   z.strictObject({type: z.literal('reply.stop'), replyId: z.uuid()}),
+  /** `SESSION_CUT` follows once the driver's `cutSession` has cut. */
+  z.strictObject({
+    type: z.literal('session.cut'),
+    treeId: z.uuid(),
+    replyId: z.uuid(),
+    session: DeletionCutSchema,
+    vendorProgram: SignInRequestSchema,
+  }),
   z.strictObject({
     type: z.literal('sign-in.start'),
     request: SignInRequestSchema,
@@ -211,6 +244,7 @@ export const HostMessageSchema = z.discriminatedUnion('type', [
   PromptRecordedMessage,
   PromptDroppedMessage,
   ReplyRecordedMessage,
+  SessionCutMessage,
   SignInUpdateSchema,
   SessionStoreMessage,
 ])

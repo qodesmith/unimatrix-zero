@@ -61,6 +61,18 @@ export const PromptSendResult = z.strictObject({
   reply: ReplySchema,
 })
 
+/** The Prompt and every Turn below it, for good; refused while one streams. */
+export const PromptDeleteCommand = z.strictObject({
+  type: z.literal('prompt.delete'),
+  treeId: z.uuid(),
+  promptId: z.uuid(),
+})
+
+export const PromptDeleteResult = z.strictObject({
+  promptIds: z.array(z.uuid()),
+  replyIds: z.array(z.uuid()),
+})
+
 /**
  * Keeps the text so far. The Reply ends with its `RUN_FINISHED` once the
  * Provider has let go of the turn.
@@ -131,6 +143,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   TreeRenameCommand,
   TreeTurnsCommand,
   PromptSendCommand,
+  PromptDeleteCommand,
   ReplyStopCommand,
   ReplyRetryCommand,
   ProviderConnectCommand,
@@ -153,6 +166,7 @@ const resultSchemas = {
   'tree.rename': TreeSchema,
   'tree.turns': TreeTurnsResult,
   'prompt.send': PromptSendResult,
+  'prompt.delete': PromptDeleteResult,
   'reply.stop': Done,
   'reply.retry': ReplyRetryResult,
   'provider.connect': Done,

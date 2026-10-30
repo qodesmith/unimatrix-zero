@@ -65,6 +65,23 @@ export async function runHost(
     }
   }
 
+  async function cut(command: Extract<HostCommand, {type: 'session.cut'}>) {
+    const {treeId, replyId, session, vendorProgram} = command
+
+    const made = await driver
+      .cutSession({session, vendorProgram})
+      .catch(() => false)
+
+    if (made) {
+      port.postMessage({
+        type: 'SESSION_CUT',
+        treeId,
+        replyId,
+        dropFrom: session.dropFrom,
+      })
+    }
+  }
+
   function run(command: HostCommand) {
     switch (command.type) {
       case 'reply.start':
@@ -72,6 +89,9 @@ export async function runHost(
         break
       case 'reply.stop':
         void driver.stop(command.replyId).catch(() => undefined)
+        break
+      case 'session.cut':
+        void cut(command)
         break
       case 'sign-in.start':
         void signIn(command.request)

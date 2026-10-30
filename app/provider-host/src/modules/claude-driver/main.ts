@@ -73,7 +73,7 @@ export function createClaudeDriver({
     answerApproval: notYet,
     forkSession: notYet,
     rebuildSession: notYet,
-    rewindSession: notYet,
+    cutSession: replies.cutSession,
     runOneShot: notYet,
     mcpSignIn: notYet,
   }

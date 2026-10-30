@@ -3,12 +3,11 @@ import type {CanvasState, Collapsed, Expanded} from '../canvas-context'
 import type {TreeIndex} from '../tree'
 import type {Focus} from './Flow'
 import type {CanvasOrientation} from '@uz/contract/settings'
-import type {Reply} from '@uz/contract/turns'
 import type {Viewport} from '@xyflow/react'
 import type {ReactNode} from 'react'
 
 import {useSettings, useUpdateSettings} from '#modules/settings/main'
-import {useReply, useReplyRun, useTurns} from '#modules/turns/main'
+import {useTurns} from '#modules/turns/main'
 import {ReactFlowProvider} from '@xyflow/react'
 import {
   useCallback,
@@ -21,8 +20,10 @@ import {
 
 import {CanvasContext} from '../canvas-context'
 import {useChatSlideout} from '../chat-slideout/use-chat-slideout'
+import {useDeletion} from '../deletion'
+import {useEscapeStops} from '../escape-stops'
 import {TURN_WIDTH} from '../layout'
-import {indexTurns, isEmpty, newestReply, pathTo, previousReply} from '../tree'
+import {indexTurns, isEmpty, pathTo, previousReply} from '../tree'
 import {CanvasControls} from './CanvasControls'
 import {ChatSlideout} from './ChatSlideout'
 import {Flow} from './Flow'
@@ -55,57 +56,6 @@ function unfoldedOver(index: TreeIndex, replyId: string) {
 
     return {ids, toggledReplyId: topmost}
   }
-}
-
-interface EscapeStops {
-  treeId: string
-  index: TreeIndex
-  activeReplyId: string | null
-  chatOpen: boolean
-  /** The Reply the slideout ends at, kept while it slides away. */
-  chatEnd: Reply | null
-}
-
-/**
- * Esc stops the streaming Reply in view, the slideout's end else the Active
- * Thread's, capturing the key before the slideout closes on it.
- */
-function useEscapeStops({
-  treeId,
-  index,
-  activeReplyId,
-  chatOpen,
-  chatEnd,
-}: EscapeStops) {
-  const replyId = chatOpen && chatEnd ? chatEnd.id : activeReplyId
-
-  const shown = useReply(
-    replyId === null ? null : (index.replyById.get(replyId) ?? null)
-  )
-
-  const status = shown?.status
-
-  const streaming = status === 'streaming' ? replyId : null
-  const {stop} = useReplyRun(treeId, streaming)
-
-  useEffect(() => {
-    if (streaming === null) return undefined
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape' || event.defaultPrevented) return
-
-      const {target} = event
-
-      if (target instanceof Element && target.matches('input, textarea')) return
-
-      event.preventDefault()
-      stop()
-    }
-
-    globalThis.addEventListener('keydown', onKeyDown, true)
-
-    return () => globalThis.removeEventListener('keydown', onKeyDown, true)
-  }, [streaming, stop])
 }
 
 interface EmptyTreeProps {
@@ -251,15 +201,21 @@ function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
     []
   )
 
-  const activeReplyId =
-    chosenReplyId !== null && index.replyById.has(chosenReplyId)
-      ? chosenReplyId
-      : (newestReply(index)?.id ?? null)
+  const {deleted, activeReplyId, onDeleteConfirmed} = useDeletion(
+    index,
+    chosenReplyId
+  )
 
   useEscapeStops({treeId, index, activeReplyId, chatOpen, chatEnd})
 
+  // A box deleted under the pointer never says the pointer left it.
+  const hoveredTurnId =
+    hoverTurnId !== null && pathTo(index, hoverTurnId).length > 0
+      ? hoverTurnId
+      : null
+
   const highlightedTurnId =
-    hoverTurnId ?? (chatOpen ? chatEnd?.id : null) ?? activeReplyId
+    hoveredTurnId ?? (chatOpen ? chatEnd?.id : null) ?? activeReplyId
 
   const thread = useMemo(
     () => new Set(highlightedTurnId ? pathTo(index, highlightedTurnId) : []),
@@ -371,6 +327,7 @@ function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
       onInputFocus,
       onSent: sentFromInput,
       inputToFocus,
+      onDeleteConfirmed,
       openChat,
       expandedTurnIds: expanded.ids,
       toggleExpanded,
@@ -388,6 +345,7 @@ function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
       onInputFocus,
       sentFromInput,
       inputToFocus,
+      onDeleteConfirmed,
       openChat,
       expanded.ids,
       toggleExpanded,
@@ -446,6 +404,7 @@ function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
             focus={focus}
             fitOnLoad={!startedEmpty}
             startAt={inputAt}
+            deleted={deleted}
             switching={switching}
             showMap={showMap}
             onHover={setHoverTurnId}

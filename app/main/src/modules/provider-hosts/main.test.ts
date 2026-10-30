@@ -4,6 +4,7 @@ import type {
   PromptDropped,
   PromptRecorded,
   ReplyRecorded,
+  SessionCutReport,
   SessionStoreRequest,
 } from '@uz/contract/host'
 import type {ProviderId, SignInUpdate} from '@uz/contract/providers'
@@ -56,6 +57,7 @@ let events: ReplyEvent[]
 let recorded: ReplyRecorded[]
 let promptsRecorded: PromptRecorded[]
 let promptsDropped: PromptDropped[]
+let sessionsCut: SessionCutReport[]
 let storeRequests: SessionStoreRequest[]
 let signInUpdates: SignInUpdate[]
 let statuses: HostStatus[]
@@ -72,6 +74,7 @@ function setUp() {
     onReplyEvent: (_provider, event) => events.push(event),
     onPromptRecorded: (_provider, message) => promptsRecorded.push(message),
     onPromptDropped: (_provider, message) => promptsDropped.push(message),
+    onSessionCut: (_provider, message) => sessionsCut.push(message),
     onReplyRecorded: (_provider, message) => recorded.push(message),
     onSignInUpdate: (_provider, update) => signInUpdates.push(update),
     onSessionStore: (_provider, request) => {
@@ -101,6 +104,7 @@ beforeEach(() => {
   recorded = []
   promptsRecorded = []
   promptsDropped = []
+  sessionsCut = []
   storeRequests = []
   signInUpdates = []
   statuses = []
@@ -206,6 +210,24 @@ it('passes on that a Retry’s cut dropped a Reply’s recorded Prompt', () => {
   latest().say(message)
 
   expect(promptsDropped).toEqual([message])
+  expect(events).toEqual([])
+})
+
+it('passes on that a Provider cut deleted Turns from its session', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+  const {treeId, replyId} = textDelta
+
+  const message = {
+    type: 'SESSION_CUT',
+    treeId,
+    replyId,
+    dropFrom: 'p2',
+  } as const
+
+  latest().say(message)
+
+  expect(sessionsCut).toEqual([message])
   expect(events).toEqual([])
 })
 
@@ -398,6 +420,7 @@ it('does not restart a host that was stopped while its crash was handled', () =>
     onReplyEvent: () => undefined,
     onPromptRecorded: () => undefined,
     onPromptDropped: () => undefined,
+    onSessionCut: () => undefined,
     onReplyRecorded: () => undefined,
     onSignInUpdate: () => undefined,
     onSessionStore: () => null,

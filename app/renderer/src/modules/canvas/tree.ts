@@ -97,3 +97,21 @@ export function newestReply(index: TreeIndex): Reply | null {
 export function replyOf(index: TreeIndex, turnId: string): Reply | null {
   return index.replyById.get(turnId) ?? index.replyByPrompt.get(turnId) ?? null
 }
+
+/** A Prompt's id and the id of every Prompt and Reply below it. */
+export function turnsFrom(index: TreeIndex, promptId: string): string[] {
+  const ids: string[] = []
+  const prompts = [promptId]
+
+  for (const id of prompts) {
+    ids.push(id)
+    const reply = index.replyByPrompt.get(id)
+
+    if (!reply) continue
+
+    ids.push(reply.id)
+    prompts.push(...branchesOf(index, reply.id).map(branch => branch.id))
+  }
+
+  return ids
+}

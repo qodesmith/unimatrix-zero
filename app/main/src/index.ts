@@ -98,6 +98,7 @@ function openWindow(db: Database) {
       turns.hostPromptRecorded(provider, recorded),
     onPromptDropped: (provider, dropped) =>
       turns.hostPromptDropped(provider, dropped),
+    onSessionCut: (provider, cut) => turns.hostSessionCut(provider, cut),
     onReplyRecorded: (provider, recorded) =>
       turns.hostRecorded(provider, recorded),
     onSessionStore: sessions.handle,

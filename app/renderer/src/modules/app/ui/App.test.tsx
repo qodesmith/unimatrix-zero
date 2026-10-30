@@ -117,7 +117,11 @@ function fakeMain(saved: Saved = {}) {
       return {ok: true, value: {prompt, reply}}
     }
 
-    if (command.type === 'reply.stop' || command.type === 'reply.retry') {
+    if (
+      command.type === 'reply.stop' ||
+      command.type === 'reply.retry' ||
+      command.type === 'prompt.delete'
+    ) {
       return {ok: false, error: {code: 'not-found', message: 'Gone'}}
     }
 

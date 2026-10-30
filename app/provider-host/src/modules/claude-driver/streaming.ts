@@ -110,10 +110,13 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
   const sessionStore = appSessionStore(deps.store)
 
+  /** Waits for a closing `claude` in the session, which may still write to it. */
   async function open(request: ReplyRequest, restore: Restore): Promise<Live> {
     const {program, configDir} = request.vendorProgram
 
     if (!program) throw new Error('The manifest names no Claude program.')
+
+    if (request.session) await warm.closed(request.session.sessionId)
 
     const cwd = configDir
     const projectKey = projectKeyOf(cwd)
@@ -414,5 +417,9 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     }
   }
 
-  return createReplyRuns(write)
+  return {
+    ...createReplyRuns(write),
+    /** `claude` cuts with `resumeSessionAt` when the next Prompt resumes. */
+    cutSession: async () => false,
+  }
 }

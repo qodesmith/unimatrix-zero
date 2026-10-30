@@ -235,3 +235,85 @@ it('rejects a session store request main couldn’t answer', async () => {
 
   await expect(saved).rejects.toThrow('The disk is full.')
 })
+
+const cut = {
+  type: 'session.cut',
+  treeId: request.treeId,
+  replyId: request.replyId,
+  session: {
+    type: 'cut',
+    sessionId: 's',
+    messageId: 'kept',
+    keepThrough: 'kept',
+    dropFrom: 'deleted',
+  },
+  vendorProgram: {program: null, configDir: '/codex'},
+}
+
+function cutting(outcomes: (() => Promise<boolean>)[]) {
+  const asked: unknown[] = []
+
+  const driver: ProviderDriver = {
+    ...createFakeDriver({delayMs: 0}),
+    async cutSession(input) {
+      asked.push(input)
+      const outcome = outcomes.shift()
+
+      if (!outcome) throw new Error('No cut was expected')
+
+      return outcome()
+    },
+  }
+
+  return {driver, asked}
+}
+
+it('tells main once the driver has cut the session', async () => {
+  const main = fakeMain()
+  const {driver, asked} = cutting([async () => true])
+  await runHost(main.port, () => driver)
+
+  main.command(cut)
+  await expect.poll(() => main.sent.at(-1)?.type).toBe('SESSION_CUT')
+
+  expect(asked).toEqual([
+    {session: cut.session, vendorProgram: cut.vendorProgram},
+  ])
+  expect(main.sent.at(-1)).toEqual({
+    type: 'SESSION_CUT',
+    treeId: cut.treeId,
+    replyId: cut.replyId,
+    dropFrom: 'deleted',
+  })
+})
+
+it('tells main nothing when the driver leaves the cut for later or fails it', async () => {
+  const main = fakeMain()
+  const failed = '01a16096-00b0-7d3b-8205-6b76ddc26ce0'
+  const made = '01a16096-00b1-7d3b-8205-6b76ddc26ce0'
+
+  const {driver} = cutting([
+    async () => false,
+    async () => {
+      throw new Error('codex would not start')
+    },
+    async () => true,
+  ])
+
+  await runHost(main.port, () => driver)
+
+  main.command(cut)
+  main.command({...cut, replyId: failed})
+  main.command({...cut, replyId: made})
+  await expect.poll(() => main.sent.at(-1)?.type).toBe('SESSION_CUT')
+
+  // The cuts settle in order, so a post for either earlier one comes first.
+  expect(main.sent.filter(message => message.type === 'SESSION_CUT')).toEqual([
+    {
+      type: 'SESSION_CUT',
+      treeId: cut.treeId,
+      replyId: made,
+      dropFrom: 'deleted',
+    },
+  ])
+})

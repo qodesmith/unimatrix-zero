@@ -89,6 +89,24 @@ it('closes the longest idle when more than the most are open', () => {
   expect(warm.size).toBe(2)
 })
 
+it('says when every `claude` it closed in a session has ended', async () => {
+  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
+  const ending = Promise.withResolvers<undefined>()
+  const one = {...session('s1', 'm2'), close: async () => ending.promise}
+
+  warm.add(one)
+  warm.release(one)
+  warm.claim({sessionId: 's1', messageId: 'm1'})
+
+  await expect(
+    Promise.race([warm.closed('s1'), Promise.resolve('closing')])
+  ).resolves.toBe('closing')
+
+  ending.resolve(undefined)
+
+  await expect(warm.closed('s1')).resolves.toBeUndefined()
+})
+
 it('never closes a session writing a Reply to make room', () => {
   const warm = createWarmSessions({whenIdle: idleFor(1000), max: 1})
   const one = session('s1', 'm')

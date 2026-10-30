@@ -3,6 +3,7 @@ import type {
   PromptDropped,
   PromptRecorded,
   ReplyRecorded,
+  SessionCutReport,
   SessionStoreRequest,
   SessionStoreValue,
 } from '@uz/contract/host'
@@ -48,6 +49,7 @@ interface ProviderHostsOptions {
   onReplyEvent: (provider: ProviderId, event: ReplyEvent) => void
   onPromptRecorded: (provider: ProviderId, recorded: PromptRecorded) => void
   onPromptDropped: (provider: ProviderId, dropped: PromptDropped) => void
+  onSessionCut: (provider: ProviderId, cut: SessionCutReport) => void
   onReplyRecorded: (provider: ProviderId, recorded: ReplyRecorded) => void
   onSignInUpdate: (provider: ProviderId, update: SignInUpdate) => void
   /** Answers a host's request about its sessions; throws if it can't. */
@@ -68,6 +70,7 @@ export function createProviderHosts({
   onReplyEvent,
   onPromptRecorded,
   onPromptDropped,
+  onSessionCut,
   onReplyRecorded,
   onSignInUpdate,
   onSessionStore,
@@ -129,6 +132,8 @@ export function createProviderHosts({
         onPromptRecorded(provider, message)
       } else if (message.type === 'PROMPT_DROPPED') {
         onPromptDropped(provider, message)
+      } else if (message.type === 'SESSION_CUT') {
+        onSessionCut(provider, message)
       } else if (message.type === 'REPLY_RECORDED') {
         onReplyRecorded(provider, message)
       } else if (message.type === 'SESSION_STORE') {

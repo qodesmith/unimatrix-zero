@@ -44,3 +44,21 @@ export function updateSavedReply(
       : turns
   )
 }
+
+export function removeDeleted(
+  queryClient: QueryClient,
+  treeId: string,
+  {promptIds, replyIds}: CommandResult<'prompt.delete'>
+) {
+  const prompts = new Set(promptIds)
+  const replies = new Set(replyIds)
+
+  queryClient.setQueryData<Turns>(turnsKey(treeId), turns =>
+    turns
+      ? {
+          prompts: turns.prompts.filter(prompt => !prompts.has(prompt.id)),
+          replies: turns.replies.filter(reply => !replies.has(reply.id)),
+        }
+      : turns
+  )
+}

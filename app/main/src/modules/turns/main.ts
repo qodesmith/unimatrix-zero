@@ -7,6 +7,7 @@ import type {
   PromptRecorded,
   ReplyRecorded,
   ReplyRequest,
+  SessionCutReport,
   SignInRequest,
 } from '@uz/contract/host'
 import type {Model, ProviderId} from '@uz/contract/providers'
@@ -17,6 +18,12 @@ import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {eq} from 'drizzle-orm'
 
 import {continuation, recovery} from './continuation'
+import {
+  clearCutOnDrop,
+  clearCutOnPrompt,
+  clearCutOnReport,
+  deleteBelow,
+} from './deletion'
 import {createInFlight} from './in-flight'
 import {insertExchange, listTurns, resetReply, savedReply} from './rows'
 
@@ -169,11 +176,50 @@ export function createTurns({
     hostEvent: (provider: ProviderId, event: ReplyEvent) =>
       inFlight.apply(provider, event),
 
-    hostPromptRecorded: (provider: ProviderId, recorded: PromptRecorded) =>
-      inFlight.recordPrompt(provider, recorded),
+    /**
+     * Refused while a Reply below streams. The Provider is asked to cut the
+     * deleted Turns from its session now; one that can't cuts them with the
+     * next Prompt from the Reply the deleted Prompt answers.
+     */
+    deletePrompt(
+      treeId: string,
+      promptId: string
+    ): CommandResult<'prompt.delete'> | null {
+      const deleted = deleteBelow(db, treeId, promptId)
 
-    hostPromptDropped: (provider: ProviderId, dropped: PromptDropped) =>
-      inFlight.dropPrompt(provider, dropped),
+      if (!deleted) return null
+
+      const {promptIds, replyIds, cut} = deleted
+
+      if (cut && hosts.ready(cut.provider)) {
+        try {
+          hosts.send(cut.provider, {
+            type: 'session.cut',
+            treeId,
+            replyId: cut.replyId,
+            session: cut.session,
+            vendorProgram: vendorProgramFor(cut.provider),
+          })
+        } catch {
+          // The next Prompt from that Reply cuts instead.
+        }
+      }
+
+      return {promptIds, replyIds}
+    },
+
+    hostPromptRecorded(provider: ProviderId, recorded: PromptRecorded) {
+      inFlight.recordPrompt(provider, recorded)
+      clearCutOnPrompt(db, recorded)
+    },
+
+    hostPromptDropped(provider: ProviderId, dropped: PromptDropped) {
+      inFlight.dropPrompt(provider, dropped)
+      clearCutOnDrop(db, dropped.treeId, dropped.replyId)
+    },
+
+    hostSessionCut: (provider: ProviderId, cut: SessionCutReport) =>
+      clearCutOnReport(db, provider, cut),
 
     hostRecorded: (provider: ProviderId, recorded: ReplyRecorded) =>
       inFlight.record(provider, recorded),

@@ -103,6 +103,38 @@ function fakeMain(saved: Saved) {
   const listeners = new Set<(event: AppEvent) => void>()
   /** What main says when it refuses a Stop; null takes every Stop. */
   const stops = {refusal: null as string | null}
+  const deletes = {refusal: null as string | null}
+  /** While set, the Turns are fetched only once it settles. */
+  const turnsLoads = {held: null as Promise<void> | null}
+
+  function cutFrom(promptId: string) {
+    const promptIds = [promptId]
+    const replyIds: string[] = []
+
+    for (const id of promptIds) {
+      for (const answer of replies.filter(one => one.promptId === id)) {
+        replyIds.push(answer.id)
+        promptIds.push(
+          ...prompts.flatMap(one =>
+            one.parentReplyId === answer.id ? [one.id] : []
+          )
+        )
+      }
+    }
+
+    prompts.splice(
+      0,
+      Infinity,
+      ...prompts.filter(one => !promptIds.includes(one.id))
+    )
+    replies.splice(
+      0,
+      Infinity,
+      ...replies.filter(one => !replyIds.includes(one.id))
+    )
+
+    return {promptIds, replyIds}
+  }
 
   function publish(event: AppEvent) {
     for (const listener of listeners) listener(event)
@@ -113,6 +145,8 @@ function fakeMain(saved: Saved) {
       sent.push(command)
 
       if (command.type === 'tree.turns') {
+        await turnsLoads.held
+
         return {ok: true, value: {prompts: [...prompts], replies: [...replies]}}
       }
 
@@ -153,6 +187,17 @@ function fakeMain(saved: Saved) {
           : {ok: false, error: {code: 'handler-failed', message: stops.refusal}}
       }
 
+      if (command.type === 'prompt.delete') {
+        if (deletes.refusal !== null) {
+          return {
+            ok: false,
+            error: {code: 'handler-failed', message: deletes.refusal},
+          }
+        }
+
+        return {ok: true, value: cutFrom(command.promptId)}
+      }
+
       if (command.type === 'reply.retry') {
         const where = replies.findIndex(one => one.id === command.replyId)
         const failed = replies[where]
@@ -191,7 +236,7 @@ function fakeMain(saved: Saved) {
     registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
   }
 
-  return {...bridge, sent, publish, replies, stops}
+  return {...bridge, sent, publish, replies, stops, deletes, turnsLoads}
 }
 
 function Providers({children}: {children: ReactNode}) {
@@ -1832,4 +1877,225 @@ it('lets a streaming Reply go when Show more, pressed from the keyboard, lets ou
   await new Promise(requestAnimationFrame)
   await new Promise(requestAnimationFrame)
   expect(lineTop('Line 12')).toBeCloseTo(before, 0)
+})
+
+function deleteButtonOf(promptText: string) {
+  return nodeOf(promptText).getByRole('button', {
+    name: 'Delete this Prompt and everything below it',
+  })
+}
+
+function opacityOf(locator: ReturnType<typeof deleteButtonOf>) {
+  const shown = locator.element().closest('[data-delete]')
+
+  return shown ? getComputedStyle(shown).opacity : null
+}
+
+it('shows a Prompt’s delete control only while the pointer is over it, in both orientations', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await hoverAway()
+
+  await expect.poll(() => opacityOf(deleteButtonOf('Prompt two'))).toBe('0')
+  await page.getByText('Prompt two').hover()
+  await expect.poll(() => opacityOf(deleteButtonOf('Prompt two'))).toBe('1')
+  await hoverAway()
+  await expect.poll(() => opacityOf(deleteButtonOf('Prompt two'))).toBe('0')
+
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+  await expect
+    .poll(() => document.querySelectorAll('.react-flow__node-exchange').length)
+    .toBe(5)
+  await hoverAway()
+  await expect.poll(() => opacityOf(deleteButtonOf('Prompt two'))).toBe('0')
+  await page.getByText('Prompt two').hover()
+  await expect.poll(() => opacityOf(deleteButtonOf('Prompt two'))).toBe('1')
+  await page.getByText('Reply two').hover()
+  await expect.poll(() => opacityOf(deleteButtonOf('Prompt two'))).toBe('0')
+})
+
+async function armDelete(promptText: string) {
+  await page.getByText(promptText).hover()
+  await deleteButtonOf(promptText).click()
+}
+
+it('asks to delete the Prompt with every Turn below it, and cancels by Cancel, Esc or the pointer leaving', async () => {
+  const {main} = await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await armDelete('Prompt two')
+  const two = nodeOf('Prompt two')
+  await expect.element(two.getByText('Delete 6 Turns?')).toBeVisible()
+  await expect.element(two.getByText('This can’t be undone.')).toBeVisible()
+  await two.getByRole('button', {name: 'Cancel'}).click()
+  await expect.element(two.getByText('Delete 6 Turns?')).not.toBeInTheDocument()
+  await expect.element(deleteButtonOf('Prompt two')).toHaveFocus()
+
+  await deleteButtonOf('Prompt two').click()
+  await expect.element(two.getByText('Delete 6 Turns?')).toBeVisible()
+  await userEvent.keyboard('{Escape}')
+  await expect.element(two.getByText('Delete 6 Turns?')).not.toBeInTheDocument()
+
+  await armDelete('Prompt three')
+  await expect
+    .element(nodeOf('Prompt three').getByText('Delete 2 Turns?'))
+    .toBeVisible()
+  await hoverAway()
+  await expect
+    .element(nodeOf('Prompt three').getByText('Delete 2 Turns?'))
+    .not.toBeInTheDocument()
+
+  expect(main.sent.some(command => command.type === 'prompt.delete')).toBe(
+    false
+  )
+})
+
+it('deletes the Prompt and every Turn below it once confirmed, before the Turns are fetched again', async () => {
+  const {main} = await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  main.turnsLoads.held = new Promise(() => {})
+
+  await armDelete('Prompt two')
+  await nodeOf('Prompt two').getByRole('button', {name: 'Delete'}).click()
+
+  await expect.element(page.getByText('Prompt two')).not.toBeInTheDocument()
+  expect(main.sent.filter(command => command.type === 'prompt.delete')).toEqual(
+    [{type: 'prompt.delete', treeId, promptId: uuid(2)}]
+  )
+
+  for (const gone of ['Reply two', 'Prompt four', 'Reply five']) {
+    expect(page.getByText(gone).query()).toBeNull()
+  }
+
+  await expect.poll(nodeCount).toBe(4)
+  await expect.element(page.getByText('Reply three')).toBeVisible()
+})
+
+it('shows main’s refusal in the confirmation and keeps every Turn', async () => {
+  const {main} = await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  main.deletes.refusal = 'A Reply below is still being written'
+
+  await armDelete('Prompt two')
+  const two = nodeOf('Prompt two')
+  await two.getByRole('button', {name: 'Delete'}).click()
+
+  await expect
+    .element(two.getByRole('alert'))
+    .toHaveTextContent('A Reply below is still being written')
+  await expect.element(two.getByText('Delete 6 Turns?')).toBeVisible()
+  expect(nodeCount()).toBe(10)
+})
+
+it('offers no delete on a Prompt with a Reply streaming at or below it', async () => {
+  const saved = forkedTree()
+
+  saved.replies = saved.replies.map(one =>
+    one.id === uuid(15) ? {...one, status: 'streaming', content: []} : one
+  )
+
+  await renderCanvas(saved)
+  await expect.element(page.getByText('Prompt five')).toBeVisible()
+
+  await expect.element(deleteButtonOf('Prompt four')).toBeInTheDocument()
+  await expect.element(deleteButtonOf('Prompt three')).toBeInTheDocument()
+
+  for (const above of ['Prompt one', 'Prompt two', 'Prompt five']) {
+    expect(deleteButtonOf(above).query()).toBeNull()
+  }
+})
+
+async function deleteFrom(promptText: string) {
+  await armDelete(promptText)
+  await nodeOf(promptText).getByRole('button', {name: 'Delete'}).click()
+  await expect.element(page.getByText(promptText)).not.toBeInTheDocument()
+}
+
+it('keeps the Reply a deleted Prompt answered where it is on screen, in both orientations', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await settledViewport()
+  const before = rect('Reply two')
+
+  await deleteFrom('Prompt four')
+  await settledViewport()
+  expect(rect('Reply two').left).toBeCloseTo(before.left, 0)
+  expect(rect('Reply two').top).toBeCloseTo(before.top, 0)
+
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+  await expect
+    .poll(() => document.querySelectorAll('.react-flow__node-exchange').length)
+    .toBe(4)
+  await settledViewport()
+  const card = rect('Reply one')
+
+  await deleteFrom('Prompt three')
+  await settledViewport()
+  expect(rect('Reply one').left).toBeCloseTo(card.left, 0)
+  expect(rect('Reply one').top).toBeCloseTo(card.top, 0)
+})
+
+it('keeps a card put once it stops being a Fork and its pill goes, beside a taller Branch', async () => {
+  const saved = forkedTree()
+
+  saved.replies = saved.replies.map(one =>
+    one.id === uuid(14)
+      ? {
+          ...one,
+          content: [{type: 'text', text: 'Reply four\n\nand on\n\nand on'}],
+        }
+      : one
+  )
+
+  await renderCanvas({...saved, settings: {canvasOrientation: 'horizontal'}})
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await settledViewport()
+  const before = rect('Reply two')
+
+  await deleteFrom('Prompt five')
+  await expect
+    .element(nodeOf('Reply two').getByRole('button', {name: /^Fork/}))
+    .not.toBeInTheDocument()
+  await settledViewport()
+  expect(rect('Reply two').left).toBeCloseTo(before.left, 0)
+  expect(rect('Reply two').top).toBeCloseTo(before.top, 0)
+})
+
+it('moves the Active Thread up to the Reply a deleted Prompt answered, when it ran through the Prompt', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await hoverAway()
+  await expect.poll(() => revealed('Reply five')).toBe('true')
+
+  await deleteFrom('Prompt five')
+  await hoverAway()
+  await expect.poll(() => revealed('Reply two')).toBe('true')
+  expect(revealed('Reply four')).toBe('false')
+
+  await clickInputUnder('Reply three')
+  await deleteFrom('Prompt four')
+  await hoverAway()
+  await expect.poll(() => revealed('Reply three')).toBe('true')
+  expect(revealed('Reply two')).toBe('false')
+})
+
+it('cancels a delete with Esc rather than stopping the Active Thread’s streaming Reply', async () => {
+  const saved = forkedTree()
+
+  saved.replies = saved.replies.map(one =>
+    one.id === uuid(15) ? {...one, status: 'streaming', content: []} : one
+  )
+
+  const {main} = await renderCanvas(saved)
+  await expect.element(page.getByText('Prompt five')).toBeVisible()
+
+  await armDelete('Prompt three')
+  const three = nodeOf('Prompt three')
+  await expect.element(three.getByText('Delete 2 Turns?')).toBeVisible()
+  await userEvent.keyboard('{Escape}')
+  await expect
+    .element(three.getByText('Delete 2 Turns?'))
+    .not.toBeInTheDocument()
+
+  expect(main.sent.some(command => command.type === 'reply.stop')).toBe(false)
 })

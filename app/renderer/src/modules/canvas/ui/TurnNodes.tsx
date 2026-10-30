@@ -12,6 +12,7 @@ import {TURN_WIDTH} from '../layout'
 import {branchesOf, isFork, previousReply} from '../tree'
 import {CappedText} from './CappedText'
 import {ContextMeter, ContextSize} from './ContextSize'
+import {PromptBox} from './PromptBox'
 import {PromptInput} from './PromptInput'
 
 /** A vertical Reply's line down through its Input's space, drawn as its edge. */
@@ -252,12 +253,12 @@ export function PromptNode({data}: NodeProps<TurnNode>) {
   return (
     <div style={{width: TURN_WIDTH}}>
       <Handle type="target" position={Position.Top} className={hiddenHandle} />
-      <div
-        data-turn={turn.prompt.id}
+      <PromptBox
+        promptId={turn.prompt.id}
         className="rounded-xl border border-border bg-prompt px-3.5 py-2.5 text-prompt-foreground shadow-sm"
       >
         <PromptText prompt={turn.prompt} />
-      </div>
+      </PromptBox>
       <Handle
         type="source"
         position={Position.Bottom}
@@ -354,12 +355,12 @@ function ExchangeTurns({
 
   return (
     <div className={replyFrame(status, joined)}>
-      <div
-        data-turn={prompt.id}
+      <PromptBox
+        promptId={prompt.id}
         className="border-b border-border bg-prompt px-3.5 py-2.5 text-prompt-foreground"
       >
         <PromptText prompt={prompt} />
-      </div>
+      </PromptBox>
       {reply && (
         <div data-turn={reply.id} className="relative">
           <ReplyBody reply={reply} />

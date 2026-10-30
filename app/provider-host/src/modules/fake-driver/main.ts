@@ -232,7 +232,7 @@ export function createFakeDriver({
     answerApproval: async () => undefined,
     forkSession: async () => ({sessionId: randomUUID(), messageId: null}),
     rebuildSession: async () => ({sessionId: randomUUID(), messageId: null}),
-    rewindSession: async () => undefined,
+    cutSession: async () => true,
     runOneShot: async () => 'A fake one-shot answer.',
     mcpSignIn: async () => undefined,
   }

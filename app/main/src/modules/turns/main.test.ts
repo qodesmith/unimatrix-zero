@@ -802,3 +802,273 @@ describe('retrying a Reply', () => {
     })
   })
 })
+
+/** Saved by Claude at `messageId`, its Prompt recorded as `p-<messageId>`. */
+function savedAt(parentReplyId: string, messageId: string, sessionId = 's1') {
+  const replyId = sendPrompt(parentReplyId, `Prompt ${messageId}`)
+  recordPrompt(replyId, `p-${messageId}`, sessionId)
+  turns.hostRecorded('claude', {
+    type: 'REPLY_RECORDED',
+    treeId,
+    replyId,
+    model: 'claude-haiku-5-5',
+    session: {sessionId, messageId},
+  })
+  finish(replyId)
+
+  return replyId
+}
+
+function promptOf(replyId: string) {
+  return saved(replyId).promptId
+}
+
+function cutsAsked() {
+  return hostCommands.filter(command => command.type === 'session.cut')
+}
+
+const cutAtFirst = {
+  sessionId: 's1',
+  messageId: 'm1',
+  type: 'cut',
+  keepThrough: 'm1',
+  dropFrom: 'p-m2',
+}
+
+/** A Thread of three Replies in `s1`, the last two deleted. */
+function deletedMidThread() {
+  const first = savedRoot()
+  const second = savedAt(first, 'm2')
+  savedAt(second, 'm3')
+  hostCommands = []
+  turns.deletePrompt(treeId, promptOf(second))
+
+  return first
+}
+
+describe('deleting a Prompt', () => {
+  it('deletes it and every Turn below it, Branches too, and nothing else', () => {
+    const first = savedRoot()
+    const second = savedAt(first, 'm2')
+    const third = savedAt(second, 'm3')
+    const branch = savedAt(second, 'm-b', 's-b')
+    const below = [second, third, branch]
+    const promptIds = below.map(promptOf).toSorted()
+
+    const deleted = turns.deletePrompt(treeId, promptOf(second))
+
+    expect(deleted?.promptIds.toSorted()).toEqual(promptIds)
+    expect(deleted?.replyIds.toSorted()).toEqual(below.toSorted())
+    expect(turns.list(treeId)).toMatchObject({
+      prompts: [{id: promptOf(first)}],
+      replies: [{id: first}],
+    })
+  })
+
+  it('deletes the root Prompt, after which the Tree takes a new one', () => {
+    const first = savedRoot()
+    const rootPromptId = promptOf(first)
+
+    expect(turns.deletePrompt(treeId, rootPromptId)).toEqual({
+      promptIds: [rootPromptId],
+      replyIds: [first],
+    })
+    expect(turns.list(treeId)).toEqual({prompts: [], replies: []})
+    expect(cutsAsked()).toEqual([])
+    expect(
+      turns.sendPrompt({treeId, parentReplyId: null, text: 'Anew'})
+    ).not.toBeNull()
+  })
+
+  it('answers nothing for a Prompt the Tree doesn’t have', () => {
+    expect(turns.deletePrompt(treeId, crypto.randomUUID())).toBeNull()
+  })
+
+  it('is refused while a Reply below it streams, deleting nothing', () => {
+    const first = savedRoot()
+    const second = savedAt(first, 'm2')
+    const streaming = sendPrompt(second)
+
+    expect(() => turns.deletePrompt(treeId, promptOf(second))).toThrow(
+      'Wait for the Replies below to finish, or stop them, before deleting.'
+    )
+    expect(
+      turns
+        .list(treeId)
+        .replies.map(reply => reply.id)
+        .toSorted()
+    ).toEqual([first, second, streaming].toSorted())
+  })
+
+  it('asks the host to cut the Provider session back to the Reply it answers', () => {
+    const first = deletedMidThread()
+
+    expect(cutsAsked()).toEqual([
+      {
+        type: 'session.cut',
+        treeId,
+        replyId: first,
+        session: cutAtFirst,
+        vendorProgram,
+      },
+    ])
+  })
+
+  it('cuts the session with the next Prompt from that Reply while the host hasn’t', () => {
+    const first = deletedMidThread()
+    hostCommands = []
+
+    turns.sendPrompt({treeId, parentReplyId: first, text: 'Again'})
+
+    expect(sessionsStarted()).toEqual([cutAtFirst])
+  })
+
+  it('continues from that Reply once the host has cut', () => {
+    const first = deletedMidThread()
+    turns.hostSessionCut('claude', {
+      type: 'SESSION_CUT',
+      treeId,
+      replyId: first,
+      dropFrom: 'p-m2',
+    })
+    hostCommands = []
+
+    turns.sendPrompt({treeId, parentReplyId: first, text: 'Again'})
+
+    expect(sessionsStarted()).toEqual([
+      {sessionId: 's1', messageId: 'm1', type: 'continue'},
+    ])
+  })
+
+  it('still cuts with the next Prompt when the host couldn’t be reached', () => {
+    const first = savedRoot()
+    const second = savedAt(first, 'm2')
+    hostReachable = false
+    turns.deletePrompt(treeId, promptOf(second))
+    hostReachable = true
+
+    turns.sendPrompt({treeId, parentReplyId: first, text: 'Again'})
+
+    expect(sessionsStarted()).toEqual([cutAtFirst])
+  })
+
+  it('stops cutting once the next Reply’s Prompt is in the session', () => {
+    const first = deletedMidThread()
+    const next = sendPrompt(first, 'Again')
+    recordPrompt(next, 'p-next')
+    fail(next)
+
+    turns.retry(treeId, next)
+
+    expect(sessionsStarted()).toEqual([
+      {sessionId: 's1', messageId: 'm1', type: 'rewind'},
+    ])
+  })
+
+  it('stops cutting once the Provider dropped the deleted Turns for the next Reply', () => {
+    const first = deletedMidThread()
+    const next = sendPrompt(first, 'Again')
+    turns.hostPromptDropped('claude', {
+      type: 'PROMPT_DROPPED',
+      treeId,
+      replyId: next,
+    })
+    fail(next)
+
+    turns.retry(treeId, next)
+
+    expect(sessionsStarted()).toEqual([
+      {sessionId: 's1', messageId: 'm1', type: 'rewind'},
+    ])
+  })
+
+  it('still cuts on a Retry whose Prompt never reached the session', () => {
+    const first = deletedMidThread()
+    const next = sendPrompt(first, 'Again')
+    fail(next)
+
+    turns.retry(treeId, next)
+
+    expect(sessionsStarted()).toEqual([cutAtFirst])
+  })
+
+  it('keeps cutting after the host cut a drop the Tree has since moved past', () => {
+    const first = deletedMidThread()
+    const next = savedAt(first, 'm-next')
+    turns.deletePrompt(treeId, promptOf(next))
+    turns.hostSessionCut('claude', {
+      type: 'SESSION_CUT',
+      treeId,
+      replyId: first,
+      dropFrom: 'p-m2',
+    })
+    hostCommands = []
+
+    turns.sendPrompt({treeId, parentReplyId: first, text: 'Again'})
+
+    expect(sessionsStarted()).toEqual([{...cutAtFirst, dropFrom: 'p-m-next'}])
+  })
+
+  it('asks for no cut when the deleted Prompt started a Branch in a session of its own', () => {
+    const first = savedRoot()
+    savedAt(first, 'm2')
+    const branch = savedAt(first, 'm-b', 's-b')
+    hostCommands = []
+
+    turns.deletePrompt(treeId, promptOf(branch))
+
+    expect(cutsAsked()).toEqual([])
+  })
+
+  it('asks for no cut when the deleted Reply never reached the session', () => {
+    const first = savedRoot()
+    const second = sendPrompt(first)
+    fail(second)
+
+    turns.deletePrompt(treeId, promptOf(second))
+    turns.sendPrompt({treeId, parentReplyId: first, text: 'Again'})
+
+    expect(cutsAsked()).toEqual([])
+    expect(sessionsStarted()).toEqual([
+      {sessionId: 's1', messageId: 'm1', type: 'continue'},
+    ])
+  })
+
+  it('cuts from the first Prompt below that went on in the session, when the deleted one’s never reached it', () => {
+    const first = savedRoot()
+    const stopped = sendPrompt(first, 'And then?')
+    stopUnrecorded(stopped)
+    savedAt(stopped, 'm-below')
+    hostCommands = []
+
+    turns.deletePrompt(treeId, promptOf(stopped))
+
+    expect(cutsAsked()).toMatchObject([
+      {replyId: first, session: {...cutAtFirst, dropFrom: 'p-m-below'}},
+    ])
+  })
+
+  it('cuts after a stopped Reply’s own Prompt when its Provider never saved it', () => {
+    const first = savedRoot()
+    const stopped = sendPrompt(first, 'And then?')
+    recordPrompt(stopped, 'p-stopped')
+    stopUnrecorded(stopped)
+    const below = sendPrompt(stopped, 'Go on')
+    recordPrompt(below, 'p-below')
+    finish(below)
+
+    turns.deletePrompt(treeId, promptOf(below))
+
+    expect(cutsAsked()).toMatchObject([
+      {
+        replyId: stopped,
+        session: {
+          sessionId: 's1',
+          messageId: 'm1',
+          keepThrough: 'p-stopped',
+          dropFrom: 'p-below',
+        },
+      },
+    ])
+  })
+})

@@ -305,6 +305,21 @@ describe('Reply commands', () => {
       })
     ).toMatchObject({ok: false, error: {code: 'not-found'}})
   })
+
+  it('answers not-found for deleting a Prompt the Tree doesn’t have', async () => {
+    const tree = await createTree()
+
+    expect(
+      await send({
+        type: 'prompt.delete',
+        treeId: tree.id,
+        promptId: crypto.randomUUID(),
+      })
+    ).toMatchObject({
+      ok: false,
+      error: {code: 'not-found', message: 'That Prompt no longer exists.'},
+    })
+  })
 })
 
 describe('connecting a Provider', () => {

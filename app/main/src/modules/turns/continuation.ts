@@ -1,5 +1,10 @@
 import type {Database} from '#modules/database/main'
-import type {ReplyRequest, ReplySession} from '@uz/contract/host'
+import type {
+  DeletionCut,
+  ReplyRequest,
+  ReplySession,
+  SessionRef,
+} from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
 import type {Reply} from '@uz/contract/turns'
 
@@ -11,7 +16,12 @@ const {prompts, replies, systemPrompts} = schema
 /** A Reply ended early with its text kept; its Provider may not have saved it. */
 const CUT_SHORT = new Set<Reply['status']>(['stopped', 'interrupted'])
 
-type ContinuedSession = Extract<ReplySession, {type: 'continue' | 'fork'}>
+type ContinuedSession = Extract<
+  ReplySession,
+  {type: 'continue' | 'fork' | 'cut'}
+>
+
+type ReplyRow = typeof replies.$inferSelect
 
 /** A null session means the Provider has nothing of the Thread and starts one. */
 export interface Continuation {
@@ -42,38 +52,17 @@ function answered(db: Database, replyId: string, except?: string) {
   return prompt !== undefined
 }
 
-/**
- * Forks when the Reply already has a Prompt after it other than `except`, the
- * Prompt being run again. A Reply cut short before its Provider saved it
- * continues from the Reply its own Prompt answers, whose session holds that
- * Prompt.
- */
-export function continuation(
+function resumed(
   db: Database,
   treeId: string,
-  replyId: string,
+  row: ReplyRow,
   except?: string
-): Continuation | null {
-  const row = db
-    .select()
-    .from(replies)
-    .where(and(eq(replies.id, replyId), eq(replies.treeId, treeId)))
-    .get()
-
-  if (!row) return null
-
-  if (row.status === 'streaming') {
-    throw new Error('Wait for this Reply to finish before continuing.')
-  }
-
+): ContinuedSession | null {
   if (row.sessionId !== null && row.sessionMessageId !== null) {
     return {
-      provider: row.provider,
-      session: {
-        type: answered(db, replyId, except) ? 'fork' : 'continue',
-        sessionId: row.sessionId,
-        messageId: row.sessionMessageId,
-      },
+      type: answered(db, row.id, except) ? 'fork' : 'continue',
+      sessionId: row.sessionId,
+      messageId: row.sessionMessageId,
     }
   }
 
@@ -98,15 +87,105 @@ export function continuation(
 
   const session = before?.session ?? null
 
+  if (session?.type === 'fork' || !answered(db, row.id, except)) {
+    return session
+  }
+
+  return session && {type: 'fork', ...sessionRef(session)}
+}
+
+function sessionRef({sessionId, messageId}: SessionRef) {
+  return {sessionId, messageId}
+}
+
+/**
+ * Keeps the Reply, or only its Prompt when it was cut short before its
+ * Provider saved it.
+ */
+function cutBack(
+  row: ReplyRow,
+  session: SessionRef,
+  dropFrom: string
+): DeletionCut {
+  const keepThrough =
+    row.sessionMessageId === null
+      ? (promptIn(session, row) ?? session.messageId)
+      : session.messageId
+
+  return {type: 'cut', ...sessionRef(session), keepThrough, dropFrom}
+}
+
+/**
+ * Forks when the Reply already has a Prompt after it other than `except`, the
+ * Prompt being run again. A Reply cut short before its Provider saved it
+ * continues from the Reply its own Prompt answers, whose session holds that
+ * Prompt. A session still holding Turns deleted from below the Reply is cut
+ * back to it.
+ */
+export function continuation(
+  db: Database,
+  treeId: string,
+  replyId: string,
+  except?: string
+): Continuation | null {
+  const row = db
+    .select()
+    .from(replies)
+    .where(and(eq(replies.id, replyId), eq(replies.treeId, treeId)))
+    .get()
+
+  if (!row) return null
+
+  if (row.status === 'streaming') {
+    throw new Error('Wait for this Reply to finish before continuing.')
+  }
+
+  const session = resumed(db, treeId, row, except)
+  const dropFrom = row.sessionDropFrom
+
   return {
     provider: row.provider,
-    session: session && {
-      ...session,
-      type:
-        session.type === 'fork' || answered(db, replyId, except)
-          ? 'fork'
-          : 'continue',
-    },
+    session:
+      session?.type === 'continue' && dropFrom !== null
+        ? cutBack(row, session, dropFrom)
+        : session,
+  }
+}
+
+/**
+ * The cut that drops the deleted Replies from the session of the Reply the
+ * deleted Prompt answers, from the first that went on in it; else null.
+ * `deleted` is in order from the top, and a Branch below forks a session of
+ * its own.
+ */
+export function cutBelow(
+  db: Database,
+  treeId: string,
+  prompt: {id: string; parentReplyId: string | null},
+  deleted: Pick<ReplyRow, 'sessionId' | 'sessionPromptId'>[]
+) {
+  if (prompt.parentReplyId === null) return null
+
+  const row = db
+    .select()
+    .from(replies)
+    .where(eq(replies.id, prompt.parentReplyId))
+    .get()
+
+  const session = row && resumed(db, treeId, row, prompt.id)
+
+  const dropFrom =
+    deleted.find(
+      reply =>
+        reply.sessionId === session?.sessionId && reply.sessionPromptId !== null
+    )?.sessionPromptId ?? null
+
+  if (!row || !session || dropFrom === null) return null
+
+  return {
+    replyId: row.id,
+    provider: row.provider,
+    session: cutBack(row, session, dropFrom),
   }
 }
 
@@ -175,9 +254,7 @@ export function recovery(
   }
 }
 
-type ReplyRow = typeof replies.$inferSelect
-
-function promptIn(session: ContinuedSession, reply: ReplyRow | undefined) {
+function promptIn(session: SessionRef, reply: ReplyRow | undefined) {
   return reply?.sessionId === session.sessionId
     ? (reply.sessionPromptId ?? null)
     : null
@@ -186,14 +263,15 @@ function promptIn(session: ContinuedSession, reply: ReplyRow | undefined) {
 /**
  * Rewinds to the Reply answered once its Provider saved it. One cut short
  * before then left only its Prompt in the session, so the cut goes after that
- * Prompt and before the failed attempt's own.
+ * Prompt and before the failed attempt's own. A cut of Turns deleted below the
+ * Reply answered already drops the failed attempt with them.
  */
 function rewound(
   session: ContinuedSession,
   parent: ReplyRow | undefined,
   failed: ReplyRow
 ): ReplySession {
-  if (session.type === 'fork') return session
+  if (session.type === 'fork' || session.type === 'cut') return session
 
   const {sessionId, messageId} = session
 

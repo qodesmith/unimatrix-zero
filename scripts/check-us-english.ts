@@ -131,6 +131,7 @@ function skipped(file: string) {
     file === 'bun.lock' ||
     file.startsWith('tooling/oxlint/anti-slop/') ||
     file.startsWith('app/provider-host/src/modules/codex-driver/protocol/') ||
+    file.startsWith('app/provider-host/src/modules/codex-driver/recordings/') ||
     installedSkills.some(dir => file === dir || file.startsWith(`${dir}/`))
   )
 }

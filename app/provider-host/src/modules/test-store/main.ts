@@ -22,6 +22,7 @@ type Refusals = Partial<Record<SessionStoreRequest['op'], string>>
 export function fakeStore(refuses: Refusals = {}) {
   const entries = new Map<string, SessionEntry[]>()
   const files = new Map<string, Map<string, SessionFile>>()
+  const asked: SessionStoreRequest['op'][] = []
 
   function filesOf(projectKey: string, sessionId: string) {
     const key = keyText({projectKey, sessionId})
@@ -80,6 +81,7 @@ export function fakeStore(refuses: Refusals = {}) {
   const client = createSessionStoreClient(message => {
     if (message.type !== 'SESSION_STORE') return
 
+    asked.push(message.request.op)
     const refused = refuses[message.request.op]
 
     setTimeout(() => {
@@ -94,6 +96,8 @@ export function fakeStore(refuses: Refusals = {}) {
 
   return {
     client,
+    /** Each op asked so far, oldest first. */
+    asked,
     entriesOf(projectKey: string, sessionId: string) {
       return entries.get(keyText({projectKey, sessionId})) ?? []
     },
