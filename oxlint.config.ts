@@ -101,6 +101,7 @@ const config: OxlintConfig = {
       env: {browser: true},
       rules: {
         'uz/no-hardcoded-colors': 'error',
+        'uz/shadcn-base-ui': 'error',
       },
     },
     {

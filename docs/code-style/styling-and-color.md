@@ -1,5 +1,10 @@
 # Styling and color
 
+## Build the UI from shadcn components on Base UI. Enforced by: uz/shadcn-base-ui
+
+- The decision is [ADR 0020](../adr/0020-renderer-ui-is-shadcn-on-base-ui.md). Add a component with `shadcn add` from `app/renderer` (the `base-vega` style in `components.json`); it lands in `shadcn/ui/` and other modules import it from `#modules/shadcn/main`.
+- Copy AI Elements patterns only from their Base UI pages, `ui.shadcn.com/docs/ai-elements/base/...`.
+
 ## Style with Tailwind utilities at the call site
 
 - Express styling as Tailwind utilities at the call site. Tailwind v4 covers more than it looks like it does: gradients, arbitrary stop positions and color mixes all have utilities, so "the design needs real CSS" is usually wrong.

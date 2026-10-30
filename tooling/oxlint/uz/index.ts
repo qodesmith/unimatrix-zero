@@ -3,6 +3,7 @@ import {definePlugin} from '@oxlint/plugins'
 import {moduleBoundaries} from './rules/module-boundaries.ts'
 import {noFixtureAssertion} from './rules/no-fixture-assertion.ts'
 import {noHardcodedColors} from './rules/no-hardcoded-colors.ts'
+import {shadcnBaseUi} from './rules/shadcn-base-ui.ts'
 import {tsxUnderUi} from './rules/tsx-under-ui.ts'
 
 const plugin = definePlugin({
@@ -11,6 +12,7 @@ const plugin = definePlugin({
     'module-boundaries': moduleBoundaries,
     'no-fixture-assertion': noFixtureAssertion,
     'no-hardcoded-colors': noHardcodedColors,
+    'shadcn-base-ui': shadcnBaseUi,
     'tsx-under-ui': tsxUnderUi,
   },
 })
