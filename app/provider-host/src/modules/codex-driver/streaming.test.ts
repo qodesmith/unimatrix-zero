@@ -47,6 +47,12 @@ const RETRIED_TURN = '01a170aa-1476-75b0-892c-bd4587e4d57b'
 const REWOUND_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-50-${REWOUND_THREAD_ID}.jsonl`
 const REVERTED_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-56-${REWOUND_THREAD_ID}_01a170aa-145c-7992-b8a7-bcfb762e8621.jsonl`
 
+/** As `thanked.ndjson`, `cut.ndjson` and `cut-resumed.ndjson` recorded them. */
+const THANKED_THREAD_ID = '01a1893a-31f8-76f2-8050-38ee9d75c720'
+const HELLO_TURN = '01a1893a-3439-7c23-9c2d-69d52b12a8b4'
+const GOODBYE_TURN = '01a1893a-4532-7b33-804e-21ff70011737'
+const THANKS_TURN = '01a1893a-4f0d-71a0-9828-93cd3ea3291e'
+
 type Streamed = StartReplyEvent
 
 interface Report {
@@ -1094,49 +1100,45 @@ it('keeps a loaded thread’s cut in the app’s copy, so a resume from it alone
   expect(report?.contexts).toEqual([[THREAD_ID, FIRST_TURN]])
 })
 
-it('resumes an unloaded thread from the app’s copy to cut deleted Turns, and keeps the cut there', async () => {
-  const opened = await setUp(['started.ndjson'])
-  const first = await opened.reply(FIRST_PROMPT)
-  await opened.reply(SECOND_PROMPT, recordedIn(first))
+it('cuts an unloaded thread from a mid-Thread Prompt, dropping every Turn after it, and keeps the cut in the app’s copy', async () => {
+  const opened = await setUp(['thanked.ndjson'])
+  const hi = await opened.reply(FIRST_PROMPT)
+  const bye = await opened.reply(SECOND_PROMPT, recordedIn(hi))
+  await opened.reply('Now say thanks in three words.', recordedIn(bye))
   await opened.allClosed()
 
-  const cutter = await setUp(
-    [
-      withSteps(
-        'resumed.ndjson',
-        2,
-        [
-          ...revertTo(THREAD_ID, CUT_ROLLOUT),
-          ...readOf(THREAD_ID, CUT_ROLLOUT),
-        ],
-        {rest: false}
-      ),
-    ],
-    {store: opened.store}
-  )
+  const cutter = await setUp(['cut.ndjson'], {store: opened.store})
 
-  await expect(cutter.cut(THREAD_ID, FIRST_TURN, SECOND_TURN)).resolves.toBe(
-    true
-  )
+  await expect(
+    cutter.cut(THANKED_THREAD_ID, HELLO_TURN, promptRecordedIn(bye).messageId)
+  ).resolves.toBe(true)
   await cutter.allClosed()
   const [cut] = cutter.reports()
 
   expect(cut?.resumedFrom.map(line => line.id)).toEqual([
-    THREAD_ID,
-    FIRST_TURN,
-    SECOND_TURN,
+    THANKED_THREAD_ID,
+    HELLO_TURN,
+    GOODBYE_TURN,
+    THANKS_TURN,
   ])
-  expect(cut?.reverted).toBe(SECOND_TURN)
+  expect(cut?.reverted).toBe(GOODBYE_TURN)
   expect(cut?.ended).toBe('input-closed')
 
-  const codex = await setUp(['resumed.ndjson'], {store: opened.store})
-  await codex.reply(THIRD_PROMPT, recordedIn(first))
+  const codex = await setUp(['cut-resumed.ndjson'], {store: opened.store})
+
+  const next = await codex.reply(
+    'What did I ask you to say? Just the words.',
+    recordedIn(hi)
+  )
+
+  expect(next.at(-1)).toMatchObject({status: 'complete'})
   const [report] = codex.reports()
 
   expect(report?.resumedFrom.map(line => line.id)).toEqual([
-    THREAD_ID,
-    FIRST_TURN,
+    THANKED_THREAD_ID,
+    HELLO_TURN,
   ])
+  expect(report?.contexts).toEqual([[THANKED_THREAD_ID, HELLO_TURN]])
 })
 
 it('cuts deleted Turns from the loaded thread on the next Prompt, before Codex starts its turn', async () => {

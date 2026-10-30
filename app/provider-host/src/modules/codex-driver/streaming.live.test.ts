@@ -9,8 +9,10 @@
  * test at a time with `-t`: the ids the driver tests pin change each time.
  */
 import type {
+  PromptRecorded,
   ReplyRecorded,
   SessionRef,
+  SignInRequest,
   StartReplyEvent,
 } from '@uz/contract/host'
 
@@ -338,6 +340,150 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       )
       expect(retried.answer).toMatch(/hi/i)
       expect(retried.answer).not.toMatch(/bye/i)
+
+      await closed()
+    } finally {
+      for (const home of homes) fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 180_000)
+
+  it('cuts an unloaded thread from a mid-Thread Prompt, dropping every Turn after it, then resumes from the app’s copy alone', async () => {
+    if (!folder || !signedIn) return
+
+    const store = fakeStore()
+    const recording = process.env.UZ_RECORD === 'yes'
+
+    const recorder = createRecorder(
+      ['thanked.ndjson', 'cut.ndjson', 'cut-resumed.ndjson'].map(name =>
+        path.join(RECORDINGS, name)
+      )
+    )
+
+    const homes = [homeFrom(signedIn), homeFrom(signedIn), homeFrom(signedIn)]
+    const treeId = crypto.randomUUID()
+
+    const idle = heldIdle()
+    const exits: Promise<unknown>[] = []
+    const start = recording ? recorder.spawn : spawnCodex
+
+    function driver() {
+      return createCodexDriver({
+        store: store.client,
+        spawn: (command, options) => {
+          const child = start(command, options)
+          exits.push(once(child, 'exit').catch(() => undefined))
+
+          return child
+        },
+        whenIdle: idle.whenIdle,
+      })
+    }
+
+    /** Lets idle time pass, then waits for every `codex` to exit. */
+    async function closed() {
+      idle.pass()
+      await Promise.all(exits)
+    }
+
+    function vendorProgram(home: string): SignInRequest {
+      return {
+        program: {
+          path: folder ?? '',
+          build: {
+            url: 'https://example.com/codex.tar.gz',
+            sha256: '0'.repeat(64),
+            size: 1,
+            archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+          },
+        },
+        configDir: home,
+      }
+    }
+
+    async function reply(
+      on: ReturnType<typeof driver>,
+      home: string,
+      text: string,
+      session: SessionRef | null
+    ) {
+      const events = await Array.fromAsync(
+        on.startReply({
+          treeId,
+          replyId: crypto.randomUUID(),
+          model: 'default',
+          systemPrompt: 'You answer in as few words as you can.',
+          prompt: {text},
+          vendorProgram: vendorProgram(home),
+          session: session && {...session, type: 'continue'},
+        })
+      )
+
+      expectComplete(events)
+
+      const prompted = events.find(
+        (event): event is PromptRecorded => event.type === 'PROMPT_RECORDED'
+      )
+
+      const recorded = events.find(
+        (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+      )
+
+      if (!prompted || !recorded) throw new Error('The Reply was not recorded')
+
+      const answer = events
+        .flatMap(event => (event.type === 'TEXT_DELTA' ? [event.delta] : []))
+        .join('')
+
+      return {prompted, recorded, answer}
+    }
+
+    try {
+      const [home, cutHome, thirdHome] = homes as [string, string, string]
+      const first = driver()
+      const hi = await reply(first, home, 'Say hi in three words.', null)
+
+      const bye = await reply(
+        first,
+        home,
+        'Now say bye in three words.',
+        hi.recorded.session
+      )
+
+      await reply(
+        first,
+        home,
+        'Now say thanks in three words.',
+        bye.recorded.session
+      )
+
+      await closed()
+
+      const kept = hi.recorded.session
+
+      await expect(
+        driver().cutSession({
+          session: {
+            type: 'cut',
+            ...kept,
+            keepThrough: kept.messageId,
+            dropFrom: bye.prompted.session.messageId,
+          },
+          vendorProgram: vendorProgram(cutHome),
+        })
+      ).resolves.toBe(true)
+
+      await closed()
+
+      const resumed = await reply(
+        driver(),
+        thirdHome,
+        'What did I ask you to say? Just the words.',
+        kept
+      )
+
+      expect(resumed.recorded.session.sessionId).toBe(kept.sessionId)
+      expect(resumed.answer).toMatch(/hi/i)
+      expect(resumed.answer).not.toMatch(/bye|thank/i)
 
       await closed()
     } finally {
