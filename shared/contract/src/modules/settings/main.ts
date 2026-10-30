@@ -25,10 +25,7 @@ export const SettingsSchema = z.strictObject({
   limitTurnHeight: z.boolean(),
   /** A thin bar on each Reply toward the Context window. */
   contextSizeMeter: z.boolean(),
-  /**
-   * The base font size in pixels, set by ⌘+ and ⌘−; zoom scales the canvas
-   * alone.
-   */
+  /** The base font size, in pixels. */
   fontSize: z
     .int()
     .min(FONT_SIZE.min)

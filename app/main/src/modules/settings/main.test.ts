@@ -1,6 +1,7 @@
 import type {Settings} from '@uz/contract/settings'
 
 import {openDatabase, schema} from '#modules/database/main'
+import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import path from 'node:path'
 import {beforeEach, expect, it} from 'vitest'
 
@@ -18,13 +19,8 @@ it('keeps a change across reopening and leaves the other Settings alone', () => 
   createSettings(db).update({canvasOrientation: 'horizontal'})
 
   expect(createSettings(db).read()).toEqual({
-    themeMode: 'system',
+    ...DEFAULT_SETTINGS,
     canvasOrientation: 'horizontal',
-    limitTurnHeight: true,
-    contextSizeMeter: true,
-    fontSize: 16,
-    sendKey: 'enter',
-    reReadNote: true,
   })
 })
 
@@ -37,10 +33,9 @@ it('answers an update with every Setting as now saved', () => {
   })
 
   expect(settings.update({sendKey: 'mod-enter', reReadNote: false})).toEqual({
+    ...DEFAULT_SETTINGS,
     themeMode: 'dark',
     canvasOrientation: 'horizontal',
-    limitTurnHeight: true,
-    contextSizeMeter: true,
     fontSize: 20,
     sendKey: 'mod-enter',
     reReadNote: false,
@@ -55,24 +50,8 @@ it('hands every saved Setting to onSaved after each update', () => {
   settings.update({sendKey: 'mod-enter'})
 
   expect(heard).toEqual([
-    {
-      themeMode: 'light',
-      canvasOrientation: 'vertical',
-      limitTurnHeight: true,
-      contextSizeMeter: true,
-      fontSize: 16,
-      sendKey: 'enter',
-      reReadNote: true,
-    },
-    {
-      themeMode: 'light',
-      canvasOrientation: 'vertical',
-      limitTurnHeight: true,
-      contextSizeMeter: true,
-      fontSize: 16,
-      sendKey: 'mod-enter',
-      reReadNote: true,
-    },
+    {...DEFAULT_SETTINGS, themeMode: 'light'},
+    {...DEFAULT_SETTINGS, themeMode: 'light', sendKey: 'mod-enter'},
   ])
 })
 

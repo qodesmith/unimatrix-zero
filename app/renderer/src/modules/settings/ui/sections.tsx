@@ -2,7 +2,7 @@ import {Button} from '#modules/shadcn/main'
 import {DEFAULT_SETTINGS, FONT_SIZE} from '@uz/contract/settings'
 
 import {useSettings, useUpdateSettings} from '../use-settings'
-import {Choice, Toggle} from './controls'
+import {Choice, Group, Toggle} from './controls'
 
 export function AppearanceSection() {
   const settings = useSettings()
@@ -20,8 +20,7 @@ export function AppearanceSection() {
         ]}
         onChange={themeMode => void update({themeMode})}
       />
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-sm font-medium">Font size</legend>
+      <Group legend="Font size">
         <div className="flex items-center gap-3 text-sm">
           <input
             type="range"
@@ -48,7 +47,7 @@ export function AppearanceSection() {
         <p className="text-sm text-muted-foreground">
           ⌘/Ctrl + and − change it too, and ⌘/Ctrl 0 resets it.
         </p>
-      </fieldset>
+      </Group>
       <Choice
         legend="Canvas orientation"
         value={settings.canvasOrientation}

@@ -1,47 +1,12 @@
-import type {Bridge} from '@uz/contract/bridge'
-import type {Command} from '@uz/contract/commands'
-import type {AppEvent} from '@uz/contract/events'
 import type {Settings} from '@uz/contract/settings'
 
-import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import {expect, it} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {page} from 'vitest/browser'
 
+import {fakeMain} from '../fake-main'
 import {SettingsPage} from './SettingsPage'
 import {SettingsProvider} from './SettingsProvider'
-
-function fakeMain(saved: Partial<Settings> = {}) {
-  const settings: Settings = {...DEFAULT_SETTINGS, ...saved}
-  const sent: Command[] = []
-
-  const bridge: Bridge = {
-    send: (async (command: Command) => {
-      sent.push(command)
-
-      if (command.type !== 'settings.update') throw new Error('Not faked')
-
-      Object.assign(settings, command.changes)
-
-      return {ok: true, value: {...settings}}
-    }) as Bridge['send'],
-    subscribe: (listener: (event: AppEvent) => void) => {
-      listener({
-        type: 'SNAPSHOT',
-        app: {version: '0.0.0'},
-        replies: [],
-        providers: [],
-        signIn: null,
-        settings: {...settings},
-      })
-
-      return () => {}
-    },
-    registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
-  }
-
-  return {...bridge, sent}
-}
 
 async function renderSettings(saved: Partial<Settings> = {}) {
   const main = fakeMain(saved)

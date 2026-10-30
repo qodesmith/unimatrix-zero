@@ -1,5 +1,19 @@
 import type {ReactNode} from 'react'
 
+interface GroupProps {
+  legend: string
+  children: ReactNode
+}
+
+export function Group({legend, children}: GroupProps) {
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="mb-2 text-sm font-medium">{legend}</legend>
+      {children}
+    </fieldset>
+  )
+}
+
 interface ChoiceProps<T extends string> {
   legend: string
   value: T
@@ -14,8 +28,7 @@ export function Choice<T extends string>({
   onChange,
 }: ChoiceProps<T>) {
   return (
-    <fieldset className="flex flex-col gap-2">
-      <legend className="mb-2 text-sm font-medium">{legend}</legend>
+    <Group legend={legend}>
       {options.map(option => (
         <label key={option.value} className="flex items-center gap-2 text-sm">
           <input
@@ -27,7 +40,7 @@ export function Choice<T extends string>({
           {option.label}
         </label>
       ))}
-    </fieldset>
+    </Group>
   )
 }
 
