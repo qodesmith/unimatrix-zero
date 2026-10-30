@@ -315,6 +315,9 @@ it('closes only Settings on Esc over a streaming Reply and the slideout: the Rep
 
   await expect.element(slideout.getByText('Hi there')).toBeVisible()
   expect(main.sent.map(command => command.type)).not.toContain('reply.stop')
+
+  main.publish({...ids, type: 'TEXT_DELTA', delta: ', again'})
+  await expect.element(slideout.getByText('Hi there, again')).toBeVisible()
 })
 
 it('creates a Tree and opens it', async () => {

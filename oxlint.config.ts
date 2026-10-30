@@ -101,7 +101,6 @@ const config: OxlintConfig = {
       env: {browser: true},
       rules: {
         'uz/no-hardcoded-colors': 'error',
-        'uz/shadcn-base-ui': 'error',
       },
     },
     {
@@ -435,6 +434,8 @@ const config: OxlintConfig = {
     'uz/module-boundaries': 'error',
     // Top level, not a test override: it reads only `it`/`test` callbacks.
     'uz/no-fixture-assertion': 'error',
+    // Top level: a Radix import fails anywhere; plain controls only exist in the renderer.
+    'uz/shadcn-base-ui': 'error',
     'uz/tsx-under-ui': 'error',
 
     ///////////////

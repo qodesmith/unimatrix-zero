@@ -2,28 +2,10 @@ import type {PromptDeleteState} from '../prompt-delete/machine'
 import type {KeyboardEvent, ReactNode} from 'react'
 
 import {Button, cn} from '#modules/shadcn/main'
+import {TrashIcon} from 'lucide-react'
 import {useEffect, useRef} from 'react'
 
 import {usePromptDelete} from '../prompt-delete/use-prompt-delete'
-
-function TrashIcon() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="size-3.5"
-    >
-      <path d="M3 6h18" />
-      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-    </svg>
-  )
-}
 
 interface ConfirmationProps {
   state: Exclude<PromptDeleteState, {status: 'idle'}>
@@ -149,7 +131,7 @@ export function PromptBox({promptId, className, children}: PromptBoxProps) {
               className="size-6 bg-card text-muted-foreground shadow-sm hover:text-destructive"
               onClick={arm}
             >
-              <TrashIcon />
+              <TrashIcon className="size-3.5" />
             </Button>
           ) : (
             <Confirmation

@@ -14,6 +14,9 @@ describe('uz/shadcn-base-ui', () => {
     'src/modules/shadcn/ui/button.tsx': 'export const x = <button />\n',
     'src/modules/a/radix.ts': "export {Dialog} from 'radix-ui'\n",
     'src/modules/a/scoped.ts': "import '@radix-ui/react-dialog'\n",
+    'src/modules/a/star.ts': "export * from '@radix-ui/react-dialog'\n",
+    'src/modules/a/dynamic.ts':
+      "export const dialog = import('@radix-ui/react-dialog')\n",
     'src/modules/shadcn/ui/dialog.tsx':
       "export {Dialog} from '@radix-ui/react-dialog'\n",
   })
@@ -36,6 +39,8 @@ describe('uz/shadcn-base-ui', () => {
     for (const file of [
       'src/modules/a/radix.ts',
       'src/modules/a/scoped.ts',
+      'src/modules/a/star.ts',
+      'src/modules/a/dynamic.ts',
       'src/modules/shadcn/ui/dialog.tsx',
     ])
       expect(codesFor(diagnostics, file)).toEqual(['uz(shadcn-base-ui)'])

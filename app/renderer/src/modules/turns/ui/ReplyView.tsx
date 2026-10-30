@@ -243,8 +243,17 @@ function prettyArgs(args: string) {
   }
 }
 
+const TOOL_PROGRESS = {
+  running: {label: 'running…', status: 'running'},
+  failed: {label: 'failed', status: 'error'},
+  done: {label: 'done', status: undefined},
+} as const
+
 function ToolCallView({part}: {part: ToolCall}) {
   const {toolName, args, result} = part
+
+  const progress =
+    result === null ? 'running' : result.isError ? 'failed' : 'done'
 
   return (
     <Trace
@@ -255,19 +264,11 @@ function ToolCallView({part}: {part: ToolCall}) {
       <TraceCollapsible>
         <TraceCollapsibleTrigger>
           <TraceLine
-            status={
-              result === null ? 'running' : result.isError ? 'error' : undefined
-            }
+            status={TOOL_PROGRESS[progress].status}
             className="text-xs"
           >
             <TraceTitle className="font-medium">{toolName}</TraceTitle>
-            <TraceDescription>
-              {result === null
-                ? 'running…'
-                : result.isError
-                  ? 'failed'
-                  : 'done'}
-            </TraceDescription>
+            <TraceDescription>{TOOL_PROGRESS[progress].label}</TraceDescription>
           </TraceLine>
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent>
