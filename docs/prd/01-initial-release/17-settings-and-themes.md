@@ -15,7 +15,7 @@ Source: [Settings and user preferences](https://github.com/qodesmith/unimatrix-z
 | **Archive & restore** | Archive everything…, Restore…, a line about dragging or double-clicking an Archive.                                                                                                                                                                                                                                                                                                            |
 | **Updates & About**   | Update checks on/off (on), Check now, app and vendor program versions ("1.8.2 (shell 3)"), Report a problem…, Copy / Export / Clear diagnostics, the line "Reports go to a GitHub issue. The app keeps no copy beyond Diagnostics, and the relay keeps nothing."                                                                                                                               |
 
-**Font size** runs from 12 to 24 pixels in steps of 2. Beside its control on this page, ⌘+ and ⌘− change it a step at a time, and ⌘0 sets it back to 16. It grows text, not the layout, and it is not Zoom, which scales the canvas alone; the window itself never zooms.
+**Font size** runs from 12 to 24 pixels in steps of 2. Beside its control on this page, ⌘+ and ⌘− change it a step at a time, and ⌘0 sets it back to 16. It grows text and the widths that cap a line of it, not the spacing, and it is not Zoom, which scales the canvas alone; the window itself never zooms.
 
 **Deliberately not Settings:** a default Model for new Trees (last-used), a simple/advanced mode, interface language.
 

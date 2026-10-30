@@ -148,7 +148,7 @@ The single place for the user's global preferences: how the app looks and behave
 _Avoid_: Preferences, options, config
 
 **Font size**:
-The base size of all text in the app, a Setting. Text grows with it; the layout and the canvas's Zoom stay as they are.
+The base size of all text in the app, a Setting. Text grows with it, and so do the widths that cap a line of it; spacing and the canvas's Zoom stay as they are.
 _Avoid_: Text size, zoom
 
 **Tools panel**:
