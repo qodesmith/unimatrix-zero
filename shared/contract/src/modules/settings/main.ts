@@ -14,6 +14,9 @@ export type ThemeMode = z.infer<typeof ThemeModeSchema>
  */
 export const SendKeySchema = z.enum(['enter', 'mod-enter'])
 
+/** The floor and ceiling of the text size, in pixels. */
+export const TEXT_SIZE = {min: 12, max: 24}
+
 /** Global, never per Tree; a Setting changes nothing about what the AI does. */
 export const SettingsSchema = z.strictObject({
   themeMode: ThemeModeSchema,
@@ -22,6 +25,11 @@ export const SettingsSchema = z.strictObject({
   limitTurnHeight: z.boolean(),
   /** A thin bar on each Reply toward the Context window. */
   contextSizeMeter: z.boolean(),
+  /**
+   * The base text size in pixels, set by ⌘+ and ⌘−; zoom scales the canvas
+   * alone.
+   */
+  textSize: z.int().min(TEXT_SIZE.min).max(TEXT_SIZE.max),
   sendKey: SendKeySchema,
   /** The note above the Input before a step that re-reads the Thread cold. */
   reReadNote: z.boolean(),
@@ -34,6 +42,7 @@ export const DEFAULT_SETTINGS: Settings = {
   canvasOrientation: 'vertical',
   limitTurnHeight: true,
   contextSizeMeter: true,
+  textSize: 16,
   sendKey: 'enter',
   reReadNote: true,
 }

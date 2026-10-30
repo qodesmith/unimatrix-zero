@@ -26,6 +26,7 @@ import {
   hardenSession,
   isTopLevelAppFrame,
   openLink,
+  setAppMenu,
 } from '#modules/window/main'
 import {app, dialog, ipcMain, protocol, session} from 'electron'
 import path from 'node:path'
@@ -166,13 +167,12 @@ function openWindow(db: Database) {
   createDroppedFiles().listen(ipcMain, fromAppWindow)
   registerSubscribeChannel(ipcMain, hub, fromAppWindow)
 
+  setAppMenu()
   createWindow({
     session: windowSession,
     preloadPath,
     url,
     packaged: app.isPackaged,
-    zoomFactor: settings.readZoomFactor(),
-    onZoom: factor => settings.saveZoomFactor(factor),
   })
 }
 

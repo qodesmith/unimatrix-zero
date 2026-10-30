@@ -22,6 +22,7 @@ it('keeps a change across reopening and leaves the other Settings alone', () => 
     canvasOrientation: 'horizontal',
     limitTurnHeight: true,
     contextSizeMeter: true,
+    textSize: 16,
     sendKey: 'enter',
     reReadNote: true,
   })
@@ -29,13 +30,18 @@ it('keeps a change across reopening and leaves the other Settings alone', () => 
 
 it('answers an update with every Setting as now saved', () => {
   const settings = createSettings(db)
-  settings.update({canvasOrientation: 'horizontal', themeMode: 'dark'})
+  settings.update({
+    canvasOrientation: 'horizontal',
+    themeMode: 'dark',
+    textSize: 20,
+  })
 
   expect(settings.update({sendKey: 'mod-enter', reReadNote: false})).toEqual({
     themeMode: 'dark',
     canvasOrientation: 'horizontal',
     limitTurnHeight: true,
     contextSizeMeter: true,
+    textSize: 20,
     sendKey: 'mod-enter',
     reReadNote: false,
   })
@@ -54,6 +60,7 @@ it('hands every saved Setting to onSaved after each update', () => {
       canvasOrientation: 'vertical',
       limitTurnHeight: true,
       contextSizeMeter: true,
+      textSize: 16,
       sendKey: 'enter',
       reReadNote: true,
     },
@@ -62,6 +69,7 @@ it('hands every saved Setting to onSaved after each update', () => {
       canvasOrientation: 'vertical',
       limitTurnHeight: true,
       contextSizeMeter: true,
+      textSize: 16,
       sendKey: 'mod-enter',
       reReadNote: true,
     },
@@ -75,26 +83,3 @@ it('reads a saved value that no longer fits as the default', () => {
 
   expect(createSettings(db).read().canvasOrientation).toBe('vertical')
 })
-
-it('keeps the zoom across reopening, starting at 100%', () => {
-  expect(createSettings(db).readZoomFactor()).toBe(1)
-
-  createSettings(db).saveZoomFactor(1.25)
-
-  expect(createSettings(db).readZoomFactor()).toBe(1.25)
-})
-
-it('keeps the zoom out of the Settings the window is sent', () => {
-  createSettings(db).saveZoomFactor(1.25)
-
-  expect(Object.keys(createSettings(db).read())).not.toContain('zoomFactor')
-})
-
-it.each([{factor: 0.25}, {factor: 40}])(
-  'reads a saved zoom of $factor, out of range, as 100%',
-  ({factor}) => {
-    createSettings(db).saveZoomFactor(factor)
-
-    expect(createSettings(db).readZoomFactor()).toBe(1)
-  }
-)

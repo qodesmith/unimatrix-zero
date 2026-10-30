@@ -3,8 +3,6 @@ import type {Settings, SettingsUpdate} from '@uz/contract/settings'
 
 import {schema} from '#modules/database/main'
 import {DEFAULT_SETTINGS, SettingsSchema} from '@uz/contract/settings'
-import {eq} from 'drizzle-orm'
-import {z} from 'zod'
 
 type SettingKey = keyof Settings
 
@@ -13,12 +11,6 @@ function isSettingKey(key: string): key is SettingKey {
 }
 
 const KEYS = Object.keys(SettingsSchema.shape).filter(isSettingKey)
-
-/** Not a Setting: ⌘+ and ⌘− change it, and it lives beside the Settings. */
-const ZOOM_KEY = 'zoomFactor'
-
-/** The smallest and largest of the steps in `window/zoom.ts`. */
-const ZoomFactorSchema = z.number().min(0.5).max(2)
 
 export type SettingsStore = ReturnType<typeof createSettings>
 
@@ -46,18 +38,6 @@ export function createSettings(
     return result
   }
 
-  function write(
-    into: Pick<Database, 'insert'>,
-    key: string,
-    value: Settings[SettingKey] | number
-  ) {
-    into
-      .insert(settings)
-      .values({key, value})
-      .onConflictDoUpdate({target: settings.key, set: {value}})
-      .run()
-  }
-
   return {
     read,
 
@@ -66,7 +46,12 @@ export function createSettings(
         for (const key of KEYS) {
           const value = changes[key]
 
-          if (value !== undefined) write(tx, key, value)
+          if (value === undefined) continue
+
+          tx.insert(settings)
+            .values({key, value})
+            .onConflictDoUpdate({target: settings.key, set: {value}})
+            .run()
         }
       })
 
@@ -74,22 +59,6 @@ export function createSettings(
       onSaved?.(saved)
 
       return saved
-    },
-
-    readZoomFactor(): number {
-      const row = db
-        .select()
-        .from(settings)
-        .where(eq(settings.key, ZOOM_KEY))
-        .get()
-
-      const parsed = ZoomFactorSchema.safeParse(row?.value)
-
-      return parsed.success ? parsed.data : 1
-    },
-
-    saveZoomFactor(factor: number) {
-      write(db, ZOOM_KEY, factor)
     },
   }
 }

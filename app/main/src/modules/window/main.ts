@@ -1,11 +1,11 @@
 import type {ThemeMode} from '@uz/contract/settings'
 import type {Session, WebContents} from 'electron'
 
-import {BrowserWindow, nativeTheme, shell} from 'electron'
+import {BrowserWindow, Menu, nativeTheme, shell} from 'electron'
 
 import {isAppUrl} from './app-url'
 import {isOpenableExternally} from './link-rule'
-import {withinSteps, zoomFor} from './zoom'
+import {menuTemplate} from './menu'
 
 export {isTopLevelAppFrame} from './app-url'
 
@@ -14,8 +14,6 @@ interface WindowOptions {
   preloadPath: string
   url: string
   packaged: boolean
-  zoomFactor: number
-  onZoom: (factor: number) => void
 }
 
 /** Every `webPreferences` value is explicit, not left to Electron's defaults. */
@@ -24,8 +22,6 @@ export function createWindow({
   preloadPath,
   url,
   packaged,
-  zoomFactor,
-  onZoom,
 }: WindowOptions): BrowserWindow {
   const window = new BrowserWindow({
     width: 1280,
@@ -51,13 +47,11 @@ export function createWindow({
       navigateOnDragDrop: false,
       devTools: !packaged,
       spellcheck: false,
-      zoomFactor,
+      zoomFactor: 1,
     },
   })
 
   lockNavigation(window.webContents, url)
-  zoomOnKeys(window.webContents, onZoom)
-  saveZoomOnClose(window, onZoom)
   window.once('ready-to-show', () => window.show())
   void window.loadURL(url)
 
@@ -81,27 +75,11 @@ function lockNavigation(contents: WebContents, appUrl: string) {
   contents.on('will-attach-webview', event => event.preventDefault())
 }
 
-/** Ahead of the default menu's own zoom keys, which skip the steps in `zoom.ts`. */
-function zoomOnKeys(contents: WebContents, onZoom: (factor: number) => void) {
-  contents.on('before-input-event', (event, input) => {
-    const factor = zoomFor(input, contents.getZoomFactor(), process.platform)
-
-    if (factor === null) return
-
-    event.preventDefault()
-    contents.setZoomFactor(factor)
-    onZoom(factor)
-  })
-}
-
-/** The default menu's View zoom items change it with no key press to catch. */
-function saveZoomOnClose(
-  window: BrowserWindow,
-  onZoom: (factor: number) => void
-) {
-  window.on('close', () => {
-    onZoom(withinSteps(window.webContents.getZoomFactor()))
-  })
+/** Electron's default menu, less its zoom items: the window never zooms. */
+export function setAppMenu() {
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate(menuTemplate(process.platform))
+  )
 }
 
 /**
