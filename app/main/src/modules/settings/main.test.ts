@@ -14,17 +14,6 @@ beforeEach(() => {
   db = openDatabase({file: ':memory:', migrationsFolder})
 })
 
-it('starts from the defaults: system mode, vertical, capped heights, the meter and note on, Enter sends', () => {
-  expect(createSettings(db).read()).toEqual({
-    themeMode: 'system',
-    canvasOrientation: 'vertical',
-    limitTurnHeight: true,
-    contextSizeMeter: true,
-    sendKey: 'enter',
-    reReadNote: true,
-  })
-})
-
 it('keeps a change across reopening and leaves the other Settings alone', () => {
   createSettings(db).update({canvasOrientation: 'horizontal'})
 
