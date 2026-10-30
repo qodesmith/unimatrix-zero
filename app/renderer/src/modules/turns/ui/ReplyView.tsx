@@ -259,7 +259,7 @@ function ToolCallView({part}: {part: ToolCall}) {
     <Trace
       role="group"
       aria-label={`Tool call ${toolName}`}
-      className="w-auto self-start text-xs"
+      className="w-auto max-w-full self-start text-xs"
     >
       <TraceCollapsible>
         <TraceCollapsibleTrigger>

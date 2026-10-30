@@ -35,7 +35,7 @@ export function TreeList({
   return (
     <SidebarGroup role="region" aria-label="Trees">
       <SidebarGroupLabel render={<h2 />}>Trees</SidebarGroupLabel>
-      <SidebarGroupAction onClick={onCreate}>
+      <SidebarGroupAction title="New Tree" onClick={onCreate}>
         <PlusIcon />
         <span className="sr-only">New Tree</span>
       </SidebarGroupAction>
@@ -139,7 +139,7 @@ function RenameInput({tree, onDone}: RenameInputProps) {
       aria-label="Tree name"
       autoFocus
       maxLength={TREE_TITLE_MAX_LENGTH}
-      className="h-8 bg-background"
+      className="h-8 bg-background px-2"
       value={title}
       onChange={event => setTitle(event.target.value)}
       onKeyDown={onKeyDown}

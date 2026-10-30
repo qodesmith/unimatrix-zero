@@ -198,7 +198,7 @@ function ChatReply({reply}: {reply: Reply}) {
         <Bubble
           variant="card"
           className={cn(
-            'max-w-full',
+            'w-full max-w-full',
             status === 'failed' &&
               '*:data-[slot=bubble-content]:border-destructive',
             status === 'streaming' &&
