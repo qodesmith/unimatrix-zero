@@ -5,7 +5,7 @@ import {BrowserWindow, nativeTheme, shell} from 'electron'
 
 import {isAppUrl} from './app-url'
 import {isOpenableExternally} from './link-rule'
-import {zoomFor} from './zoom'
+import {withinSteps, zoomFor} from './zoom'
 
 export {isTopLevelAppFrame} from './app-url'
 
@@ -57,6 +57,7 @@ export function createWindow({
 
   lockNavigation(window.webContents, url)
   zoomOnKeys(window.webContents, onZoom)
+  saveZoomOnClose(window, onZoom)
   window.once('ready-to-show', () => window.show())
   void window.loadURL(url)
 
@@ -80,7 +81,7 @@ function lockNavigation(contents: WebContents, appUrl: string) {
   contents.on('will-attach-webview', event => event.preventDefault())
 }
 
-/** Ahead of the default menu's own zoom keys, which would change it unsaved. */
+/** Ahead of the default menu's own zoom keys, which skip the steps in `zoom.ts`. */
 function zoomOnKeys(contents: WebContents, onZoom: (factor: number) => void) {
   contents.on('before-input-event', (event, input) => {
     const factor = zoomFor(input, contents.getZoomFactor(), process.platform)
@@ -90,6 +91,16 @@ function zoomOnKeys(contents: WebContents, onZoom: (factor: number) => void) {
     event.preventDefault()
     contents.setZoomFactor(factor)
     onZoom(factor)
+  })
+}
+
+/** The default menu's View zoom items change it with no key press to catch. */
+function saveZoomOnClose(
+  window: BrowserWindow,
+  onZoom: (factor: number) => void
+) {
+  window.on('close', () => {
+    onZoom(withinSteps(window.webContents.getZoomFactor()))
   })
 }
 
