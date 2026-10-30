@@ -14,11 +14,11 @@ function press(
   }
 }
 
-it('steps up a pixel on ⌘+ and ⌘=, and down on ⌘− and ⌘_', () => {
-  expect(textSizeFor(press('='), 16)).toBe(17)
-  expect(textSizeFor(press('+'), 17)).toBe(18)
-  expect(textSizeFor(press('-'), 18)).toBe(17)
-  expect(textSizeFor(press('_'), 17)).toBe(16)
+it('steps up 2px on ⌘+ and ⌘=, and down on ⌘− and ⌘_', () => {
+  expect(textSizeFor(press('='), 16)).toBe(18)
+  expect(textSizeFor(press('+'), 18)).toBe(20)
+  expect(textSizeFor(press('-'), 20)).toBe(18)
+  expect(textSizeFor(press('_'), 18)).toBe(16)
 })
 
 it('stays within 12px and 24px', () => {
@@ -27,11 +27,11 @@ it('stays within 12px and 24px', () => {
 })
 
 it('goes back to 16px on ⌘0', () => {
-  expect(textSizeFor(press('0'), 21)).toBe(16)
+  expect(textSizeFor(press('0'), 22)).toBe(16)
 })
 
 it('takes Ctrl as well as ⌘', () => {
-  expect(textSizeFor(press('=', {metaKey: false, ctrlKey: true}), 16)).toBe(17)
+  expect(textSizeFor(press('=', {metaKey: false, ctrlKey: true}), 16)).toBe(18)
 })
 
 it('leaves every other key to the page', () => {

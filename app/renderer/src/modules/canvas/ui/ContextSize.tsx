@@ -36,7 +36,7 @@ export function ContextSize({
     <>
       <span
         aria-label={`Context size ${formatTokens(contextSize)}`}
-        className="cursor-default rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
+        className="cursor-default rounded-md bg-muted px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted-foreground"
       >
         {formatTokens(contextSize)} ctx
       </span>

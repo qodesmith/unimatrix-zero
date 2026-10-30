@@ -42,7 +42,7 @@ export function CanvasControls({
   const still = useReducedMotion()
 
   return (
-    <div className="flex shrink-0 items-center gap-1 text-[11px]">
+    <div className="flex shrink-0 items-center gap-1 text-[0.6875rem]">
       {(streaming.length > 0 || failed.length > 0) && (
         <div role="status" className="flex items-center gap-1">
           {streaming.length > 0 && (
@@ -149,7 +149,7 @@ function JumpButton({label, title, ids, onJump, dotClass}: JumpButtonProps) {
       variant="ghost"
       size="sm"
       title={title}
-      className="h-7 gap-1.5 px-2 text-[11px]"
+      className="h-7 gap-1.5 px-2 text-[0.6875rem]"
       onClick={next}
     >
       <span className={cn('size-2 rounded-full', dotClass)} />

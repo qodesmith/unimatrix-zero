@@ -152,7 +152,7 @@ function Checklist({
                 <span
                   aria-hidden
                   className={cn(
-                    'flex size-5 items-center justify-center rounded-full text-[11px]',
+                    'flex size-5 items-center justify-center rounded-full text-[0.6875rem]',
                     index < current && 'bg-success text-primary-foreground',
                     index === current &&
                       'animate-pulse bg-primary text-primary-foreground',

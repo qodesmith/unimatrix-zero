@@ -123,7 +123,7 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
         type="button"
         aria-expanded={!collapsed}
         className={cn(
-          'rounded-full border border-border bg-muted px-2.5 py-0.5 text-[11px] text-muted-foreground',
+          'rounded-full border border-border bg-muted px-2.5 py-0.5 text-[0.6875rem] text-muted-foreground',
           'hover:text-foreground'
         )}
         onClick={() => toggleCollapsed(replyId)}

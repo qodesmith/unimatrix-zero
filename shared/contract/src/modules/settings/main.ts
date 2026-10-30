@@ -14,8 +14,8 @@ export type ThemeMode = z.infer<typeof ThemeModeSchema>
  */
 export const SendKeySchema = z.enum(['enter', 'mod-enter'])
 
-/** The floor and ceiling of the text size, in pixels. */
-export const TEXT_SIZE = {min: 12, max: 24}
+/** The text size's floor, ceiling and step, in pixels. */
+export const TEXT_SIZE = {min: 12, max: 24, step: 2}
 
 /** Global, never per Tree; a Setting changes nothing about what the AI does. */
 export const SettingsSchema = z.strictObject({
@@ -29,7 +29,11 @@ export const SettingsSchema = z.strictObject({
    * The base text size in pixels, set by ⌘+ and ⌘−; zoom scales the canvas
    * alone.
    */
-  textSize: z.int().min(TEXT_SIZE.min).max(TEXT_SIZE.max),
+  textSize: z
+    .int()
+    .min(TEXT_SIZE.min)
+    .max(TEXT_SIZE.max)
+    .multipleOf(TEXT_SIZE.step),
   sendKey: SendKeySchema,
   /** The note above the Input before a step that re-reads the Thread cold. */
   reReadNote: z.boolean(),

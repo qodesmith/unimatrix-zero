@@ -122,6 +122,26 @@ it('saves each Appearance Setting as it is changed, and shows the change', async
   await expect.element(page.getByRole('radio', {name: 'Light'})).toBeChecked()
 })
 
+it('shows the saved text size, saves it from the slider, and resets it to 16px', async () => {
+  const main = await renderSettings({textSize: 20})
+  const slider = page.getByRole('slider', {name: 'Text size'})
+  const reset = page.getByRole('button', {name: 'Reset'})
+
+  await expect.element(slider).toHaveValue('20')
+  await expect.element(page.getByText('20px')).toBeVisible()
+
+  await slider.fill('14')
+  await expect.element(page.getByText('14px')).toBeVisible()
+  await reset.click()
+
+  await expect.element(page.getByText('16px')).toBeVisible()
+  await expect.element(reset).toBeDisabled()
+  expect(main.sent).toEqual([
+    {type: 'settings.update', changes: {textSize: 14}},
+    {type: 'settings.update', changes: {textSize: 16}},
+  ])
+})
+
 it('shows and saves the send key and the re-read note from Chat', async () => {
   const main = await renderSettings({sendKey: 'mod-enter', reReadNote: false})
 

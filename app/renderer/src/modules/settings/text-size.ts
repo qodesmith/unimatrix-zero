@@ -9,11 +9,11 @@ export function textSizeFor(press: KeyPress, current: number): number | null {
   switch (press.key) {
     case '=':
     case '+':
-      return Math.min(current + 1, TEXT_SIZE.max)
+      return Math.min(current + TEXT_SIZE.step, TEXT_SIZE.max)
 
     case '-':
     case '_':
-      return Math.max(current - 1, TEXT_SIZE.min)
+      return Math.max(current - TEXT_SIZE.step, TEXT_SIZE.min)
 
     case '0':
       return DEFAULT_SETTINGS.textSize

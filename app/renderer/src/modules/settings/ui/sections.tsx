@@ -1,3 +1,6 @@
+import {Button} from '#modules/shadcn/main'
+import {DEFAULT_SETTINGS, TEXT_SIZE} from '@uz/contract/settings'
+
 import {useSettings, useUpdateSettings} from '../use-settings'
 import {Choice, Toggle} from './controls'
 
@@ -17,6 +20,35 @@ export function AppearanceSection() {
         ]}
         onChange={themeMode => void update({themeMode})}
       />
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-2 text-sm font-medium">Text size</legend>
+        <div className="flex items-center gap-3 text-sm">
+          <input
+            type="range"
+            aria-label="Text size"
+            className="accent-primary"
+            min={TEXT_SIZE.min}
+            max={TEXT_SIZE.max}
+            step={TEXT_SIZE.step}
+            value={settings.textSize}
+            onChange={event =>
+              void update({textSize: Number(event.target.value)})
+            }
+          />
+          <output>{settings.textSize}px</output>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={settings.textSize === DEFAULT_SETTINGS.textSize}
+            onClick={() => void update({textSize: DEFAULT_SETTINGS.textSize})}
+          >
+            Reset
+          </Button>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          ⌘/Ctrl + and − change it too, and ⌘/Ctrl 0 resets it.
+        </p>
+      </fieldset>
       <Choice
         legend="Canvas orientation"
         value={settings.canvasOrientation}

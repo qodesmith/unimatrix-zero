@@ -76,15 +76,15 @@ it('saves and shows a bigger text size on ⌘+, and a smaller one on ⌘−', as
 
   await userEvent.keyboard('{Meta>}={/Meta}')
 
-  await expect.poll(rootFontSize).toBe('21px')
+  await expect.poll(rootFontSize).toBe('22px')
 
   await userEvent.keyboard('{Meta>}-{/Meta}{Meta>}-{/Meta}')
 
-  await expect.poll(rootFontSize).toBe('19px')
+  await expect.poll(rootFontSize).toBe('18px')
   expect(main.sent).toEqual([
-    {type: 'settings.update', changes: {textSize: 21}},
+    {type: 'settings.update', changes: {textSize: 22}},
     {type: 'settings.update', changes: {textSize: 20}},
-    {type: 'settings.update', changes: {textSize: 19}},
+    {type: 'settings.update', changes: {textSize: 18}},
   ])
 })
 
@@ -98,9 +98,9 @@ it('steps twice for two presses that come before a render', async () => {
     )
   }
 
-  await expect.poll(rootFontSize).toBe('22px')
+  await expect.poll(rootFontSize).toBe('24px')
   expect(main.sent).toEqual([
-    {type: 'settings.update', changes: {textSize: 21}},
     {type: 'settings.update', changes: {textSize: 22}},
+    {type: 'settings.update', changes: {textSize: 24}},
   ])
 })
