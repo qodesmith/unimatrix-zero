@@ -57,8 +57,26 @@ it('hands every saved Setting to onSaved after each update', () => {
   const settings = createSettings(db, saved => heard.push(saved))
 
   settings.update({themeMode: 'light'})
+  settings.update({sendKey: 'mod-enter'})
 
-  expect(heard.map(saved => saved.themeMode)).toEqual(['light'])
+  expect(heard).toEqual([
+    {
+      themeMode: 'light',
+      canvasOrientation: 'vertical',
+      limitTurnHeight: true,
+      contextSizeMeter: true,
+      sendKey: 'enter',
+      reReadNote: true,
+    },
+    {
+      themeMode: 'light',
+      canvasOrientation: 'vertical',
+      limitTurnHeight: true,
+      contextSizeMeter: true,
+      sendKey: 'mod-enter',
+      reReadNote: true,
+    },
+  ])
 })
 
 it('reads a saved value that no longer fits as the default', () => {
@@ -83,8 +101,11 @@ it('keeps the zoom out of the Settings the window is sent', () => {
   expect(Object.keys(createSettings(db).read())).not.toContain('zoomFactor')
 })
 
-it('reads a saved zoom out of range as 100%', () => {
-  createSettings(db).saveZoomFactor(40)
+it.each([{factor: 0.25}, {factor: 40}])(
+  'reads a saved zoom of $factor, out of range, as 100%',
+  ({factor}) => {
+    createSettings(db).saveZoomFactor(factor)
 
-  expect(createSettings(db).readZoomFactor()).toBe(1)
-})
+    expect(createSettings(db).readZoomFactor()).toBe(1)
+  }
+)

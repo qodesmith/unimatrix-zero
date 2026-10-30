@@ -81,24 +81,29 @@ it('lists every section, with those not built yet unavailable', async () => {
 })
 
 it('opens on Appearance, showing the saved values', async () => {
-  await renderSettings({themeMode: 'dark', limitTurnHeight: false})
+  await renderSettings({
+    themeMode: 'dark',
+    canvasOrientation: 'horizontal',
+    contextSizeMeter: false,
+    limitTurnHeight: false,
+  })
 
   await expect
     .element(page.getByRole('heading', {name: 'Appearance'}))
     .toBeVisible()
   await expect.element(page.getByRole('radio', {name: 'Dark'})).toBeChecked()
   await expect
-    .element(page.getByRole('radio', {name: 'Vertical'}))
+    .element(page.getByRole('radio', {name: 'Horizontal'}))
     .toBeChecked()
   await expect
     .element(page.getByRole('checkbox', {name: /Context size meter/}))
-    .toBeChecked()
+    .not.toBeChecked()
   await expect
     .element(page.getByRole('checkbox', {name: /Limit height/}))
     .not.toBeChecked()
 })
 
-it('saves each Appearance Setting as it is changed', async () => {
+it('saves each Appearance Setting as it is changed, and shows the change', async () => {
   const main = await renderSettings()
 
   await page.getByRole('radio', {name: 'Light'}).click()
@@ -117,31 +122,31 @@ it('saves each Appearance Setting as it is changed', async () => {
   await expect.element(page.getByRole('radio', {name: 'Light'})).toBeChecked()
 })
 
-it('saves the send key and the re-read note from Chat', async () => {
-  const main = await renderSettings()
+it('shows and saves the send key and the re-read note from Chat', async () => {
+  const main = await renderSettings({sendKey: 'mod-enter', reReadNote: false})
 
   await sections().getByRole('button', {name: 'Chat'}).click()
   await expect
     .element(
       page.getByRole('radio', {
-        name: 'Enter sends · Shift+Enter adds a new line',
+        name: 'Enter adds a new line · ⌘/Ctrl+Enter sends',
       })
     )
     .toBeChecked()
   await expect
     .element(page.getByRole('checkbox', {name: /Re-read note/}))
-    .toBeChecked()
+    .not.toBeChecked()
 
   await page
-    .getByRole('radio', {name: 'Enter adds a new line · ⌘/Ctrl+Enter sends'})
+    .getByRole('radio', {name: 'Enter sends · Shift+Enter adds a new line'})
     .click()
   await page.getByRole('checkbox', {name: /Re-read note/}).click()
 
   await expect
     .poll(() => main.sent)
     .toEqual([
-      {type: 'settings.update', changes: {sendKey: 'mod-enter'}},
-      {type: 'settings.update', changes: {reReadNote: false}},
+      {type: 'settings.update', changes: {sendKey: 'enter'}},
+      {type: 'settings.update', changes: {reReadNote: true}},
     ])
 })
 

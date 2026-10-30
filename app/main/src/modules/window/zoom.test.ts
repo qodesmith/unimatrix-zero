@@ -12,11 +12,12 @@ function press(key: string, held: {meta?: boolean; control?: boolean} = {}) {
   }
 }
 
-it('steps up on ⌘+ and ⌘=, and down on ⌘−', () => {
+it('steps up on ⌘+ and ⌘=, and down on ⌘− and ⌘_', () => {
   expect(zoomFor(press('='), 1, 'darwin')).toBe(1.1)
   expect(zoomFor(press('+'), 1.1, 'darwin')).toBe(1.25)
   expect(zoomFor(press('-'), 1.25, 'darwin')).toBe(1.1)
   expect(zoomFor(press('-'), 1, 'darwin')).toBe(0.9)
+  expect(zoomFor(press('_'), 0.9, 'darwin')).toBe(0.8)
 })
 
 it('goes back to 100% on ⌘0', () => {
