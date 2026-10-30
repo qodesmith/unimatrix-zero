@@ -1,5 +1,5 @@
 import {Button} from '#modules/shadcn/main'
-import {DEFAULT_SETTINGS, TEXT_SIZE} from '@uz/contract/settings'
+import {DEFAULT_SETTINGS, FONT_SIZE} from '@uz/contract/settings'
 
 import {useSettings, useUpdateSettings} from '../use-settings'
 import {Choice, Toggle} from './controls'
@@ -21,26 +21,26 @@ export function AppearanceSection() {
         onChange={themeMode => void update({themeMode})}
       />
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-sm font-medium">Text size</legend>
+        <legend className="mb-2 text-sm font-medium">Font size</legend>
         <div className="flex items-center gap-3 text-sm">
           <input
             type="range"
-            aria-label="Text size"
+            aria-label="Font size"
             className="accent-primary"
-            min={TEXT_SIZE.min}
-            max={TEXT_SIZE.max}
-            step={TEXT_SIZE.step}
-            value={settings.textSize}
+            min={FONT_SIZE.min}
+            max={FONT_SIZE.max}
+            step={FONT_SIZE.step}
+            value={settings.fontSize}
             onChange={event =>
-              void update({textSize: Number(event.target.value)})
+              void update({fontSize: Number(event.target.value)})
             }
           />
-          <output>{settings.textSize}px</output>
+          <output>{settings.fontSize}px</output>
           <Button
             variant="outline"
             size="sm"
-            disabled={settings.textSize === DEFAULT_SETTINGS.textSize}
-            onClick={() => void update({textSize: DEFAULT_SETTINGS.textSize})}
+            disabled={settings.fontSize === DEFAULT_SETTINGS.fontSize}
+            onClick={() => void update({fontSize: DEFAULT_SETTINGS.fontSize})}
           >
             Reset
           </Button>

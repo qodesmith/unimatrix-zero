@@ -8,8 +8,8 @@ import {afterEach, expect, it} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {userEvent} from 'vitest/browser'
 
+import {FontSize} from './FontSize'
 import {SettingsProvider} from './SettingsProvider'
-import {TextSize} from './TextSize'
 
 function fakeMain(saved: Partial<Settings>) {
   const settings: Settings = {...DEFAULT_SETTINGS, ...saved}
@@ -43,13 +43,13 @@ function fakeMain(saved: Partial<Settings>) {
   return {...bridge, sent}
 }
 
-async function renderTextSize(saved: Partial<Settings>) {
+async function renderFontSize(saved: Partial<Settings>) {
   const main = fakeMain(saved)
   globalThis.window.uz = main
 
   await render(
     <SettingsProvider>
-      <TextSize />
+      <FontSize />
     </SettingsProvider>
   )
 
@@ -64,14 +64,14 @@ afterEach(() => {
   document.documentElement.style.fontSize = ''
 })
 
-it('sizes the root font from the saved text size', async () => {
-  await renderTextSize({textSize: 20})
+it('sizes the root font from the saved font size', async () => {
+  await renderFontSize({fontSize: 20})
 
   await expect.poll(rootFontSize).toBe('20px')
 })
 
-it('saves and shows a bigger text size on ⌘+, and a smaller one on ⌘−', async () => {
-  const main = await renderTextSize({textSize: 20})
+it('saves and shows a bigger font size on ⌘+, and a smaller one on ⌘−', async () => {
+  const main = await renderFontSize({fontSize: 20})
   await expect.poll(rootFontSize).toBe('20px')
 
   await userEvent.keyboard('{Meta>}={/Meta}')
@@ -82,14 +82,14 @@ it('saves and shows a bigger text size on ⌘+, and a smaller one on ⌘−', as
 
   await expect.poll(rootFontSize).toBe('18px')
   expect(main.sent).toEqual([
-    {type: 'settings.update', changes: {textSize: 22}},
-    {type: 'settings.update', changes: {textSize: 20}},
-    {type: 'settings.update', changes: {textSize: 18}},
+    {type: 'settings.update', changes: {fontSize: 22}},
+    {type: 'settings.update', changes: {fontSize: 20}},
+    {type: 'settings.update', changes: {fontSize: 18}},
   ])
 })
 
 it('steps twice for two presses that come before a render', async () => {
-  const main = await renderTextSize({textSize: 20})
+  const main = await renderFontSize({fontSize: 20})
   await expect.poll(rootFontSize).toBe('20px')
 
   for (let i = 0; i < 2; i++) {
@@ -100,7 +100,7 @@ it('steps twice for two presses that come before a render', async () => {
 
   await expect.poll(rootFontSize).toBe('24px')
   expect(main.sent).toEqual([
-    {type: 'settings.update', changes: {textSize: 22}},
-    {type: 'settings.update', changes: {textSize: 24}},
+    {type: 'settings.update', changes: {fontSize: 22}},
+    {type: 'settings.update', changes: {fontSize: 24}},
   ])
 })

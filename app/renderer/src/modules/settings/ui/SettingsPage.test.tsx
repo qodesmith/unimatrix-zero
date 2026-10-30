@@ -122,9 +122,9 @@ it('saves each Appearance Setting as it is changed, and shows the change', async
   await expect.element(page.getByRole('radio', {name: 'Light'})).toBeChecked()
 })
 
-it('shows the saved text size, saves it from the slider, and resets it to 16px', async () => {
-  const main = await renderSettings({textSize: 20})
-  const slider = page.getByRole('slider', {name: 'Text size'})
+it('shows the saved font size, saves it from the slider, and resets it to 16px', async () => {
+  const main = await renderSettings({fontSize: 20})
+  const slider = page.getByRole('slider', {name: 'Font size'})
   const reset = page.getByRole('button', {name: 'Reset'})
 
   await expect.element(slider).toHaveValue('20')
@@ -137,8 +137,8 @@ it('shows the saved text size, saves it from the slider, and resets it to 16px',
   await expect.element(page.getByText('16px')).toBeVisible()
   await expect.element(reset).toBeDisabled()
   expect(main.sent).toEqual([
-    {type: 'settings.update', changes: {textSize: 14}},
-    {type: 'settings.update', changes: {textSize: 16}},
+    {type: 'settings.update', changes: {fontSize: 14}},
+    {type: 'settings.update', changes: {fontSize: 16}},
   ])
 })
 

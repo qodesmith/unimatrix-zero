@@ -122,8 +122,8 @@ _Avoid_: The Model's limit, the Model's window, max tokens (that is output)
 The app's main view: a whole Tree laid out spatially on an infinite canvas, in one of two orientations, vertical (top-down, the default) or horizontal (left-to-right). Orientation is a global preference, not per Tree.
 
 **Zoom**:
-How far the canvas is scaled, changed by pinch, ⌘-scroll or the canvas's zoom buttons. Only the canvas zooms; the window never does, and zoom never changes the Text size.
-_Avoid_: Zoom for the Text size or the window
+How far the canvas is scaled, changed by pinch, ⌘-scroll or the canvas's zoom buttons. Only the canvas zooms; the window never does, and zoom never changes the Font size.
+_Avoid_: Zoom for the Font size or the window
 
 **Chat mode**:
 One Thread of a Tree shown as a conventional vertical chat, in a slideout over canvas mode that opens from any Reply and can expand to full screen. It is not a separate view; to switch Threads, open it from another Reply on the canvas.
@@ -147,9 +147,9 @@ _Avoid_: Folder, project, group
 The single place for the user's global preferences: how the app looks and behaves, and the defaults new Trees start from. Settings never changes an existing Tree; anything that shapes what the AI does in one Tree belongs to that Tree.
 _Avoid_: Preferences, options, config
 
-**Text size**:
+**Font size**:
 The base size of all text in the app, a Setting from 12 to 24 pixels in steps of 2, set on the Appearance page or by ⌘+ and ⌘−; ⌘0 and Reset set it back to 16. Text grows with it; the layout and the canvas's Zoom stay as they are.
-_Avoid_: Font size (the Theme sets the font), zoom
+_Avoid_: Text size, zoom
 
 **Tools panel**:
 A Tree's own list of what the AI may use there: web search, Subagents, each MCP server, Skill and Plugin, the Provider's own built-in tools and account connectors, and the Workspace's permission level. New Trees start from the defaults in Settings; changing the panel changes only that Tree.

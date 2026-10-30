@@ -8,7 +8,7 @@ import {
   anyConnected,
   useConnections,
 } from '#modules/connections/main'
-import {SettingsPage, SettingsProvider, TextSize} from '#modules/settings/main'
+import {FontSize, SettingsPage, SettingsProvider} from '#modules/settings/main'
 import {Button} from '#modules/shadcn/main'
 import {TreeList, TreeTitle, useTrees} from '#modules/trees/main'
 import {LiveReplies} from '#modules/turns/main'
@@ -24,7 +24,7 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
-        <TextSize />
+        <FontSize />
         <ConnectionsProvider>
           <LiveReplies>
             <AppLayout />

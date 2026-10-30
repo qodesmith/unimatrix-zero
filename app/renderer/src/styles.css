@@ -11,7 +11,7 @@
 
 @custom-variant dark (&:where([data-mode='dark'], [data-mode='dark'] *));
 
-/* Spacing stays in pixels, so the text size Setting grows text, not the layout. */
+/* Spacing stays in pixels, so the font size Setting grows text, not the layout. */
 @theme {
   --spacing: 4px;
 }

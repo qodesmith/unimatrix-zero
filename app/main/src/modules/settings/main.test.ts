@@ -22,7 +22,7 @@ it('keeps a change across reopening and leaves the other Settings alone', () => 
     canvasOrientation: 'horizontal',
     limitTurnHeight: true,
     contextSizeMeter: true,
-    textSize: 16,
+    fontSize: 16,
     sendKey: 'enter',
     reReadNote: true,
   })
@@ -33,7 +33,7 @@ it('answers an update with every Setting as now saved', () => {
   settings.update({
     canvasOrientation: 'horizontal',
     themeMode: 'dark',
-    textSize: 20,
+    fontSize: 20,
   })
 
   expect(settings.update({sendKey: 'mod-enter', reReadNote: false})).toEqual({
@@ -41,7 +41,7 @@ it('answers an update with every Setting as now saved', () => {
     canvasOrientation: 'horizontal',
     limitTurnHeight: true,
     contextSizeMeter: true,
-    textSize: 20,
+    fontSize: 20,
     sendKey: 'mod-enter',
     reReadNote: false,
   })
@@ -60,7 +60,7 @@ it('hands every saved Setting to onSaved after each update', () => {
       canvasOrientation: 'vertical',
       limitTurnHeight: true,
       contextSizeMeter: true,
-      textSize: 16,
+      fontSize: 16,
       sendKey: 'enter',
       reReadNote: true,
     },
@@ -69,7 +69,7 @@ it('hands every saved Setting to onSaved after each update', () => {
       canvasOrientation: 'vertical',
       limitTurnHeight: true,
       contextSizeMeter: true,
-      textSize: 16,
+      fontSize: 16,
       sendKey: 'mod-enter',
       reReadNote: true,
     },

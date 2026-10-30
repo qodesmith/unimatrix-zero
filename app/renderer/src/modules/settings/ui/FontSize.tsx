@@ -1,33 +1,33 @@
 import {useEffect, useLayoutEffect, useRef} from 'react'
 
-import {textSizeFor} from '../text-size'
+import {fontSizeFor} from '../font-size'
 import {useSettings, useUpdateSettings} from '../use-settings'
 
 /**
  * Sets the root font size, which every `rem` of text follows, and changes it
  * on ⌘+, ⌘− and ⌘0.
  */
-export function TextSize() {
-  const {textSize} = useSettings()
+export function FontSize() {
+  const {fontSize} = useSettings()
   const update = useUpdateSettings()
   // A held key repeats faster than a render, so each press steps from the last.
-  const current = useRef(textSize)
+  const current = useRef(fontSize)
 
   useLayoutEffect(() => {
-    current.current = textSize
-    document.documentElement.style.fontSize = `${textSize}px`
-  }, [textSize])
+    current.current = fontSize
+    document.documentElement.style.fontSize = `${fontSize}px`
+  }, [fontSize])
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      const next = textSizeFor(event, current.current)
+      const next = fontSizeFor(event, current.current)
 
       if (next === null) return
       event.preventDefault()
 
       if (next === current.current) return
       current.current = next
-      void update({textSize: next})
+      void update({fontSize: next})
     }
 
     globalThis.addEventListener('keydown', onKeyDown)
