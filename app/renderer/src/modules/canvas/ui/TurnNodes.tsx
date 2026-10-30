@@ -5,6 +5,7 @@ import type {Node, NodeProps} from '@xyflow/react'
 import {Button, cn} from '#modules/shadcn/main'
 import {ReplyView, useReply} from '#modules/turns/main'
 import {Handle, Position} from '@xyflow/react'
+import {ChevronRightIcon} from 'lucide-react'
 import {useEffect, useRef, useState} from 'react'
 
 import {useCanvas} from '../canvas-context'
@@ -97,18 +98,7 @@ function OpenChatButton({replyId}: {replyId: string}) {
       className="ml-auto size-6 text-muted-foreground"
       onClick={() => openChat(replyId)}
     >
-      <svg
-        aria-hidden
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="size-4"
-      >
-        <path d="m9 18 6-6-6-6" />
-      </svg>
+      <ChevronRightIcon />
     </Button>
   )
 }
@@ -119,17 +109,18 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
 
   return (
     <footer className="px-3.5 pb-2.5">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="xs"
         aria-expanded={!collapsed}
         className={cn(
-          'rounded-full border border-border bg-muted px-2.5 py-0.5 text-[0.6875rem] text-muted-foreground',
-          'hover:text-foreground'
+          'h-auto rounded-full border-border bg-muted px-2.5 py-0.5 text-[0.6875rem] font-normal text-muted-foreground',
+          'hover:text-foreground aria-expanded:bg-muted aria-expanded:text-muted-foreground aria-expanded:hover:text-foreground dark:hover:bg-muted'
         )}
         onClick={() => toggleCollapsed(replyId)}
       >
         Fork · {branches} Branches
-      </button>
+      </Button>
     </footer>
   )
 }

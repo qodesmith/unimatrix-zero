@@ -1,4 +1,5 @@
 import {Button, cn} from '#modules/shadcn/main'
+import {InfoIcon, XIcon} from 'lucide-react'
 import {useRef, useState} from 'react'
 
 import {formatTokens} from '../format'
@@ -40,16 +41,17 @@ export function ContextSize({
       >
         {formatTokens(contextSize)} ctx
       </span>
-      <button
+      <Button
         ref={info}
-        type="button"
+        variant="ghost"
+        size="icon-xs"
         aria-label="Context size details"
         aria-expanded={open}
-        className="rounded-full text-muted-foreground hover:text-foreground"
+        className="size-auto rounded-full border-0 text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
         onClick={() => setOpen(!open)}
       >
-        <InfoIcon />
-      </button>
+        <InfoIcon className="size-3.5" />
+      </Button>
       <div
         aria-hidden
         className={cn(
@@ -101,7 +103,7 @@ function ContextSizeDrawer({
           className="size-6"
           onClick={onClose}
         >
-          ✕
+          <XIcon />
         </Button>
       </div>
       <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-3 py-2 text-xs">
@@ -121,25 +123,6 @@ function ContextSizeDrawer({
         )}
       </dl>
     </aside>
-  )
-}
-
-function InfoIcon() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="size-3.5"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 16v-4" />
-      <path d="M12 8h.01" />
-    </svg>
   )
 }
 

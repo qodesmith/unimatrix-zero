@@ -1,14 +1,20 @@
 import type {ReactNode} from 'react'
 
+import {RadioGroup, RadioGroupItem, Switch} from '#modules/shadcn/main'
+import {useId} from 'react'
+
 interface GroupProps {
   legend: string
+  legendId?: string
   children: ReactNode
 }
 
-export function Group({legend, children}: GroupProps) {
+export function Group({legend, legendId, children}: GroupProps) {
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="mb-2 text-sm font-medium">{legend}</legend>
+      <legend id={legendId} className="mb-2 text-sm font-medium">
+        {legend}
+      </legend>
       {children}
     </fieldset>
   )
@@ -27,19 +33,23 @@ export function Choice<T extends string>({
   options,
   onChange,
 }: ChoiceProps<T>) {
+  const legendId = useId()
+
   return (
-    <Group legend={legend}>
-      {options.map(option => (
-        <label key={option.value} className="flex items-center gap-2 text-sm">
-          <input
-            type="radio"
-            className="accent-primary"
-            checked={option.value === value}
-            onChange={() => onChange(option.value)}
-          />
-          {option.label}
-        </label>
-      ))}
+    <Group legend={legend} legendId={legendId}>
+      <RadioGroup
+        aria-labelledby={legendId}
+        className="gap-2"
+        value={value}
+        onValueChange={onChange}
+      >
+        {options.map(option => (
+          <label key={option.value} className="flex items-center gap-2 text-sm">
+            <RadioGroupItem value={option.value} />
+            {option.label}
+          </label>
+        ))}
+      </RadioGroup>
     </Group>
   )
 }
@@ -54,12 +64,7 @@ interface ToggleProps {
 export function Toggle({label, description, checked, onChange}: ToggleProps) {
   return (
     <label className="flex items-start gap-3 text-sm">
-      <input
-        type="checkbox"
-        className="mt-0.5 accent-primary"
-        checked={checked}
-        onChange={event => onChange(event.target.checked)}
-      />
+      <Switch className="mt-0.5" checked={checked} onCheckedChange={onChange} />
       <span className="flex flex-col gap-0.5">
         <span className="font-medium">{label}</span>
         <span className="text-muted-foreground">{description}</span>

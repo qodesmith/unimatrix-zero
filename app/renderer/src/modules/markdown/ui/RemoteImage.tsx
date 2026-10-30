@@ -1,6 +1,7 @@
 import type {ExtraProps} from 'streamdown'
 
 import {bridge} from '#modules/bridge/main'
+import {Button} from '#modules/shadcn/main'
 import {useState} from 'react'
 
 type ImageProps = React.JSX.IntrinsicElements['img'] & ExtraProps
@@ -83,14 +84,14 @@ function RemoteImageChip({
       {load.state === 'failed' && (
         <span className="text-destructive">{load.message}</span>
       )}
-      <button
-        type="button"
+      <Button
+        variant="link"
         disabled={load.state === 'loading'}
         onClick={() => void loadImage()}
-        className="font-medium text-foreground underline-offset-2 hover:underline disabled:opacity-50"
+        className="h-auto border-0 p-0 text-xs text-foreground underline-offset-2"
       >
         {BUTTON_LABELS[load.state]}
-      </button>
+      </Button>
     </span>
   )
 }

@@ -4,6 +4,7 @@ import type {ReactNode} from 'react'
 import {Button, cn} from '#modules/shadcn/main'
 import {CanvasOrientationSchema} from '@uz/contract/settings'
 import {useReactFlow} from '@xyflow/react'
+import {MapIcon, MinusIcon, PlusIcon, ScanIcon} from 'lucide-react'
 import {useRef} from 'react'
 
 import {useReducedMotion} from '../reduced-motion'
@@ -69,13 +70,13 @@ export function CanvasControls({
         title="Zoom in"
         onClick={() => void flow.zoomIn({duration: still ? 0 : 200})}
       >
-        +
+        <PlusIcon />
       </ToolButton>
       <ToolButton
         title="Zoom out"
         onClick={() => void flow.zoomOut({duration: still ? 0 : 200})}
       >
-        −
+        <MinusIcon />
       </ToolButton>
       <ToolButton
         title="Fit the whole Tree"
@@ -87,7 +88,7 @@ export function CanvasControls({
           })
         }
       >
-        ⤢
+        <ScanIcon />
       </ToolButton>
       <ToolButton
         title="Show the minimap"
@@ -102,20 +103,20 @@ export function CanvasControls({
         className="ml-1 flex rounded-lg bg-muted p-0.5"
       >
         {CanvasOrientationSchema.options.map(value => (
-          <button
+          <Button
             key={value}
-            type="button"
+            variant="ghost"
             aria-pressed={orientation === value}
             className={cn(
-              'rounded-md px-2 py-1',
+              'h-auto border-0 px-2 py-1 text-[0.6875rem] font-normal',
               orientation === value
-                ? 'bg-card text-card-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-card text-card-foreground shadow-sm hover:bg-card hover:text-card-foreground dark:hover:bg-card'
+                : 'text-muted-foreground hover:bg-transparent dark:hover:bg-transparent'
             )}
             onClick={() => onOrientation(value)}
           >
             {LABELS[value]}
-          </button>
+          </Button>
         ))}
       </div>
     </div>
@@ -176,29 +177,13 @@ function ToolButton({
       title={title}
       aria-label={title}
       aria-pressed={pressed}
-      className={cn('size-7', pressed && 'bg-accent text-accent-foreground')}
+      className={cn(
+        "size-7 [&_svg:not([class*='size-'])]:size-3.5",
+        pressed && 'bg-accent text-accent-foreground'
+      )}
       onClick={onClick}
     >
       {children}
     </Button>
-  )
-}
-
-function MapIcon() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="size-3.5"
-    >
-      <path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" />
-      <path d="M15 5.764v15" />
-      <path d="M9 3.236v15" />
-    </svg>
   )
 }

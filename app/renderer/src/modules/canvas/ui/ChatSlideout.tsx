@@ -3,6 +3,7 @@ import type {ReactNode} from 'react'
 
 import {Button, cn} from '#modules/shadcn/main'
 import {ReplyView, useReply} from '#modules/turns/main'
+import {Maximize2Icon, Minimize2Icon, XIcon} from 'lucide-react'
 import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 
 import {atBottom} from '../at-bottom'
@@ -132,10 +133,10 @@ export function ChatSlideout({
             title={full ? 'Exit full screen' : 'Full screen'}
             onClick={() => setFull(!full)}
           >
-            {full ? '⤡' : '⤢'}
+            {full ? <Minimize2Icon /> : <Maximize2Icon />}
           </HeaderButton>
           <HeaderButton title="Close" onClick={onClose}>
-            ✕
+            <XIcon />
           </HeaderButton>
         </div>
       </header>

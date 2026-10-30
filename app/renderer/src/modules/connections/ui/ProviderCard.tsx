@@ -2,8 +2,9 @@ import type {Card} from '../cards'
 import type {ProviderId, SignInStep} from '@uz/contract/providers'
 import type {ReactNode} from 'react'
 
-import {Button, cn} from '#modules/shadcn/main'
+import {Button, Input, cn} from '#modules/shadcn/main'
 import {PROVIDER_NAMES, SignInStepEvent} from '@uz/contract/providers'
+import {CheckIcon} from 'lucide-react'
 import {useState} from 'react'
 
 import {ABOUT, failureLine} from '../about'
@@ -93,9 +94,7 @@ function CardBody({
   if (card.kind === 'connected') {
     return (
       <div className="flex flex-col items-center gap-1 rounded-lg bg-success/10 p-4 text-center">
-        <span aria-hidden className="text-2xl text-success">
-          ✓
-        </span>
+        <CheckIcon aria-hidden className="size-6 text-success" />
         <p className="font-medium">Connected</p>
         <p className="text-sm text-muted-foreground">{card.account.email}</p>
         <p className="rounded-full bg-background px-2 text-xs text-muted-foreground">
@@ -152,14 +151,14 @@ function Checklist({
                 <span
                   aria-hidden
                   className={cn(
-                    'flex size-5 items-center justify-center rounded-full text-[0.6875rem]',
+                    'flex size-5 items-center justify-center rounded-full',
                     index < current && 'bg-success text-primary-foreground',
                     index === current &&
                       'animate-pulse bg-primary text-primary-foreground',
                     index > current && 'bg-muted'
                   )}
                 >
-                  {index < current ? '✓' : ''}
+                  {index < current && <CheckIcon className="size-3" />}
                 </span>
                 {label(name)}
               </span>
@@ -242,11 +241,11 @@ function PasteCode({provider, step, openPage, submitCode}: StepDetailProps) {
       {step.url && (
         <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
           {PROVIDER_NAMES[provider]}’s page
-          <input
+          <Input
             readOnly
             value={step.url}
             onFocus={event => event.target.select()}
-            className="truncate rounded-md border border-input bg-background px-2 py-1"
+            className="h-7 truncate px-2 text-xs md:text-xs"
           />
         </label>
       )}
@@ -265,13 +264,14 @@ function OpenAgain({
   if (!url) return null
 
   return (
-    <button
-      type="button"
-      className="text-xs text-muted-foreground underline"
+    <Button
+      variant="link"
+      size="xs"
+      className="h-auto px-0 text-muted-foreground underline"
       onClick={openPage}
     >
       Don’t see the page? Open it again
-    </button>
+    </Button>
   )
 }
 
@@ -298,14 +298,14 @@ function CodeEntry({
       }}
     >
       <div className="flex gap-2">
-        <input
+        <Input
           aria-label="Code"
           aria-invalid={wrongCode}
           autoFocus
           placeholder="Paste the code here"
           value={code}
           onChange={event => setCode(event.target.value)}
-          className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-1.5 font-mono text-sm aria-invalid:border-destructive"
+          className="h-8 flex-1 font-mono"
         />
         <Button
           type="submit"

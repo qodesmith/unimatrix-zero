@@ -2,7 +2,7 @@ import type {Settings} from '@uz/contract/settings'
 
 import {expect, it} from 'vitest'
 import {render} from 'vitest-browser-react'
-import {page} from 'vitest/browser'
+import {page, userEvent} from 'vitest/browser'
 
 import {fakeMain} from '../fake-main'
 import {SettingsPage} from './SettingsPage'
@@ -61,10 +61,10 @@ it('opens on Appearance, showing the saved values', async () => {
     .element(page.getByRole('radio', {name: 'Horizontal'}))
     .toBeChecked()
   await expect
-    .element(page.getByRole('checkbox', {name: /Context size meter/}))
+    .element(page.getByRole('switch', {name: /Context size meter/}))
     .not.toBeChecked()
   await expect
-    .element(page.getByRole('checkbox', {name: /Limit height/}))
+    .element(page.getByRole('switch', {name: /Limit height/}))
     .not.toBeChecked()
 })
 
@@ -73,8 +73,8 @@ it('saves each Appearance Setting as it is changed, and shows the change', async
 
   await page.getByRole('radio', {name: 'Light'}).click()
   await page.getByRole('radio', {name: 'Horizontal'}).click()
-  await page.getByRole('checkbox', {name: /Context size meter/}).click()
-  await page.getByRole('checkbox', {name: /Limit height/}).click()
+  await page.getByRole('switch', {name: /Context size meter/}).click()
+  await page.getByRole('switch', {name: /Limit height/}).click()
 
   await expect
     .poll(() => main.sent)
@@ -95,14 +95,15 @@ it('shows the saved font size, saves it from the slider, and resets it to 16px',
   await expect.element(slider).toHaveValue('20')
   await expect.element(page.getByText('20px')).toBeVisible()
 
-  await slider.fill('14')
-  await expect.element(page.getByText('14px')).toBeVisible()
+  slider.element().focus()
+  await userEvent.keyboard('{ArrowLeft}')
+  await expect.element(page.getByText('18px')).toBeVisible()
   await reset.click()
 
   await expect.element(page.getByText('16px')).toBeVisible()
   await expect.element(reset).toBeDisabled()
   expect(main.sent).toEqual([
-    {type: 'settings.update', changes: {fontSize: 14}},
+    {type: 'settings.update', changes: {fontSize: 18}},
     {type: 'settings.update', changes: {fontSize: 16}},
   ])
 })
@@ -119,13 +120,13 @@ it('shows and saves the send key and the re-read note from Chat', async () => {
     )
     .toBeChecked()
   await expect
-    .element(page.getByRole('checkbox', {name: /Re-read note/}))
+    .element(page.getByRole('switch', {name: /Re-read note/}))
     .not.toBeChecked()
 
   await page
     .getByRole('radio', {name: 'Enter sends · Shift+Enter adds a new line'})
     .click()
-  await page.getByRole('checkbox', {name: /Re-read note/}).click()
+  await page.getByRole('switch', {name: /Re-read note/}).click()
 
   await expect
     .poll(() => main.sent)

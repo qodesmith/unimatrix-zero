@@ -4,6 +4,8 @@ export {Button} from './ui/button'
 
 export {Input} from './ui/input'
 
+export {RadioGroup, RadioGroupItem} from './ui/radio-group'
+
 export {Sheet, SheetContent, SheetTrigger} from './ui/sheet'
 
 export {
@@ -21,3 +23,7 @@ export {
   SidebarMenuItem,
   SidebarProvider,
 } from './ui/sidebar'
+
+export {Slider} from './ui/slider'
+
+export {Switch} from './ui/switch'

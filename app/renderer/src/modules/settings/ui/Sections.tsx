@@ -1,5 +1,6 @@
-import {Button} from '#modules/shadcn/main'
+import {Button, Slider} from '#modules/shadcn/main'
 import {DEFAULT_SETTINGS, FONT_SIZE} from '@uz/contract/settings'
+import {useId} from 'react'
 
 import {useSettings, useUpdateSettings} from '../use-settings'
 import {Choice, Group, Toggle} from './Controls'
@@ -7,6 +8,7 @@ import {Choice, Group, Toggle} from './Controls'
 export function AppearanceSection() {
   const settings = useSettings()
   const update = useUpdateSettings()
+  const fontSizeId = useId()
 
   return (
     <>
@@ -20,19 +22,20 @@ export function AppearanceSection() {
         ]}
         onChange={themeMode => void update({themeMode})}
       />
-      <Group legend="Font size">
+      <Group legend="Font size" legendId={fontSizeId}>
         <div className="flex items-center gap-3 text-sm">
-          <input
-            type="range"
-            aria-label="Font size"
-            className="accent-primary"
+          <Slider
+            aria-labelledby={fontSizeId}
+            className="w-32"
             min={FONT_SIZE.min}
             max={FONT_SIZE.max}
             step={FONT_SIZE.step}
-            value={settings.fontSize}
-            onChange={event =>
-              void update({fontSize: Number(event.target.value)})
-            }
+            value={[settings.fontSize]}
+            onValueChange={value => {
+              const [fontSize] = [value].flat()
+
+              if (fontSize !== undefined) void update({fontSize})
+            }}
           />
           <output>{settings.fontSize}px</output>
           <Button
