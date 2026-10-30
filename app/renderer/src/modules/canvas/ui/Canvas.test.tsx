@@ -104,6 +104,8 @@ function fakeMain(saved: Saved) {
   /** What main says when it refuses a Stop; null takes every Stop. */
   const stops = {refusal: null as string | null}
   const deletes = {refusal: null as string | null}
+  /** While set, the Turns are fetched only once it settles. */
+  const turnsLoads = {held: null as Promise<void> | null}
 
   function cutFrom(promptId: string) {
     const promptIds = [promptId]
@@ -143,6 +145,8 @@ function fakeMain(saved: Saved) {
       sent.push(command)
 
       if (command.type === 'tree.turns') {
+        await turnsLoads.held
+
         return {ok: true, value: {prompts: [...prompts], replies: [...replies]}}
       }
 
@@ -232,7 +236,7 @@ function fakeMain(saved: Saved) {
     registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
   }
 
-  return {...bridge, sent, publish, replies, stops, deletes}
+  return {...bridge, sent, publish, replies, stops, deletes, turnsLoads}
 }
 
 function Providers({children}: {children: ReactNode}) {
@@ -1946,9 +1950,10 @@ it('asks to delete the Prompt with every Turn below it, and cancels by Cancel, E
   )
 })
 
-it('deletes the Prompt and every Turn below it once confirmed', async () => {
+it('deletes the Prompt and every Turn below it once confirmed, before the Turns are fetched again', async () => {
   const {main} = await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
+  main.turnsLoads.held = new Promise(() => {})
 
   await armDelete('Prompt two')
   await nodeOf('Prompt two').getByRole('button', {name: 'Delete'}).click()
