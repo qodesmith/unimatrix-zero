@@ -203,11 +203,17 @@ describe('a collapsed Fork', () => {
   })
 })
 
-it('lays out from the structure alone: the same Tree always lands in the same places', () => {
-  const first = layoutTree(forkedTree(), 'vertical', sized({}))
-  const second = layoutTree(forkedTree(), 'vertical', sized({}))
+it('lays out from the structure alone, whatever order its Turns arrive in', () => {
+  const {prompts, replies} = forkedTree()
 
-  expect(second.nodes).toEqual(first.nodes)
+  const arrived = indexTurns({
+    prompts: prompts.toReversed(),
+    replies: replies.toReversed(),
+  })
+
+  expect(layoutTree(arrived, 'vertical', sized({})).nodes).toEqual(
+    layoutTree(forkedTree(), 'vertical', sized({})).nodes
+  )
 })
 
 /** Two Branches of the root Reply, with the second one started at `second`. */

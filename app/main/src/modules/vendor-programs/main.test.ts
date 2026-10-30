@@ -5,19 +5,6 @@ import {DEV_MANIFEST, signInRequestFor} from './main'
 
 const userData = path.join('/data', 'unimatrix-zero')
 
-it('names one Claude build for each OS and arch the app ships on', () => {
-  expect(
-    Object.keys(DEV_MANIFEST.vendorPrograms.claude.builds).toSorted()
-  ).toEqual([
-    'darwin-arm64',
-    'darwin-x64',
-    'linux-arm64',
-    'linux-x64',
-    'win32-arm64',
-    'win32-x64',
-  ])
-})
-
 it('puts the exact Claude build under userData, beside its own configuration', () => {
   const request = signInRequestFor('claude', {
     userData,

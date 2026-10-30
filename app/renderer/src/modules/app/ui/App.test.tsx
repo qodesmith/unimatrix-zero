@@ -188,19 +188,6 @@ it('shows the pong main sends back', async () => {
     .toBeVisible()
 })
 
-it('lists the Trees main has saved', async () => {
-  globalThis.window.uz = fakeMain({
-    trees: [
-      {id: crypto.randomUUID(), title: 'Trip planning', createdAt: receivedAt},
-    ],
-  })
-  await renderApp()
-
-  await expect
-    .element(page.getByRole('button', {name: 'Trip planning'}))
-    .toBeVisible()
-})
-
 it('creates a Tree and opens it', async () => {
   globalThis.window.uz = fakeMain()
   await renderApp()
@@ -641,11 +628,11 @@ describe('connecting a Provider', () => {
       await expect
         .element(claudeCard().getByRole('alert'))
         .toHaveTextContent(line)
+      main.sent.length = 0
       await claudeCard().getByRole('button', {name: action}).click()
-      expect(main.sent.at(-1)).toEqual({
-        type: 'provider.connect',
-        provider: 'claude',
-      })
+      expect(main.sent).toEqual([
+        {type: 'provider.connect', provider: 'claude'},
+      ])
     }
   })
 

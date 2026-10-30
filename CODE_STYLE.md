@@ -5,8 +5,9 @@ Read this file first, then load the skill and the topic file that your task's li
 
 ## What this file holds
 
-A skill owns each general rule.
-This file and its topics hold only what is true in Unimatrix Zero and not in every repo.
+A skill owns the rules it states.
+This file and its topics hold what this repo adds: rules true only in Unimatrix Zero, and general rules the named skill leaves out or this repo holds more strictly.
+A topic doesn't restate its skill.
 A rule that lint or a test enforces is not written out here: its topic names the rule, and the lint message carries the rest.
 
 ## Pick the task

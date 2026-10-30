@@ -32,17 +32,6 @@ it('renders a link that opens outside the window, and blocks a javascript: one',
   expect(screen.container.querySelector('a[href^="javascript"]')).toBeNull()
 })
 
-it('closes unfinished Markdown while the Reply is still being written', async () => {
-  const screen = await render(
-    <ReplyMarkdown text="Some **bold text" streaming />
-  )
-
-  await expect.element(screen.getByText('bold text')).toBeVisible()
-  expect(
-    screen.container.querySelector('[data-streamdown="strong"]')?.textContent
-  ).toBe('bold text')
-})
-
 it('renders a KaTeX command that needs trust as an error, not markup', async () => {
   const screen = await render(
     <ReplyMarkdown

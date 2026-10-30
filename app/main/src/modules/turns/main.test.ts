@@ -19,6 +19,7 @@ const createdAt = new Date('2026-10-19T12:00:00.000Z')
 
 let db: Database
 let published: AppEvent[]
+let whenPublished: (event: AppEvent) => void
 let hostCommands: HostCommand[]
 let hostReady: boolean
 let hostReachable: boolean
@@ -41,7 +42,10 @@ const hosts: ReplyHosts = {
 function launch() {
   return createTurns({
     db,
-    publish: event => published.push(event),
+    publish: event => {
+      published.push(event)
+      whenPublished(event)
+    },
     hosts,
     vendorProgramFor: () => vendorProgram,
     now: () => createdAt,
@@ -52,6 +56,7 @@ beforeEach(() => {
   vi.useFakeTimers()
   db = openDatabase({file: ':memory:', migrationsFolder})
   published = []
+  whenPublished = () => undefined
   hostCommands = []
   hostReady = true
   hostReachable = true
@@ -300,6 +305,13 @@ describe('a streaming Reply', () => {
   })
 
   it('publishes each event after saving what it needed to', () => {
+    const savedWhenFinished: string[] = []
+    whenPublished = event => {
+      if (event.type === 'RUN_FINISHED') {
+        savedWhenFinished.push(saved(replyId).status)
+      }
+    }
+
     fromHost(replyId, {type: 'TEXT_DELTA', delta: 'Hi'})
     finish(replyId)
 
@@ -307,6 +319,7 @@ describe('a streaming Reply', () => {
       'TEXT_DELTA',
       'RUN_FINISHED',
     ])
+    expect(savedWhenFinished).toEqual(['complete'])
   })
 
   it('keeps what it shows for a window that connects mid-stream', () => {

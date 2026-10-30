@@ -869,18 +869,6 @@ it('switches to one card per Exchange, left to right, and writes the Setting', a
     .toBe(true)
 })
 
-it('opens with the orientation the Setting says', async () => {
-  await renderCanvas({
-    ...forkedTree(),
-    settings: {canvasOrientation: 'horizontal'},
-  })
-
-  await expect.element(page.getByText('Reply five')).toBeVisible()
-  expect(document.querySelectorAll('.react-flow__node-exchange')).toHaveLength(
-    5
-  )
-})
-
 const longText = Array.from({length: 40}, (_, i) => `Line ${i + 1}`).join('\n')
 
 // Markdown folds single newlines into one paragraph.

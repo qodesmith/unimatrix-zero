@@ -295,6 +295,7 @@ it('reports a crash and restarts after 1 s, 5 s, then 30 s, then stays down', ()
   hosts.connect('claude')
 
   for (const delay of RESTART_DELAYS_MS) {
+    latest().say({type: 'HOST_READY', models})
     latest().crash()
     expect(hosts.ready()).toBeNull()
 
