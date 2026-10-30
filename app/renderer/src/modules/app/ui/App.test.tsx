@@ -188,6 +188,29 @@ it('shows the pong main sends back', async () => {
     .toBeVisible()
 })
 
+it('opens Settings from the sidebar, and leaves it for the Tree picked there', async () => {
+  globalThis.window.uz = fakeMain({
+    trees: [
+      {id: crypto.randomUUID(), title: 'Trip planning', createdAt: receivedAt},
+    ],
+  })
+  await renderApp()
+
+  await page
+    .getByRole('complementary')
+    .getByRole('button', {name: 'Settings'})
+    .click()
+  await expect
+    .element(page.getByRole('heading', {name: 'Appearance'}))
+    .toBeVisible()
+
+  await page.getByRole('button', {name: 'Trip planning'}).click()
+  await expect
+    .element(page.getByRole('heading', {name: 'Trip planning'}))
+    .toBeVisible()
+  expect(page.getByRole('heading', {name: 'Appearance'}).query()).toBeNull()
+})
+
 it('creates a Tree and opens it', async () => {
   globalThis.window.uz = fakeMain()
   await renderApp()
@@ -693,11 +716,15 @@ describe('connecting a Provider', () => {
       .toHaveTextContent('ChatGPT can’t be connected in this version yet.')
   })
 
-  it('shows the same cards from the sidebar once connected', async () => {
+  it('shows the same cards under Settings once connected, with no Connections button left in the sidebar', async () => {
     globalThis.window.uz = fakeMain()
     await renderApp()
 
-    await page.getByRole('button', {name: 'Connections'}).click()
+    await page.getByRole('button', {name: 'Settings'}).click()
+    await page
+      .getByRole('navigation', {name: 'Settings sections'})
+      .getByRole('button', {name: 'Connections'})
+      .click()
 
     await expect
       .element(page.getByRole('heading', {name: 'Connections'}))
@@ -708,10 +735,11 @@ describe('connecting a Provider', () => {
     await expect
       .element(page.getByRole('button', {name: 'Connect ChatGPT'}))
       .toBeEnabled()
-
-    await page.getByRole('button', {name: '← Back to your Tree'}).click()
-    await expect
-      .element(page.getByRole('button', {name: 'Ping main'}))
-      .toBeVisible()
+    expect(
+      page
+        .getByRole('complementary')
+        .getByRole('button', {name: 'Connections'})
+        .query()
+    ).toBeNull()
   })
 })

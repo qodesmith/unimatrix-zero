@@ -3,7 +3,7 @@ import type {ResolvedThemeMode} from '@uz/contract/theme'
 import {fromPartial} from '@total-typescript/shoehorn'
 import {expect, it} from 'vitest'
 
-import {followSystemMode} from './main'
+import {followColorScheme} from './main'
 
 function fakeWindow(prefersDark: boolean) {
   const root = document.createElement('html')
@@ -35,14 +35,14 @@ function fakeWindow(prefersDark: boolean) {
 
 it('applies the clay accent of the mode the system prefers', () => {
   const {window, root} = fakeWindow(true)
-  followSystemMode(undefined, window)
+  followColorScheme(undefined, window)
   expect(root.style.getPropertyValue('--primary')).toBe('#e07a52')
   expect(root.dataset.mode).toBe('dark')
 })
 
 it('follows the system when it switches mode', () => {
   const {window, root, switchTo} = fakeWindow(true)
-  followSystemMode(undefined, window)
+  followColorScheme(undefined, window)
   switchTo('light')
   expect(root.style.getPropertyValue('--primary')).toBe('#c2562f')
   expect(root.dataset.mode).toBe('light')
@@ -50,7 +50,7 @@ it('follows the system when it switches mode', () => {
 
 it('stops following once unsubscribed', () => {
   const {window, root, switchTo} = fakeWindow(false)
-  const stop = followSystemMode(undefined, window)
+  const stop = followColorScheme(undefined, window)
   stop()
   switchTo('dark')
   expect(root.dataset.mode).toBe('light')

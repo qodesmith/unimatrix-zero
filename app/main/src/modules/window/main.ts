@@ -1,9 +1,11 @@
+import type {ThemeMode} from '@uz/contract/settings'
 import type {Session, WebContents} from 'electron'
 
-import {BrowserWindow, shell} from 'electron'
+import {BrowserWindow, Menu, nativeTheme, shell} from 'electron'
 
 import {isAppUrl} from './app-url'
 import {isOpenableExternally} from './link-rule'
+import {menuTemplate} from './menu'
 
 export {isTopLevelAppFrame} from './app-url'
 
@@ -45,6 +47,7 @@ export function createWindow({
       navigateOnDragDrop: false,
       devTools: !packaged,
       spellcheck: false,
+      zoomFactor: 1,
     },
   })
 
@@ -70,6 +73,24 @@ function lockNavigation(contents: WebContents, appUrl: string) {
     return {action: 'deny'}
   })
   contents.on('will-attach-webview', event => event.preventDefault())
+}
+
+/**
+ * Electron's default menu, less its zoom items and its Help menu: the window
+ * never zooms.
+ */
+export function setAppMenu() {
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate(menuTemplate(process.platform))
+  )
+}
+
+/**
+ * Chromium's `prefers-color-scheme` follows `themeSource`, so setting it
+ * before the window opens makes the first paint right.
+ */
+export function followThemeMode(mode: ThemeMode) {
+  nativeTheme.themeSource = mode
 }
 
 export function openLink(url: string) {

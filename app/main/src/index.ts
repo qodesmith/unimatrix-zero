@@ -22,9 +22,11 @@ import {createTurns} from '#modules/turns/main'
 import {signInRequestFor} from '#modules/vendor-programs/main'
 import {
   createWindow,
+  followThemeMode,
   hardenSession,
   isTopLevelAppFrame,
   openLink,
+  setAppMenu,
 } from '#modules/window/main'
 import {app, dialog, ipcMain, protocol, session} from 'electron'
 import path from 'node:path'
@@ -79,7 +81,8 @@ function openWindow(db: Database) {
     return isTopLevelAppFrame(event, url)
   }
 
-  const settings = createSettings(db)
+  const settings = createSettings(db, saved => followThemeMode(saved.themeMode))
+  followThemeMode(settings.read().themeMode)
 
   const hub = createHub(() => ({
     type: 'SNAPSHOT',
@@ -164,6 +167,7 @@ function openWindow(db: Database) {
   createDroppedFiles().listen(ipcMain, fromAppWindow)
   registerSubscribeChannel(ipcMain, hub, fromAppWindow)
 
+  setAppMenu()
   createWindow({
     session: windowSession,
     preloadPath,

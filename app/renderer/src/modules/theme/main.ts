@@ -28,8 +28,11 @@ function applyThemeSet(
   root.style.colorScheme = mode
 }
 
-/** Writes the Theme's tokens onto `:root` and follows the system's mode. */
-export function followSystemMode(
+/**
+ * Writes the Theme's tokens onto `:root` for the mode `prefers-color-scheme`
+ * reports: main points it at the mode Setting.
+ */
+export function followColorScheme(
   theme: Theme = hearth,
   window: Window = globalThis.window
 ) {

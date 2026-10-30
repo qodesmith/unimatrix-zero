@@ -1,5 +1,6 @@
 import type {KeyboardEvent, Ref} from 'react'
 
+import {useSettings} from '#modules/settings/main'
 import {Button} from '#modules/shadcn/main'
 import {useSendPrompt} from '#modules/turns/main'
 import {useState} from 'react'
@@ -23,7 +24,7 @@ interface PromptInputProps {
   ref?: Ref<HTMLTextAreaElement>
 }
 
-/** Where the user types the next Prompt. Enter sends; Shift+Enter breaks a line. */
+/** Where the user types the next Prompt. */
 export function PromptInput({
   treeId,
   parentReplyId,
@@ -35,6 +36,7 @@ export function PromptInput({
   ref,
 }: PromptInputProps) {
   const sendPrompt = useSendPrompt(treeId, parentReplyId)
+  const {sendKey} = useSettings()
   const [ownDraft, setOwnDraft] = useState('')
   const draft = kept ?? ownDraft
   const [sending, setSending] = useState(false)
@@ -64,7 +66,12 @@ export function PromptInput({
   }
 
   function onKeyDown(event: KeyboardEvent) {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key !== 'Enter') return
+
+    const sends =
+      sendKey === 'enter' ? !event.shiftKey : event.metaKey || event.ctrlKey
+
+    if (sends) {
       event.preventDefault()
       void send()
     }

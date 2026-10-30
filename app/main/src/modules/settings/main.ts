@@ -15,7 +15,10 @@ const KEYS = Object.keys(SettingsSchema.shape).filter(isSettingKey)
 export type SettingsStore = ReturnType<typeof createSettings>
 
 /** One row per key; a value that no longer fits its schema reads as the default. */
-export function createSettings(db: Database) {
+export function createSettings(
+  db: Database,
+  onSaved?: (saved: Settings) => void
+) {
   const {settings} = schema
 
   function read(): Settings {
@@ -52,7 +55,10 @@ export function createSettings(db: Database) {
         }
       })
 
-      return read()
+      const saved = read()
+      onSaved?.(saved)
+
+      return saved
     },
   }
 }

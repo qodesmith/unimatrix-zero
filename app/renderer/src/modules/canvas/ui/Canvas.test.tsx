@@ -1225,6 +1225,42 @@ it('shows one centered Input on an empty Tree and the Turns once it is sent', as
     .toBe(2)
 })
 
+it('breaks a line on Shift+Enter and sends on Enter, by default', async () => {
+  const {main} = await renderCanvas({prompts: [], replies: []})
+  const input = page.getByRole('textbox', {name: 'Prompt'})
+
+  await input.fill('Hello?')
+  await userEvent.keyboard('{Shift>}{Enter}{/Shift}')
+  await expect.element(input).toHaveValue('Hello?\n')
+  await userEvent.keyboard('There{Enter}')
+
+  await expect
+    .poll(() => main.sent.filter(command => command.type === 'prompt.send'))
+    .toEqual([expect.objectContaining({text: 'Hello?\nThere'})])
+})
+
+it.each(['Meta', 'Control'])(
+  'breaks a line on Enter and sends on %s+Enter when the send key Setting says so',
+  async held => {
+    const {main} = await renderCanvas({
+      prompts: [],
+      replies: [],
+      settings: {sendKey: 'mod-enter'},
+    })
+
+    const input = page.getByRole('textbox', {name: 'Prompt'})
+
+    await input.fill('Hello?')
+    await userEvent.keyboard('{Enter}')
+    await expect.element(input).toHaveValue('Hello?\n')
+    await userEvent.keyboard(`There{${held}>}{Enter}{/${held}}`)
+
+    await expect
+      .poll(() => main.sent.filter(command => command.type === 'prompt.send'))
+      .toEqual([expect.objectContaining({text: 'Hello?\nThere'})])
+  }
+)
+
 // A 720px window, the narrowest, leaves the canvas about 464px beside the sidebar.
 it.each([
   {pane: 'wide', width: 1280},

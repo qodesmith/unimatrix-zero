@@ -11,6 +11,11 @@
 
 @custom-variant dark (&:where([data-mode='dark'], [data-mode='dark'] *));
 
+/* Spacing stays in pixels, so the font size Setting grows text, not the layout. */
+@theme {
+  --spacing: 4px;
+}
+
 /* Every color, radius and font below is a Theme token set on :root by the theme module. */
 @theme inline {
   --font-sans: var(--font);
