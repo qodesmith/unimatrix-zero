@@ -1,7 +1,12 @@
 import type {KeyboardEvent, Ref} from 'react'
 
 import {useSettings} from '#modules/settings/main'
-import {Button} from '#modules/shadcn/main'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupTextarea,
+} from '#modules/shadcn/main'
 import {useSendPrompt} from '#modules/turns/main'
 import {useState} from 'react'
 
@@ -79,33 +84,36 @@ export function PromptInput({
 
   return (
     <form
-      className="nowheel flex w-full flex-col gap-2"
+      className="nowheel w-full"
       onSubmit={event => {
         event.preventDefault()
         void send()
       }}
     >
-      <textarea
-        ref={ref}
-        aria-label="Prompt"
-        rows={2}
-        placeholder={parentReplyId === null ? 'Ask anything' : 'Reply…'}
-        className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm"
-        value={draft}
-        onFocus={onFocus}
-        onChange={event => updateDraft(event.target.value)}
-        onKeyDown={onKeyDown}
-      />
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-destructive">{error}</p>
-        <Button
-          type="submit"
-          size="sm"
-          disabled={!canSend || sending || draft.trim() === ''}
-        >
-          Send
-        </Button>
-      </div>
+      <InputGroup className="bg-background">
+        <InputGroupTextarea
+          ref={ref}
+          aria-label="Prompt"
+          rows={2}
+          placeholder={parentReplyId === null ? 'Ask anything' : 'Reply…'}
+          className="field-sizing-fixed min-h-0 px-3 text-sm md:text-sm"
+          value={draft}
+          onFocus={onFocus}
+          onChange={event => updateDraft(event.target.value)}
+          onKeyDown={onKeyDown}
+        />
+        <InputGroupAddon align="block-end" className="justify-between">
+          <p className="text-xs font-normal text-destructive">{error}</p>
+          <InputGroupButton
+            type="submit"
+            variant="default"
+            size="sm"
+            disabled={!canSend || sending || draft.trim() === ''}
+          >
+            Send
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
     </form>
   )
 }

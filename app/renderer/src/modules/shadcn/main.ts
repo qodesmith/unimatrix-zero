@@ -1,8 +1,19 @@
 export {cn} from './lib/utils'
 
+export {Bubble, BubbleContent} from './ui/bubble'
+
 export {Button} from './ui/button'
 
 export {Input} from './ui/input'
+
+export {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupTextarea,
+} from './ui/input-group'
+
+export {Message, MessageContent} from './ui/message'
 
 export {RadioGroup, RadioGroupItem} from './ui/radio-group'
 
@@ -27,3 +38,13 @@ export {
 export {Slider} from './ui/slider'
 
 export {Switch} from './ui/switch'
+
+export {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceDescription,
+  TraceLine,
+  TraceTitle,
+} from './ui/trace'

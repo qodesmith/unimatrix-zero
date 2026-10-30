@@ -1,7 +1,14 @@
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
 
-import {Button, cn} from '#modules/shadcn/main'
+import {
+  Bubble,
+  BubbleContent,
+  Button,
+  Message,
+  MessageContent,
+  cn,
+} from '#modules/shadcn/main'
 import {ReplyView, useReply} from '#modules/turns/main'
 import {Maximize2Icon, Minimize2Icon, XIcon} from 'lucide-react'
 import {useEffect, useLayoutEffect, useRef, useState} from 'react'
@@ -170,12 +177,15 @@ function ChatTurn({turnId}: {turnId: string}) {
 
 function ChatPrompt({prompt}: {prompt: Prompt}) {
   return (
-    <div
-      data-chat-turn={prompt.id}
-      className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-prompt px-3.5 py-2 text-sm whitespace-pre-wrap text-prompt-foreground"
-    >
-      {prompt.text}
-    </div>
+    <Message align="end" data-chat-turn={prompt.id}>
+      <MessageContent>
+        <Bubble variant="prompt" align="end" className="max-w-[85%]">
+          <BubbleContent className="rounded-2xl rounded-br-md px-3.5 whitespace-pre-wrap">
+            {prompt.text}
+          </BubbleContent>
+        </Bubble>
+      </MessageContent>
+    </Message>
   )
 }
 
@@ -183,16 +193,24 @@ function ChatReply({reply}: {reply: Reply}) {
   const {status} = useReply(reply)
 
   return (
-    <div
-      data-chat-turn={reply.id}
-      className={cn(
-        'rounded-2xl rounded-bl-md border border-border bg-card px-3.5 py-2 text-card-foreground shadow-sm',
-        status === 'failed' && 'border-destructive',
-        status === 'streaming' && 'border-primary/50'
-      )}
-    >
-      <ReplyView reply={reply} />
-    </div>
+    <Message data-chat-turn={reply.id}>
+      <MessageContent>
+        <Bubble
+          variant="card"
+          className={cn(
+            'max-w-full',
+            status === 'failed' &&
+              '*:data-[slot=bubble-content]:border-destructive',
+            status === 'streaming' &&
+              '*:data-[slot=bubble-content]:border-primary/50'
+          )}
+        >
+          <BubbleContent className="w-full rounded-2xl rounded-bl-md px-3.5">
+            <ReplyView reply={reply} />
+          </BubbleContent>
+        </Bubble>
+      </MessageContent>
+    </Message>
   )
 }
 
