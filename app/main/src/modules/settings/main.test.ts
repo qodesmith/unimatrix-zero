@@ -52,7 +52,7 @@ it('answers an update with every Setting as now saved', () => {
   })
 })
 
-it('hands every saved Setting to the window after each update', () => {
+it('hands every saved Setting to onSaved after each update', () => {
   const heard: Settings[] = []
   const settings = createSettings(db, saved => heard.push(saved))
 

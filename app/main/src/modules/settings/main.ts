@@ -17,14 +17,12 @@ const KEYS = Object.keys(SettingsSchema.shape).filter(isSettingKey)
 /** Not a Setting: ⌘+ and ⌘− change it, and it lives beside the Settings. */
 const ZOOM_KEY = 'zoomFactor'
 
-const ZoomFactorSchema = z.number().min(0.25).max(5)
+/** The smallest and largest of the steps in `window/zoom.ts`. */
+const ZoomFactorSchema = z.number().min(0.5).max(2)
 
 export type SettingsStore = ReturnType<typeof createSettings>
 
-/**
- * One row per key; a value that no longer fits its schema reads as the
- * default. `onSaved` hears every Setting after each update.
- */
+/** One row per key; a value that no longer fits its schema reads as the default. */
 export function createSettings(
   db: Database,
   onSaved?: (saved: Settings) => void

@@ -7,7 +7,6 @@ interface ChoiceProps<T extends string> {
   onChange: (value: T) => void
 }
 
-/** One of a few values, each spelled out, as radio buttons. */
 export function Choice<T extends string>({
   legend,
   value,

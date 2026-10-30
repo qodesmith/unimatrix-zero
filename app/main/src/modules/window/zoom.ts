@@ -5,10 +5,7 @@ const FACTORS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2]
 
 type Keys = Pick<Input, 'type' | 'key' | 'meta' | 'control' | 'alt'>
 
-/**
- * The zoom a key press asks for: ⌘+ (or ⌘=) a step up, ⌘− a step down, ⌘0
- * back to 100%; Ctrl off macOS. Null when the press is not one of them.
- */
+/** Null when the press is not a zoom key. Ctrl stands in for ⌘ off macOS. */
 export function zoomFor(
   input: Keys,
   current: number,

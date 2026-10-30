@@ -14,7 +14,6 @@ interface WindowOptions {
   preloadPath: string
   url: string
   packaged: boolean
-  /** The zoom to open at; ⌘+ and ⌘− hand each new one to `onZoom`. */
   zoomFactor: number
   onZoom: (factor: number) => void
 }

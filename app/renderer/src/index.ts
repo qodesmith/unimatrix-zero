@@ -1,11 +1,11 @@
 import './styles.css'
 
 import {App} from '#modules/app/main'
-import {followSystemMode} from '#modules/theme/main'
+import {followColorScheme} from '#modules/theme/main'
 import {createElement} from 'react'
 import {createRoot} from 'react-dom/client'
 
-followSystemMode()
+followColorScheme()
 
 const root = document.getElementById('root')
 
