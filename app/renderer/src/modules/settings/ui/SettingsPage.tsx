@@ -1,6 +1,16 @@
 import type {ReactNode} from 'react'
 
-import {cn} from '#modules/shadcn/main'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+} from '#modules/shadcn/main'
 import {useState} from 'react'
 
 import {AppearanceSection, ChatSection} from './Sections'
@@ -34,37 +44,48 @@ export function SettingsPage({connections}: SettingsPageProps) {
   }
 
   return (
-    <div className="flex h-full bg-background">
-      <nav
-        aria-label="Settings sections"
-        className="flex w-52 shrink-0 flex-col gap-1 border-r border-border p-4"
+    <SidebarProvider className="h-full min-h-0 bg-background">
+      <Sidebar
+        collapsible="none"
+        className="w-52 border-r border-sidebar-border"
       >
-        <h1 className="mb-3 px-3 text-lg font-semibold">Settings</h1>
-        {SECTIONS.map(section => (
-          <button
-            key={section}
-            type="button"
-            aria-current={section === openSection ? 'page' : undefined}
-            disabled={content[section] === undefined}
-            className={cn(
-              'rounded-md px-3 py-1.5 text-left text-sm hover:bg-accent disabled:pointer-events-none disabled:opacity-50',
-              section === openSection && 'bg-accent font-medium'
-            )}
-            onClick={() => setOpenSection(section)}
-          >
-            {section}
-          </button>
-        ))}
-      </nav>
+        <SidebarHeader>
+          <h1 className="px-2 pt-2 text-lg font-semibold">Settings</h1>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <nav aria-label="Settings sections">
+                <SidebarMenu>
+                  {SECTIONS.map(section => (
+                    <SidebarMenuItem key={section}>
+                      <SidebarMenuButton
+                        isActive={section === openSection}
+                        aria-current={
+                          section === openSection ? 'page' : undefined
+                        }
+                        disabled={content[section] === undefined}
+                        onClick={() => setOpenSection(section)}
+                      >
+                        <span>{section}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </nav>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+      </Sidebar>
       <section
         aria-label={openSection}
-        className="min-w-0 flex-1 overflow-y-auto p-8"
+        className="h-full min-w-0 flex-1 overflow-y-auto p-8"
       >
         <div className="flex max-w-2xl flex-col gap-8">
           <h2 className="text-2xl font-semibold">{openSection}</h2>
           {content[openSection]}
         </div>
       </section>
-    </div>
+    </SidebarProvider>
   )
 }

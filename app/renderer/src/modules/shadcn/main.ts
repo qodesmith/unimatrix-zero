@@ -4,6 +4,8 @@ export {Button} from './ui/button'
 
 export {Input} from './ui/input'
 
+export {Sheet, SheetContent, SheetTrigger} from './ui/sheet'
+
 export {
   Sidebar,
   SidebarContent,

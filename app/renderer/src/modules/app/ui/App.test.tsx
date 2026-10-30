@@ -188,27 +188,133 @@ it('shows the pong main sends back', async () => {
     .toBeVisible()
 })
 
-it('opens Settings from the sidebar, and leaves it for the Tree picked there', async () => {
-  globalThis.window.uz = fakeMain({
-    trees: [
-      {id: crypto.randomUUID(), title: 'Trip planning', createdAt: receivedAt},
-    ],
-  })
-  await renderApp()
+function viewport() {
+  return (
+    document.querySelector('.react-flow__viewport')?.getAttribute('style') ?? ''
+  )
+}
 
+function zoomOf() {
+  const scale = /scale\(([\d.]+)\)/.exec(viewport())?.[1]
+
+  return scale === undefined ? Number.NaN : Number(scale)
+}
+
+async function settledViewport() {
+  let last: string | null = null
+
+  await expect
+    .poll(
+      () => {
+        const now = viewport()
+        const same = now === last
+        last = now
+
+        return same
+      },
+      {interval: 100}
+    )
+    .toBe(true)
+
+  return last
+}
+
+function settingsSheet() {
+  return page.getByRole('dialog', {name: 'Settings'})
+}
+
+async function openSettings() {
   await page
     .getByRole('complementary')
     .getByRole('button', {name: 'Settings'})
     .click()
   await expect
-    .element(page.getByRole('heading', {name: 'Appearance'}))
+    .element(settingsSheet().getByRole('heading', {name: 'Appearance'}))
     .toBeVisible()
+}
 
+async function startStreaming(main: ReturnType<typeof fakeMain>) {
+  await page.getByRole('button', {name: 'New Tree'}).click()
+  await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
+  await userEvent.keyboard('{Enter}')
+
+  const ids = firstReply(main)
+  main.publish({...ids, type: 'TEXT_DELTA', delta: 'Hi '})
+  await expect.element(page.getByText('Hi', {exact: true})).toBeVisible()
+
+  return ids
+}
+
+it('opens Settings in a Sheet over the Tree, and closing it with the X shows the same Tree at the same pan and zoom', async () => {
+  const tree = {
+    id: crypto.randomUUID(),
+    title: 'Trip planning',
+    createdAt: receivedAt,
+  }
+
+  const prompt: Prompt = {
+    id: crypto.randomUUID(),
+    treeId: tree.id,
+    parentReplyId: null,
+    text: 'Where to?',
+    createdAt: receivedAt,
+  }
+
+  globalThis.window.uz = fakeMain({
+    trees: [tree],
+    prompts: [prompt],
+    replies: [
+      {
+        id: crypto.randomUUID(),
+        treeId: tree.id,
+        promptId: prompt.id,
+        provider: 'claude',
+        model: 'fake',
+        status: 'complete',
+        content: [{type: 'text', text: 'Lisbon'}],
+        contextSize: null,
+        contextWindow: null,
+        failure: null,
+        createdAt: receivedAt,
+      },
+    ],
+  })
+  await renderApp()
   await page.getByRole('button', {name: 'Trip planning'}).click()
+  await expect.element(page.getByText('Lisbon')).toBeVisible()
+  await settledViewport()
+
+  const loaded = zoomOf()
+  await page.getByRole('button', {name: 'Zoom in'}).click()
+  await expect.poll(zoomOf).toBeGreaterThan(loaded * 1.1)
+  const zoomedIn = await settledViewport()
+
+  await openSettings()
+  await settingsSheet().getByRole('button', {name: 'Close'}).click()
+
+  await expect.element(settingsSheet()).not.toBeInTheDocument()
   await expect
     .element(page.getByRole('heading', {name: 'Trip planning'}))
     .toBeVisible()
-  expect(page.getByRole('heading', {name: 'Appearance'}).query()).toBeNull()
+  expect(viewport()).toBe(zoomedIn)
+})
+
+it('closes only Settings on Esc over a streaming Reply and the slideout: the Reply is not stopped, and the slideout shows the text that came meanwhile', async () => {
+  const main = fakeMain()
+  globalThis.window.uz = main
+  await renderApp()
+  const ids = await startStreaming(main)
+  await page.getByRole('button', {name: 'Open in Chat mode'}).click()
+  const slideout = page.getByRole('complementary', {name: 'Chat'})
+  await expect.element(slideout).toBeVisible()
+
+  await openSettings()
+  main.publish({...ids, type: 'TEXT_DELTA', delta: 'there'})
+  await userEvent.keyboard('{Escape}')
+  await expect.element(settingsSheet()).not.toBeInTheDocument()
+
+  await expect.element(slideout.getByText('Hi there')).toBeVisible()
+  expect(main.sent.map(command => command.type)).not.toContain('reply.stop')
 })
 
 it('creates a Tree and opens it', async () => {

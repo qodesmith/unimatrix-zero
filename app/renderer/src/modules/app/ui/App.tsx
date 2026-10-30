@@ -15,6 +15,9 @@ import {
 } from '#modules/settings/main'
 import {
   Button,
+  Sheet,
+  SheetContent,
+  SheetTrigger,
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -56,7 +59,6 @@ function AppLayout() {
   const {trees, openTree, error: treesError, open, create, rename} = useTrees()
   // Null until main says whether any Provider is connected.
   const [firstLaunch, setFirstLaunch] = useState<boolean | null>(null)
-  const [showSettings, setShowSettings] = useState(false)
   const [pong, setPong] = useState<Pong | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -108,14 +110,8 @@ function AppLayout() {
           <TreeList
             trees={trees}
             openTreeId={openTree?.id ?? null}
-            onCreate={() => {
-              setShowSettings(false)
-              void create()
-            }}
-            onOpen={treeId => {
-              setShowSettings(false)
-              void open(treeId)
-            }}
+            onCreate={() => void create()}
+            onOpen={treeId => void open(treeId)}
             onRename={(treeId, title) => void rename(treeId, title)}
           />
           {treesError && (
@@ -125,25 +121,26 @@ function AppLayout() {
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton
-                aria-pressed={showSettings}
-                onClick={() => setShowSettings(true)}
-              >
-                <SettingsIcon />
-                <span>Settings</span>
-              </SidebarMenuButton>
+              <Sheet>
+                <SheetTrigger render={<SidebarMenuButton />}>
+                  <SettingsIcon />
+                  <span>Settings</span>
+                </SheetTrigger>
+                <SheetContent
+                  aria-label="Settings"
+                  className="w-full gap-0 p-0 data-[side=right]:sm:max-w-4xl"
+                >
+                  <SettingsPage
+                    connections={<Connections connections={connections} />}
+                  />
+                </SheetContent>
+              </Sheet>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset className="min-h-0 min-w-0 bg-canvas-background">
-        {showSettings ? (
-          <div className="min-h-0 flex-1">
-            <SettingsPage
-              connections={<Connections connections={connections} />}
-            />
-          </div>
-        ) : openTree ? (
+        {openTree ? (
           <div className="min-h-0 flex-1">
             <Canvas
               key={openTree.id}

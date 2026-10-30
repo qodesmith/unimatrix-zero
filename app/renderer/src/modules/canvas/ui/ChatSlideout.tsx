@@ -7,6 +7,7 @@ import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 
 import {atBottom} from '../at-bottom'
 import {useCanvas} from '../canvas-context'
+import {dialogOpen} from '../dialog-open'
 import {pathTo} from '../tree'
 import {PromptInput} from './PromptInput'
 
@@ -52,7 +53,9 @@ export function ChatSlideout({
     if (!open) return undefined
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape' || event.defaultPrevented) return
+      if (event.key !== 'Escape' || event.defaultPrevented || dialogOpen()) {
+        return
+      }
 
       const {target} = event
 
