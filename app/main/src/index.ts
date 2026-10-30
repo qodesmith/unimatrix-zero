@@ -22,6 +22,7 @@ import {createTurns} from '#modules/turns/main'
 import {signInRequestFor} from '#modules/vendor-programs/main'
 import {
   createWindow,
+  followThemeMode,
   hardenSession,
   isTopLevelAppFrame,
   openLink,
@@ -79,7 +80,8 @@ function openWindow(db: Database) {
     return isTopLevelAppFrame(event, url)
   }
 
-  const settings = createSettings(db)
+  const settings = createSettings(db, saved => followThemeMode(saved.themeMode))
+  followThemeMode(settings.read().themeMode)
 
   const hub = createHub(() => ({
     type: 'SNAPSHOT',
@@ -169,6 +171,8 @@ function openWindow(db: Database) {
     preloadPath,
     url,
     packaged: app.isPackaged,
+    zoomFactor: settings.readZoomFactor(),
+    onZoom: factor => settings.saveZoomFactor(factor),
   })
 }
 

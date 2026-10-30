@@ -8,7 +8,7 @@ import {
   anyConnected,
   useConnections,
 } from '#modules/connections/main'
-import {SettingsProvider} from '#modules/settings/main'
+import {SettingsPage, SettingsProvider} from '#modules/settings/main'
 import {Button} from '#modules/shadcn/main'
 import {TreeList, TreeTitle, useTrees} from '#modules/trees/main'
 import {LiveReplies} from '#modules/turns/main'
@@ -39,7 +39,7 @@ function AppLayout() {
   const {trees, openTree, error: treesError, open, create, rename} = useTrees()
   // Null until main says whether any Provider is connected.
   const [firstLaunch, setFirstLaunch] = useState<boolean | null>(null)
-  const [showConnections, setShowConnections] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [pong, setPong] = useState<Pong | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -85,11 +85,11 @@ function AppLayout() {
           trees={trees}
           openTreeId={openTree?.id ?? null}
           onCreate={() => {
-            setShowConnections(false)
+            setShowSettings(false)
             void create()
           }}
           onOpen={treeId => {
-            setShowConnections(false)
+            setShowSettings(false)
             void open(treeId)
           }}
           onRename={(treeId, title) => void rename(treeId, title)}
@@ -99,18 +99,18 @@ function AppLayout() {
           variant="ghost"
           size="sm"
           className="mt-auto justify-start"
-          aria-pressed={showConnections}
-          onClick={() => setShowConnections(true)}
+          aria-pressed={showSettings}
+          onClick={() => setShowSettings(true)}
         >
-          Connections
+          <GearIcon />
+          Settings
         </Button>
       </aside>
       <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-canvas-background">
-        {showConnections ? (
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <Connections
-              connections={connections}
-              onBack={() => setShowConnections(false)}
+        {showSettings ? (
+          <div className="min-h-0 flex-1">
+            <SettingsPage
+              connections={<Connections connections={connections} />}
             />
           </div>
         ) : openTree ? (
@@ -134,5 +134,22 @@ function AppLayout() {
         )}
       </main>
     </div>
+  )
+}
+
+function GearIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
   )
 }

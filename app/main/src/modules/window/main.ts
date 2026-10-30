@@ -1,9 +1,11 @@
+import type {ThemeMode} from '@uz/contract/settings'
 import type {Session, WebContents} from 'electron'
 
-import {BrowserWindow, shell} from 'electron'
+import {BrowserWindow, nativeTheme, shell} from 'electron'
 
 import {isAppUrl} from './app-url'
 import {isOpenableExternally} from './link-rule'
+import {zoomFor} from './zoom'
 
 export {isTopLevelAppFrame} from './app-url'
 
@@ -12,6 +14,9 @@ interface WindowOptions {
   preloadPath: string
   url: string
   packaged: boolean
+  /** The zoom to open at; ⌘+ and ⌘− hand each new one to `onZoom`. */
+  zoomFactor: number
+  onZoom: (factor: number) => void
 }
 
 /** Every `webPreferences` value is explicit, not left to Electron's defaults. */
@@ -20,6 +25,8 @@ export function createWindow({
   preloadPath,
   url,
   packaged,
+  zoomFactor,
+  onZoom,
 }: WindowOptions): BrowserWindow {
   const window = new BrowserWindow({
     width: 1280,
@@ -45,10 +52,12 @@ export function createWindow({
       navigateOnDragDrop: false,
       devTools: !packaged,
       spellcheck: false,
+      zoomFactor,
     },
   })
 
   lockNavigation(window.webContents, url)
+  zoomOnKeys(window.webContents, onZoom)
   window.once('ready-to-show', () => window.show())
   void window.loadURL(url)
 
@@ -70,6 +79,27 @@ function lockNavigation(contents: WebContents, appUrl: string) {
     return {action: 'deny'}
   })
   contents.on('will-attach-webview', event => event.preventDefault())
+}
+
+/** Ahead of the default menu's own zoom keys, which would change it unsaved. */
+function zoomOnKeys(contents: WebContents, onZoom: (factor: number) => void) {
+  contents.on('before-input-event', (event, input) => {
+    const factor = zoomFor(input, contents.getZoomFactor(), process.platform)
+
+    if (factor === null) return
+
+    event.preventDefault()
+    contents.setZoomFactor(factor)
+    onZoom(factor)
+  })
+}
+
+/**
+ * Light, dark or the system's: Chromium's `prefers-color-scheme` follows it,
+ * so set before the window opens, the first paint is already right.
+ */
+export function followThemeMode(mode: ThemeMode) {
+  nativeTheme.themeSource = mode
 }
 
 export function openLink(url: string) {

@@ -1,6 +1,6 @@
 import type {ConnectionsControls} from '../use-connections'
 
-import {Button} from '#modules/shadcn/main'
+import {Button, cn} from '#modules/shadcn/main'
 import {ProviderIdSchema} from '@uz/contract/providers'
 
 import {anyConnected, cardOf} from '../cards'
@@ -8,44 +8,44 @@ import {ProviderCard} from './ProviderCard'
 
 interface ConnectionsProps {
   connections: ConnectionsControls
-  /** First launch only: the introduction, and "Start chatting" once ready. */
+  /**
+   * First launch only: the introduction, and "Start chatting" once ready.
+   * Without it, the cards alone, for the Settings section.
+   */
   onStart?: () => void
-  onBack?: () => void
 }
 
-export function Connections({connections, onStart, onBack}: ConnectionsProps) {
+export function Connections({connections, onStart}: ConnectionsProps) {
   const {state} = connections
   const connecting = state.signIn?.provider ?? null
 
   return (
-    <div className="relative flex min-h-full w-full flex-col items-center gap-8 bg-background p-8">
-      {onBack && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="absolute top-4 left-4"
-          onClick={onBack}
-        >
-          ← Back to your Tree
-        </Button>
+    <div
+      className={cn(
+        'flex w-full flex-col gap-8',
+        onStart && 'min-h-full items-center bg-background p-8'
       )}
-      <div className="max-w-xl text-center">
-        {onStart && (
+    >
+      {onStart && (
+        <div className="max-w-xl text-center">
           <p className="mb-4 text-lg text-muted-foreground">
             Talk with Claude or ChatGPT, and branch any conversation into as
             many directions as you like. It uses the plan you already pay for.
           </p>
-        )}
-        <h1 className="text-3xl font-bold">
-          {onStart ? 'Connect the AI you already pay for' : 'Connections'}
-        </h1>
-        {onStart && (
+          <h1 className="text-3xl font-bold">
+            Connect the AI you already pay for
+          </h1>
           <p className="mt-2 text-muted-foreground">
             One is enough to start. You can connect the other any time.
           </p>
+        </div>
+      )}
+      <div
+        className={cn(
+          'flex flex-wrap items-start gap-6',
+          onStart && 'justify-center'
         )}
-      </div>
-      <div className="flex flex-wrap items-start justify-center gap-6">
+      >
         {ProviderIdSchema.options.map(provider => (
           <ProviderCard
             key={provider}

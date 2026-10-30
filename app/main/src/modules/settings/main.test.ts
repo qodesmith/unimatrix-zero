@@ -1,3 +1,5 @@
+import type {Settings} from '@uz/contract/settings'
+
 import {openDatabase, schema} from '#modules/database/main'
 import path from 'node:path'
 import {beforeEach, expect, it} from 'vitest'
@@ -12,11 +14,14 @@ beforeEach(() => {
   db = openDatabase({file: ':memory:', migrationsFolder})
 })
 
-it('starts from the defaults: vertical, capped heights, the meter on', () => {
+it('starts from the defaults: system mode, vertical, capped heights, the meter and note on, Enter sends', () => {
   expect(createSettings(db).read()).toEqual({
+    themeMode: 'system',
     canvasOrientation: 'vertical',
     limitTurnHeight: true,
     contextSizeMeter: true,
+    sendKey: 'enter',
+    reReadNote: true,
   })
 })
 
@@ -24,21 +29,36 @@ it('keeps a change across reopening and leaves the other Settings alone', () => 
   createSettings(db).update({canvasOrientation: 'horizontal'})
 
   expect(createSettings(db).read()).toEqual({
+    themeMode: 'system',
     canvasOrientation: 'horizontal',
     limitTurnHeight: true,
     contextSizeMeter: true,
+    sendKey: 'enter',
+    reReadNote: true,
   })
 })
 
 it('answers an update with every Setting as now saved', () => {
   const settings = createSettings(db)
-  settings.update({canvasOrientation: 'horizontal'})
+  settings.update({canvasOrientation: 'horizontal', themeMode: 'dark'})
 
-  expect(settings.update({contextSizeMeter: false})).toEqual({
+  expect(settings.update({sendKey: 'mod-enter', reReadNote: false})).toEqual({
+    themeMode: 'dark',
     canvasOrientation: 'horizontal',
     limitTurnHeight: true,
-    contextSizeMeter: false,
+    contextSizeMeter: true,
+    sendKey: 'mod-enter',
+    reReadNote: false,
   })
+})
+
+it('hands every saved Setting to the window after each update', () => {
+  const heard: Settings[] = []
+  const settings = createSettings(db, saved => heard.push(saved))
+
+  settings.update({themeMode: 'light'})
+
+  expect(heard.map(saved => saved.themeMode)).toEqual(['light'])
 })
 
 it('reads a saved value that no longer fits as the default', () => {
@@ -47,4 +67,24 @@ it('reads a saved value that no longer fits as the default', () => {
     .run()
 
   expect(createSettings(db).read().canvasOrientation).toBe('vertical')
+})
+
+it('keeps the zoom across reopening, starting at 100%', () => {
+  expect(createSettings(db).readZoomFactor()).toBe(1)
+
+  createSettings(db).saveZoomFactor(1.25)
+
+  expect(createSettings(db).readZoomFactor()).toBe(1.25)
+})
+
+it('keeps the zoom out of the Settings the window is sent', () => {
+  createSettings(db).saveZoomFactor(1.25)
+
+  expect(Object.keys(createSettings(db).read())).not.toContain('zoomFactor')
+})
+
+it('reads a saved zoom out of range as 100%', () => {
+  createSettings(db).saveZoomFactor(40)
+
+  expect(createSettings(db).readZoomFactor()).toBe(1)
 })
