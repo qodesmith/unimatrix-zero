@@ -24,6 +24,7 @@ function now() {
 let published: AppEvent[]
 let hostCommands: HostCommand[]
 let hostReady: boolean
+let loaded: string[]
 let deps: Parameters<typeof dispatchCommand>[2]
 
 beforeEach(() => {
@@ -31,6 +32,7 @@ beforeEach(() => {
   published = []
   hostCommands = []
   hostReady = true
+  loaded = []
 
   function publish(event: AppEvent) {
     published.push(event)
@@ -70,7 +72,11 @@ beforeEach(() => {
       now,
     }),
     images: {
-      load: async url => ({dataUrl: `data:image/png;base64,${url.length}`}),
+      load: async url => {
+        loaded.push(url)
+
+        return {dataUrl: 'data:image/png;base64,iVBORw0KGgo='}
+      },
     },
     settings: createSettings(db),
     publish,
@@ -358,15 +364,28 @@ describe('connecting a Provider', () => {
 })
 
 describe('loading a remote image', () => {
-  it('hands back what main fetched, as a data URL', async () => {
-    expect(
-      await send({type: 'image.load', url: 'https://example.com/a.png'})
-    ).toEqual({ok: true, value: {dataUrl: 'data:image/png;base64,25'}})
+  it('fetches an http or https link and hands back what main fetched', async () => {
+    const https = await send({
+      type: 'image.load',
+      url: 'https://a.example/1.png',
+    })
+
+    await send({type: 'image.load', url: 'http://b.example/2.png'})
+
+    expect(loaded).toEqual([
+      'https://a.example/1.png',
+      'http://b.example/2.png',
+    ])
+    expect(https).toEqual({
+      ok: true,
+      value: {dataUrl: 'data:image/png;base64,iVBORw0KGgo='},
+    })
   })
 
-  it('refuses any link that is not http or https', async () => {
+  it('refuses any link that is not http or https, fetching nothing', async () => {
     expect(
       await send({type: 'image.load', url: 'file:///etc/passwd'})
     ).toMatchObject({ok: false, error: {code: 'invalid-command'}})
+    expect(loaded).toEqual([])
   })
 })

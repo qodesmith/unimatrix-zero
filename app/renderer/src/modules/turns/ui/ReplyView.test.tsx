@@ -398,9 +398,20 @@ it.each([
 
     await expect.element(screen.getByText('Half an answer')).toBeVisible()
     await expect.element(screen.getByText(line)).toHaveClass('text-destructive')
-    expect(screen.getByText('This Reply failed.').query()).toBeNull()
   }
 )
+
+it('says only that a Reply failed when it has no reason', async () => {
+  const screen = await renderSaved({
+    status: 'failed',
+    content: [{type: 'text', text: 'Half an answer'}],
+    failure: null,
+  })
+
+  await expect
+    .element(screen.getByText('Failed', {exact: true}))
+    .toHaveClass('text-destructive')
+})
 
 it('says when a reached limit lifts, in local time', async () => {
   const screen = await renderSaved(
