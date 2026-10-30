@@ -10,7 +10,7 @@ interface ConnectionsProps {
   connections: ConnectionsControls
   /**
    * First launch only: the introduction, and "Start chatting" once ready.
-   * Without it, the cards alone, for the Settings section.
+   * Without it, only the cards.
    */
   onStart?: () => void
 }

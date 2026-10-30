@@ -24,10 +24,7 @@ interface PromptInputProps {
   ref?: Ref<HTMLTextAreaElement>
 }
 
-/**
- * Where the user types the next Prompt. The send key Setting picks between
- * Enter (Shift+Enter breaks a line) and ⌘/Ctrl+Enter (Enter breaks a line).
- */
+/** Where the user types the next Prompt. */
 export function PromptInput({
   treeId,
   parentReplyId,

@@ -4,7 +4,6 @@ export const CanvasOrientationSchema = z.enum(['vertical', 'horizontal'])
 
 export type CanvasOrientation = z.infer<typeof CanvasOrientationSchema>
 
-/** Which set of the Theme shows; `system` follows the operating system. */
 export const ThemeModeSchema = z.enum(['system', 'light', 'dark'])
 
 export type ThemeMode = z.infer<typeof ThemeModeSchema>

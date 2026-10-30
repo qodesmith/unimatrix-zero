@@ -94,8 +94,8 @@ function zoomOnKeys(contents: WebContents, onZoom: (factor: number) => void) {
 }
 
 /**
- * Light, dark or the system's: Chromium's `prefers-color-scheme` follows it,
- * so set before the window opens, the first paint is already right.
+ * Chromium's `prefers-color-scheme` follows `themeSource`, so setting it
+ * before the window opens makes the first paint right.
  */
 export function followThemeMode(mode: ThemeMode) {
   nativeTheme.themeSource = mode
