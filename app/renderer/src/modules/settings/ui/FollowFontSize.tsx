@@ -7,7 +7,7 @@ import {useSettings, useUpdateSettings} from '../use-settings'
  * Sets the root font size, which every `rem` of text follows, and changes it
  * on ⌘+, ⌘− and ⌘0.
  */
-export function FontSize() {
+export function FollowFontSize() {
   const {fontSize} = useSettings()
   const update = useUpdateSettings()
   // A held key repeats faster than a render, so each press steps from the last.

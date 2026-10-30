@@ -3,7 +3,7 @@ import type {ReactNode} from 'react'
 import {cn} from '#modules/shadcn/main'
 import {useState} from 'react'
 
-import {AppearanceSection, ChatSection} from './sections'
+import {AppearanceSection, ChatSection} from './Sections'
 
 const SECTIONS = [
   'Appearance',
@@ -25,7 +25,7 @@ interface SettingsPageProps {
 
 /** Every global Setting, one section at a time. */
 export function SettingsPage({connections}: SettingsPageProps) {
-  const [open, setOpen] = useState<Section>('Appearance')
+  const [openSection, setOpenSection] = useState<Section>('Appearance')
 
   const content: Partial<Record<Section, ReactNode>> = {
     Appearance: <AppearanceSection />,
@@ -44,22 +44,25 @@ export function SettingsPage({connections}: SettingsPageProps) {
           <button
             key={section}
             type="button"
-            aria-current={section === open ? 'page' : undefined}
+            aria-current={section === openSection ? 'page' : undefined}
             disabled={content[section] === undefined}
             className={cn(
               'rounded-md px-3 py-1.5 text-left text-sm hover:bg-accent disabled:pointer-events-none disabled:opacity-50',
-              section === open && 'bg-accent font-medium'
+              section === openSection && 'bg-accent font-medium'
             )}
-            onClick={() => setOpen(section)}
+            onClick={() => setOpenSection(section)}
           >
             {section}
           </button>
         ))}
       </nav>
-      <section aria-label={open} className="min-w-0 flex-1 overflow-y-auto p-8">
+      <section
+        aria-label={openSection}
+        className="min-w-0 flex-1 overflow-y-auto p-8"
+      >
         <div className="flex max-w-2xl flex-col gap-8">
-          <h2 className="text-2xl font-semibold">{open}</h2>
-          {content[open]}
+          <h2 className="text-2xl font-semibold">{openSection}</h2>
+          {content[openSection]}
         </div>
       </section>
     </div>

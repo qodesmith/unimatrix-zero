@@ -148,7 +148,7 @@ The single place for the user's global preferences: how the app looks and behave
 _Avoid_: Preferences, options, config
 
 **Font size**:
-The base size of all text in the app, a Setting from 12 to 24 pixels in steps of 2, set on the Appearance page or by ⌘+ and ⌘−; ⌘0 and Reset set it back to 16. Text grows with it; the layout and the canvas's Zoom stay as they are.
+The base size of all text in the app, a Setting. Text grows with it; the layout and the canvas's Zoom stay as they are.
 _Avoid_: Text size, zoom
 
 **Tools panel**:

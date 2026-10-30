@@ -2,7 +2,7 @@ import {Button} from '#modules/shadcn/main'
 import {DEFAULT_SETTINGS, FONT_SIZE} from '@uz/contract/settings'
 
 import {useSettings, useUpdateSettings} from '../use-settings'
-import {Choice, Group, Toggle} from './controls'
+import {Choice, Group, Toggle} from './Controls'
 
 export function AppearanceSection() {
   const settings = useSettings()
