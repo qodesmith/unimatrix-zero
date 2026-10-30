@@ -3,11 +3,11 @@ import type {Input} from 'electron'
 /** Chrome's steps, so ⌘+ and ⌘− feel the same as in a browser. */
 const FACTORS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2]
 
-type Keys = Pick<Input, 'type' | 'key' | 'meta' | 'control' | 'alt'>
+type KeyPress = Pick<Input, 'type' | 'key' | 'meta' | 'control' | 'alt'>
 
 /** Null when the press is not a zoom key. */
 export function zoomFor(
-  input: Keys,
+  input: KeyPress,
   current: number,
   platform: NodeJS.Platform
 ): number | null {
