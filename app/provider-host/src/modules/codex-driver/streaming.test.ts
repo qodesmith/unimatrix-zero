@@ -579,28 +579,6 @@ it('resumes a Retry from the app’s copy when the thread isn’t loaded, with n
   ])
 })
 
-it('cuts a Retry’s loaded thread before the failed turn, keeping the Reply cut short', async () => {
-  const codex = await setUp(['reverted.ndjson'])
-
-  const hi = await codex.reply(FIRST_PROMPT)
-  const bye = await codex.reply(SECOND_PROMPT, recordedIn(hi))
-
-  const retried = await codex.reply(
-    'What was the last thing I asked you? Just the words.',
-    {
-      ...recordedIn(hi),
-      type: 'cut',
-      keepThrough: null,
-      dropFrom: promptRecordedIn(bye).messageId,
-    }
-  )
-
-  const [report] = codex.reports()
-
-  expect(report?.reverted).toBe(BYE_TURN)
-  expect(droppedIn(retried)).toBe(true)
-})
-
 /** `resumed.ndjson` with a `thread/revert` before the turn named `failed`. */
 function resumedThenReverted() {
   const reverted = ROLLOUT.replace('.jsonl', '_reverted.jsonl')

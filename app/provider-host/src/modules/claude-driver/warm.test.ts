@@ -90,6 +90,7 @@ it('closes the longest idle when more than the most are open', () => {
 })
 
 it('says when every `claude` it closed in a session has ended', async () => {
+  vi.useRealTimers()
   const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
   const ending = Promise.withResolvers<undefined>()
   const one = {...session('s1', 'm2'), close: async () => ending.promise}
@@ -97,14 +98,20 @@ it('says when every `claude` it closed in a session has ended', async () => {
   warm.add(one)
   warm.release(one)
   warm.claim({sessionId: 's1', messageId: 'm1'})
+  const closed = warm.closed('s1')
 
   await expect(
-    Promise.race([warm.closed('s1'), Promise.resolve('closing')])
+    Promise.race([
+      closed.then(() => 'ended'),
+      new Promise(resolve => {
+        setTimeout(resolve, 0, 'closing')
+      }),
+    ])
   ).resolves.toBe('closing')
 
   ending.resolve(undefined)
 
-  await expect(warm.closed('s1')).resolves.toBeUndefined()
+  await expect(closed).resolves.toBeUndefined()
 })
 
 it('never closes a session writing a Reply to make room', () => {
