@@ -12,6 +12,7 @@ import {ConnectionsProvider} from '#modules/connections/main'
 import {SettingsProvider} from '#modules/settings/main'
 import {LiveReplies} from '#modules/turns/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
+import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import {expect, it, onTestFinished, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
@@ -229,6 +230,7 @@ function fakeMain(saved: Saved) {
         providers: PROVIDERS,
         signIn: null,
         settings: {...settings},
+        layout: DEFAULT_LAYOUT,
       })
 
       return () => listeners.delete(listener)

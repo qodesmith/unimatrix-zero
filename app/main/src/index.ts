@@ -13,6 +13,7 @@ import {readDevRun} from '#modules/dev/main'
 import {createDroppedFiles} from '#modules/dropped-files/main'
 import {utilityHost} from '#modules/host-process/main'
 import {createHub, registerSubscribeChannel} from '#modules/hub/main'
+import {createLayout} from '#modules/layout/main'
 import {createProviderHosts} from '#modules/provider-hosts/main'
 import {createRemoteImages} from '#modules/remote-images/main'
 import {createSessions} from '#modules/sessions/main'
@@ -83,6 +84,7 @@ function openWindow(db: Database) {
 
   const settings = createSettings(db, saved => followThemeMode(saved.themeMode))
   followThemeMode(settings.read().themeMode)
+  const layout = createLayout(db)
 
   const hub = createHub(() => ({
     type: 'SNAPSHOT',
@@ -90,6 +92,7 @@ function openWindow(db: Database) {
     replies: turns.streaming(),
     ...connections.snapshot(),
     settings: settings.read(),
+    layout: layout.read(),
   }))
 
   const sessions = createSessions(db)
@@ -161,6 +164,7 @@ function openWindow(db: Database) {
       connections,
       images: createRemoteImages(globalThis.fetch),
       settings,
+      layout,
       publish: hub.publish,
     }
   )

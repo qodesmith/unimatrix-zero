@@ -4,6 +4,7 @@ import type {HostCommand} from '@uz/contract/host'
 
 import {createConnections} from '#modules/connections/main'
 import {openDatabase} from '#modules/database/main'
+import {createLayout} from '#modules/layout/main'
 import {createSettings} from '#modules/settings/main'
 import {createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
@@ -79,6 +80,7 @@ beforeEach(() => {
       },
     },
     settings: createSettings(db),
+    layout: createLayout(db),
     publish,
   }
 })
@@ -387,5 +389,20 @@ describe('loading a remote image', () => {
       await send({type: 'image.load', url: 'file:///etc/passwd'})
     ).toMatchObject({ok: false, error: {code: 'invalid-command'}})
     expect(loaded).toEqual([])
+  })
+})
+
+describe('the Layout', () => {
+  it('saves a change and tells every window the Layout as now saved', async () => {
+    const outcome = await send({
+      type: 'layout.update',
+      changes: {sidebarOpen: false},
+    })
+
+    expect(outcome).toEqual({ok: true, value: {sidebarOpen: false}})
+    expect(published).toEqual([
+      {type: 'LAYOUT_CHANGED', layout: {sidebarOpen: false}},
+    ])
+    expect(deps.layout.read()).toEqual({sidebarOpen: false})
   })
 })

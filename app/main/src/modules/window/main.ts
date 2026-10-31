@@ -26,7 +26,7 @@ export function createWindow({
   const window = new BrowserWindow({
     width: 1280,
     height: 820,
-    minWidth: 720,
+    minWidth: 768,
     minHeight: 480,
     show: false,
     title: 'Unimatrix Zero',

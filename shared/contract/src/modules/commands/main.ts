@@ -1,3 +1,4 @@
+import {LayoutSchema, LayoutUpdateSchema} from '#modules/layout/main'
 import {ProviderIdSchema} from '#modules/providers/main'
 import {SettingsSchema, SettingsUpdateSchema} from '#modules/settings/main'
 import {TREE_TITLE_MAX_LENGTH, TreeSchema} from '#modules/trees/main'
@@ -133,6 +134,12 @@ export const SettingsUpdateCommand = z.strictObject({
   changes: SettingsUpdateSchema,
 })
 
+/** Changes some of the Layout; `LAYOUT_CHANGED` follows with all of it. */
+export const LayoutUpdateCommand = z.strictObject({
+  type: z.literal('layout.update'),
+  changes: LayoutUpdateSchema,
+})
+
 const Done = z.strictObject({})
 
 export const CommandSchema = z.discriminatedUnion('type', [
@@ -152,6 +159,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   SignInCancelCommand,
   ImageLoadCommand,
   SettingsUpdateCommand,
+  LayoutUpdateCommand,
 ])
 
 export type Command = z.infer<typeof CommandSchema>
@@ -175,6 +183,7 @@ const resultSchemas = {
   'sign-in.cancel': Done,
   'image.load': ImageLoadResult,
   'settings.update': SettingsSchema,
+  'layout.update': LayoutSchema,
 } as const satisfies Record<CommandType, z.ZodType>
 
 export type CommandResult<T extends CommandType> = z.infer<

@@ -176,6 +176,17 @@ export const settings = sqliteTable(
   table => [uniqueIndex('settings_key').on(table.key)]
 )
 
+/** One row per Layout key, kept apart from Settings (ADR 0021). */
+export const layout = sqliteTable(
+  'layout',
+  {
+    id: id(),
+    key: text('key').notNull(),
+    value: text('value', {mode: 'json'}).notNull(),
+  },
+  table => [uniqueIndex('layout_key').on(table.key)]
+)
+
 export const themes = sqliteTable('themes', {
   id: id(),
   json: text('json').notNull(),
