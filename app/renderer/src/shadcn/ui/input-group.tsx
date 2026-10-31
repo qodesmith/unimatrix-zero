@@ -1,11 +1,11 @@
 import type {VariantProps} from 'class-variance-authority'
 
+import {Button} from '#shadcn/ui/button'
+import {Input} from '#shadcn/ui/input'
+import {Textarea} from '#shadcn/ui/textarea'
 import {cva} from 'class-variance-authority'
 import {cn} from 'cn'
 import * as React from 'react'
-
-import {Button} from './button'
-import {Textarea} from './textarea'
 
 function InputGroup({className, ...props}: React.ComponentProps<'div'>) {
   return (
@@ -106,6 +106,31 @@ function InputGroupButton({
   )
 }
 
+function InputGroupText({className, ...props}: React.ComponentProps<'span'>) {
+  return (
+    <span
+      className={cn(
+        "flex items-center gap-2 text-sm text-muted-foreground [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function InputGroupInput({className, ...props}: React.ComponentProps<'input'>) {
+  return (
+    <Input
+      data-slot="input-group-control"
+      className={cn(
+        'flex-1 rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:ring-0 aria-invalid:ring-0 dark:bg-transparent',
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
 function InputGroupTextarea({
   className,
   ...props
@@ -122,4 +147,11 @@ function InputGroupTextarea({
   )
 }
 
-export {InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea}
+export {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupText,
+  InputGroupInput,
+  InputGroupTextarea,
+}

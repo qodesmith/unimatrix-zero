@@ -6,6 +6,16 @@ import {cva} from 'class-variance-authority'
 import {cn} from 'cn'
 import * as React from 'react'
 
+function BubbleGroup({className, ...props}: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot="bubble-group"
+      className={cn('flex min-w-0 flex-col gap-2', className)}
+      {...props}
+    />
+  )
+}
+
 const bubbleVariants = cva(
   'group/bubble relative flex w-fit max-w-[80%] min-w-0 flex-col gap-1 group-data-[align=end]/message:self-end data-[align=end]:self-end data-[variant=ghost]:max-w-full',
   {
@@ -17,6 +27,8 @@ const bubbleVariants = cva(
           '*:data-[slot=bubble-content]:bg-secondary *:data-[slot=bubble-content]:text-secondary-foreground [&>[data-slot=bubble-content]:is(button,a):hover]:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)]',
         muted:
           '*:data-[slot=bubble-content]:bg-muted [&>[data-slot=bubble-content]:is(button,a):hover]:bg-[color-mix(in_oklch,var(--muted),var(--foreground)_5%)]',
+        tinted:
+          '*:data-[slot=bubble-content]:bg-[color-mix(in_oklch,var(--primary)_12%,var(--background))] *:data-[slot=bubble-content]:text-foreground [&>[data-slot=bubble-content]:is(button,a):hover]:bg-[color-mix(in_oklch,var(--primary)_18%,var(--background))]',
         prompt:
           '*:data-[slot=bubble-content]:bg-prompt *:data-[slot=bubble-content]:text-prompt-foreground',
         card: '*:data-[slot=bubble-content]:border-border *:data-[slot=bubble-content]:bg-card *:data-[slot=bubble-content]:text-card-foreground *:data-[slot=bubble-content]:shadow-sm',
@@ -77,4 +89,44 @@ function BubbleContent({
   })
 }
 
-export {Bubble, BubbleContent}
+const bubbleReactionsVariants = cva(
+  'absolute z-10 flex w-fit shrink-0 items-center justify-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-sm ring-3 ring-card has-[button]:p-0',
+  {
+    variants: {
+      side: {
+        top: 'top-0 -translate-y-3/4',
+        bottom: 'bottom-0 translate-y-3/4',
+      },
+      align: {
+        start: 'left-3',
+        end: 'right-3',
+      },
+    },
+    defaultVariants: {
+      side: 'bottom',
+      align: 'end',
+    },
+  }
+)
+
+function BubbleReactions({
+  side = 'bottom',
+  align = 'end',
+  className,
+  ...props
+}: React.ComponentProps<'div'> & {
+  align?: 'start' | 'end'
+  side?: 'top' | 'bottom'
+}) {
+  return (
+    <div
+      data-slot="bubble-reactions"
+      data-align={align}
+      data-side={side}
+      className={cn(bubbleReactionsVariants({side, align}), className)}
+      {...props}
+    />
+  )
+}
+
+export {BubbleGroup, Bubble, BubbleContent, BubbleReactions}

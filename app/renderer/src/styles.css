@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 @import '@fontsource-variable/figtree';
 @import 'streamdown/styles.css';
 @import '@xyflow/react/dist/style.css';

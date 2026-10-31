@@ -108,6 +108,18 @@ it('shows the saved font size, saves it from the slider, and resets it to 16px',
   ])
 })
 
+it('draws the track of the font size slider', async () => {
+  await renderSettings({fontSize: 20})
+
+  const track = page
+    .getByRole('slider', {name: 'Font size'})
+    .element()
+    .closest('[data-slot="slider"]')
+    ?.querySelector('[data-slot="slider-track"]')
+
+  expect(track?.getBoundingClientRect().height).toBeGreaterThan(0)
+})
+
 it('shows and saves the send key and the re-read note from Chat', async () => {
   const main = await renderSettings({sendKey: 'mod-enter', reReadNote: false})
 
