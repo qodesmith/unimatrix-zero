@@ -643,8 +643,8 @@ describe('collapsing the sidebar', () => {
     await renderApp()
 
     await expect.element(page.getByText('Start a new Tree')).toBeInTheDocument()
-    expect(sidebarRight()).toBeLessThanOrEqual(0)
-    expect(canvasWidth()).toBe(globalThis.innerWidth)
+    await expect.poll(sidebarRight).toBeLessThanOrEqual(0)
+    await expect.poll(canvasWidth).toBe(globalThis.innerWidth)
     expect(before).toEqual([])
 
     main.publish({type: 'LAYOUT_CHANGED', layout: {sidebarOpen: true}})
