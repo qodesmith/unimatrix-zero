@@ -9,8 +9,8 @@ import type {
 
 import {useProviderStatus} from '#modules/connections/main'
 import {ReplyMarkdown} from '#modules/markdown/main'
+import {Button} from '#shadcn/ui/button'
 import {
-  Button,
   Trace,
   TraceCollapsible,
   TraceCollapsibleContent,
@@ -18,9 +18,9 @@ import {
   TraceDescription,
   TraceLine,
   TraceTitle,
-  cn,
-} from '#modules/shadcn/main'
+} from '#shadcn/ui/trace'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
+import {cn} from 'cn'
 import {Fragment} from 'react'
 
 import {useReplyRun} from '../reply-run/use-reply-run'

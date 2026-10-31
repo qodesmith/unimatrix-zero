@@ -10,7 +10,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-} from '#modules/shadcn/main'
+} from '#shadcn/ui/sidebar'
 import {useState} from 'react'
 
 import {AppearanceSection, ChatSection} from './Sections'

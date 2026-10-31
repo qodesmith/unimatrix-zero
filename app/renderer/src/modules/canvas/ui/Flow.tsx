@@ -5,8 +5,8 @@ import type {Stem, TurnNode} from './TurnNodes'
 import type {CanvasOrientation} from '@uz/contract/settings'
 import type {Edge, NodeChange, Viewport} from '@xyflow/react'
 
-import {cn} from '#modules/shadcn/main'
 import {Background, MiniMap, ReactFlow, useReactFlow} from '@xyflow/react'
+import {cn} from 'cn'
 import {
   useCallback,
   useEffect,

@@ -1,7 +1,7 @@
 import type {ExtraProps} from 'streamdown'
 
 import {bridge} from '#modules/bridge/main'
-import {Button} from '#modules/shadcn/main'
+import {Button} from '#shadcn/ui/button'
 import {useState} from 'react'
 
 type ImageProps = React.JSX.IntrinsicElements['img'] & ExtraProps

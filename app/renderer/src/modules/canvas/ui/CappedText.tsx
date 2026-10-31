@@ -1,7 +1,8 @@
 import type {ReactNode} from 'react'
 
-import {Button, cn} from '#modules/shadcn/main'
+import {Button} from '#shadcn/ui/button'
 import {useReactFlow, useStoreApi} from '@xyflow/react'
+import {cn} from 'cn'
 import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 
 import {atBottom} from '../at-bottom'

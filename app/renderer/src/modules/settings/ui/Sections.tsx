@@ -1,4 +1,5 @@
-import {Button, Slider} from '#modules/shadcn/main'
+import {Button} from '#shadcn/ui/button'
+import {Slider} from '#shadcn/ui/slider'
 import {DEFAULT_SETTINGS, FONT_SIZE} from '@uz/contract/settings'
 import {useId} from 'react'
 

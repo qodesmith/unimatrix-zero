@@ -1,4 +1,5 @@
-import {Button, cn} from '#modules/shadcn/main'
+import {Button} from '#shadcn/ui/button'
+import {cn} from 'cn'
 import {InfoIcon, XIcon} from 'lucide-react'
 import {useRef, useState} from 'react'
 

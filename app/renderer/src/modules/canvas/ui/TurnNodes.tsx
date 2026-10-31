@@ -2,9 +2,10 @@ import type {LayoutNode} from '../layout'
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Node, NodeProps} from '@xyflow/react'
 
-import {Button, cn} from '#modules/shadcn/main'
 import {ReplyView, useReply} from '#modules/turns/main'
+import {Button} from '#shadcn/ui/button'
 import {Handle, Position} from '@xyflow/react'
+import {cn} from 'cn'
 import {ChevronRightIcon} from 'lucide-react'
 import {useEffect, useRef, useState} from 'react'
 

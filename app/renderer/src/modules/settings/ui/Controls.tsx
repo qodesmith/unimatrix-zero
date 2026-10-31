@@ -1,6 +1,7 @@
 import type {ReactNode} from 'react'
 
-import {RadioGroup, RadioGroupItem, Switch} from '#modules/shadcn/main'
+import {RadioGroup, RadioGroupItem} from '#shadcn/ui/radio-group'
+import {Switch} from '#shadcn/ui/switch'
 import {useId} from 'react'
 
 interface GroupProps {

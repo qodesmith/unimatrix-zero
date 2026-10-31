@@ -2,7 +2,7 @@
 
 ## Build the UI from shadcn components on Base UI. Enforced by: uz/shadcn-base-ui
 
-- The decision is [ADR 0020](../adr/0020-renderer-ui-is-shadcn-on-base-ui.md). Add a component with `shadcn add` from `app/renderer` (the `base-vega` style in `components.json`); it lands in `shadcn/ui/` and other modules import it from `#modules/shadcn/main`.
+- The decision is [ADR 0020](../adr/0020-renderer-ui-is-shadcn-on-base-ui.md). Add a component with `shadcn add` from `app/renderer` (the `base-vega` style in `components.json`); it lands in `app/renderer/src/shadcn/ui/`, and code imports each component from its own file, as `#shadcn/ui/button`. There is no barrel.
 - Copy AI Elements patterns only from their Base UI pages, `ui.shadcn.com/docs/ai-elements/base/...`.
 
 ## Style with Tailwind utilities at the call site
@@ -12,7 +12,7 @@
 
 ## Merge class names with `cn`
 
-- Join or toggle class names with `cn` from `#modules/shadcn/main`, never a template literal or string concatenation. `cn` drops falsy values and lets a later Tailwind utility win over a conflicting earlier one, so a `className` passed in from outside overrides the defaults.
+- Join or toggle class names with `cn`, never a template literal or string concatenation. App code imports it from the package (`import {cn} from 'cn'`); shadcn components import it from `#shadcn/lib/utils`, the path `shadcn add` writes. `cn` drops falsy values and lets a later Tailwind utility win over a conflicting earlier one, so a `className` passed in from outside overrides the defaults.
 - Don't import `clsx` or `tailwind-merge`. `cn` replaces both, and `vite.config.ts` aliases them to `cn` so the packages that still import them (class-variance-authority, Streamdown) don't put a second merger in the bundle.
 
 ## Give a bare class in `styles.css` its reason

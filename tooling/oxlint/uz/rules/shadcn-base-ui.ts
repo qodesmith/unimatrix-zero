@@ -17,7 +17,7 @@ export const shadcnBaseUi: Rule = defineRule({
     },
     messages: {
       plain:
-        'Use the shadcn component for <{{name}}> from #modules/shadcn/main; add it with `shadcn add` if it is missing. See ADR 0020.',
+        'Use the shadcn component for <{{name}}> from #shadcn/ui/; add it with `shadcn add` if it is missing. See ADR 0020.',
       radix:
         'No Radix: shadcn components here use the Base UI flavor (base-vega). See ADR 0020.',
     },

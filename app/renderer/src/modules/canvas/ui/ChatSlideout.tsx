@@ -1,15 +1,11 @@
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
 
-import {
-  Bubble,
-  BubbleContent,
-  Button,
-  Message,
-  MessageContent,
-  cn,
-} from '#modules/shadcn/main'
 import {ReplyView, useReply} from '#modules/turns/main'
+import {Bubble, BubbleContent} from '#shadcn/ui/bubble'
+import {Button} from '#shadcn/ui/button'
+import {Message, MessageContent} from '#shadcn/ui/message'
+import {cn} from 'cn'
 import {Maximize2Icon, Minimize2Icon, XIcon} from 'lucide-react'
 import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 

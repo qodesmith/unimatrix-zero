@@ -1,8 +1,8 @@
 import type {Tree} from '@uz/contract/trees'
 import type {KeyboardEvent} from 'react'
 
+import {Input} from '#shadcn/ui/input'
 import {
-  Input,
   SidebarGroup,
   SidebarGroupAction,
   SidebarGroupContent,
@@ -10,7 +10,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from '#modules/shadcn/main'
+} from '#shadcn/ui/sidebar'
 import {TREE_TITLE_MAX_LENGTH} from '@uz/contract/trees'
 import {PlusIcon} from 'lucide-react'
 import {useRef, useState} from 'react'

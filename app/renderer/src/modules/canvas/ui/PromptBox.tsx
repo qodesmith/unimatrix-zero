@@ -1,7 +1,8 @@
 import type {PromptDeleteState} from '../prompt-delete/machine'
 import type {KeyboardEvent, ReactNode} from 'react'
 
-import {Button, cn} from '#modules/shadcn/main'
+import {Button} from '#shadcn/ui/button'
+import {cn} from 'cn'
 import {TrashIcon} from 'lucide-react'
 import {useEffect, useRef} from 'react'
 

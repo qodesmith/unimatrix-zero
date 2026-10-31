@@ -13,11 +13,11 @@ import {
   SettingsPage,
   SettingsProvider,
 } from '#modules/settings/main'
+import {TreeList, TreeTitle, useTrees} from '#modules/trees/main'
+import {LiveReplies} from '#modules/turns/main'
+import {Button} from '#shadcn/ui/button'
+import {Sheet, SheetContent, SheetTrigger} from '#shadcn/ui/sheet'
 import {
-  Button,
-  Sheet,
-  SheetContent,
-  SheetTrigger,
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -27,9 +27,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-} from '#modules/shadcn/main'
-import {TreeList, TreeTitle, useTrees} from '#modules/trees/main'
-import {LiveReplies} from '#modules/turns/main'
+} from '#shadcn/ui/sidebar'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {SettingsIcon} from 'lucide-react'
 import {useState} from 'react'

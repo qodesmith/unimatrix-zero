@@ -1,7 +1,8 @@
 import type {ConnectionsControls} from '../use-connections'
 
-import {Button, cn} from '#modules/shadcn/main'
+import {Button} from '#shadcn/ui/button'
 import {ProviderIdSchema} from '@uz/contract/providers'
+import {cn} from 'cn'
 
 import {anyConnected, cardOf} from '../cards'
 import {ProviderCard} from './ProviderCard'

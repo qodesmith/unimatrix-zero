@@ -1,4 +1,4 @@
-import {Sheet, SheetContent, SheetTrigger} from '#modules/shadcn/main'
+import {Sheet, SheetContent, SheetTrigger} from '#shadcn/ui/sheet'
 import {createElement} from 'react'
 import {expect, it} from 'vitest'
 import {render} from 'vitest-browser-react'

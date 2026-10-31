@@ -1,4 +1,4 @@
-import {cn} from 'cn'
+import {cn} from '#shadcn/lib/utils'
 import {ChevronRightIcon} from 'lucide-react'
 import * as React from 'react'
 

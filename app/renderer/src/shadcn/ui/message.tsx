@@ -1,4 +1,4 @@
-import {cn} from 'cn'
+import {cn} from '#shadcn/lib/utils'
 import * as React from 'react'
 
 function Message({

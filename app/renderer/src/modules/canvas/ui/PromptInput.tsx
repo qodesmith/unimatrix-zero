@@ -1,13 +1,13 @@
 import type {KeyboardEvent, Ref} from 'react'
 
 import {useSettings} from '#modules/settings/main'
+import {useSendPrompt} from '#modules/turns/main'
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupTextarea,
-} from '#modules/shadcn/main'
-import {useSendPrompt} from '#modules/turns/main'
+} from '#shadcn/ui/input-group'
 import {useState} from 'react'
 
 interface PromptInputProps {

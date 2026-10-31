@@ -2,8 +2,10 @@ import type {Card} from '../cards'
 import type {ProviderId, SignInStep} from '@uz/contract/providers'
 import type {ReactNode} from 'react'
 
-import {Button, Input, cn} from '#modules/shadcn/main'
+import {Button} from '#shadcn/ui/button'
+import {Input} from '#shadcn/ui/input'
 import {PROVIDER_NAMES, SignInStepEvent} from '@uz/contract/providers'
+import {cn} from 'cn'
 import {CheckIcon} from 'lucide-react'
 import {useState} from 'react'
 
