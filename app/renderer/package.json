@@ -6,7 +6,8 @@
     "#modules/*": "./src/modules/*.ts",
     "#shadcn/ui/*": "./src/shadcn/ui/*.tsx",
     "#shadcn/hooks/*": "./src/shadcn/hooks/*.ts",
-    "#shadcn/lib/*": "./src/shadcn/lib/*.ts"
+    "#shadcn/lib/*": "./src/shadcn/lib/*.ts",
+    "#shadcn/*": "./src/shadcn/*.tsx"
   },
   "scripts": {
     "build": "vite build"

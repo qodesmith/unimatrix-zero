@@ -12,7 +12,7 @@
 
 ## Merge class names with `cn`
 
-- Join or toggle class names with `cn`, never a template literal or string concatenation. App code imports it from the package (`import {cn} from 'cn'`); shadcn components import it from `#shadcn/lib/utils`, the path `shadcn add` writes. `cn` drops falsy values and lets a later Tailwind utility win over a conflicting earlier one, so a `className` passed in from outside overrides the defaults.
+- Join or toggle class names with `cn`, never a template literal or string concatenation. Every file, shadcn components included, imports it from the package: `import {cn} from 'cn'`, which is what `shadcn add` writes. `cn` drops falsy values and lets a later Tailwind utility win over a conflicting earlier one, so a `className` passed in from outside overrides the defaults.
 - Don't import `clsx` or `tailwind-merge`. `cn` replaces both, and `vite.config.ts` aliases them to `cn` so the packages that still import them (class-variance-authority, Streamdown) don't put a second merger in the bundle.
 
 ## Give a bare class in `styles.css` its reason

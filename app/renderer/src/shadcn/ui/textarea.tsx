@@ -1,4 +1,4 @@
-import {cn} from '#shadcn/lib/utils'
+import {cn} from 'cn'
 import * as React from 'react'
 
 function Textarea({className, ...props}: React.ComponentProps<'textarea'>) {

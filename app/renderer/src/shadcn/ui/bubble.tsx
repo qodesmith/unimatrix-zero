@@ -1,9 +1,9 @@
 import type {VariantProps} from 'class-variance-authority'
 
-import {cn} from '#shadcn/lib/utils'
 import {mergeProps} from '@base-ui/react/merge-props'
 import {useRender} from '@base-ui/react/use-render'
 import {cva} from 'class-variance-authority'
+import {cn} from 'cn'
 import * as React from 'react'
 
 const bubbleVariants = cva(
