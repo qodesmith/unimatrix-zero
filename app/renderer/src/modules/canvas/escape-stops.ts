@@ -4,6 +4,8 @@ import type {Reply} from '@uz/contract/turns'
 import {useReply, useReplyRun} from '#modules/turns/main'
 import {useEffect} from 'react'
 
+import {dialogOpen} from './dialog-open'
+
 interface EscapeStops {
   treeId: string
   index: TreeIndex
@@ -39,14 +41,13 @@ export function useEscapeStops({
     if (streaming === null) return undefined
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape' || event.defaultPrevented) return
+      if (event.key !== 'Escape' || event.defaultPrevented || dialogOpen()) {
+        return
+      }
 
       const {target} = event
 
-      if (
-        target instanceof Element &&
-        target.closest('input, textarea, [data-handles-escape]')
-      ) {
+      if (target instanceof Element && target.closest('input, textarea')) {
         return
       }
 

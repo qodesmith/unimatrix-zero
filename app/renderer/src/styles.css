@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 @import '@fontsource-variable/figtree';
 @import 'streamdown/styles.css';
 @import '@xyflow/react/dist/style.css';
@@ -46,6 +47,11 @@
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-overlay: var(--overlay);
   --color-canvas-background: var(--canvas-background);
   --color-canvas-dots: var(--canvas-dots);
   --color-canvas-edge: var(--canvas-edge);

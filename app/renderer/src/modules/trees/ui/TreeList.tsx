@@ -1,8 +1,19 @@
 import type {Tree} from '@uz/contract/trees'
 import type {KeyboardEvent} from 'react'
 
-import {Button} from '#modules/shadcn/main'
+import {Input} from '#shadcn/ui/input'
+import {
+  SidebarGroup,
+  SidebarGroupAction,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from '#shadcn/ui/sidebar'
+import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
 import {TREE_TITLE_MAX_LENGTH} from '@uz/contract/trees'
+import {PlusIcon} from 'lucide-react'
 import {useRef, useState} from 'react'
 
 interface TreeListProps {
@@ -23,44 +34,48 @@ export function TreeList({
   const [renamingId, setRenamingId] = useState<string | null>(null)
 
   return (
-    <section aria-label="Trees" className="flex flex-col gap-2">
-      <header className="flex items-center justify-between">
-        <h2 className="text-xs font-semibold tracking-wide uppercase">Trees</h2>
-        <Button size="sm" variant="ghost" onClick={onCreate}>
-          New Tree
-        </Button>
-      </header>
-      {trees.length === 0 ? (
-        <div className="text-xs text-muted-foreground">
-          <p className="font-medium">Start a new Tree</p>
-          <p>One conversation that can branch in any direction.</p>
-        </div>
-      ) : (
-        <ul className="flex flex-col gap-0.5">
-          {trees.map(tree => (
-            <li key={tree.id}>
-              {renamingId === tree.id ? (
-                <RenameInput
-                  tree={tree}
-                  onDone={title => {
-                    setRenamingId(null)
+    <SidebarGroup role="region" aria-label="Trees">
+      <SidebarGroupLabel render={<h2 />}>Trees</SidebarGroupLabel>
+      <Tooltip>
+        <TooltipTrigger render={<SidebarGroupAction onClick={onCreate} />}>
+          <PlusIcon />
+          <span className="sr-only">New Tree</span>
+        </TooltipTrigger>
+        <TooltipContent side="right">New Tree</TooltipContent>
+      </Tooltip>
+      <SidebarGroupContent>
+        {trees.length === 0 ? (
+          <div className="px-2 text-xs text-muted-foreground">
+            <p className="font-medium">Start a new Tree</p>
+            <p>One conversation that can branch in any direction.</p>
+          </div>
+        ) : (
+          <SidebarMenu>
+            {trees.map(tree => (
+              <SidebarMenuItem key={tree.id}>
+                {renamingId === tree.id ? (
+                  <RenameInput
+                    tree={tree}
+                    onDone={title => {
+                      setRenamingId(null)
 
-                    if (title !== null) onRename(tree.id, title)
-                  }}
-                />
-              ) : (
-                <TreeButton
-                  tree={tree}
-                  isOpen={tree.id === openTreeId}
-                  onOpen={() => onOpen(tree.id)}
-                  onRename={() => setRenamingId(tree.id)}
-                />
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+                      if (title !== null) onRename(tree.id, title)
+                    }}
+                  />
+                ) : (
+                  <TreeButton
+                    tree={tree}
+                    isOpen={tree.id === openTreeId}
+                    onOpen={() => onOpen(tree.id)}
+                    onRename={() => setRenamingId(tree.id)}
+                  />
+                )}
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        )}
+      </SidebarGroupContent>
+    </SidebarGroup>
   )
 }
 
@@ -81,16 +96,17 @@ function TreeButton({tree, isOpen, onOpen, onRename}: TreeButtonProps) {
   }
 
   return (
-    <button
-      type="button"
+    <SidebarMenuButton
+      isActive={isOpen}
       aria-current={isOpen ? 'page' : undefined}
-      className="w-full truncate rounded-md px-2 py-1 text-left text-sm hover:bg-sidebar-accent aria-[current=page]:bg-sidebar-accent aria-[current=page]:font-medium"
       onClick={onOpen}
       onDoubleClick={onRename}
       onKeyDown={onKeyDown}
     >
-      <TreeTitle tree={tree} />
-    </button>
+      <span>
+        <TreeTitle tree={tree} />
+      </span>
+    </SidebarMenuButton>
   )
 }
 
@@ -123,11 +139,11 @@ function RenameInput({tree, onDone}: RenameInputProps) {
   }
 
   return (
-    <input
+    <Input
       aria-label="Tree name"
       autoFocus
       maxLength={TREE_TITLE_MAX_LENGTH}
-      className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
+      className="h-8 bg-background px-2"
       value={title}
       onChange={event => setTitle(event.target.value)}
       onKeyDown={onKeyDown}

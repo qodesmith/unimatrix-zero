@@ -1,3 +1,5 @@
+// The Playwright provider gives `cdp()` its `send`.
+/// <reference types="@vitest/browser-playwright" />
 import type {Bridge} from '@uz/contract/bridge'
 import type {Command, CommandOutcome, CommandType} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
@@ -7,9 +9,9 @@ import type {Prompt, Reply, StreamingReply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
 
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
-import {describe, expect, it} from 'vitest'
+import {describe, expect, it, onTestFinished} from 'vitest'
 import {render} from 'vitest-browser-react'
-import {page, userEvent} from 'vitest/browser'
+import {cdp, page, userEvent} from 'vitest/browser'
 
 import {App} from './App'
 
@@ -188,27 +190,126 @@ it('shows the pong main sends back', async () => {
     .toBeVisible()
 })
 
-it('opens Settings from the sidebar, and leaves it for the Tree picked there', async () => {
-  globalThis.window.uz = fakeMain({
-    trees: [
-      {id: crypto.randomUUID(), title: 'Trip planning', createdAt: receivedAt},
-    ],
-  })
-  await renderApp()
+function viewport() {
+  return (
+    document.querySelector('.react-flow__viewport')?.getAttribute('style') ?? ''
+  )
+}
 
+function zoomOf() {
+  const scale = /scale\(([\d.]+)\)/.exec(viewport())?.[1]
+
+  return scale === undefined ? Number.NaN : Number(scale)
+}
+
+/** '' clears the emulation: no preference. */
+async function emulateReducedMotion(value: 'reduce' | '') {
+  await cdp().send('Emulation.setEmulatedMedia', {
+    features: [{name: 'prefers-reduced-motion', value}],
+  })
+}
+
+function settingsSheet() {
+  return page.getByRole('dialog', {name: 'Settings'})
+}
+
+async function openSettings() {
   await page
     .getByRole('complementary')
     .getByRole('button', {name: 'Settings'})
     .click()
   await expect
-    .element(page.getByRole('heading', {name: 'Appearance'}))
+    .element(settingsSheet().getByRole('heading', {name: 'Appearance'}))
     .toBeVisible()
+}
 
+async function startStreaming(main: ReturnType<typeof fakeMain>) {
+  await page.getByRole('button', {name: 'New Tree'}).click()
+  await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
+  await userEvent.keyboard('{Enter}')
+
+  const ids = firstReply(main)
+  main.publish({...ids, type: 'TEXT_DELTA', delta: 'Hi '})
+  await expect.element(page.getByText('Hi', {exact: true})).toBeVisible()
+
+  return ids
+}
+
+it('opens Settings in a Sheet over the Tree, and closing it with the X shows the same Tree at the same pan and zoom', async () => {
+  const tree = {
+    id: crypto.randomUUID(),
+    title: 'Trip planning',
+    createdAt: receivedAt,
+  }
+
+  const prompt: Prompt = {
+    id: crypto.randomUUID(),
+    treeId: tree.id,
+    parentReplyId: null,
+    text: 'Where to?',
+    createdAt: receivedAt,
+  }
+
+  globalThis.window.uz = fakeMain({
+    trees: [tree],
+    prompts: [prompt],
+    replies: [
+      {
+        id: crypto.randomUUID(),
+        treeId: tree.id,
+        promptId: prompt.id,
+        provider: 'claude',
+        model: 'fake',
+        status: 'complete',
+        content: [{type: 'text', text: 'Lisbon'}],
+        contextSize: null,
+        contextWindow: null,
+        failure: null,
+        createdAt: receivedAt,
+      },
+    ],
+  })
+  await emulateReducedMotion('reduce')
+  onTestFinished(async () => emulateReducedMotion(''))
+  await renderApp()
   await page.getByRole('button', {name: 'Trip planning'}).click()
+  await expect.element(page.getByText('Lisbon')).toBeVisible()
+  await expect.poll(() => document.querySelector('.canvas-fitting')).toBeNull()
+
+  const loaded = zoomOf()
+  await page.getByRole('button', {name: 'Zoom in'}).click()
+  await expect.poll(zoomOf).toBeGreaterThan(loaded * 1.1)
+  const zoomedIn = viewport()
+
+  await openSettings()
+  await settingsSheet().getByRole('button', {name: 'Close'}).click()
+
+  await expect.element(settingsSheet()).not.toBeInTheDocument()
   await expect
     .element(page.getByRole('heading', {name: 'Trip planning'}))
     .toBeVisible()
-  expect(page.getByRole('heading', {name: 'Appearance'}).query()).toBeNull()
+  expect(viewport()).toBe(zoomedIn)
+})
+
+it('closes only Settings on Esc over a streaming Reply and the slideout: the Reply is not stopped, and the slideout shows the text that came meanwhile', async () => {
+  const main = fakeMain()
+  globalThis.window.uz = main
+  await renderApp()
+  const ids = await startStreaming(main)
+  await page.getByRole('button', {name: 'Open in Chat mode'}).click()
+  const slideout = page.getByRole('complementary', {name: 'Chat'})
+  await expect.element(slideout).toBeVisible()
+
+  await openSettings()
+  main.publish({...ids, type: 'TEXT_DELTA', delta: 'there'})
+  await userEvent.keyboard('{Escape}')
+  await expect.element(settingsSheet()).not.toBeInTheDocument()
+
+  await expect.element(slideout.getByText('Hi there')).toBeVisible()
+  expect(main.sent.map(command => command.type)).not.toContain('reply.stop')
+
+  main.publish({...ids, type: 'TEXT_DELTA', delta: ', again'})
+  await expect.element(slideout.getByText('Hi there, again')).toBeVisible()
 })
 
 it('creates a Tree and opens it', async () => {

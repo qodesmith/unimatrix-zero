@@ -1,12 +1,17 @@
 import type {CanvasOrientation} from '@uz/contract/settings'
-import type {ReactNode} from 'react'
 
-import {Button, cn} from '#modules/shadcn/main'
+import {Button} from '#shadcn/ui/button'
+import {Toggle} from '#shadcn/ui/toggle'
+import {ToggleGroup, ToggleGroupItem} from '#shadcn/ui/toggle-group'
+import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
 import {CanvasOrientationSchema} from '@uz/contract/settings'
 import {useReactFlow} from '@xyflow/react'
+import {cn} from 'cn'
+import {MapIcon, MinusIcon, PlusIcon, ScanIcon} from 'lucide-react'
 import {useRef} from 'react'
 
 import {useReducedMotion} from '../reduced-motion'
+import {TooltipButton} from './TooltipButton'
 
 interface CanvasControlsProps {
   orientation: CanvasOrientation
@@ -19,6 +24,8 @@ interface CanvasControlsProps {
   showMap: boolean
   onToggleMap: () => void
 }
+
+const TOOL_CLASS = "size-7 [&_svg:not([class*='size-'])]:size-3.5"
 
 const LABELS: Record<CanvasOrientation, string> = {
   vertical: 'Vertical',
@@ -65,20 +72,23 @@ export function CanvasControls({
           )}
         </div>
       )}
-      <ToolButton
-        title="Zoom in"
+      <TooltipButton
+        label="Zoom in"
+        className={TOOL_CLASS}
         onClick={() => void flow.zoomIn({duration: still ? 0 : 200})}
       >
-        +
-      </ToolButton>
-      <ToolButton
-        title="Zoom out"
+        <PlusIcon />
+      </TooltipButton>
+      <TooltipButton
+        label="Zoom out"
+        className={TOOL_CLASS}
         onClick={() => void flow.zoomOut({duration: still ? 0 : 200})}
       >
-        −
-      </ToolButton>
-      <ToolButton
-        title="Fit the whole Tree"
+        <MinusIcon />
+      </TooltipButton>
+      <TooltipButton
+        label="Fit the whole Tree"
+        className={TOOL_CLASS}
         onClick={() =>
           void flow.fitView({
             padding: 0.15,
@@ -87,37 +97,49 @@ export function CanvasControls({
           })
         }
       >
-        ⤢
-      </ToolButton>
-      <ToolButton
-        title="Show the minimap"
-        pressed={showMap}
-        onClick={onToggleMap}
-      >
-        <MapIcon />
-      </ToolButton>
-      <div
-        role="group"
+        <ScanIcon />
+      </TooltipButton>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Toggle
+              aria-label="Show the minimap"
+              size="sm"
+              pressed={showMap}
+              onPressedChange={() => onToggleMap()}
+              className={cn(
+                TOOL_CLASS,
+                'min-w-7 px-0 aria-pressed:bg-accent aria-pressed:text-accent-foreground'
+              )}
+            />
+          }
+        >
+          <MapIcon />
+        </TooltipTrigger>
+        <TooltipContent>Show the minimap</TooltipContent>
+      </Tooltip>
+      <ToggleGroup
         aria-label="Orientation"
-        className="ml-1 flex rounded-lg bg-muted p-0.5"
+        spacing={0}
+        value={[orientation]}
+        onValueChange={([next]) => {
+          const parsed = CanvasOrientationSchema.safeParse(next)
+
+          if (parsed.success) onOrientation(parsed.data)
+        }}
+        className="ml-1 rounded-lg bg-muted p-0.5"
       >
         {CanvasOrientationSchema.options.map(value => (
-          <button
+          <ToggleGroupItem
             key={value}
-            type="button"
-            aria-pressed={orientation === value}
-            className={cn(
-              'rounded-md px-2 py-1',
-              orientation === value
-                ? 'bg-card text-card-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-            onClick={() => onOrientation(value)}
+            value={value}
+            size="sm"
+            className="h-auto min-w-0 rounded-md! px-2 py-1 text-[0.6875rem] font-normal text-muted-foreground hover:bg-transparent aria-pressed:bg-card aria-pressed:text-card-foreground aria-pressed:shadow-sm"
           >
             {LABELS[value]}
-          </button>
+          </ToggleGroupItem>
         ))}
-      </div>
+      </ToggleGroup>
     </div>
   )
 }
@@ -145,60 +167,21 @@ function JumpButton({label, title, ids, onJump, dotClass}: JumpButtonProps) {
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      title={title}
-      className="h-7 gap-1.5 px-2 text-[0.6875rem]"
-      onClick={next}
-    >
-      <span className={cn('size-2 rounded-full', dotClass)} />
-      {label}
-    </Button>
-  )
-}
-
-function ToolButton({
-  title,
-  pressed,
-  onClick,
-  children,
-}: {
-  title: string
-  pressed?: boolean
-  onClick: () => void
-  children: ReactNode
-}) {
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      title={title}
-      aria-label={title}
-      aria-pressed={pressed}
-      className={cn('size-7', pressed && 'bg-accent text-accent-foreground')}
-      onClick={onClick}
-    >
-      {children}
-    </Button>
-  )
-}
-
-function MapIcon() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="size-3.5"
-    >
-      <path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" />
-      <path d="M15 5.764v15" />
-      <path d="M9 3.236v15" />
-    </svg>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2 text-[0.6875rem]"
+            onClick={next}
+          />
+        }
+      >
+        <span className={cn('size-2 rounded-full', dotClass)} />
+        {label}
+      </TooltipTrigger>
+      <TooltipContent>{title}</TooltipContent>
+    </Tooltip>
   )
 }

@@ -1,14 +1,18 @@
 import type {Prompt, Reply} from '@uz/contract/turns'
-import type {ReactNode} from 'react'
 
-import {Button, cn} from '#modules/shadcn/main'
 import {ReplyView, useReply} from '#modules/turns/main'
+import {Bubble, BubbleContent} from '#shadcn/ui/bubble'
+import {Message, MessageContent} from '#shadcn/ui/message'
+import {cn} from 'cn'
+import {Maximize2Icon, Minimize2Icon, XIcon} from 'lucide-react'
 import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 
 import {atBottom} from '../at-bottom'
 import {useCanvas} from '../canvas-context'
+import {dialogOpen} from '../dialog-open'
 import {pathTo} from '../tree'
 import {PromptInput} from './PromptInput'
+import {TooltipButton} from './TooltipButton'
 
 interface ChatSlideoutProps {
   /** The Reply the shown Thread ends at. */
@@ -52,7 +56,9 @@ export function ChatSlideout({
     if (!open) return undefined
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape' || event.defaultPrevented) return
+      if (event.key !== 'Escape' || event.defaultPrevented || dialogOpen()) {
+        return
+      }
 
       const {target} = event
 
@@ -125,15 +131,16 @@ export function ChatSlideout({
       <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2">
         <h2 className="text-xs text-muted-foreground">Thread</h2>
         <div className="flex gap-1">
-          <HeaderButton
-            title={full ? 'Exit full screen' : 'Full screen'}
+          <TooltipButton
+            label={full ? 'Exit full screen' : 'Full screen'}
+            className="size-7"
             onClick={() => setFull(!full)}
           >
-            {full ? '⤡' : '⤢'}
-          </HeaderButton>
-          <HeaderButton title="Close" onClick={onClose}>
-            ✕
-          </HeaderButton>
+            {full ? <Minimize2Icon /> : <Maximize2Icon />}
+          </TooltipButton>
+          <TooltipButton label="Close" className="size-7" onClick={onClose}>
+            <XIcon />
+          </TooltipButton>
         </div>
       </header>
       <div
@@ -166,12 +173,15 @@ function ChatTurn({turnId}: {turnId: string}) {
 
 function ChatPrompt({prompt}: {prompt: Prompt}) {
   return (
-    <div
-      data-chat-turn={prompt.id}
-      className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-prompt px-3.5 py-2 text-sm whitespace-pre-wrap text-prompt-foreground"
-    >
-      {prompt.text}
-    </div>
+    <Message align="end" data-chat-turn={prompt.id}>
+      <MessageContent>
+        <Bubble variant="prompt" align="end" className="max-w-[85%]">
+          <BubbleContent className="rounded-2xl rounded-br-md px-3.5 whitespace-pre-wrap">
+            {prompt.text}
+          </BubbleContent>
+        </Bubble>
+      </MessageContent>
+    </Message>
   )
 }
 
@@ -179,16 +189,24 @@ function ChatReply({reply}: {reply: Reply}) {
   const {status} = useReply(reply)
 
   return (
-    <div
-      data-chat-turn={reply.id}
-      className={cn(
-        'rounded-2xl rounded-bl-md border border-border bg-card px-3.5 py-2 text-card-foreground shadow-sm',
-        status === 'failed' && 'border-destructive',
-        status === 'streaming' && 'border-primary/50'
-      )}
-    >
-      <ReplyView reply={reply} />
-    </div>
+    <Message data-chat-turn={reply.id}>
+      <MessageContent>
+        <Bubble
+          variant="card"
+          className={cn(
+            'w-full max-w-full',
+            status === 'failed' &&
+              '*:data-[slot=bubble-content]:border-destructive',
+            status === 'streaming' &&
+              '*:data-[slot=bubble-content]:border-primary/50'
+          )}
+        >
+          <BubbleContent className="w-full rounded-2xl rounded-bl-md px-3.5">
+            <ReplyView reply={reply} />
+          </BubbleContent>
+        </Bubble>
+      </MessageContent>
+    </Message>
   )
 }
 
@@ -236,28 +254,5 @@ function ChatInput({end, onFocus, onSent}: ChatInputProps) {
         />
       </div>
     </footer>
-  )
-}
-
-function HeaderButton({
-  title,
-  onClick,
-  children,
-}: {
-  title: string
-  onClick: () => void
-  children: ReactNode
-}) {
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      title={title}
-      aria-label={title}
-      className="size-7"
-      onClick={onClick}
-    >
-      {children}
-    </Button>
   )
 }

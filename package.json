@@ -36,7 +36,8 @@
     "codex-protocol": "bun run scripts/codex-protocol.ts",
     "record-fake-reply": "bun run scripts/record-fake-reply.ts",
     "skills:install": "bun run scripts/install-skills.ts",
-    "skills:update": "bunx skills update --project -y"
+    "skills:update": "bunx skills update --project -y",
+    "shadcn:updates": "bun run scripts/shadcn-updates.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.4.4",

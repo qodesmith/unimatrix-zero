@@ -1,7 +1,12 @@
-import {Button, cn} from '#modules/shadcn/main'
+import {Badge} from '#shadcn/ui/badge'
+import {Button} from '#shadcn/ui/button'
+import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
+import {cn} from 'cn'
+import {InfoIcon, XIcon} from 'lucide-react'
 import {useRef, useState} from 'react'
 
 import {formatTokens} from '../format'
+import {TooltipButton} from './TooltipButton'
 
 interface ContextSizeProps {
   contextSize: number
@@ -34,22 +39,24 @@ export function ContextSize({
 
   return (
     <>
-      <span
+      <Badge
+        variant="secondary"
         aria-label={`Context size ${formatTokens(contextSize)}`}
-        className="cursor-default rounded-md bg-muted px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted-foreground"
+        className="cursor-default rounded-md bg-muted px-1.5 font-mono text-[0.6875rem] text-muted-foreground"
       >
         {formatTokens(contextSize)} ctx
-      </span>
-      <button
+      </Badge>
+      <Button
         ref={info}
-        type="button"
+        variant="ghost"
+        size="icon-xs"
         aria-label="Context size details"
         aria-expanded={open}
-        className="rounded-full text-muted-foreground hover:text-foreground"
+        className="size-auto rounded-full border-0 text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
         onClick={() => setOpen(!open)}
       >
-        <InfoIcon />
-      </button>
+        <InfoIcon className="size-3.5" />
+      </Button>
       <div
         aria-hidden
         className={cn(
@@ -93,16 +100,9 @@ function ContextSizeDrawer({
     >
       <div className="flex items-center justify-between border-b border-border py-1 pr-1 pl-3">
         <h3 className="text-xs text-muted-foreground">Context size</h3>
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Close"
-          aria-label="Close"
-          className="size-6"
-          onClick={onClose}
-        >
-          ✕
-        </Button>
+        <TooltipButton label="Close" className="size-6" onClick={onClose}>
+          <XIcon />
+        </TooltipButton>
       </div>
       <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-3 py-2 text-xs">
         {added !== null && (
@@ -124,25 +124,6 @@ function ContextSizeDrawer({
   )
 }
 
-function InfoIcon() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="size-3.5"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 16v-4" />
-      <path d="M12 8h.01" />
-    </svg>
-  )
-}
-
 interface ContextMeterProps {
   contextSize: number
   contextWindow: number
@@ -152,16 +133,24 @@ export function ContextMeter({contextSize, contextWindow}: ContextMeterProps) {
   const percent = Math.min(100, (contextSize / contextWindow) * 100)
 
   return (
-    <div
-      role="meter"
-      aria-label="Context size toward the Context window"
-      aria-valuenow={contextSize}
-      aria-valuemin={0}
-      aria-valuemax={contextWindow}
-      title={`${formatTokens(contextSize)} of ${formatTokens(contextWindow)}`}
-      className="h-1 w-full bg-muted"
-    >
-      <div className="h-full bg-primary" style={{width: `${percent}%`}} />
-    </div>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <div
+            role="meter"
+            aria-label="Context size toward the Context window"
+            aria-valuenow={contextSize}
+            aria-valuemin={0}
+            aria-valuemax={contextWindow}
+            className="h-1 w-full bg-muted"
+          />
+        }
+      >
+        <div className="h-full bg-primary" style={{width: `${percent}%`}} />
+      </TooltipTrigger>
+      <TooltipContent>
+        {formatTokens(contextSize)} of {formatTokens(contextWindow)}
+      </TooltipContent>
+    </Tooltip>
   )
 }

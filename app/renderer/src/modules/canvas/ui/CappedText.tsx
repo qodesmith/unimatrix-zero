@@ -1,7 +1,8 @@
 import type {ReactNode} from 'react'
 
-import {cn} from '#modules/shadcn/main'
+import {Button} from '#shadcn/ui/button'
 import {useReactFlow, useStoreApi} from '@xyflow/react'
+import {cn} from 'cn'
 import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 
 import {atBottom} from '../at-bottom'
@@ -109,13 +110,13 @@ export function CappedText({
       </div>
       {limit && (overflows || expanded) && (
         <div className="mt-1 flex justify-end">
-          <button
-            type="button"
-            className="text-xs text-primary hover:underline"
+          <Button
+            variant="link"
+            className="h-auto border-0 p-0 text-xs font-normal underline-offset-auto"
             onClick={onClick}
           >
             {expanded ? 'Show less' : 'Show more'}
-          </button>
+          </Button>
         </div>
       )}
     </div>

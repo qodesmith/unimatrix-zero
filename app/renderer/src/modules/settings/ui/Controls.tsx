@@ -1,16 +1,31 @@
 import type {ReactNode} from 'react'
 
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from '#shadcn/ui/field'
+import {RadioGroup, RadioGroupItem} from '#shadcn/ui/radio-group'
+import {Switch} from '#shadcn/ui/switch'
+import {useId} from 'react'
+
 interface GroupProps {
   legend: string
+  legendId?: string
   children: ReactNode
 }
 
-export function Group({legend, children}: GroupProps) {
+export function Group({legend, legendId, children}: GroupProps) {
   return (
-    <fieldset className="flex flex-col gap-2">
-      <legend className="mb-2 text-sm font-medium">{legend}</legend>
+    <FieldSet className="gap-2">
+      <FieldLegend id={legendId} variant="label" className="mb-2">
+        {legend}
+      </FieldLegend>
       {children}
-    </fieldset>
+    </FieldSet>
   )
 }
 
@@ -27,19 +42,32 @@ export function Choice<T extends string>({
   options,
   onChange,
 }: ChoiceProps<T>) {
+  const legendId = useId()
+  const optionId = useId()
+
   return (
-    <Group legend={legend}>
-      {options.map(option => (
-        <label key={option.value} className="flex items-center gap-2 text-sm">
-          <input
-            type="radio"
-            className="accent-primary"
-            checked={option.value === value}
-            onChange={() => onChange(option.value)}
-          />
-          {option.label}
-        </label>
-      ))}
+    <Group legend={legend} legendId={legendId}>
+      <RadioGroup
+        aria-labelledby={legendId}
+        className="gap-2"
+        value={value}
+        onValueChange={onChange}
+      >
+        {options.map(option => (
+          <Field key={option.value} orientation="horizontal">
+            <RadioGroupItem
+              id={`${optionId}-${option.value}`}
+              value={option.value}
+            />
+            <FieldLabel
+              htmlFor={`${optionId}-${option.value}`}
+              className="font-normal"
+            >
+              {option.label}
+            </FieldLabel>
+          </Field>
+        ))}
+      </RadioGroup>
     </Group>
   )
 }
@@ -52,18 +80,20 @@ interface ToggleProps {
 }
 
 export function Toggle({label, description, checked, onChange}: ToggleProps) {
+  const id = useId()
+
   return (
-    <label className="flex items-start gap-3 text-sm">
-      <input
-        type="checkbox"
-        className="mt-0.5 accent-primary"
+    <Field orientation="horizontal" className="gap-3">
+      <Switch
+        id={id}
+        className="mt-0.5"
         checked={checked}
-        onChange={event => onChange(event.target.checked)}
+        onCheckedChange={onChange}
       />
-      <span className="flex flex-col gap-0.5">
-        <span className="font-medium">{label}</span>
-        <span className="text-muted-foreground">{description}</span>
-      </span>
-    </label>
+      <FieldContent className="gap-0.5">
+        <FieldLabel htmlFor={id}>{label}</FieldLabel>
+        <FieldDescription>{description}</FieldDescription>
+      </FieldContent>
+    </Field>
   )
 }

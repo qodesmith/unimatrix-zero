@@ -13,10 +13,25 @@ import {
   SettingsPage,
   SettingsProvider,
 } from '#modules/settings/main'
-import {Button} from '#modules/shadcn/main'
 import {TreeList, TreeTitle, useTrees} from '#modules/trees/main'
 import {LiveReplies} from '#modules/turns/main'
+import {Alert, AlertDescription} from '#shadcn/ui/alert'
+import {Button} from '#shadcn/ui/button'
+import {Sheet, SheetContent, SheetTrigger} from '#shadcn/ui/sheet'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+} from '#shadcn/ui/sidebar'
+import {TooltipProvider} from '#shadcn/ui/tooltip'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
+import {SettingsIcon} from 'lucide-react'
 import {useState} from 'react'
 
 type Pong = CommandResult<'app.ping'>
@@ -31,7 +46,9 @@ export function App() {
         <FollowFontSize />
         <ConnectionsProvider>
           <LiveReplies>
-            <AppLayout />
+            <TooltipProvider>
+              <AppLayout />
+            </TooltipProvider>
           </LiveReplies>
         </ConnectionsProvider>
       </SettingsProvider>
@@ -44,7 +61,6 @@ function AppLayout() {
   const {trees, openTree, error: treesError, open, create, rename} = useTrees()
   // Null until main says whether any Provider is connected.
   const [firstLaunch, setFirstLaunch] = useState<boolean | null>(null)
-  const [showSettings, setShowSettings] = useState(false)
   const [pong, setPong] = useState<Pong | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -83,42 +99,54 @@ function AppLayout() {
   }
 
   return (
-    <div className="flex h-full">
-      <aside className="flex w-64 shrink-0 flex-col gap-4 border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground">
-        <h1 className="text-sm font-semibold">Unimatrix Zero</h1>
-        <TreeList
-          trees={trees}
-          openTreeId={openTree?.id ?? null}
-          onCreate={() => {
-            setShowSettings(false)
-            void create()
-          }}
-          onOpen={treeId => {
-            setShowSettings(false)
-            void open(treeId)
-          }}
-          onRename={(treeId, title) => void rename(treeId, title)}
-        />
-        {treesError && <p className="text-xs text-destructive">{treesError}</p>}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mt-auto justify-start"
-          aria-pressed={showSettings}
-          onClick={() => setShowSettings(true)}
-        >
-          <GearIcon />
-          Settings
-        </Button>
-      </aside>
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-canvas-background">
-        {showSettings ? (
-          <div className="min-h-0 flex-1">
-            <SettingsPage
-              connections={<Connections connections={connections} />}
-            />
-          </div>
-        ) : openTree ? (
+    <SidebarProvider className="h-full min-h-0">
+      <Sidebar
+        collapsible="none"
+        role="complementary"
+        className="border-r border-sidebar-border"
+      >
+        <SidebarHeader>
+          <h1 className="px-2 pt-2 text-sm font-semibold">Unimatrix Zero</h1>
+        </SidebarHeader>
+        <SidebarContent>
+          <TreeList
+            trees={trees}
+            openTreeId={openTree?.id ?? null}
+            onCreate={() => void create()}
+            onOpen={treeId => void open(treeId)}
+            onRename={(treeId, title) => void rename(treeId, title)}
+          />
+          {treesError && (
+            <Alert variant="destructive" className="mx-2 w-auto">
+              <AlertDescription className="text-xs">
+                {treesError}
+              </AlertDescription>
+            </Alert>
+          )}
+        </SidebarContent>
+        <SidebarFooter>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <Sheet>
+                <SheetTrigger render={<SidebarMenuButton />}>
+                  <SettingsIcon />
+                  <span>Settings</span>
+                </SheetTrigger>
+                <SheetContent
+                  aria-label="Settings"
+                  className="w-full gap-0 p-0 data-[side=right]:sm:max-w-4xl"
+                >
+                  <SettingsPage
+                    connections={<Connections connections={connections} />}
+                  />
+                </SheetContent>
+              </Sheet>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
+      </Sidebar>
+      <SidebarInset className="min-h-0 min-w-0 bg-canvas-background">
+        {openTree ? (
           <div className="min-h-0 flex-1">
             <Canvas
               key={openTree.id}
@@ -137,24 +165,7 @@ function AppLayout() {
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
         )}
-      </main>
-    </div>
-  )
-}
-
-function GearIcon() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }

@@ -1,5 +1,11 @@
 # Styling and color
 
+## Build the UI from shadcn components on Base UI. Enforced by: uz/shadcn-base-ui, uz/no-rsc-directives
+
+- The decision is [ADR 0020](../adr/0020-renderer-ui-is-shadcn-on-base-ui.md). Add a component with `shadcn add` from `app/renderer` (the `base-vega` style in `components.json`). Where it lands and how code imports it are in [README.md](../../README.md), section Modules.
+- Never let `shadcn add` overwrite a component we already have: our copies carry lint fixes and changes of our own. `bun run shadcn:updates [component...]` shows how each of ours differs from what `shadcn add` writes today; bring in by hand the upstream changes worth having.
+- AI Elements (Message, Bubble, Trace and the rest) are shadcn registry components like any other: add them with `shadcn add`, never by copying from their docs pages. They take our own data as props, with no AI SDK. Use only shadcn's set, never Vercel's separate AI Elements registry (`registry.ai-sdk.dev`).
+
 ## Style with Tailwind utilities at the call site
 
 - Express styling as Tailwind utilities at the call site. Tailwind v4 covers more than it looks like it does: gradients, arbitrary stop positions and color mixes all have utilities, so "the design needs real CSS" is usually wrong.
@@ -7,7 +13,7 @@
 
 ## Merge class names with `cn`
 
-- Join or toggle class names with `cn` from `#modules/shadcn/main`, never a template literal or string concatenation. `cn` drops falsy values and lets a later Tailwind utility win over a conflicting earlier one, so a `className` passed in from outside overrides the defaults.
+- Join or toggle class names with `cn`, never a template literal or string concatenation. Every file, shadcn components included, imports it from the package: `import {cn} from 'cn'`, which is what `shadcn add` writes. `cn` drops falsy values and lets a later Tailwind utility win over a conflicting earlier one, so a `className` passed in from outside overrides the defaults.
 - Don't import `clsx` or `tailwind-merge`. `cn` replaces both, and `vite.config.ts` aliases them to `cn` so the packages that still import them (class-variance-authority, Streamdown) don't put a second merger in the bundle.
 
 ## Give a bare class in `styles.css` its reason

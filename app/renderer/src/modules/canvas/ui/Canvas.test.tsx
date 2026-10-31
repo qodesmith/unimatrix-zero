@@ -1943,31 +1943,31 @@ async function armDelete(promptText: string) {
   await deleteButtonOf(promptText).click()
 }
 
-it('asks to delete the Prompt with every Turn below it, and cancels by Cancel, Esc or the pointer leaving', async () => {
+function confirmation() {
+  return page.getByRole('alertdialog')
+}
+
+it('asks in a dialog to delete the Prompt with every Turn below it, and cancels by Cancel or Esc', async () => {
   const {main} = await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
   await armDelete('Prompt two')
-  const two = nodeOf('Prompt two')
-  await expect.element(two.getByText('Delete 6 Turns?')).toBeVisible()
-  await expect.element(two.getByText('This can’t be undone.')).toBeVisible()
-  await two.getByRole('button', {name: 'Cancel'}).click()
-  await expect.element(two.getByText('Delete 6 Turns?')).not.toBeInTheDocument()
+  await expect
+    .element(page.getByRole('alertdialog', {name: 'Delete 6 Turns?'}))
+    .toBeVisible()
+  await expect
+    .element(confirmation().getByText('This can’t be undone.'))
+    .toBeVisible()
+  await confirmation().getByRole('button', {name: 'Cancel'}).click()
+  await expect.element(confirmation()).not.toBeInTheDocument()
   await expect.element(deleteButtonOf('Prompt two')).toHaveFocus()
-
-  await deleteButtonOf('Prompt two').click()
-  await expect.element(two.getByText('Delete 6 Turns?')).toBeVisible()
-  await userEvent.keyboard('{Escape}')
-  await expect.element(two.getByText('Delete 6 Turns?')).not.toBeInTheDocument()
 
   await armDelete('Prompt three')
   await expect
-    .element(nodeOf('Prompt three').getByText('Delete 2 Turns?'))
+    .element(page.getByRole('alertdialog', {name: 'Delete 2 Turns?'}))
     .toBeVisible()
-  await hoverAway()
-  await expect
-    .element(nodeOf('Prompt three').getByText('Delete 2 Turns?'))
-    .not.toBeInTheDocument()
+  await userEvent.keyboard('{Escape}')
+  await expect.element(confirmation()).not.toBeInTheDocument()
 
   expect(main.sent.some(command => command.type === 'prompt.delete')).toBe(
     false
@@ -1980,7 +1980,7 @@ it('deletes the Prompt and every Turn below it once confirmed, before the Turns 
   main.turnsLoads.held = new Promise(() => {})
 
   await armDelete('Prompt two')
-  await nodeOf('Prompt two').getByRole('button', {name: 'Delete'}).click()
+  await confirmation().getByRole('button', {name: 'Delete'}).click()
 
   await expect.element(page.getByText('Prompt two')).not.toBeInTheDocument()
   expect(main.sent.filter(command => command.type === 'prompt.delete')).toEqual(
@@ -2001,13 +2001,14 @@ it('shows main’s refusal in the confirmation and keeps every Turn', async () =
   main.deletes.refusal = 'A Reply below is still being written'
 
   await armDelete('Prompt two')
-  const two = nodeOf('Prompt two')
-  await two.getByRole('button', {name: 'Delete'}).click()
+  await confirmation().getByRole('button', {name: 'Delete'}).click()
 
   await expect
-    .element(two.getByRole('alert'))
+    .element(confirmation().getByRole('alert'))
     .toHaveTextContent('A Reply below is still being written')
-  await expect.element(two.getByText('Delete 6 Turns?')).toBeVisible()
+  await expect
+    .element(page.getByRole('alertdialog', {name: 'Delete 6 Turns?'}))
+    .toBeVisible()
   expect(nodeCount()).toBe(10)
 })
 
@@ -2031,7 +2032,7 @@ it('offers no delete on a Prompt with a Reply streaming at or below it', async (
 
 async function deleteFrom(promptText: string) {
   await armDelete(promptText)
-  await nodeOf(promptText).getByRole('button', {name: 'Delete'}).click()
+  await confirmation().getByRole('button', {name: 'Delete'}).click()
   await expect.element(page.getByText(promptText)).not.toBeInTheDocument()
 }
 
@@ -2114,12 +2115,11 @@ it('cancels a delete with Esc rather than stopping the Active Thread’s streami
   await expect.element(page.getByText('Prompt five')).toBeVisible()
 
   await armDelete('Prompt three')
-  const three = nodeOf('Prompt three')
-  await expect.element(three.getByText('Delete 2 Turns?')).toBeVisible()
-  await userEvent.keyboard('{Escape}')
   await expect
-    .element(three.getByText('Delete 2 Turns?'))
-    .not.toBeInTheDocument()
+    .element(page.getByRole('alertdialog', {name: 'Delete 2 Turns?'}))
+    .toBeVisible()
+  await userEvent.keyboard('{Escape}')
+  await expect.element(confirmation()).not.toBeInTheDocument()
 
   expect(main.sent.some(command => command.type === 'reply.stop')).toBe(false)
 })

@@ -9,8 +9,18 @@ import type {
 
 import {useProviderStatus} from '#modules/connections/main'
 import {ReplyMarkdown} from '#modules/markdown/main'
-import {Button, cn} from '#modules/shadcn/main'
+import {Button} from '#shadcn/ui/button'
+import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceDescription,
+  TraceLine,
+  TraceTitle,
+} from '#shadcn/ui/trace'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
+import {cn} from 'cn'
 import {Fragment} from 'react'
 
 import {useReplyRun} from '../reply-run/use-reply-run'
@@ -233,43 +243,60 @@ function prettyArgs(args: string) {
   }
 }
 
+const TOOL_PROGRESS = {
+  running: {label: 'running…', status: 'running'},
+  failed: {label: 'failed', status: 'error'},
+  done: {label: 'done', status: undefined},
+} as const
+
 function ToolCallView({part}: {part: ToolCall}) {
   const {toolName, args, result} = part
 
+  const progress =
+    result === null ? 'running' : result.isError ? 'failed' : 'done'
+
   return (
-    <details
+    <Trace
+      role="group"
       aria-label={`Tool call ${toolName}`}
-      className="self-start rounded-md border border-border bg-muted/50 px-2 py-1 text-xs"
+      className="w-auto max-w-full self-start text-xs"
     >
-      <summary className="cursor-pointer select-none">
-        <span className="font-medium">{toolName}</span>
-        <span className="ml-2 text-muted-foreground">
-          {result === null ? 'running…' : result.isError ? 'failed' : 'done'}
-        </span>
-      </summary>
-      <dl className="mt-1 flex flex-col gap-1">
-        <dt className="text-muted-foreground">Arguments</dt>
-        <dd>
-          <pre className="overflow-x-auto whitespace-pre-wrap">
-            {prettyArgs(args)}
-          </pre>
-        </dd>
-        {result && (
-          <>
-            <dt className="text-muted-foreground">Result</dt>
-            <dd>
-              <pre
-                className={cn(
-                  'overflow-x-auto whitespace-pre-wrap',
-                  result.isError && 'text-destructive'
-                )}
-              >
-                {result.content}
+      <TraceCollapsible>
+        <TraceCollapsibleTrigger>
+          <TraceLine
+            status={TOOL_PROGRESS[progress].status}
+            className="text-xs"
+          >
+            <TraceTitle className="font-medium">{toolName}</TraceTitle>
+            <TraceDescription>{TOOL_PROGRESS[progress].label}</TraceDescription>
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent>
+          <dl className="flex flex-col gap-1">
+            <dt>Arguments</dt>
+            <dd className="text-foreground">
+              <pre className="overflow-x-auto whitespace-pre-wrap">
+                {prettyArgs(args)}
               </pre>
             </dd>
-          </>
-        )}
-      </dl>
-    </details>
+            {result && (
+              <>
+                <dt>Result</dt>
+                <dd className="text-foreground">
+                  <pre
+                    className={cn(
+                      'overflow-x-auto whitespace-pre-wrap',
+                      result.isError && 'text-destructive'
+                    )}
+                  >
+                    {result.content}
+                  </pre>
+                </dd>
+              </>
+            )}
+          </dl>
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </Trace>
   )
 }

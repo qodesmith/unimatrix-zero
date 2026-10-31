@@ -1,12 +1,25 @@
-import {Button} from '#modules/shadcn/main'
+import {Button} from '#shadcn/ui/button'
+import {Kbd, KbdGroup} from '#shadcn/ui/kbd'
+import {Slider} from '#shadcn/ui/slider'
 import {DEFAULT_SETTINGS, FONT_SIZE} from '@uz/contract/settings'
+import {useId} from 'react'
 
 import {useSettings, useUpdateSettings} from '../use-settings'
 import {Choice, Group, Toggle} from './Controls'
 
+function ModShortcut({keyName}: {keyName: string}) {
+  return (
+    <KbdGroup>
+      <Kbd>⌘/Ctrl</Kbd>
+      <Kbd>{keyName}</Kbd>
+    </KbdGroup>
+  )
+}
+
 export function AppearanceSection() {
   const settings = useSettings()
   const update = useUpdateSettings()
+  const fontSizeId = useId()
 
   return (
     <>
@@ -20,19 +33,20 @@ export function AppearanceSection() {
         ]}
         onChange={themeMode => void update({themeMode})}
       />
-      <Group legend="Font size">
+      <Group legend="Font size" legendId={fontSizeId}>
         <div className="flex items-center gap-3 text-sm">
-          <input
-            type="range"
-            aria-label="Font size"
-            className="accent-primary"
+          <Slider
+            aria-labelledby={fontSizeId}
+            className="w-32"
             min={FONT_SIZE.min}
             max={FONT_SIZE.max}
             step={FONT_SIZE.step}
-            value={settings.fontSize}
-            onChange={event =>
-              void update({fontSize: Number(event.target.value)})
-            }
+            value={[settings.fontSize]}
+            onValueChange={value => {
+              const [fontSize] = [value].flat()
+
+              if (fontSize !== undefined) void update({fontSize})
+            }}
           />
           <output>{settings.fontSize}px</output>
           <Button
@@ -45,7 +59,8 @@ export function AppearanceSection() {
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          ⌘/Ctrl + and − change it too, and ⌘/Ctrl 0 resets it.
+          <ModShortcut keyName="+" /> and <ModShortcut keyName="−" /> change it
+          too, and <ModShortcut keyName="0" /> resets it.
         </p>
       </Group>
       <Choice

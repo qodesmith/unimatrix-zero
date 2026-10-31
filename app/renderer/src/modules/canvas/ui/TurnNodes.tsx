@@ -2,9 +2,12 @@ import type {LayoutNode} from '../layout'
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Node, NodeProps} from '@xyflow/react'
 
-import {Button, cn} from '#modules/shadcn/main'
 import {ReplyView, useReply} from '#modules/turns/main'
+import {Button} from '#shadcn/ui/button'
+import {Card} from '#shadcn/ui/card'
 import {Handle, Position} from '@xyflow/react'
+import {cn} from 'cn'
+import {ChevronRightIcon} from 'lucide-react'
 import {useEffect, useRef, useState} from 'react'
 
 import {useCanvas} from '../canvas-context'
@@ -14,6 +17,7 @@ import {CappedText} from './CappedText'
 import {ContextMeter, ContextSize} from './ContextSize'
 import {PromptBox} from './PromptBox'
 import {PromptInput} from './PromptInput'
+import {TooltipButton} from './TooltipButton'
 
 /** A vertical Reply's line down through its Input's space, drawn as its edge. */
 export type Stem = 'none' | 'plain' | 'on-thread'
@@ -89,27 +93,13 @@ function OpenChatButton({replyId}: {replyId: string}) {
   const {openChat} = useCanvas()
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      title="Open in Chat mode"
-      aria-label="Open in Chat mode"
+    <TooltipButton
+      label="Open in Chat mode"
       className="ml-auto size-6 text-muted-foreground"
       onClick={() => openChat(replyId)}
     >
-      <svg
-        aria-hidden
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="size-4"
-      >
-        <path d="m9 18 6-6-6-6" />
-      </svg>
-    </Button>
+      <ChevronRightIcon />
+    </TooltipButton>
   )
 }
 
@@ -119,17 +109,18 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
 
   return (
     <footer className="px-3.5 pb-2.5">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="xs"
         aria-expanded={!collapsed}
         className={cn(
-          'rounded-full border border-border bg-muted px-2.5 py-0.5 text-[0.6875rem] text-muted-foreground',
-          'hover:text-foreground'
+          'h-auto rounded-full border-border bg-muted px-2.5 py-0.5 text-[0.6875rem] font-normal text-muted-foreground',
+          'hover:text-foreground aria-expanded:bg-muted aria-expanded:text-muted-foreground aria-expanded:hover:text-foreground dark:hover:bg-muted'
         )}
         onClick={() => toggleCollapsed(replyId)}
       >
         Fork · {branches} Branches
-      </button>
+      </Button>
     </footer>
   )
 }
@@ -232,12 +223,13 @@ function useHovered() {
 }
 
 /**
- * `joined` squares the bottom corners and fades the bottom border, so the box
- * runs on into the revealed Input under it.
+ * Clears Card's own padding, gap and ring, because the Prompt and Reply pad
+ * themselves, and its text-sm, so the text follows the font size Setting.
+ * `joined` runs the box on into the revealed Input under it.
  */
 function replyFrame(status: Reply['status'], joined: boolean) {
   return cn(
-    'relative z-10 overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-sm transition-[border-radius,border-color] ease-out motion-reduce:transition-none',
+    'relative z-10 gap-0 rounded-xl border border-border py-0 text-base shadow-sm ring-0 transition-[border-radius,border-color] ease-out motion-reduce:transition-none',
     status === 'failed' && 'border-destructive',
     status === 'streaming' && 'border-primary/50',
     joined && 'rounded-b-none border-b-transparent'
@@ -304,9 +296,9 @@ function ReplyTurn({reply, joined}: {reply: Reply; joined: boolean}) {
   const {status} = useReply(reply)
 
   return (
-    <div data-turn={reply.id} className={replyFrame(status, joined)}>
+    <Card data-turn={reply.id} className={replyFrame(status, joined)}>
       <ReplyBody reply={reply} />
-    </div>
+    </Card>
   )
 }
 
@@ -354,7 +346,7 @@ function ExchangeTurns({
   const status = useReply(reply)?.status ?? 'complete'
 
   return (
-    <div className={replyFrame(status, joined)}>
+    <Card className={replyFrame(status, joined)}>
       <PromptBox
         promptId={prompt.id}
         className="border-b border-border bg-prompt px-3.5 py-2.5 text-prompt-foreground"
@@ -366,6 +358,6 @@ function ExchangeTurns({
           <ReplyBody reply={reply} />
         </div>
       )}
-    </div>
+    </Card>
   )
 }

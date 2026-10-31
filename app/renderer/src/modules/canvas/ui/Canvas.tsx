@@ -8,6 +8,7 @@ import type {ReactNode} from 'react'
 
 import {useSettings, useUpdateSettings} from '#modules/settings/main'
 import {useTurns} from '#modules/turns/main'
+import {Alert, AlertDescription} from '#shadcn/ui/alert'
 import {ReactFlowProvider} from '@xyflow/react'
 import {
   useCallback,
@@ -140,7 +141,9 @@ export function Canvas({treeId, title}: CanvasProps) {
   if (turns.isError) {
     return (
       <CanvasFrame title={title}>
-        <p className="p-6 text-sm text-destructive">{turns.error.message}</p>
+        <Alert variant="destructive" className="m-6 w-auto">
+          <AlertDescription>{turns.error.message}</AlertDescription>
+        </Alert>
       </CanvasFrame>
     )
   }

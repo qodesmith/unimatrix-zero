@@ -37,13 +37,15 @@ Main's SQLite schema lives in `app/main/src/modules/database/schema.ts`. After c
 
 Inside a package, code lives in deep modules: `src/modules/<name>/main.ts` is the only file another module may import, written as `#modules/<name>/main`. Everything else in the folder is private, tests sit beside their unit, and `.tsx` files live under a `ui/` folder. The `uz/module-boundaries` and `uz/tsx-under-ui` lint rules in `tooling/oxlint/uz/` enforce this.
 
+The renderer's shadcn components are the exception: they sit outside `src/modules/` in `app/renderer/src/shadcn/`, with no `main.ts`, and code imports each file directly (`#shadcn/ui/button`).
+
 ### Colors
 
 Every color, radius and font in the UI is a Theme token (ADR 0009): the Hearth light and dark sets in `app/renderer/src/modules/theme/hearth.ts`, applied as CSS variables and mapped into Tailwind in `styles.css`. `uz/no-hardcoded-colors` fails the build on a palette class or a color literal anywhere under `app/renderer/src` except the `theme` module, which is where the token values live; `scripts/check-css-tokens.ts` does the same for CSS.
 
 ## Linting
 
-`oxlint.config.ts` turns on oxlint's `correctness`, `suspicious` and `perf` categories, lists every other rule it sets one entry per rule, and is type-aware, with warnings failing the run. Beside oxlint's own plugins it loads two JS plugins: `uz` (`tooling/oxlint/uz/`: module boundaries, `.tsx` under `ui/`, Theme-token colors, and tests that assert on their own fixtures) and `anti-slop` (`tooling/oxlint/anti-slop/`, a copy of [dmmulroy/anti-slop](https://github.com/dmmulroy/anti-slop) installed by the `install-anti-slop` skill; its `UPSTREAM.md` names the source commit). Each `uz` rule has a test beside it that runs the real oxlint over fixtures.
+`oxlint.config.ts` turns on oxlint's `correctness`, `suspicious` and `perf` categories, lists every other rule it sets one entry per rule, and is type-aware, with warnings failing the run. Beside oxlint's own plugins it loads two JS plugins: `uz` (`tooling/oxlint/uz/`: module boundaries, `.tsx` under `ui/`, Theme-token colors, controls from shadcn on Base UI, no React Server Components directives (`'use client'`, `'use server'`), and tests that assert on their own fixtures) and `anti-slop` (`tooling/oxlint/anti-slop/`, a copy of [dmmulroy/anti-slop](https://github.com/dmmulroy/anti-slop) installed by the `install-anti-slop` skill; its `UPSTREAM.md` names the source commit). Each `uz` rule has a test beside it that runs the real oxlint over fixtures.
 
 A disable comment carries its reason after `--`, and one that no longer suppresses anything fails the run. The `lint-fixing` skill has the fixes for the rules whose obvious fix is wrong.
 
