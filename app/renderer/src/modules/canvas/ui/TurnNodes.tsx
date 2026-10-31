@@ -225,10 +225,9 @@ function useHovered() {
 }
 
 /**
- * A Card with no padding, gap or ring of its own: the Prompt and Reply inside
- * pad themselves, and the text keeps the font size Setting. `joined` squares
- * the bottom corners and fades the bottom border, so the box runs on into the
- * revealed Input under it.
+ * Clears Card's own padding, gap and ring, because the Prompt and Reply pad
+ * themselves, and its text-sm, so the text follows the font size Setting.
+ * `joined` runs the box on into the revealed Input under it.
  */
 function replyFrame(status: Reply['status'], joined: boolean) {
   return cn(

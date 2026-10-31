@@ -1,9 +1,7 @@
 /**
- * Shows how each shadcn file we own differs from what `shadcn add` writes
- * today, so an upstream change can be picked in by hand. It generates in a
- * throwaway worktree and never writes to this one. `bun run shadcn:updates`
- * checks every component in app/renderer/src/shadcn; `bun run shadcn:updates
- * slider sheet` checks only the ones named.
+ * Diffs each shadcn file we own against what `shadcn add` writes today, in a
+ * throwaway worktree. `bun run shadcn:updates [name...]` checks every
+ * component, or only the ones named.
  */
 import {$, Glob} from 'bun'
 import {existsSync} from 'node:fs'

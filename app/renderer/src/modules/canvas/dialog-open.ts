@@ -1,7 +1,6 @@
 /**
- * An open dialog, such as the Settings Sheet or the confirmation to delete a
- * Prompt, owns Esc: the canvas's own Esc handlers leave it alone. Base UI marks
- * an open dialog or alert dialog `data-open`.
+ * An open dialog owns Esc, so the canvas's Esc handlers yield to it. Base UI
+ * marks one `data-open`.
  */
 export function dialogOpen() {
   return (

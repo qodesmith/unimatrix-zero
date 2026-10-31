@@ -104,9 +104,8 @@ const config: OxlintConfig = {
       },
     },
     {
-      // shadcn's own file layout: splitting sidebar.tsx, or moving
-      // buttonVariants and useSidebar out, breaks the imports other registry
-      // components make from these files.
+      // Other registry components import buttonVariants, useSidebar and the
+      // rest from these exact files, so they keep shadcn's layout.
       files: ['app/renderer/src/shadcn/**'],
       rules: {
         'max-lines': 'off',

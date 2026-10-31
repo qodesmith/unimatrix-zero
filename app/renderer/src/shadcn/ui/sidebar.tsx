@@ -20,7 +20,6 @@ import {cn} from 'cn'
 import {PanelLeftIcon} from 'lucide-react'
 import * as React from 'react'
 
-// React's style type has no custom properties; these add the sidebar's own.
 type CssVariables = React.CSSProperties & Record<`--${string}`, string>
 
 const SIDEBAR_WIDTH = '16rem'

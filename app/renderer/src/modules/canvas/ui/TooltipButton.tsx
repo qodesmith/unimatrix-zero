@@ -5,7 +5,6 @@ import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
 
 type TooltipButtonProps = ComponentProps<typeof Button> & {label: string}
 
-/** An icon button: its label names it and shows as its tooltip. */
 export function TooltipButton({label, ...props}: TooltipButtonProps) {
   return (
     <Tooltip>

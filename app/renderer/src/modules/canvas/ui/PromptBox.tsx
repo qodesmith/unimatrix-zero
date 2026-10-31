@@ -24,7 +24,6 @@ interface ConfirmationProps {
   onCancel: () => void
 }
 
-/** Modal: Esc or Cancel closes it, and focus goes back to the trigger. */
 function Confirmation({
   state,
   turnCount,
