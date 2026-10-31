@@ -105,7 +105,7 @@ function EmptyTree({treeId, onPlaced, onSent}: EmptyTreeProps) {
   )
 }
 
-type CanvasFrameProps = Heading & {
+type CanvasFrameProps = HeadingProps & {
   controls?: ReactNode
   children?: ReactNode
 }
@@ -131,14 +131,13 @@ function CanvasFrame({
   )
 }
 
-interface Heading {
+interface HeadingProps {
   /** The Tree's name, drawn in the row the controls share. */
   title: ReactNode
-  /** Drawn first in that row, at the canvas's top-left. */
   sidebarToggle?: ReactNode
 }
 
-type CanvasProps = Heading & {treeId: string}
+type CanvasProps = HeadingProps & {treeId: string}
 
 /** One Tree on the canvas: a centered Input while it is empty, then its Turns. */
 export function Canvas({treeId, ...heading}: CanvasProps) {
@@ -161,7 +160,7 @@ export function Canvas({treeId, ...heading}: CanvasProps) {
 
 interface TreeCanvasProps {
   treeId: string
-  heading: Heading
+  heading: HeadingProps
   turns: Turns
 }
 

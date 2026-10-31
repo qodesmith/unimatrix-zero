@@ -176,7 +176,6 @@ export const settings = sqliteTable(
   table => [uniqueIndex('settings_key').on(table.key)]
 )
 
-/** One row per Layout key, kept apart from Settings (ADR 0021). */
 export const layout = sqliteTable(
   'layout',
   {
