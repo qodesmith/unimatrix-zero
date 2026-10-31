@@ -1,3 +1,5 @@
+// The Playwright provider gives `cdp()` its `send`.
+/// <reference types="@vitest/browser-playwright" />
 import type {Bridge} from '@uz/contract/bridge'
 import type {Command, CommandOutcome, CommandType} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
@@ -7,9 +9,9 @@ import type {Prompt, Reply, StreamingReply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
 
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
-import {describe, expect, it} from 'vitest'
+import {describe, expect, it, onTestFinished} from 'vitest'
 import {render} from 'vitest-browser-react'
-import {page, userEvent} from 'vitest/browser'
+import {cdp, page, userEvent} from 'vitest/browser'
 
 import {App} from './App'
 
@@ -200,23 +202,11 @@ function zoomOf() {
   return scale === undefined ? Number.NaN : Number(scale)
 }
 
-async function settledViewport() {
-  let last: string | null = null
-
-  await expect
-    .poll(
-      () => {
-        const now = viewport()
-        const same = now === last
-        last = now
-
-        return same
-      },
-      {interval: 100}
-    )
-    .toBe(true)
-
-  return last
+/** '' clears the emulation: no preference. */
+async function emulateReducedMotion(value: 'reduce' | '') {
+  await cdp().send('Emulation.setEmulatedMedia', {
+    features: [{name: 'prefers-reduced-motion', value}],
+  })
 }
 
 function settingsSheet() {
@@ -279,15 +269,17 @@ it('opens Settings in a Sheet over the Tree, and closing it with the X shows the
       },
     ],
   })
+  await emulateReducedMotion('reduce')
+  onTestFinished(async () => emulateReducedMotion(''))
   await renderApp()
   await page.getByRole('button', {name: 'Trip planning'}).click()
   await expect.element(page.getByText('Lisbon')).toBeVisible()
-  await settledViewport()
+  await expect.poll(() => document.querySelector('.canvas-fitting')).toBeNull()
 
   const loaded = zoomOf()
   await page.getByRole('button', {name: 'Zoom in'}).click()
   await expect.poll(zoomOf).toBeGreaterThan(loaded * 1.1)
-  const zoomedIn = await settledViewport()
+  const zoomedIn = viewport()
 
   await openSettings()
   await settingsSheet().getByRole('button', {name: 'Close'}).click()

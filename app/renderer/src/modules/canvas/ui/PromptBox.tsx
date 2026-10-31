@@ -24,17 +24,34 @@ interface ConfirmationProps {
   onCancel: () => void
 }
 
+function confirmationView(state: PromptDeleteState) {
+  switch (state.status) {
+    case 'idle':
+      return {open: false, deleting: false, error: null}
+    case 'armed':
+      return {open: true, deleting: false, error: null}
+    case 'deleting':
+      return {open: true, deleting: true, error: null}
+    case 'refused':
+      return {open: true, deleting: false, error: state.error}
+    default:
+      throw new Error('Unknown delete state.')
+  }
+}
+
 function Confirmation({
   state,
   turnCount,
   onConfirm,
   onCancel,
 }: ConfirmationProps) {
+  const {open, deleting, error} = confirmationView(state)
+
   return (
     <AlertDialog
-      open={state.status !== 'idle'}
-      onOpenChange={open => {
-        if (!open) onCancel()
+      open={open}
+      onOpenChange={next => {
+        if (!next) onCancel()
       }}
     >
       <AlertDialogContent size="sm">
@@ -44,19 +61,19 @@ function Confirmation({
           </AlertDialogTitle>
           <AlertDialogDescription>This can’t be undone.</AlertDialogDescription>
         </AlertDialogHeader>
-        {state.status === 'refused' && (
+        {error !== null && (
           <p role="alert" className="text-sm text-destructive">
-            {state.error}
+            {error}
           </p>
         )}
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
-            disabled={state.status === 'deleting'}
+            disabled={deleting}
             onClick={onConfirm}
           >
-            {state.status === 'deleting' ? 'Deleting…' : 'Delete'}
+            {deleting ? 'Deleting…' : 'Delete'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

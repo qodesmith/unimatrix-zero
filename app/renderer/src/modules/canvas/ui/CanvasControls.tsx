@@ -25,9 +25,7 @@ interface CanvasControlsProps {
   onToggleMap: () => void
 }
 
-const TOOL_PROPS = {
-  className: "size-7 [&_svg:not([class*='size-'])]:size-3.5",
-} as const
+const TOOL_CLASS = "size-7 [&_svg:not([class*='size-'])]:size-3.5"
 
 const LABELS: Record<CanvasOrientation, string> = {
   vertical: 'Vertical',
@@ -76,21 +74,21 @@ export function CanvasControls({
       )}
       <TooltipButton
         label="Zoom in"
-        {...TOOL_PROPS}
+        className={TOOL_CLASS}
         onClick={() => void flow.zoomIn({duration: still ? 0 : 200})}
       >
         <PlusIcon />
       </TooltipButton>
       <TooltipButton
         label="Zoom out"
-        {...TOOL_PROPS}
+        className={TOOL_CLASS}
         onClick={() => void flow.zoomOut({duration: still ? 0 : 200})}
       >
         <MinusIcon />
       </TooltipButton>
       <TooltipButton
         label="Fit the whole Tree"
-        {...TOOL_PROPS}
+        className={TOOL_CLASS}
         onClick={() =>
           void flow.fitView({
             padding: 0.15,
@@ -110,7 +108,7 @@ export function CanvasControls({
               pressed={showMap}
               onPressedChange={() => onToggleMap()}
               className={cn(
-                TOOL_PROPS.className,
+                TOOL_CLASS,
                 'min-w-7 px-0 aria-pressed:bg-accent aria-pressed:text-accent-foreground'
               )}
             />
