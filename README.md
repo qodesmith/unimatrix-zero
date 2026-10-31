@@ -45,7 +45,7 @@ Every color, radius and font in the UI is a Theme token (ADR 0009): the Hearth l
 
 ## Linting
 
-`oxlint.config.ts` turns on oxlint's `correctness`, `suspicious` and `perf` categories, lists every other rule it sets one entry per rule, and is type-aware, with warnings failing the run. Beside oxlint's own plugins it loads two JS plugins: `uz` (`tooling/oxlint/uz/`: module boundaries, `.tsx` under `ui/`, Theme-token colors, controls from shadcn on Base UI, no `'use client'` directives, and tests that assert on their own fixtures) and `anti-slop` (`tooling/oxlint/anti-slop/`, a copy of [dmmulroy/anti-slop](https://github.com/dmmulroy/anti-slop) installed by the `install-anti-slop` skill; its `UPSTREAM.md` names the source commit). Each `uz` rule has a test beside it that runs the real oxlint over fixtures.
+`oxlint.config.ts` turns on oxlint's `correctness`, `suspicious` and `perf` categories, lists every other rule it sets one entry per rule, and is type-aware, with warnings failing the run. Beside oxlint's own plugins it loads two JS plugins: `uz` (`tooling/oxlint/uz/`: module boundaries, `.tsx` under `ui/`, Theme-token colors, controls from shadcn on Base UI, no React Server Components directives (`'use client'`, `'use server'`), and tests that assert on their own fixtures) and `anti-slop` (`tooling/oxlint/anti-slop/`, a copy of [dmmulroy/anti-slop](https://github.com/dmmulroy/anti-slop) installed by the `install-anti-slop` skill; its `UPSTREAM.md` names the source commit). Each `uz` rule has a test beside it that runs the real oxlint over fixtures.
 
 A disable comment carries its reason after `--`, and one that no longer suppresses anything fails the run. The `lint-fixing` skill has the fixes for the rules whose obvious fix is wrong.
 

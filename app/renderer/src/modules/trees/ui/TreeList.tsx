@@ -11,6 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '#shadcn/ui/sidebar'
+import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
 import {TREE_TITLE_MAX_LENGTH} from '@uz/contract/trees'
 import {PlusIcon} from 'lucide-react'
 import {useRef, useState} from 'react'
@@ -35,10 +36,13 @@ export function TreeList({
   return (
     <SidebarGroup role="region" aria-label="Trees">
       <SidebarGroupLabel render={<h2 />}>Trees</SidebarGroupLabel>
-      <SidebarGroupAction title="New Tree" onClick={onCreate}>
-        <PlusIcon />
-        <span className="sr-only">New Tree</span>
-      </SidebarGroupAction>
+      <Tooltip>
+        <TooltipTrigger render={<SidebarGroupAction onClick={onCreate} />}>
+          <PlusIcon />
+          <span className="sr-only">New Tree</span>
+        </TooltipTrigger>
+        <TooltipContent side="right">New Tree</TooltipContent>
+      </Tooltip>
       <SidebarGroupContent>
         {trees.length === 0 ? (
           <div className="px-2 text-xs text-muted-foreground">

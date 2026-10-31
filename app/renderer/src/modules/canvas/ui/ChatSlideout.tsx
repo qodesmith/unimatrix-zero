@@ -1,9 +1,7 @@
 import type {Prompt, Reply} from '@uz/contract/turns'
-import type {ReactNode} from 'react'
 
 import {ReplyView, useReply} from '#modules/turns/main'
 import {Bubble, BubbleContent} from '#shadcn/ui/bubble'
-import {Button} from '#shadcn/ui/button'
 import {Message, MessageContent} from '#shadcn/ui/message'
 import {cn} from 'cn'
 import {Maximize2Icon, Minimize2Icon, XIcon} from 'lucide-react'
@@ -14,6 +12,7 @@ import {useCanvas} from '../canvas-context'
 import {dialogOpen} from '../dialog-open'
 import {pathTo} from '../tree'
 import {PromptInput} from './PromptInput'
+import {TooltipButton} from './TooltipButton'
 
 interface ChatSlideoutProps {
   /** The Reply the shown Thread ends at. */
@@ -132,15 +131,24 @@ export function ChatSlideout({
       <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2">
         <h2 className="text-xs text-muted-foreground">Thread</h2>
         <div className="flex gap-1">
-          <HeaderButton
-            title={full ? 'Exit full screen' : 'Full screen'}
+          <TooltipButton
+            label={full ? 'Exit full screen' : 'Full screen'}
+            variant="ghost"
+            size="icon"
+            className="size-7"
             onClick={() => setFull(!full)}
           >
             {full ? <Minimize2Icon /> : <Maximize2Icon />}
-          </HeaderButton>
-          <HeaderButton title="Close" onClick={onClose}>
+          </TooltipButton>
+          <TooltipButton
+            label="Close"
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            onClick={onClose}
+          >
             <XIcon />
-          </HeaderButton>
+          </TooltipButton>
         </div>
       </header>
       <div
@@ -254,28 +262,5 @@ function ChatInput({end, onFocus, onSent}: ChatInputProps) {
         />
       </div>
     </footer>
-  )
-}
-
-function HeaderButton({
-  title,
-  onClick,
-  children,
-}: {
-  title: string
-  onClick: () => void
-  children: ReactNode
-}) {
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      title={title}
-      aria-label={title}
-      className="size-7"
-      onClick={onClick}
-    >
-      {children}
-    </Button>
   )
 }

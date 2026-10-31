@@ -4,7 +4,7 @@ import {defineRule} from '@oxlint/plugins'
 
 const DIRECTIVES = new Set(['use client', 'use server'])
 
-export const noUseClient: Rule = defineRule({
+export const noRscDirectives: Rule = defineRule({
   meta: {
     type: 'suggestion',
     docs: {

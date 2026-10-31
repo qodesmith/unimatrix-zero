@@ -15,6 +15,7 @@ import {
 } from '#modules/settings/main'
 import {TreeList, TreeTitle, useTrees} from '#modules/trees/main'
 import {LiveReplies} from '#modules/turns/main'
+import {Alert, AlertDescription} from '#shadcn/ui/alert'
 import {Button} from '#shadcn/ui/button'
 import {Sheet, SheetContent, SheetTrigger} from '#shadcn/ui/sheet'
 import {
@@ -28,6 +29,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from '#shadcn/ui/sidebar'
+import {TooltipProvider} from '#shadcn/ui/tooltip'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {SettingsIcon} from 'lucide-react'
 import {useState} from 'react'
@@ -44,7 +46,9 @@ export function App() {
         <FollowFontSize />
         <ConnectionsProvider>
           <LiveReplies>
-            <AppLayout />
+            <TooltipProvider>
+              <AppLayout />
+            </TooltipProvider>
           </LiveReplies>
         </ConnectionsProvider>
       </SettingsProvider>
@@ -113,7 +117,11 @@ function AppLayout() {
             onRename={(treeId, title) => void rename(treeId, title)}
           />
           {treesError && (
-            <p className="px-4 text-xs text-destructive">{treesError}</p>
+            <Alert variant="destructive" className="mx-2 w-auto">
+              <AlertDescription className="text-xs">
+                {treesError}
+              </AlertDescription>
+            </Alert>
           )}
         </SidebarContent>
         <SidebarFooter>

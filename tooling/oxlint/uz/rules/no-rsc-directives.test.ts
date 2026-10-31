@@ -2,8 +2,8 @@ import {describe, expect, it} from 'vitest'
 
 import {codesFor, lintFixture} from '../../lint-fixture'
 
-describe('uz/no-use-client', () => {
-  const diagnostics = lintFixture(['uz/no-use-client'], {
+describe('uz/no-rsc-directives', () => {
+  const diagnostics = lintFixture(['uz/no-rsc-directives'], {
     'src/client.tsx': "'use client'\n\nexport const x = 1\n",
     'src/server.ts': '"use server"\n\nexport const x = 1\n',
     'src/inner.ts': "export function act() {\n  'use server'\n  return 1\n}\n",
@@ -14,7 +14,7 @@ describe('uz/no-use-client', () => {
   it("fails a 'use client' or 'use server' directive, at the top or in a function", () => {
     for (const file of ['client.tsx', 'server.ts', 'inner.ts'])
       expect(codesFor(diagnostics, `src/${file}`)).toEqual([
-        'uz(no-use-client)',
+        'uz(no-rsc-directives)',
       ])
   })
 

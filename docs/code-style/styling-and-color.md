@@ -4,7 +4,7 @@
 
 - The decision is [ADR 0020](../adr/0020-renderer-ui-is-shadcn-on-base-ui.md). Add a component with `shadcn add` from `app/renderer` (the `base-vega` style in `components.json`); it lands in `app/renderer/src/shadcn/ui/`, and code imports each component from its own file, as `#shadcn/ui/button`. There is no barrel.
 - Never let `shadcn add` overwrite a component we already have: our copies carry lint fixes and changes of our own. `bun run shadcn:updates [component...]` shows how each of ours differs from what `shadcn add` writes today; bring in by hand the upstream changes worth having.
-- AI Elements (Message, Bubble, Trace and the rest) are shadcn registry components like any other: add them with `shadcn add`, never by copying from their docs pages. They take our own data as props, with no AI SDK.
+- AI Elements (Message, Bubble, Trace and the rest) are shadcn registry components like any other: add them with `shadcn add`, never by copying from their docs pages. They take our own data as props, with no AI SDK. Use only shadcn's set, never Vercel's separate AI Elements registry (`registry.ai-sdk.dev`).
 
 ## Style with Tailwind utilities at the call site
 

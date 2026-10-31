@@ -47,10 +47,7 @@ export function useEscapeStops({
 
       const {target} = event
 
-      if (
-        target instanceof Element &&
-        target.closest('input, textarea, [data-handles-escape]')
-      ) {
+      if (target instanceof Element && target.closest('input, textarea')) {
         return
       }
 

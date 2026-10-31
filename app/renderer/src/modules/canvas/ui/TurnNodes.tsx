@@ -4,6 +4,7 @@ import type {Node, NodeProps} from '@xyflow/react'
 
 import {ReplyView, useReply} from '#modules/turns/main'
 import {Button} from '#shadcn/ui/button'
+import {Card} from '#shadcn/ui/card'
 import {Handle, Position} from '@xyflow/react'
 import {cn} from 'cn'
 import {ChevronRightIcon} from 'lucide-react'
@@ -16,6 +17,7 @@ import {CappedText} from './CappedText'
 import {ContextMeter, ContextSize} from './ContextSize'
 import {PromptBox} from './PromptBox'
 import {PromptInput} from './PromptInput'
+import {TooltipButton} from './TooltipButton'
 
 /** A vertical Reply's line down through its Input's space, drawn as its edge. */
 export type Stem = 'none' | 'plain' | 'on-thread'
@@ -91,16 +93,15 @@ function OpenChatButton({replyId}: {replyId: string}) {
   const {openChat} = useCanvas()
 
   return (
-    <Button
+    <TooltipButton
+      label="Open in Chat mode"
       variant="ghost"
       size="icon"
-      title="Open in Chat mode"
-      aria-label="Open in Chat mode"
       className="ml-auto size-6 text-muted-foreground"
       onClick={() => openChat(replyId)}
     >
       <ChevronRightIcon />
-    </Button>
+    </TooltipButton>
   )
 }
 
@@ -224,12 +225,14 @@ function useHovered() {
 }
 
 /**
- * `joined` squares the bottom corners and fades the bottom border, so the box
- * runs on into the revealed Input under it.
+ * A Card with no padding, gap or ring of its own: the Prompt and Reply inside
+ * pad themselves, and the text keeps the font size Setting. `joined` squares
+ * the bottom corners and fades the bottom border, so the box runs on into the
+ * revealed Input under it.
  */
 function replyFrame(status: Reply['status'], joined: boolean) {
   return cn(
-    'relative z-10 overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-sm transition-[border-radius,border-color] ease-out motion-reduce:transition-none',
+    'relative z-10 gap-0 rounded-xl border border-border py-0 text-base shadow-sm ring-0 transition-[border-radius,border-color] ease-out motion-reduce:transition-none',
     status === 'failed' && 'border-destructive',
     status === 'streaming' && 'border-primary/50',
     joined && 'rounded-b-none border-b-transparent'
@@ -296,9 +299,9 @@ function ReplyTurn({reply, joined}: {reply: Reply; joined: boolean}) {
   const {status} = useReply(reply)
 
   return (
-    <div data-turn={reply.id} className={replyFrame(status, joined)}>
+    <Card data-turn={reply.id} className={replyFrame(status, joined)}>
       <ReplyBody reply={reply} />
-    </div>
+    </Card>
   )
 }
 
@@ -346,7 +349,7 @@ function ExchangeTurns({
   const status = useReply(reply)?.status ?? 'complete'
 
   return (
-    <div className={replyFrame(status, joined)}>
+    <Card className={replyFrame(status, joined)}>
       <PromptBox
         promptId={prompt.id}
         className="border-b border-border bg-prompt px-3.5 py-2.5 text-prompt-foreground"
@@ -358,6 +361,6 @@ function ExchangeTurns({
           <ReplyBody reply={reply} />
         </div>
       )}
-    </div>
+    </Card>
   )
 }

@@ -1,4 +1,5 @@
 import {Button} from '#shadcn/ui/button'
+import {Kbd, KbdGroup} from '#shadcn/ui/kbd'
 import {Slider} from '#shadcn/ui/slider'
 import {DEFAULT_SETTINGS, FONT_SIZE} from '@uz/contract/settings'
 import {useId} from 'react'
@@ -49,7 +50,21 @@ export function AppearanceSection() {
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          ⌘/Ctrl + and − change it too, and ⌘/Ctrl 0 resets it.
+          <KbdGroup>
+            <Kbd>⌘/Ctrl</Kbd>
+            <Kbd>+</Kbd>
+          </KbdGroup>{' '}
+          and{' '}
+          <KbdGroup>
+            <Kbd>⌘/Ctrl</Kbd>
+            <Kbd>−</Kbd>
+          </KbdGroup>{' '}
+          change it too, and{' '}
+          <KbdGroup>
+            <Kbd>⌘/Ctrl</Kbd>
+            <Kbd>0</Kbd>
+          </KbdGroup>{' '}
+          resets it.
         </p>
       </Group>
       <Choice

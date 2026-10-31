@@ -2,12 +2,23 @@ import type {Card} from '../cards'
 import type {ProviderId, SignInStep} from '@uz/contract/providers'
 import type {ReactNode} from 'react'
 
+import {Badge} from '#shadcn/ui/badge'
 import {Button} from '#shadcn/ui/button'
+import {
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  Card as CardRoot,
+  CardTitle,
+} from '#shadcn/ui/card'
+import {Field, FieldError, FieldLabel} from '#shadcn/ui/field'
 import {Input} from '#shadcn/ui/input'
+import {Progress} from '#shadcn/ui/progress'
 import {PROVIDER_NAMES, SignInStepEvent} from '@uz/contract/providers'
 import {cn} from 'cn'
 import {CheckIcon} from 'lucide-react'
-import {useState} from 'react'
+import {useId, useState} from 'react'
 
 import {ABOUT, failureLine} from '../about'
 
@@ -37,12 +48,13 @@ export function ProviderCard({
   const about = ABOUT[provider]
 
   return (
-    <section
+    <CardRoot
+      role="region"
       aria-label={name}
       data-state={card.kind}
-      className="flex w-80 flex-col gap-5 rounded-xl border-2 border-transparent bg-card p-6 text-card-foreground shadow-sm data-[state=connected]:border-success data-[state=failed]:border-destructive/40"
+      className="w-80 gap-5 data-[state=connected]:ring-2 data-[state=connected]:ring-success data-[state=failed]:ring-2 data-[state=failed]:ring-destructive/40"
     >
-      <header className="flex items-center gap-3">
+      <CardHeader className="flex items-center gap-3">
         <span
           aria-hidden
           className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-primary text-2xl text-primary-foreground"
@@ -50,14 +62,18 @@ export function ProviderCard({
           {about.mark}
         </span>
         <div>
-          <h2 className="text-xl font-semibold">{name}</h2>
-          <p className="text-sm text-muted-foreground">
+          <CardTitle>
+            <h2 className="text-xl font-semibold">{name}</h2>
+          </CardTitle>
+          <CardDescription>
             {about.plans} · by {about.company}
-          </p>
+          </CardDescription>
         </div>
-      </header>
-      <CardBody provider={provider} card={card} {...actions} />
-      <footer className="mt-auto flex flex-col gap-2">
+      </CardHeader>
+      <CardContent>
+        <CardBody provider={provider} card={card} {...actions} />
+      </CardContent>
+      <CardFooter className="mt-auto flex-col items-stretch gap-2">
         <CardAction
           provider={provider}
           card={card}
@@ -69,8 +85,8 @@ export function ProviderCard({
             You can connect {name} once {PROVIDER_NAMES[waitingFor]} is done.
           </p>
         )}
-      </footer>
-    </section>
+      </CardFooter>
+    </CardRoot>
   )
 }
 
@@ -99,9 +115,12 @@ function CardBody({
         <CheckIcon aria-hidden className="size-6 text-success" />
         <p className="font-medium">Connected</p>
         <p className="text-sm text-muted-foreground">{card.account.email}</p>
-        <p className="rounded-full bg-background px-2 text-xs text-muted-foreground">
+        <Badge
+          variant="outline"
+          className="bg-background text-muted-foreground"
+        >
           {name} {card.account.plan}
-        </p>
+        </Badge>
       </div>
     )
   }
@@ -200,21 +219,12 @@ function DownloadProgress({provider, step}: StepDetailProps) {
   const {receivedBytes, totalBytes} = step.progress
 
   return (
-    <div
-      role="progressbar"
+    <Progress
       aria-label={`Getting ${PROVIDER_NAMES[provider]} ready`}
-      aria-valuemin={0}
-      aria-valuemax={totalBytes}
-      aria-valuenow={receivedBytes}
-      className="ml-7 h-1.5 overflow-hidden rounded-full bg-muted"
-    >
-      <div
-        className="h-full bg-primary transition-all"
-        style={{
-          width: `${totalBytes ? (receivedBytes / totalBytes) * 100 : 0}%`,
-        }}
-      />
-    </div>
+      value={receivedBytes}
+      max={totalBytes}
+      className="ml-7"
+    />
   )
 }
 
@@ -232,6 +242,8 @@ function PageNote({provider, step, openPage}: StepDetailProps) {
 
 /** Without a link while a new page replaces one whose code was refused. */
 function PasteCode({provider, step, openPage, submitCode}: StepDetailProps) {
+  const urlId = useId()
+
   return (
     <div className="ml-7 flex flex-col gap-2">
       <CodeEntry
@@ -241,15 +253,21 @@ function PasteCode({provider, step, openPage, submitCode}: StepDetailProps) {
         submitCode={submitCode}
       />
       {step.url && (
-        <label className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-          {PROVIDER_NAMES[provider]}’s page
+        <Field className="gap-0.5">
+          <FieldLabel
+            htmlFor={urlId}
+            className="text-xs font-normal text-muted-foreground"
+          >
+            {PROVIDER_NAMES[provider]}’s page
+          </FieldLabel>
           <Input
+            id={urlId}
             readOnly
             value={step.url}
             onFocus={event => event.target.select()}
             className="h-7 truncate px-2 text-xs md:text-xs"
           />
-        </label>
+        </Field>
       )}
       <OpenAgain url={step.url} openPage={openPage} />
     </div>
@@ -318,10 +336,10 @@ function CodeEntry({
         </Button>
       </div>
       {wrongCode && (
-        <p className="text-xs text-destructive">
+        <FieldError className="text-xs">
           That code didn’t work. Copy it again from {PROVIDER_NAMES[provider]}’s
           page.
-        </p>
+        </FieldError>
       )}
     </form>
   )

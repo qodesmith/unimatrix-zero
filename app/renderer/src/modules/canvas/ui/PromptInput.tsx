@@ -2,6 +2,7 @@ import type {KeyboardEvent, Ref} from 'react'
 
 import {useSettings} from '#modules/settings/main'
 import {useSendPrompt} from '#modules/turns/main'
+import {FieldError} from '#shadcn/ui/field'
 import {
   InputGroup,
   InputGroupAddon,
@@ -103,11 +104,12 @@ export function PromptInput({
           onKeyDown={onKeyDown}
         />
         <InputGroupAddon align="block-end" className="justify-between">
-          <p className="text-xs font-normal text-destructive">{error}</p>
+          <FieldError className="text-xs">{error}</FieldError>
           <InputGroupButton
             type="submit"
             variant="default"
             size="sm"
+            className="ml-auto"
             disabled={!canSend || sending || draft.trim() === ''}
           >
             Send

@@ -1,79 +1,67 @@
 import type {PromptDeleteState} from '../prompt-delete/machine'
-import type {KeyboardEvent, ReactNode} from 'react'
+import type {ReactNode} from 'react'
 
-import {Button} from '#shadcn/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '#shadcn/ui/alert-dialog'
 import {cn} from 'cn'
 import {TrashIcon} from 'lucide-react'
-import {useEffect, useRef} from 'react'
 
 import {usePromptDelete} from '../prompt-delete/use-prompt-delete'
+import {TooltipButton} from './TooltipButton'
 
 interface ConfirmationProps {
-  state: Exclude<PromptDeleteState, {status: 'idle'}>
+  state: PromptDeleteState
   turnCount: number
   onConfirm: () => void
   onCancel: () => void
 }
 
+/** Modal: Esc or Cancel closes it, and focus goes back to the trigger. */
 function Confirmation({
   state,
   turnCount,
   onConfirm,
   onCancel,
 }: ConfirmationProps) {
-  const cancelButton = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    cancelButton.current?.focus({preventScroll: true})
-  }, [])
-
-  function onKeyDown(event: KeyboardEvent) {
-    if (event.key !== 'Escape') return
-
-    event.preventDefault()
-    onCancel()
-  }
-
   return (
-    <div
-      role="group"
-      aria-label="Delete this Prompt"
-      data-handles-escape
-      className="flex max-w-md flex-col gap-1 rounded-lg border border-border bg-card py-1 pr-1 pl-3 text-xs text-card-foreground shadow-md"
-      onKeyDown={onKeyDown}
+    <AlertDialog
+      open={state.status !== 'idle'}
+      onOpenChange={open => {
+        if (!open) onCancel()
+      }}
     >
-      <div className="flex items-center gap-1.5">
-        <p className="mr-1 whitespace-nowrap">
-          <span className="font-medium">
+      <AlertDialogContent size="sm">
+        <AlertDialogHeader>
+          <AlertDialogTitle>
             Delete {turnCount} {turnCount === 1 ? 'Turn' : 'Turns'}?
-          </span>{' '}
-          <span className="text-muted-foreground">This can’t be undone.</span>
-        </p>
-        <Button
-          ref={cancelButton}
-          variant="ghost"
-          size="sm"
-          className="h-6 px-2 text-xs"
-          onClick={onCancel}
-        >
-          Cancel
-        </Button>
-        <Button
-          variant="destructive"
-          size="sm"
-          className="h-6 px-2 text-xs"
-          disabled={state.status === 'deleting'}
-          onClick={onConfirm}
-        >
-          {state.status === 'deleting' ? 'Deleting…' : 'Delete'}
-        </Button>
-      </div>
-      {state.status === 'refused' && (
-        <p role="alert" className="pr-2 pb-1 text-destructive">
-          {state.error}
-        </p>
-      )}
-    </div>
+          </AlertDialogTitle>
+          <AlertDialogDescription>This can’t be undone.</AlertDialogDescription>
+        </AlertDialogHeader>
+        {state.status === 'refused' && (
+          <p role="alert" className="text-sm text-destructive">
+            {state.error}
+          </p>
+        )}
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={state.status === 'deleting'}
+            onClick={onConfirm}
+          >
+            {state.status === 'deleting' ? 'Deleting…' : 'Delete'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
 
@@ -84,33 +72,17 @@ interface PromptBoxProps {
 }
 
 /**
- * A Prompt's box, with its delete control and confirmation drawn over its
- * top-right corner, so neither shifts anything on the canvas.
+ * A Prompt's box, with its delete control drawn over its top-right corner, so
+ * it shifts nothing on the canvas.
  */
 export function PromptBox({promptId, className, children}: PromptBoxProps) {
   const {state, offered, turnCount, arm, cancel, confirm} =
     usePromptDelete(promptId)
 
-  const trigger = useRef<HTMLButtonElement>(null)
-  const refocus = useRef(false)
-
-  useEffect(() => {
-    if (state.status !== 'idle' || !refocus.current) return
-
-    refocus.current = false
-    trigger.current?.focus({preventScroll: true})
-  }, [state.status])
-
-  function cancelFromConfirmation() {
-    refocus.current = true
-    cancel()
-  }
-
   return (
     <div
       data-turn={promptId}
       className={cn('group/prompt relative', className)}
-      onPointerLeave={cancel}
     >
       {children}
       {offered && (
@@ -122,26 +94,21 @@ export function PromptBox({promptId, className, children}: PromptBoxProps) {
               'opacity-0 group-hover/prompt:opacity-100 focus-within:opacity-100'
           )}
         >
-          {state.status === 'idle' ? (
-            <Button
-              ref={trigger}
-              variant="ghost"
-              size="icon"
-              title="Delete this Prompt and everything below it"
-              aria-label="Delete this Prompt and everything below it"
-              className="size-6 bg-card text-muted-foreground shadow-sm hover:text-destructive"
-              onClick={arm}
-            >
-              <TrashIcon className="size-3.5" />
-            </Button>
-          ) : (
-            <Confirmation
-              state={state}
-              turnCount={turnCount}
-              onConfirm={confirm}
-              onCancel={cancelFromConfirmation}
-            />
-          )}
+          <TooltipButton
+            label="Delete this Prompt and everything below it"
+            variant="ghost"
+            size="icon"
+            className="size-6 bg-card text-muted-foreground shadow-sm hover:text-destructive"
+            onClick={arm}
+          >
+            <TrashIcon className="size-3.5" />
+          </TooltipButton>
+          <Confirmation
+            state={state}
+            turnCount={turnCount}
+            onConfirm={confirm}
+            onCancel={cancel}
+          />
         </div>
       )}
     </div>

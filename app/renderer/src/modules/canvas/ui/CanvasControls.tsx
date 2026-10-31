@@ -1,7 +1,9 @@
 import type {CanvasOrientation} from '@uz/contract/settings'
-import type {ReactNode} from 'react'
 
 import {Button} from '#shadcn/ui/button'
+import {Toggle} from '#shadcn/ui/toggle'
+import {ToggleGroup, ToggleGroupItem} from '#shadcn/ui/toggle-group'
+import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
 import {CanvasOrientationSchema} from '@uz/contract/settings'
 import {useReactFlow} from '@xyflow/react'
 import {cn} from 'cn'
@@ -9,6 +11,7 @@ import {MapIcon, MinusIcon, PlusIcon, ScanIcon} from 'lucide-react'
 import {useRef} from 'react'
 
 import {useReducedMotion} from '../reduced-motion'
+import {TooltipButton} from './TooltipButton'
 
 interface CanvasControlsProps {
   orientation: CanvasOrientation
@@ -21,6 +24,12 @@ interface CanvasControlsProps {
   showMap: boolean
   onToggleMap: () => void
 }
+
+const TOOL_PROPS = {
+  variant: 'ghost',
+  size: 'icon',
+  className: "size-7 [&_svg:not([class*='size-'])]:size-3.5",
+} as const
 
 const LABELS: Record<CanvasOrientation, string> = {
   vertical: 'Vertical',
@@ -67,20 +76,23 @@ export function CanvasControls({
           )}
         </div>
       )}
-      <ToolButton
-        title="Zoom in"
+      <TooltipButton
+        label="Zoom in"
+        {...TOOL_PROPS}
         onClick={() => void flow.zoomIn({duration: still ? 0 : 200})}
       >
         <PlusIcon />
-      </ToolButton>
-      <ToolButton
-        title="Zoom out"
+      </TooltipButton>
+      <TooltipButton
+        label="Zoom out"
+        {...TOOL_PROPS}
         onClick={() => void flow.zoomOut({duration: still ? 0 : 200})}
       >
         <MinusIcon />
-      </ToolButton>
-      <ToolButton
-        title="Fit the whole Tree"
+      </TooltipButton>
+      <TooltipButton
+        label="Fit the whole Tree"
+        {...TOOL_PROPS}
         onClick={() =>
           void flow.fitView({
             padding: 0.15,
@@ -90,36 +102,48 @@ export function CanvasControls({
         }
       >
         <ScanIcon />
-      </ToolButton>
-      <ToolButton
-        title="Show the minimap"
-        pressed={showMap}
-        onClick={onToggleMap}
-      >
-        <MapIcon />
-      </ToolButton>
-      <div
-        role="group"
+      </TooltipButton>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Toggle
+              aria-label="Show the minimap"
+              size="sm"
+              pressed={showMap}
+              onPressedChange={() => onToggleMap()}
+              className={cn(
+                TOOL_PROPS.className,
+                'min-w-7 px-0 aria-pressed:bg-accent aria-pressed:text-accent-foreground'
+              )}
+            />
+          }
+        >
+          <MapIcon />
+        </TooltipTrigger>
+        <TooltipContent>Show the minimap</TooltipContent>
+      </Tooltip>
+      <ToggleGroup
         aria-label="Orientation"
-        className="ml-1 flex rounded-lg bg-muted p-0.5"
+        spacing={0}
+        value={[orientation]}
+        onValueChange={([next]) => {
+          const parsed = CanvasOrientationSchema.safeParse(next)
+
+          if (parsed.success) onOrientation(parsed.data)
+        }}
+        className="ml-1 rounded-lg bg-muted p-0.5"
       >
         {CanvasOrientationSchema.options.map(value => (
-          <Button
+          <ToggleGroupItem
             key={value}
-            variant="ghost"
-            aria-pressed={orientation === value}
-            className={cn(
-              'h-auto border-0 px-2 py-1 text-[0.6875rem] font-normal',
-              orientation === value
-                ? 'bg-card text-card-foreground shadow-sm hover:bg-card hover:text-card-foreground dark:hover:bg-card'
-                : 'text-muted-foreground hover:bg-transparent dark:hover:bg-transparent'
-            )}
-            onClick={() => onOrientation(value)}
+            value={value}
+            size="sm"
+            className="h-auto min-w-0 rounded-md! px-2 py-1 text-[0.6875rem] font-normal text-muted-foreground hover:bg-transparent aria-pressed:bg-card aria-pressed:text-card-foreground aria-pressed:shadow-sm"
           >
             {LABELS[value]}
-          </Button>
+          </ToggleGroupItem>
         ))}
-      </div>
+      </ToggleGroup>
     </div>
   )
 }
@@ -147,44 +171,21 @@ function JumpButton({label, title, ids, onJump, dotClass}: JumpButtonProps) {
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      title={title}
-      className="h-7 gap-1.5 px-2 text-[0.6875rem]"
-      onClick={next}
-    >
-      <span className={cn('size-2 rounded-full', dotClass)} />
-      {label}
-    </Button>
-  )
-}
-
-function ToolButton({
-  title,
-  pressed,
-  onClick,
-  children,
-}: {
-  title: string
-  pressed?: boolean
-  onClick: () => void
-  children: ReactNode
-}) {
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      title={title}
-      aria-label={title}
-      aria-pressed={pressed}
-      className={cn(
-        "size-7 [&_svg:not([class*='size-'])]:size-3.5",
-        pressed && 'bg-accent text-accent-foreground'
-      )}
-      onClick={onClick}
-    >
-      {children}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2 text-[0.6875rem]"
+            onClick={next}
+          />
+        }
+      >
+        <span className={cn('size-2 rounded-full', dotClass)} />
+        {label}
+      </TooltipTrigger>
+      <TooltipContent>{title}</TooltipContent>
+    </Tooltip>
   )
 }

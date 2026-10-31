@@ -1,9 +1,12 @@
+import {Badge} from '#shadcn/ui/badge'
 import {Button} from '#shadcn/ui/button'
+import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
 import {cn} from 'cn'
 import {InfoIcon, XIcon} from 'lucide-react'
 import {useRef, useState} from 'react'
 
 import {formatTokens} from '../format'
+import {TooltipButton} from './TooltipButton'
 
 interface ContextSizeProps {
   contextSize: number
@@ -36,12 +39,13 @@ export function ContextSize({
 
   return (
     <>
-      <span
+      <Badge
+        variant="secondary"
         aria-label={`Context size ${formatTokens(contextSize)}`}
-        className="cursor-default rounded-md bg-muted px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted-foreground"
+        className="cursor-default rounded-md bg-muted px-1.5 font-mono text-[0.6875rem] text-muted-foreground"
       >
         {formatTokens(contextSize)} ctx
-      </span>
+      </Badge>
       <Button
         ref={info}
         variant="ghost"
@@ -96,16 +100,15 @@ function ContextSizeDrawer({
     >
       <div className="flex items-center justify-between border-b border-border py-1 pr-1 pl-3">
         <h3 className="text-xs text-muted-foreground">Context size</h3>
-        <Button
+        <TooltipButton
+          label="Close"
           variant="ghost"
           size="icon"
-          title="Close"
-          aria-label="Close"
           className="size-6"
           onClick={onClose}
         >
           <XIcon />
-        </Button>
+        </TooltipButton>
       </div>
       <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-3 py-2 text-xs">
         {added !== null && (
@@ -136,16 +139,24 @@ export function ContextMeter({contextSize, contextWindow}: ContextMeterProps) {
   const percent = Math.min(100, (contextSize / contextWindow) * 100)
 
   return (
-    <div
-      role="meter"
-      aria-label="Context size toward the Context window"
-      aria-valuenow={contextSize}
-      aria-valuemin={0}
-      aria-valuemax={contextWindow}
-      title={`${formatTokens(contextSize)} of ${formatTokens(contextWindow)}`}
-      className="h-1 w-full bg-muted"
-    >
-      <div className="h-full bg-primary" style={{width: `${percent}%`}} />
-    </div>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <div
+            role="meter"
+            aria-label="Context size toward the Context window"
+            aria-valuenow={contextSize}
+            aria-valuemin={0}
+            aria-valuemax={contextWindow}
+            className="h-1 w-full bg-muted"
+          />
+        }
+      >
+        <div className="h-full bg-primary" style={{width: `${percent}%`}} />
+      </TooltipTrigger>
+      <TooltipContent>
+        {formatTokens(contextSize)} of {formatTokens(contextWindow)}
+      </TooltipContent>
+    </Tooltip>
   )
 }

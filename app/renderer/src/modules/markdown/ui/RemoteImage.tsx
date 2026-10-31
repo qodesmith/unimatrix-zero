@@ -2,6 +2,7 @@ import type {ExtraProps} from 'streamdown'
 
 import {bridge} from '#modules/bridge/main'
 import {Button} from '#shadcn/ui/button'
+import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
 import {useState} from 'react'
 
 type ImageProps = React.JSX.IntrinsicElements['img'] & ExtraProps
@@ -75,23 +76,27 @@ function RemoteImageChip({
   }
 
   return (
-    <span
-      title={url}
-      className="inline-flex max-w-full flex-wrap items-center gap-x-2 rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground"
-    >
-      <span>Image from {hostOf(url)}</span>
-      {alt && <span className="truncate italic">{alt}</span>}
-      {load.state === 'failed' && (
-        <span className="text-destructive">{load.message}</span>
-      )}
-      <Button
-        variant="link"
-        disabled={load.state === 'loading'}
-        onClick={() => void loadImage()}
-        className="h-auto border-0 p-0 text-xs text-foreground underline-offset-2"
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span className="inline-flex max-w-full flex-wrap items-center gap-x-2 rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground" />
+        }
       >
-        {BUTTON_LABELS[load.state]}
-      </Button>
-    </span>
+        <span>Image from {hostOf(url)}</span>
+        {alt && <span className="truncate italic">{alt}</span>}
+        {load.state === 'failed' && (
+          <span className="text-destructive">{load.message}</span>
+        )}
+        <Button
+          variant="link"
+          disabled={load.state === 'loading'}
+          onClick={() => void loadImage()}
+          className="h-auto border-0 p-0 text-xs text-foreground underline-offset-2"
+        >
+          {BUTTON_LABELS[load.state]}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{url}</TooltipContent>
+    </Tooltip>
   )
 }

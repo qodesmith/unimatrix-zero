@@ -1,3 +1,10 @@
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '#shadcn/ui/alert-dialog'
 import {Sheet, SheetContent, SheetTrigger} from '#shadcn/ui/sheet'
 import {createElement} from 'react'
 import {expect, it} from 'vitest'
@@ -22,5 +29,29 @@ it('sees a Sheet only while it is open', async () => {
   expect(dialogOpen()).toBe(true)
 
   await page.getByRole('button', {name: 'Close'}).click()
+  await expect.poll(() => dialogOpen()).toBe(false)
+})
+
+it('sees an alert dialog only while it is open', async () => {
+  await render(
+    createElement(
+      AlertDialog,
+      null,
+      createElement(AlertDialogTrigger, null, 'Delete'),
+      createElement(
+        AlertDialogContent,
+        null,
+        createElement(AlertDialogTitle, null, 'Delete 2 Turns?'),
+        createElement(AlertDialogCancel, null, 'Cancel')
+      )
+    )
+  )
+  expect(dialogOpen()).toBe(false)
+
+  await page.getByRole('button', {name: 'Delete'}).click()
+  await expect.element(page.getByRole('alertdialog')).toBeVisible()
+  expect(dialogOpen()).toBe(true)
+
+  await page.getByRole('button', {name: 'Cancel'}).click()
   await expect.poll(() => dialogOpen()).toBe(false)
 })
