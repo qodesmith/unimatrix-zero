@@ -1,4 +1,4 @@
-import type {PlacedTurn} from '../layout'
+import type {PlacedNode} from '../layout'
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Node, NodeProps} from '@xyflow/react'
 
@@ -22,7 +22,7 @@ import {TooltipButton} from './TooltipButton'
 /** A vertical Reply's line down through its Input's space, drawn as its edge. */
 export type Stem = 'none' | 'plain' | 'on-thread'
 
-export type TurnNode = Node<{turn: PlacedTurn; stem: Stem}, PlacedTurn['kind']>
+export type TurnNode = Node<{turn: PlacedNode; stem: Stem}, PlacedNode['kind']>
 
 /** Sized to nothing, so an edge meets the box's border. */
 const hiddenHandle = 'size-0! min-h-0! min-w-0! border-0! opacity-0!'

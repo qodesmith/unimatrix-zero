@@ -636,6 +636,30 @@ describe('collapsing the sidebar', () => {
     ])
   })
 
+  it('closes at once, then opens again when main refuses to save it', async () => {
+    const main = fakeMain()
+    const refusal = Promise.withResolvers<CommandOutcome<'layout.update'>>()
+
+    globalThis.window.uz = {
+      ...main,
+      send: (async (command: Command) =>
+        command.type === 'layout.update'
+          ? refusal.promise
+          : main.send(command)) as Bridge['send'],
+    }
+    await renderApp()
+    await expect.poll(sidebarRight).toBeGreaterThan(0)
+
+    await page.getByRole('button', {name: 'Toggle Sidebar'}).click()
+    await expect.poll(sidebarRight).toBeLessThanOrEqual(0)
+
+    refusal.resolve({
+      ok: false,
+      error: {code: 'handler-failed', message: 'The disk is full.'},
+    })
+    await expect.poll(sidebarRight).toBeGreaterThan(0)
+  })
+
   it('starts closed when main saved it closed, without showing it open first, then follows main', async () => {
     const before = watchSidebarState()
     const main = fakeMain({layout: {sidebarOpen: false}})

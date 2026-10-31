@@ -41,7 +41,7 @@ interface ExchangeTurns {
 
 type Unplaced = PromptTurn | ReplyTurn | ExchangeTurns
 
-export type PlacedTurn = Unplaced & {position: Point}
+export type PlacedNode = Unplaced & {position: Point}
 
 interface PlacementEdge {
   id: string
@@ -50,7 +50,7 @@ interface PlacementEdge {
 }
 
 export interface Placement {
-  nodes: PlacedTurn[]
+  nodes: PlacedNode[]
   edges: PlacementEdge[]
 }
 

@@ -63,31 +63,33 @@ function sized(heights: Record<string, number>) {
   return (id: string) => ({width, height: heights[id] ?? 80})
 }
 
-function positions(layout: ReturnType<typeof layoutTree>) {
-  const byId = new Map(layout.nodes.map(node => [node.id, node.position]))
+function positions(placement: ReturnType<typeof layoutTree>) {
+  const byId = new Map(placement.nodes.map(node => [node.id, node.position]))
 
   return (id: string) => {
     const position = byId.get(id)
 
-    if (!position) throw new Error(`No node ${id} in the layout`)
+    if (!position) throw new Error(`No node ${id} in the placement`)
 
     return position
   }
 }
 
 describe('vertical', () => {
-  const layout = layoutTree(forkedTree(), 'vertical', sized({R1: 300}))
-  const pos = positions(layout)
+  const placement = layoutTree(forkedTree(), 'vertical', sized({R1: 300}))
+  const pos = positions(placement)
 
   it('draws every Prompt and Reply as its own box', () => {
-    expect(layout.nodes.map(node => node.kind).toSorted()).toEqual([
+    expect(placement.nodes.map(node => node.kind).toSorted()).toEqual([
       ...Array.from({length: 6}, () => 'prompt'),
       ...Array.from({length: 6}, () => 'reply'),
     ])
   })
 
   it('connects each Prompt to its Reply and each Branch to the Reply it answers', () => {
-    expect(layout.edges.map(edge => `${edge.source}>${edge.target}`)).toEqual(
+    expect(
+      placement.edges.map(edge => `${edge.source}>${edge.target}`)
+    ).toEqual(
       expect.arrayContaining([
         'P1>R1',
         'R1>P2',
@@ -98,7 +100,7 @@ describe('vertical', () => {
         'P6>R6',
       ])
     )
-    expect(layout.edges).toHaveLength(11)
+    expect(placement.edges).toHaveLength(11)
   })
 
   it('reads top-down: a Turn sits below the one it follows, clear of its height', () => {
@@ -123,18 +125,18 @@ describe('vertical', () => {
 })
 
 describe('horizontal', () => {
-  const layout = layoutTree(
+  const placement = layoutTree(
     forkedTree(),
     'horizontal',
     sized({P2: 320, P3: 100, P1: 200})
   )
 
-  const pos = positions(layout)
+  const pos = positions(placement)
 
   it('draws one card per Exchange, holding the Prompt and its Reply', () => {
-    expect(layout.nodes).toHaveLength(6)
+    expect(placement.nodes).toHaveLength(6)
     expect(
-      layout.nodes.map(node =>
+      placement.nodes.map(node =>
         node.kind === 'exchange' ? `${node.prompt.id}+${node.reply?.id}` : node
       )
     ).toEqual(expect.arrayContaining(['P1+R1', 'P2+R2', 'P3+R3', 'P6+R6']))
@@ -142,7 +144,7 @@ describe('horizontal', () => {
 
   it('connects each Exchange to the one its Prompt answers', () => {
     expect(
-      layout.edges.map(edge => `${edge.source}>${edge.target}`).toSorted()
+      placement.edges.map(edge => `${edge.source}>${edge.target}`).toSorted()
     ).toEqual(['P1>P2', 'P1>P3', 'P2>P4', 'P2>P5', 'P2>P6'])
   })
 
