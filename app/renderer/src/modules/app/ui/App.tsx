@@ -9,6 +9,12 @@ import {
   useConnections,
 } from '#modules/connections/main'
 import {
+  LayoutProvider,
+  SidebarToggle,
+  useLayout,
+  useUpdateLayout,
+} from '#modules/layout/main'
+import {
   FollowFontSize,
   SettingsPage,
   SettingsProvider,
@@ -44,13 +50,15 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
         <FollowFontSize />
-        <ConnectionsProvider>
-          <LiveReplies>
-            <TooltipProvider>
-              <AppLayout />
-            </TooltipProvider>
-          </LiveReplies>
-        </ConnectionsProvider>
+        <LayoutProvider>
+          <ConnectionsProvider>
+            <LiveReplies>
+              <TooltipProvider>
+                <AppLayout />
+              </TooltipProvider>
+            </LiveReplies>
+          </ConnectionsProvider>
+        </LayoutProvider>
       </SettingsProvider>
     </QueryClientProvider>
   )
@@ -58,6 +66,8 @@ export function App() {
 
 function AppLayout() {
   const connections = useConnections()
+  const layout = useLayout()
+  const updateLayout = useUpdateLayout()
   const {trees, openTree, error: treesError, open, create, rename} = useTrees()
   // Null until main says whether any Provider is connected.
   const [firstLaunch, setFirstLaunch] = useState<boolean | null>(null)
@@ -99,9 +109,13 @@ function AppLayout() {
   }
 
   return (
-    <SidebarProvider className="h-full min-h-0">
+    <SidebarProvider
+      className="h-full min-h-0"
+      open={layout.sidebarOpen}
+      onOpenChange={sidebarOpen => void updateLayout({sidebarOpen})}
+    >
       <Sidebar
-        collapsible="none"
+        collapsible="offcanvas"
         role="complementary"
         className="border-r border-sidebar-border"
       >
@@ -152,18 +166,24 @@ function AppLayout() {
               key={openTree.id}
               treeId={openTree.id}
               title={<TreeTitle tree={openTree} />}
+              sidebarToggle={<SidebarToggle />}
             />
           </div>
         ) : (
-          <div className="flex flex-1 flex-col items-center justify-center gap-4">
-            <Button onClick={() => void ping()}>Ping main</Button>
-            {pong && (
-              <p className="rounded-lg bg-prompt px-3 py-2 text-sm text-prompt-foreground">
-                pong · {pong.nonce} · {pong.receivedAt}
-              </p>
-            )}
-            {error && <p className="text-sm text-destructive">{error}</p>}
-          </div>
+          <>
+            <header className="flex min-h-12 shrink-0 items-center px-4 pt-4 pb-2">
+              <SidebarToggle />
+            </header>
+            <div className="flex flex-1 flex-col items-center justify-center gap-4">
+              <Button onClick={() => void ping()}>Ping main</Button>
+              {pong && (
+                <p className="rounded-lg bg-prompt px-3 py-2 text-sm text-prompt-foreground">
+                  pong · {pong.nonce} · {pong.receivedAt}
+                </p>
+              )}
+              {error && <p className="text-sm text-destructive">{error}</p>}
+            </div>
+          </>
         )}
       </SidebarInset>
     </SidebarProvider>
