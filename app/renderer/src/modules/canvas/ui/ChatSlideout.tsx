@@ -133,20 +133,12 @@ export function ChatSlideout({
         <div className="flex gap-1">
           <TooltipButton
             label={full ? 'Exit full screen' : 'Full screen'}
-            variant="ghost"
-            size="icon"
             className="size-7"
             onClick={() => setFull(!full)}
           >
             {full ? <Minimize2Icon /> : <Maximize2Icon />}
           </TooltipButton>
-          <TooltipButton
-            label="Close"
-            variant="ghost"
-            size="icon"
-            className="size-7"
-            onClick={onClose}
-          >
+          <TooltipButton label="Close" className="size-7" onClick={onClose}>
             <XIcon />
           </TooltipButton>
         </div>

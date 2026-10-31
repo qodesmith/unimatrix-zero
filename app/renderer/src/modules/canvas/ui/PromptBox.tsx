@@ -95,8 +95,6 @@ export function PromptBox({promptId, className, children}: PromptBoxProps) {
         >
           <TooltipButton
             label="Delete this Prompt and everything below it"
-            variant="ghost"
-            size="icon"
             className="size-6 bg-card text-muted-foreground shadow-sm hover:text-destructive"
             onClick={arm}
           >

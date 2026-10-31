@@ -5,10 +5,19 @@ import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
 
 type TooltipButtonProps = ComponentProps<typeof Button> & {label: string}
 
-export function TooltipButton({label, ...props}: TooltipButtonProps) {
+export function TooltipButton({
+  label,
+  variant = 'ghost',
+  size = 'icon',
+  ...props
+}: TooltipButtonProps) {
   return (
     <Tooltip>
-      <TooltipTrigger render={<Button aria-label={label} {...props} />} />
+      <TooltipTrigger
+        render={
+          <Button aria-label={label} variant={variant} size={size} {...props} />
+        }
+      />
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
   )

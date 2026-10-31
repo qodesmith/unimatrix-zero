@@ -26,8 +26,6 @@ interface CanvasControlsProps {
 }
 
 const TOOL_PROPS = {
-  variant: 'ghost',
-  size: 'icon',
   className: "size-7 [&_svg:not([class*='size-'])]:size-3.5",
 } as const
 

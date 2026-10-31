@@ -100,13 +100,7 @@ function ContextSizeDrawer({
     >
       <div className="flex items-center justify-between border-b border-border py-1 pr-1 pl-3">
         <h3 className="text-xs text-muted-foreground">Context size</h3>
-        <TooltipButton
-          label="Close"
-          variant="ghost"
-          size="icon"
-          className="size-6"
-          onClick={onClose}
-        >
+        <TooltipButton label="Close" className="size-6" onClick={onClose}>
           <XIcon />
         </TooltipButton>
       </div>

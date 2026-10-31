@@ -95,8 +95,6 @@ function OpenChatButton({replyId}: {replyId: string}) {
   return (
     <TooltipButton
       label="Open in Chat mode"
-      variant="ghost"
-      size="icon"
       className="ml-auto size-6 text-muted-foreground"
       onClick={() => openChat(replyId)}
     >

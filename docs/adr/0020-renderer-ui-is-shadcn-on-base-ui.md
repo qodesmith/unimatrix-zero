@@ -9,5 +9,5 @@ Every control and layout piece in the renderer is a shadcn component copied in w
 
 ## Consequences
 
-- **Add components only with the `base-vega` style**, and copy AI Elements patterns only from their Base UI pages. The old AI SDK Elements registry depends on Radix and is never used.
-- **`uz/shadcn-base-ui` enforces it**: plain controls outside `shadcn/ui` and any Radix import fail lint.
+- **Add components only with the `base-vega` style**, AI Elements included. The old AI SDK Elements registry depends on Radix and is never used.
+- **Lint fails** a plain control outside the copied components and any Radix import.

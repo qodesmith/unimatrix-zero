@@ -7,6 +7,15 @@ import {useId} from 'react'
 import {useSettings, useUpdateSettings} from '../use-settings'
 import {Choice, Group, Toggle} from './Controls'
 
+function ModShortcut({keyName}: {keyName: string}) {
+  return (
+    <KbdGroup>
+      <Kbd>⌘/Ctrl</Kbd>
+      <Kbd>{keyName}</Kbd>
+    </KbdGroup>
+  )
+}
+
 export function AppearanceSection() {
   const settings = useSettings()
   const update = useUpdateSettings()
@@ -50,21 +59,8 @@ export function AppearanceSection() {
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          <KbdGroup>
-            <Kbd>⌘/Ctrl</Kbd>
-            <Kbd>+</Kbd>
-          </KbdGroup>{' '}
-          and{' '}
-          <KbdGroup>
-            <Kbd>⌘/Ctrl</Kbd>
-            <Kbd>−</Kbd>
-          </KbdGroup>{' '}
-          change it too, and{' '}
-          <KbdGroup>
-            <Kbd>⌘/Ctrl</Kbd>
-            <Kbd>0</Kbd>
-          </KbdGroup>{' '}
-          resets it.
+          <ModShortcut keyName="+" /> and <ModShortcut keyName="−" /> change it
+          too, and <ModShortcut keyName="0" /> resets it.
         </p>
       </Group>
       <Choice
