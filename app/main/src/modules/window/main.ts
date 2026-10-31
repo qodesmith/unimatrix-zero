@@ -26,8 +26,11 @@ export function createWindow({
   const window = new BrowserWindow({
     width: 1280,
     height: 820,
-    minWidth: 720,
+    minWidth: 768,
     minHeight: 480,
+    // The sizes are the page's, so the window's frame can't take it under
+    // 768 px, where shadcn's Sidebar turns into a slide-over panel.
+    useContentSize: true,
     show: false,
     title: 'Unimatrix Zero',
     webPreferences: {

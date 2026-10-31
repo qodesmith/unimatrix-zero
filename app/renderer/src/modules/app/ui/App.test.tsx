@@ -3,11 +3,13 @@
 import type {Bridge} from '@uz/contract/bridge'
 import type {Command, CommandOutcome, CommandType} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
+import type {Layout} from '@uz/contract/layout'
 import type {Settings} from '@uz/contract/settings'
 import type {Tree} from '@uz/contract/trees'
 import type {Prompt, Reply, StreamingReply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
 
+import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import {describe, expect, it, onTestFinished} from 'vitest'
 import {render} from 'vitest-browser-react'
@@ -24,6 +26,7 @@ interface Saved {
   streaming?: StreamingReply[]
   firstLaunch?: boolean
   settings?: Partial<Settings>
+  layout?: Partial<Layout>
 }
 
 const account = {email: 'sam@example.com', plan: 'Max'}
@@ -33,6 +36,7 @@ function fakeMain(saved: Saved = {}) {
   const prompts = [...(saved.prompts ?? [])]
   const replies = [...(saved.replies ?? [])]
   const settings: Settings = {...DEFAULT_SETTINGS, ...saved.settings}
+  const layout: Layout = {...DEFAULT_LAYOUT, ...saved.layout}
   const sent: Command[] = []
   const listeners = new Set<(event: AppEvent) => void>()
 
@@ -60,6 +64,13 @@ function fakeMain(saved: Saved = {}) {
       publish({type: 'SETTINGS_CHANGED', settings: {...settings}})
 
       return {ok: true, value: {...settings}}
+    }
+
+    if (command.type === 'layout.update') {
+      Object.assign(layout, command.changes)
+      publish({type: 'LAYOUT_CHANGED', layout: {...layout}})
+
+      return {ok: true, value: {...layout}}
     }
 
     if (command.type === 'tree.create') {
@@ -154,6 +165,7 @@ function fakeMain(saved: Saved = {}) {
         ],
         signIn: null,
         settings: {...settings},
+        layout: {...layout},
       })
 
       return () => listeners.delete(listener)
@@ -527,6 +539,118 @@ function claudeCard() {
 function chatgptCard() {
   return page.getByRole('region', {name: 'ChatGPT'})
 }
+
+/** Where the app sidebar's right edge is: 0 or less once it has slid out. */
+function sidebarRight() {
+  return page
+    .getByRole('complementary')
+    .first()
+    .element()
+    .getBoundingClientRect().right
+}
+
+function canvasWidth() {
+  return (
+    document
+      .querySelector('[data-slot="sidebar-inset"]')
+      ?.getBoundingClientRect().width ?? 0
+  )
+}
+
+function layoutUpdates(main: ReturnType<typeof fakeMain>) {
+  return main.sent.filter(command => command.type === 'layout.update')
+}
+
+/** Each value the app sidebar's `data-state` held before it changed. */
+function watchSidebarState() {
+  const before: (string | null)[] = []
+
+  const observer = new MutationObserver(records => {
+    for (const record of records) {
+      if (
+        record.target instanceof Element &&
+        record.target.matches('[data-slot="sidebar"]')
+      ) {
+        before.push(record.oldValue)
+      }
+    }
+  })
+
+  observer.observe(document.body, {
+    subtree: true,
+    attributeFilter: ['data-state'],
+    attributeOldValue: true,
+  })
+  onTestFinished(() => observer.disconnect())
+
+  return before
+}
+
+describe('collapsing the sidebar', () => {
+  it('closes from the trigger and opens again with ⌘B, saving each, while the canvas takes the freed width', async () => {
+    const main = fakeMain()
+    globalThis.window.uz = main
+    await renderApp()
+    await expect.poll(sidebarRight).toBeGreaterThan(0)
+    const besideSidebar = canvasWidth()
+
+    await page.getByRole('button', {name: 'Toggle Sidebar'}).click()
+
+    await expect.poll(sidebarRight).toBeLessThanOrEqual(0)
+    await expect.poll(canvasWidth).toBe(globalThis.innerWidth)
+    expect(besideSidebar).toBeLessThan(globalThis.innerWidth)
+
+    await userEvent.keyboard('{Meta>}b{/Meta}')
+
+    await expect.poll(sidebarRight).toBeGreaterThan(0)
+    await expect.poll(canvasWidth).toBe(besideSidebar)
+    expect(layoutUpdates(main)).toEqual([
+      {type: 'layout.update', changes: {sidebarOpen: false}},
+      {type: 'layout.update', changes: {sidebarOpen: true}},
+    ])
+  })
+
+  it('closes from the trigger beside an open Tree’s title', async () => {
+    const main = fakeMain({
+      trees: [{id: crypto.randomUUID(), title: 'Draft', createdAt: receivedAt}],
+    })
+
+    globalThis.window.uz = main
+    await renderApp()
+    await page.getByRole('button', {name: 'Draft'}).click()
+
+    const title = page.getByRole('heading', {name: 'Draft'})
+    await expect.element(title).toBeVisible()
+    const header = title.element().parentElement
+
+    if (!header) throw new Error('The Tree’s title has no header')
+
+    await page
+      .elementLocator(header)
+      .getByRole('button', {name: 'Toggle Sidebar'})
+      .click()
+
+    await expect.poll(sidebarRight).toBeLessThanOrEqual(0)
+    expect(layoutUpdates(main)).toEqual([
+      {type: 'layout.update', changes: {sidebarOpen: false}},
+    ])
+  })
+
+  it('starts closed when main saved it closed, without showing it open first, then follows main', async () => {
+    const before = watchSidebarState()
+    const main = fakeMain({layout: {sidebarOpen: false}})
+    globalThis.window.uz = main
+    await renderApp()
+
+    await expect.element(page.getByText('Start a new Tree')).toBeInTheDocument()
+    await expect.poll(sidebarRight).toBeLessThanOrEqual(0)
+    await expect.poll(canvasWidth).toBe(globalThis.innerWidth)
+    expect(before).toEqual([])
+
+    main.publish({type: 'LAYOUT_CHANGED', layout: {sidebarOpen: true}})
+    await expect.poll(sidebarRight).toBeGreaterThan(0)
+  })
+})
 
 describe('connecting a Provider', () => {
   const url = 'https://claude.com/cai/oauth/authorize?code=true&state=s'

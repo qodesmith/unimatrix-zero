@@ -105,17 +105,22 @@ function EmptyTree({treeId, onPlaced, onSent}: EmptyTreeProps) {
   )
 }
 
-interface CanvasFrameProps {
-  title: ReactNode
+type CanvasFrameProps = HeadingProps & {
   controls?: ReactNode
   children?: ReactNode
 }
 
 /** The Tree's name with the canvas controls beside it, over the canvas. */
-function CanvasFrame({title, controls, children}: CanvasFrameProps) {
+function CanvasFrame({
+  title,
+  sidebarToggle,
+  controls,
+  children,
+}: CanvasFrameProps) {
   return (
     <div className="flex h-full flex-col">
       <header className="flex min-h-12 shrink-0 items-center gap-3 px-4 pt-4 pb-2">
+        {sidebarToggle}
         <h2 className="min-w-0 flex-1 truncate text-lg font-semibold">
           {title}
         </h2>
@@ -126,21 +131,23 @@ function CanvasFrame({title, controls, children}: CanvasFrameProps) {
   )
 }
 
-interface CanvasProps {
-  treeId: string
+interface HeadingProps {
   /** The Tree's name, drawn in the row the controls share. */
   title: ReactNode
+  sidebarToggle?: ReactNode
 }
 
+type CanvasProps = HeadingProps & {treeId: string}
+
 /** One Tree on the canvas: a centered Input while it is empty, then its Turns. */
-export function Canvas({treeId, title}: CanvasProps) {
+export function Canvas({treeId, ...heading}: CanvasProps) {
   const turns = useTurns(treeId)
 
-  if (turns.isPending) return <CanvasFrame title={title} />
+  if (turns.isPending) return <CanvasFrame {...heading} />
 
   if (turns.isError) {
     return (
-      <CanvasFrame title={title}>
+      <CanvasFrame {...heading}>
         <Alert variant="destructive" className="m-6 w-auto">
           <AlertDescription>{turns.error.message}</AlertDescription>
         </Alert>
@@ -148,14 +155,16 @@ export function Canvas({treeId, title}: CanvasProps) {
     )
   }
 
-  return <TreeCanvas treeId={treeId} title={title} turns={turns.data} />
+  return <TreeCanvas treeId={treeId} heading={heading} turns={turns.data} />
 }
 
-interface TreeCanvasProps extends CanvasProps {
+interface TreeCanvasProps {
+  treeId: string
+  heading: HeadingProps
   turns: Turns
 }
 
-function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
+function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
   const index = useMemo(() => indexTurns(turns), [turns])
   const settings = useSettings()
   const {canvasOrientation, limitTurnHeight, contextSizeMeter} = settings
@@ -363,7 +372,7 @@ function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
 
   if (isEmpty(index)) {
     return (
-      <CanvasFrame title={title}>
+      <CanvasFrame {...heading}>
         <EmptyTree
           treeId={treeId}
           onPlaced={setInputAt}
@@ -385,7 +394,7 @@ function TreeCanvas({treeId, title, turns}: TreeCanvasProps) {
     <CanvasContext value={state}>
       <ReactFlowProvider>
         <CanvasFrame
-          title={title}
+          {...heading}
           controls={
             <CanvasControls
               orientation={canvasOrientation}
