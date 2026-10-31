@@ -41,17 +41,17 @@ interface ExchangeTurns {
 
 type Unplaced = PromptTurn | ReplyTurn | ExchangeTurns
 
-export type LayoutNode = Unplaced & {position: Point}
+export type PlacedTurn = Unplaced & {position: Point}
 
-interface LayoutEdge {
+interface PlacementEdge {
   id: string
   source: string
   target: string
 }
 
-export interface Layout {
-  nodes: LayoutNode[]
-  edges: LayoutEdge[]
+export interface Placement {
+  nodes: PlacedTurn[]
+  edges: PlacementEdge[]
 }
 
 interface Gap {
@@ -68,13 +68,13 @@ const GAPS: Record<CanvasOrientation, Gap> = {
 
 interface Graph {
   nodes: Unplaced[]
-  edges: LayoutEdge[]
+  edges: PlacementEdge[]
   /** Each node's children in reading order. */
   children: Map<string, string[]>
   roots: string[]
 }
 
-function edge(source: string, target: string): LayoutEdge {
+function edge(source: string, target: string): PlacementEdge {
   return {id: `${source}-${target}`, source, target}
 }
 
@@ -85,7 +85,7 @@ const NONE_COLLAPSED: CollapsedReplyIds = new Set()
 /** Vertical: every Turn its own box, a Reply under its Prompt. */
 function turnGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
   const nodes: Unplaced[] = []
-  const edges: LayoutEdge[] = []
+  const edges: PlacementEdge[] = []
   const children = new Map<string, string[]>()
   const roots: string[] = []
 
@@ -125,7 +125,7 @@ function turnGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
 /** Horizontal: one card per Exchange, Branches fanning out to the right. */
 function exchangeGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
   const nodes: Unplaced[] = []
-  const edges: LayoutEdge[] = []
+  const edges: PlacementEdge[] = []
   const children = new Map<string, string[]>()
   const roots: string[] = []
 
@@ -165,7 +165,7 @@ export function layoutTree(
   orientation: CanvasOrientation,
   sizeOf: (nodeId: string) => Size | undefined,
   collapsed: CollapsedReplyIds = NONE_COLLAPSED
-): Layout {
+): Placement {
   const vertical = orientation === 'vertical'
   const gap = GAPS[orientation]
 

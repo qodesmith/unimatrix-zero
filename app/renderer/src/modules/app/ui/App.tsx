@@ -117,6 +117,7 @@ function AppLayout() {
       <Sidebar
         collapsible="offcanvas"
         role="complementary"
+        inert={!layout.sidebarOpen}
         className="border-r border-sidebar-border"
       >
         <SidebarHeader>

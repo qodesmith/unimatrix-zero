@@ -650,6 +650,31 @@ describe('collapsing the sidebar', () => {
     main.publish({type: 'LAYOUT_CHANGED', layout: {sidebarOpen: true}})
     await expect.poll(sidebarRight).toBeGreaterThan(0)
   })
+
+  it('keeps a closed sidebar’s Trees out of the keyboard’s reach, and lets them back once it opens', async () => {
+    const main = fakeMain({
+      trees: [{id: crypto.randomUUID(), title: 'Draft', createdAt: receivedAt}],
+      layout: {sidebarOpen: false},
+    })
+
+    globalThis.window.uz = main
+    await renderApp()
+    await expect.poll(sidebarRight).toBeLessThanOrEqual(0)
+
+    const row = page
+      .getByRole('button', {name: 'Draft', includeHidden: true})
+      .element()
+
+    if (!(row instanceof HTMLElement)) throw new Error('No Tree row')
+
+    row.focus()
+    expect(document.activeElement).not.toBe(row)
+
+    main.publish({type: 'LAYOUT_CHANGED', layout: {sidebarOpen: true}})
+    await expect.poll(sidebarRight).toBeGreaterThan(0)
+    row.focus()
+    expect(document.activeElement).toBe(row)
+  })
 })
 
 describe('connecting a Provider', () => {
