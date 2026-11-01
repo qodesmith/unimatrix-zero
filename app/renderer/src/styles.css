@@ -114,7 +114,7 @@
    the Turns have arrived. */
 @media (prefers-reduced-motion: no-preference) {
   .canvas-switching .react-flow__node {
-    transition: transform 400ms ease;
+    transition: transform var(--transition-duration-slide) var(--ease-slide);
   }
 }
 .react-flow__edges {

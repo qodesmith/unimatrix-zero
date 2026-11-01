@@ -24,14 +24,12 @@ import {useChatSlideout} from '../chat-slideout/use-chat-slideout'
 import {useDeletion} from '../deletion'
 import {useEscapeStops} from '../escape-stops'
 import {TURN_WIDTH} from '../layout'
+import {slideMs} from '../slide'
 import {indexTurns, isEmpty, pathTo, previousReply} from '../tree'
 import {CanvasControls} from './CanvasControls'
 import {ChatSlideout} from './ChatSlideout'
 import {Flow} from './Flow'
 import {PromptInput} from './PromptInput'
-
-/** The length of `.canvas-switching`'s transform transition in styles.css. */
-const SWITCH_MS = 400
 
 function toggled(id: string) {
   return (current: ReadonlySet<string>) => {
@@ -326,7 +324,7 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
 
     if (switchTimer.current) clearTimeout(switchTimer.current)
 
-    switchTimer.current = setTimeout(() => setSwitching(false), SWITCH_MS)
+    switchTimer.current = setTimeout(() => setSwitching(false), slideMs())
 
     if (activeReplyId) focusOn(activeReplyId, 'center')
   }

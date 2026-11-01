@@ -10,6 +10,7 @@ import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 import {atBottom} from '../at-bottom'
 import {useCanvas} from '../canvas-context'
 import {dialogOpen} from '../dialog-open'
+import {durationMs} from '../slide'
 import {pathTo} from '../tree'
 import {PromptInput} from './PromptInput'
 import {TooltipButton} from './TooltipButton'
@@ -33,12 +34,7 @@ const SCROLL_MARGIN = 12
 
 /** The slideout's own transition length, read from its CSS so it can't drift. */
 function slideMs(element: HTMLElement | null) {
-  if (!element) return 0
-
-  // Computed transition-duration is always in seconds, like "0.4s".
-  return (
-    Number.parseFloat(getComputedStyle(element).transitionDuration) * 1000 || 0
-  )
+  return element ? durationMs(getComputedStyle(element).transitionDuration) : 0
 }
 
 /** Chat mode: one Thread as a conventional chat in a slideout over the canvas. */
