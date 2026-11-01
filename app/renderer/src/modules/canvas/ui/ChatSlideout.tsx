@@ -33,8 +33,8 @@ interface ChatSlideoutProps {
 const SCROLL_MARGIN = 12
 
 /**
- * The element's transition length; 0 when nothing transitions, as under
- * reduced motion.
+ * 0 under reduced motion: `transition-none` clears the property but leaves the
+ * duration set.
  */
 function transitionMs(element: HTMLElement | null) {
   if (!element) return 0

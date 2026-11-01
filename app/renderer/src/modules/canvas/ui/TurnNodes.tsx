@@ -179,7 +179,7 @@ function ReplyInput({
         <div
           aria-hidden
           className={cn(
-            'absolute inset-y-0 left-1/2 -translate-x-1/2 transition-opacity duration-slide ease-slide',
+            'absolute inset-y-0 left-1/2 -translate-x-1/2 transition-opacity duration-slide ease-slide motion-reduce:transition-none',
             stem === 'on-thread'
               ? 'w-[2.5px] bg-thread-highlight'
               : 'w-[1.5px] bg-canvas-edge',
