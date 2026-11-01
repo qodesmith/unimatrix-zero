@@ -91,8 +91,8 @@ function ContextSizeDrawer({
     <aside
       aria-label="Context size details"
       className={cn(
-        'absolute inset-y-0 left-0 z-10 w-56 border-r border-border bg-popover text-popover-foreground transition-[translate,visibility] duration-slide ease-slide motion-reduce:transition-none',
-        !open && 'invisible -translate-x-full'
+        'absolute inset-y-0 left-0 z-10 w-56 border-r border-border bg-popover text-popover-foreground transition-[translate,opacity,visibility] duration-slide ease-slide motion-reduce:transition-none',
+        !open && 'invisible -translate-x-[2.5rem] opacity-0'
       )}
       onKeyDown={event => {
         if (event.key === 'Escape' && !event.defaultPrevented) onClose()

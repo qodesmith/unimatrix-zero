@@ -126,9 +126,9 @@ export function ChatSlideout({
       aria-label="Chat"
       inert={!open}
       className={cn(
-        'absolute inset-y-0 right-0 z-10 flex flex-col bg-background transition-transform duration-slide ease-slide motion-reduce:transition-none starting:translate-x-full',
-        full ? 'left-0' : 'w-110 max-w-full border-l border-border shadow-xl',
-        !open && 'translate-x-full'
+        'absolute inset-y-0 right-0 z-10 flex max-w-full flex-col bg-background transition-[translate,opacity,width,box-shadow] duration-slide ease-slide motion-reduce:transition-none starting:translate-x-[2.5rem] starting:opacity-0',
+        full ? 'w-full' : 'w-110 border-l border-border shadow-xl',
+        !open && 'translate-x-[2.5rem] opacity-0'
       )}
     >
       <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2">

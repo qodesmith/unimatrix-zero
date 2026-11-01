@@ -1429,30 +1429,102 @@ it('opens nothing on a click on a Turn’s box', async () => {
   await expect.element(slideout()).not.toBeInTheDocument()
 })
 
-function sliding(aside: Element) {
-  return aside
+function transitionOf(element: Element, property: string) {
+  return element
     .getAnimations()
-    .some(
+    .find(
       animation =>
         animation instanceof CSSTransition &&
-        animation.transitionProperty === 'translate'
+        animation.transitionProperty === property
     )
 }
 
-it('slides the slideout in as it opens and out as it closes', async () => {
+function sliding(element: Element) {
+  return transitionOf(element, 'translate') !== undefined
+}
+
+function fading(element: Element) {
+  return transitionOf(element, 'opacity') !== undefined
+}
+
+/** How far the running slide carries the element, in px, either way. */
+function slideDistance(element: Element) {
+  const {effect} = transitionOf(element, 'translate') ?? {}
+
+  const keyframes =
+    effect instanceof KeyframeEffect ? effect.getKeyframes() : []
+
+  const offset = keyframes.find(({translate}) => translate !== 'none')
+  const [x = ''] = String(offset?.translate).split(' ')
+  const distance = Math.abs(Number.parseFloat(x))
+
+  // A full slide comes back as a share of the width, like `100%`.
+  return x.endsWith('%') ? (distance / 100) * element.clientWidth : distance
+}
+
+/** Fading, and sliding a short way rather than across its whole width. */
+function expectShortFadingSlide(element: Element) {
+  expect(fading(element)).toBe(true)
+  expect(slideDistance(element)).toBeGreaterThan(0)
+  expect(slideDistance(element)).toBeLessThan(element.clientWidth / 4)
+}
+
+it('slides the slideout a short way in as it opens and out as it closes, fading as it goes', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
   await openChatAt('Reply four')
   await expect.element(slideout()).toBeInTheDocument()
   const aside = slideout().element()
-  expect(sliding(aside)).toBe(true)
+  expectShortFadingSlide(aside)
   await expect.poll(() => sliding(aside)).toBe(false)
 
   await slideout().getByRole('button', {name: 'Close'}).click()
   expect(aside.isConnected).toBe(true)
-  expect(sliding(aside)).toBe(true)
+  expectShortFadingSlide(aside)
   await expect.poll(() => aside.isConnected).toBe(false)
+})
+
+it('slides the Context size drawer a short way in as it opens and out as it closes, fading as it goes', async () => {
+  clock = 0
+  await renderCanvas({
+    prompts: [prompt(1, null, 'Prompt one')],
+    replies: [{...reply(11, 1, 'Reply one'), contextSize: 10_000}],
+  })
+  await expect.element(page.getByText('10.0k ctx')).toBeVisible()
+
+  await page.getByRole('button', {name: 'Context size details'}).click()
+
+  const drawer = page.getByRole('complementary', {
+    name: 'Context size details',
+  })
+
+  await expect.element(drawer).toBeVisible()
+  expectShortFadingSlide(drawer.element())
+  await expect.poll(() => sliding(drawer.element())).toBe(false)
+
+  await drawer.getByRole('button', {name: 'Close'}).click()
+  expectShortFadingSlide(drawer.element())
+})
+
+it('widens the slideout to full screen and back with a transition rather than a jump', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await openChatAt('Reply four')
+  await expect.element(slideout()).toBeVisible()
+  const aside = slideout().element()
+  await expect.poll(() => sliding(aside)).toBe(false)
+
+  const canvasWidth = canvas().element().getBoundingClientRect().width
+
+  await slideout().getByRole('button', {name: 'Full screen'}).click()
+  expect(transitionOf(aside, 'width')).toBeDefined()
+  await expect.poll(slideoutWidth).toBe(canvasWidth)
+
+  await slideout().getByRole('button', {name: 'Exit full screen'}).click()
+  expect(transitionOf(aside, 'width')).toBeDefined()
+  await expect.poll(slideoutWidth).toBeLessThan(canvasWidth / 2)
 })
 
 /** '' clears the emulation: no preference. */
@@ -1462,7 +1534,7 @@ async function emulateReducedMotion(value: 'reduce' | '') {
   })
 }
 
-it('opens and closes the slideout without sliding when the OS asks for reduced motion', async () => {
+it('opens, widens and closes the slideout without sliding, fading or growing when the OS asks for reduced motion', async () => {
   await emulateReducedMotion('reduce')
   onTestFinished(async () => emulateReducedMotion(''))
   await renderCanvas(forkedTree())
@@ -1472,9 +1544,14 @@ it('opens and closes the slideout without sliding when the OS asks for reduced m
   await expect.element(slideout()).toBeInTheDocument()
   const aside = slideout().element()
   expect(sliding(aside)).toBe(false)
+  expect(fading(aside)).toBe(false)
+
+  await slideout().getByRole('button', {name: 'Full screen'}).click()
+  expect(transitionOf(aside, 'width')).toBeUndefined()
 
   await slideout().getByRole('button', {name: 'Close'}).click()
   expect(sliding(aside)).toBe(false)
+  expect(fading(aside)).toBe(false)
   await expect.poll(() => aside.isConnected).toBe(false)
 })
 
