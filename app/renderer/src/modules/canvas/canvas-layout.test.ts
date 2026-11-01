@@ -2,7 +2,7 @@ import type {Prompt, Reply} from '@uz/contract/turns'
 
 import {describe, expect, it} from 'vitest'
 
-import {placeTree} from './placement'
+import {layoutCanvas} from './canvas-layout'
 import {indexTurns} from './tree'
 
 const treeId = '01a16096-00ad-7d3b-8205-6b76ddc26ce0'
@@ -63,24 +63,24 @@ function sized(heights: Record<string, number>) {
   return (id: string) => ({width, height: heights[id] ?? 80})
 }
 
-function positions(placement: ReturnType<typeof placeTree>) {
-  const byId = new Map(placement.nodes.map(node => [node.id, node.position]))
+function positions(canvasLayout: ReturnType<typeof layoutCanvas>) {
+  const byId = new Map(canvasLayout.nodes.map(node => [node.id, node.position]))
 
   return (id: string) => {
     const position = byId.get(id)
 
-    if (!position) throw new Error(`No node ${id} in the placement`)
+    if (!position) throw new Error(`No node ${id} in the canvas layout`)
 
     return position
   }
 }
 
 describe('vertical', () => {
-  const placement = placeTree(forkedTree(), 'vertical', sized({R1: 300}))
-  const pos = positions(placement)
+  const canvasLayout = layoutCanvas(forkedTree(), 'vertical', sized({R1: 300}))
+  const pos = positions(canvasLayout)
 
   it('draws every Prompt and Reply as its own box', () => {
-    expect(placement.nodes.map(node => node.kind).toSorted()).toEqual([
+    expect(canvasLayout.nodes.map(node => node.kind).toSorted()).toEqual([
       ...Array.from({length: 6}, () => 'prompt'),
       ...Array.from({length: 6}, () => 'reply'),
     ])
@@ -88,7 +88,7 @@ describe('vertical', () => {
 
   it('connects each Prompt to its Reply and each Branch to the Reply it answers', () => {
     expect(
-      placement.edges.map(edge => `${edge.source}>${edge.target}`)
+      canvasLayout.edges.map(edge => `${edge.source}>${edge.target}`)
     ).toEqual(
       expect.arrayContaining([
         'P1>R1',
@@ -100,7 +100,7 @@ describe('vertical', () => {
         'P6>R6',
       ])
     )
-    expect(placement.edges).toHaveLength(11)
+    expect(canvasLayout.edges).toHaveLength(11)
   })
 
   it('reads top-down: a Turn sits below the one it follows, clear of its height', () => {
@@ -125,18 +125,18 @@ describe('vertical', () => {
 })
 
 describe('horizontal', () => {
-  const placement = placeTree(
+  const canvasLayout = layoutCanvas(
     forkedTree(),
     'horizontal',
     sized({P2: 320, P3: 100, P1: 200})
   )
 
-  const pos = positions(placement)
+  const pos = positions(canvasLayout)
 
   it('draws one card per Exchange, holding the Prompt and its Reply', () => {
-    expect(placement.nodes).toHaveLength(6)
+    expect(canvasLayout.nodes).toHaveLength(6)
     expect(
-      placement.nodes.map(node =>
+      canvasLayout.nodes.map(node =>
         node.kind === 'exchange' ? `${node.prompt.id}+${node.reply?.id}` : node
       )
     ).toEqual(expect.arrayContaining(['P1+R1', 'P2+R2', 'P3+R3', 'P6+R6']))
@@ -144,7 +144,7 @@ describe('horizontal', () => {
 
   it('connects each Exchange to the one its Prompt answers', () => {
     expect(
-      placement.edges.map(edge => `${edge.source}>${edge.target}`).toSorted()
+      canvasLayout.edges.map(edge => `${edge.source}>${edge.target}`).toSorted()
     ).toEqual(['P1>P2', 'P1>P3', 'P2>P4', 'P2>P5', 'P2>P6'])
   })
 
@@ -162,7 +162,12 @@ describe('a collapsed Fork', () => {
   const collapsed = new Set(['R2'])
 
   it('leaves its Branches out, Turns and connections, in both orientations', () => {
-    const vertical = placeTree(forkedTree(), 'vertical', sized({}), collapsed)
+    const vertical = layoutCanvas(
+      forkedTree(),
+      'vertical',
+      sized({}),
+      collapsed
+    )
 
     expect(vertical.nodes.map(node => node.id).toSorted()).toEqual([
       'P1',
@@ -176,7 +181,7 @@ describe('a collapsed Fork', () => {
       vertical.edges.map(edge => `${edge.source}>${edge.target}`).toSorted()
     ).toEqual(['P1>R1', 'P2>R2', 'P3>R3', 'R1>P2', 'R1>P3'])
 
-    const horizontal = placeTree(
+    const horizontal = layoutCanvas(
       forkedTree(),
       'horizontal',
       sized({}),
@@ -194,10 +199,10 @@ describe('a collapsed Fork', () => {
   })
 
   it('takes only its own room, so its sibling Branch moves in beside it', () => {
-    const open = positions(placeTree(forkedTree(), 'vertical', sized({})))
+    const open = positions(layoutCanvas(forkedTree(), 'vertical', sized({})))
 
     const folded = positions(
-      placeTree(forkedTree(), 'vertical', sized({}), collapsed)
+      layoutCanvas(forkedTree(), 'vertical', sized({}), collapsed)
     )
 
     expect(folded('P3').x).toBeLessThan(open('P3').x)
@@ -213,8 +218,8 @@ it('lays out from the structure alone, whatever order its Turns arrive in', () =
     replies: replies.toReversed(),
   })
 
-  expect(placeTree(arrived, 'vertical', sized({})).nodes).toEqual(
-    placeTree(forkedTree(), 'vertical', sized({})).nodes
+  expect(layoutCanvas(arrived, 'vertical', sized({})).nodes).toEqual(
+    layoutCanvas(forkedTree(), 'vertical', sized({})).nodes
   )
 })
 
@@ -233,11 +238,14 @@ function twoBranches(second: string) {
 
 it('orders Branches by when they were started, not by their ids', () => {
   const started = positions(
-    placeTree(twoBranches(at(0)), 'vertical', sized({}))
+    layoutCanvas(twoBranches(at(0)), 'vertical', sized({}))
   )
 
   expect(started('Pb').x).toBeLessThan(started('Pa').x)
 
-  const tied = positions(placeTree(twoBranches(at(2)), 'vertical', sized({})))
+  const tied = positions(
+    layoutCanvas(twoBranches(at(2)), 'vertical', sized({}))
+  )
+
   expect(tied('Pa').x).toBeLessThan(tied('Pb').x)
 })

@@ -4,13 +4,13 @@ import {createContext, use} from 'react'
 
 export interface Collapsed {
   ids: ReadonlySet<string>
-  /** Kept where it was on screen as the placement changes around it. */
+  /** Kept where it was on screen as the canvas layout changes around it. */
   toggledReplyId: string | null
 }
 
 export interface Expanded {
   ids: ReadonlySet<string>
-  /** Kept where it was on screen as the placement changes around it. */
+  /** Kept where it was on screen as the canvas layout changes around it. */
   toggledTurnId: string | null
 }
 

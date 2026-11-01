@@ -20,10 +20,10 @@ import {
 } from 'react'
 
 import {CanvasContext} from '../canvas-context'
+import {TURN_WIDTH} from '../canvas-layout'
 import {useChatSlideout} from '../chat-slideout/use-chat-slideout'
 import {useDeletion} from '../deletion'
 import {useEscapeStops} from '../escape-stops'
-import {TURN_WIDTH} from '../placement'
 import {slideMs} from '../slide'
 import {indexTurns, isEmpty, pathTo, previousReply} from '../tree'
 import {CanvasControls} from './CanvasControls'

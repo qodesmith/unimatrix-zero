@@ -41,17 +41,17 @@ interface ExchangeTurns {
 
 type Unplaced = PromptTurn | ReplyTurn | ExchangeTurns
 
-export type PlacedNode = Unplaced & {position: Point}
+export type CanvasLayoutNode = Unplaced & {position: Point}
 
-interface PlacementEdge {
+interface CanvasLayoutEdge {
   id: string
   source: string
   target: string
 }
 
-export interface Placement {
-  nodes: PlacedNode[]
-  edges: PlacementEdge[]
+export interface CanvasLayout {
+  nodes: CanvasLayoutNode[]
+  edges: CanvasLayoutEdge[]
 }
 
 interface Gap {
@@ -68,13 +68,13 @@ const GAPS: Record<CanvasOrientation, Gap> = {
 
 interface Graph {
   nodes: Unplaced[]
-  edges: PlacementEdge[]
+  edges: CanvasLayoutEdge[]
   /** Each node's children in reading order. */
   children: Map<string, string[]>
   roots: string[]
 }
 
-function edge(source: string, target: string): PlacementEdge {
+function edge(source: string, target: string): CanvasLayoutEdge {
   return {id: `${source}-${target}`, source, target}
 }
 
@@ -85,7 +85,7 @@ const NONE_COLLAPSED: CollapsedReplyIds = new Set()
 /** Vertical: every Turn its own box, a Reply under its Prompt. */
 function turnGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
   const nodes: Unplaced[] = []
-  const edges: PlacementEdge[] = []
+  const edges: CanvasLayoutEdge[] = []
   const children = new Map<string, string[]>()
   const roots: string[] = []
 
@@ -125,7 +125,7 @@ function turnGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
 /** Horizontal: one card per Exchange, Branches fanning out to the right. */
 function exchangeGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
   const nodes: Unplaced[] = []
-  const edges: PlacementEdge[] = []
+  const edges: CanvasLayoutEdge[] = []
   const children = new Map<string, string[]>()
   const roots: string[] = []
 
@@ -160,12 +160,12 @@ function exchangeGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
  * Branches keep the order they were started in, and a Fork sits centered over
  * its Branches.
  */
-export function placeTree(
+export function layoutCanvas(
   index: TreeIndex,
   orientation: CanvasOrientation,
   sizeOf: (nodeId: string) => Size | undefined,
   collapsed: CollapsedReplyIds = NONE_COLLAPSED
-): Placement {
+): CanvasLayout {
   const vertical = orientation === 'vertical'
   const gap = GAPS[orientation]
 

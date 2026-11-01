@@ -1,4 +1,4 @@
-import type {PlacedNode} from '../placement'
+import type {CanvasLayoutNode} from '../canvas-layout'
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Node, NodeProps} from '@xyflow/react'
 
@@ -11,7 +11,7 @@ import {ChevronRightIcon} from 'lucide-react'
 import {useEffect, useRef, useState} from 'react'
 
 import {useCanvas} from '../canvas-context'
-import {TURN_WIDTH} from '../placement'
+import {TURN_WIDTH} from '../canvas-layout'
 import {branchesOf, isFork, previousReply} from '../tree'
 import {CappedText} from './CappedText'
 import {ContextMeter, ContextSize} from './ContextSize'
@@ -22,7 +22,10 @@ import {TooltipButton} from './TooltipButton'
 /** A vertical Reply's line down through its Input's space, drawn as its edge. */
 export type Stem = 'none' | 'plain' | 'on-thread'
 
-export type TurnNode = Node<{turn: PlacedNode; stem: Stem}, PlacedNode['kind']>
+export type TurnNode = Node<
+  {turn: CanvasLayoutNode; stem: Stem},
+  CanvasLayoutNode['kind']
+>
 
 /** Sized to nothing, so an edge meets the box's border. */
 const hiddenHandle = 'size-0! min-h-0! min-w-0! border-0! opacity-0!'
