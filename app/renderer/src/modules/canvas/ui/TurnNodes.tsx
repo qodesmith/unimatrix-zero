@@ -115,8 +115,7 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
 
   const streaming = folded
     ? repliesUnder(index, replyId).filter(one => one.status === 'streaming')
-        .length
-    : 0
+    : []
 
   return (
     <Tooltip>
@@ -127,8 +126,8 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
             size="xs"
             aria-expanded={!folded}
             aria-label={
-              streaming > 0
-                ? `${branches} Branches, ${streaming} streaming`
+              streaming.length > 0
+                ? `${branches} Branches, ${streaming.length} streaming`
                 : undefined
             }
             className={cn(
@@ -136,7 +135,7 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
               folded
                 ? 'bg-muted font-medium text-foreground shadow-xs hover:bg-muted dark:hover:bg-muted'
                 : 'text-muted-foreground aria-expanded:bg-transparent aria-expanded:text-muted-foreground aria-expanded:hover:bg-muted aria-expanded:hover:text-foreground',
-              streaming > 0 && 'border-primary/50'
+              streaming.length > 0 && 'border-primary/50'
             )}
             onClick={() => toggleCollapsed(replyId)}
           />
@@ -149,7 +148,7 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
           )}
         />
         {branches} Branches
-        {streaming > 0 && (
+        {streaming.length > 0 && (
           <span className="ml-0.5 size-1.5 animate-pulse rounded-full bg-primary motion-reduce:animate-none" />
         )}
       </TooltipTrigger>
