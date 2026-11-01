@@ -1462,7 +1462,6 @@ function slideDistance(element: Element) {
   return x.endsWith('%') ? (distance / 100) * element.clientWidth : distance
 }
 
-/** Fading, and sliding a short way rather than across its whole width. */
 function expectShortFadingSlide(element: Element) {
   expect(fading(element)).toBe(true)
   expect(slideDistance(element)).toBeGreaterThan(0)
