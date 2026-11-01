@@ -176,7 +176,7 @@ function ReplyInput({
         <div
           aria-hidden
           className={cn(
-            'absolute inset-y-0 left-1/2 -translate-x-1/2 transition-opacity',
+            'absolute inset-y-0 left-1/2 -translate-x-1/2 transition-opacity duration-slide ease-slide',
             stem === 'on-thread'
               ? 'w-[2.5px] bg-thread-highlight'
               : 'w-[1.5px] bg-canvas-edge',
@@ -188,7 +188,7 @@ function ReplyInput({
         <div
           data-revealed={revealed}
           className={cn(
-            'rounded-b-xl border border-t-0 border-border bg-card px-3.5 pt-5.5 pb-2.5 shadow-sm transition-[translate] ease-out motion-reduce:transition-none',
+            'rounded-b-xl border border-t-0 border-border bg-card px-3.5 pt-5.5 pb-2.5 shadow-sm transition-[translate] duration-slide ease-slide motion-reduce:transition-none',
             streaming && 'border-primary/50',
             !revealed && '-translate-y-full focus-within:translate-y-0'
           )}
@@ -229,7 +229,7 @@ function useHovered() {
  */
 function replyFrame(status: Reply['status'], joined: boolean) {
   return cn(
-    'relative z-10 gap-0 rounded-xl border border-border py-0 text-base shadow-sm ring-0 transition-[border-radius,border-color] ease-out motion-reduce:transition-none',
+    'relative z-10 gap-0 rounded-xl border border-border py-0 text-base shadow-sm ring-0 transition-[border-radius,border-color] duration-slide ease-slide motion-reduce:transition-none',
     status === 'failed' && 'border-destructive',
     status === 'streaming' && 'border-primary/50',
     joined && 'rounded-b-none border-b-transparent'
