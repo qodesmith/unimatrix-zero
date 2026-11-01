@@ -173,7 +173,9 @@ function useFolded(replyId: string | null) {
  * reaches no lower than the Input's -mt-3, or a hidden Input's stack shows
  * below the card.
  */
-function FoldedStack() {
+function FoldedStack({replyId}: {replyId: string | null}) {
+  if (!useFolded(replyId)) return null
+
   return (
     <>
       <div
@@ -226,7 +228,6 @@ function ReplyInput({
 
   const {id: replyId, status} = useReply(reply)
   const streaming = status === 'streaming'
-  const folded = useFolded(replyId)
   const textarea = useRef<HTMLTextAreaElement>(null)
 
   // On every render, since the node stays hidden until React Flow measures it.
@@ -256,7 +257,7 @@ function ReplyInput({
             !revealed && '-translate-y-full focus-within:translate-y-0'
           )}
         >
-          {folded && <FoldedStack />}
+          <FoldedStack replyId={replyId} />
           <div
             className={cn(
               'relative rounded-b-xl border border-t-0 border-border bg-card px-3.5 pt-5.5 pb-2.5 shadow-sm',
@@ -365,11 +366,10 @@ export function ReplyNode({data}: NodeProps<TurnNode>) {
 
 function ReplyTurn({reply, joined}: {reply: Reply; joined: boolean}) {
   const {status} = useReply(reply)
-  const folded = useFolded(reply.id)
 
   return (
     <div className="relative">
-      {folded && <FoldedStack />}
+      <FoldedStack replyId={reply.id} />
       <Card data-turn={reply.id} className={replyFrame(status, joined)}>
         <ReplyBody reply={reply} />
       </Card>
@@ -419,11 +419,10 @@ function ExchangeTurns({
   joined: boolean
 }) {
   const status = useReply(reply)?.status ?? 'complete'
-  const folded = useFolded(reply?.id ?? null)
 
   return (
     <div className="relative">
-      {folded && <FoldedStack />}
+      <FoldedStack replyId={reply?.id ?? null} />
       <Card className={replyFrame(status, joined)}>
         <PromptBox
           promptId={prompt.id}

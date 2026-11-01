@@ -30,22 +30,22 @@ export function Group({legend, legendId, children}: GroupProps) {
   )
 }
 
-interface ChoiceProps<T extends number | string> {
+interface ChoiceProps<T extends number | string> extends Omit<
+  ChoiceOptionsProps<T>,
+  'legendId' | 'inline'
+> {
   legend: string
-  value: T
-  options: readonly {value: T; label: string}[]
-  onChange: (value: T) => void
 }
 
 export function Choice<T extends number | string>({
   legend,
-  ...options
+  ...choice
 }: ChoiceProps<T>) {
   const legendId = useId()
 
   return (
     <Group legend={legend} legendId={legendId}>
-      <ChoiceOptions legendId={legendId} {...options} />
+      <ChoiceOptions legendId={legendId} {...choice} />
     </Group>
   )
 }

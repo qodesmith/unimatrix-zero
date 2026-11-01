@@ -414,7 +414,9 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
                   ? null
                   : () => {
                       jumpTo(activeReplyId, 'input')
-                      setInputToFocus(activeReplyId)
+
+                      if (!failed.includes(activeReplyId))
+                        setInputToFocus(activeReplyId)
                     }
               }
               showMap={showMap}

@@ -18,7 +18,6 @@ import {expect, it, onTestFinished, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {cdp, page, userEvent} from 'vitest/browser'
 
-import {startZoom} from '../canvas-layout'
 import {Canvas} from './Canvas'
 
 const treeId = '01a16096-00ad-7d3b-8205-6b76ddc26ce0'
@@ -735,9 +734,7 @@ it('zooms to the Active Thread’s Input at the zoom a new Tree starts at, howev
     .click()
   await settledViewport()
 
-  expect(zoomOf()).toBe(
-    startZoom(canvas().element().getBoundingClientRect().width)
-  )
+  expect(zoomOf()).toBe(1)
   expect(inputOffCenter('Reply one')).toBeLessThan(2)
   await expect.element(inputUnder('Reply one')).toHaveFocus()
 })
