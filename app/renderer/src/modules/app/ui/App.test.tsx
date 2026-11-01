@@ -221,6 +221,22 @@ async function emulateReducedMotion(value: 'reduce' | '') {
   })
 }
 
+/** The `data-slot` of each element a CSS transition starts on from now. */
+function watchTransitions() {
+  const slots: (string | null)[] = []
+
+  function record(event: TransitionEvent) {
+    if (event.target instanceof Element) {
+      slots.push(event.target.getAttribute('data-slot'))
+    }
+  }
+
+  document.addEventListener('transitionrun', record)
+  onTestFinished(() => document.removeEventListener('transitionrun', record))
+
+  return slots
+}
+
 function settingsSheet() {
   return page.getByRole('dialog', {name: 'Settings'})
 }
@@ -301,6 +317,22 @@ it('opens Settings in a Sheet over the Tree, and closing it with the X shows the
     .element(page.getByRole('heading', {name: 'Trip planning'}))
     .toBeVisible()
   expect(viewport()).toBe(zoomedIn)
+})
+
+it('opens and closes Settings without sliding or fading when the OS asks for reduced motion', async () => {
+  await emulateReducedMotion('reduce')
+  onTestFinished(async () => emulateReducedMotion(''))
+  globalThis.window.uz = fakeMain()
+  await renderApp()
+  const moved = watchTransitions()
+
+  await openSettings()
+  await settingsSheet().getByRole('button', {name: 'Close'}).click()
+  await expect.element(settingsSheet()).not.toBeInTheDocument()
+
+  expect(
+    moved.filter(slot => slot === 'sheet-content' || slot === 'sheet-overlay')
+  ).toEqual([])
 })
 
 it('closes only Settings on Esc over a streaming Reply and the slideout: the Reply is not stopped, and the slideout shows the text that came meanwhile', async () => {
@@ -608,6 +640,26 @@ describe('collapsing the sidebar', () => {
       {type: 'layout.update', changes: {sidebarOpen: false}},
       {type: 'layout.update', changes: {sidebarOpen: true}},
     ])
+  })
+
+  it('closes and opens again without sliding when the OS asks for reduced motion', async () => {
+    await emulateReducedMotion('reduce')
+    onTestFinished(async () => emulateReducedMotion(''))
+    globalThis.window.uz = fakeMain()
+    await renderApp()
+    await expect.poll(sidebarRight).toBeGreaterThan(0)
+    const moved = watchTransitions()
+
+    await page.getByRole('button', {name: 'Toggle Sidebar'}).click()
+    await expect.poll(sidebarRight).toBeLessThanOrEqual(0)
+    await userEvent.keyboard('{Meta>}b{/Meta}')
+    await expect.poll(sidebarRight).toBeGreaterThan(0)
+
+    expect(
+      moved.filter(
+        slot => slot === 'sidebar-gap' || slot === 'sidebar-container'
+      )
+    ).toEqual([])
   })
 
   it('closes from the trigger beside an open Tree’s title', async () => {
