@@ -704,7 +704,11 @@ function inputOffCenter(replyText: string) {
 
   if (!input) throw new Error(`${replyText} has no Input`)
 
-  const box = input.getBoundingClientRect()
+  return offCenter(input)
+}
+
+function offCenter(element: Element) {
+  const box = element.getBoundingClientRect()
   const frame = canvas().element().getBoundingClientRect()
 
   return Math.max(
@@ -737,6 +741,27 @@ it('zooms to the Active Thread’s Input at the zoom a new Tree starts at, howev
   expect(zoomOf()).toBe(1)
   expect(inputOffCenter('Reply one')).toBeLessThan(2)
   await expect.element(inputUnder('Reply one')).toHaveFocus()
+})
+
+it('zooms to a failed Active Reply’s card at the zoom a new Tree starts at, and leaves the cursor alone once a Retry gives it an Input', async () => {
+  await renderCanvas(endingIn('failed', 'Cut off'))
+  await expect.element(page.getByText('Connection lost')).toBeVisible()
+  await settledViewport()
+
+  await page.getByRole('button', {name: 'Zoom out'}).click()
+  await settledViewport()
+
+  await page
+    .getByRole('button', {name: 'Zoom to the Active Thread’s Input'})
+    .click()
+  await settledViewport()
+
+  expect(zoomOf()).toBe(1)
+  expect(offCenter(nodeOf('Cut off').element())).toBeLessThan(2)
+
+  await nodeOf('Cut off').getByRole('button', {name: 'Retry'}).click()
+  await expect.element(inputUnder('Writing…')).toBeVisible()
+  await expect.element(inputUnder('Writing…')).not.toHaveFocus()
 })
 
 function nodeCount() {
