@@ -17,6 +17,17 @@ interface Point {
 /** Every Turn is drawn this wide, in both orientations. */
 export const TURN_WIDTH = 768
 
+/** The space an empty Tree's Input keeps from each edge of the canvas. */
+export const START_MARGIN = 24
+
+/**
+ * The zoom a new Tree starts at: a Turn at full size, or shrunk to fit a
+ * canvas narrower than a Turn and its margins.
+ */
+export function startZoom(canvasWidth: number) {
+  return Math.min(1, (canvasWidth - 2 * START_MARGIN) / TURN_WIDTH)
+}
+
 const DEFAULT_SIZE: Size = {width: TURN_WIDTH, height: 80}
 
 interface PromptTurn {

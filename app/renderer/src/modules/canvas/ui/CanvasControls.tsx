@@ -7,7 +7,7 @@ import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
 import {CanvasOrientationSchema} from '@uz/contract/settings'
 import {useReactFlow} from '@xyflow/react'
 import {cn} from 'cn'
-import {MapIcon, MinusIcon, PlusIcon, ScanIcon} from 'lucide-react'
+import {FocusIcon, MapIcon, MinusIcon, PlusIcon, ScanIcon} from 'lucide-react'
 import {useRef} from 'react'
 
 import {useReducedMotion} from '../reduced-motion'
@@ -21,6 +21,8 @@ interface CanvasControlsProps {
   /** Replies that failed, oldest first. */
   failed: string[]
   onJump: (replyId: string) => void
+  /** Null while there is no Active Thread to zoom to. */
+  onZoomToActive: (() => void) | null
   showMap: boolean
   onToggleMap: () => void
 }
@@ -42,6 +44,7 @@ export function CanvasControls({
   streaming,
   failed,
   onJump,
+  onZoomToActive,
   showMap,
   onToggleMap,
 }: CanvasControlsProps) {
@@ -98,6 +101,14 @@ export function CanvasControls({
         }
       >
         <ScanIcon />
+      </TooltipButton>
+      <TooltipButton
+        label="Zoom to the Active Thread’s Input"
+        className={TOOL_CLASS}
+        disabled={onZoomToActive === null}
+        onClick={() => onZoomToActive?.()}
+      >
+        <FocusIcon />
       </TooltipButton>
       <Tooltip>
         <TooltipTrigger

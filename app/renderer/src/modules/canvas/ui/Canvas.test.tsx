@@ -18,6 +18,7 @@ import {expect, it, onTestFinished, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {cdp, page, userEvent} from 'vitest/browser'
 
+import {startZoom} from '../canvas-layout'
 import {Canvas} from './Canvas'
 
 const treeId = '01a16096-00ad-7d3b-8205-6b76ddc26ce0'
@@ -697,6 +698,48 @@ it('keeps the controls beside the Tree’s name, off the canvas, with only the m
   await expect
     .element(canvas().getByRole('img', {name: 'Minimap'}))
     .toBeVisible()
+})
+
+function inputOffCenter(replyText: string) {
+  const input = inputUnder(replyText).element().closest('form')
+
+  if (!input) throw new Error(`${replyText} has no Input`)
+
+  const box = input.getBoundingClientRect()
+  const frame = canvas().element().getBoundingClientRect()
+
+  return Math.max(
+    Math.abs(box.left + box.width / 2 - (frame.left + frame.width / 2)),
+    Math.abs(box.top + box.height / 2 - (frame.top + frame.height / 2))
+  )
+}
+
+it('zooms to the Active Thread’s Input at the zoom a new Tree starts at, however long its Reply, and puts the cursor in it', async () => {
+  const long = ['Reply one', ...Array.from({length: 80}, () => 'More.')]
+
+  await renderCanvas({
+    ...linearTree(),
+    replies: [reply(11, 1, long.join('\n\n')), reply(12, 2, 'Reply two')],
+    settings: {limitTurnHeight: false},
+  })
+  await expect.element(page.getByText('Reply two')).toBeVisible()
+  await settledViewport()
+
+  await clickInputUnder('Reply one')
+  await hoverAway()
+  await page.getByRole('button', {name: 'Zoom out'}).click()
+  await settledViewport()
+
+  await page
+    .getByRole('button', {name: 'Zoom to the Active Thread’s Input'})
+    .click()
+  await settledViewport()
+
+  expect(zoomOf()).toBe(
+    startZoom(canvas().element().getBoundingClientRect().width)
+  )
+  expect(inputOffCenter('Reply one')).toBeLessThan(2)
+  await expect.element(inputUnder('Reply one')).toHaveFocus()
 })
 
 function nodeCount() {

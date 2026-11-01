@@ -5,7 +5,13 @@ import type {Stem, TurnNode} from './TurnNodes'
 import type {CanvasOrientation} from '@uz/contract/settings'
 import type {Edge, NodeChange, Viewport} from '@xyflow/react'
 
-import {Background, MiniMap, ReactFlow, useReactFlow} from '@xyflow/react'
+import {
+  Background,
+  MiniMap,
+  ReactFlow,
+  useReactFlow,
+  useStore,
+} from '@xyflow/react'
 import {cn} from 'cn'
 import {
   useCallback,
@@ -16,7 +22,7 @@ import {
   useState,
 } from 'react'
 
-import {layoutCanvas} from '../canvas-layout'
+import {layoutCanvas, startZoom} from '../canvas-layout'
 import {useFollow} from '../follow'
 import {useReducedMotion} from '../reduced-motion'
 import {slideMs} from '../slide'
@@ -26,8 +32,11 @@ import {ExchangeNode, PromptNode, ReplyNode} from './TurnNodes'
 /** A request to bring a Reply into view; every request gets a new sequence. */
 export interface Focus {
   replyId: string
-  /** `follow` shows the Reply's bottom and keeps it shown while it streams. */
-  mode: 'center' | 'follow'
+  /**
+   * `follow` shows the Reply's bottom and keeps it shown while it streams;
+   * `input` centers its Input at the zoom a new Tree starts at.
+   */
+  mode: 'center' | 'follow' | 'input'
   sequence: number
 }
 
@@ -97,6 +106,13 @@ function settledSize(held: Held, size: Size | undefined) {
   return held.resizing === null || size !== held.resizing
 }
 
+/** A failed Reply has none: it shows Retry instead. */
+function inputOf(pane: HTMLDivElement | null, nodeId: string) {
+  return pane
+    ?.querySelector(`.react-flow__node[data-id="${CSS.escape(nodeId)}"]`)
+    ?.querySelector('[data-revealed] form')
+}
+
 function hoverIdOf(node: TurnNode) {
   const {turn} = node.data
 
@@ -118,6 +134,8 @@ export function Flow({
   onHover,
 }: FlowProps) {
   const flow = useReactFlow<TurnNode>()
+  const pane = useRef<HTMLDivElement>(null)
+  const canvasWidth = useStore(state => state.width)
   const reducedMotion = useReducedMotion()
   const panMs = useMemo(() => (reducedMotion ? 0 : slideMs()), [reducedMotion])
   // Per orientation: the same id is a Prompt box in one and an Exchange card in the other.
@@ -330,10 +348,10 @@ export function Flow({
     void fitAll()
   }, [hasFork, allMeasured, focus, flow, panMs, follow])
 
-  // Each focus centers or follows its Reply at the current zoom, once the
-  // Reply's box has a size; while the first Fork waits to be fitted, the fit
-  // takes it instead. A Reply folded away is not panned to, then or once it is
-  // unfolded.
+  // Each focus centers or follows its Reply at the current zoom, or centers its
+  // Input at the zoom a new Tree starts at, once the Reply's box has a size;
+  // while the first Fork waits to be fitted, the fit takes it instead. A Reply
+  // folded away is not panned to, then or once it is unfolded.
   useEffect(() => {
     if (!focus || centered.current === focus.sequence) return
 
@@ -361,11 +379,27 @@ export function Flow({
     }
 
     unfollow()
-    void flow.setCenter(
-      node.position.x + size.width / 2,
-      node.position.y + size.height / 2,
-      {zoom: flow.getZoom(), duration: panMs, interpolate: 'linear'}
-    )
+
+    const input =
+      focus.mode === 'input'
+        ? inputOf(pane.current, nodeId)?.getBoundingClientRect()
+        : undefined
+
+    const center = input
+      ? flow.screenToFlowPosition({
+          x: input.left + input.width / 2,
+          y: input.top + input.height / 2,
+        })
+      : {
+          x: node.position.x + size.width / 2,
+          y: node.position.y + size.height / 2,
+        }
+
+    void flow.setCenter(center.x, center.y, {
+      zoom: focus.mode === 'input' ? startZoom(canvasWidth) : flow.getZoom(),
+      duration: panMs,
+      interpolate: 'linear',
+    })
   }, [
     focus,
     hasFork,
@@ -377,10 +411,12 @@ export function Flow({
     panMs,
     follow,
     unfollow,
+    canvasWidth,
   ])
 
   return (
     <ReactFlow<TurnNode>
+      ref={pane}
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
