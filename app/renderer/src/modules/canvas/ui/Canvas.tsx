@@ -20,7 +20,7 @@ import {
 } from 'react'
 
 import {CanvasContext} from '../canvas-context'
-import {TURN_WIDTH} from '../canvas-layout'
+import {START_MARGIN, TURN_WIDTH, startZoom} from '../canvas-layout'
 import {useChatSlideout} from '../chat-slideout/use-chat-slideout'
 import {useDeletion} from '../deletion'
 import {useEscapeStops} from '../escape-stops'
@@ -85,7 +85,7 @@ function EmptyTree({treeId, onPlaced, onSent}: EmptyTreeProps) {
       onPlaced({
         x: to.left - from.left,
         y: to.top - from.top,
-        zoom: Math.min(1, to.width / TURN_WIDTH),
+        zoom: startZoom(from.width),
       })
     })
 
@@ -96,7 +96,11 @@ function EmptyTree({treeId, onPlaced, onSent}: EmptyTreeProps) {
   }, [onPlaced])
 
   return (
-    <div ref={pane} className="flex h-full items-center justify-center p-6">
+    <div
+      ref={pane}
+      className="flex h-full items-center justify-center"
+      style={{padding: START_MARGIN}}
+    >
       <div ref={box} className="max-w-full" style={{width: TURN_WIDTH}}>
         <PromptInput treeId={treeId} parentReplyId={null} onSent={onSent} />
       </div>
@@ -307,13 +311,13 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
   )
 
   const jumpTo = useCallback(
-    (replyId: string) => {
+    (replyId: string, mode: Focus['mode'] = 'center') => {
       const reply = index.replyById.get(replyId)
       const parent = reply ? previousReply(index, reply) : null
 
       if (parent) setCollapsed(unfoldedOver(index, parent.id))
 
-      focusOn(replyId, 'center')
+      focusOn(replyId, mode)
     },
     [index, focusOn]
   )
@@ -405,6 +409,16 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
               streaming={streaming}
               failed={failed}
               onJump={jumpTo}
+              onZoomToActive={
+                activeReplyId === null
+                  ? null
+                  : () => {
+                      jumpTo(activeReplyId, 'input')
+
+                      if (!failed.includes(activeReplyId))
+                        setInputToFocus(activeReplyId)
+                    }
+              }
               showMap={showMap}
               onToggleMap={() => setShowMap(shown => !shown)}
             />

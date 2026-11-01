@@ -5,14 +5,15 @@ import type {Node, NodeProps} from '@xyflow/react'
 import {ReplyView, useReply} from '#modules/turns/main'
 import {Button} from '#shadcn/ui/button'
 import {Card} from '#shadcn/ui/card'
+import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
 import {Handle, Position} from '@xyflow/react'
 import {cn} from 'cn'
-import {ChevronRightIcon} from 'lucide-react'
+import {ChevronDownIcon, ChevronRightIcon} from 'lucide-react'
 import {useEffect, useRef, useState} from 'react'
 
 import {useCanvas} from '../canvas-context'
 import {TURN_WIDTH} from '../canvas-layout'
-import {branchesOf, isFork, previousReply} from '../tree'
+import {branchesOf, isFork, previousReply, repliesUnder} from '../tree'
 import {CappedText} from './CappedText'
 import {ContextMeter, ContextSize} from './ContextSize'
 import {PromptBox} from './PromptBox'
@@ -75,16 +76,18 @@ function ReplyBody({reply}: {reply: Reply}) {
         expanded={expandedTurnIds.has(reply.id)}
         onToggle={() => toggleExpanded(reply.id)}
         streaming={status === 'streaming'}
+        trailing={
+          isFork(index, reply.id) && (
+            <ForkPill
+              replyId={reply.id}
+              branches={branchesOf(index, reply.id).length}
+            />
+          )
+        }
         className="px-3.5 py-2"
       >
         <ReplyView reply={reply} />
       </CappedText>
-      {isFork(index, reply.id) && (
-        <ForkPill
-          replyId={reply.id}
-          branches={branchesOf(index, reply.id).length}
-        />
-      )}
       {contextSizeMeter && contextSize !== null && contextWindow !== null && (
         <ContextMeter contextSize={contextSize} contextWindow={contextWindow} />
       )}
@@ -107,24 +110,82 @@ function OpenChatButton({replyId}: {replyId: string}) {
 }
 
 function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
-  const {collapsedReplyIds, toggleCollapsed} = useCanvas()
-  const collapsed = collapsedReplyIds.has(replyId)
+  const {index, toggleCollapsed} = useCanvas()
+  const folded = useFolded(replyId)
+
+  const streaming = folded
+    ? repliesUnder(index, replyId).filter(one => one.status === 'streaming')
+    : []
 
   return (
-    <footer className="px-3.5 pb-2.5">
-      <Button
-        variant="ghost"
-        size="xs"
-        aria-expanded={!collapsed}
-        className={cn(
-          'h-auto rounded-full border-border bg-muted px-2.5 py-0.5 text-[0.6875rem] font-normal text-muted-foreground',
-          'hover:text-foreground aria-expanded:bg-muted aria-expanded:text-muted-foreground aria-expanded:hover:text-foreground dark:hover:bg-muted'
-        )}
-        onClick={() => toggleCollapsed(replyId)}
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="xs"
+            aria-expanded={!folded}
+            aria-label={
+              streaming.length > 0
+                ? `${branches} Branches, ${streaming.length} streaming`
+                : undefined
+            }
+            className={cn(
+              'h-auto gap-1 rounded-full border-border py-0.5 pr-2.5 pl-1.5 text-[0.6875rem] font-normal',
+              folded
+                ? 'bg-muted font-medium text-foreground shadow-xs hover:bg-muted dark:hover:bg-muted'
+                : 'text-muted-foreground aria-expanded:bg-transparent aria-expanded:text-muted-foreground aria-expanded:hover:bg-muted aria-expanded:hover:text-foreground',
+              streaming.length > 0 && 'border-primary/50'
+            )}
+            onClick={() => toggleCollapsed(replyId)}
+          />
+        }
       >
-        Fork · {branches} Branches
-      </Button>
-    </footer>
+        <ChevronDownIcon
+          className={cn(
+            'transition-transform duration-slide ease-slide motion-reduce:transition-none',
+            folded && '-rotate-90'
+          )}
+        />
+        {branches} Branches
+        {streaming.length > 0 && (
+          <span className="ml-0.5 size-1.5 animate-pulse rounded-full bg-primary motion-reduce:animate-none" />
+        )}
+      </TooltipTrigger>
+      <TooltipContent>
+        {folded ? 'Show Branches' : 'Hide Branches'}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+function useFolded(replyId: string | null) {
+  const {index, collapsedReplyIds} = useCanvas()
+
+  return (
+    replyId !== null && isFork(index, replyId) && collapsedReplyIds.has(replyId)
+  )
+}
+
+/**
+ * Needs a positioned parent, and the box it peeks out under drawn after it. It
+ * reaches no lower than the Input's -mt-3, or a hidden Input's stack shows
+ * below the card.
+ */
+function FoldedStack({replyId}: {replyId: string | null}) {
+  if (!useFolded(replyId)) return null
+
+  return (
+    <>
+      <div
+        aria-hidden
+        className="absolute inset-x-4 -bottom-3 h-6 rounded-b-xl border border-border bg-card shadow-sm"
+      />
+      <div
+        aria-hidden
+        className="absolute inset-x-2 -bottom-1.5 h-6 rounded-b-xl border border-border bg-card shadow-sm"
+      />
+    </>
   )
 }
 
@@ -187,25 +248,32 @@ function ReplyInput({
           )}
         />
       )}
-      <div className="-mt-3 [clip-path:inset(0_-0.5rem_-0.5rem)]">
+      <div className="-mt-3 [clip-path:inset(0_-0.5rem_-1rem)]">
         <div
           data-revealed={revealed}
           className={cn(
-            'rounded-b-xl border border-t-0 border-border bg-card px-3.5 pt-5.5 pb-2.5 shadow-sm transition-[translate] duration-slide ease-slide motion-reduce:transition-none',
-            streaming && 'border-primary/50',
+            'relative transition-[translate] duration-slide ease-slide motion-reduce:transition-none',
             !revealed && '-translate-y-full focus-within:translate-y-0'
           )}
         >
-          <PromptInput
-            ref={textarea}
-            treeId={treeId}
-            parentReplyId={replyId}
-            canSend={!streaming}
-            onFocus={() => onInputFocus(replyId)}
-            onSent={sent => onSent(sent, replyId)}
-            draft={drafts.get(replyId) ?? ''}
-            onDraftChange={text => setDraft(replyId, text)}
-          />
+          <FoldedStack replyId={replyId} />
+          <div
+            className={cn(
+              'relative rounded-b-xl border border-t-0 border-border bg-card px-3.5 pt-5.5 pb-2.5 shadow-sm',
+              streaming && 'border-primary/50'
+            )}
+          >
+            <PromptInput
+              ref={textarea}
+              treeId={treeId}
+              parentReplyId={replyId}
+              canSend={!streaming}
+              onFocus={() => onInputFocus(replyId)}
+              onSent={sent => onSent(sent, replyId)}
+              draft={drafts.get(replyId) ?? ''}
+              onDraftChange={text => setDraft(replyId, text)}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -299,9 +367,12 @@ function ReplyTurn({reply, joined}: {reply: Reply; joined: boolean}) {
   const {status} = useReply(reply)
 
   return (
-    <Card data-turn={reply.id} className={replyFrame(status, joined)}>
-      <ReplyBody reply={reply} />
-    </Card>
+    <div className="relative">
+      <FoldedStack replyId={reply.id} />
+      <Card data-turn={reply.id} className={replyFrame(status, joined)}>
+        <ReplyBody reply={reply} />
+      </Card>
+    </div>
   )
 }
 
@@ -349,18 +420,21 @@ function ExchangeTurns({
   const status = useReply(reply)?.status ?? 'complete'
 
   return (
-    <Card className={replyFrame(status, joined)}>
-      <PromptBox
-        promptId={prompt.id}
-        className="border-b border-border bg-prompt px-3.5 py-2.5 text-prompt-foreground"
-      >
-        <PromptText prompt={prompt} />
-      </PromptBox>
-      {reply && (
-        <div data-turn={reply.id} className="relative">
-          <ReplyBody reply={reply} />
-        </div>
-      )}
-    </Card>
+    <div className="relative">
+      <FoldedStack replyId={reply?.id ?? null} />
+      <Card className={replyFrame(status, joined)}>
+        <PromptBox
+          promptId={prompt.id}
+          className="border-b border-border bg-prompt px-3.5 py-2.5 text-prompt-foreground"
+        >
+          <PromptText prompt={prompt} />
+        </PromptBox>
+        {reply && (
+          <div data-turn={reply.id} className="relative">
+            <ReplyBody reply={reply} />
+          </div>
+        )}
+      </Card>
+    </div>
   )
 }
