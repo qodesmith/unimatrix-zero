@@ -1,5 +1,5 @@
 import type {Collapsed, Expanded} from '../canvas-context'
-import type {Layout, Size} from '../layout'
+import type {CanvasLayout, Size} from '../canvas-layout'
 import type {TreeIndex} from '../tree'
 import type {Stem, TurnNode} from './TurnNodes'
 import type {CanvasOrientation} from '@uz/contract/settings'
@@ -16,9 +16,10 @@ import {
   useState,
 } from 'react'
 
+import {layoutCanvas} from '../canvas-layout'
 import {useFollow} from '../follow'
-import {layoutTree} from '../layout'
 import {useReducedMotion} from '../reduced-motion'
+import {slideMs} from '../slide'
 import {isFork} from '../tree'
 import {ExchangeNode, PromptNode, ReplyNode} from './TurnNodes'
 
@@ -64,7 +65,7 @@ const FIT = {padding: 0.15, maxZoom: 1}
 const nodeTypes = {prompt: PromptNode, reply: ReplyNode, exchange: ExchangeNode}
 
 function isOnThread(
-  edge: Layout['edges'][number],
+  edge: CanvasLayout['edges'][number],
   thread: ReadonlySet<string>
 ) {
   return thread.has(edge.source) && thread.has(edge.target)
@@ -72,17 +73,17 @@ function isOnThread(
 
 function stemOf(
   nodeId: string,
-  layout: Layout,
+  canvasLayout: CanvasLayout,
   thread: ReadonlySet<string>
 ): Stem {
-  const outgoing = layout.edges.filter(edge => edge.source === nodeId)
+  const outgoing = canvasLayout.edges.filter(edge => edge.source === nodeId)
 
   if (outgoing.length === 0) return 'none'
 
   return outgoing.some(edge => isOnThread(edge, thread)) ? 'on-thread' : 'plain'
 }
 
-/** A Turn kept where it is on screen while the layout changes around it. */
+/** A Turn kept where it is on screen while the canvas layout changes. */
 interface Held {
   turnId: string
   /**
@@ -117,13 +118,14 @@ export function Flow({
   onHover,
 }: FlowProps) {
   const flow = useReactFlow<TurnNode>()
-  const panMs = useReducedMotion() ? 0 : 400
+  const reducedMotion = useReducedMotion()
+  const panMs = useMemo(() => (reducedMotion ? 0 : slideMs()), [reducedMotion])
   // Per orientation: the same id is a Prompt box in one and an Exchange card in the other.
   const [sizes, setSizes] = useState<Sizes>(NO_SIZES)
   const measured = sizes[orientation]
 
-  const layout = useMemo(
-    () => layoutTree(index, orientation, id => measured[id], collapsed.ids),
+  const canvasLayout = useMemo(
+    () => layoutCanvas(index, orientation, id => measured[id], collapsed.ids),
     [index, orientation, measured, collapsed.ids]
   )
 
@@ -137,23 +139,23 @@ export function Flow({
 
   const {follow, unfollow, letGo, onMoveStart, onMoveEnd} = useFollow({
     index,
-    layout,
+    canvasLayout,
     measured,
     nodeIdOf,
     panMs,
   })
 
   const allMeasured =
-    layout.nodes.length > 0 &&
-    layout.nodes.every(node => measured[node.id] !== undefined)
+    canvasLayout.nodes.length > 0 &&
+    canvasLayout.nodes.every(node => measured[node.id] !== undefined)
 
-  // Folding or unfolding a Fork moves its Reply in the layout, and again as the
-  // boxes it shows are measured; the viewport moves by the same amount, scaled,
-  // so the Reply stays where it is on screen. A pan lets it go. Letting out or
-  // capping a Turn's text holds its Turn the same way until its box is measured
-  // anew, and lets a followed Reply go, so the text being read stays put.
-  // Deleting Turns from below a Reply holds the Reply too.
-  const lastLayout = useRef(layout)
+  // Folding or unfolding a Fork moves its Reply in the canvas layout, and again
+  // as the boxes it shows are measured; the viewport moves by the same amount,
+  // scaled, so the Reply stays where it is on screen. A pan lets it go. Letting
+  // out or capping a Turn's text holds its Turn the same way until its box is
+  // measured anew, and lets a followed Reply go, so the text being read stays
+  // put. Deleting Turns from below a Reply holds the Reply too.
+  const lastCanvasLayout = useRef(canvasLayout)
   const lastCollapsed = useRef(collapsed)
   const lastExpanded = useRef(expanded)
   const lastDeleted = useRef(deleted)
@@ -176,8 +178,8 @@ export function Flow({
   }, [deleted, measured, nodeIdOf])
 
   useLayoutEffect(() => {
-    const before = lastLayout.current
-    lastLayout.current = layout
+    const before = lastCanvasLayout.current
+    lastCanvasLayout.current = canvasLayout
 
     if (lastCollapsed.current !== collapsed) {
       lastCollapsed.current = collapsed
@@ -207,7 +209,7 @@ export function Flow({
       held.current = null
 
     const from = before.nodes.find(node => node.id === nodeId)?.position
-    const to = layout.nodes.find(node => node.id === nodeId)?.position
+    const to = canvasLayout.nodes.find(node => node.id === nodeId)?.position
 
     if (!from || !to) return
 
@@ -219,7 +221,7 @@ export function Flow({
       zoom,
     })
   }, [
-    layout,
+    canvasLayout,
     collapsed,
     expanded,
     measured,
@@ -260,25 +262,27 @@ export function Flow({
 
   const nodes = useMemo<TurnNode[]>(
     () =>
-      layout.nodes.map(turn => ({
+      canvasLayout.nodes.map(turn => ({
         id: turn.id,
         type: turn.kind,
         position: turn.position,
         data: {
           turn,
           stem:
-            turn.kind === 'reply' ? stemOf(turn.id, layout, thread) : 'none',
+            turn.kind === 'reply'
+              ? stemOf(turn.id, canvasLayout, thread)
+              : 'none',
         },
         measured: measured[turn.id],
         draggable: false,
         selectable: false,
       })),
-    [layout, measured, thread]
+    [canvasLayout, measured, thread]
   )
 
   const edges = useMemo<Edge[]>(
     () =>
-      layout.edges.map(edge => {
+      canvasLayout.edges.map(edge => {
         const highlighted = isOnThread(edge, thread)
 
         return {
@@ -288,7 +292,7 @@ export function Flow({
           zIndex: highlighted ? 1 : 0,
         }
       }),
-    [layout, thread]
+    [canvasLayout, thread]
   )
 
   const [fitted, setFitted] = useState(!fitOnLoad)
@@ -336,7 +340,7 @@ export function Flow({
     if (hasFork && !forkShown.current) return
 
     const nodeId = nodeIdOf(focus.replyId)
-    const node = layout.nodes.find(candidate => candidate.id === nodeId)
+    const node = canvasLayout.nodes.find(candidate => candidate.id === nodeId)
     const size = measured[nodeId]
 
     if (!node && index.replyById.has(focus.replyId)) {
@@ -366,7 +370,7 @@ export function Flow({
     focus,
     hasFork,
     nodeIdOf,
-    layout,
+    canvasLayout,
     index,
     measured,
     flow,

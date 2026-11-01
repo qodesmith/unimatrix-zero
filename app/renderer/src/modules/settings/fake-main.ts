@@ -3,6 +3,7 @@ import type {Command} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {Settings} from '@uz/contract/settings'
 
+import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 
 /** Main's side of the bridge for Settings tests, keeping each update it sent. */
@@ -29,6 +30,7 @@ export function fakeMain(saved: Partial<Settings> = {}) {
         providers: [],
         signIn: null,
         settings: {...settings},
+        layout: DEFAULT_LAYOUT,
       })
 
       return () => undefined

@@ -1,3 +1,4 @@
+import {LayoutSchema} from '#modules/layout/main'
 import {
   ProviderEventSchema,
   ProviderStatusSchema,
@@ -18,11 +19,17 @@ export const SnapshotEvent = z.strictObject({
   /** The Provider being connected, at its latest step. */
   signIn: SignInStepEvent.nullable(),
   settings: SettingsSchema,
+  layout: LayoutSchema,
 })
 
 export const SettingsChangedEvent = z.strictObject({
   type: z.literal('SETTINGS_CHANGED'),
   settings: SettingsSchema,
+})
+
+export const LayoutChangedEvent = z.strictObject({
+  type: z.literal('LAYOUT_CHANGED'),
+  layout: LayoutSchema,
 })
 
 export const TreeCreatedEvent = z.strictObject({
@@ -40,6 +47,7 @@ export const EventSchema = z.discriminatedUnion('type', [
   TreeCreatedEvent,
   TreeRenamedEvent,
   SettingsChangedEvent,
+  LayoutChangedEvent,
   ReplyEventSchema,
   ProviderEventSchema,
 ])

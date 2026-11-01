@@ -1,4 +1,5 @@
 import type {Connections} from '#modules/connections/main'
+import type {LayoutStore} from '#modules/layout/main'
 import type {RemoteImages} from '#modules/remote-images/main'
 import type {SettingsStore} from '#modules/settings/main'
 import type {Trees} from '#modules/trees/main'
@@ -17,6 +18,7 @@ export interface HandlerDeps {
   >
   images: RemoteImages
   settings: SettingsStore
+  layout: LayoutStore
   publish: (event: AppEvent) => void
 }
 
@@ -130,6 +132,13 @@ export const handlers: Handlers = {
   'settings.update': ({changes}, {settings, publish}) => {
     const saved = settings.update(changes)
     publish({type: 'SETTINGS_CHANGED', settings: saved})
+
+    return saved
+  },
+
+  'layout.update': ({changes}, {layout, publish}) => {
+    const saved = layout.update(changes)
+    publish({type: 'LAYOUT_CHANGED', layout: saved})
 
     return saved
   },

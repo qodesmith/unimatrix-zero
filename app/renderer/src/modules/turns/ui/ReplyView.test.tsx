@@ -8,6 +8,7 @@ import type {ReactNode} from 'react'
 import {ConnectionsProvider} from '#modules/connections/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {EventSchema} from '@uz/contract/events'
+import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import {afterEach, beforeEach, expect, it, onTestFinished, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
@@ -95,6 +96,7 @@ function fakeMain(claude: ProviderStatus['status'] = 'ready') {
         ],
         signIn: null,
         settings: DEFAULT_SETTINGS,
+        layout: DEFAULT_LAYOUT,
       })
 
       return () => listeners.delete(listener)

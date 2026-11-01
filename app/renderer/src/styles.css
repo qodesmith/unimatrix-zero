@@ -17,6 +17,12 @@
   --spacing: 4px;
 }
 
+/* `duration-slide ease-slide`: the motion every panel that slides in shares. */
+@theme {
+  --ease-slide: var(--ease-out);
+  --transition-duration-slide: 400ms;
+}
+
 /* Every color, radius and font below is a Theme token set on :root by the theme module. */
 @theme inline {
   --font-sans: var(--font);
@@ -108,7 +114,7 @@
    the Turns have arrived. */
 @media (prefers-reduced-motion: no-preference) {
   .canvas-switching .react-flow__node {
-    transition: transform 400ms ease;
+    transition: transform var(--transition-duration-slide) var(--ease-slide);
   }
 }
 .react-flow__edges {

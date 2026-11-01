@@ -1,5 +1,6 @@
 import type {AppEvent} from '@uz/contract/events'
 
+import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import {expect, it} from 'vitest'
 
@@ -23,6 +24,7 @@ const snapshot: AppEvent = {
   ],
   signIn: null,
   settings: DEFAULT_SETTINGS,
+  layout: DEFAULT_LAYOUT,
 }
 
 it('shows every card ready to connect once main has answered', () => {

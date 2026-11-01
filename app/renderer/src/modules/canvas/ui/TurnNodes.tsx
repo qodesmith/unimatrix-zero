@@ -1,4 +1,4 @@
-import type {LayoutNode} from '../layout'
+import type {CanvasLayoutNode} from '../canvas-layout'
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Node, NodeProps} from '@xyflow/react'
 
@@ -11,7 +11,7 @@ import {ChevronRightIcon} from 'lucide-react'
 import {useEffect, useRef, useState} from 'react'
 
 import {useCanvas} from '../canvas-context'
-import {TURN_WIDTH} from '../layout'
+import {TURN_WIDTH} from '../canvas-layout'
 import {branchesOf, isFork, previousReply} from '../tree'
 import {CappedText} from './CappedText'
 import {ContextMeter, ContextSize} from './ContextSize'
@@ -22,7 +22,10 @@ import {TooltipButton} from './TooltipButton'
 /** A vertical Reply's line down through its Input's space, drawn as its edge. */
 export type Stem = 'none' | 'plain' | 'on-thread'
 
-export type TurnNode = Node<{turn: LayoutNode; stem: Stem}, LayoutNode['kind']>
+export type TurnNode = Node<
+  {turn: CanvasLayoutNode; stem: Stem},
+  CanvasLayoutNode['kind']
+>
 
 /** Sized to nothing, so an edge meets the box's border. */
 const hiddenHandle = 'size-0! min-h-0! min-w-0! border-0! opacity-0!'
@@ -176,7 +179,7 @@ function ReplyInput({
         <div
           aria-hidden
           className={cn(
-            'absolute inset-y-0 left-1/2 -translate-x-1/2 transition-opacity',
+            'absolute inset-y-0 left-1/2 -translate-x-1/2 transition-opacity duration-slide ease-slide motion-reduce:transition-none',
             stem === 'on-thread'
               ? 'w-[2.5px] bg-thread-highlight'
               : 'w-[1.5px] bg-canvas-edge',
@@ -188,7 +191,7 @@ function ReplyInput({
         <div
           data-revealed={revealed}
           className={cn(
-            'rounded-b-xl border border-t-0 border-border bg-card px-3.5 pt-5.5 pb-2.5 shadow-sm transition-[translate] ease-out motion-reduce:transition-none',
+            'rounded-b-xl border border-t-0 border-border bg-card px-3.5 pt-5.5 pb-2.5 shadow-sm transition-[translate] duration-slide ease-slide motion-reduce:transition-none',
             streaming && 'border-primary/50',
             !revealed && '-translate-y-full focus-within:translate-y-0'
           )}
@@ -229,7 +232,7 @@ function useHovered() {
  */
 function replyFrame(status: Reply['status'], joined: boolean) {
   return cn(
-    'relative z-10 gap-0 rounded-xl border border-border py-0 text-base shadow-sm ring-0 transition-[border-radius,border-color] ease-out motion-reduce:transition-none',
+    'relative z-10 gap-0 rounded-xl border border-border py-0 text-base shadow-sm ring-0 transition-[border-radius,border-color] duration-slide ease-slide motion-reduce:transition-none',
     status === 'failed' && 'border-destructive',
     status === 'streaming' && 'border-primary/50',
     joined && 'rounded-b-none border-b-transparent'

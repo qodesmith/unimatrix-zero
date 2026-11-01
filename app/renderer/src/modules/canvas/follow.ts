@@ -1,4 +1,4 @@
-import type {Layout, Size} from './layout'
+import type {CanvasLayout, Size} from './canvas-layout'
 import type {TreeIndex} from './tree'
 import type {Viewport} from '@xyflow/react'
 
@@ -35,7 +35,7 @@ interface Followed {
 
 interface FollowOptions {
   index: TreeIndex
-  layout: Layout
+  canvasLayout: CanvasLayout
   measured: Record<string, Size>
   nodeIdOf: (replyId: string) => string
   panMs: number
@@ -48,7 +48,7 @@ interface FollowOptions {
  */
 export function useFollow({
   index,
-  layout,
+  canvasLayout,
   measured,
   nodeIdOf,
   panMs,
@@ -64,7 +64,7 @@ export function useFollow({
   const boxOf = useCallback(
     (replyId: string) => {
       const nodeId = nodeIdOf(replyId)
-      const node = layout.nodes.find(candidate => candidate.id === nodeId)
+      const node = canvasLayout.nodes.find(candidate => candidate.id === nodeId)
       const size = measured[nodeId]
 
       if (!node || !size) return null
@@ -78,7 +78,7 @@ export function useFollow({
         y: {start: top, end: top + size.height * zoom},
       }
     },
-    [nodeIdOf, layout, measured, flow]
+    [nodeIdOf, canvasLayout, measured, flow]
   )
 
   const glideTo = useCallback(

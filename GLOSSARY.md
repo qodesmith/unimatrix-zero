@@ -151,6 +151,10 @@ _Avoid_: Preferences, options, config
 The base size of all text in the app, a Setting. Text grows with it, and so do the widths that cap a line of it; spacing and the canvas's Zoom stay as they are.
 _Avoid_: Text size, zoom
 
+**Layout**:
+How the window is arranged, such as whether the sidebar is open, which the app remembers and restores on its own. It is never a Setting: the user changes it by arranging the window, not on the Settings page.
+_Avoid_: Window state, UI state, view state
+
 **Tools panel**:
 A Tree's own list of what the AI may use there: web search, Subagents, each MCP server, Skill and Plugin, the Provider's own built-in tools and account connectors, and the Workspace's permission level. New Trees start from the defaults in Settings; changing the panel changes only that Tree.
 _Avoid_: Tool settings, capabilities, permissions panel

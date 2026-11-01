@@ -1,5 +1,6 @@
 import type {AppEvent} from '@uz/contract/events'
 
+import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import {expect, it} from 'vitest'
 
@@ -19,6 +20,7 @@ function setUp() {
     providers: [],
     signIn: null,
     settings: DEFAULT_SETTINGS,
+    layout: DEFAULT_LAYOUT,
   }))
 }
 

@@ -10,6 +10,7 @@ import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 import {atBottom} from '../at-bottom'
 import {useCanvas} from '../canvas-context'
 import {dialogOpen} from '../dialog-open'
+import {durationMs} from '../slide'
 import {pathTo} from '../tree'
 import {PromptInput} from './PromptInput'
 import {TooltipButton} from './TooltipButton'
@@ -31,7 +32,19 @@ interface ChatSlideoutProps {
 /** Room left above the Turn scrolled to, in px. */
 const SCROLL_MARGIN = 12
 
-const SLIDE_MS = 300
+/**
+ * 0 under reduced motion: `transition-none` clears the property but leaves the
+ * duration set.
+ */
+function transitionMs(element: HTMLElement | null) {
+  if (!element) return 0
+
+  const style = getComputedStyle(element)
+
+  return style.transitionProperty === 'none'
+    ? 0
+    : durationMs(style.transitionDuration)
+}
 
 /** Chat mode: one Thread as a conventional chat in a slideout over the canvas. */
 export function ChatSlideout({
@@ -81,7 +94,7 @@ export function ChatSlideout({
   useEffect(() => {
     if (open) return undefined
 
-    const timer = setTimeout(onClosed, SLIDE_MS)
+    const timer = setTimeout(onClosed, transitionMs(aside.current))
 
     return () => clearTimeout(timer)
   }, [open, onClosed])
@@ -121,11 +134,10 @@ export function ChatSlideout({
       ref={aside}
       aria-label="Chat"
       inert={!open}
-      style={{transitionDuration: `${SLIDE_MS}ms`}}
       className={cn(
-        'absolute inset-y-0 right-0 z-10 flex flex-col bg-background transition-transform ease-out motion-reduce:transition-none starting:translate-x-full',
-        full ? 'left-0' : 'w-110 max-w-full border-l border-border shadow-xl',
-        !open && 'translate-x-full'
+        'absolute inset-y-0 right-0 z-10 flex max-w-full flex-col bg-background transition-[translate,opacity,width,box-shadow] duration-slide ease-slide motion-reduce:transition-none starting:translate-x-[2.5rem] starting:opacity-0',
+        full ? 'w-full' : 'w-110 border-l border-border shadow-xl',
+        !open && 'translate-x-[2.5rem] opacity-0'
       )}
     >
       <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2">

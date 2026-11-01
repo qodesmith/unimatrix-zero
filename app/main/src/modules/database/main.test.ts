@@ -77,6 +77,7 @@ describe('opening', () => {
       .map(row => row.name)
 
     expect(tables).toEqual([
+      'layout',
       'prompts',
       'providers',
       'replies',
