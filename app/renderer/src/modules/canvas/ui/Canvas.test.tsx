@@ -1555,7 +1555,7 @@ it('opens, widens and closes the slideout without sliding, fading or growing whe
   await expect.poll(() => aside.isConnected).toBe(false)
 })
 
-it('zooms and switches orientation without gliding when the OS asks for reduced motion', async () => {
+it('zooms and switches orientation without gliding or hiding the connections when the OS asks for reduced motion', async () => {
   await emulateReducedMotion('reduce')
   onTestFinished(async () => emulateReducedMotion(''))
   await renderCanvas(forkedTree())
@@ -1567,6 +1567,19 @@ it('zooms and switches orientation without gliding when the OS asks for reduced 
   await page.getByRole('button', {name: 'Zoom in'}).click()
   expect(zoomOf()).toBeCloseTo(loaded * 1.2, 2)
 
+  let hidden = false
+
+  const observer = new MutationObserver(() => {
+    hidden ||= document.querySelector('.canvas-switching') !== null
+  })
+
+  observer.observe(document.body, {
+    attributes: true,
+    attributeFilter: ['class'],
+    subtree: true,
+  })
+  onTestFinished(() => observer.disconnect())
+
   await page.getByRole('button', {name: 'Horizontal'}).click()
 
   const gliding = [...document.querySelectorAll('.react-flow__node')].filter(
@@ -1574,6 +1587,10 @@ it('zooms and switches orientation without gliding when the OS asks for reduced 
   )
 
   expect(gliding).toEqual([])
+  await expect
+    .poll(() => document.querySelectorAll('.react-flow__node-exchange').length)
+    .toBeGreaterThan(0)
+  expect(hidden).toBe(false)
 })
 
 it('scrolls the slideout to the Reply it opened from, expands to cover the canvas, and closes with Esc or its close control', async () => {

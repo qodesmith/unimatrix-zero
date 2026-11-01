@@ -19,6 +19,7 @@ import {
 import {layoutCanvas} from '../canvas-layout'
 import {useFollow} from '../follow'
 import {useReducedMotion} from '../reduced-motion'
+import {slideMs} from '../slide'
 import {isFork} from '../tree'
 import {ExchangeNode, PromptNode, ReplyNode} from './TurnNodes'
 
@@ -117,7 +118,8 @@ export function Flow({
   onHover,
 }: FlowProps) {
   const flow = useReactFlow<TurnNode>()
-  const panMs = useReducedMotion() ? 0 : 400
+  const reducedMotion = useReducedMotion()
+  const panMs = useMemo(() => (reducedMotion ? 0 : slideMs()), [reducedMotion])
   // Per orientation: the same id is a Prompt box in one and an Exchange card in the other.
   const [sizes, setSizes] = useState<Sizes>(NO_SIZES)
   const measured = sizes[orientation]

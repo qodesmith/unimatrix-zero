@@ -24,6 +24,7 @@ import {TURN_WIDTH} from '../canvas-layout'
 import {useChatSlideout} from '../chat-slideout/use-chat-slideout'
 import {useDeletion} from '../deletion'
 import {useEscapeStops} from '../escape-stops'
+import {useReducedMotion} from '../reduced-motion'
 import {slideMs} from '../slide'
 import {indexTurns, isEmpty, pathTo, previousReply} from '../tree'
 import {CanvasControls} from './CanvasControls'
@@ -185,6 +186,7 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
   const [inputToFocus, setInputToFocus] = useState<string | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const [switching, setSwitching] = useState(false)
+  const reducedMotion = useReducedMotion()
   const [inputAt, setInputAt] = useState<Viewport | null>(null)
   const [showMap, setShowMap] = useState(false)
 
@@ -320,11 +322,14 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
     if (orientation === canvasOrientation) return
 
     void updateSettings({canvasOrientation: orientation})
-    setSwitching(true)
 
-    if (switchTimer.current) clearTimeout(switchTimer.current)
+    if (!reducedMotion) {
+      setSwitching(true)
 
-    switchTimer.current = setTimeout(() => setSwitching(false), slideMs())
+      if (switchTimer.current) clearTimeout(switchTimer.current)
+
+      switchTimer.current = setTimeout(() => setSwitching(false), slideMs())
+    }
 
     if (activeReplyId) focusOn(activeReplyId, 'center')
   }
