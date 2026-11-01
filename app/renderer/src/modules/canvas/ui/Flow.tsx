@@ -106,7 +106,6 @@ function settledSize(held: Held, size: Size | undefined) {
   return held.resizing === null || size !== held.resizing
 }
 
-/** A failed Reply has none: it shows Retry instead. */
 function inputOf(pane: HTMLDivElement | null, nodeId: string) {
   return pane
     ?.querySelector(`.react-flow__node[data-id="${CSS.escape(nodeId)}"]`)
@@ -348,10 +347,9 @@ export function Flow({
     void fitAll()
   }, [hasFork, allMeasured, focus, flow, panMs, follow])
 
-  // Each focus centers or follows its Reply at the current zoom, or centers its
-  // Input at the zoom a new Tree starts at, once the Reply's box has a size;
-  // while the first Fork waits to be fitted, the fit takes it instead. A Reply
-  // folded away is not panned to, then or once it is unfolded.
+  // A focus waits for its Reply's box to have a size, and while the first Fork
+  // waits to be fitted, the fit takes it instead. A Reply folded away is not
+  // panned to, then or once it is unfolded.
   useEffect(() => {
     if (!focus || centered.current === focus.sequence) return
 

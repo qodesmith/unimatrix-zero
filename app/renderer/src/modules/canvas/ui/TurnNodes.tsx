@@ -160,7 +160,6 @@ function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
   )
 }
 
-/** A Fork whose Branches are folded away; a Reply that is no Fork never is. */
 function useFolded(replyId: string | null) {
   const {index, collapsedReplyIds} = useCanvas()
 
