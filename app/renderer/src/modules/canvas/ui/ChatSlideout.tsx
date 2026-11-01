@@ -32,9 +32,18 @@ interface ChatSlideoutProps {
 /** Room left above the Turn scrolled to, in px. */
 const SCROLL_MARGIN = 12
 
-/** The slideout's own transition length, read from its CSS so it can't drift. */
-function slideMs(element: HTMLElement | null) {
-  return element ? durationMs(getComputedStyle(element).transitionDuration) : 0
+/**
+ * The element's transition length; 0 when nothing transitions, as under
+ * reduced motion.
+ */
+function transitionMs(element: HTMLElement | null) {
+  if (!element) return 0
+
+  const style = getComputedStyle(element)
+
+  return style.transitionProperty === 'none'
+    ? 0
+    : durationMs(style.transitionDuration)
 }
 
 /** Chat mode: one Thread as a conventional chat in a slideout over the canvas. */
@@ -85,7 +94,7 @@ export function ChatSlideout({
   useEffect(() => {
     if (open) return undefined
 
-    const timer = setTimeout(onClosed, slideMs(aside.current))
+    const timer = setTimeout(onClosed, transitionMs(aside.current))
 
     return () => clearTimeout(timer)
   }, [open, onClosed])

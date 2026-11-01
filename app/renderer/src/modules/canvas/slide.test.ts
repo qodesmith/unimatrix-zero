@@ -12,7 +12,7 @@ it('reads no time at all as 0', () => {
   expect(durationMs('')).toBe(0)
 })
 
-it('reads the slide motion’s length from the stylesheet', () => {
+it('reads the slide motion’s length from `--transition-duration-slide`', () => {
   document.documentElement.style.setProperty(
     '--transition-duration-slide',
     '250ms'

@@ -160,7 +160,7 @@ function exchangeGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
  * Branches keep the order they were started in, and a Fork sits centered over
  * its Branches.
  */
-export function layoutTree(
+export function placeTree(
   index: TreeIndex,
   orientation: CanvasOrientation,
   sizeOf: (nodeId: string) => Size | undefined,

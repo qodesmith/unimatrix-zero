@@ -1,5 +1,5 @@
 import type {Collapsed, Expanded} from '../canvas-context'
-import type {Placement, Size} from '../layout'
+import type {Placement, Size} from '../placement'
 import type {TreeIndex} from '../tree'
 import type {Stem, TurnNode} from './TurnNodes'
 import type {CanvasOrientation} from '@uz/contract/settings'
@@ -17,7 +17,7 @@ import {
 } from 'react'
 
 import {useFollow} from '../follow'
-import {layoutTree} from '../layout'
+import {placeTree} from '../placement'
 import {useReducedMotion} from '../reduced-motion'
 import {isFork} from '../tree'
 import {ExchangeNode, PromptNode, ReplyNode} from './TurnNodes'
@@ -123,7 +123,7 @@ export function Flow({
   const measured = sizes[orientation]
 
   const placement = useMemo(
-    () => layoutTree(index, orientation, id => measured[id], collapsed.ids),
+    () => placeTree(index, orientation, id => measured[id], collapsed.ids),
     [index, orientation, measured, collapsed.ids]
   )
 

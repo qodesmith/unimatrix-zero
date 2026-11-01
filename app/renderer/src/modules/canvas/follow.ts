@@ -1,4 +1,4 @@
-import type {Placement, Size} from './layout'
+import type {Placement, Size} from './placement'
 import type {TreeIndex} from './tree'
 import type {Viewport} from '@xyflow/react'
 

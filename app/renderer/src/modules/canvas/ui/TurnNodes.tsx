@@ -1,4 +1,4 @@
-import type {PlacedNode} from '../layout'
+import type {PlacedNode} from '../placement'
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Node, NodeProps} from '@xyflow/react'
 
@@ -11,7 +11,7 @@ import {ChevronRightIcon} from 'lucide-react'
 import {useEffect, useRef, useState} from 'react'
 
 import {useCanvas} from '../canvas-context'
-import {TURN_WIDTH} from '../layout'
+import {TURN_WIDTH} from '../placement'
 import {branchesOf, isFork, previousReply} from '../tree'
 import {CappedText} from './CappedText'
 import {ContextMeter, ContextSize} from './ContextSize'
