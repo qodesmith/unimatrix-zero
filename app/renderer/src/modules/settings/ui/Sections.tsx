@@ -1,11 +1,15 @@
 import {Button} from '#shadcn/ui/button'
 import {Kbd, KbdGroup} from '#shadcn/ui/kbd'
-import {Slider} from '#shadcn/ui/slider'
 import {DEFAULT_SETTINGS, FONT_SIZE} from '@uz/contract/settings'
 import {useId} from 'react'
 
 import {useSettings, useUpdateSettings} from '../use-settings'
-import {Choice, Group, Toggle} from './Controls'
+import {Choice, ChoiceOptions, Group, Toggle} from './Controls'
+
+const FONT_SIZES = Array.from(
+  {length: (FONT_SIZE.max - FONT_SIZE.min) / FONT_SIZE.step + 1},
+  (_, index) => FONT_SIZE.min + index * FONT_SIZE.step
+)
 
 function ModShortcut({keyName}: {keyName: string}) {
   return (
@@ -34,21 +38,17 @@ export function AppearanceSection() {
         onChange={themeMode => void update({themeMode})}
       />
       <Group legend="Font size" legendId={fontSizeId}>
-        <div className="flex items-center gap-3 text-sm">
-          <Slider
-            aria-labelledby={fontSizeId}
-            className="w-32"
-            min={FONT_SIZE.min}
-            max={FONT_SIZE.max}
-            step={FONT_SIZE.step}
-            value={[settings.fontSize]}
-            onValueChange={value => {
-              const [fontSize] = [value].flat()
-
-              if (fontSize !== undefined) void update({fontSize})
-            }}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <ChoiceOptions
+            inline
+            legendId={fontSizeId}
+            value={settings.fontSize}
+            options={FONT_SIZES.map(size => ({
+              value: size,
+              label: `${size}px`,
+            }))}
+            onChange={fontSize => void update({fontSize})}
           />
-          <output>{settings.fontSize}px</output>
           <Button
             variant="outline"
             size="sm"

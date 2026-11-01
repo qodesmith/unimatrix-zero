@@ -2,7 +2,7 @@ import type {Settings} from '@uz/contract/settings'
 
 import {expect, it} from 'vitest'
 import {render} from 'vitest-browser-react'
-import {page, userEvent} from 'vitest/browser'
+import {page} from 'vitest/browser'
 
 import {fakeMain} from '../fake-main'
 import {SettingsPage} from './SettingsPage'
@@ -87,37 +87,29 @@ it('saves each Appearance Setting as it is changed, and shows the change', async
   await expect.element(page.getByRole('radio', {name: 'Light'})).toBeChecked()
 })
 
-it('shows the saved font size, saves it from the slider, and resets it to 16px', async () => {
+it('shows the saved font size, saves a picked one, and resets it to 16px', async () => {
   const main = await renderSettings({fontSize: 20})
-  const slider = page.getByRole('slider', {name: 'Font size'})
+  const fontSize = page.getByRole('radiogroup', {name: 'Font size'})
   const reset = page.getByRole('button', {name: 'Reset'})
 
-  await expect.element(slider).toHaveValue('20')
-  await expect.element(page.getByText('20px')).toBeVisible()
+  await expect
+    .element(fontSize.getByRole('radio', {name: '20px'}))
+    .toBeChecked()
 
-  slider.element().focus()
-  await userEvent.keyboard('{ArrowLeft}')
-  await expect.element(page.getByText('18px')).toBeVisible()
+  await fontSize.getByRole('radio', {name: '14px'}).click()
+  await expect
+    .element(fontSize.getByRole('radio', {name: '14px'}))
+    .toBeChecked()
   await reset.click()
 
-  await expect.element(page.getByText('16px')).toBeVisible()
+  await expect
+    .element(fontSize.getByRole('radio', {name: '16px'}))
+    .toBeChecked()
   await expect.element(reset).toBeDisabled()
   expect(main.sent).toEqual([
-    {type: 'settings.update', changes: {fontSize: 18}},
+    {type: 'settings.update', changes: {fontSize: 14}},
     {type: 'settings.update', changes: {fontSize: 16}},
   ])
-})
-
-it('draws the track of the font size slider', async () => {
-  await renderSettings({fontSize: 20})
-
-  const track = page
-    .getByRole('slider', {name: 'Font size'})
-    .element()
-    .closest('[data-slot="slider"]')
-    ?.querySelector('[data-slot="slider-track"]')
-
-  expect(track?.getBoundingClientRect().height).toBeGreaterThan(0)
 })
 
 it('shows and saves the send key and the re-read note from Chat', async () => {

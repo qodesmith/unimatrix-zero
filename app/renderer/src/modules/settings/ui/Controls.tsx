@@ -10,6 +10,7 @@ import {
 } from '#shadcn/ui/field'
 import {RadioGroup, RadioGroupItem} from '#shadcn/ui/radio-group'
 import {Switch} from '#shadcn/ui/switch'
+import {cn} from 'cn'
 import {useId} from 'react'
 
 interface GroupProps {
@@ -29,46 +30,70 @@ export function Group({legend, legendId, children}: GroupProps) {
   )
 }
 
-interface ChoiceProps<T extends string> {
+interface ChoiceProps<T extends number | string> {
   legend: string
   value: T
   options: readonly {value: T; label: string}[]
   onChange: (value: T) => void
 }
 
-export function Choice<T extends string>({
+export function Choice<T extends number | string>({
   legend,
-  value,
-  options,
-  onChange,
+  ...options
 }: ChoiceProps<T>) {
   const legendId = useId()
-  const optionId = useId()
 
   return (
     <Group legend={legend} legendId={legendId}>
-      <RadioGroup
-        aria-labelledby={legendId}
-        className="gap-2"
-        value={value}
-        onValueChange={onChange}
-      >
-        {options.map(option => (
-          <Field key={option.value} orientation="horizontal">
-            <RadioGroupItem
-              id={`${optionId}-${option.value}`}
-              value={option.value}
-            />
-            <FieldLabel
-              htmlFor={`${optionId}-${option.value}`}
-              className="font-normal"
-            >
-              {option.label}
-            </FieldLabel>
-          </Field>
-        ))}
-      </RadioGroup>
+      <ChoiceOptions legendId={legendId} {...options} />
     </Group>
+  )
+}
+
+interface ChoiceOptionsProps<T extends number | string> {
+  legendId: string
+  value: T
+  options: readonly {value: T; label: string}[]
+  onChange: (value: T) => void
+  inline?: boolean
+}
+
+/** A Choice's radios without its legend, for a Group that holds more. */
+export function ChoiceOptions<T extends number | string>({
+  legendId,
+  value,
+  options,
+  onChange,
+  inline = false,
+}: ChoiceOptionsProps<T>) {
+  const optionId = useId()
+
+  return (
+    <RadioGroup
+      aria-labelledby={legendId}
+      className={cn('gap-2', inline && 'flex w-auto flex-wrap gap-x-5')}
+      value={value}
+      onValueChange={onChange}
+    >
+      {options.map(option => (
+        <Field
+          key={option.value}
+          orientation="horizontal"
+          className={cn(inline && 'w-auto gap-2')}
+        >
+          <RadioGroupItem
+            id={`${optionId}-${option.value}`}
+            value={option.value}
+          />
+          <FieldLabel
+            htmlFor={`${optionId}-${option.value}`}
+            className="font-normal"
+          >
+            {option.label}
+          </FieldLabel>
+        </Field>
+      ))}
+    </RadioGroup>
   )
 }
 
