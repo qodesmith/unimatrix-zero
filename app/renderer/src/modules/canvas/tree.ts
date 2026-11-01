@@ -115,3 +115,10 @@ export function turnsFrom(index: TreeIndex, promptId: string): string[] {
 
   return ids
 }
+
+/** Every Reply in a Reply's Branches, however deep. */
+export function repliesUnder(index: TreeIndex, replyId: string): Reply[] {
+  return branchesOf(index, replyId)
+    .flatMap(branch => turnsFrom(index, branch.id))
+    .flatMap(id => index.replyById.get(id) ?? [])
+}

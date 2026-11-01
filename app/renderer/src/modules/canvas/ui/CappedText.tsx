@@ -15,6 +15,8 @@ interface CappedTextProps {
   onToggle: () => void
   /** The box stays on the newest text until the user scrolls up. */
   streaming?: boolean
+  /** Held at the end of Show more's line, which shows for it alone too. */
+  trailing?: ReactNode
   className?: string
   children: ReactNode
 }
@@ -37,6 +39,7 @@ export function CappedText({
   expanded,
   onToggle,
   streaming = false,
+  trailing,
   className,
   children,
 }: CappedTextProps) {
@@ -48,6 +51,7 @@ export function CappedText({
   const flow = useReactFlow()
   const store = useStoreApi()
   const capped = limit && !expanded
+  const toggles = limit && (overflows || expanded)
 
   // On every render, since a toggle is waiting only for the one it causes.
   useLayoutEffect(() => {
@@ -108,15 +112,18 @@ export function CappedText({
       >
         <div ref={content}>{children}</div>
       </div>
-      {limit && (overflows || expanded) && (
-        <div className="mt-1 flex justify-end">
-          <Button
-            variant="link"
-            className="h-auto border-0 p-0 text-xs font-normal underline-offset-auto"
-            onClick={onClick}
-          >
-            {expanded ? 'Show less' : 'Show more'}
-          </Button>
+      {(toggles || trailing) && (
+        <div className="mt-1 flex items-center gap-2">
+          {toggles && (
+            <Button
+              variant="link"
+              className="h-auto border-0 p-0 text-xs font-normal underline-offset-auto"
+              onClick={onClick}
+            >
+              {expanded ? 'Show less' : 'Show more'}
+            </Button>
+          )}
+          {trailing && <div className="ml-auto">{trailing}</div>}
         </div>
       )}
     </div>

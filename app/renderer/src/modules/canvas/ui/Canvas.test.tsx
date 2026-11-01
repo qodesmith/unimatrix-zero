@@ -450,7 +450,7 @@ it('keeps a draft through its Fork folding and unfolding, and through an orienta
   await hoverAway()
 
   const pill = nodeOf('Reply two').getByRole('button', {
-    name: 'Fork · 2 Branches',
+    name: '2 Branches',
   })
 
   await pill.click()
@@ -753,7 +753,8 @@ it('folds a Fork’s Branches through its pill and unfolds them again, with the 
   await settledViewport()
 
   const pill = nodeOf('Reply two').getByRole('button', {
-    name: 'Fork · 2 Branches',
+    name: '2 Branches',
+    exact: true,
   })
 
   await expect.element(pill).toHaveAttribute('aria-expanded', 'true')
@@ -786,7 +787,7 @@ it('folds a Fork’s Branches in the horizontal orientation too, its card stayin
   await settledViewport()
 
   const pill = nodeOf('Reply two').getByRole('button', {
-    name: 'Fork · 2 Branches',
+    name: '2 Branches',
   })
 
   const before = rect('Reply two')
@@ -810,7 +811,7 @@ it('unfolds a folded Fork to jump to a Reply streaming in one of its Branches', 
   await expect.poll(viewport).not.toContain('translate(0px, 0px)')
 
   const pill = nodeOf('Reply two').getByRole('button', {
-    name: 'Fork · 2 Branches',
+    name: '2 Branches',
   })
 
   await pill.click()
@@ -823,21 +824,57 @@ it('unfolds a folded Fork to jump to a Reply streaming in one of its Branches', 
   await expect.poll(viewport).not.toBe(folded)
 })
 
+it('tells on a folded Fork’s pill that a Reply in its Branches is streaming, until it unfolds', async () => {
+  const saved = forkedTree()
+
+  saved.replies = saved.replies.map(one =>
+    one.id === uuid(15) ? {...one, status: 'streaming', content: []} : one
+  )
+
+  await renderCanvas(saved)
+  await expect.element(page.getByText('Prompt five')).toBeVisible()
+
+  const pill = nodeOf('Reply two').getByRole('button', {name: /Branches/})
+
+  await expect.element(pill).toHaveAccessibleName('2 Branches')
+
+  await pill.click()
+  await expect.element(page.getByText('Prompt five')).not.toBeInTheDocument()
+  await expect.element(pill).toHaveAccessibleName('2 Branches, 1 streaming')
+
+  await nodeOf('Reply one')
+    .getByRole('button', {name: /Branches/})
+    .click()
+  await expect.element(page.getByText('Prompt two')).not.toBeInTheDocument()
+  await expect
+    .element(nodeOf('Reply one').getByRole('button', {name: /Branches/}))
+    .toHaveAccessibleName('2 Branches, 1 streaming')
+
+  await nodeOf('Reply one')
+    .getByRole('button', {name: /Branches/})
+    .click()
+  await expect.element(page.getByText('Reply two')).toBeVisible()
+  const remounted = nodeOf('Reply two').getByRole('button', {name: /Branches/})
+
+  await expect
+    .element(remounted)
+    .toHaveAccessibleName('2 Branches, 1 streaming')
+  await remounted.click()
+  await expect.element(page.getByText('Prompt five')).toBeVisible()
+  await expect.element(remounted).toHaveAccessibleName('2 Branches')
+})
+
 it('unfolds a folded Fork when a Prompt is sent into it, showing the new Branch', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
-  await nodeOf('Reply two')
-    .getByRole('button', {name: 'Fork · 2 Branches'})
-    .click()
+  await nodeOf('Reply two').getByRole('button', {name: '2 Branches'}).click()
   await expect.element(page.getByText('Prompt four')).not.toBeInTheDocument()
 
   await sendInto('Reply two', 'A third way')
   await expect.element(page.getByText('Prompt four')).toBeVisible()
   await expect
-    .element(
-      nodeOf('Reply two').getByRole('button', {name: 'Fork · 3 Branches'})
-    )
+    .element(nodeOf('Reply two').getByRole('button', {name: '3 Branches'}))
     .toHaveAttribute('aria-expanded', 'true')
 })
 
@@ -848,9 +885,7 @@ it('keeps a Fork’s card put on unfolding Branches folded since before an orien
 
   // Reply five, the newest, ends the Active Thread: the switch has it to pan to
   // but folded away, and the unfolded cards are measured only once they show.
-  await nodeOf('Reply two')
-    .getByRole('button', {name: 'Fork · 2 Branches'})
-    .click()
+  await nodeOf('Reply two').getByRole('button', {name: '2 Branches'}).click()
   await expect.element(page.getByText('Reply five')).not.toBeInTheDocument()
 
   await page.getByRole('button', {name: 'Horizontal'}).click()
@@ -863,9 +898,7 @@ it('keeps a Fork’s card put on unfolding Branches folded since before an orien
   await settledViewport()
   const before = rect('Reply two')
 
-  await nodeOf('Reply two')
-    .getByRole('button', {name: 'Fork · 2 Branches'})
-    .click()
+  await nodeOf('Reply two').getByRole('button', {name: '2 Branches'}).click()
   await expect.element(page.getByText('Reply five')).toBeVisible()
   await settledViewport()
   expect(rect('Reply two').left).toBeCloseTo(before.left, 0)
@@ -1030,6 +1063,41 @@ it('keeps the text a Reply was scrolled to where it is on screen as Show more le
 
   const before = await showMoreScrolledTo('Line 12')
   expect(lineTop('Line 12')).toBeCloseTo(before, 0)
+})
+
+it('puts a long Fork’s Show more and its Branches pill on one line, at either end', async () => {
+  const saved = forkedTree()
+
+  saved.replies = saved.replies.map(one =>
+    one.id === uuid(11)
+      ? {...one, content: [{type: 'text', text: longReply}]}
+      : one
+  )
+
+  await renderCanvas(saved)
+  await expect.element(page.getByText('Line 40')).toBeInTheDocument()
+
+  const box = document
+    .querySelector(`[data-turn="${uuid(11)}"]`)
+    ?.closest('.react-flow__node')
+
+  if (!box) throw new Error('Reply one is not on the canvas')
+
+  const node = page.elementLocator(box)
+  const more = node.getByRole('button', {name: 'Show more'})
+  const pill = node.getByRole('button', {name: '2 Branches'})
+
+  await expect.element(more).toBeVisible()
+  await expect.element(pill).toBeVisible()
+
+  const card = node.element().getBoundingClientRect()
+  const left = more.element().getBoundingClientRect()
+  const right = pill.element().getBoundingClientRect()
+
+  expect(left.top).toBeLessThan(right.bottom)
+  expect(right.top).toBeLessThan(left.bottom)
+  expect(left.left - card.left).toBeLessThan(card.right - left.right)
+  expect(card.right - right.right).toBeLessThan(right.left - card.left)
 })
 
 it('keeps a scrolled Fork’s text put as Show more lets it out and its card re-centers over its Branches', async () => {
@@ -1434,9 +1502,7 @@ it('branches from the slideout into a Reply that already has a response, and fol
   await userEvent.keyboard('{Enter}')
 
   await expect
-    .element(
-      nodeOf('Reply one').getByRole('button', {name: 'Fork · 3 Branches'})
-    )
+    .element(nodeOf('Reply one').getByRole('button', {name: '3 Branches'}))
     .toBeVisible()
   expect(main.sent.filter(command => command.type === 'prompt.send')).toEqual([
     expect.objectContaining({parentReplyId: uuid(11), text: 'A third way'}),
