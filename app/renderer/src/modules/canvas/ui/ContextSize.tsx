@@ -60,7 +60,7 @@ export function ContextSize({
       <div
         aria-hidden
         className={cn(
-          'absolute inset-0 z-10 bg-card/40 backdrop-blur-sm transition-[opacity,visibility] ease-out motion-reduce:transition-none',
+          'absolute inset-0 z-10 bg-card/40 backdrop-blur-sm transition-[opacity,visibility] duration-slide ease-slide motion-reduce:transition-none',
           !open && 'invisible opacity-0'
         )}
         onClick={close}
@@ -91,7 +91,7 @@ function ContextSizeDrawer({
     <aside
       aria-label="Context size details"
       className={cn(
-        'absolute inset-y-0 left-0 z-10 w-56 border-r border-border bg-popover text-popover-foreground transition-[translate,visibility] ease-out motion-reduce:transition-none',
+        'absolute inset-y-0 left-0 z-10 w-56 border-r border-border bg-popover text-popover-foreground transition-[translate,visibility] duration-slide ease-slide motion-reduce:transition-none',
         !open && 'invisible -translate-x-full'
       )}
       onKeyDown={event => {

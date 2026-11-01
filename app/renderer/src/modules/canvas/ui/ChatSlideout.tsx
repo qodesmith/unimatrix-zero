@@ -31,7 +31,15 @@ interface ChatSlideoutProps {
 /** Room left above the Turn scrolled to, in px. */
 const SCROLL_MARGIN = 12
 
-const SLIDE_MS = 300
+/** The slideout's own transition length, read from its CSS so it can't drift. */
+function slideMs(element: HTMLElement | null) {
+  if (!element) return 0
+
+  // Computed transition-duration is always in seconds, like "0.4s".
+  return (
+    Number.parseFloat(getComputedStyle(element).transitionDuration) * 1000 || 0
+  )
+}
 
 /** Chat mode: one Thread as a conventional chat in a slideout over the canvas. */
 export function ChatSlideout({
@@ -81,7 +89,7 @@ export function ChatSlideout({
   useEffect(() => {
     if (open) return undefined
 
-    const timer = setTimeout(onClosed, SLIDE_MS)
+    const timer = setTimeout(onClosed, slideMs(aside.current))
 
     return () => clearTimeout(timer)
   }, [open, onClosed])
@@ -121,9 +129,8 @@ export function ChatSlideout({
       ref={aside}
       aria-label="Chat"
       inert={!open}
-      style={{transitionDuration: `${SLIDE_MS}ms`}}
       className={cn(
-        'absolute inset-y-0 right-0 z-10 flex flex-col bg-background transition-transform ease-out motion-reduce:transition-none starting:translate-x-full',
+        'absolute inset-y-0 right-0 z-10 flex flex-col bg-background transition-transform duration-slide ease-slide motion-reduce:transition-none starting:translate-x-full',
         full ? 'left-0' : 'w-110 max-w-full border-l border-border shadow-xl',
         !open && 'translate-x-full'
       )}

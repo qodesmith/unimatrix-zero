@@ -17,6 +17,12 @@
   --spacing: 4px;
 }
 
+/* `duration-slide ease-slide`: the motion every panel that slides in shares. */
+@theme {
+  --ease-slide: var(--ease-out);
+  --transition-duration-slide: 400ms;
+}
+
 /* Every color, radius and font below is a Theme token set on :root by the theme module. */
 @theme inline {
   --font-sans: var(--font);
