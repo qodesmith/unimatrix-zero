@@ -2,10 +2,7 @@ import {Kbd, KbdGroup} from '#shadcn/ui/kbd'
 import {SidebarTrigger} from '#shadcn/ui/sidebar'
 import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
 
-/**
- * Opens and closes the app sidebar; ⌘B is stock `SidebarProvider`'s own
- * listener.
- */
+/** ⌘B is stock `SidebarProvider`'s own listener, not this component's. */
 export function SidebarToggle() {
   return (
     <Tooltip>
