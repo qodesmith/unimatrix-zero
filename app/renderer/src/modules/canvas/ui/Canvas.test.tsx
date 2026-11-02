@@ -1625,6 +1625,38 @@ it('slides the slideout a short way in as it opens and out as it closes, fading 
   await expect.poll(() => aside.isConnected).toBe(false)
 })
 
+async function setPlaybackRate(playbackRate: number) {
+  await cdp().send('Animation.setPlaybackRate', {playbackRate})
+}
+
+it('keeps the slideout until its slide out ends, however long that takes', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await openChatAt('Reply four')
+  const aside = slideout().element()
+  await expect.poll(() => sliding(aside)).toBe(false)
+
+  await cdp().send('Animation.enable')
+  await setPlaybackRate(0)
+  onTestFinished(async () => setPlaybackRate(1))
+  vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']})
+  onTestFinished(() => {
+    vi.useRealTimers()
+  })
+
+  await slideout().getByRole('button', {name: 'Close'}).click()
+  await expect.poll(() => sliding(aside)).toBe(true)
+  vi.runOnlyPendingTimers()
+  vi.useRealTimers()
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  expect(aside.isConnected).toBe(true)
+
+  await setPlaybackRate(1)
+  await expect.poll(() => aside.isConnected).toBe(false)
+})
+
 it('slides the Context size drawer a short way in as it opens and out as it closes, fading as it goes', async () => {
   clock = 0
   await renderCanvas({

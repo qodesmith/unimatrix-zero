@@ -10,7 +10,6 @@ import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 import {atBottom} from '../at-bottom'
 import {useCanvas} from '../canvas-context'
 import {dialogOpen} from '../dialog-open'
-import {durationMs} from '../slide'
 import {pathTo} from '../tree'
 import {PromptInput} from './PromptInput'
 import {TooltipButton} from './TooltipButton'
@@ -31,20 +30,6 @@ interface ChatSlideoutProps {
 
 /** Room left above the Turn scrolled to, in px. */
 const SCROLL_MARGIN = 12
-
-/**
- * 0 under reduced motion: `transition-none` clears the property but leaves the
- * duration set.
- */
-function transitionMs(element: HTMLElement | null) {
-  if (!element) return 0
-
-  const style = getComputedStyle(element)
-
-  return style.transitionProperty === 'none'
-    ? 0
-    : durationMs(style.transitionDuration)
-}
 
 /** Chat mode: one Thread as a conventional chat in a slideout over the canvas. */
 export function ChatSlideout({
@@ -94,9 +79,23 @@ export function ChatSlideout({
   useEffect(() => {
     if (open) return undefined
 
-    const timer = setTimeout(onClosed, transitionMs(aside.current))
+    let current = true
 
-    return () => clearTimeout(timer)
+    async function slidOut() {
+      await Promise.allSettled(
+        (aside.current?.getAnimations() ?? []).map(
+          async animation => animation.finished
+        )
+      )
+
+      if (current) onClosed()
+    }
+
+    void slidOut()
+
+    return () => {
+      current = false
+    }
   }, [open, onClosed])
 
   useLayoutEffect(() => {
