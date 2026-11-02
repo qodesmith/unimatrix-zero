@@ -1,3 +1,4 @@
+import {DEFAULT_SIDEBAR_SECTIONS} from '@uz/contract/layout'
 import {expect, it} from 'vitest'
 
 import {arrange, resetSplit, resized} from './sidebar-sections'
@@ -48,19 +49,21 @@ it('arranges a drag’s sizes back to the layout dragged to', () => {
 })
 
 it('resets two sections to the default split of their space, leaving the third alone', () => {
-  expect(
-    resetSplit(
-      {
-        trees: {size: 20, collapsed: false},
-        files: {size: 65, collapsed: false},
-        usage: {size: 15, collapsed: true},
-      },
-      'trees',
-      'files'
-    )
-  ).toEqual({
-    trees: {size: 55, collapsed: false},
-    files: {size: 30, collapsed: false},
-    usage: {size: 15, collapsed: true},
-  })
+  const usage = {size: 15, collapsed: true}
+
+  const reset = resetSplit(
+    {
+      trees: {size: 20, collapsed: false},
+      files: {size: 48, collapsed: false},
+      usage,
+    },
+    'trees',
+    'files'
+  )
+
+  expect(reset.trees.size + reset.files.size).toBeCloseTo(68)
+  expect(reset.trees.size / reset.files.size).toBeCloseTo(
+    DEFAULT_SIDEBAR_SECTIONS.trees.size / DEFAULT_SIDEBAR_SECTIONS.files.size
+  )
+  expect(reset.usage).toEqual(usage)
 })

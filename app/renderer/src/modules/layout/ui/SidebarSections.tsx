@@ -60,8 +60,8 @@ function headerShare(
 }
 
 /**
- * The sidebar's sections, VS Code Explorer style: dividers to drag, and
- * headers that collapse a section to themselves, all kept in the Layout.
+ * The sidebar's sections: dividers to drag, and headers that collapse a
+ * section to themselves, all kept in the Layout.
  */
 export function SidebarSections(
   props: Record<SidebarSectionId, SectionContent>

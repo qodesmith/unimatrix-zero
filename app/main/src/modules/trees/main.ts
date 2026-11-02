@@ -144,11 +144,9 @@ export function createTrees(db: Database) {
       )
     },
 
-    /** Its Turns go with it; whether it existed. */
-    delete(id: string): boolean {
-      return (
-        db.delete(trees).where(eq(trees.id, id)).returning().get() !== undefined
-      )
+    /** Its Turns go with it. */
+    delete(id: string): void {
+      db.delete(trees).where(eq(trees.id, id)).run()
     },
   }
 }
