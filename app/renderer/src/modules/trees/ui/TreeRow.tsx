@@ -112,10 +112,6 @@ export function TreeRow({
   )
 }
 
-/**
- * Gives way to the ⋯ button where the row is hovered, focused or has its menu
- * open.
- */
 function TreeDetails({id, tree}: {id: string; tree: Tree}) {
   const streaming = useTreeStreaming(tree.id)
   const now = useNow()

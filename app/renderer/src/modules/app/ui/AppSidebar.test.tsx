@@ -491,7 +491,6 @@ function divider(index: number) {
   return found
 }
 
-/** `read` once per animation frame, for `ms`. */
 async function framesOf(read: () => number, ms: number) {
   const values: number[] = []
   const end = performance.now() + ms

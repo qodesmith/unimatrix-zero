@@ -100,7 +100,6 @@ export function createTurns({
     /** For a window that connects mid-stream. */
     streaming: () => inFlight.streaming(),
 
-    /** Whether a Reply in the Tree is being written. */
     streamsIn: (treeId: string) => inFlight.streamsIn(treeId),
 
     /** Null when the Reply it answers is gone. */

@@ -7,7 +7,6 @@ import type {Reply} from '@uz/contract/turns'
 
 import {TREE_TITLE_MAX_LENGTH} from '@uz/contract/trees'
 
-/** How much of the root Prompt, and of its Reply, the one-shot reads. */
 const EXCERPT_LENGTH = 2000
 
 /** A stopped Reply has finished too: its text so far is what it says. */
@@ -66,7 +65,6 @@ export function createTitles({
   vendorProgramFor,
   publish,
 }: TitlesDeps) {
-  /** The Reply when it answers the root Prompt of an untitled Tree. */
   function firstExchange({treeId, replyId, status}: FinishedReply) {
     if (!FINISHED.has(status) || trees.get(treeId)?.title !== null) return null
 

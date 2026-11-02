@@ -42,7 +42,6 @@ function sectionLayout(layout: PanelLayout): SectionLayout {
   }
 }
 
-/** A header's share of the panels' height, as `arrange` takes it. */
 function headerShare(
   group: RefObject<HTMLDivElement | null>,
   header: RefObject<HTMLDivElement | null>

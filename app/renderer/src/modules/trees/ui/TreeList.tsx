@@ -18,7 +18,6 @@ interface TreeListProps {
   onDelete: (treeId: string) => void
 }
 
-/** The Trees section's body: a row per Tree, or the invitation to start one. */
 export function TreeList({
   trees,
   hasTrees,

@@ -247,7 +247,6 @@ export const HostReadyMessage = z.strictObject({
   type: z.literal('HOST_READY'),
   /** Empty until the driver can write Replies. */
   models: z.array(ModelSchema),
-  /** As `ProviderDriver.smallestModel` reads it. */
   smallestModel: z.string().min(1).nullable(),
 })
 

@@ -34,7 +34,6 @@ export const RESTART_DELAYS_MS = [1000, 5000, 30_000]
 /** A host that stays up this long after reporting ready has recovered. */
 export const STABLE_AFTER_MS = 60_000
 
-/** A one-shot the host hasn't answered in this long has failed. */
 export const ONE_SHOT_TIMEOUT_MS = 60_000
 
 interface PendingOneShot {

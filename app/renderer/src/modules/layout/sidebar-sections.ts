@@ -18,7 +18,6 @@ function openTotal(sections: Sections) {
   return openIds(sections).reduce((sum, id) => sum + sections[id].size, 0)
 }
 
-/** The height left for the open sections once each collapsed one has its header. */
 function free(sections: Sections, headerShare: number) {
   return 100 - (SECTION_IDS.length - openIds(sections).length) * headerShare
 }

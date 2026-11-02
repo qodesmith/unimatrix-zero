@@ -11,7 +11,6 @@ import {setTimeout as delay} from 'node:timers/promises'
 import {claudeEnvironment} from './environment'
 import {CLOSE_TIMEOUT_MS} from './session'
 
-/** The parts of an SDK message a one-shot reads. */
 export type OneShotMessage =
   | {type: Exclude<SDKMessage['type'], 'result'>}
   | Pick<SDKResultSuccess, 'type' | 'subtype' | 'is_error' | 'result'>

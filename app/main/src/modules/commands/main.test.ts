@@ -127,7 +127,6 @@ async function sendPrompt(
   return PromptSendResult.parse(outcome.value)
 }
 
-/** The host saves the Reply and finishes it. */
 function answer(treeId: string, replyId: string) {
   deps.turns.hostRecorded('claude', {
     type: 'REPLY_RECORDED',

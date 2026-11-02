@@ -20,9 +20,7 @@ function clampWidth(width: number) {
 }
 
 interface LayoutSidebarProps {
-  /** What the sidebar holds. */
   sidebar: ReactNode
-  /** The rest of the window, beside the sidebar. */
   children: ReactNode
 }
 

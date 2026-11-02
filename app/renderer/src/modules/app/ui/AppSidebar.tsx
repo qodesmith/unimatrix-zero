@@ -18,7 +18,6 @@ import {SettingsIcon} from 'lucide-react'
 
 interface AppSidebarProps {
   trees: ReturnType<typeof useTrees>
-  /** The Connections cards, for the Settings page. */
   connections: ReactNode
 }
 

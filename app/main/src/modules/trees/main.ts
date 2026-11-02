@@ -88,7 +88,6 @@ export function createTrees(db: Database) {
       return tree
     },
 
-    /** The Tree last active first. */
     list(): Tree[] {
       return selectRows(db)
         .orderBy(desc(lastActiveAt), desc(trees.id))
@@ -121,7 +120,6 @@ export function createTrees(db: Database) {
       )
     },
 
-    /** The Tree after its failures were seen, and whether it had any unseen. */
     markSeen(id: string): {tree: Tree; changed: boolean} | null {
       const changed = db
         .update(trees)
@@ -165,7 +163,6 @@ export function createTreeRows(
   }
 
   return {
-    /** A Prompt in it was sent or deleted. */
     turnsChanged: (treeId: string) => changed(store.get(treeId)),
 
     replyFinished({treeId, status}: {treeId: string; status: ReplyStatus}) {
