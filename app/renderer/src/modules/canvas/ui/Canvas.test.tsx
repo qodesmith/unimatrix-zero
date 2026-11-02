@@ -295,20 +295,39 @@ function zoomOf() {
 }
 
 async function settledViewport() {
+  let frames = 0
+  let counting = true
+
+  function count() {
+    frames++
+
+    if (counting) requestAnimationFrame(count)
+  }
+
+  requestAnimationFrame(count)
+
   let last: string | null = null
+  let framesAtLast = 0
 
-  await expect
-    .poll(
-      () => {
-        const now = viewport()
-        const same = now === last
-        last = now
+  // On a loaded runner, two samples with no frame drawn between them can both
+  // land mid-glide.
+  try {
+    await expect
+      .poll(
+        () => {
+          const now = viewport()
+          const settled = now === last && frames - framesAtLast >= 2
+          last = now
+          framesAtLast = frames
 
-        return same
-      },
-      {interval: 100}
-    )
-    .toBe(true)
+          return settled
+        },
+        {interval: 100}
+      )
+      .toBe(true)
+  } finally {
+    counting = false
+  }
 
   return last
 }
