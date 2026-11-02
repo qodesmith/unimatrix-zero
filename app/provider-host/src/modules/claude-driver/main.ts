@@ -81,7 +81,8 @@ export function createClaudeDriver({
     forkSession: notYet,
     rebuildSession: notYet,
     cutSession: replies.cutSession,
-    runOneShot: async request => runClaudeOneShot({query: run, env}, request),
+    runOneShot: async (request, signal) =>
+      runClaudeOneShot({query: run, env}, request, signal),
     mcpSignIn: notYet,
   }
 }

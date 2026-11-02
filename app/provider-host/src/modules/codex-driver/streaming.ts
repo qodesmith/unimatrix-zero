@@ -131,6 +131,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
 
     if (running.writing > 0) return
 
+    running.wake?.()
     running.wake = deps.whenIdle(() => {
       if (current === running) current = null
 

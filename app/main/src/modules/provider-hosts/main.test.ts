@@ -562,4 +562,22 @@ describe('a one-shot', () => {
       ])
     ).resolves.toBe('rejected')
   })
+
+  it('tells its host to cancel it once it takes too long', async () => {
+    const hosts = readyHost()
+
+    const pending = hosts.runOneShot('claude', {
+      prompt: 'Title?',
+      vendorProgram,
+    })
+
+    const {requestId} = asked()
+    vi.advanceTimersByTime(ONE_SHOT_TIMEOUT_MS)
+
+    await expect(pending).rejects.toThrow('took too long')
+    expect(latest().received.at(-1)).toEqual({
+      type: 'one-shot.cancel',
+      requestId,
+    })
+  })
 })

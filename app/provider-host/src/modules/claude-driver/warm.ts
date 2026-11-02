@@ -27,12 +27,15 @@ export function createWarmSessions<Session extends WarmSession>({
   const open = new Set<Session>()
   /** The idle ones, longest idle first, each with what calls off its close. */
   const idle = new Map<Session, () => void>()
-  /** Each session's `claude` still closing. */
   const closing = new Map<string, Set<Promise<void>>>()
 
-  function forget(session: Session) {
+  function wake(session: Session) {
     idle.get(session)?.()
     idle.delete(session)
+  }
+
+  function forget(session: Session) {
+    wake(session)
     open.delete(session)
   }
 
@@ -72,8 +75,7 @@ export function createWarmSessions<Session extends WarmSession>({
         if (session.sessionId !== ref.sessionId) continue
 
         if (session.messageId === ref.messageId) {
-          idle.get(session)?.()
-          idle.delete(session)
+          wake(session)
 
           return session
         }
@@ -92,6 +94,7 @@ export function createWarmSessions<Session extends WarmSession>({
     release(session: Session) {
       if (!open.has(session)) return
 
+      wake(session)
       idle.set(
         session,
         whenIdle(() => close(session))
