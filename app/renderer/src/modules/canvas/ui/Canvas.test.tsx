@@ -1610,9 +1610,7 @@ it('opens the Model picker of a Reply’s Input on the canvas', async () => {
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
   await nodeOf('Reply five').getByRole('combobox', {name: 'Model'}).click()
-  await expect
-    .element(page.getByRole('option', {name: 'Fake'}))
-    .toBeVisible()
+  await expect.element(page.getByRole('option', {name: 'Fake'})).toBeVisible()
 })
 
 function transitionOf(element: Element, property: string) {
