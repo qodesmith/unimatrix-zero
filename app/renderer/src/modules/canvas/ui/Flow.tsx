@@ -27,6 +27,7 @@ import {useFollow} from '../follow'
 import {useReducedMotion} from '../reduced-motion'
 import {slideMs} from '../slide'
 import {isFork} from '../tree'
+import {whenTurnsArrive} from '../when-turns-arrive'
 import {ExchangeNode, PromptNode, ReplyNode} from './TurnNodes'
 
 /** A request to bring a Reply into view; every request gets a new sequence. */
@@ -43,18 +44,15 @@ export interface Focus {
 interface FlowProps {
   index: TreeIndex
   orientation: CanvasOrientation
-  /** The Turn ids on the highlighted Thread. */
   thread: ReadonlySet<string>
   collapsed: Collapsed
   expanded: Expanded
   focus: Focus | null
-  /** Fit the whole Tree once it is measured; off for a Tree that starts here. */
   fitOnLoad: boolean
   /** Where the root Prompt is drawn at first, and how far zoomed. */
   startAt: Viewport | null
   /** A new one each time a Prompt and every Turn below it are deleted. */
   deleted: Deleted | null
-  switching: boolean
   showMap: boolean
   onHover: (turnId: string | null) => void
 }
@@ -128,7 +126,6 @@ export function Flow({
   fitOnLoad,
   startAt,
   deleted,
-  switching,
   showMap,
   onHover,
 }: FlowProps) {
@@ -166,12 +163,26 @@ export function Flow({
     canvasLayout.nodes.length > 0 &&
     canvasLayout.nodes.every(node => measured[node.id] !== undefined)
 
-  // Folding or unfolding a Fork moves its Reply in the canvas layout, and again
-  // as the boxes it shows are measured; the viewport moves by the same amount,
-  // scaled, so the Reply stays where it is on screen. A pan lets it go. Letting
-  // out or capping a Turn's text holds its Turn the same way until its box is
-  // measured anew, and lets a followed Reply go, so the text being read stays
-  // put. Deleting Turns from below a Reply holds the Reply too.
+  const [laidOutFor, setLaidOutFor] = useState(orientation)
+  // An orientation, not a flag, so a switch that lands as the last one ends
+  // still restarts the wait.
+  const [switchingTo, setSwitchingTo] = useState<CanvasOrientation | null>(null)
+
+  if (laidOutFor !== orientation) {
+    setLaidOutFor(orientation)
+    setSwitchingTo(reducedMotion ? null : orientation)
+  }
+
+  useEffect(() => {
+    const element = pane.current
+
+    if (switchingTo === null || !element) return undefined
+
+    return whenTurnsArrive(element, () => setSwitchingTo(null))
+  }, [switchingTo])
+
+  // The held Turn moves again as the boxes around it are measured, so it stays
+  // held until they all are; a pan to a focus lets it go.
   const lastCanvasLayout = useRef(canvasLayout)
   const lastCollapsed = useRef(collapsed)
   const lastExpanded = useRef(expanded)
@@ -347,9 +358,7 @@ export function Flow({
     void fitAll()
   }, [hasFork, allMeasured, focus, flow, panMs, follow])
 
-  // A focus waits for its Reply's box to have a size, and while the first Fork
-  // waits to be fitted, the fit takes it instead. A Reply folded away is not
-  // panned to, then or once it is unfolded.
+  // A Reply folded away is not panned to, then or once it is unfolded.
   useEffect(() => {
     if (!focus || centered.current === focus.sequence) return
 
@@ -432,7 +441,7 @@ export function Flow({
       maxZoom={1.5}
       proOptions={{hideAttribution: true}}
       className={cn(
-        switching && 'canvas-switching',
+        switchingTo !== null && 'canvas-switching',
         !fitted && 'canvas-fitting'
       )}
       onNodeMouseEnter={(_event, node) => onHover(hoverIdOf(node))}

@@ -295,20 +295,39 @@ function zoomOf() {
 }
 
 async function settledViewport() {
+  let frames = 0
+  let counting = true
+
+  function count() {
+    frames++
+
+    if (counting) requestAnimationFrame(count)
+  }
+
+  requestAnimationFrame(count)
+
   let last: string | null = null
+  let framesAtLast = 0
 
-  await expect
-    .poll(
-      () => {
-        const now = viewport()
-        const same = now === last
-        last = now
+  // On a loaded runner, two samples with no frame drawn between them can both
+  // land mid-glide.
+  try {
+    await expect
+      .poll(
+        () => {
+          const now = viewport()
+          const settled = now === last && frames - framesAtLast >= 2
+          last = now
+          framesAtLast = frames
 
-        return same
-      },
-      {interval: 100}
-    )
-    .toBe(true)
+          return settled
+        },
+        {interval: 100}
+      )
+      .toBe(true)
+  } finally {
+    counting = false
+  }
 
   return last
 }
@@ -1621,6 +1640,16 @@ async function setPlaybackRate(playbackRate: number) {
   await cdp().send('Animation.setPlaybackRate', {playbackRate})
 }
 
+async function freezeAnimationsAndTimers() {
+  await cdp().send('Animation.enable')
+  await setPlaybackRate(0)
+  onTestFinished(async () => setPlaybackRate(1))
+  vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']})
+  onTestFinished(() => {
+    vi.useRealTimers()
+  })
+}
+
 it('keeps the slideout until its slide out ends, however long that takes', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
@@ -1629,14 +1658,7 @@ it('keeps the slideout until its slide out ends, however long that takes', async
   const aside = slideout().element()
   await expect.poll(() => sliding(aside)).toBe(false)
 
-  await cdp().send('Animation.enable')
-  await setPlaybackRate(0)
-  onTestFinished(async () => setPlaybackRate(1))
-  vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']})
-  onTestFinished(() => {
-    vi.useRealTimers()
-  })
-
+  await freezeAnimationsAndTimers()
   await slideout().getByRole('button', {name: 'Close'}).click()
   await expect.poll(() => sliding(aside)).toBe(true)
   vi.runOnlyPendingTimers()
@@ -1647,6 +1669,160 @@ it('keeps the slideout until its slide out ends, however long that takes', async
 
   await setPlaybackRate(1)
   await expect.poll(() => aside.isConnected).toBe(false)
+})
+
+function turnSlides() {
+  return [...document.querySelectorAll('.react-flow__node')].flatMap(node => {
+    const slide = transitionOf(node, 'transform')
+
+    return slide ? [slide] : []
+  })
+}
+
+function connectionsShown() {
+  const connections = document.querySelector('.react-flow__edges')
+
+  if (!connections) throw new Error('The connections are not drawn')
+
+  return getComputedStyle(connections).opacity !== '0' || fading(connections)
+}
+
+function nodesOfKind(kind: 'exchange' | 'reply') {
+  return document.querySelectorAll(`.react-flow__node-${kind}`).length
+}
+
+async function everyFrameUntil(check: () => boolean) {
+  if (check()) return
+
+  await new Promise(requestAnimationFrame)
+
+  await everyFrameUntil(check)
+}
+
+it('keeps the connections hidden through an orientation switch until the last Turn arrives, however long that takes', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await settledViewport()
+  expect(connectionsShown()).toBe(true)
+
+  await freezeAnimationsAndTimers()
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+  await expect.poll(() => turnSlides().length).toBeGreaterThan(0)
+  vi.runOnlyPendingTimers()
+  vi.useRealTimers()
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  expect(turnSlides().length).toBeGreaterThan(0)
+  expect(connectionsShown()).toBe(false)
+
+  await setPlaybackRate(1)
+  await expect.poll(connectionsShown).toBe(true)
+  expect(turnSlides()).toEqual([])
+})
+
+it('keeps the connections hidden while the Turns slide again for a Fork folded partway through an orientation switch', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await settledViewport()
+
+  await freezeAnimationsAndTimers()
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+  await expect.poll(() => nodesOfKind('exchange')).toBe(5)
+  await expect.poll(() => turnSlides().length).toBeGreaterThan(0)
+  const firstSlides = new Set(turnSlides())
+
+  // Frozen mid-slide, the card sits out of a pointer's and a role query's reach.
+  const pill = [
+    ...nodeOf('Reply two').element().querySelectorAll('button'),
+  ].find(button => button.textContent === '2 Branches')
+
+  if (!pill) throw new Error('Reply two shows no Fork pill')
+
+  pill.click()
+  await expect
+    .poll(() => turnSlides().some(slide => !firstSlides.has(slide)))
+    .toBe(true)
+
+  for (const slide of firstSlides) {
+    if (slide.playState === 'running') slide.finish()
+  }
+
+  vi.useRealTimers()
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  expect(turnSlides().length).toBeGreaterThan(0)
+  expect(connectionsShown()).toBe(false)
+
+  await setPlaybackRate(1)
+  await expect.poll(connectionsShown).toBe(true)
+})
+
+it('keeps a Reply’s stem hidden with the connections through a switch to vertical until the last Turn arrives', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await hoverAway()
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+  await expect.poll(() => nodesOfKind('exchange')).toBe(5)
+  await expect.poll(connectionsShown).toBe(true)
+  await settledViewport()
+
+  await freezeAnimationsAndTimers()
+  await page.getByRole('button', {name: 'Vertical'}).click()
+  await expect.poll(() => turnSlides().length).toBeGreaterThan(0)
+  vi.runOnlyPendingTimers()
+  vi.useRealTimers()
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  const stem = stemUnder('Reply one')
+  expect(turnSlides().length).toBeGreaterThan(0)
+  expect(connectionsShown()).toBe(false)
+  expect(getComputedStyle(stem).opacity).toBe('0')
+
+  await setPlaybackRate(1)
+  await expect.poll(connectionsShown).toBe(true)
+  await expect.poll(() => getComputedStyle(stem).opacity).toBe('1')
+})
+
+it('shows the connections after an orientation switch where no Turn moves, with no timer running', async () => {
+  clock = 0
+  await renderCanvas({
+    prompts: [prompt(1, null, 'Prompt one')],
+    replies: [reply(11, 1, 'Reply one')],
+  })
+  await expect.element(page.getByText('Reply one')).toBeVisible()
+  await settledViewport()
+
+  // Both orientations measured, so the Reply comes back already in place.
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+  await expect.element(canvas().getByText('Reply one')).toBeVisible()
+  await page.getByRole('button', {name: 'Vertical'}).click()
+  await expect.poll(connectionsShown).toBe(true)
+
+  // `expect.poll` would advance the frozen timers.
+  await freezeAnimationsAndTimers()
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+  await everyFrameUntil(() => nodesOfKind('exchange') === 1)
+  await page.getByRole('button', {name: 'Vertical'}).click()
+  await everyFrameUntil(() => nodesOfKind('reply') === 1)
+  expect(turnSlides()).toEqual([])
+  await everyFrameUntil(connectionsShown)
+})
+
+it('slides the Turns and hides the connections when the orientation changes in Settings', async () => {
+  const {main} = await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await settledViewport()
+
+  await freezeAnimationsAndTimers()
+  main.publish({
+    type: 'SETTINGS_CHANGED',
+    settings: {...DEFAULT_SETTINGS, canvasOrientation: 'horizontal'},
+  })
+  await expect.poll(() => turnSlides().length).toBeGreaterThan(0)
+  expect(connectionsShown()).toBe(false)
+
+  await setPlaybackRate(1)
+  await expect.poll(connectionsShown).toBe(true)
 })
 
 it('slides the Context size drawer a short way in as it opens and out as it closes, fading as it goes', async () => {

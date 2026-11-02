@@ -10,22 +10,13 @@ import {useSettings, useUpdateSettings} from '#modules/settings/main'
 import {useTurns} from '#modules/turns/main'
 import {Alert, AlertDescription} from '#shadcn/ui/alert'
 import {ReactFlowProvider} from '@xyflow/react'
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import {useCallback, useLayoutEffect, useMemo, useRef, useState} from 'react'
 
 import {CanvasContext} from '../canvas-context'
 import {START_MARGIN, TURN_WIDTH, startZoom} from '../canvas-layout'
 import {useChatSlideout} from '../chat-slideout/use-chat-slideout'
 import {useDeletion} from '../deletion'
 import {useEscapeStops} from '../escape-stops'
-import {useReducedMotion} from '../reduced-motion'
-import {slideMs} from '../slide'
 import {indexTurns, isEmpty, pathTo, previousReply} from '../tree'
 import {CanvasControls} from './CanvasControls'
 import {ChatSlideout} from './ChatSlideout'
@@ -113,7 +104,6 @@ type CanvasFrameProps = HeadingProps & {
   children?: ReactNode
 }
 
-/** The Tree's name with the canvas controls beside it, over the canvas. */
 function CanvasFrame({
   title,
   sidebarToggle,
@@ -135,7 +125,6 @@ function CanvasFrame({
 }
 
 interface HeadingProps {
-  /** The Tree's name, drawn in the row the controls share. */
   title: ReactNode
   sidebarToggle?: ReactNode
 }
@@ -189,8 +178,6 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
   const [hoverTurnId, setHoverTurnId] = useState<string | null>(null)
   const [inputToFocus, setInputToFocus] = useState<string | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
-  const [switching, setSwitching] = useState(false)
-  const reducedMotion = useReducedMotion()
   const [inputAt, setInputAt] = useState<Viewport | null>(null)
   const [showMap, setShowMap] = useState(false)
 
@@ -206,15 +193,6 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
 
   const [drafts, setDrafts] = useState<ReadonlyMap<string, string>>(
     () => new Map()
-  )
-
-  const switchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(
-    () => () => {
-      if (switchTimer.current) clearTimeout(switchTimer.current)
-    },
-    []
   )
 
   const {deleted, activeReplyId, onDeleteConfirmed} = useDeletion(
@@ -327,14 +305,6 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
 
     void updateSettings({canvasOrientation: orientation})
 
-    if (!reducedMotion) {
-      setSwitching(true)
-
-      if (switchTimer.current) clearTimeout(switchTimer.current)
-
-      switchTimer.current = setTimeout(() => setSwitching(false), slideMs())
-    }
-
     if (activeReplyId) focusOn(activeReplyId, 'center')
   }
 
@@ -434,7 +404,6 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
             fitOnLoad={!startedEmpty}
             startAt={inputAt}
             deleted={deleted}
-            switching={switching}
             showMap={showMap}
             onHover={setHoverTurnId}
           />
