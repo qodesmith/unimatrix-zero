@@ -18,6 +18,7 @@ import {useRef, useState} from 'react'
 
 interface TreeListProps {
   trees: Tree[]
+  hasTrees: boolean | null
   openTreeId: string | null
   onCreate: () => void
   onOpen: (treeId: string) => void
@@ -26,6 +27,7 @@ interface TreeListProps {
 
 export function TreeList({
   trees,
+  hasTrees,
   openTreeId,
   onCreate,
   onOpen,
@@ -44,12 +46,13 @@ export function TreeList({
         <TooltipContent side="right">New Tree</TooltipContent>
       </Tooltip>
       <SidebarGroupContent>
-        {trees.length === 0 ? (
+        {hasTrees === false && (
           <div className="px-2 text-xs text-muted-foreground">
             <p className="font-medium">Start a new Tree</p>
             <p>One conversation that can branch in any direction.</p>
           </div>
-        ) : (
+        )}
+        {hasTrees && (
           <SidebarMenu>
             {trees.map(tree => (
               <SidebarMenuItem key={tree.id}>
