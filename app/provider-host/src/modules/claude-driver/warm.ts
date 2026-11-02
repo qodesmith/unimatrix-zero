@@ -8,6 +8,8 @@ export const MAX_WARM = 6
 export interface WarmSession {
   readonly sessionId: string | null
   readonly messageId: string | null
+  /** The Model `claude` started on, which it keeps. */
+  readonly model: string
   close(): Promise<void>
 }
 
@@ -69,12 +71,15 @@ export function createWarmSessions<Session extends WarmSession>({
   }
 
   return {
-    /** Closes it at any other point, so `claude` never runs a session twice. */
-    claim(ref: SessionRef): Session | null {
+    /**
+     * Closes it at any other point or on another Model, so `claude` never runs
+     * a session twice.
+     */
+    claim(ref: SessionRef, model: string): Session | null {
       for (const session of idle.keys()) {
         if (session.sessionId !== ref.sessionId) continue
 
-        if (session.messageId === ref.messageId) {
+        if (session.messageId === ref.messageId && session.model === model) {
           wake(session)
 
           return session

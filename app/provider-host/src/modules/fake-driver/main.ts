@@ -1,5 +1,6 @@
 import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {ProviderDriver, ReplyRequest} from '@uz/contract/host'
+import type {Model} from '@uz/contract/providers'
 
 import {createReplyRuns} from '#modules/reply-runs/main'
 import {randomUUID} from 'node:crypto'
@@ -42,6 +43,23 @@ flowchart LR
 That's the end of the fake Reply.`
 
 const WORDS_BEFORE_TROUBLE = 12
+
+const FAKE_MODELS: Model[] = [
+  {
+    id: 'fake',
+    name: 'Fake model',
+    isDefault: true,
+    resolvesTo: null,
+    needsAppUpdate: false,
+  },
+  {
+    id: 'fake-pro',
+    name: 'Fake model Pro',
+    isDefault: false,
+    resolvesTo: null,
+    needsAppUpdate: false,
+  },
+]
 
 /** Words with the whitespace after them, so the deltas join back exactly. */
 function words(text: string): string[] {
@@ -199,7 +217,7 @@ export function createFakeDriver({
       recorded: {
         ...ids,
         type: 'REPLY_RECORDED',
-        model: 'fake',
+        model: request.model,
         session: {
           sessionId:
             request.session && request.session.type !== 'fork'
@@ -223,7 +241,8 @@ export function createFakeDriver({
       status: 'signed-in',
       account: {email: 'fake@example.com', plan: 'Fake'},
     }),
-    listModels: async () => [{id: 'fake', name: 'Fake model'}],
+    listModels: async () => FAKE_MODELS,
+    onModelsChanged: () => undefined,
     smallestModel: async () => 'fake-small',
     readUsage: async () => ({windows: []}),
     ...createFakeSignIn({delayMs, answerMs: signInAnswerMs}),

@@ -10,6 +10,15 @@ it.each([
   ['You’ve hit your limit', 'limit-reached'],
   ['ENOSPC: no space left on device, write', 'disk-full'],
   ['Prompt is too long', 'provider-error'],
+  [
+    "The 'gpt-5.9' model requires a newer version of Codex. Please upgrade to the latest app or CLI and try again.",
+    'needs-app-update',
+  ],
+  [
+    "The 'claude-opus-9' model requires a newer version of Claude Code.",
+    'needs-app-update',
+  ],
+  ['This feature requires a newer version of macOS.', 'provider-error'],
 ])('names the failure in %j as %s', (message, code) => {
   expect(failureOf(message)).toEqual({code, message})
 })

@@ -4,6 +4,8 @@ import type {Account} from './protocol/v2/Account'
 import type {AccountLoginCompletedNotification} from './protocol/v2/AccountLoginCompletedNotification'
 import type {AgentMessageDeltaNotification} from './protocol/v2/AgentMessageDeltaNotification'
 import type {LoginAccountResponse} from './protocol/v2/LoginAccountResponse'
+import type {Model as CodexModel} from './protocol/v2/Model'
+import type {ModelListResponse} from './protocol/v2/ModelListResponse'
 import type {RateLimitWindow} from './protocol/v2/RateLimitWindow'
 import type {Thread} from './protocol/v2/Thread'
 import type {ThreadTokenUsage} from './protocol/v2/ThreadTokenUsage'
@@ -71,6 +73,20 @@ export const RESPONSES = {
   }) satisfies z.ZodType<
     Pick<ThreadTurnsListResponse, 'nextCursor'> & {
       data: Pick<Turn, 'id'>[]
+    }
+  >,
+  'model/list': z.looseObject({
+    data: z.array(
+      z.looseObject({
+        model: z.string(),
+        displayName: z.string(),
+        isDefault: z.boolean(),
+      })
+    ),
+    nextCursor: z.string().nullable(),
+  }) satisfies z.ZodType<
+    Pick<ModelListResponse, 'nextCursor'> & {
+      data: Pick<CodexModel, 'model' | 'displayName' | 'isDefault'>[]
     }
   >,
   'turn/start': z.looseObject({turn: z.looseObject({id: z.string()})}),

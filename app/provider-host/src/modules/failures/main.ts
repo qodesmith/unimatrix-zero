@@ -8,6 +8,9 @@ const LIMIT_REACHED =
 
 const DISK_FULL = /ENOSPC|no space left|disk (?:is )?full/i
 
+/** OpenAI's wording for a Model the vendor program is too old for. */
+const NEEDS_APP_UPDATE = /requires a newer version of (?:Codex|Claude Code)\b/i
+
 /** "resets at 3:00 PM", "resets 2026-10-24T15:00:00Z", "reset in 2 hours". */
 const RESETS = /resets?\s+(?:at|on|in)?\s*:?\s*([^.;,()]+)/i
 
@@ -25,6 +28,8 @@ function resetsAtIn(message: string): string | undefined {
 
 /** `resetsAt` is in seconds since the epoch; it wins over the message's time. */
 export function failureOf(message: string, resetsAt?: number): RunFailure {
+  if (NEEDS_APP_UPDATE.test(message)) return {code: 'needs-app-update', message}
+
   if (CONNECTION_LOST.test(message)) return {code: 'connection-lost', message}
 
   if (LIMIT_REACHED.test(message)) {

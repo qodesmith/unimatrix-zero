@@ -9,9 +9,10 @@ import {spawn} from 'node:child_process'
 
 import {readAccount} from './account'
 import {signOut, startLogin} from './login'
+import {createModelList} from './models'
 import {runClaudeOneShot} from './one-shot'
 import {SIGN_IN_TIMEOUT_MS, createClaudeSignIn} from './sign-in'
-import {DEFAULT_MODEL, createClaudeReplies} from './streaming'
+import {createClaudeReplies} from './streaming'
 import {IDLE_CLOSE_MS, MAX_WARM} from './warm'
 
 /**
@@ -35,7 +36,7 @@ export function spawnClaude({command, args, cwd, env, signal}: SpawnOptions) {
 }
 
 type ClaudeDriverOptions = Pick<ClaudeRepliesDeps, 'store'> &
-  Partial<Omit<ClaudeRepliesDeps, 'store'>>
+  Partial<Omit<ClaudeRepliesDeps, 'store' | 'learnModels'>>
 
 export function createClaudeDriver({
   store,
@@ -45,6 +46,8 @@ export function createClaudeDriver({
   whenIdle = idleFor(IDLE_CLOSE_MS),
   maxWarm = MAX_WARM,
 }: ClaudeDriverOptions): ProviderDriver {
+  const models = createModelList()
+
   const replies = createClaudeReplies({
     store,
     query: run,
@@ -52,6 +55,7 @@ export function createClaudeDriver({
     env,
     whenIdle,
     maxWarm,
+    learnModels: models.learn,
   })
 
   return {
@@ -68,11 +72,13 @@ export function createClaudeDriver({
       startLogin,
       readAccount,
       signOut,
+      learnModels: models.learn,
       env,
       timeoutMs: SIGN_IN_TIMEOUT_MS,
     }),
     readConnection: notYet,
-    listModels: async () => [{id: DEFAULT_MODEL, name: 'Default'}],
+    listModels: async () => models.list(),
+    onModelsChanged: models.onChanged,
     smallestModel: async () => SMALLEST_MODEL,
     readUsage: notYet,
     startReply: replies.startReply,

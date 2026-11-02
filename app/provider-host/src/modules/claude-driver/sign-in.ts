@@ -3,8 +3,9 @@ import type {
   DownloadProgress,
   ProgramTarget,
 } from '#modules/vendor-program/main'
+import type {AccountRead} from './account'
 import type {ClaudeCommand, Login, LoginEvents} from './login'
-import type {AccountInfo} from '@anthropic-ai/claude-agent-sdk'
+import type {ModelInfo} from '@anthropic-ai/claude-agent-sdk'
 import type {SignInRequest} from '@uz/contract/host'
 import type {SignInFinished, SignInUpdate} from '@uz/contract/providers'
 
@@ -53,7 +54,9 @@ export interface ClaudeSignInDeps {
     program: string
     env: Record<string, string>
     cwd: string
-  }) => Promise<AccountInfo>
+  }) => Promise<AccountRead>
+  /** Hears the Models of an account it connects. */
+  learnModels: (models: ModelInfo[]) => void
   signOut: (
     command: ClaudeCommand,
     env: Record<string, string>
@@ -237,7 +240,7 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
 
     yield {type: 'SIGN_IN_STEP', step: 'check-plan'}
 
-    const account = await deps
+    const read = await deps
       .readAccount({program: program.path, env, cwd: configDir})
       .catch(() => null)
 
@@ -249,7 +252,7 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
     }
 
     // No plan at all, not even "Claude API", means it wasn't read.
-    if (account?.subscriptionType === undefined) {
+    if (read?.account.subscriptionType === undefined) {
       yield signInFailed(
         'failed',
         'Couldn’t check your Claude plan. Try again.'
@@ -258,7 +261,7 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
       return
     }
 
-    const plan = planOf(account.subscriptionType)
+    const plan = planOf(read.account.subscriptionType)
 
     if (!plan) {
       // Signed out so another account can be used; a failure is harmless.
@@ -271,10 +274,12 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
       return
     }
 
+    deps.learnModels(read.models)
+
     yield {
       type: 'SIGN_IN_FINISHED',
       outcome: 'connected',
-      account: {email: account.email ?? '', plan},
+      account: {email: read.account.email ?? '', plan},
     }
   }
 

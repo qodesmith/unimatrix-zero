@@ -3,10 +3,11 @@ import {afterEach, beforeEach, expect, it, vi} from 'vitest'
 
 import {createWarmSessions} from './warm'
 
-function session(sessionId: string, messageId: string) {
+function session(sessionId: string, messageId: string, model = 'haiku') {
   return {
     sessionId,
     messageId,
+    model,
     closed: false,
     async close() {
       this.closed = true
@@ -28,8 +29,8 @@ it('gives back the idle session standing at that Reply', () => {
   warm.add(one)
   warm.release(one)
 
-  expect(warm.claim({sessionId: 's1', messageId: 'm1'})).toBe(one)
-  expect(warm.claim({sessionId: 's1', messageId: 'm1'})).toBeNull()
+  expect(warm.claim({sessionId: 's1', messageId: 'm1'}, 'haiku')).toBe(one)
+  expect(warm.claim({sessionId: 's1', messageId: 'm1'}, 'haiku')).toBeNull()
 })
 
 it('closes one standing elsewhere in the session instead of giving it back', () => {
@@ -38,7 +39,18 @@ it('closes one standing elsewhere in the session instead of giving it back', () 
   warm.add(one)
   warm.release(one)
 
-  expect(warm.claim({sessionId: 's1', messageId: 'm1'})).toBeNull()
+  expect(warm.claim({sessionId: 's1', messageId: 'm1'}, 'haiku')).toBeNull()
+  expect(one.closed).toBe(true)
+  expect(warm.size).toBe(0)
+})
+
+it('closes one on another Model instead of giving it back', () => {
+  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
+  const one = session('s1', 'm1', 'haiku')
+  warm.add(one)
+  warm.release(one)
+
+  expect(warm.claim({sessionId: 's1', messageId: 'm1'}, 'sonnet')).toBeNull()
   expect(one.closed).toBe(true)
   expect(warm.size).toBe(0)
 })
@@ -63,7 +75,7 @@ it('starts the idle wait over after each Reply', () => {
   warm.release(one)
   vi.advanceTimersByTime(900)
 
-  warm.claim({sessionId: 's1', messageId: 'm1'})
+  warm.claim({sessionId: 's1', messageId: 'm1'}, 'haiku')
   vi.advanceTimersByTime(5000)
   expect(one.closed).toBe(false)
 
@@ -80,7 +92,7 @@ it('never closes a session claimed after being released twice', () => {
   vi.advanceTimersByTime(500)
   warm.release(one)
 
-  warm.claim({sessionId: 's1', messageId: 'm1'})
+  warm.claim({sessionId: 's1', messageId: 'm1'}, 'haiku')
   vi.advanceTimersByTime(5000)
 
   expect(one.closed).toBe(false)
@@ -111,7 +123,7 @@ it('says when every `claude` it closed in a session has ended', async () => {
 
   warm.add(one)
   warm.release(one)
-  warm.claim({sessionId: 's1', messageId: 'm1'})
+  warm.claim({sessionId: 's1', messageId: 'm1'}, 'haiku')
   const closed = warm.closed('s1')
 
   await expect(

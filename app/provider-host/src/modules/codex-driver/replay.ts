@@ -43,7 +43,7 @@ const [, ...steps] = fs.readFileSync(recording, 'utf8')
 const home = process.env.CODEX_HOME
 const standIn = ${JSON.stringify(CODEX_HOME_STAND_IN)}
 const vendorVariables = Object.keys(process.env).filter(name => /^(OPENAI|CODEX|ANTHROPIC|CLAUDE)_/i.test(name))
-const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], resumedFrom: [], contexts: [], forkedThrough: null, interrupted: null, reverted: null, ended: null}
+const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], turnModels: [], modelLists: [], resumedFrom: [], contexts: [], forkedThrough: null, interrupted: null, reverted: null, ended: null}
 
 function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
@@ -160,9 +160,11 @@ process.stdin.on('data', chunk => {
     }
     if (message.method === 'turn/start') {
       report.prompts.push(message.params.input[0].text)
+      report.turnModels.push(message.params.model)
       const rollout = rolloutOf(message.params.threadId)
       report.contexts.push(rollout ? historyOf(rollout).map(line => line.id) : [])
     }
+    if (message.method === 'model/list') report.modelLists.push(message.params)
     if (message.method === 'turn/interrupt') report.interrupted = message.params.turnId
     if (message.method === 'thread/revert') {
       report.reverted = message.params.beforeTurnId

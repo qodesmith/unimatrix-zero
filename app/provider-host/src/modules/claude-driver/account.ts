@@ -1,4 +1,8 @@
-import type {AccountInfo, SDKUserMessage} from '@anthropic-ai/claude-agent-sdk'
+import type {
+  AccountInfo,
+  ModelInfo,
+  SDKUserMessage,
+} from '@anthropic-ai/claude-agent-sdk'
 
 import {query} from '@anthropic-ai/claude-agent-sdk'
 import {spawn} from 'node:child_process'
@@ -28,12 +32,18 @@ interface SessionOptions {
   cwd: string
 }
 
+export interface AccountRead {
+  account: AccountInfo
+  /** What the account may pick, as this `claude` listed them. */
+  models: ModelInfo[]
+}
+
 /** Waits for `claude` to exit, so it can finish a token refresh. */
 export async function readAccount({
   program,
   env,
   cwd,
-}: SessionOptions): Promise<AccountInfo> {
+}: SessionOptions): Promise<AccountRead> {
   const input = Promise.withResolvers<void>()
   let exited: Promise<unknown> = Promise.resolve()
 
@@ -74,7 +84,9 @@ export async function readAccount({
   })
 
   try {
-    return await session.accountInfo()
+    const {account, models} = await session.initializationResult()
+
+    return {account, models}
   } finally {
     // The SDK ends `claude`'s input once the Prompts run out, but closing the
     // session kills `claude` 2 s later, so it closes only once `claude` has

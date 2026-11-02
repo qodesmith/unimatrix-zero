@@ -1,5 +1,6 @@
 import type {HostPort} from './main'
 import type {HostMessage, ProviderDriver} from '@uz/contract/host'
+import type {Model} from '@uz/contract/providers'
 
 import {createFakeDriver} from '#modules/fake-driver/main'
 import {expect, it} from 'vitest'
@@ -37,17 +38,11 @@ async function finished(sent: HostMessage[]) {
   await expect.poll(() => sent.at(-1)?.type).toBe('RUN_FINISHED')
 }
 
-it('says it is ready with the driver’s Models', async () => {
+it('says it is ready with the driver’s smallest Model', async () => {
   const main = fakeMain()
   await runHost(main.port, () => createFakeDriver({delayMs: 0}))
 
-  expect(main.sent).toEqual([
-    {
-      type: 'HOST_READY',
-      models: [{id: 'fake', name: 'Fake model'}],
-      smallestModel: 'fake-small',
-    },
-  ])
+  expect(main.sent).toEqual([{type: 'HOST_READY', smallestModel: 'fake-small'}])
 })
 
 it('says it is ready with no smallest Model when the driver can’t read one', async () => {
@@ -60,12 +55,89 @@ it('says it is ready with no smallest Model when the driver can’t read one', a
     },
   }))
 
-  expect(main.sent).toEqual([
-    {
-      type: 'HOST_READY',
-      models: [{id: 'fake', name: 'Fake model'}],
-      smallestModel: null,
+  expect(main.sent).toEqual([{type: 'HOST_READY', smallestModel: null}])
+})
+
+const vendorProgram = {program: null, configDir: '/codex'}
+
+const pro = {
+  id: 'pro',
+  name: 'Pro',
+  isDefault: false,
+  resolvesTo: null,
+  needsAppUpdate: false,
+}
+
+function listing(outcomes: (() => Promise<Model[] | null>)[]) {
+  const asked: unknown[] = []
+
+  const driver: ProviderDriver = {
+    ...createFakeDriver({delayMs: 0}),
+    async listModels(input) {
+      asked.push(input)
+      const outcome = outcomes.shift()
+
+      if (!outcome) throw new Error('No list was expected')
+
+      return outcome()
     },
+  }
+
+  return {driver, asked}
+}
+
+it('lists the driver’s Models for main', async () => {
+  const main = fakeMain()
+  const {driver, asked} = listing([async () => [pro]])
+  await runHost(main.port, () => driver)
+
+  main.command({type: 'models.list', vendorProgram})
+  await expect.poll(() => main.sent.at(-1)?.type).toBe('MODELS_CHANGED')
+
+  expect(asked).toEqual([vendorProgram])
+  expect(main.sent.at(-1)).toEqual({type: 'MODELS_CHANGED', models: [pro]})
+})
+
+it('tells main nothing when the driver can’t list its Models or fails to', async () => {
+  const main = fakeMain()
+
+  const {driver} = listing([
+    async () => null,
+    async () => {
+      throw new Error('codex would not start')
+    },
+    async () => [pro],
+  ])
+
+  await runHost(main.port, () => driver)
+
+  main.command({type: 'models.list', vendorProgram})
+  main.command({type: 'models.list', vendorProgram})
+  main.command({type: 'models.list', vendorProgram})
+  await expect.poll(() => main.sent.at(-1)?.type).toBe('MODELS_CHANGED')
+
+  // The lists settle in order, so a post for either earlier one comes first.
+  expect(
+    main.sent.filter(message => message.type === 'MODELS_CHANGED')
+  ).toEqual([{type: 'MODELS_CHANGED', models: [pro]}])
+})
+
+it('tells main each list the driver learns on its own', async () => {
+  const main = fakeMain()
+  const listeners: ((models: Model[]) => void)[] = []
+
+  await runHost(main.port, () => ({
+    ...createFakeDriver({delayMs: 0}),
+    onModelsChanged: listener => listeners.push(listener),
+  }))
+
+  const [learned] = listeners
+  learned?.([pro])
+  learned?.([])
+
+  expect(main.sent.slice(1)).toEqual([
+    {type: 'MODELS_CHANGED', models: [pro]},
+    {type: 'MODELS_CHANGED', models: []},
   ])
 })
 
