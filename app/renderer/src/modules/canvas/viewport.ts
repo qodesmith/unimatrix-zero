@@ -47,6 +47,16 @@ export function useMotion() {
 
 export type Moves = ReturnType<typeof useMotion>['moves']
 
+/** React Flow's ways to move the viewport, each one counted by `useViewport`. */
+export type Move =
+  | 'setViewport'
+  | 'setCenter'
+  | 'fitView'
+  | 'fitBounds'
+  | 'zoomIn'
+  | 'zoomOut'
+  | 'zoomTo'
+
 type CanvasViewport = ReactFlowInstance & {stop: Moves['stop']}
 
 function viewportOf(flow: ReactFlowInstance, moves: Moves): CanvasViewport {
@@ -57,8 +67,7 @@ function viewportOf(flow: ReactFlowInstance, moves: Moves): CanvasViewport {
     return duration ? moves.glide(run) : moves.jump(run)
   }
 
-  return {
-    ...flow,
+  const moved: Pick<ReactFlowInstance, Move> = {
     setViewport: async (viewport, options) =>
       move(options?.duration, async () => flow.setViewport(viewport, options)),
     setCenter: async (x, y, options) =>
@@ -73,8 +82,9 @@ function viewportOf(flow: ReactFlowInstance, moves: Moves): CanvasViewport {
       move(options?.duration, async () => flow.zoomOut(options)),
     zoomTo: async (zoomLevel, options) =>
       move(options?.duration, async () => flow.zoomTo(zoomLevel, options)),
-    stop: moves.stop,
   }
+
+  return {...flow, ...moved, stop: moves.stop}
 }
 
 /**
