@@ -23,9 +23,23 @@ export type Capabilities = z.infer<typeof CapabilitiesSchema>
 export const ModelSchema = z.strictObject({
   id: z.string().min(1),
   name: z.string().min(1),
+  /** The Provider's current default; at most one in a list. */
+  isDefault: z.boolean(),
+  /** The id a Reply written on it records, when that isn't `id`. */
+  resolvesTo: z.string().min(1).nullable(),
+  /** The vendor program is too old for it, so the picker shows it disabled. */
+  needsAppUpdate: z.boolean(),
 })
 
 export type Model = z.infer<typeof ModelSchema>
+
+/** A Model and the Provider that offers it. */
+export const ModelChoiceSchema = z.strictObject({
+  provider: ProviderIdSchema,
+  model: z.string().min(1),
+})
+
+export type ModelChoice = z.infer<typeof ModelChoiceSchema>
 
 export const AccountSchema = z.strictObject({
   email: z.string(),
