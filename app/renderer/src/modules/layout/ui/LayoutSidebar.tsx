@@ -17,9 +17,6 @@ import {usePanelRef} from 'react-resizable-panels'
 
 import {useLayout, useUpdateLayout} from '../use-layout'
 
-// Matches `--transition-duration-slide` in styles.css.
-const SLIDE_MS = 400
-
 function clampWidth(width: number) {
   return Math.round(
     Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, width))
@@ -56,10 +53,6 @@ export function LayoutSidebar({sidebar, children}: LayoutSidebarProps) {
       group?.setAttribute('data-toggling', '')
     }
 
-    const settled = setTimeout(() => {
-      group?.removeAttribute('data-toggling')
-    }, SLIDE_MS)
-
     function apply() {
       if (!current) return
 
@@ -67,13 +60,26 @@ export function LayoutSidebar({sidebar, children}: LayoutSidebarProps) {
       else panelRef.current?.collapse()
     }
 
+    async function settle() {
+      const panels = [...(group?.children ?? [])]
+
+      await Promise.allSettled(
+        panels
+          .flatMap(panel => panel.getAnimations())
+          .map(async animation => animation.finished)
+      )
+
+      if (current) group?.removeAttribute('data-toggling')
+    }
+
     apply()
     // The Panel turns collapsible only once it registers again, after this.
     queueMicrotask(apply)
+    const frame = requestAnimationFrame(() => void settle())
 
     return () => {
       current = false
-      clearTimeout(settled)
+      cancelAnimationFrame(frame)
     }
   }, [open, panelRef, width])
 

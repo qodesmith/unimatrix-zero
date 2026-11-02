@@ -486,6 +486,32 @@ function sidebarWidth() {
   return sidebar().element().getBoundingClientRect().width
 }
 
+function sidebarRight() {
+  return sidebar().element().getBoundingClientRect().right
+}
+
+function sidebarPanel() {
+  const panel = sidebar().element().closest('[data-panel]')
+
+  if (!panel) throw new Error('No sidebar panel')
+
+  return panel
+}
+
+function canvasLeft() {
+  return (
+    document
+      .querySelector('[data-slot="sidebar-inset"]')
+      ?.getBoundingClientRect().left ?? 0
+  )
+}
+
+async function nextFrame() {
+  return new Promise(resolve => {
+    requestAnimationFrame(resolve)
+  })
+}
+
 function widthHandle() {
   return page.getByRole('separator', {name: 'Sidebar width'}).element()
 }
@@ -542,6 +568,41 @@ describe('the sidebar’s width', () => {
       {type: 'layout.update', changes: {sidebarWidth: widest}},
       {type: 'layout.update', changes: {sidebarWidth: wider}},
     ])
+  })
+
+  it('slides open at its full width', async () => {
+    await renderApp(fakeMain({layout: {sidebarOpen: false}}))
+    await expect.poll(sidebarRight).toBeLessThanOrEqual(0)
+
+    await cdp().send('Animation.enable')
+    await setPlaybackRate(0)
+    onTestFinished(async () => setPlaybackRate(1))
+    await userEvent.keyboard('{Meta>}b{/Meta}')
+
+    await expect.poll(() => flexGrowTransition(sidebarPanel())).toBeDefined()
+    const transition = flexGrowTransition(sidebarPanel())
+
+    if (!transition) throw new Error('No flex-grow transition')
+
+    transition.currentTime = 200
+    await nextFrame()
+    await nextFrame()
+    expect(sidebarRight()).toBeGreaterThan(0)
+    expect(sidebarRight()).toBeLessThan(290)
+    expect(sidebarWidth()).toBe(290)
+  })
+
+  it('follows a drag at once after it slides closed and open again', async () => {
+    await renderApp(fakeMain())
+    await expect.poll(sidebarRight).toBe(290)
+
+    await userEvent.keyboard('{Meta>}b{/Meta}')
+    await expect.poll(sidebarRight).toBeLessThanOrEqual(0)
+    await userEvent.keyboard('{Meta>}b{/Meta}')
+    await expect.poll(sidebarRight).toBe(290)
+
+    await drag(widthHandle(), {x: 110, y: 0})
+    expect(canvasLeft()).toBe(400)
   })
 
   it('opens as wide as it was saved', async () => {
