@@ -1,6 +1,7 @@
 import type {HostProcess, HostStatus} from './main'
 import type {
   HostCommand,
+  OneShotFinished,
   PromptDropped,
   PromptRecorded,
   ReplyRecorded,
@@ -10,11 +11,20 @@ import type {
 import type {ProviderId, SignInUpdate} from '@uz/contract/providers'
 import type {ReplyEvent} from '@uz/contract/turns'
 
-import {afterEach, beforeEach, expect, it, vi} from 'vitest'
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 
-import {RESTART_DELAYS_MS, STABLE_AFTER_MS, createProviderHosts} from './main'
+import {
+  ONE_SHOT_TIMEOUT_MS,
+  RESTART_DELAYS_MS,
+  STABLE_AFTER_MS,
+  createProviderHosts,
+} from './main'
 
 const models = [{id: 'fake', name: 'Fake model'}]
+
+const hostReady = {type: 'HOST_READY', models, smallestModel: 'fake-small'}
+
+const vendorProgram = {program: null, configDir: '/claude'}
 
 const textDelta = {
   type: 'TEXT_DELTA',
@@ -132,7 +142,7 @@ it('is ready once the host says so, with its first Model', () => {
 
   expect(hosts.ready()).toBeNull()
 
-  latest().say({type: 'HOST_READY', models})
+  latest().say(hostReady)
 
   expect(hosts.ready()).toEqual({provider: 'claude', model: models[0]})
 })
@@ -262,7 +272,7 @@ it('answers a host’s session store requests, failures included', () => {
 it('is ready for a given Provider only when that Provider’s host is', () => {
   const hosts = setUp()
   hosts.connect('claude')
-  latest().say({type: 'HOST_READY', models})
+  latest().say(hostReady)
 
   expect(hosts.ready('claude')).toEqual({provider: 'claude', model: models[0]})
   expect(hosts.ready('chatgpt')).toBeNull()
@@ -295,7 +305,7 @@ it('reports a crash and restarts after 1 s, 5 s, then 30 s, then stays down', ()
   hosts.connect('claude')
 
   for (const delay of RESTART_DELAYS_MS) {
-    latest().say({type: 'HOST_READY', models})
+    latest().say(hostReady)
     latest().crash()
     expect(hosts.ready()).toBeNull()
 
@@ -319,7 +329,7 @@ it('starts the backoff over once a restarted host has stayed up', () => {
 
   latest().crash()
   vi.advanceTimersByTime(RESTART_DELAYS_MS[0] ?? 0)
-  latest().say({type: 'HOST_READY', models})
+  latest().say(hostReady)
   vi.advanceTimersByTime(STABLE_AFTER_MS)
 
   latest().crash()
@@ -356,7 +366,7 @@ it('stops every host without counting it as a crash', () => {
 it('reports where the host stands as it starts, crashes and gives up', () => {
   const hosts = setUp()
   hosts.connect('claude')
-  latest().say({type: 'HOST_READY', models})
+  latest().say(hostReady)
 
   for (const delay of RESTART_DELAYS_MS) {
     latest().crash()
@@ -435,4 +445,121 @@ it('does not restart a host that was stopped while its crash was handled', () =>
 
   expect(spawned).toHaveLength(1)
   expect(statuses).toEqual(['starting'])
+})
+
+function readyHost() {
+  const hosts = setUp()
+  hosts.connect('claude')
+  latest().say(hostReady)
+
+  return hosts
+}
+
+function asked() {
+  const command = latest().received.at(-1)
+
+  if (command?.type !== 'one-shot.run') throw new Error('No one-shot was run')
+
+  return command
+}
+
+function finish(requestId: string, outcome: OneShotFinished['outcome']) {
+  latest().say({type: 'ONE_SHOT_FINISHED', requestId, outcome})
+}
+
+describe('a one-shot', () => {
+  it('runs on the host’s smallest Model and answers with the matching result', async () => {
+    const hosts = readyHost()
+
+    const first = hosts.runOneShot('claude', {prompt: 'Title?', vendorProgram})
+    const firstId = asked().requestId
+    const second = hosts.runOneShot('claude', {prompt: 'Again?', vendorProgram})
+    const secondId = asked().requestId
+
+    expect(latest().received).toEqual([
+      {
+        type: 'one-shot.run',
+        requestId: firstId,
+        request: {model: 'fake-small', prompt: 'Title?', vendorProgram},
+      },
+      {
+        type: 'one-shot.run',
+        requestId: secondId,
+        request: {model: 'fake-small', prompt: 'Again?', vendorProgram},
+      },
+    ])
+    expect(secondId).not.toBe(firstId)
+
+    finish(secondId, {ok: false, message: 'Rate limited.'})
+    finish(firstId, {ok: true, text: 'Trip to Lisbon'})
+
+    await expect(first).resolves.toBe('Trip to Lisbon')
+    await expect(second).rejects.toThrow('Rate limited.')
+  })
+
+  it.each([
+    ['its host is not ready', () => setUp()],
+    [
+      'its host has no smallest Model',
+      () => {
+        const hosts = setUp()
+        hosts.connect('claude')
+        latest().say({...hostReady, smallestModel: null})
+
+        return hosts
+      },
+    ],
+  ])('is refused when %s', async (_case, hostsFor) => {
+    const hosts = hostsFor()
+    hosts.connect('claude')
+
+    const refused = hosts.runOneShot('claude', {
+      prompt: 'Title?',
+      vendorProgram,
+    })
+
+    expect(spawned.flatMap(child => child.received)).toEqual([])
+    await expect(refused).rejects.toThrow('can’t run a one-shot')
+  })
+
+  it.each([
+    ['its host crashes', () => latest().crash()],
+    [
+      'its host is stopped',
+      (hosts: ReturnType<typeof setUp>) => hosts.stop('claude'),
+    ],
+    [
+      `${ONE_SHOT_TIMEOUT_MS} ms pass`,
+      () => vi.advanceTimersByTime(ONE_SHOT_TIMEOUT_MS),
+    ],
+  ])('fails when %s first', async (_case, interrupt) => {
+    const hosts = readyHost()
+
+    const pending = hosts.runOneShot('claude', {
+      prompt: 'Title?',
+      vendorProgram,
+    })
+
+    const {requestId} = asked()
+
+    const settled = pending.then(
+      () => 'resolved',
+      () => 'rejected'
+    )
+
+    vi.advanceTimersByTime(ONE_SHOT_TIMEOUT_MS - 1)
+    interrupt(hosts)
+    finish(requestId, {ok: true, text: 'Too late'})
+    vi.useRealTimers()
+
+    // Settled already, or only the test's own timer can end the race.
+    await expect(
+      Promise.race([
+        settled,
+        new Promise(resolve => {
+          setTimeout(() => resolve('pending'), 0)
+        }),
+      ])
+    ).resolves.toBe('rejected')
+  })
 })

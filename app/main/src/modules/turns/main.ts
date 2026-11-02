@@ -1,4 +1,5 @@
 import type {Database} from '#modules/database/main'
+import type {FinishedReply} from './in-flight'
 import type {Command, CommandResult} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {
@@ -29,6 +30,8 @@ import {insertExchange, listTurns, resetReply, savedReply} from './rows'
 
 export {PARTIAL_SAVE_MS} from './in-flight'
 
+export type {FinishedReply} from './in-flight'
+
 /** What a Reply needs of the Provider hosts. */
 export interface ReplyHosts {
   /** A ready host's Provider (`only`, if given) and its default Model. */
@@ -44,6 +47,10 @@ export interface TurnsDeps {
   /** The vendor program and configuration folder a Provider's Replies use. */
   vendorProgramFor: (provider: ProviderId) => SignInRequest
   now: () => Date
+  /** A Prompt in the Tree was sent or deleted. */
+  onTurnsChanged: (treeId: string) => void
+  /** Every way a Reply ends, a failure to reach its host included. */
+  onReplyFinished: (finished: FinishedReply) => void
 }
 
 export type NewPrompt = Omit<Extract<Command, {type: 'prompt.send'}>, 'type'>
@@ -61,8 +68,10 @@ export function createTurns({
   hosts,
   vendorProgramFor,
   now,
+  onTurnsChanged,
+  onReplyFinished,
 }: TurnsDeps) {
-  const inFlight = createInFlight(db, publish)
+  const inFlight = createInFlight(db, publish, onReplyFinished)
 
   db.update(schema.replies)
     .set({status: 'interrupted'})
@@ -90,6 +99,9 @@ export function createTurns({
 
     /** For a window that connects mid-stream. */
     streaming: () => inFlight.streaming(),
+
+    /** Whether a Reply in the Tree is being written. */
+    streamsIn: (treeId: string) => inFlight.streamsIn(treeId),
 
     /** Null when the Reply it answers is gone. */
     sendPrompt({
@@ -125,18 +137,19 @@ export function createTurns({
         now: now(),
       })
 
-      return {
-        prompt,
-        reply: startOnHost(provider, {
-          treeId,
-          replyId: reply.id,
-          model: model.id,
-          systemPrompt,
-          prompt: {text},
-          vendorProgram: vendorProgramFor(provider),
-          session: continued?.session ?? null,
-        }),
-      }
+      const started = startOnHost(provider, {
+        treeId,
+        replyId: reply.id,
+        model: model.id,
+        systemPrompt,
+        prompt: {text},
+        vendorProgram: vendorProgramFor(provider),
+        session: continued?.session ?? null,
+      })
+
+      onTurnsChanged(treeId)
+
+      return {prompt, reply: started}
     },
 
     /** Runs a failed Reply's Prompt again in place; null when it's gone. */
@@ -204,6 +217,8 @@ export function createTurns({
           // The next Prompt from that Reply cuts instead.
         }
       }
+
+      onTurnsChanged(treeId)
 
       return {promptIds, replyIds}
     },

@@ -49,6 +49,8 @@ function launch() {
     hosts,
     vendorProgramFor: () => vendorProgram,
     now: () => createdAt,
+    onTurnsChanged: () => undefined,
+    onReplyFinished: () => undefined,
   })
 }
 

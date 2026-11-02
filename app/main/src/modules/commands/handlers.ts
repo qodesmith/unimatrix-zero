@@ -52,13 +52,35 @@ export const handlers: Handlers = {
 
   'tree.list': (_command, {trees}) => ({trees: trees.list()}),
 
-  'tree.open': ({treeId}, {trees}) => found(trees.get(treeId)),
+  'tree.open': ({treeId}, {trees, publish}) => {
+    const seen = trees.markSeen(treeId)
+
+    if (seen?.changed) publish({type: 'TREE_CHANGED', tree: seen.tree})
+
+    return found(seen?.tree ?? null)
+  },
 
   'tree.rename': ({treeId, title}, {trees, publish}) => {
     const tree = found(trees.rename(treeId, title))
-    publish({type: 'TREE_RENAMED', tree})
+    publish({type: 'TREE_CHANGED', tree})
 
     return tree
+  },
+
+  'tree.delete': ({treeId}, {trees, turns, publish}) => {
+    found(trees.get(treeId))
+
+    if (turns.streamsIn(treeId)) {
+      throw new Error(
+        'Wait for its Replies to finish, or stop them, before deleting this Tree.'
+      )
+    }
+
+    // Its Provider sessions stay for now (#102).
+    trees.delete(treeId)
+    publish({type: 'TREE_DELETED', treeId})
+
+    return {}
   },
 
   'tree.turns': ({treeId}, {trees, turns}) => {

@@ -37,6 +37,13 @@ function providersReply(provider: ProviderId, treeId: string, replyId: string) {
   )
 }
 
+export interface FinishedReply {
+  provider: ProviderId
+  treeId: string
+  replyId: string
+  status: Extract<ReplyEvent, {type: 'RUN_FINISHED'}>['status']
+}
+
 interface Entry {
   provider: ProviderId
   reply: StreamingReply
@@ -50,7 +57,8 @@ interface Entry {
  */
 export function createInFlight(
   db: Database,
-  publish: (event: AppEvent) => void
+  publish: (event: AppEvent) => void,
+  onFinished: (finished: FinishedReply) => void
 ) {
   const entries = new Map<string, Entry>()
 
@@ -89,6 +97,11 @@ export function createInFlight(
     }
 
     publish(event)
+
+    if (event.type === 'RUN_FINISHED') {
+      const {treeId, replyId, status} = event
+      onFinished({provider, treeId, replyId, status})
+    }
   }
 
   function fail(entry: Entry, failure: RunFailure) {
@@ -167,6 +180,10 @@ export function createInFlight(
       for (const entry of entries.values()) {
         if (entry.saveTimer) save(entry)
       }
+    },
+
+    streamsIn(treeId: string): boolean {
+      return [...entries.values()].some(entry => entry.reply.treeId === treeId)
     },
 
     streaming(): StreamingReply[] {

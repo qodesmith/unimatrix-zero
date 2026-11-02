@@ -1,0 +1,1 @@
+ALTER TABLE `trees` ADD `unseen_failure` integer DEFAULT false NOT NULL;

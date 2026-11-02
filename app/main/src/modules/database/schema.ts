@@ -24,6 +24,10 @@ function createdAt() {
 export const trees = sqliteTable('trees', {
   id: id(),
   title: text('title'),
+  /** A Reply in it failed since the Tree was last opened. */
+  unseenFailure: integer('unseen_failure', {mode: 'boolean'})
+    .notNull()
+    .default(false),
   createdAt: createdAt(),
 })
 

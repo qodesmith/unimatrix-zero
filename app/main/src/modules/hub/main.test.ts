@@ -9,7 +9,11 @@ import {createHub} from './main'
 const tree = {
   id: '01a16096-00ad-7d3b-8205-6b76ddc26ce0',
   title: null,
+  firstLine: null,
   createdAt: '2026-10-19T12:00:00.000Z',
+  lastActiveAt: '2026-10-19T12:00:00.000Z',
+  turnCount: 0,
+  unseenFailure: false,
 }
 
 function setUp() {
@@ -36,11 +40,11 @@ it('sends a SNAPSHOT on connect, then only what is published after it', () => {
 
   hub.publish({type: 'TREE_CREATED', tree})
   hub.connect(1, window.send)
-  hub.publish({type: 'TREE_RENAMED', tree: {...tree, title: 'Later'}})
+  hub.publish({type: 'TREE_CHANGED', tree: {...tree, title: 'Later'}})
 
   expect(window.received.map(event => event.type)).toEqual([
     'SNAPSHOT',
-    'TREE_RENAMED',
+    'TREE_CHANGED',
   ])
 })
 
