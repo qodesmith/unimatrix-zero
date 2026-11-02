@@ -15,6 +15,7 @@ import {cn} from 'cn'
 import {useLayoutEffect, useRef} from 'react'
 import {usePanelRef} from 'react-resizable-panels'
 
+import {settleToggle} from '../settle-toggle'
 import {useLayout, useUpdateLayout} from '../use-layout'
 
 function clampWidth(width: number) {
@@ -60,26 +61,14 @@ export function LayoutSidebar({sidebar, children}: LayoutSidebarProps) {
       else panelRef.current?.collapse()
     }
 
-    async function settle() {
-      const panels = [...(group?.children ?? [])]
-
-      await Promise.allSettled(
-        panels
-          .flatMap(panel => panel.getAnimations())
-          .map(async animation => animation.finished)
-      )
-
-      if (current) group?.removeAttribute('data-toggling')
-    }
-
     apply()
     // The Panel turns collapsible only once it registers again, after this.
     queueMicrotask(apply)
-    const frame = requestAnimationFrame(() => void settle())
+    const cancelSettle = settleToggle(group)
 
     return () => {
       current = false
-      cancelAnimationFrame(frame)
+      cancelSettle()
     }
   }, [open, panelRef, width])
 

@@ -13,6 +13,7 @@ import {ChevronDownIcon, ChevronRightIcon} from 'lucide-react'
 import {Fragment, useId, useLayoutEffect, useRef} from 'react'
 import {useGroupRef} from 'react-resizable-panels'
 
+import {settleToggle} from '../settle-toggle'
 import {SECTION_IDS, arrange, resetSplit, resized} from '../sidebar-sections'
 import {useLayout, useUpdateLayout} from '../use-layout'
 
@@ -31,8 +32,6 @@ const MIN_HEIGHT: Record<SidebarSectionId, string> = {
 
 // The header's `h-8`, which is all a collapsed section shows.
 const HEADER_HEIGHT = '2rem'
-
-const TOGGLE_MS = 200
 
 function sectionLayout(layout: PanelLayout): SectionLayout {
   return {
@@ -83,10 +82,6 @@ export function SidebarSections(
       group?.setAttribute('data-toggling', '')
     }
 
-    const settled = setTimeout(() => {
-      group?.removeAttribute('data-toggling')
-    }, TOGGLE_MS)
-
     function apply() {
       if (current) {
         groupRef.current?.setLayout(
@@ -99,10 +94,11 @@ export function SidebarSections(
     // A Panel whose constraints changed registers again after this effect,
     // and the Group checks the layout against the old ones until it has.
     queueMicrotask(apply)
+    const cancelSettle = settleToggle(group)
 
     return () => {
       current = false
-      clearTimeout(settled)
+      cancelSettle()
     }
   }, [groupRef, sections])
 

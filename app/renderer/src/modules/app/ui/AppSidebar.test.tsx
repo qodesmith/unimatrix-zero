@@ -801,6 +801,23 @@ describe('the sidebar’s sections', () => {
     await expect.poll(() => heightOf('Files')).toBe(headerHeight)
   })
 
+  it('follows a divider drag at once after a section collapses and expands', async () => {
+    await renderApp(fakeMain())
+    await expect.poll(() => heightOf('Files')).toBeGreaterThan(180)
+    const open = heightOf('Files')
+
+    await header('Files').click()
+    await expect
+      .element(header('Files'))
+      .toHaveAttribute('aria-expanded', 'false')
+    await header('Files').click()
+    await expect.poll(() => heightOf('Files')).toBeCloseTo(open, 0)
+
+    const trees = heightOf('Trees')
+    await drag(divider(0), {x: 0, y: 40})
+    expect(heightOf('Trees')).toBeCloseTo(trees + 40, 0)
+  })
+
   it('keeps the dividers beside a collapsed section from moving', async () => {
     const main = fakeMain()
     await renderApp(main)
