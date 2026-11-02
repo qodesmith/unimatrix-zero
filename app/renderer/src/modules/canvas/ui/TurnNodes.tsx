@@ -244,7 +244,8 @@ function ReplyInput({
             stem === 'on-thread'
               ? 'w-[2.5px] bg-thread-highlight'
               : 'w-[1.5px] bg-canvas-edge',
-            revealed && 'opacity-0'
+            revealed && 'opacity-0',
+            'in-[.canvas-switching]:opacity-0 in-[.canvas-switching]:transition-none'
           )}
         />
       )}

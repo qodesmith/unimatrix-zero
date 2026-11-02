@@ -1738,6 +1738,32 @@ it('keeps the connections hidden while the Turns slide again for a Fork folded p
   await expect.poll(connectionsShown).toBe(true)
 })
 
+it('keeps a Reply’s stem hidden with the connections through a switch to vertical until the last Turn arrives', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await hoverAway()
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+  await expect.poll(() => nodesOfKind('exchange')).toBe(5)
+  await expect.poll(connectionsShown).toBe(true)
+  await settledViewport()
+
+  await freezeAnimationsAndTimers()
+  await page.getByRole('button', {name: 'Vertical'}).click()
+  await expect.poll(() => turnSlides().length).toBeGreaterThan(0)
+  vi.runOnlyPendingTimers()
+  vi.useRealTimers()
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  const stem = stemUnder('Reply one')
+  expect(turnSlides().length).toBeGreaterThan(0)
+  expect(connectionsShown()).toBe(false)
+  expect(getComputedStyle(stem).opacity).toBe('0')
+
+  await setPlaybackRate(1)
+  await expect.poll(connectionsShown).toBe(true)
+  await expect.poll(() => getComputedStyle(stem).opacity).toBe('1')
+})
+
 it('shows the connections after an orientation switch where no Turn moves, with no timer running', async () => {
   clock = 0
   await renderCanvas({
