@@ -10,10 +10,10 @@ import {createInbox} from '#modules/inbox/main'
 import {setTimeout as delay} from 'node:timers/promises'
 
 /** Far longer than a token refresh; a `claude` still running then is stuck. */
-const CLOSE_TIMEOUT_MS = 30_000
+export const CLOSE_TIMEOUT_MS = 30_000
 
 export type QueryFn = (params: {
-  prompt: AsyncIterable<SDKUserMessage>
+  prompt: string | AsyncIterable<SDKUserMessage>
   options: Options
 }) => Query
 

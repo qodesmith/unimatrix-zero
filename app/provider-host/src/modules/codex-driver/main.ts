@@ -75,6 +75,8 @@ export function createCodexDriver({
     ...createCodexSignIn({getProgramReady, open, portFree, timeoutMs}),
     readConnection: notYet,
     listModels: async () => [{id: DEFAULT_MODEL, name: 'Default'}],
+    // Without one-shots yet, main writes no automatic title.
+    smallestModel: async () => null,
     readUsage: notYet,
     startReply: replies.startReply,
     stop: replies.stop,

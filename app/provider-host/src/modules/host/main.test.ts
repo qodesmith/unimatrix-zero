@@ -42,7 +42,30 @@ it('says it is ready with the driver’s Models', async () => {
   await runHost(main.port, () => createFakeDriver({delayMs: 0}))
 
   expect(main.sent).toEqual([
-    {type: 'HOST_READY', models: [{id: 'fake', name: 'Fake model'}]},
+    {
+      type: 'HOST_READY',
+      models: [{id: 'fake', name: 'Fake model'}],
+      smallestModel: 'fake-small',
+    },
+  ])
+})
+
+it('says it is ready with no smallest Model when the driver can’t read one', async () => {
+  const main = fakeMain()
+
+  await runHost(main.port, () => ({
+    ...createFakeDriver({delayMs: 0}),
+    smallestModel: async () => {
+      throw new Error('not signed in')
+    },
+  }))
+
+  expect(main.sent).toEqual([
+    {
+      type: 'HOST_READY',
+      models: [{id: 'fake', name: 'Fake model'}],
+      smallestModel: null,
+    },
   ])
 })
 
@@ -316,4 +339,73 @@ it('tells main nothing when the driver leaves the cut for later or fails it', as
       dropFrom: 'deleted',
     },
   ])
+})
+
+const oneShot = {
+  type: 'one-shot.run',
+  requestId: 'title-1',
+  request: {
+    model: 'haiku',
+    prompt: 'Name this conversation.',
+    vendorProgram: {program: null, configDir: '/claude'},
+  },
+}
+
+function oneShots(outcomes: (() => Promise<string>)[]) {
+  const asked: unknown[] = []
+
+  const driver: ProviderDriver = {
+    ...createFakeDriver({delayMs: 0}),
+    async runOneShot(input) {
+      asked.push(input)
+      const outcome = outcomes.shift()
+
+      if (!outcome) throw new Error('No one-shot was expected')
+
+      return outcome()
+    },
+  }
+
+  return {driver, asked}
+}
+
+async function oneShotFinished(sent: HostMessage[]) {
+  await expect.poll(() => sent.at(-1)?.type).toBe('ONE_SHOT_FINISHED')
+}
+
+it('runs a one-shot and answers main with its text', async () => {
+  const main = fakeMain()
+  const {driver, asked} = oneShots([async () => 'Otters at dusk'])
+  await runHost(main.port, () => driver)
+
+  main.command(oneShot)
+  await oneShotFinished(main.sent)
+
+  expect(asked).toEqual([oneShot.request])
+  expect(main.sent.at(-1)).toEqual({
+    type: 'ONE_SHOT_FINISHED',
+    requestId: 'title-1',
+    outcome: {ok: true, text: 'Otters at dusk'},
+  })
+})
+
+it('answers main with the message when a one-shot fails', async () => {
+  const main = fakeMain()
+
+  const {driver} = oneShots([
+    async () => {
+      throw new Error('You hit your limit.')
+    },
+  ])
+
+  await runHost(main.port, () => driver)
+
+  main.command(oneShot)
+  await oneShotFinished(main.sent)
+
+  expect(main.sent.at(-1)).toEqual({
+    type: 'ONE_SHOT_FINISHED',
+    requestId: 'title-1',
+    outcome: {ok: false, message: 'You hit your limit.'},
+  })
 })

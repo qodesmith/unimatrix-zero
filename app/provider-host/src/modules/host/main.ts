@@ -2,6 +2,8 @@ import type {SessionStoreClient} from '#modules/session-store/main'
 import type {
   HostCommand,
   HostMessage,
+  OneShotFinished,
+  OneShotRequest,
   ProviderDriver,
   ReplyRequest,
   SignInRequest,
@@ -82,6 +84,30 @@ export async function runHost(
     }
   }
 
+  async function oneShot({
+    requestId,
+    request,
+  }: Extract<HostCommand, {type: 'one-shot.run'}>) {
+    port.postMessage({
+      type: 'ONE_SHOT_FINISHED',
+      requestId,
+      outcome: await oneShotOutcome(request),
+    })
+  }
+
+  async function oneShotOutcome(
+    request: OneShotRequest
+  ): Promise<OneShotFinished['outcome']> {
+    try {
+      return {ok: true, text: await driver.runOneShot(request)}
+    } catch (error) {
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : String(error),
+      }
+    }
+  }
+
   function run(command: HostCommand) {
     switch (command.type) {
       case 'reply.start':
@@ -92,6 +118,9 @@ export async function runHost(
         break
       case 'session.cut':
         void cut(command)
+        break
+      case 'one-shot.run':
+        void oneShot(command)
         break
       case 'sign-in.start':
         void signIn(command.request)
@@ -117,7 +146,11 @@ export async function runHost(
     if (command.success) run(command.data)
   })
 
-  port.postMessage({type: 'HOST_READY', models: await driver.listModels()})
+  port.postMessage({
+    type: 'HOST_READY',
+    models: await driver.listModels(),
+    smallestModel: await driver.smallestModel().catch(() => null),
+  })
 }
 
 function driverFor(provider: ProviderId, store: SessionStoreClient) {

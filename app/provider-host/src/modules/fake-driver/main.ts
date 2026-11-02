@@ -226,6 +226,7 @@ export function createFakeDriver({
       account: {email: 'fake@example.com', plan: 'Fake'},
     }),
     listModels: async () => [{id: 'fake', name: 'Fake model'}],
+    smallestModel: async () => 'fake-small',
     readUsage: async () => ({windows: []}),
     ...createFakeSignIn({delayMs, answerMs: signInAnswerMs}),
     ...createReplyRuns(write),
