@@ -674,8 +674,8 @@ it('zooms out just enough to show the whole Tree on its first Fork, and keeps th
   expect(zoomOf()).toBe(zoom)
 
   await sendInto('Reply one', 'Another way')
-  // A glide's zoom dips on the way, so only the zoom it ends at counts.
   await expect.poll(zoomOf).toBeLessThan(zoom)
+  // A glide's zoom dips on the way, so only the zoom it ends at counts.
   await settledViewport()
   expect(zoomOf()).toBeLessThan(zoom)
   const fitted = zoomOf()
