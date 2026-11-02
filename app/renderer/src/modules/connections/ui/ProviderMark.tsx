@@ -1,23 +1,16 @@
 import type {ProviderId} from '@uz/contract/providers'
 
 import {PROVIDER_NAMES} from '@uz/contract/providers'
-import {cn} from 'cn'
 
 import {ABOUT} from '../about'
 
 /** The Provider's icon, named for screen readers. */
-export function ProviderMark({
-  provider,
-  className,
-}: {
-  provider: ProviderId
-  className?: string
-}) {
+export function ProviderMark({provider}: {provider: ProviderId}) {
   return (
     <span
       role="img"
       aria-label={PROVIDER_NAMES[provider]}
-      className={cn('leading-none', className)}
+      className="leading-none"
     >
       {ABOUT[provider].mark}
     </span>

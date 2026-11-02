@@ -74,12 +74,32 @@ export function createConnections({
   }
 
   /** Saved only while the Provider has an account saved. */
-  function applyModels(provider: ProviderId, models: Model[]) {
+  function saveModels(provider: ProviderId, models: Model[]) {
     db.update(providers)
       .set({models})
       .where(eq(providers.provider, provider))
       .run()
     publish({type: 'MODELS_CHANGED', provider, models})
+  }
+
+  /**
+   * No list says a Model needs an app update, so a mark learned from a failed
+   * Reply outlives the Provider listing it again.
+   */
+  function applyModels(provider: ProviderId, models: Model[]) {
+    const gated = new Set(
+      modelsOf(provider).flatMap(model =>
+        model.needsAppUpdate ? [model.id] : []
+      )
+    )
+
+    const listed = structuredClone(models)
+
+    for (const model of listed) {
+      if (gated.has(model.id)) model.needsAppUpdate = true
+    }
+
+    saveModels(provider, listed)
   }
 
   function statusOf(provider: ProviderId): ProviderStatus {
@@ -237,20 +257,21 @@ export function createConnections({
 
     applyModels,
 
-    /** `modelId` is a Model's id, or the id it resolves to. */
+    /** Every saved Model whose id, or the id it resolves to, is `modelId`. */
     markNeedsAppUpdate(provider: ProviderId, modelId: string) {
       const models = modelsOf(provider)
 
-      const gated = models.find(
+      const marked = models.filter(
         model =>
           !model.needsAppUpdate &&
           (model.id === modelId || model.resolvesTo === modelId)
       )
 
-      if (!gated) return
+      if (marked.length === 0) return
 
-      gated.needsAppUpdate = true
-      applyModels(provider, models)
+      for (const model of marked) model.needsAppUpdate = true
+
+      saveModels(provider, models)
     },
 
     hostCrashed(provider: ProviderId) {

@@ -14,11 +14,7 @@ const NOT_LOADED: ModelPick = {
   heldBecause: '',
 }
 
-/**
- * An Input's Model picker: the user's pick, else the Model of the Reply it is
- * attached to, else, for a new Tree's root Input, the last-used Model. Send is
- * held with an empty reason until main's `SNAPSHOT` arrives.
- */
+/** Send is held with an empty reason until main's `SNAPSHOT` arrives. */
 export function useModelPick(
   picked: ModelChoice | null,
   attachedTo: Reply | null

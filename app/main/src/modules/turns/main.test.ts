@@ -188,7 +188,7 @@ describe('sending the root Prompt', () => {
     })
   })
 
-  it('starts a new Tree from the Model of the newest Reply in any Tree, and says so on each send', () => {
+  it('starts a new Tree from the Model of the newest Reply in any Tree, and says so when a Prompt is sent', () => {
     expect(turns.lastModel()).toBeNull()
 
     sendPrompt(null, 'Older')

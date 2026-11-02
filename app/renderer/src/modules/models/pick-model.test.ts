@@ -293,11 +293,11 @@ it('selects nothing in a continuing Thread whose Provider was removed, and holds
   expect(pick.heldBecause).toBe('Connect Claude to continue this Thread')
 })
 
-it('holds Send while the wanted Provider hasn’t listed its Models yet', () => {
+it('sends on the wanted Model as it is while its Provider hasn’t listed any', () => {
   const pick = pickModel({
     wanted: {provider: 'claude', model: 'opus'},
     lockedTo: 'claude',
-    statuses: only('claude', 'starting'),
+    statuses: connected,
     models: {...models, claude: []},
   })
 
@@ -307,7 +307,7 @@ it('holds Send while the wanted Provider hasn’t listed its Models yet', () => 
     name: 'opus',
   })
   expect(pick.notice).toBeNull()
-  expect(pick.heldBecause).toBe('Waiting for Claude’s Models…')
+  expect(pick.heldBecause).toBeNull()
 })
 
 it('holds Send, saying so, when every Model of the Provider needs an app update', () => {
@@ -325,7 +325,7 @@ it('holds Send, saying so, when every Model of the Provider needs an app update'
   )
 })
 
-it('holds Send while the first connected Provider hasn’t listed its Models yet', () => {
+it('leaves the choice to the first connected Provider while it hasn’t listed any Models', () => {
   const pick = pickModel({
     wanted: null,
     lockedTo: null,
@@ -333,6 +333,10 @@ it('holds Send while the first connected Provider hasn’t listed its Models yet
     models: {...models, claude: []},
   })
 
-  expect(pick.selected).toBeNull()
-  expect(pick.heldBecause).toBe('Waiting for Claude’s Models…')
+  expect(pick.selected).toEqual({
+    provider: 'claude',
+    model: 'default',
+    name: 'Default',
+  })
+  expect(pick.heldBecause).toBeNull()
 })

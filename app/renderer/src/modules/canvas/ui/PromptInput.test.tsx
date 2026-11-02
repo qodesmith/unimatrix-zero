@@ -210,7 +210,7 @@ it('sends the Model picked in the Input', async () => {
   expect(sentModels(main)).toEqual([{provider: 'claude', model: 'haiku'}])
 })
 
-it('lists every connected Provider at the root, and only the Thread’s own in a continuing Thread', async () => {
+it('lists only the Thread’s own Provider in a continuing Thread', async () => {
   await renderInput({attachedTo: attachedReply('claude', 'opus')})
 
   await page.getByRole('button', {name: 'Claude Opus'}).click()

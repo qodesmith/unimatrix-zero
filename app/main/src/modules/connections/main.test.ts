@@ -327,6 +327,35 @@ it('marks the saved Model a Reply was written on as needing an app update, once'
   ])
 })
 
+it('marks every saved Model resolving to the one a Reply was written on', () => {
+  const connections = setUp()
+  connected(connections)
+  const latest = {...sonnet, id: 'default', resolvesTo: 'claude-opus-5'}
+  connections.applyModels('claude', [latest, opus])
+
+  connections.markNeedsAppUpdate('claude', 'claude-opus-5')
+
+  expect(setUp().snapshot().models.claude).toEqual([
+    {...latest, needsAppUpdate: true},
+    {...opus, needsAppUpdate: true},
+  ])
+})
+
+it('keeps a Model marked as needing an app update when the Provider lists it again', () => {
+  const connections = setUp()
+  connected(connections)
+  connections.applyModels('claude', [opus, sonnet])
+  connections.markNeedsAppUpdate('claude', 'opus')
+
+  connections.applyModels('claude', [opus, sonnet])
+
+  expect(published.at(-1)).toEqual({
+    type: 'MODELS_CHANGED',
+    provider: 'claude',
+    models: [{...opus, needsAppUpdate: true}, sonnet],
+  })
+})
+
 it('asks a connected Provider for its Models once connected and whenever its host is ready', () => {
   const connections = setUp()
   connections.connect('claude')

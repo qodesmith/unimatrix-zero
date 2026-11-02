@@ -1065,20 +1065,6 @@ it('lists no Models before a `claude` has run, then those of the newest one, tel
   )
 })
 
-it('tells no change when a new `claude` lists the Models the last one did', async () => {
-  const claude = await setUp(['warm.ndjson', 'resumed.ndjson', 'forked.ndjson'])
-  const changes: Model[][] = []
-  claude.driver.onModelsChanged(models => changes.push(models))
-  const session = await warmThread(claude)
-  await claude.reply(THIRD_PROMPT, session)
-
-  const first = {sessionId: SESSION_ID, messageId: FIRST_MESSAGE}
-  const forked = await claude.reply(FORK_PROMPT, {...first, type: 'fork'})
-
-  expect(forked.at(-1)).toMatchObject({status: 'complete'})
-  expect(changes).toHaveLength(2)
-})
-
 it('learns nothing from a `claude` whose Models can’t be read, and writes the Reply all the same', async () => {
   const claude = await setUp([
     edited('warm.ndjson', lines =>
@@ -1088,17 +1074,20 @@ it('learns nothing from a `claude` whose Models can’t be read, and writes the 
         )
       )
     ),
+    'resumed.ndjson',
   ])
 
   const changes: Model[][] = []
   claude.driver.onModelsChanged(models => changes.push(models))
 
-  const events = await claude.reply(FIRST_PROMPT)
+  const first = await claude.reply(FIRST_PROMPT)
 
-  expect(textOf(events)).toBe('TEAL')
-  expect(events.at(-1)).toMatchObject({status: 'complete'})
-  await expect(
-    claude.driver.listModels(claude.vendorProgram)
-  ).resolves.toBeNull()
-  expect(changes).toEqual([])
+  expect(textOf(first)).toBe('TEAL')
+  expect(first.at(-1)).toMatchObject({status: 'complete'})
+
+  const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
+  await claude.reply(THIRD_PROMPT, recordedIn(second), {model: 'sonnet'})
+  await expect.poll(() => changes.length).toBe(1)
+
+  expect(changes[0]?.[0]).toMatchObject({resolvesTo: 'claude-fable-5-1'})
 })

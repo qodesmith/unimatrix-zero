@@ -1,10 +1,9 @@
 import type {ModelInfo} from '@anthropic-ai/claude-agent-sdk'
 import type {Model} from '@uz/contract/providers'
 
+import {DEFAULT_MODEL_ID} from '@uz/contract/providers'
 import {isDeepStrictEqual} from 'node:util'
 import {z} from 'zod'
-
-import {DEFAULT_MODEL} from './streaming'
 
 const ModelInfosSchema = z.array(
   z.looseObject({
@@ -33,7 +32,7 @@ export function createModelList() {
     const models = parsed.data.map(({value, displayName, resolvedModel}) => ({
       id: value,
       name: displayName,
-      isDefault: value === DEFAULT_MODEL,
+      isDefault: value === DEFAULT_MODEL_ID,
       resolvesTo: resolvedModel ?? null,
       needsAppUpdate: false,
     }))

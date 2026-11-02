@@ -18,14 +18,12 @@ import type {
 
 import {createInbox} from '#modules/inbox/main'
 import {ProgramCrashed, createReplyRuns} from '#modules/reply-runs/main'
+import {DEFAULT_MODEL_ID} from '@uz/contract/providers'
 
 import {readModels} from './models'
 import {createReplyMapper, threadOf, turnOf} from './replies'
 import {requestRevert} from './revert'
 import {folderOf, readRollouts, rolloutAt, writeRolloutsBack} from './rollouts'
-
-/** The Model id that leaves the choice to Codex. */
-const DEFAULT_MODEL = 'default'
 
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
 
@@ -206,7 +204,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       cwd: configDir,
       sandbox: 'read-only',
       approvalPolicy: 'never',
-      model: request.model === DEFAULT_MODEL ? null : request.model,
+      model: request.model === DEFAULT_MODEL_ID ? null : request.model,
       developerInstructions: request.systemPrompt || null,
     } satisfies ParamsOf<'thread/start'>
 
@@ -378,7 +376,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
 
     try {
       // A thread loaded on another Model switches to this one from here on.
-      const model = request.model === DEFAULT_MODEL ? null : request.model
+      const model = request.model === DEFAULT_MODEL_ID ? null : request.model
 
       const started = await server.request('turn/start', {
         threadId: thread.id,

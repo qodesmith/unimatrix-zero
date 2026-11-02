@@ -33,7 +33,12 @@ export const ModelSchema = z.strictObject({
 
 export type Model = z.infer<typeof ModelSchema>
 
-/** A Model and the Provider that offers it. */
+/**
+ * Leaves the choice to the Provider: every driver takes it, so an Input can
+ * send before its Provider has listed any Models.
+ */
+export const DEFAULT_MODEL_ID = 'default'
+
 export const ModelChoiceSchema = z.strictObject({
   provider: ProviderIdSchema,
   model: z.string().min(1),

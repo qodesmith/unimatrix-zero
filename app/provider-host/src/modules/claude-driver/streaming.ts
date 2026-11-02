@@ -20,6 +20,7 @@ import type {UUID} from 'node:crypto'
 
 import {failureOf} from '#modules/failures/main'
 import {createReplyRuns} from '#modules/reply-runs/main'
+import {DEFAULT_MODEL_ID} from '@uz/contract/providers'
 import {randomUUID} from 'node:crypto'
 
 import {claudeEnvironment} from './environment'
@@ -33,9 +34,6 @@ import {
   writeTranscriptBack,
 } from './transcripts'
 import {createWarmSessions} from './warm'
-
-/** The Model id that leaves the choice to Claude: the plan's default. */
-export const DEFAULT_MODEL = 'default'
 
 export interface ClaudeRepliesDeps {
   store: SessionStoreClient
@@ -151,7 +149,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       includePartialMessages: true,
       thinking: {type: 'adaptive', display: 'summarized'},
       systemPrompt: request.systemPrompt,
-      ...(request.model === DEFAULT_MODEL ? {} : {model: request.model}),
+      ...(request.model === DEFAULT_MODEL_ID ? {} : {model: request.model}),
       ...(resume ? {resume} : {}),
       ...(fork ? {forkSession: true} : {}),
       ...(upTo ? {resumeSessionAt: upTo} : {}),

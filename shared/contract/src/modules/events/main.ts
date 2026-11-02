@@ -21,7 +21,7 @@ export const SnapshotEvent = z.strictObject({
   providers: z.array(ProviderStatusSchema),
   /** Each Provider's Models as it last listed them; empty if it never has. */
   models: z.record(ProviderIdSchema, z.array(ModelSchema)),
-  /** The Model of the newest Prompt in any Tree, where a new Tree starts. */
+  /** The newest Reply's Model in any Tree, where a new Tree starts. */
   lastModel: ModelChoiceSchema.nullable(),
   /** The Provider being connected, at its latest step. */
   signIn: SignInStepEvent.nullable(),

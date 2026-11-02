@@ -5,7 +5,7 @@ import type {
   ProviderStatus,
 } from '@uz/contract/providers'
 
-import {PROVIDER_NAMES} from '@uz/contract/providers'
+import {DEFAULT_MODEL_ID, PROVIDER_NAMES} from '@uz/contract/providers'
 
 export interface ModelPickInput {
   /** The user's pick in this Input, else its Reply's Model, else the last-used. */
@@ -63,28 +63,31 @@ function selectedOf(provider: ProviderId, model: Model): SelectedModel {
 
 type Selection = Pick<ModelPick, 'selected' | 'heldBecause'>
 
-/** The Provider's default, or why there is none to send with yet. */
+/**
+ * The Provider's default, or why there is none to send with. Before it lists
+ * any, the choice is left to it.
+ */
 function startOn(
   provider: ProviderId,
   models: Record<ProviderId, Model[]>
 ): Selection {
   const listed = models[provider]
+
+  if (listed.length === 0) {
+    return {
+      selected: {provider, model: DEFAULT_MODEL_ID, name: 'Default'},
+      heldBecause: null,
+    }
+  }
+
   const fallback = defaultOf(listed)
 
-  if (fallback)
-    return {selected: selectedOf(provider, fallback), heldBecause: null}
-
-  return {
-    selected: null,
-    heldBecause:
-      listed.length === 0
-        ? waitingFor(provider)
-        : `${PROVIDER_NAMES[provider]} offers no Model this app version can use`,
-  }
-}
-
-function waitingFor(provider: ProviderId) {
-  return `Waiting for ${PROVIDER_NAMES[provider]}’s Models…`
+  return fallback
+    ? {selected: selectedOf(provider, fallback), heldBecause: null}
+    : {
+        selected: null,
+        heldBecause: `${PROVIDER_NAMES[provider]} offers no Model this app version can use`,
+      }
 }
 
 function startOnFirstConnected({statuses, models}: ModelPickInput): Selection {
@@ -110,10 +113,7 @@ function fromList(wanted: ModelChoice, models: Record<ProviderId, Model[]>) {
   const found = findModel(listed, wanted.model)
 
   if (listed.length === 0) {
-    return {
-      selected: {...wanted, name: wanted.model},
-      heldBecause: waitingFor(wanted.provider),
-    }
+    return {selected: {...wanted, name: wanted.model}, heldBecause: null}
   }
 
   if (found && !found.needsAppUpdate) {
