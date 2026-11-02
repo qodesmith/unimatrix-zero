@@ -2,21 +2,20 @@ import type {ModelPick} from '../pick-model'
 import type {ModelChoice} from '@uz/contract/providers'
 
 import {ProviderMark, useConnections} from '#modules/connections/main'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from '#shadcn/ui/dropdown-menu'
 import {InputGroupButton} from '#shadcn/ui/input-group'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '#shadcn/ui/select'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
-import {ChevronDownIcon} from 'lucide-react'
 
-function keyOf({provider, model}: ModelChoice) {
-  return JSON.stringify([provider, model])
+function sameChoice(a: ModelChoice, b: ModelChoice) {
+  return a.provider === b.provider && a.model === b.model
 }
 
 interface ModelPickerProps {
@@ -39,46 +38,53 @@ export function ModelPicker({pick, onPick}: ModelPickerProps) {
           Sign in again
         </InputGroupButton>
       )}
-      <DropdownMenu>
-        <DropdownMenuTrigger render={<InputGroupButton className="max-w-48" />}>
-          {selected ? (
-            <>
-              <ProviderMark provider={selected.provider} />
-              <span className="truncate">{selected.name}</span>
-            </>
-          ) : (
-            <span>No Model</span>
-          )}
-          <ChevronDownIcon />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-auto min-w-48">
-          <DropdownMenuRadioGroup value={selected ? keyOf(selected) : ''}>
-            {groups.map(({provider, models}) => (
-              <DropdownMenuGroup key={provider}>
-                <DropdownMenuLabel className="flex items-center gap-1.5">
-                  <ProviderMark provider={provider} />
-                  {PROVIDER_NAMES[provider]}
-                </DropdownMenuLabel>
-                {models.map(model => (
-                  <DropdownMenuRadioItem
-                    key={model.id}
-                    value={keyOf({provider, model: model.id})}
-                    disabled={model.needsAppUpdate}
-                    onClick={() => onPick({provider, model: model.id})}
-                  >
-                    {model.name}
-                    {model.needsAppUpdate && (
-                      <span className="ml-auto text-xs text-muted-foreground">
-                        Needs an app update
-                      </span>
-                    )}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuGroup>
-            ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Select<ModelChoice>
+        value={selected && {provider: selected.provider, model: selected.model}}
+        isItemEqualToValue={sameChoice}
+        onValueChange={choice => {
+          if (choice) onPick(choice)
+        }}
+      >
+        <SelectTrigger
+          aria-label="Model"
+          className="h-6 max-w-48 gap-1 border-transparent bg-transparent px-1.5 shadow-none hover:bg-muted aria-expanded:bg-muted dark:bg-transparent dark:hover:bg-muted/50"
+        >
+          <SelectValue>
+            {selected ? (
+              <>
+                <ProviderMark provider={selected.provider} />
+                <span className="truncate">{selected.name}</span>
+              </>
+            ) : (
+              'No Model'
+            )}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent className="w-auto min-w-48">
+          {groups.map(({provider, models}) => (
+            <SelectGroup key={provider}>
+              <SelectLabel className="flex items-center gap-1.5">
+                <ProviderMark provider={provider} />
+                {PROVIDER_NAMES[provider]}
+              </SelectLabel>
+              {models.map(model => (
+                <SelectItem
+                  key={model.id}
+                  value={{provider, model: model.id}}
+                  disabled={model.needsAppUpdate}
+                >
+                  {model.name}
+                  {model.needsAppUpdate && (
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      Needs an app update
+                    </span>
+                  )}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          ))}
+        </SelectContent>
+      </Select>
     </>
   )
 }

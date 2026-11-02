@@ -162,6 +162,19 @@ function sentModels(main: ReturnType<typeof fakeMain>) {
   )
 }
 
+function picker() {
+  return page.getByRole('combobox', {name: 'Model'})
+}
+
+async function expectPicked(providerName: string, modelName: string) {
+  await expect
+    .element(picker().getByRole('img', {name: providerName}))
+    .toBeVisible()
+  await expect
+    .element(picker().getByText(modelName, {exact: true}))
+    .toBeVisible()
+}
+
 async function send(main: ReturnType<typeof fakeMain>) {
   await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
   await userEvent.keyboard('{Enter}')
@@ -174,9 +187,7 @@ it('defaults to the Model of the Reply it is attached to, and sends with it', as
     lastModel: {provider: 'chatgpt', model: 'gpt-5'},
   })
 
-  await expect
-    .element(page.getByRole('button', {name: 'Claude Opus'}))
-    .toBeVisible()
+  await expectPicked('Claude', 'Opus')
 
   await send(main)
   expect(sentModels(main)).toEqual([{provider: 'claude', model: 'opus'}])
@@ -187,24 +198,21 @@ it('starts a new Tree from the last-used Model', async () => {
     lastModel: {provider: 'chatgpt', model: 'gpt-5'},
   })
 
-  await expect
-    .element(page.getByRole('button', {name: 'ChatGPT GPT-5'}))
-    .toBeVisible()
+  await expectPicked('ChatGPT', 'GPT-5')
 
   await send(main)
   expect(sentModels(main)).toEqual([{provider: 'chatgpt', model: 'gpt-5'}])
 })
 
-it('sends the Model picked in the Input', async () => {
+it('sends the Model picked in the Input, closing the picker on the pick', async () => {
   const main = await renderInput({
     attachedTo: attachedReply('claude', 'opus'),
   })
 
-  await page.getByRole('button', {name: 'Claude Opus'}).click()
-  await page.getByRole('menuitemradio', {name: 'Haiku'}).click()
-  await expect
-    .element(page.getByRole('button', {name: 'Claude Haiku'}))
-    .toBeVisible()
+  await picker().click()
+  await page.getByRole('option', {name: 'Haiku'}).click()
+  await expectPicked('Claude', 'Haiku')
+  await expect.element(page.getByRole('listbox')).not.toBeInTheDocument()
 
   await send(main)
   expect(sentModels(main)).toEqual([{provider: 'claude', model: 'haiku'}])
@@ -213,25 +221,21 @@ it('sends the Model picked in the Input', async () => {
 it('lists only the Thread’s own Provider in a continuing Thread', async () => {
   await renderInput({attachedTo: attachedReply('claude', 'opus')})
 
-  await page.getByRole('button', {name: 'Claude Opus'}).click()
-  await expect
-    .element(page.getByRole('menuitemradio', {name: 'Haiku'}))
-    .toBeVisible()
-  expect(page.getByRole('menuitemradio', {name: 'GPT-5'}).query()).toBeNull()
+  await picker().click()
+  await expect.element(page.getByRole('option', {name: 'Haiku'})).toBeVisible()
+  expect(page.getByRole('option', {name: 'GPT-5'}).query()).toBeNull()
 })
 
 it('lists a Model the app is too old for, disabled as needing an app update', async () => {
   await renderInput()
 
-  await page.getByRole('button', {name: 'Claude Opus'}).click()
+  await picker().click()
 
-  const gated = page.getByRole('menuitemradio', {name: /Opus 5/})
+  const gated = page.getByRole('option', {name: /Opus 5/})
 
   await expect.element(gated).toHaveAttribute('aria-disabled', 'true')
   await expect.element(gated.getByText('Needs an app update')).toBeVisible()
-  await expect
-    .element(page.getByRole('menuitemradio', {name: 'GPT-5'}))
-    .toBeVisible()
+  await expect.element(page.getByRole('option', {name: 'GPT-5'})).toBeVisible()
 })
 
 it('falls back to the Provider’s default, visibly, when the Reply’s Model is no longer offered', async () => {
@@ -258,9 +262,7 @@ it('offers to sign in again beside a signed-out Provider’s Model, holding Send
 
   await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
   await expect.element(page.getByRole('button', {name: 'Send'})).toBeDisabled()
-  await expect
-    .element(page.getByRole('button', {name: 'Claude Haiku'}))
-    .toBeVisible()
+  await expectPicked('Claude', 'Haiku')
   await expect
     .element(page.getByText('Sign in to Claude again to send'))
     .toBeVisible()
