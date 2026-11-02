@@ -339,7 +339,7 @@ it('doesn’t start a sign-in while another holds ChatGPT’s sign-in port', asy
   expect(sign.close).toHaveBeenCalledOnce()
 })
 
-it('stops listening to Codex when the sign-in is closed on ChatGPT’s page', async () => {
+it('stops listening to Codex when the sign-in stops on ChatGPT’s page', async () => {
   const sign = setUp()
   const updates = sign.signIn.signIn(request)
 

@@ -284,8 +284,8 @@ export function createProviderHosts({
       return new Promise<string>((resolve, reject) => {
         const timer = setTimeout(() => {
           host.oneShots.delete(requestId)
-          child.post({type: 'one-shot.cancel', requestId})
           reject(new Error(`The ${provider} host took too long to answer.`))
+          child.post({type: 'one-shot.cancel', requestId})
         }, ONE_SHOT_TIMEOUT_MS)
 
         host.oneShots.set(requestId, {resolve, reject, timer})

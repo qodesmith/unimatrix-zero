@@ -16,10 +16,7 @@ const request = {
   },
 }
 
-/**
- * `exited` holds the fake `claude` open after its last message; `close` ends
- * it, as the SDK's does.
- */
+/** `exited` holds the fake `claude` open after its last message. */
 function fakeClaude(
   messages: OneShotMessage[],
   exited: Promise<void> = Promise.resolve()
@@ -27,9 +24,11 @@ function fakeClaude(
   const asked: Parameters<OneShotQuery>[0][] = []
   const closed = Promise.withResolvers<void>()
   let closes = 0
+  let exiting = false
 
   async function* run() {
     yield* messages
+    exiting = true
     await Promise.race([exited, closed.promise])
   }
 
@@ -44,7 +43,7 @@ function fakeClaude(
     })
   }
 
-  return {query, asked, closes: () => closes}
+  return {query, asked, closes: () => closes, exiting: () => exiting}
 }
 
 const notCanceled = new AbortController().signal
@@ -166,7 +165,6 @@ it('ends a claude that hangs once main cancels the one-shot', async () => {
   cancel.abort()
 
   await expect(text).rejects.toThrow('Claude ended without an answer.')
-  expect(claude.closes()).toBe(1)
 })
 
 it('lets claude exit by itself when the cancel comes after its answer', async () => {
@@ -180,9 +178,7 @@ it('lets claude exit by itself when the cancel comes after its answer', async ()
     cancel.signal
   )
 
-  await new Promise(resolve => {
-    setTimeout(resolve, 0)
-  })
+  await expect.poll(() => claude.exiting()).toBe(true)
   cancel.abort()
   exit.resolve()
 

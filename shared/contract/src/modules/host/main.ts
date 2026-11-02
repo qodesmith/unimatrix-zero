@@ -215,7 +215,6 @@ export const HostCommandSchema = z.discriminatedUnion('type', [
     requestId: z.string().min(1),
     request: OneShotRequestSchema,
   }),
-  /** Ends the one-shot's vendor program; main has already given up on it. */
   z.strictObject({
     type: z.literal('one-shot.cancel'),
     requestId: z.string().min(1),
