@@ -464,6 +464,21 @@ function divider(index: number) {
   return found
 }
 
+/** `read` once per animation frame, for `ms`. */
+async function framesOf(read: () => number, ms: number) {
+  const values: number[] = []
+  const end = performance.now() + ms
+
+  while (performance.now() < end) {
+    await new Promise(resolve => {
+      requestAnimationFrame(resolve)
+    })
+    values.push(read())
+  }
+
+  return values
+}
+
 function savedSections(main: FakeMain) {
   return layoutUpdates(main).map(command => command.changes.sidebarSections)
 }
@@ -572,13 +587,36 @@ describe('the sidebar’s sections', () => {
     expect(heightOf('Usage')).toBeCloseTo(90, 0)
   })
 
+  it('animates a section collapsing', async () => {
+    const main = fakeMain()
+    await renderApp(main)
+    await expect.poll(() => heightOf('Files')).toBeGreaterThan(180)
+
+    const open = heightOf('Files')
+
+    const headerHeight = header('Files')
+      .element()
+      .getBoundingClientRect().height
+
+    await header('Files').click()
+    const heights = await framesOf(() => heightOf('Files'), 400)
+
+    expect(
+      heights.some(height => height > headerHeight + 1 && height < open - 1)
+    ).toBe(true)
+    expect(heights.at(-1)).toBe(headerHeight)
+  })
+
   it('keeps the dividers beside a collapsed section from moving', async () => {
     const main = fakeMain()
     await renderApp(main)
+
+    const headerHeight = header('Files')
+      .element()
+      .getBoundingClientRect().height
+
     await header('Files').click()
-    await expect
-      .element(header('Files'))
-      .toHaveAttribute('aria-expanded', 'false')
+    await expect.poll(() => heightOf('Files')).toBe(headerHeight)
     const before = {trees: heightOf('Trees'), usage: heightOf('Usage')}
 
     await drag(divider(0), {x: 0, y: -100})

@@ -32,6 +32,8 @@ const MIN_HEIGHT: Record<SidebarSectionId, string> = {
 // The header's `h-8`, which is all a collapsed section shows.
 const HEADER_HEIGHT = '2rem'
 
+const TOGGLE_MS = 200
+
 function sectionLayout(layout: PanelLayout): SectionLayout {
   return {
     trees: layout.trees ?? 0,
@@ -70,10 +72,21 @@ export function SidebarSections(
   const groupRef = useGroupRef()
   const groupElement = useRef<HTMLDivElement>(null)
   const header = useRef<HTMLDivElement>(null)
+  const toggled = useRef(false)
   const anyOpen = SECTION_IDS.some(id => !sections[id].collapsed)
 
   useLayoutEffect(() => {
+    const group = groupElement.current
     let current = true
+
+    if (toggled.current) {
+      toggled.current = false
+      group?.setAttribute('data-toggling', '')
+    }
+
+    const settled = setTimeout(() => {
+      group?.removeAttribute('data-toggling')
+    }, TOGGLE_MS)
 
     function apply() {
       if (current) {
@@ -90,6 +103,7 @@ export function SidebarSections(
 
     return () => {
       current = false
+      clearTimeout(settled)
     }
   }, [groupRef, sections])
 
@@ -114,7 +128,7 @@ export function SidebarSections(
   return (
     <ResizablePanelGroup
       orientation="vertical"
-      className="min-h-0 flex-1"
+      className="min-h-0 flex-1 motion-safe:[&[data-toggling]>[data-panel]]:transition-[flex-grow] motion-safe:[&[data-toggling]>[data-panel]]:duration-200 motion-safe:[&[data-toggling]>[data-panel]]:ease-out"
       groupRef={groupRef}
       elementRef={groupElement}
       defaultLayout={arrange(sections, 0)}
@@ -154,12 +168,13 @@ export function SidebarSections(
                 {...props[id]}
                 headerRef={id === 'trees' ? header : undefined}
                 collapsed={collapsed}
-                onToggle={() =>
+                onToggle={() => {
+                  toggled.current = true
                   save({
                     ...sections,
                     [id]: {...sections[id], collapsed: !collapsed},
                   })
-                }
+                }}
               />
             </ResizablePanel>
           </Fragment>
