@@ -52,7 +52,6 @@ interface FlowProps {
   deleted: Deleted | null
   switching: boolean
   showMap: boolean
-  /** A glide of the canvas's own is running. */
   moving: boolean
   moves: Moves
   onHover: (turnId: string | null) => void
@@ -343,7 +342,6 @@ export function Flow({
     node => measured[node.id] !== undefined
   )
 
-  // A move the canvas has yet to start.
   const waiting =
     !fitted ||
     !sized ||

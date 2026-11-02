@@ -9,7 +9,6 @@ export function useMotion() {
   const latest = useRef(0)
   const [moving, setMoving] = useState(false)
 
-  /** A move with a duration. */
   const glide = useCallback(async (run: () => Promise<boolean>) => {
     const sequence = ++latest.current
     setMoving(true)
@@ -24,7 +23,6 @@ export function useMotion() {
     setMoving(false)
   }, [])
 
-  /** A move with no duration. */
   const jump = useCallback(
     (run: () => Promise<boolean>) => {
       stop()

@@ -5,7 +5,6 @@ import type {Moves} from './motion'
 import {useReactFlow} from '@xyflow/react'
 import {useCallback, useLayoutEffect, useRef} from 'react'
 
-/** A Turn kept where it is on screen while the canvas layout changes. */
 interface Held {
   turnId: string
   /**
@@ -37,7 +36,12 @@ interface HoldOptions {
   moves: Moves
 }
 
-/** Returns what lets the held Turn go. */
+/**
+ * Keeps a Turn where it is on screen while the canvas layout moves it, until
+ * its boxes are measured anew: a Fork's Reply as it folds or unfolds, a Turn
+ * as its text is let out or capped, and a Reply as the Turns below it are
+ * deleted. Returns what lets it go.
+ */
 export function useHold({
   canvasLayout,
   collapsed,
@@ -50,12 +54,6 @@ export function useHold({
   moves,
 }: HoldOptions) {
   const flow = useReactFlow()
-  // Folding or unfolding a Fork moves its Reply in the canvas layout, and again
-  // as the boxes it shows are measured; the viewport moves by the same amount,
-  // scaled, so the Reply stays where it is on screen. A pan lets it go. Letting
-  // out or capping a Turn's text holds its Turn the same way until its box is
-  // measured anew, and lets a followed Reply go, so the text being read stays
-  // put. Deleting Turns from below a Reply holds the Reply too.
   const lastCanvasLayout = useRef(canvasLayout)
   const lastCollapsed = useRef(collapsed)
   const lastExpanded = useRef(expanded)

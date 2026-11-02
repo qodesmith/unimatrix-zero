@@ -288,7 +288,6 @@ function zoomOf() {
   return scale === undefined ? Number.NaN : Number(scale)
 }
 
-/** The canvas is gliding, or has a move it is yet to start. */
 function moving() {
   return document.querySelector('.react-flow')?.hasAttribute('data-moving')
 }
@@ -694,10 +693,6 @@ it('zooms out just enough to show the whole Tree on its first Fork, and keeps th
   expect(zoomOf()).toBe(fitted)
 })
 
-/**
- * The zoom at each change to the canvas once a Prompt with this text is drawn,
- * and whether the canvas said it was moving.
- */
 function promptDrawn(flow: Element, text: string) {
   return [...flow.querySelectorAll('.react-flow__node-prompt')].some(node =>
     node.textContent.includes(text)
