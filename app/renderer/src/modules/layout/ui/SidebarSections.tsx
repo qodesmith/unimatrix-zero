@@ -195,7 +195,7 @@ function Section({
             size="sm"
             aria-expanded={!collapsed}
             aria-controls={bodyId}
-            className="h-8 w-full justify-start gap-1 rounded-none px-2 text-xs font-semibold"
+            className="h-8 w-full justify-start gap-1 rounded-none px-2 text-xs font-semibold hover:bg-transparent aria-expanded:bg-transparent dark:hover:bg-transparent"
             onClick={onToggle}
           >
             {collapsed ? <ChevronRightIcon /> : <ChevronDownIcon />}
