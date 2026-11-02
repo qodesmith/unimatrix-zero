@@ -1,5 +1,4 @@
 import {useStateMachine} from '#modules/state-machine/main'
-import {deleteTree} from '#modules/trees/main'
 import {useDeletePrompt} from '#modules/turns/main'
 import {useCallback, useMemo} from 'react'
 
@@ -9,9 +8,8 @@ import {askToDelete} from './actions'
 import {initialPromptDelete, promptDeleteTransition} from './machine'
 
 /**
- * Deleting a Prompt and every Turn below it, offered only while none of those
- * Replies streams: main refuses then too. Deleting the root Prompt deletes
- * the Tree, the same as deleting it from the sidebar.
+ * Deleting a Prompt below the root and every Turn below it, offered only while
+ * none of those Replies streams: main refuses then too.
  */
 export function usePromptDelete(promptId: string) {
   const {treeId, index, onDeleteConfirmed} = useCanvas()
@@ -28,8 +26,6 @@ export function usePromptDelete(promptId: string) {
     id => index.replyById.get(id)?.status === 'streaming'
   )
 
-  const isRoot = index.promptById.get(promptId)?.parentReplyId === null
-
   const arm = useCallback(() => send({type: 'armed'}), [send])
   const cancel = useCallback(() => send({type: 'canceled'}), [send])
 
@@ -37,19 +33,13 @@ export function usePromptDelete(promptId: string) {
     if (promptDeleteTransition(state, {type: 'confirmed'}) === state) return
 
     send({type: 'confirmed'})
-
-    if (isRoot) {
-      void askToDelete({runDelete: async () => deleteTree(treeId), send})
-    } else {
-      onDeleteConfirmed(promptId)
-      void askToDelete({runDelete: async () => deletePrompt(promptId), send})
-    }
+    onDeleteConfirmed(promptId)
+    void askToDelete({runDelete: async () => deletePrompt(promptId), send})
   }
 
   return {
     state,
     offered,
-    isRoot,
     turnCount: turnIds.length,
     arm,
     cancel,

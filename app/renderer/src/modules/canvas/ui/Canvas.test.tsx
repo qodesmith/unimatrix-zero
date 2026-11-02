@@ -2319,7 +2319,7 @@ it('shows main’s refusal to delete the Tree in the root Prompt’s confirmatio
   expect(nodeCount()).toBe(10)
 })
 
-it('offers no delete on a Prompt with a Reply streaming at or below it', async () => {
+it('offers no delete on a Prompt with a Reply streaming at or below it, but still offers the Tree’s', async () => {
   const saved = forkedTree()
 
   saved.replies = saved.replies.map(one =>
@@ -2336,7 +2336,7 @@ it('offers no delete on a Prompt with a Reply streaming at or below it', async (
     expect(deleteButtonOf(above).query()).toBeNull()
   }
 
-  expect(deleteTreeButton().query()).toBeNull()
+  await expect.element(deleteTreeButton()).toBeInTheDocument()
 })
 
 async function deleteFrom(promptText: string) {

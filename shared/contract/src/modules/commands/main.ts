@@ -39,7 +39,7 @@ export const TreeRenameCommand = z.strictObject({
   title: z.string().trim().min(1).max(TREE_TITLE_MAX_LENGTH),
 })
 
-/** The Tree and every Turn in it, for good; refused while a Reply in it streams. */
+/** The Tree and every Turn in it, for good, once its streaming Replies stop. */
 export const TreeDeleteCommand = z.strictObject({
   type: z.literal('tree.delete'),
   treeId: z.uuid(),

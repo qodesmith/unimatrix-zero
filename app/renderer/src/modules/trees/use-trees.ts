@@ -5,7 +5,6 @@ import {bridge} from '#modules/bridge/main'
 import {useEffect, useState} from 'react'
 
 import {applyEvent, sortTrees} from './apply-event'
-import {deleteTree} from './delete-tree'
 
 /**
  * Main answers and sends on one ordered channel, so events folded in before
@@ -71,11 +70,6 @@ export function useTrees() {
     await run({type: 'tree.rename', treeId, title})
   }
 
-  async function deleteOne(treeId: string) {
-    const outcome = await deleteTree(treeId)
-    setError(outcome.ok ? null : outcome.error)
-  }
-
   return {
     trees,
     /** Null until main lists the Trees, unless a live event already brought one. */
@@ -85,6 +79,5 @@ export function useTrees() {
     open,
     create,
     rename,
-    delete: deleteOne,
   }
 }

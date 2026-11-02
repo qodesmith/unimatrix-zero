@@ -1,5 +1,5 @@
 import type {Database} from '#modules/database/main'
-import type {ReplyHosts} from './main'
+import type {FinishedReply, ReplyHosts} from './main'
 import type {AppEvent} from '@uz/contract/events'
 import type {HostCommand} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
@@ -20,6 +20,7 @@ const createdAt = new Date('2026-10-19T12:00:00.000Z')
 let db: Database
 let published: AppEvent[]
 let whenPublished: (event: AppEvent) => void
+let finished: FinishedReply[]
 let hostCommands: HostCommand[]
 let hostReady: boolean
 let hostReachable: boolean
@@ -50,7 +51,7 @@ function launch() {
     vendorProgramFor: () => vendorProgram,
     now: () => createdAt,
     onTurnsChanged: () => undefined,
-    onReplyFinished: () => undefined,
+    onReplyFinished: reply => finished.push(reply),
   })
 }
 
@@ -59,6 +60,7 @@ beforeEach(() => {
   db = openDatabase({file: ':memory:', migrationsFolder})
   published = []
   whenPublished = () => undefined
+  finished = []
   hostCommands = []
   hostReady = true
   hostReachable = true
@@ -576,6 +578,73 @@ describe('stopping a Reply', () => {
       'That Reply isn’t being written.'
     )
     expect(hostCommands).toEqual([])
+  })
+})
+
+describe('stopping every Reply in a Tree', () => {
+  it('ends each one as stopped at once, saving its text, and asks its host to stop', () => {
+    const replyId = sendPrompt(null)
+    fromHost(replyId, {type: 'TEXT_DELTA', delta: 'Half an answer'})
+
+    turns.stopAll(treeId)
+
+    expect(saved(replyId)).toMatchObject({
+      status: 'stopped',
+      content: [{type: 'text', text: 'Half an answer'}],
+    })
+    expect(published.at(-1)).toEqual({
+      type: 'RUN_FINISHED',
+      treeId,
+      replyId,
+      status: 'stopped',
+    })
+    expect(hostCommands).toEqual([{type: 'reply.stop', replyId}])
+  })
+
+  it('tells no one they finished, and still tells of a Reply in another Tree', () => {
+    const root = savedRoot()
+    sendPrompt(root)
+
+    const elsewhere = turns.sendPrompt({
+      treeId: createTrees(db).create(createdAt).id,
+      parentReplyId: null,
+      text: 'Hi',
+    })
+
+    if (!elsewhere) throw new Error('The root Prompt was refused')
+
+    finished = []
+    turns.stopAll(treeId)
+
+    turns.hostEvent('claude', {
+      type: 'RUN_FINISHED',
+      treeId: elsewhere.reply.treeId,
+      replyId: elsewhere.reply.id,
+      status: 'complete',
+    })
+
+    expect(finished.map(reply => reply.replyId)).toEqual([elsewhere.reply.id])
+  })
+
+  it('drops what their host sends after', () => {
+    const replyId = sendPrompt(null)
+    turns.stopAll(treeId)
+    const count = published.length
+
+    fromHost(replyId, {type: 'TEXT_DELTA', delta: 'Too late'})
+    fromHost(replyId, {type: 'RUN_FINISHED', status: 'stopped'})
+
+    expect(published).toHaveLength(count)
+    expect(saved(replyId).content).toEqual([])
+  })
+
+  it('ends them when their host can’t be reached', () => {
+    const replyId = sendPrompt(null)
+    hostReachable = false
+
+    turns.stopAll(treeId)
+
+    expect(saved(replyId).status).toBe('stopped')
   })
 })
 

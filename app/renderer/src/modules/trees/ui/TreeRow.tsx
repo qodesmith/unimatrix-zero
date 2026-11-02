@@ -19,8 +19,10 @@ import {MoreHorizontalIcon} from 'lucide-react'
 import {useId, useRef, useState} from 'react'
 
 import {relativeTime} from '../relative-time'
+import {useTreeDelete} from '../tree-delete/use-tree-delete'
 import {treeName} from '../tree-name'
 import {useNow} from '../use-now'
+import {DeleteTreeDialog} from './DeleteTreeDialog'
 
 export function TreeTitle({tree}: {tree: Tree}) {
   return tree.title ?? <span className="italic">{treeName(tree)}</span>
@@ -34,7 +36,6 @@ interface TreeRowProps {
   onStartRename: () => void
   /** The new title, or null when renaming was abandoned. */
   onRenamed: (title: string | null) => void
-  onDelete: () => void
 }
 
 export function TreeRow({
@@ -44,10 +45,10 @@ export function TreeRow({
   onOpen,
   onStartRename,
   onRenamed,
-  onDelete,
 }: TreeRowProps) {
   const detailsId = useId()
   const renameChosen = useRef(false)
+  const {ask, dialog} = useTreeDelete(tree.id)
 
   function onKeyDown(event: KeyboardEvent) {
     if (event.key === 'F2') onStartRename()
@@ -103,11 +104,12 @@ export function TreeRow({
           >
             Rename
           </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={onDelete}>
+          <DropdownMenuItem variant="destructive" onClick={ask}>
             Delete…
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <DeleteTreeDialog {...dialog} />
     </SidebarMenuItem>
   )
 }

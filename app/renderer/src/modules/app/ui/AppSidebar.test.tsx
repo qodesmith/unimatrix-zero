@@ -373,32 +373,65 @@ describe('deleting a Tree', () => {
       .toBeVisible()
   })
 
-  it('says why main refused to delete it, and keeps its row', async () => {
-    const main = fakeMain({trees: [savedTree({title: 'Busy'})]})
+  it('deletes a Tree while a Reply in it streams, saying Deleting… until main answers', async () => {
+    const tree = savedTree({title: 'Busy'})
+    const main = fakeMain({trees: [tree]})
+    const answered = Promise.withResolvers<void>()
+    globalThis.window.uz = {
+      ...main,
+      send: (async (command: Command) => {
+        if (command.type === 'tree.delete') await answered.promise
+
+        return main.send(command)
+      }) as Bridge['send'],
+    }
+    await render(<App />, {wrapper: FullHeight})
+    const ids = {treeId: tree.id, replyId: crypto.randomUUID()}
+    main.publish({...ids, type: 'TEXT_DELTA', delta: 'Hi'})
+    await expect
+      .element(treeRow('Busy'))
+      .toHaveAccessibleDescription(/Writing a Reply/)
+
+    await askToDelete('Busy')
+    await deleteDialog().getByRole('button', {name: 'Delete'}).click()
+
+    await expect
+      .element(deleteDialog().getByRole('button', {name: 'Deleting…'}))
+      .toBeDisabled()
+
+    main.publish({...ids, type: 'RUN_FINISHED', status: 'stopped'})
+    answered.resolve()
+
+    await expect.element(treeRow('Busy')).not.toBeInTheDocument()
+    await expect.element(deleteDialog()).not.toBeInTheDocument()
+  })
+
+  it('says in its dialog why main refused to delete it, and keeps its row', async () => {
+    const main = fakeMain({trees: [savedTree({title: 'Kept'})]})
     globalThis.window.uz = {
       ...main,
       send: (async (command: Command) =>
         command.type === 'tree.delete'
           ? {
               ok: false,
-              error: {
-                code: 'handler-failed',
-                message: 'A Reply in this Tree is still being written.',
-              },
+              error: {code: 'handler-failed', message: 'The disk is full.'},
             }
           : main.send(command)) as Bridge['send'],
     }
     await render(<App />, {wrapper: FullHeight})
 
-    await askToDelete('Busy')
+    await askToDelete('Kept')
     await deleteDialog().getByRole('button', {name: 'Delete'}).click()
 
     await expect
-      .element(
-        sidebar().getByText('A Reply in this Tree is still being written.')
-      )
-      .toBeVisible()
-    await expect.element(treeRow('Busy')).toBeVisible()
+      .element(deleteDialog().getByRole('alert'))
+      .toHaveTextContent('The disk is full.')
+    await expect
+      .element(deleteDialog().getByRole('button', {name: 'Delete'}))
+      .toBeEnabled()
+
+    await deleteDialog().getByRole('button', {name: 'Cancel'}).click()
+    await expect.element(treeRow('Kept')).toBeVisible()
   })
 })
 

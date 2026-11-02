@@ -77,13 +77,8 @@ export function createInFlight(
     entry.saveTimer ??= setTimeout(() => save(entry), PARTIAL_SAVE_MS)
   }
 
-  function apply(provider: ProviderId, event: ReplyEvent) {
-    const entry = entries.get(event.replyId)
-
-    if (entry?.provider !== provider || entry.reply.treeId !== event.treeId) {
-      return
-    }
-
+  /** Saves what the event changed, then tells the windows. */
+  function advance(entry: Entry, event: ReplyEvent) {
     const before = entry.reply
     entry.reply = foldReplyEvent(before, event)
 
@@ -97,6 +92,16 @@ export function createInFlight(
     }
 
     publish(event)
+  }
+
+  function apply(provider: ProviderId, event: ReplyEvent) {
+    const entry = entries.get(event.replyId)
+
+    if (entry?.provider !== provider || entry.reply.treeId !== event.treeId) {
+      return
+    }
+
+    advance(entry, event)
 
     if (event.type === 'RUN_FINISHED') {
       const {treeId, replyId, status} = event
@@ -182,8 +187,30 @@ export function createInFlight(
       }
     },
 
-    streamsIn(treeId: string): boolean {
-      return [...entries.values()].some(entry => entry.reply.treeId === treeId)
+    /**
+     * Ends the Tree's Replies as stopped without their hosts, and returns
+     * them. The windows hear each end, and nothing else follows from it: the
+     * Tree is about to be deleted.
+     */
+    endIn(treeId: string): {provider: ProviderId; replyId: string}[] {
+      const ending = [...entries.values()].filter(
+        entry => entry.reply.treeId === treeId
+      )
+
+      for (const entry of ending) {
+        const {replyId} = entry.reply
+        advance(entry, {
+          type: 'RUN_FINISHED',
+          treeId,
+          replyId,
+          status: 'stopped',
+        })
+      }
+
+      return ending.map(({provider, reply}) => ({
+        provider,
+        replyId: reply.replyId,
+      }))
     },
 
     streaming(): StreamingReply[] {

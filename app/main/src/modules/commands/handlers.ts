@@ -69,13 +69,7 @@ export const handlers: Handlers = {
 
   'tree.delete': ({treeId}, {trees, turns, publish}) => {
     found(trees.get(treeId))
-
-    if (turns.streamsIn(treeId)) {
-      throw new Error(
-        'Wait for its Replies to finish, or stop them, before deleting this Tree.'
-      )
-    }
-
+    turns.stopAll(treeId)
     trees.delete(treeId)
     publish({type: 'TREE_DELETED', treeId})
 

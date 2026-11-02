@@ -407,27 +407,50 @@ describe('deleting a Tree', () => {
     })
   })
 
-  it('is refused while a Reply in it streams', async () => {
+  it('ends each Reply streaming in it, asks its host to stop, and deletes it at once', async () => {
     const tree = await createTree()
-    const {reply} = await sendPrompt(tree.id, null)
-    const count = published.length
+    const root = await sendPrompt(tree.id, null)
+    answer(tree.id, root.reply.id)
+    const first = await sendPrompt(tree.id, root.reply.id)
+    const second = await sendPrompt(tree.id, root.reply.id)
+    hostCommands = []
 
     expect(await send({type: 'tree.delete', treeId: tree.id})).toEqual({
-      ok: false,
-      error: {
-        code: 'handler-failed',
-        message:
-          'Wait for its Replies to finish, or stop them, before deleting this Tree.',
-      },
-    })
-    expect(published).toHaveLength(count)
-    expect(await listed()).toHaveLength(1)
-
-    answer(tree.id, reply.id)
-
-    expect(await send({type: 'tree.delete', treeId: tree.id})).toMatchObject({
       ok: true,
+      value: {},
     })
+    expect(hostCommands).toEqual([
+      {type: 'reply.stop', replyId: first.reply.id},
+      {type: 'reply.stop', replyId: second.reply.id},
+    ])
+    expect(published.slice(-3)).toEqual([
+      {
+        type: 'RUN_FINISHED',
+        treeId: tree.id,
+        replyId: first.reply.id,
+        status: 'stopped',
+      },
+      {
+        type: 'RUN_FINISHED',
+        treeId: tree.id,
+        replyId: second.reply.id,
+        status: 'stopped',
+      },
+      {type: 'TREE_DELETED', treeId: tree.id},
+    ])
+    expect(await listed()).toEqual([])
+  })
+
+  it('deletes it when the host writing its Reply can’t be reached', async () => {
+    const tree = await createTree()
+    await sendPrompt(tree.id, null)
+    hostReachable = false
+
+    expect(await send({type: 'tree.delete', treeId: tree.id})).toEqual({
+      ok: true,
+      value: {},
+    })
+    expect(published.at(-1)).toEqual({type: 'TREE_DELETED', treeId: tree.id})
   })
 
   it('answers not-found for a Tree that does not exist', async () => {

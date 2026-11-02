@@ -99,8 +99,6 @@ export function createTurns({
     /** For a window that connects mid-stream. */
     streaming: () => inFlight.streaming(),
 
-    streamsIn: (treeId: string) => inFlight.streamsIn(treeId),
-
     /** Null when the Reply it answers is gone. */
     sendPrompt({
       treeId,
@@ -182,6 +180,20 @@ export function createTurns({
       if (!provider) throw new Error('That Reply isn’t being written.')
 
       hosts.send(provider, {type: 'reply.stop', replyId})
+    },
+
+    /**
+     * Ends the Tree's streaming Replies at once, for deleting it. Their hosts
+     * are asked to stop too, and anything they send after is dropped.
+     */
+    stopAll(treeId: string) {
+      for (const {provider, replyId} of inFlight.endIn(treeId)) {
+        try {
+          hosts.send(provider, {type: 'reply.stop', replyId})
+        } catch {
+          // A host that can't be reached writes nothing more.
+        }
+      }
     },
 
     hostEvent: (provider: ProviderId, event: ReplyEvent) =>
