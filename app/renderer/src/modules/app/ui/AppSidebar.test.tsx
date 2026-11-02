@@ -227,10 +227,7 @@ describe('renaming a Tree', () => {
   it('renames it from its ⋯ menu, which holds only Rename and Delete…', async () => {
     await renderApp(
       fakeMain({
-        trees: [
-          savedTree({title: 'Draft', turnCount: 2}),
-          savedTree({title: 'Other'}),
-        ],
+        trees: [savedTree({title: 'Draft'}), savedTree({title: 'Other'})],
       })
     )
     await sidebar().getByRole('button', {name: 'Actions for Other'}).click()
@@ -285,8 +282,8 @@ async function askToDelete(name: string) {
 }
 
 describe('deleting a Tree', () => {
-  it('asks first, and Cancel keeps it', async () => {
-    const main = fakeMain({trees: [savedTree({title: 'Draft', turnCount: 3})]})
+  it('asks first, even for an empty Tree, and Cancel keeps it', async () => {
+    const main = fakeMain({trees: [savedTree({title: 'Draft'})]})
     await renderApp(main)
 
     await askToDelete('Draft')
@@ -376,23 +373,8 @@ describe('deleting a Tree', () => {
       .toBeVisible()
   })
 
-  it('deletes an empty Tree at once, without asking', async () => {
-    const tree = savedTree({title: 'Empty'})
-    const main = fakeMain({trees: [tree]})
-    await renderApp(main)
-
-    await sidebar().getByRole('button', {name: 'Actions for Empty'}).click()
-    await page.getByRole('menuitem', {name: 'Delete', exact: true}).click()
-
-    await expect.element(treeRow('Empty')).not.toBeInTheDocument()
-    expect(sentOf(main, 'tree.delete')).toEqual([
-      {type: 'tree.delete', treeId: tree.id},
-    ])
-    expect(deleteDialog().query()).toBeNull()
-  })
-
   it('says why main refused to delete it, and keeps its row', async () => {
-    const main = fakeMain({trees: [savedTree({title: 'Busy', turnCount: 1})]})
+    const main = fakeMain({trees: [savedTree({title: 'Busy'})]})
     globalThis.window.uz = {
       ...main,
       send: (async (command: Command) =>

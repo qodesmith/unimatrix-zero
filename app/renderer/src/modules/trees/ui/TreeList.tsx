@@ -54,10 +54,7 @@ export function TreeList({
 
               if (title !== null) onRename(tree.id, title)
             }}
-            onDelete={() => {
-              if (tree.turnCount === 0) onDelete(tree.id)
-              else setDeletingId(tree.id)
-            }}
+            onDelete={() => setDeletingId(tree.id)}
           />
         ))}
       </SidebarMenu>
