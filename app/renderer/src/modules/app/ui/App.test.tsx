@@ -193,14 +193,9 @@ function firstReply(main: ReturnType<typeof fakeMain>) {
   return {treeId: reply.treeId, replyId: reply.id}
 }
 
-it('shows the pong main sends back', async () => {
-  globalThis.window.uz = fakeMain()
-  await renderApp()
-  await page.getByRole('button', {name: 'Ping main'}).click()
-  await expect
-    .element(page.getByText(/pong · .* · 2026-10-19T12:00:00.000Z/))
-    .toBeVisible()
-})
+function sidebarNewTree() {
+  return page.getByRole('complementary').getByRole('button', {name: 'New Tree'})
+}
 
 function viewport() {
   return (
@@ -252,7 +247,7 @@ async function openSettings() {
 }
 
 async function startStreaming(main: ReturnType<typeof fakeMain>) {
-  await page.getByRole('button', {name: 'New Tree'}).click()
+  await sidebarNewTree().click()
   await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
   await userEvent.keyboard('{Enter}')
 
@@ -359,9 +354,11 @@ it('closes only Settings on Esc over a streaming Reply and the slideout: the Rep
 it('creates a Tree and opens it', async () => {
   globalThis.window.uz = fakeMain()
   await renderApp()
-  await expect.element(page.getByText('Start a new Tree')).toBeVisible()
+  await expect
+    .element(page.getByRole('complementary').getByText('Start a new Tree'))
+    .toBeVisible()
 
-  await page.getByRole('button', {name: 'New Tree'}).click()
+  await sidebarNewTree().click()
 
   await expect
     .element(page.getByRole('button', {name: 'Untitled Tree'}))
@@ -407,7 +404,7 @@ it('streams a Reply word by word into an empty Tree', async () => {
   const main = fakeMain()
   globalThis.window.uz = main
   await renderApp()
-  await page.getByRole('button', {name: 'New Tree'}).click()
+  await sidebarNewTree().click()
 
   await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
   await userEvent.keyboard('{Enter}')
@@ -430,7 +427,7 @@ it('continues the Thread from its last Reply once that Reply has finished', asyn
   const main = fakeMain()
   globalThis.window.uz = main
   await renderApp()
-  await page.getByRole('button', {name: 'New Tree'}).click()
+  await sidebarNewTree().click()
   await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
   await userEvent.keyboard('{Enter}')
 
@@ -543,7 +540,7 @@ it('shows a failed Reply with the text it had', async () => {
   const main = fakeMain()
   globalThis.window.uz = main
   await renderApp()
-  await page.getByRole('button', {name: 'New Tree'}).click()
+  await sidebarNewTree().click()
   await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
   await page.getByRole('button', {name: 'Send'}).click()
   await expect.element(page.getByText('Writing…')).toBeVisible()
@@ -718,7 +715,9 @@ describe('collapsing the sidebar', () => {
     globalThis.window.uz = main
     await renderApp()
 
-    await expect.element(page.getByText('Start a new Tree')).toBeInTheDocument()
+    await expect
+      .element(page.getByRole('main').getByText('Start a new Tree'))
+      .toBeVisible()
     await expect.poll(sidebarRight).toBeLessThanOrEqual(0)
     await expect.poll(canvasWidth).toBe(globalThis.innerWidth)
     expect(before).toEqual([])
@@ -750,6 +749,68 @@ describe('collapsing the sidebar', () => {
     await expect.poll(sidebarRight).toBeGreaterThan(0)
     row.focus()
     expect(document.activeElement).toBe(row)
+  })
+})
+
+function noTreeOpen() {
+  return page.getByRole('main')
+}
+
+describe('with no Tree open', () => {
+  const draft = {id: crypto.randomUUID(), title: 'Draft', createdAt: receivedAt}
+
+  it('says no Tree is open when there are Trees, and starts a new one from the main area', async () => {
+    const main = fakeMain({trees: [draft]})
+    globalThis.window.uz = main
+    await renderApp()
+
+    await expect
+      .element(
+        noTreeOpen().getByText(
+          'Pick a Tree from the sidebar, or start a new one.'
+        )
+      )
+      .toBeVisible()
+    await noTreeOpen().getByRole('button', {name: 'New Tree'}).click()
+
+    await expect
+      .element(page.getByRole('heading', {name: 'Untitled Tree'}))
+      .toBeVisible()
+    expect(main.sent).toContainEqual({type: 'tree.create'})
+  })
+
+  it('offers Show Trees only while the sidebar is closed, and it opens the sidebar and saves it open', async () => {
+    const main = fakeMain({trees: [draft], layout: {sidebarOpen: false}})
+    globalThis.window.uz = main
+    await renderApp()
+    await expect.poll(sidebarRight).toBeLessThanOrEqual(0)
+
+    await noTreeOpen().getByRole('button', {name: 'Show Trees'}).click()
+
+    await expect.poll(sidebarRight).toBeGreaterThan(0)
+    expect(main.sent).toContainEqual({
+      type: 'layout.update',
+      changes: {sidebarOpen: true},
+    })
+    await expect
+      .element(noTreeOpen().getByRole('button', {name: 'Show Trees'}))
+      .not.toBeInTheDocument()
+  })
+
+  it('invites a first Tree, with no Show Trees, when there are none', async () => {
+    globalThis.window.uz = fakeMain({layout: {sidebarOpen: false}})
+    await renderApp()
+
+    await expect
+      .element(
+        noTreeOpen().getByText(
+          'One conversation that can branch in any direction.'
+        )
+      )
+      .toBeVisible()
+    await expect
+      .element(noTreeOpen().getByRole('button', {name: 'Show Trees'}))
+      .not.toBeInTheDocument()
   })
 })
 
