@@ -153,6 +153,14 @@ export function isReplyEvent(event: StartReplyEvent): event is ReplyEvent {
   return replyEventTypes.has(event.type)
 }
 
+export const OneShotRequestSchema = z.strictObject({
+  model: z.string().min(1),
+  prompt: z.string().min(1),
+  vendorProgram: SignInRequestSchema,
+})
+
+export type OneShotRequest = z.infer<typeof OneShotRequestSchema>
+
 /** One Provider, one account; no vendor SDK type leaves its Provider host. */
 export interface ProviderDriver {
   readonly capabilities: Capabilities
@@ -164,6 +172,11 @@ export interface ProviderDriver {
   submitSignInCode(code: string): void
   cancelSignIn(): void
   listModels(): Promise<Model[]>
+  /**
+   * The smallest Model on the account's plan, for one-shots; null when it can't
+   * run them.
+   */
+  smallestModel(): Promise<string | null>
   readUsage(): Promise<Usage>
   /**
    * Ends with `RUN_FINISHED`, including after `stop`. `PROMPT_DROPPED` comes
@@ -188,7 +201,7 @@ export interface ProviderDriver {
     vendorProgram: SignInRequest
   }): Promise<boolean>
   /** A tiny tool-free request outside any Tree: titles, Summaries. */
-  runOneShot(input: {model: string; prompt: string}): Promise<string>
+  runOneShot(input: OneShotRequest): Promise<string>
   mcpSignIn(serverId: string): Promise<void>
 }
 
@@ -204,6 +217,12 @@ export const HostCommandSchema = z.discriminatedUnion('type', [
     replyId: z.uuid(),
     session: DeletionCutSchema,
     vendorProgram: SignInRequestSchema,
+  }),
+  /** `ONE_SHOT_FINISHED` follows with the same `requestId`. */
+  z.strictObject({
+    type: z.literal('one-shot.run'),
+    requestId: z.string().min(1),
+    request: OneShotRequestSchema,
   }),
   z.strictObject({
     type: z.literal('sign-in.start'),
@@ -228,7 +247,20 @@ export const HostReadyMessage = z.strictObject({
   type: z.literal('HOST_READY'),
   /** Empty until the driver can write Replies. */
   models: z.array(ModelSchema),
+  /** As `ProviderDriver.smallestModel` reads it. */
+  smallestModel: z.string().min(1).nullable(),
 })
+
+export const OneShotFinishedMessage = z.strictObject({
+  type: z.literal('ONE_SHOT_FINISHED'),
+  requestId: z.string().min(1),
+  outcome: z.discriminatedUnion('ok', [
+    z.strictObject({ok: z.literal(true), text: z.string()}),
+    z.strictObject({ok: z.literal(false), message: z.string()}),
+  ]),
+})
+
+export type OneShotFinished = z.infer<typeof OneShotFinishedMessage>
 
 /** Asks main to keep, or give back, part of a Provider session. */
 export const SessionStoreMessage = z.strictObject({
@@ -245,6 +277,7 @@ export const HostMessageSchema = z.discriminatedUnion('type', [
   PromptDroppedMessage,
   ReplyRecordedMessage,
   SessionCutMessage,
+  OneShotFinishedMessage,
   SignInUpdateSchema,
   SessionStoreMessage,
 ])
