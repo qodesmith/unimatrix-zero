@@ -1621,6 +1621,17 @@ async function setPlaybackRate(playbackRate: number) {
   await cdp().send('Animation.setPlaybackRate', {playbackRate})
 }
 
+/** Freezes every animation and timer until the test lets them go. */
+async function freezeAnimations() {
+  await cdp().send('Animation.enable')
+  await setPlaybackRate(0)
+  onTestFinished(async () => setPlaybackRate(1))
+  vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']})
+  onTestFinished(() => {
+    vi.useRealTimers()
+  })
+}
+
 it('keeps the slideout until its slide out ends, however long that takes', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
@@ -1629,14 +1640,7 @@ it('keeps the slideout until its slide out ends, however long that takes', async
   const aside = slideout().element()
   await expect.poll(() => sliding(aside)).toBe(false)
 
-  await cdp().send('Animation.enable')
-  await setPlaybackRate(0)
-  onTestFinished(async () => setPlaybackRate(1))
-  vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']})
-  onTestFinished(() => {
-    vi.useRealTimers()
-  })
-
+  await freezeAnimations()
   await slideout().getByRole('button', {name: 'Close'}).click()
   await expect.poll(() => sliding(aside)).toBe(true)
   vi.runOnlyPendingTimers()
@@ -1647,6 +1651,137 @@ it('keeps the slideout until its slide out ends, however long that takes', async
 
   await setPlaybackRate(1)
   await expect.poll(() => aside.isConnected).toBe(false)
+})
+
+function turnSlides() {
+  return [...document.querySelectorAll('.react-flow__node')].flatMap(node => {
+    const slide = transitionOf(node, 'transform')
+
+    return slide ? [slide] : []
+  })
+}
+
+function connectionsShown() {
+  const connections = document.querySelector('.react-flow__edges')
+
+  if (!connections) throw new Error('The connections are not drawn')
+
+  return getComputedStyle(connections).opacity !== '0' || fading(connections)
+}
+
+function nodesOfKind(kind: 'exchange' | 'reply') {
+  return document.querySelectorAll(`.react-flow__node-${kind}`).length
+}
+
+/** Whether `check` passes within a few frames, well short of a slide. */
+async function withinFrames(check: () => boolean, frames = 6) {
+  if (check() || frames === 0) return check()
+
+  await new Promise(requestAnimationFrame)
+
+  return withinFrames(check, frames - 1)
+}
+
+it('keeps the connections hidden through an orientation switch until the last Turn arrives, however long that takes', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await settledViewport()
+  expect(connectionsShown()).toBe(true)
+
+  await freezeAnimations()
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+  await expect.poll(() => turnSlides().length).toBeGreaterThan(0)
+  vi.runOnlyPendingTimers()
+  vi.useRealTimers()
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  expect(turnSlides().length).toBeGreaterThan(0)
+  expect(connectionsShown()).toBe(false)
+
+  await setPlaybackRate(1)
+  await expect.poll(connectionsShown).toBe(true)
+  expect(turnSlides()).toEqual([])
+})
+
+it('keeps the connections hidden while the Turns slide again for a Fork folded partway through an orientation switch', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await settledViewport()
+
+  await freezeAnimations()
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+  await expect
+    .poll(() => document.querySelectorAll('.react-flow__node-exchange').length)
+    .toBe(5)
+  await expect.poll(() => turnSlides().length).toBeGreaterThan(0)
+  const firstSlides = new Set(turnSlides())
+
+  // Frozen mid-slide, the card sits out of a pointer's and a role query's reach.
+  const pill = [
+    ...nodeOf('Reply two').element().querySelectorAll('button'),
+  ].find(button => button.textContent === '2 Branches')
+
+  if (!pill) throw new Error('Reply two shows no Fork pill')
+
+  pill.click()
+  await expect
+    .poll(() => turnSlides().some(slide => !firstSlides.has(slide)))
+    .toBe(true)
+
+  for (const slide of firstSlides) {
+    if (slide.playState === 'running') slide.finish()
+  }
+
+  vi.useRealTimers()
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  expect(turnSlides().length).toBeGreaterThan(0)
+  expect(connectionsShown()).toBe(false)
+
+  await setPlaybackRate(1)
+  await expect.poll(connectionsShown).toBe(true)
+})
+
+it('shows the connections at once after an orientation switch where no Turn moves', async () => {
+  clock = 0
+  await renderCanvas({
+    prompts: [prompt(1, null, 'Prompt one')],
+    replies: [reply(11, 1, 'Reply one')],
+  })
+  await expect.element(page.getByText('Reply one')).toBeVisible()
+  await settledViewport()
+
+  // Both orientations measured, so the Reply comes back already in place.
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+  await expect.element(canvas().getByText('Reply one')).toBeVisible()
+  await page.getByRole('button', {name: 'Vertical'}).click()
+  await expect.poll(connectionsShown).toBe(true)
+
+  // `expect.poll` would advance the frozen timers.
+  await freezeAnimations()
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+  expect(await withinFrames(() => nodesOfKind('exchange') === 1)).toBe(true)
+  await page.getByRole('button', {name: 'Vertical'}).click()
+  expect(await withinFrames(() => nodesOfKind('reply') === 1)).toBe(true)
+  expect(turnSlides()).toEqual([])
+  expect(await withinFrames(connectionsShown)).toBe(true)
+})
+
+it('slides the Turns and hides the connections when the orientation changes in Settings', async () => {
+  const {main} = await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  await settledViewport()
+
+  await freezeAnimations()
+  main.publish({
+    type: 'SETTINGS_CHANGED',
+    settings: {...DEFAULT_SETTINGS, canvasOrientation: 'horizontal'},
+  })
+  await expect.poll(() => turnSlides().length).toBeGreaterThan(0)
+  expect(connectionsShown()).toBe(false)
+
+  await setPlaybackRate(1)
+  await expect.poll(connectionsShown).toBe(true)
 })
 
 it('slides the Context size drawer a short way in as it opens and out as it closes, fading as it goes', async () => {

@@ -27,6 +27,7 @@ import {useFollow} from '../follow'
 import {useReducedMotion} from '../reduced-motion'
 import {slideMs} from '../slide'
 import {isFork} from '../tree'
+import {whenTurnsArrive} from '../when-turns-arrive'
 import {ExchangeNode, PromptNode, ReplyNode} from './TurnNodes'
 
 /** A request to bring a Reply into view; every request gets a new sequence. */
@@ -54,7 +55,6 @@ interface FlowProps {
   startAt: Viewport | null
   /** A new one each time a Prompt and every Turn below it are deleted. */
   deleted: Deleted | null
-  switching: boolean
   showMap: boolean
   onHover: (turnId: string | null) => void
 }
@@ -128,7 +128,6 @@ export function Flow({
   fitOnLoad,
   startAt,
   deleted,
-  switching,
   showMap,
   onHover,
 }: FlowProps) {
@@ -165,6 +164,24 @@ export function Flow({
   const allMeasured =
     canvasLayout.nodes.length > 0 &&
     canvasLayout.nodes.every(node => measured[node.id] !== undefined)
+
+  const [laidOutFor, setLaidOutFor] = useState(orientation)
+  // Two switches in a row go to different orientations, so each one restarts
+  // the wait, even when it lands as the last one ends.
+  const [switchingTo, setSwitchingTo] = useState<CanvasOrientation | null>(null)
+
+  if (laidOutFor !== orientation) {
+    setLaidOutFor(orientation)
+    setSwitchingTo(reducedMotion ? null : orientation)
+  }
+
+  useEffect(() => {
+    const element = pane.current
+
+    if (switchingTo === null || !element) return undefined
+
+    return whenTurnsArrive(element, () => setSwitchingTo(null))
+  }, [switchingTo])
 
   // Folding or unfolding a Fork moves its Reply in the canvas layout, and again
   // as the boxes it shows are measured; the viewport moves by the same amount,
@@ -432,7 +449,7 @@ export function Flow({
       maxZoom={1.5}
       proOptions={{hideAttribution: true}}
       className={cn(
-        switching && 'canvas-switching',
+        switchingTo !== null && 'canvas-switching',
         !fitted && 'canvas-fitting'
       )}
       onNodeMouseEnter={(_event, node) => onHover(hoverIdOf(node))}
