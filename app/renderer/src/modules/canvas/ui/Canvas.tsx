@@ -104,7 +104,6 @@ type CanvasFrameProps = HeadingProps & {
   children?: ReactNode
 }
 
-/** The Tree's name with the canvas controls beside it, over the canvas. */
 function CanvasFrame({
   title,
   sidebarToggle,
@@ -126,7 +125,6 @@ function CanvasFrame({
 }
 
 interface HeadingProps {
-  /** The Tree's name, drawn in the row the controls share. */
   title: ReactNode
   sidebarToggle?: ReactNode
 }

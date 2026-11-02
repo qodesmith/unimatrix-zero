@@ -44,12 +44,10 @@ export interface Focus {
 interface FlowProps {
   index: TreeIndex
   orientation: CanvasOrientation
-  /** The Turn ids on the highlighted Thread. */
   thread: ReadonlySet<string>
   collapsed: Collapsed
   expanded: Expanded
   focus: Focus | null
-  /** Fit the whole Tree once it is measured; off for a Tree that starts here. */
   fitOnLoad: boolean
   /** Where the root Prompt is drawn at first, and how far zoomed. */
   startAt: Viewport | null
@@ -166,8 +164,8 @@ export function Flow({
     canvasLayout.nodes.every(node => measured[node.id] !== undefined)
 
   const [laidOutFor, setLaidOutFor] = useState(orientation)
-  // Two switches in a row go to different orientations, so each one restarts
-  // the wait, even when it lands as the last one ends.
+  // An orientation, not a flag, so a switch that lands as the last one ends
+  // still restarts the wait.
   const [switchingTo, setSwitchingTo] = useState<CanvasOrientation | null>(null)
 
   if (laidOutFor !== orientation) {
@@ -183,12 +181,8 @@ export function Flow({
     return whenTurnsArrive(element, () => setSwitchingTo(null))
   }, [switchingTo])
 
-  // Folding or unfolding a Fork moves its Reply in the canvas layout, and again
-  // as the boxes it shows are measured; the viewport moves by the same amount,
-  // scaled, so the Reply stays where it is on screen. A pan lets it go. Letting
-  // out or capping a Turn's text holds its Turn the same way until its box is
-  // measured anew, and lets a followed Reply go, so the text being read stays
-  // put. Deleting Turns from below a Reply holds the Reply too.
+  // The held Turn moves again as the boxes around it are measured, so it stays
+  // held until they all are; a pan to a focus lets it go.
   const lastCanvasLayout = useRef(canvasLayout)
   const lastCollapsed = useRef(collapsed)
   const lastExpanded = useRef(expanded)
@@ -364,9 +358,7 @@ export function Flow({
     void fitAll()
   }, [hasFork, allMeasured, focus, flow, panMs, follow])
 
-  // A focus waits for its Reply's box to have a size, and while the first Fork
-  // waits to be fitted, the fit takes it instead. A Reply folded away is not
-  // panned to, then or once it is unfolded.
+  // A Reply folded away is not panned to, then or once it is unfolded.
   useEffect(() => {
     if (!focus || centered.current === focus.sequence) return
 
