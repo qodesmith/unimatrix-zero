@@ -11,7 +11,6 @@ import {
 
 interface DeleteTreeDialogProps {
   open: boolean
-  /** Until #90 links folders, no caller has one to pass. */
   linkedFolder?: boolean
   /** Main has been asked and hasn't answered yet. */
   deleting?: boolean

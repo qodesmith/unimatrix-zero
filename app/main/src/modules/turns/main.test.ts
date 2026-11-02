@@ -110,7 +110,6 @@ function finish(replyId: string) {
   fromHost(replyId, {type: 'RUN_FINISHED', status: 'complete'})
 }
 
-/** A root Reply the Provider saved, finished. */
 function savedRoot() {
   const replyId = sendPrompt(null)
   record(replyId)
@@ -119,7 +118,6 @@ function savedRoot() {
   return replyId
 }
 
-/** Stopped before Claude saved it. */
 function stopUnrecorded(replyId: string) {
   fromHost(replyId, {type: 'RUN_FINISHED', status: 'stopped'})
 }
@@ -850,7 +848,6 @@ const cutAtFirst = {
   dropFrom: 'p-m2',
 }
 
-/** A Thread of three Replies in `s1`, the last two deleted. */
 function deletedMidThread() {
   const first = savedRoot()
   const second = savedAt(first, 'm2')

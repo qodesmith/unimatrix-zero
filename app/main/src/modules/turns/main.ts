@@ -32,7 +32,6 @@ export {PARTIAL_SAVE_MS} from './in-flight'
 
 export type {FinishedReply} from './in-flight'
 
-/** What a Reply needs of the Provider hosts. */
 export interface ReplyHosts {
   /** A ready host's Provider (`only`, if given) and its default Model. */
   ready(only?: ProviderId): {provider: ProviderId; model: Model} | null
