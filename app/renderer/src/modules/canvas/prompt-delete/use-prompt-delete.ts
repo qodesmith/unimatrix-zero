@@ -39,10 +39,10 @@ export function usePromptDelete(promptId: string) {
     send({type: 'confirmed'})
 
     if (isRoot) {
-      void askToDelete({remove: async () => deleteTree(treeId), send})
+      void askToDelete({runDelete: async () => deleteTree(treeId), send})
     } else {
       onDeleteConfirmed(promptId)
-      void askToDelete({remove: async () => deletePrompt(promptId), send})
+      void askToDelete({runDelete: async () => deletePrompt(promptId), send})
     }
   }
 

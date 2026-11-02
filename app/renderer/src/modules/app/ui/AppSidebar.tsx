@@ -39,7 +39,7 @@ export function AppSidebar({trees, connections}: AppSidebarProps) {
                 openTreeId={trees.openTree?.id ?? null}
                 onOpen={treeId => void trees.open(treeId)}
                 onRename={(treeId, title) => void trees.rename(treeId, title)}
-                onDelete={treeId => void trees.remove(treeId)}
+                onDelete={treeId => void trees.delete(treeId)}
               />
             ),
           }}

@@ -37,7 +37,7 @@ export const TreeCreatedEvent = z.strictObject({
   tree: TreeSchema,
 })
 
-/** Anything on its row changed: its title, activity, Turn count or failure. */
+/** Anything on its row changed: its title, activity or failure. */
 export const TreeChangedEvent = z.strictObject({
   type: z.literal('TREE_CHANGED'),
   tree: TreeSchema,

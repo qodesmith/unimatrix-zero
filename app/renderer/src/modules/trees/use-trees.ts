@@ -71,7 +71,7 @@ export function useTrees() {
     await run({type: 'tree.rename', treeId, title})
   }
 
-  async function remove(treeId: string) {
+  async function deleteOne(treeId: string) {
     const outcome = await deleteTree(treeId)
     setError(outcome.ok ? null : outcome.error)
   }
@@ -85,6 +85,6 @@ export function useTrees() {
     open,
     create,
     rename,
-    remove,
+    delete: deleteOne,
   }
 }

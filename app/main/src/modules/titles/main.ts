@@ -21,7 +21,6 @@ const EDGE_MARKS = /^[\s#>*_`"'“”‘’]+|[\s*_`"'“”‘’.]+$/g
 interface TitlesDeps {
   trees: Pick<Trees, 'get' | 'nameAutomatically'>
   turnsOf: Turns['list']
-  /** Rejects when the Provider can't answer. */
   runOneShot: ProviderHosts['runOneShot']
   vendorProgramFor: (provider: ProviderId) => SignInRequest
   publish: (event: AppEvent) => void
