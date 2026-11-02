@@ -55,7 +55,6 @@ export interface ClaudeSignInDeps {
     env: Record<string, string>
     cwd: string
   }) => Promise<AccountRead>
-  /** Hears the Models of an account it connects. */
   learnModels: (models: ModelInfo[]) => void
   signOut: (
     command: ClaudeCommand,
