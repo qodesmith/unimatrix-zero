@@ -104,8 +104,7 @@ export function LayoutSidebar({sidebar, children}: LayoutSidebarProps) {
           collapsible={!open}
           collapsedSize={0}
           groupResizeBehavior="preserve-pixel-size"
-          className="flex justify-end"
-          style={{overflow: 'hidden'}}
+          className="flex justify-end overflow-hidden!"
         >
           <Sidebar
             collapsible="none"
