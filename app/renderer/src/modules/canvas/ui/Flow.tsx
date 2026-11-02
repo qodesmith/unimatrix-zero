@@ -338,13 +338,9 @@ export function Flow({
     release,
   ])
 
-  const sized = canvasLayout.nodes.every(
-    node => measured[node.id] !== undefined
-  )
-
   const waiting =
     !fitted ||
-    !sized ||
+    !allMeasured ||
     (hasFork && !forkShown) ||
     (focus !== null && centered !== focus.sequence)
 
@@ -382,14 +378,20 @@ export function Flow({
     >
       <Background gap={24} />
       {showMap && (
-        <MiniMap
-          pannable
-          zoomable
-          ariaLabel="Minimap"
-          position="bottom-left"
-          className="overflow-hidden rounded-xl border border-border shadow-md"
-          style={{width: 220, height: 130}}
-        />
+        <div
+          className="contents"
+          onPointerDown={moves.stop}
+          onWheel={moves.stop}
+        >
+          <MiniMap
+            pannable
+            zoomable
+            ariaLabel="Minimap"
+            position="bottom-left"
+            className="overflow-hidden rounded-xl border border-border shadow-md"
+            style={{width: 220, height: 130}}
+          />
+        </div>
       )}
     </ReactFlow>
   )

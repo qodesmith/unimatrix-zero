@@ -37,10 +37,8 @@ interface HoldOptions {
 }
 
 /**
- * Keeps a Turn where it is on screen while the canvas layout moves it, until
- * its boxes are measured anew: a Fork's Reply as it folds or unfolds, a Turn
- * as its text is let out or capped, and a Reply as the Turns below it are
- * deleted. Returns what lets it go.
+ * Keeps a Turn still on screen while the canvas layout moves it; returns what
+ * lets it go.
  */
 export function useHold({
   canvasLayout,
