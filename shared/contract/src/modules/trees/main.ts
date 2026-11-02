@@ -12,7 +12,6 @@ export const TreeSchema = z.strictObject({
   createdAt: z.iso.datetime(),
   /** When its latest Prompt was sent, or `createdAt` before the first. */
   lastActiveAt: z.iso.datetime(),
-  turnCount: z.number().int().nonnegative(),
   /** A Reply in it failed since the Tree was last opened. */
   unseenFailure: z.boolean(),
 })

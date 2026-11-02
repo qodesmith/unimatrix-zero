@@ -21,7 +21,6 @@ export function savedTree(fields: Partial<Tree> = {}): Tree {
     firstLine: null,
     createdAt: receivedAt,
     lastActiveAt: receivedAt,
-    turnCount: 0,
     unseenFailure: false,
     ...fields,
   }

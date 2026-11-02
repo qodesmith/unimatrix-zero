@@ -67,7 +67,7 @@ describe('a Tree’s row', () => {
   })
 
   it('shows the root Prompt’s first line in italics until the automatic title replaces it', async () => {
-    const tree = savedTree({firstLine: 'Plan a week in Lisbon', turnCount: 2})
+    const tree = savedTree({firstLine: 'Plan a week in Lisbon'})
     const main = fakeMain({trees: [tree]})
     await renderApp(main)
 
@@ -185,7 +185,7 @@ describe('renaming a Tree', () => {
 
   it('starts an untitled Tree from its first line, which Enter leaves untitled', async () => {
     const main = fakeMain({
-      trees: [savedTree({firstLine: 'Plan a week in Lisbon', turnCount: 2})],
+      trees: [savedTree({firstLine: 'Plan a week in Lisbon'})],
     })
 
     await renderApp(main)
@@ -297,7 +297,7 @@ describe('deleting a Tree', () => {
   })
 
   it('deletes the open Tree on Delete, closing it and dropping its row', async () => {
-    const tree = savedTree({firstLine: 'Plan a week in Lisbon', turnCount: 1})
+    const tree = savedTree({firstLine: 'Plan a week in Lisbon'})
     const other = savedTree({title: 'Other'})
     const main = fakeMain({trees: [tree, other]})
     await renderApp(main)
@@ -322,7 +322,7 @@ describe('deleting a Tree', () => {
   })
 
   it('deletes the open Tree from its root Prompt, asking the same as its row does', async () => {
-    const tree = savedTree({title: 'Lisbon trip', turnCount: 2})
+    const tree = savedTree({title: 'Lisbon trip'})
     const other = savedTree({title: 'Other'})
 
     const root = {

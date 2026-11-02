@@ -264,7 +264,7 @@ describe('Trees', () => {
 })
 
 describe('a Tree’s row', () => {
-  it('shows the root Prompt’s first line, how many Turns it has and when the last was sent, and tells every window as each is sent', async () => {
+  it('shows the root Prompt’s first line and when the last Prompt was sent, and tells every window as each is sent', async () => {
     const tree = await createTree()
     clock = new Date('2026-10-19T13:00:00.000Z')
 
@@ -281,19 +281,16 @@ describe('a Tree’s row', () => {
     const first = {
       ...tree,
       firstLine: 'Plan a trip to Lisbon',
-      turnCount: 2,
       lastActiveAt: '2026-10-19T13:00:00.000Z',
     }
 
     const second = {
       ...first,
-      turnCount: 4,
       lastActiveAt: '2026-10-19T14:00:00.000Z',
     }
 
     expect(tree).toMatchObject({
       firstLine: null,
-      turnCount: 0,
       lastActiveAt: '2026-10-19T12:00:00.000Z',
       unseenFailure: false,
     })
@@ -320,8 +317,10 @@ describe('a Tree’s row', () => {
 
   it('tells every window when a Prompt is deleted', async () => {
     const tree = await createTree()
+    clock = new Date('2026-10-19T13:00:00.000Z')
     const root = await sendPrompt(tree.id, null)
     answer(tree.id, root.reply.id)
+    clock = new Date('2026-10-19T14:00:00.000Z')
     const next = await sendPrompt(tree.id, root.reply.id)
     answer(tree.id, next.reply.id)
 
@@ -331,8 +330,10 @@ describe('a Tree’s row', () => {
       promptId: next.prompt.id,
     })
 
-    expect(changed().at(-1)).toMatchObject({id: tree.id, turnCount: 2})
-    expect((await listed())[0]?.turnCount).toBe(2)
+    const lastActiveAt = '2026-10-19T13:00:00.000Z'
+
+    expect(changed().at(-1)).toMatchObject({id: tree.id, lastActiveAt})
+    expect((await listed())[0]?.lastActiveAt).toBe(lastActiveAt)
   })
 
   it.each([

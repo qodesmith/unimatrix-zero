@@ -12,7 +12,6 @@ const tree = {
   firstLine: null,
   createdAt: '2026-10-19T12:00:00.000Z',
   lastActiveAt: '2026-10-19T12:00:00.000Z',
-  turnCount: 0,
   unseenFailure: false,
 }
 

@@ -11,7 +11,6 @@ function tree(id: string, lastActiveAt: string): Tree {
     firstLine: null,
     createdAt: '2026-10-01T12:00:00.000Z',
     lastActiveAt,
-    turnCount: 0,
     unseenFailure: false,
   }
 }
