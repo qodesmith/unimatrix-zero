@@ -188,8 +188,11 @@ export interface ProviderDriver {
     session: DeletionCut
     vendorProgram: SignInRequest
   }): Promise<boolean>
-  /** A tiny tool-free request outside any Tree: titles, Summaries. */
-  runOneShot(input: OneShotRequest): Promise<string>
+  /**
+   * A tiny tool-free request outside any Tree: titles, Summaries. `signal`
+   * aborts once main gives up on it, and the driver ends its vendor program.
+   */
+  runOneShot(input: OneShotRequest, signal: AbortSignal): Promise<string>
   mcpSignIn(serverId: string): Promise<void>
 }
 
@@ -211,6 +214,11 @@ export const HostCommandSchema = z.discriminatedUnion('type', [
     type: z.literal('one-shot.run'),
     requestId: z.string().min(1),
     request: OneShotRequestSchema,
+  }),
+  /** Ends the one-shot's vendor program; main has already given up on it. */
+  z.strictObject({
+    type: z.literal('one-shot.cancel'),
+    requestId: z.string().min(1),
   }),
   z.strictObject({
     type: z.literal('sign-in.start'),

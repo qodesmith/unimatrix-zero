@@ -30,6 +30,7 @@ export async function runHost(
 ) {
   const store = createSessionStoreClient(message => port.postMessage(message))
   const driver = createDriver(store)
+  const oneShotsRunning = new Map<string, AbortController>()
 
   async function stream(request: ReplyRequest) {
     const {treeId, replyId} = request
@@ -88,18 +89,21 @@ export async function runHost(
     requestId,
     request,
   }: Extract<HostCommand, {type: 'one-shot.run'}>) {
-    port.postMessage({
-      type: 'ONE_SHOT_FINISHED',
-      requestId,
-      outcome: await oneShotOutcome(request),
-    })
+    const cancel = new AbortController()
+    oneShotsRunning.set(requestId, cancel)
+
+    const outcome = await oneShotOutcome(request, cancel.signal)
+    oneShotsRunning.delete(requestId)
+
+    port.postMessage({type: 'ONE_SHOT_FINISHED', requestId, outcome})
   }
 
   async function oneShotOutcome(
-    request: OneShotRequest
+    request: OneShotRequest,
+    signal: AbortSignal
   ): Promise<OneShotFinished['outcome']> {
     try {
-      return {ok: true, text: await driver.runOneShot(request)}
+      return {ok: true, text: await driver.runOneShot(request, signal)}
     } catch (error) {
       return {
         ok: false,
@@ -121,6 +125,9 @@ export async function runHost(
         break
       case 'one-shot.run':
         void oneShot(command)
+        break
+      case 'one-shot.cancel':
+        oneShotsRunning.get(command.requestId)?.abort()
         break
       case 'sign-in.start':
         void signIn(command.request)

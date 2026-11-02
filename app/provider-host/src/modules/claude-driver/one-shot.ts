@@ -56,7 +56,8 @@ async function closeOnExit(running: Running) {
 /** A string prompt ends `claude`'s input after its one result. */
 export async function runClaudeOneShot(
   deps: {query: OneShotQuery; env: NodeJS.ProcessEnv},
-  {model, prompt, vendorProgram: {program, configDir}}: OneShotRequest
+  {model, prompt, vendorProgram: {program, configDir}}: OneShotRequest,
+  signal: AbortSignal
 ): Promise<string> {
   if (!program) throw new Error('The manifest names no Claude program.')
 
@@ -77,6 +78,12 @@ export async function runClaudeOneShot(
     },
   })
 
+  function close() {
+    running.close()
+  }
+
+  signal.addEventListener('abort', close)
+
   try {
     const result = await resultOf(running)
 
@@ -86,6 +93,7 @@ export async function runClaudeOneShot(
       result.subtype === 'success' ? result.result : result.errors.join(' ')
     )
   } finally {
+    signal.removeEventListener('abort', close)
     await closeOnExit(running)
   }
 }

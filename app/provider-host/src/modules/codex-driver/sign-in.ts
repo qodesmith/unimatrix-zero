@@ -122,15 +122,15 @@ export function createCodexSignIn(deps: CodexSignInDeps) {
         .catch(() => undefined)
     }
 
-    // Codex's app-server leaves opening the page to the app.
-    yield {
-      type: 'SIGN_IN_STEP',
-      step: 'sign-in-page',
-      url: login.authUrl,
-      openPage: true,
-    }
-
     try {
+      // Codex's app-server leaves opening the page to the app.
+      yield {
+        type: 'SIGN_IN_STEP',
+        step: 'sign-in-page',
+        url: login.authUrl,
+        openPage: true,
+      }
+
       for (;;) {
         const input: Input | UserInput = await inbox.next()
 

@@ -351,22 +351,24 @@ const oneShot = {
   },
 }
 
-function oneShots(outcomes: (() => Promise<string>)[]) {
+function oneShots(outcomes: ((signal: AbortSignal) => Promise<string>)[]) {
   const asked: unknown[] = []
+  const signals: AbortSignal[] = []
 
   const driver: ProviderDriver = {
     ...createFakeDriver({delayMs: 0}),
-    async runOneShot(input) {
+    async runOneShot(input, signal) {
       asked.push(input)
+      signals.push(signal)
       const outcome = outcomes.shift()
 
       if (!outcome) throw new Error('No one-shot was expected')
 
-      return outcome()
+      return outcome(signal)
     },
   }
 
-  return {driver, asked}
+  return {driver, asked, signals}
 }
 
 async function oneShotFinished(sent: HostMessage[]) {
@@ -408,4 +410,28 @@ it('answers main with the message when a one-shot fails', async () => {
     requestId: 'title-1',
     outcome: {ok: false, message: 'You hit your limit.'},
   })
+})
+
+async function untilAborted(signal: AbortSignal): Promise<string> {
+  return new Promise((_resolve, reject) => {
+    signal.addEventListener('abort', () => reject(new Error('Canceled.')))
+  })
+}
+
+it('cancels only the one-shot main names', async () => {
+  const main = fakeMain()
+  const {driver, signals} = oneShots([untilAborted, untilAborted])
+  await runHost(main.port, () => driver)
+
+  main.command(oneShot)
+  main.command({...oneShot, requestId: 'title-2'})
+  main.command({type: 'one-shot.cancel', requestId: 'title-2'})
+  await oneShotFinished(main.sent)
+
+  expect(main.sent.at(-1)).toEqual({
+    type: 'ONE_SHOT_FINISHED',
+    requestId: 'title-2',
+    outcome: {ok: false, message: 'Canceled.'},
+  })
+  expect(signals.map(signal => signal.aborted)).toEqual([false, true])
 })

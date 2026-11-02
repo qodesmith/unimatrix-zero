@@ -72,6 +72,20 @@ it('starts the idle wait over after each Reply', () => {
   expect(one.closed).toBe(true)
 })
 
+it('never closes a session claimed after being released twice', () => {
+  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
+  const one = session('s1', 'm1')
+  warm.add(one)
+  warm.release(one)
+  vi.advanceTimersByTime(500)
+  warm.release(one)
+
+  warm.claim({sessionId: 's1', messageId: 'm1'})
+  vi.advanceTimersByTime(5000)
+
+  expect(one.closed).toBe(false)
+})
+
 it('closes the longest idle when more than the most are open', () => {
   const warm = createWarmSessions({whenIdle: idleFor(1000), max: 2})
   const one = session('s1', 'm')

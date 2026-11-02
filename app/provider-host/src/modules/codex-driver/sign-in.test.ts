@@ -62,6 +62,7 @@ function fakeServer(answers: Answers) {
     notify(notification: Notification) {
       for (const listener of listeners) listener(notification)
     },
+    listening: () => listeners.size,
     exit() {
       hasExited = true
       exit()
@@ -336,4 +337,21 @@ it('doesn’t start a sign-in while another holds ChatGPT’s sign-in port', asy
   expect(portFree).toHaveBeenCalledWith(1455)
   expect(sign.requests).toEqual([])
   expect(sign.close).toHaveBeenCalledOnce()
+})
+
+it('stops listening to Codex when the sign-in is closed on ChatGPT’s page', async () => {
+  const sign = setUp()
+  const updates = sign.signIn.signIn(request)
+
+  for (;;) {
+    const {value} = await updates.next()
+
+    if (value?.type === 'SIGN_IN_STEP' && value.step === 'sign-in-page') break
+  }
+
+  expect(sign.listening()).toBe(1)
+
+  await updates.return(undefined)
+
+  expect(sign.listening()).toBe(0)
 })
