@@ -17,21 +17,21 @@ const vendorProgram = {program: null, configDir: '/claude'}
 
 const createdAt = new Date('2026-10-19T12:00:00.000Z')
 
+const picked = {provider: 'claude', model: 'fake'} as const
+
 let db: Database
 let published: AppEvent[]
 let whenPublished: (event: AppEvent) => void
 let finished: FinishedReply[]
 let hostCommands: HostCommand[]
 let hostReady: boolean
+let clock: Date
 let hostReachable: boolean
 let turns: ReturnType<typeof createTurns>
 let treeId: string
 
 const hosts: ReplyHosts = {
-  ready: only =>
-    hostReady && (only ?? 'claude') === 'claude'
-      ? {provider: 'claude', model: {id: 'fake', name: 'Fake model'}}
-      : null,
+  ready: provider => hostReady && provider === 'claude',
   send: (_provider, command) => {
     if (!hostReachable) throw new Error('The claude host is not running.')
 
@@ -48,7 +48,7 @@ function launch() {
     },
     hosts,
     vendorProgramFor: () => vendorProgram,
-    now: () => createdAt,
+    now: () => clock,
     onTurnsChanged: () => undefined,
     onReplyFinished: reply => finished.push(reply),
   })
@@ -62,6 +62,7 @@ beforeEach(() => {
   finished = []
   hostCommands = []
   hostReady = true
+  clock = createdAt
   hostReachable = true
   turns = launch()
   treeId = createTrees(db).create(createdAt).id
@@ -71,13 +72,14 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-/** The new Reply's id, with the host's commands so far cleared. */
+/** The new Reply's id, with the host's commands and the events so far cleared. */
 function sendPrompt(parentReplyId: string | null, text = 'Hi') {
-  const sent = turns.sendPrompt({treeId, parentReplyId, text})
+  const sent = turns.sendPrompt({model: picked, treeId, parentReplyId, text})
 
   if (!sent) throw new Error('The Reply it answers is gone')
 
   hostCommands = []
+  published = []
 
   return sent.reply.id
 }
@@ -146,8 +148,15 @@ function sessionsStarted() {
 }
 
 describe('sending the root Prompt', () => {
-  it('saves the Prompt and a streaming Reply, and asks the host for it', () => {
-    const sent = turns.sendPrompt({treeId, parentReplyId: null, text: 'Hello'})
+  it('saves the Prompt and a streaming Reply on the picked Model, and asks the host for it', () => {
+    const opus = {provider: 'claude', model: 'claude-opus-5'} as const
+
+    const sent = turns.sendPrompt({
+      model: opus,
+      treeId,
+      parentReplyId: null,
+      text: 'Hello',
+    })
 
     if (!sent) throw new Error('Nothing was sent')
 
@@ -155,7 +164,7 @@ describe('sending the root Prompt', () => {
     expect(sent.reply).toMatchObject({
       promptId: sent.prompt.id,
       provider: 'claude',
-      model: 'fake',
+      model: 'claude-opus-5',
       status: 'streaming',
       content: [],
     })
@@ -165,7 +174,7 @@ describe('sending the root Prompt', () => {
         request: {
           treeId,
           replyId: sent.reply.id,
-          model: 'fake',
+          model: 'claude-opus-5',
           systemPrompt: '',
           prompt: {text: 'Hello'},
           vendorProgram,
@@ -179,11 +188,29 @@ describe('sending the root Prompt', () => {
     })
   })
 
+  it('starts a new Tree from the Model of the newest Reply in any Tree, and says so on each send', () => {
+    expect(turns.lastModel()).toBeNull()
+
+    sendPrompt(null, 'Older')
+    clock = new Date(createdAt.getTime() + 1000)
+    const opus = {provider: 'claude', model: 'claude-opus-5'} as const
+
+    turns.sendPrompt({
+      model: opus,
+      treeId: createTrees(db).create(clock).id,
+      parentReplyId: null,
+      text: 'Hi',
+    })
+
+    expect(published).toContainEqual({type: 'LAST_MODEL_CHANGED', model: opus})
+    expect(turns.lastModel()).toEqual(opus)
+  })
+
   it('is refused when no Provider is ready, and nothing is saved', () => {
     hostReady = false
 
     expect(() =>
-      turns.sendPrompt({treeId, parentReplyId: null, text: 'Hi'})
+      turns.sendPrompt({model: picked, treeId, parentReplyId: null, text: 'Hi'})
     ).toThrow('Connect a Provider to send a Prompt.')
     expect(turns.list(treeId)).toEqual({prompts: [], replies: []})
   })
@@ -191,14 +218,21 @@ describe('sending the root Prompt', () => {
   it('fails the Reply when the host can’t be reached', () => {
     hostReachable = false
 
-    const sent = turns.sendPrompt({treeId, parentReplyId: null, text: 'Hi'})
+    const sent = turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: null,
+      text: 'Hi',
+    })
 
     expect(sent?.reply).toMatchObject({
       status: 'failed',
       failure: {code: 'host-unreachable'},
     })
     expect(saved(sent?.reply.id ?? '').status).toBe('failed')
-    expect(published.at(-1)).toMatchObject({
+    expect(
+      published.find(event => event.type === 'RUN_FINISHED')
+    ).toMatchObject({
       type: 'RUN_FINISHED',
       status: 'failed',
       failure: {code: 'host-unreachable'},
@@ -210,7 +244,12 @@ describe('sending the root Prompt', () => {
     sendPrompt(null)
 
     expect(() =>
-      turns.sendPrompt({treeId, parentReplyId: null, text: 'Again'})
+      turns.sendPrompt({
+        model: picked,
+        treeId,
+        parentReplyId: null,
+        text: 'Again',
+      })
     ).toThrow('This Tree already has its first Prompt.')
     expect(hostCommands).toEqual([])
   })
@@ -357,6 +396,28 @@ describe('a streaming Reply', () => {
 
     expect(saved(replyId).model).toBe('claude-haiku-5-5')
   })
+
+  it('tells how it ended, on the Model its Provider reports and why it failed', () => {
+    const failure = {
+      code: 'needs-app-update',
+      message: 'Update the app to use this Model.',
+    } as const
+
+    record(replyId)
+
+    fromHost(replyId, {type: 'RUN_FINISHED', status: 'failed', failure})
+
+    expect(finished).toEqual([
+      {
+        provider: 'claude',
+        treeId,
+        replyId,
+        status: 'failed',
+        model: 'claude-haiku-5-5',
+        failure,
+      },
+    ])
+  })
 })
 
 describe('a host crash and quitting', () => {
@@ -414,7 +475,12 @@ describe('a host crash and quitting', () => {
       failure: null,
     })
 
-    turns.sendPrompt({treeId, parentReplyId: replyId, text: 'Go on'})
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: replyId,
+      text: 'Go on',
+    })
 
     expect(sessionsStarted()).toEqual([null])
   })
@@ -425,6 +491,7 @@ describe('a Prompt answering a Reply', () => {
     const replyId = savedRoot()
 
     const sent = turns.sendPrompt({
+      model: picked,
       treeId,
       parentReplyId: replyId,
       text: 'And then?',
@@ -467,7 +534,12 @@ describe('a Prompt answering a Reply', () => {
     setUp(replyId)
 
     expect(() =>
-      turns.sendPrompt({treeId, parentReplyId: replyId, text: 'More'})
+      turns.sendPrompt({
+        model: picked,
+        treeId,
+        parentReplyId: replyId,
+        text: 'More',
+      })
     ).toThrow(message)
     expect(hostCommands).toEqual([])
   })
@@ -475,8 +547,18 @@ describe('a Prompt answering a Reply', () => {
   it('starts a Branch from a Reply that already has a Prompt after it, forking its session', () => {
     const replyId = savedRoot()
 
-    turns.sendPrompt({treeId, parentReplyId: replyId, text: 'More'})
-    turns.sendPrompt({treeId, parentReplyId: replyId, text: 'Or instead?'})
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: replyId,
+      text: 'More',
+    })
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: replyId,
+      text: 'Or instead?',
+    })
 
     expect(sessionsStarted()).toEqual([
       {sessionId: 's1', messageId: 'm1', type: 'continue'},
@@ -503,6 +585,7 @@ describe('a Prompt answering a Reply', () => {
 
     expect(
       turns.sendPrompt({
+        model: picked,
         treeId,
         parentReplyId: crypto.randomUUID(),
         text: 'More',
@@ -515,8 +598,29 @@ describe('a Prompt answering a Reply', () => {
     hostReady = false
 
     expect(() =>
-      turns.sendPrompt({treeId, parentReplyId: replyId, text: 'More'})
+      turns.sendPrompt({
+        model: picked,
+        treeId,
+        parentReplyId: replyId,
+        text: 'More',
+      })
     ).toThrow('Connect Claude to continue this Thread.')
+  })
+
+  it('is refused on another Provider’s Model, adding nothing to the Tree', () => {
+    const replyId = savedRoot()
+    const before = turns.list(treeId)
+
+    expect(() =>
+      turns.sendPrompt({
+        model: {provider: 'chatgpt', model: 'gpt-5.5'},
+        treeId,
+        parentReplyId: replyId,
+        text: 'More',
+      })
+    ).toThrow('Pick a Claude Model to continue this Thread.')
+    expect(turns.list(treeId)).toEqual(before)
+    expect(hostCommands).toEqual([])
   })
 })
 
@@ -526,7 +630,12 @@ describe('continuing from a Reply its Provider never saved', () => {
     const cutShort = sendPrompt(replyId, 'And then?')
     stopUnrecorded(cutShort)
 
-    turns.sendPrompt({treeId, parentReplyId: cutShort, text: 'Go on'})
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: cutShort,
+      text: 'Go on',
+    })
 
     expect(sessionsStarted()).toEqual([
       {sessionId: 's1', messageId: 'm1', type: 'continue'},
@@ -538,8 +647,18 @@ describe('continuing from a Reply its Provider never saved', () => {
     const cutShort = sendPrompt(replyId, 'And then?')
     stopUnrecorded(cutShort)
 
-    turns.sendPrompt({treeId, parentReplyId: cutShort, text: 'Go on'})
-    turns.sendPrompt({treeId, parentReplyId: cutShort, text: 'Or instead?'})
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: cutShort,
+      text: 'Go on',
+    })
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: cutShort,
+      text: 'Or instead?',
+    })
 
     expect(sessionsStarted()).toEqual([
       {sessionId: 's1', messageId: 'm1', type: 'continue'},
@@ -551,7 +670,12 @@ describe('continuing from a Reply its Provider never saved', () => {
     const replyId = sendPrompt(null)
     stopUnrecorded(replyId)
 
-    turns.sendPrompt({treeId, parentReplyId: replyId, text: 'On'})
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: replyId,
+      text: 'On',
+    })
 
     expect(sessionsStarted()).toEqual([null])
   })
@@ -605,6 +729,7 @@ describe('stopping every Reply in a Tree', () => {
     sendPrompt(root)
 
     const elsewhere = turns.sendPrompt({
+      model: picked,
       treeId: createTrees(db).create(createdAt).id,
       parentReplyId: null,
       text: 'Hi',
@@ -956,7 +1081,12 @@ describe('deleting a Prompt', () => {
     expect(turns.list(treeId)).toEqual({prompts: [], replies: []})
     expect(cutsAsked()).toEqual([])
     expect(
-      turns.sendPrompt({treeId, parentReplyId: null, text: 'Anew'})
+      turns.sendPrompt({
+        model: picked,
+        treeId,
+        parentReplyId: null,
+        text: 'Anew',
+      })
     ).not.toBeNull()
   })
 
@@ -998,7 +1128,12 @@ describe('deleting a Prompt', () => {
     const first = deletedMidThread()
     hostCommands = []
 
-    turns.sendPrompt({treeId, parentReplyId: first, text: 'Again'})
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: first,
+      text: 'Again',
+    })
 
     expect(sessionsStarted()).toEqual([cutAtFirst])
   })
@@ -1013,7 +1148,12 @@ describe('deleting a Prompt', () => {
     })
     hostCommands = []
 
-    turns.sendPrompt({treeId, parentReplyId: first, text: 'Again'})
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: first,
+      text: 'Again',
+    })
 
     expect(sessionsStarted()).toEqual([
       {sessionId: 's1', messageId: 'm1', type: 'continue'},
@@ -1027,7 +1167,12 @@ describe('deleting a Prompt', () => {
     turns.deletePrompt(treeId, promptOf(second))
     hostReachable = true
 
-    turns.sendPrompt({treeId, parentReplyId: first, text: 'Again'})
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: first,
+      text: 'Again',
+    })
 
     expect(sessionsStarted()).toEqual([cutAtFirst])
   })
@@ -1084,7 +1229,12 @@ describe('deleting a Prompt', () => {
     })
     hostCommands = []
 
-    turns.sendPrompt({treeId, parentReplyId: first, text: 'Again'})
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: first,
+      text: 'Again',
+    })
 
     expect(sessionsStarted()).toEqual([{...cutAtFirst, dropFrom: 'p-m-next'}])
   })
@@ -1106,7 +1256,12 @@ describe('deleting a Prompt', () => {
     fail(second)
 
     turns.deletePrompt(treeId, promptOf(second))
-    turns.sendPrompt({treeId, parentReplyId: first, text: 'Again'})
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: first,
+      text: 'Again',
+    })
 
     expect(cutsAsked()).toEqual([])
     expect(sessionsStarted()).toEqual([

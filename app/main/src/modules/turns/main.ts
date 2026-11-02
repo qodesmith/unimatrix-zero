@@ -11,7 +11,7 @@ import type {
   SessionCutReport,
   SignInRequest,
 } from '@uz/contract/host'
-import type {Model, ProviderId} from '@uz/contract/providers'
+import type {ProviderId} from '@uz/contract/providers'
 import type {Reply, ReplyEvent} from '@uz/contract/turns'
 
 import {schema} from '#modules/database/main'
@@ -26,15 +26,20 @@ import {
   deleteBelow,
 } from './deletion'
 import {createInFlight} from './in-flight'
-import {insertExchange, listTurns, resetReply, savedReply} from './rows'
+import {
+  insertExchange,
+  lastModel,
+  listTurns,
+  resetReply,
+  savedReply,
+} from './rows'
 
 export {PARTIAL_SAVE_MS} from './in-flight'
 
 export type {FinishedReply} from './in-flight'
 
 export interface ReplyHosts {
-  /** A ready host's Provider (`only`, if given) and its default Model. */
-  ready(only?: ProviderId): {provider: ProviderId; model: Model} | null
+  ready(provider: ProviderId): boolean
   /** Throws when the host can't be reached. */
   send(provider: ProviderId, command: HostCommand): void
 }
@@ -77,7 +82,7 @@ export function createTurns({
 
   /** The Reply as it now stands: failed when its host can't be reached. */
   function startOnHost(provider: ProviderId, request: ReplyRequest): Reply {
-    inFlight.track(provider, request.treeId, request.replyId)
+    inFlight.track(provider, request.treeId, request.replyId, request.model)
 
     try {
       hosts.send(provider, {type: 'reply.start', request})
@@ -96,28 +101,37 @@ export function createTurns({
 
     streaming: () => inFlight.streaming(),
 
+    /** Where a new Tree starts. */
+    lastModel: () => lastModel(db),
+
     /** Null when the Reply it answers is gone. */
     sendPrompt({
       treeId,
       parentReplyId,
       text,
+      model: picked,
     }: NewPrompt): CommandResult<'prompt.send'> | null {
       const continued =
         parentReplyId === null ? null : continuation(db, treeId, parentReplyId)
 
       if (parentReplyId !== null && !continued) return null
 
-      const ready = hosts.ready(continued?.provider)
+      const {provider, model} = picked
 
-      if (!ready) {
+      if (continued && continued.provider !== provider) {
+        throw new Error(
+          `Pick a ${PROVIDER_NAMES[continued.provider]} Model to continue this Thread.`
+        )
+      }
+
+      if (!hosts.ready(provider)) {
         throw new Error(
           continued
-            ? `Connect ${PROVIDER_NAMES[continued.provider]} to continue this Thread.`
+            ? `Connect ${PROVIDER_NAMES[provider]} to continue this Thread.`
             : 'Connect a Provider to send a Prompt.'
         )
       }
 
-      const {provider, model} = ready
       const systemPrompt = ''
 
       const {prompt, reply} = insertExchange(db, {
@@ -125,7 +139,7 @@ export function createTurns({
         parentReplyId,
         text,
         provider,
-        model: model.id,
+        model,
         systemPrompt,
         now: now(),
       })
@@ -133,7 +147,7 @@ export function createTurns({
       const started = startOnHost(provider, {
         treeId,
         replyId: reply.id,
-        model: model.id,
+        model,
         systemPrompt,
         prompt: {text},
         vendorProgram: vendorProgramFor(provider),
@@ -141,6 +155,7 @@ export function createTurns({
       })
 
       onTurnsChanged(treeId)
+      publish({type: 'LAST_MODEL_CHANGED', model: picked})
 
       return {prompt, reply: started}
     },

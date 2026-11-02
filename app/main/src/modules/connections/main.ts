@@ -4,6 +4,7 @@ import type {AppEvent} from '@uz/contract/events'
 import type {SignInRequest} from '@uz/contract/host'
 import type {
   Account,
+  Model,
   ProviderId,
   ProviderStatus,
   SignInFinished,
@@ -13,11 +14,15 @@ import type {
 
 import {schema} from '#modules/database/main'
 import {
+  ModelSchema,
   PROVIDER_NAMES,
   ProviderIdSchema,
   signInFailed,
 } from '@uz/contract/providers'
 import {eq} from 'drizzle-orm'
+import {z} from 'zod'
+
+const ModelsSchema = z.array(ModelSchema)
 
 interface ConnectionsOptions {
   db: Database
@@ -57,6 +62,26 @@ export function createConnections({
     return row ?? null
   }
 
+  /** Empty when the Provider has no account saved or never listed them. */
+  function modelsOf(provider: ProviderId): Model[] {
+    const row = db
+      .select({models: providers.models})
+      .from(providers)
+      .where(eq(providers.provider, provider))
+      .get()
+
+    return row ? ModelsSchema.parse(row.models) : []
+  }
+
+  /** Saved only while the Provider has an account saved. */
+  function applyModels(provider: ProviderId, models: Model[]) {
+    db.update(providers)
+      .set({models})
+      .where(eq(providers.provider, provider))
+      .run()
+    publish({type: 'MODELS_CHANGED', provider, models})
+  }
+
   function statusOf(provider: ProviderId): ProviderStatus {
     const account = accountOf(provider)
 
@@ -83,6 +108,19 @@ export function createConnections({
       .run()
   }
 
+  /** The host answers with `MODELS_CHANGED` once its driver can list them. */
+  function listModels(provider: ProviderId) {
+    const vendorProgram = requestFor(provider)
+
+    if (!vendorProgram) return
+
+    try {
+      hosts.send(provider, {type: 'models.list', vendorProgram})
+    } catch {
+      // The next time the host is ready asks again.
+    }
+  }
+
   function finish(provider: ProviderId, update: SignInFinished) {
     signIn = null
 
@@ -95,7 +133,10 @@ export function createConnections({
 
     publish({...update, provider})
 
-    if (update.outcome === 'connected') publishStatus(provider)
+    if (update.outcome === 'connected') {
+      publishStatus(provider)
+      listModels(provider)
+    }
   }
 
   function connecting(provider: ProviderId) {
@@ -108,7 +149,12 @@ export function createConnections({
 
   return {
     snapshot() {
-      return {providers: ProviderIdSchema.options.map(statusOf), signIn}
+      const models: Record<ProviderId, Model[]> = {
+        claude: modelsOf('claude'),
+        chatgpt: modelsOf('chatgpt'),
+      }
+
+      return {providers: ProviderIdSchema.options.map(statusOf), models, signIn}
     },
 
     startConnected() {
@@ -182,7 +228,29 @@ export function createConnections({
     applyHostStatus(provider: ProviderId, status: HostStatus) {
       hostStatuses.set(provider, status)
 
-      if (accountOf(provider)) publishStatus(provider)
+      if (!accountOf(provider)) return
+
+      publishStatus(provider)
+
+      if (status === 'ready') listModels(provider)
+    },
+
+    applyModels,
+
+    /** `modelId` is a Model's id, or the id it resolves to. */
+    markNeedsAppUpdate(provider: ProviderId, modelId: string) {
+      const models = modelsOf(provider)
+
+      const gated = models.find(
+        model =>
+          !model.needsAppUpdate &&
+          (model.id === modelId || model.resolvesTo === modelId)
+      )
+
+      if (!gated) return
+
+      gated.needsAppUpdate = true
+      applyModels(provider, models)
     },
 
     hostCrashed(provider: ProviderId) {

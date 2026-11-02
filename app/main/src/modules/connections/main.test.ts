@@ -23,17 +23,23 @@ let published: AppEvent[]
 let sent: {provider: ProviderId; command: HostCommand}[]
 let running: Set<ProviderId>
 let opened: string[]
+let reachable: boolean
+let requestable: Set<ProviderId>
 
 function setUp() {
   return createConnections({
     db,
     hosts: {
       connect: provider => running.add(provider),
-      send: (provider, command) => sent.push({provider, command}),
+      send: (provider, command) => {
+        if (!reachable) throw new Error('The host is not running.')
+
+        sent.push({provider, command})
+      },
       stop: provider => running.delete(provider),
     },
     publish: event => published.push(event),
-    requestFor: provider => (provider === 'claude' ? request : null),
+    requestFor: provider => (requestable.has(provider) ? request : null),
     openExternal: page => opened.push(page),
     now: () => new Date('2026-10-21T12:00:00.000Z'),
   })
@@ -45,6 +51,8 @@ beforeEach(() => {
   sent = []
   running = new Set()
   opened = []
+  reachable = true
+  requestable = new Set(['claude'])
 })
 
 function connected(connections: ReturnType<typeof setUp>) {
@@ -56,12 +64,13 @@ function connected(connections: ReturnType<typeof setUp>) {
   })
 }
 
-it('starts with every Provider not connected', () => {
+it('starts with every Provider not connected and no Models', () => {
   expect(setUp().snapshot()).toEqual({
     providers: [
       {provider: 'claude', status: 'not-connected', account: null},
       {provider: 'chatgpt', status: 'not-connected', account: null},
     ],
+    models: {claude: [], chatgpt: []},
     signIn: null,
   })
 })
@@ -259,4 +268,114 @@ it('ignores updates from a host that isn’t connecting', () => {
   })
 
   expect(published).toEqual([])
+})
+
+const opus = {
+  id: 'opus',
+  name: 'Opus',
+  isDefault: true,
+  resolvesTo: 'claude-opus-5',
+  needsAppUpdate: false,
+}
+
+const sonnet = {
+  id: 'sonnet',
+  name: 'Sonnet',
+  isDefault: false,
+  resolvesTo: null,
+  needsAppUpdate: false,
+}
+
+it('saves a connected Provider’s Models, publishes them and keeps them for next time', () => {
+  const connections = setUp()
+  connected(connections)
+
+  connections.applyModels('claude', [opus, sonnet])
+
+  expect(published.at(-1)).toEqual({
+    type: 'MODELS_CHANGED',
+    provider: 'claude',
+    models: [opus, sonnet],
+  })
+  expect(setUp().snapshot().models).toEqual({
+    claude: [opus, sonnet],
+    chatgpt: [],
+  })
+})
+
+it('marks the saved Model a Reply was written on as needing an app update, once', () => {
+  const connections = setUp()
+  connected(connections)
+  connections.applyModels('claude', [opus, sonnet])
+  const before = published.length
+  const gated = [{...opus, needsAppUpdate: true}, sonnet]
+
+  connections.markNeedsAppUpdate('claude', 'claude-opus-5')
+  connections.markNeedsAppUpdate('claude', 'opus')
+  connections.markNeedsAppUpdate('claude', 'haiku')
+
+  expect(published.slice(before)).toEqual([
+    {type: 'MODELS_CHANGED', provider: 'claude', models: gated},
+  ])
+  expect(setUp().snapshot().models.claude).toEqual(gated)
+
+  connections.markNeedsAppUpdate('claude', 'sonnet')
+
+  expect(setUp().snapshot().models.claude).toEqual([
+    gated[0],
+    {...sonnet, needsAppUpdate: true},
+  ])
+})
+
+it('asks a connected Provider for its Models once connected and whenever its host is ready', () => {
+  const connections = setUp()
+  connections.connect('claude')
+  connections.applyHostStatus('claude', 'ready')
+
+  const list = {
+    provider: 'claude',
+    command: {type: 'models.list', vendorProgram: request},
+  }
+
+  expect(sent).not.toContainEqual(list)
+
+  connections.applySignInUpdate('claude', {
+    type: 'SIGN_IN_FINISHED',
+    outcome: 'connected',
+    account,
+  })
+  connections.applyHostStatus('claude', 'restarting')
+  connections.applyHostStatus('claude', 'ready')
+
+  expect(sent.slice(1)).toEqual([list, list])
+})
+
+it('skips asking for Models when the Provider can’t be connected here or its host can’t be reached', () => {
+  const connections = setUp()
+  connected(connections)
+  sent = []
+
+  requestable.clear()
+  connections.applyHostStatus('claude', 'ready')
+  requestable.add('claude')
+  reachable = false
+
+  expect(() => connections.applyHostStatus('claude', 'ready')).not.toThrow()
+  expect(sent).toEqual([])
+  expect(published.at(-1)).toMatchObject({
+    type: 'PROVIDER_STATUS',
+    status: 'ready',
+  })
+})
+
+it('keeps a Provider’s Models while its host restarts', () => {
+  const connections = setUp()
+  connected(connections)
+  connections.applyModels('claude', [opus])
+
+  connections.applyHostStatus('claude', 'restarting')
+  connections.hostCrashed('claude')
+  connections.applyHostStatus('claude', 'starting')
+
+  expect(connections.snapshot().models.claude).toEqual([opus])
 })

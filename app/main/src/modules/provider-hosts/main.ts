@@ -44,8 +44,8 @@ interface PendingOneShot {
 
 interface Host {
   process: HostProcess | null
-  /** Set once the host reports ready. */
-  models: Model[] | null
+  /** Set once the host reports ready, until its process exits. */
+  ready: boolean
   smallestModel: string | null
   restarts: number
   timers: Set<ReturnType<typeof setTimeout>>
@@ -65,6 +65,7 @@ interface ProviderHostsOptions {
   onSessionCut: (provider: ProviderId, cut: SessionCutReport) => void
   onReplyRecorded: (provider: ProviderId, recorded: ReplyRecorded) => void
   onSignInUpdate: (provider: ProviderId, update: SignInUpdate) => void
+  onModels: (provider: ProviderId, models: Model[]) => void
   /** Answers a host's request about its sessions; throws if it can't. */
   onSessionStore: (
     provider: ProviderId,
@@ -86,6 +87,7 @@ export function createProviderHosts({
   onSessionCut,
   onReplyRecorded,
   onSignInUpdate,
+  onModels,
   onSessionStore,
   onStatus,
   onCrash,
@@ -141,7 +143,7 @@ export function createProviderHosts({
   function start(provider: ProviderId, host: Host) {
     const child = spawn(provider)
     host.process = child
-    host.models = null
+    host.ready = false
     host.smallestModel = null
     onStatus(provider, 'starting')
 
@@ -153,12 +155,14 @@ export function createProviderHosts({
       const message = parsed.data
 
       if (message.type === 'HOST_READY') {
-        host.models = message.models
+        host.ready = true
         host.smallestModel = message.smallestModel
         later(host, STABLE_AFTER_MS, () => {
           host.restarts = 0
         })
         onStatus(provider, 'ready')
+      } else if (message.type === 'MODELS_CHANGED') {
+        onModels(provider, message.models)
       } else if (
         message.type === 'SIGN_IN_STEP' ||
         message.type === 'SIGN_IN_FINISHED'
@@ -189,7 +193,7 @@ export function createProviderHosts({
       if (host.process !== child) return
 
       host.process = null
-      host.models = null
+      host.ready = false
       host.smallestModel = null
       clearTimers(host)
       failOneShots(host, `The ${provider} host stopped unexpectedly.`)
@@ -232,7 +236,7 @@ export function createProviderHosts({
 
       const host: Host = {
         process: null,
-        models: null,
+        ready: false,
         smallestModel: null,
         restarts: 0,
         timers: new Set(),
@@ -243,16 +247,8 @@ export function createProviderHosts({
       start(provider, host)
     },
 
-    ready(only?: ProviderId): {provider: ProviderId; model: Model} | null {
-      for (const [provider, host] of hosts) {
-        const model = host.models?.[0]
-
-        if (host.process && model && (only ?? provider) === provider) {
-          return {provider, model}
-        }
-      }
-
-      return null
+    ready(provider: ProviderId): boolean {
+      return hosts.get(provider)?.ready ?? false
     },
 
     send(provider: ProviderId, command: HostCommand) {
@@ -275,7 +271,7 @@ export function createProviderHosts({
       const child = host?.process
       const model = host?.smallestModel
 
-      if (!host || !child || !host.models || !model) {
+      if (!host || !child || !host.ready || !model) {
         throw new Error(`The ${provider} host can’t run a one-shot.`)
       }
 

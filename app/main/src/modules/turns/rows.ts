@@ -1,10 +1,10 @@
 import type {Database} from '#modules/database/main'
-import type {ProviderId} from '@uz/contract/providers'
+import type {ModelChoice, ProviderId} from '@uz/contract/providers'
 import type {Prompt, Reply} from '@uz/contract/turns'
 
 import {schema} from '#modules/database/main'
 import {NEW_REPLY, ReplyPartSchema, RunFailureSchema} from '@uz/contract/turns'
-import {and, asc, eq, isNull} from 'drizzle-orm'
+import {and, asc, desc, eq, isNull} from 'drizzle-orm'
 import {createHash} from 'node:crypto'
 import {z} from 'zod'
 
@@ -61,6 +61,18 @@ export function listTurns(db: Database, treeId: string) {
       .all()
       .map(toReply),
   }
+}
+
+/** The Provider and Model of the newest Reply in any Tree. */
+export function lastModel(db: Database): ModelChoice | null {
+  const row = db
+    .select({provider: replies.provider, model: replies.model})
+    .from(replies)
+    .orderBy(desc(replies.createdAt), desc(replies.id))
+    .limit(1)
+    .get()
+
+  return row ?? null
 }
 
 export function savedReply(db: Database, replyId: string): Reply {
