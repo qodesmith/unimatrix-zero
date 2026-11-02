@@ -1605,6 +1605,16 @@ it('opens nothing on a click on a Turn’s box', async () => {
   await expect.element(slideout()).not.toBeInTheDocument()
 })
 
+it('opens the Model picker of a Reply’s Input on the canvas', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await nodeOf('Reply five').getByRole('button', {name: 'Claude Fake'}).click()
+  await expect
+    .element(page.getByRole('menuitemradio', {name: 'Fake'}))
+    .toBeVisible()
+})
+
 function transitionOf(element: Element, property: string) {
   return element
     .getAnimations()

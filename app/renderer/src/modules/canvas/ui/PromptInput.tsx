@@ -95,7 +95,7 @@ export function PromptInput({
 
   return (
     <form
-      className="nowheel w-full"
+      className="nowheel nopan w-full"
       onSubmit={event => {
         event.preventDefault()
         void send()
