@@ -771,6 +771,7 @@ describe('with no Tree open', () => {
         )
       )
       .toBeVisible()
+    await expect.element(noTreeOpen().getByText('No Tree open')).toBeVisible()
     await noTreeOpen().getByRole('button', {name: 'New Tree'}).click()
 
     await expect

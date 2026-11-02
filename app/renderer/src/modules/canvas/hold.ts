@@ -38,7 +38,7 @@ interface HoldOptions {
 
 /**
  * Keeps a Turn still on screen while the canvas layout moves it; returns what
- * lets it go.
+ * releases it.
  */
 export function useHold({
   canvasLayout,
