@@ -27,7 +27,6 @@ export function createWarmSessions<Session extends WarmSession>({
   const open = new Set<Session>()
   /** The idle ones, longest idle first, each with what calls off its close. */
   const idle = new Map<Session, () => void>()
-  /** Each session's `claude` still closing. */
   const closing = new Map<string, Set<Promise<void>>>()
 
   function wake(session: Session) {
