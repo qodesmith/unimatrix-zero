@@ -51,7 +51,9 @@ export function arrange(
     usage: share('usage'),
   }
 
-  return open.length === 0 ? {...layout, usage: 100 - 2 * headerShare} : layout
+  return open.length === 0
+    ? {...layout, usage: 100 - (SECTION_IDS.length - 1) * headerShare}
+    : layout
 }
 
 /**

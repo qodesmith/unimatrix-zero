@@ -1,7 +1,8 @@
+import type {ProviderHosts} from '#modules/provider-hosts/main'
 import type {Trees} from '#modules/trees/main'
 import type {FinishedReply, Turns} from '#modules/turns/main'
 import type {AppEvent} from '@uz/contract/events'
-import type {OneShotRequest, SignInRequest} from '@uz/contract/host'
+import type {SignInRequest} from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
 import type {Reply} from '@uz/contract/turns'
 
@@ -21,10 +22,7 @@ interface TitlesDeps {
   trees: Pick<Trees, 'get' | 'nameAutomatically'>
   turnsOf: Turns['list']
   /** Rejects when the Provider can't answer. */
-  runOneShot: (
-    provider: ProviderId,
-    request: Omit<OneShotRequest, 'model'>
-  ) => Promise<string>
+  runOneShot: ProviderHosts['runOneShot']
   vendorProgramFor: (provider: ProviderId) => SignInRequest
   publish: (event: AppEvent) => void
 }
