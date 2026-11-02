@@ -9,7 +9,7 @@ const deleting = {status: 'deleting'} satisfies TreeDeleteState
 
 const refused = {
   status: 'refused',
-  error: 'A The disk is full',
+  error: 'The disk is full.',
 } satisfies TreeDeleteState
 
 // @ts-expect-error only a refusal holds an error
