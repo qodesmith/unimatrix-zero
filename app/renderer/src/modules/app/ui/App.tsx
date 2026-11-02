@@ -62,7 +62,17 @@ function AppLayout() {
   const connections = useConnections()
   const layout = useLayout()
   const updateLayout = useUpdateLayout()
-  const {trees, openTree, error: treesError, open, create, rename} = useTrees()
+
+  const {
+    trees,
+    hasTrees,
+    openTree,
+    error: treesError,
+    open,
+    create,
+    rename,
+  } = useTrees()
+
   // Null until main says whether any Provider is connected.
   const [firstLaunch, setFirstLaunch] = useState<boolean | null>(null)
 
@@ -104,6 +114,7 @@ function AppLayout() {
         <SidebarContent>
           <TreeList
             trees={trees}
+            hasTrees={hasTrees}
             openTreeId={openTree?.id ?? null}
             onCreate={() => void create()}
             onOpen={treeId => void open(treeId)}
@@ -153,10 +164,9 @@ function AppLayout() {
             <header className="flex min-h-12 shrink-0 items-center px-4 pt-4 pb-2">
               <SidebarToggle />
             </header>
-            <NoTreeOpen
-              hasTrees={trees.length > 0}
-              onCreate={() => void create()}
-            />
+            {hasTrees !== null && (
+              <NoTreeOpen hasTrees={hasTrees} onCreate={() => void create()} />
+            )}
           </>
         )}
       </SidebarInset>

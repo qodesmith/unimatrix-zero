@@ -756,6 +756,31 @@ function noTreeOpen() {
   return page.getByRole('main')
 }
 
+function heldTreeList(main: ReturnType<typeof fakeMain>) {
+  const list = Promise.withResolvers<CommandOutcome<'tree.list'>>()
+
+  globalThis.window.uz = {
+    ...main,
+    send: (async (command: Command) =>
+      command.type === 'tree.list'
+        ? list.promise
+        : main.send(command)) as Bridge['send'],
+  }
+
+  return list
+}
+
+async function expectNoWordAboutTrees() {
+  await expect
+    .element(
+      page.getByRole('main').getByRole('button', {name: 'Toggle Sidebar'})
+    )
+    .toBeVisible()
+
+  expect(page.getByText('Start a new Tree').elements()).toEqual([])
+  expect(page.getByText('No Tree open').elements()).toEqual([])
+}
+
 describe('with no Tree open', () => {
   const draft = {id: crypto.randomUUID(), title: 'Draft', createdAt: receivedAt}
 
@@ -796,6 +821,33 @@ describe('with no Tree open', () => {
     await expect
       .element(noTreeOpen().getByRole('button', {name: 'Show Trees'}))
       .not.toBeInTheDocument()
+  })
+
+  it('says nothing about Trees until main lists them, then says no Tree is open', async () => {
+    const list = heldTreeList(fakeMain())
+    await renderApp()
+
+    await expectNoWordAboutTrees()
+
+    list.resolve({ok: true, value: {trees: [draft]}})
+    await expect.element(noTreeOpen().getByText('No Tree open')).toBeVisible()
+  })
+
+  it('says nothing about Trees when main cannot list them, and still starts a new one from the sidebar', async () => {
+    const list = heldTreeList(fakeMain())
+    await renderApp()
+
+    list.resolve({
+      ok: false,
+      error: {code: 'handler-failed', message: 'The disk is full.'},
+    })
+    await expect.element(page.getByText('The disk is full.')).toBeVisible()
+    await expectNoWordAboutTrees()
+
+    await sidebarNewTree().click()
+    await expect
+      .element(page.getByRole('heading', {name: 'Untitled Tree'}))
+      .toBeVisible()
   })
 
   it('invites a first Tree, with no Show Trees, when there are none', async () => {

@@ -12,6 +12,7 @@ import {applyEvent} from './apply-event'
  */
 export function useTrees() {
   const [trees, setTrees] = useState<Tree[]>([])
+  const [listed, setListed] = useState(false)
   const [openTreeId, setOpenTreeId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -23,8 +24,12 @@ export function useTrees() {
     async function load() {
       const outcome = await bridge().send({type: 'tree.list'})
 
-      if (outcome.ok) setTrees(outcome.value.trees)
-      else setError(outcome.error.message)
+      if (outcome.ok) {
+        setTrees(outcome.value.trees)
+        setListed(true)
+      } else {
+        setError(outcome.error.message)
+      }
     }
 
     void load()
@@ -57,6 +62,8 @@ export function useTrees() {
 
   return {
     trees,
+    /** Null until main lists the Trees, unless a live event already brought one. */
+    hasTrees: trees.length > 0 ? true : listed ? false : null,
     openTree: trees.find(tree => tree.id === openTreeId) ?? null,
     error,
     open,
