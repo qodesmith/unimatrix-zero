@@ -190,7 +190,8 @@ export interface ProviderDriver {
   }): Promise<boolean>
   /**
    * A tiny tool-free request outside any Tree: titles, Summaries. `signal`
-   * aborts once main gives up on it, and the driver ends its vendor program.
+   * aborts once main gives up on it; a driver still waiting on the answer
+   * then ends its vendor program.
    */
   runOneShot(input: OneShotRequest, signal: AbortSignal): Promise<string>
   mcpSignIn(serverId: string): Promise<void>
