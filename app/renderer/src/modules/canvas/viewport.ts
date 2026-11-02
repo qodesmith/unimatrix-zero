@@ -1,11 +1,4 @@
-import type {
-  FitViewOptions,
-  ReactFlowInstance,
-  SetCenterOptions,
-  Viewport,
-  ViewportHelperFunctionOptions,
-  XYPosition,
-} from '@xyflow/react'
+import type {ReactFlowInstance} from '@xyflow/react'
 
 import {useReactFlow} from '@xyflow/react'
 import {useCallback, useMemo, useRef, useState} from 'react'
@@ -24,9 +17,11 @@ export function useMotion() {
   const glide = useCallback(async (run: () => Promise<boolean>) => {
     const sequence = ++latest.current
     setMoving(true)
-    await run()
+    const moved = await run()
 
     if (latest.current === sequence) setMoving(false)
+
+    return moved
   }, [])
 
   /** The glide in flight was ended by a move with no duration, or by the user. */
@@ -38,7 +33,8 @@ export function useMotion() {
   const jump = useCallback(
     async (run: () => Promise<boolean>) => {
       stop()
-      await run()
+
+      return run()
     },
     [stop]
   )
@@ -51,41 +47,40 @@ export function useMotion() {
 
 export type Moves = ReturnType<typeof useMotion>['moves']
 
-type ZoomOptions = Parameters<ReactFlowInstance['zoomIn']>[0]
+type CanvasViewport = ReactFlowInstance & {stop: Moves['stop']}
 
-function viewportOf(flow: ReactFlowInstance, moves: Moves) {
+function viewportOf(flow: ReactFlowInstance, moves: Moves): CanvasViewport {
   async function move(
     duration: number | undefined,
     run: () => Promise<boolean>
   ) {
-    await (duration ? moves.glide(run) : moves.jump(run))
+    return duration ? moves.glide(run) : moves.jump(run)
   }
 
   return {
-    getViewport: (): Viewport => flow.getViewport(),
-    getZoom: (): number => flow.getZoom(),
-    screenToFlowPosition: (position: XYPosition) =>
-      flow.screenToFlowPosition(position),
-    setViewport: async (
-      viewport: Viewport,
-      options?: ViewportHelperFunctionOptions
-    ) =>
+    ...flow,
+    setViewport: async (viewport, options) =>
       move(options?.duration, async () => flow.setViewport(viewport, options)),
-    setCenter: async (x: number, y: number, options?: SetCenterOptions) =>
+    setCenter: async (x, y, options) =>
       move(options?.duration, async () => flow.setCenter(x, y, options)),
-    fitView: async (options?: FitViewOptions) =>
+    fitView: async options =>
       move(options?.duration, async () => flow.fitView(options)),
-    zoomIn: async (options?: ZoomOptions) =>
+    fitBounds: async (bounds, options) =>
+      move(options?.duration, async () => flow.fitBounds(bounds, options)),
+    zoomIn: async options =>
       move(options?.duration, async () => flow.zoomIn(options)),
-    zoomOut: async (options?: ZoomOptions) =>
+    zoomOut: async options =>
       move(options?.duration, async () => flow.zoomOut(options)),
+    zoomTo: async (zoomLevel, options) =>
+      move(options?.duration, async () => flow.zoomTo(zoomLevel, options)),
     stop: moves.stop,
   }
 }
 
 /**
- * React Flow's viewport, with every move counted in the canvas's `moving`. A
- * move with a duration resolves once it ends, and never when cut short.
+ * React Flow's instance, with each of its seven viewport moves counted in the
+ * canvas's `moving`. A move with a duration resolves once it ends, and never
+ * when cut short.
  */
 export function useViewport() {
   const flow = useReactFlow()
