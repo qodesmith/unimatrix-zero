@@ -263,6 +263,19 @@ function deleteDialog() {
   return page.getByRole('alertdialog')
 }
 
+async function expectDeleteTreeMessage() {
+  await expect
+    .element(deleteDialog().getByRole('heading'))
+    .toHaveTextContent('Delete Tree?')
+  await expect
+    .element(
+      deleteDialog().getByText(
+        'This Tree will be permanently deleted. This can’t be undone.'
+      )
+    )
+    .toBeVisible()
+}
+
 async function askToDelete(name: string) {
   await sidebar()
     .getByRole('button', {name: `Actions for ${name}`})
@@ -272,28 +285,12 @@ async function askToDelete(name: string) {
 }
 
 describe('deleting a Tree', () => {
-  it('asks first, with its Turn count, and Cancel keeps it', async () => {
+  it('asks first, and Cancel keeps it', async () => {
     const main = fakeMain({trees: [savedTree({title: 'Draft', turnCount: 3})]})
     await renderApp(main)
 
     await askToDelete('Draft')
-
-    await expect
-      .element(deleteDialog().getByRole('heading'))
-      .toHaveTextContent('Delete “Draft”?')
-    await expect
-      .element(deleteDialog().getByText('3 Turns are deleted for good.'))
-      .toBeVisible()
-    await expect
-      .element(
-        deleteDialog().getByText(
-          'A linked folder stays where it is, untouched.'
-        )
-      )
-      .toBeVisible()
-    await expect
-      .element(deleteDialog().getByText('This can’t be undone.'))
-      .toBeVisible()
+    await expectDeleteTreeMessage()
 
     await deleteDialog().getByRole('button', {name: 'Cancel'}).click()
 
@@ -313,12 +310,6 @@ describe('deleting a Tree', () => {
       .toBeVisible()
 
     await askToDelete('Plan a week in Lisbon')
-    await expect
-      .element(deleteDialog().getByRole('heading'))
-      .toHaveTextContent('Delete “Plan a week in Lisbon”?')
-    await expect
-      .element(deleteDialog().getByText('1 Turn is deleted for good.'))
-      .toBeVisible()
     await deleteDialog().getByRole('button', {name: 'Delete'}).click()
 
     expect(sentOf(main, 'tree.delete')).toEqual([
@@ -327,6 +318,58 @@ describe('deleting a Tree', () => {
     await expect
       .element(treeRow('Plan a week in Lisbon'))
       .not.toBeInTheDocument()
+    await expect.element(treeRow('Other')).toBeVisible()
+    await expect
+      .element(page.getByRole('main').getByText('No Tree open'))
+      .toBeVisible()
+  })
+
+  it('deletes the open Tree from its root Prompt, asking the same as its row does', async () => {
+    const tree = savedTree({title: 'Lisbon trip', turnCount: 2})
+    const other = savedTree({title: 'Other'})
+
+    const root = {
+      id: crypto.randomUUID(),
+      treeId: tree.id,
+      parentReplyId: null,
+      text: 'Plan a week in Lisbon',
+      createdAt: minutesAgo(5),
+    }
+
+    const main = fakeMain({
+      trees: [tree, other],
+      prompts: [root],
+      replies: [
+        {
+          id: crypto.randomUUID(),
+          treeId: tree.id,
+          promptId: root.id,
+          provider: 'claude',
+          model: 'fake',
+          status: 'complete',
+          content: [{type: 'text', text: 'Start in Alfama'}],
+          contextSize: null,
+          contextWindow: null,
+          failure: null,
+          createdAt: minutesAgo(5),
+        },
+      ],
+    })
+
+    await renderApp(main)
+    await treeRow('Lisbon trip').click()
+    await expect.element(page.getByText('Start in Alfama')).toBeVisible()
+
+    await page.getByText('Plan a week in Lisbon').hover()
+    await page.getByRole('button', {name: 'Delete this Tree'}).click()
+    await expectDeleteTreeMessage()
+    await deleteDialog().getByRole('button', {name: 'Delete'}).click()
+
+    expect(sentOf(main, 'tree.delete')).toEqual([
+      {type: 'tree.delete', treeId: tree.id},
+    ])
+    expect(sentOf(main, 'prompt.delete')).toEqual([])
+    await expect.element(treeRow('Lisbon trip')).not.toBeInTheDocument()
     await expect.element(treeRow('Other')).toBeVisible()
     await expect
       .element(page.getByRole('main').getByText('No Tree open'))

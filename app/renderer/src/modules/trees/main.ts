@@ -1,3 +1,7 @@
+export {deleteTree} from './delete-tree'
+
+export {DeleteTreeDialog} from './ui/DeleteTreeDialog'
+
 export {NoTreeOpen} from './ui/NoTreeOpen'
 
 export {NewTreeButton, TreeList} from './ui/TreeList'

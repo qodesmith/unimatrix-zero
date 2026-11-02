@@ -1,6 +1,7 @@
 import type {PromptDeleteState} from '../prompt-delete/machine'
 import type {ReactNode} from 'react'
 
+import {DeleteTreeDialog} from '#modules/trees/main'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -92,7 +93,7 @@ interface PromptBoxProps {
  * it shifts nothing on the canvas.
  */
 export function PromptBox({promptId, className, children}: PromptBoxProps) {
-  const {state, offered, turnCount, arm, cancel, confirm} =
+  const {state, offered, isRoot, turnCount, arm, cancel, confirm} =
     usePromptDelete(promptId)
 
   return (
@@ -111,18 +112,30 @@ export function PromptBox({promptId, className, children}: PromptBoxProps) {
           )}
         >
           <TooltipButton
-            label="Delete this Prompt and everything below it"
+            label={
+              isRoot
+                ? 'Delete this Tree'
+                : 'Delete this Prompt and everything below it'
+            }
             className="size-6 bg-card text-muted-foreground shadow-sm hover:text-destructive"
             onClick={arm}
           >
             <TrashIcon className="size-3.5" />
           </TooltipButton>
-          <Confirmation
-            state={state}
-            turnCount={turnCount}
-            onConfirm={confirm}
-            onCancel={cancel}
-          />
+          {isRoot ? (
+            <DeleteTreeDialog
+              {...confirmationView(state)}
+              onConfirm={confirm}
+              onCancel={cancel}
+            />
+          ) : (
+            <Confirmation
+              state={state}
+              turnCount={turnCount}
+              onConfirm={confirm}
+              onCancel={cancel}
+            />
+          )}
         </div>
       )}
     </div>

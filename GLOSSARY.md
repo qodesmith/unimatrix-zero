@@ -61,7 +61,7 @@ _Avoid_: Fence, jail, container, VM, working copy
 ### Conversation structure
 
 **Tree**:
-The whole branching structure of one conversation, grown from a single root Prompt. One canvas holds exactly one Tree.
+The whole branching structure of one conversation, grown from a single root Prompt. One canvas holds exactly one Tree. Deleting the root Prompt deletes the Tree.
 _Avoid_: Canvas (as a noun for the data), chat, session
 
 **Turn**:

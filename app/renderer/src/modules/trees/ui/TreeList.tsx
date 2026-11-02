@@ -27,7 +27,7 @@ export function TreeList({
   onDelete,
 }: TreeListProps) {
   const [renamingId, setRenamingId] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState<Tree | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   if (hasTrees === false) {
     return (
@@ -56,17 +56,18 @@ export function TreeList({
             }}
             onDelete={() => {
               if (tree.turnCount === 0) onDelete(tree.id)
-              else setDeleting(tree)
+              else setDeletingId(tree.id)
             }}
           />
         ))}
       </SidebarMenu>
       <DeleteTreeDialog
-        tree={deleting}
-        onCancel={() => setDeleting(null)}
-        onConfirm={tree => {
-          setDeleting(null)
-          onDelete(tree.id)
+        open={deletingId !== null}
+        onCancel={() => setDeletingId(null)}
+        onConfirm={() => {
+          if (deletingId !== null) onDelete(deletingId)
+
+          setDeletingId(null)
         }}
       />
     </>

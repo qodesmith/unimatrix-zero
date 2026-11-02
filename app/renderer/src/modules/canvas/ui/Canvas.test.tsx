@@ -199,6 +199,15 @@ function fakeMain(saved: Saved) {
         return {ok: true, value: cutFrom(command.promptId)}
       }
 
+      if (command.type === 'tree.delete') {
+        return deletes.refusal === null
+          ? {ok: true, value: {}}
+          : {
+              ok: false,
+              error: {code: 'handler-failed', message: deletes.refusal},
+            }
+      }
+
       if (command.type === 'reply.retry') {
         const where = replies.findIndex(one => one.id === command.replyId)
         const failed = replies[where]
@@ -2239,6 +2248,45 @@ it('shows main’s refusal in the confirmation and keeps every Turn', async () =
   expect(nodeCount()).toBe(10)
 })
 
+function deleteTreeButton() {
+  return nodeOf('Prompt one').getByRole('button', {name: 'Delete this Tree'})
+}
+
+it('asks to delete the whole Tree from its root Prompt, and deletes the Tree rather than the Prompt once confirmed', async () => {
+  const {main} = await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await page.getByText('Prompt one').hover()
+  await deleteTreeButton().click()
+  await expect
+    .element(page.getByRole('alertdialog', {name: 'Delete Tree?'}))
+    .toBeVisible()
+
+  await confirmation().getByRole('button', {name: 'Delete'}).click()
+
+  await expect
+    .poll(() => main.sent.filter(command => command.type === 'tree.delete'))
+    .toEqual([{type: 'tree.delete', treeId}])
+  expect(main.sent.some(command => command.type === 'prompt.delete')).toBe(
+    false
+  )
+})
+
+it('shows main’s refusal to delete the Tree in the root Prompt’s confirmation', async () => {
+  const {main} = await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  main.deletes.refusal = 'A Reply is still being written'
+
+  await page.getByText('Prompt one').hover()
+  await deleteTreeButton().click()
+  await confirmation().getByRole('button', {name: 'Delete'}).click()
+
+  await expect
+    .element(confirmation().getByRole('alert'))
+    .toHaveTextContent('A Reply is still being written')
+  expect(nodeCount()).toBe(10)
+})
+
 it('offers no delete on a Prompt with a Reply streaming at or below it', async () => {
   const saved = forkedTree()
 
@@ -2252,9 +2300,11 @@ it('offers no delete on a Prompt with a Reply streaming at or below it', async (
   await expect.element(deleteButtonOf('Prompt four')).toBeInTheDocument()
   await expect.element(deleteButtonOf('Prompt three')).toBeInTheDocument()
 
-  for (const above of ['Prompt one', 'Prompt two', 'Prompt five']) {
+  for (const above of ['Prompt two', 'Prompt five']) {
     expect(deleteButtonOf(above).query()).toBeNull()
   }
+
+  expect(deleteTreeButton().query()).toBeNull()
 })
 
 async function deleteFrom(promptText: string) {
