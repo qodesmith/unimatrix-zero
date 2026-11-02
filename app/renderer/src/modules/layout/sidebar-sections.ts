@@ -1,6 +1,9 @@
 import type {Layout, SidebarSectionId} from '@uz/contract/layout'
 
-import {DEFAULT_SIDEBAR_SECTIONS} from '@uz/contract/layout'
+import {
+  DEFAULT_SIDEBAR_SECTIONS,
+  SidebarSectionIdSchema,
+} from '@uz/contract/layout'
 
 type Sections = Layout['sidebarSections']
 
@@ -8,7 +11,7 @@ type Sections = Layout['sidebarSections']
 export type SectionLayout = Record<SidebarSectionId, number>
 
 /** Top to bottom. */
-export const SECTION_IDS = ['trees', 'files', 'usage'] as const
+export const SECTION_IDS = SidebarSectionIdSchema.options
 
 function openIds(sections: Sections) {
   return SECTION_IDS.filter(id => !sections[id].collapsed)

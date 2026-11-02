@@ -146,7 +146,8 @@ interface RenameInputProps {
 }
 
 function RenameInput({tree, onDone}: RenameInputProps) {
-  const [title, setTitle] = useState(tree.title ?? '')
+  const initial = tree.title ?? tree.firstLine ?? ''
+  const [title, setTitle] = useState(initial)
   // Enter and Escape unmount the input, which can also fire a blur.
   const done = useRef(false)
 
@@ -158,7 +159,7 @@ function RenameInput({tree, onDone}: RenameInputProps) {
 
   function commit() {
     const trimmed = title.trim()
-    finish(trimmed === '' || trimmed === tree.title ? null : trimmed)
+    finish(trimmed === '' || trimmed === initial ? null : trimmed)
   }
 
   function onKeyDown(event: KeyboardEvent) {

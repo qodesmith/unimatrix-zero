@@ -6,7 +6,15 @@ import type {Command} from '@uz/contract/commands'
 import type {Tree} from '@uz/contract/trees'
 import type {ReactNode} from 'react'
 
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {cdp, page, userEvent} from 'vitest/browser'
 
@@ -173,6 +181,24 @@ describe('renaming a Tree', () => {
     await userEvent.keyboard('{Enter}')
 
     await expect.element(treeRow('Trip planning')).toBeVisible()
+  })
+
+  it('starts an untitled Tree from its first line, which Enter leaves untitled', async () => {
+    const main = fakeMain({
+      trees: [savedTree({firstLine: 'Plan a week in Lisbon', turnCount: 2})],
+    })
+
+    await renderApp(main)
+
+    await treeRow('Plan a week in Lisbon').click()
+    await userEvent.keyboard('{F2}')
+    await expect
+      .element(page.getByRole('textbox', {name: 'Tree name'}))
+      .toHaveValue('Plan a week in Lisbon')
+    await userEvent.keyboard('{Enter}')
+
+    await expect.element(treeRow('Plan a week in Lisbon')).toBeVisible()
+    expect(sentOf(main, 'tree.rename')).toEqual([])
   })
 
   it('renames it by double-clicking it', async () => {
@@ -491,18 +517,26 @@ function divider(index: number) {
   return found
 }
 
-async function framesOf(read: () => number, ms: number) {
-  const values: number[] = []
-  const end = performance.now() + ms
+function panelOf(name: 'Trees' | 'Files' | 'Usage') {
+  const panel = section(name).element().closest('[data-panel]')
 
-  while (performance.now() < end) {
-    await new Promise(resolve => {
-      requestAnimationFrame(resolve)
-    })
-    values.push(read())
-  }
+  if (!panel) throw new Error(`No panel for ${name}`)
 
-  return values
+  return panel
+}
+
+function flexGrowTransition(element: Element) {
+  return element
+    .getAnimations()
+    .find(
+      animation =>
+        animation instanceof CSSTransition &&
+        animation.transitionProperty === 'flex-grow'
+    )
+}
+
+async function setPlaybackRate(playbackRate: number) {
+  await cdp().send('Animation.setPlaybackRate', {playbackRate})
 }
 
 function savedSections(main: FakeMain) {
@@ -624,13 +658,22 @@ describe('the sidebar’s sections', () => {
       .element()
       .getBoundingClientRect().height
 
+    await cdp().send('Animation.enable')
+    await setPlaybackRate(0)
+    onTestFinished(async () => setPlaybackRate(1))
     await header('Files').click()
-    const heights = await framesOf(() => heightOf('Files'), 400)
 
-    expect(
-      heights.some(height => height > headerHeight + 1 && height < open - 1)
-    ).toBe(true)
-    expect(heights.at(-1)).toBe(headerHeight)
+    await expect.poll(() => flexGrowTransition(panelOf('Files'))).toBeDefined()
+    const transition = flexGrowTransition(panelOf('Files'))
+
+    if (!transition) throw new Error('No flex-grow transition')
+
+    transition.currentTime = 100
+    expect(heightOf('Files')).toBeGreaterThan(headerHeight)
+    expect(heightOf('Files')).toBeLessThan(open)
+
+    await setPlaybackRate(1)
+    await expect.poll(() => heightOf('Files')).toBe(headerHeight)
   })
 
   it('keeps the dividers beside a collapsed section from moving', async () => {
