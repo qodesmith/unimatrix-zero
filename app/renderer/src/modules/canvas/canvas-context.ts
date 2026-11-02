@@ -1,4 +1,5 @@
 import type {TreeIndex} from './tree'
+import type {Reply} from '@uz/contract/turns'
 
 import {createContext, use} from 'react'
 
@@ -49,4 +50,16 @@ export function useCanvas(): CanvasState {
   if (!state) throw new Error('Turn nodes render inside <Canvas> only')
 
   return state
+}
+
+/**
+ * Null at the root, whose Input on an empty Tree sits outside <Canvas>'s
+ * context.
+ */
+export function useAttachedReply(parentReplyId: string | null): Reply | null {
+  const state = use(CanvasContext)
+
+  if (parentReplyId === null) return null
+
+  return state?.index.replyById.get(parentReplyId) ?? null
 }

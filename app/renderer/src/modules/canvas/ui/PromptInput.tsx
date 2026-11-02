@@ -1,5 +1,7 @@
+import type {ModelChoice} from '@uz/contract/providers'
 import type {KeyboardEvent, Ref} from 'react'
 
+import {ModelPicker, useModelPick} from '#modules/models/main'
 import {useSettings} from '#modules/settings/main'
 import {useSendPrompt} from '#modules/turns/main'
 import {FieldError} from '#shadcn/ui/field'
@@ -10,6 +12,8 @@ import {
   InputGroupTextarea,
 } from '#shadcn/ui/input-group'
 import {useState} from 'react'
+
+import {useAttachedReply} from '../canvas-context'
 
 interface PromptInputProps {
   treeId: string
@@ -47,6 +51,10 @@ export function PromptInput({
   const draft = kept ?? ownDraft
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [picked, setPicked] = useState<ModelChoice | null>(null)
+  const pick = useModelPick(picked, useAttachedReply(parentReplyId))
+  const {selected} = pick
+  const held = !canSend || sending || pick.heldBecause !== null
 
   function updateDraft(text: string) {
     setOwnDraft(text)
@@ -54,10 +62,12 @@ export function PromptInput({
   }
 
   async function send() {
-    if (!canSend || sending || draft.trim() === '') return
+    if (held || !selected || draft.trim() === '') return
+
+    const {provider, model} = selected
 
     setSending(true)
-    const outcome = await sendPrompt(draft)
+    const outcome = await sendPrompt(draft, {provider, model})
     setSending(false)
 
     if (!outcome.ok) {
@@ -103,17 +113,28 @@ export function PromptInput({
           onChange={event => updateDraft(event.target.value)}
           onKeyDown={onKeyDown}
         />
-        <InputGroupAddon align="block-end" className="justify-between">
+        <InputGroupAddon
+          align="block-end"
+          className="flex-wrap justify-between"
+        >
           <FieldError className="text-xs">{error}</FieldError>
-          <InputGroupButton
-            type="submit"
-            variant="default"
-            size="sm"
-            className="ml-auto"
-            disabled={!canSend || sending || draft.trim() === ''}
-          >
-            Send
-          </InputGroupButton>
+          <div className="ml-auto flex items-center gap-1">
+            <ModelPicker pick={pick} onPick={setPicked} />
+            <InputGroupButton
+              type="submit"
+              variant="default"
+              size="sm"
+              disabled={held || !selected || draft.trim() === ''}
+            >
+              Send
+            </InputGroupButton>
+          </div>
+          {(pick.notice ?? pick.heldBecause) && (
+            <p className="flex w-full flex-wrap justify-end gap-x-2 text-xs font-normal text-muted-foreground">
+              {pick.notice && <span>{pick.notice}</span>}
+              {pick.heldBecause && <span>{pick.heldBecause}</span>}
+            </p>
+          )}
         </InputGroupAddon>
       </InputGroup>
     </form>

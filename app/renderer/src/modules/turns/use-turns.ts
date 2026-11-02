@@ -1,3 +1,4 @@
+import type {ModelChoice} from '@uz/contract/providers'
 import type {Reply} from '@uz/contract/turns'
 
 import {bridge} from '#modules/bridge/main'
@@ -28,12 +29,13 @@ export type SendOutcome = {ok: true; reply: Reply} | {ok: false; error: string}
 export function useSendPrompt(treeId: string, parentReplyId: string | null) {
   const queryClient = useQueryClient()
 
-  return async (text: string): Promise<SendOutcome> => {
+  return async (text: string, model: ModelChoice): Promise<SendOutcome> => {
     const outcome = await bridge().send({
       type: 'prompt.send',
       treeId,
       parentReplyId,
       text,
+      model,
     })
 
     if (!outcome.ok) return {ok: false, error: outcome.error.message}
