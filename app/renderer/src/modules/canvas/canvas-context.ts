@@ -1,3 +1,4 @@
+import type {Moves} from './motion'
 import type {TreeIndex} from './tree'
 
 import {createContext, use} from 'react'
@@ -39,6 +40,7 @@ export interface CanvasState {
   setDraft: (replyId: string, draft: string) => void
   limitTurnHeight: boolean
   contextSizeMeter: boolean
+  moves: Moves
 }
 
 export const CanvasContext = createContext<CanvasState | null>(null)

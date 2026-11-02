@@ -1,3 +1,4 @@
+import type {Moves} from '../motion'
 import type {CanvasOrientation} from '@uz/contract/settings'
 
 import {Button} from '#shadcn/ui/button'
@@ -23,6 +24,7 @@ interface CanvasControlsProps {
   onJump: (replyId: string) => void
   /** Null while there is no Active Thread to zoom to. */
   onZoomToActive: (() => void) | null
+  moves: Moves
   showMap: boolean
   onToggleMap: () => void
 }
@@ -45,6 +47,7 @@ export function CanvasControls({
   failed,
   onJump,
   onZoomToActive,
+  moves,
   showMap,
   onToggleMap,
 }: CanvasControlsProps) {
@@ -78,14 +81,20 @@ export function CanvasControls({
       <TooltipButton
         label="Zoom in"
         className={TOOL_CLASS}
-        onClick={() => void flow.zoomIn({duration: still ? 0 : 200})}
+        onClick={() =>
+          void moves.glide(async () => flow.zoomIn({duration: still ? 0 : 200}))
+        }
       >
         <PlusIcon />
       </TooltipButton>
       <TooltipButton
         label="Zoom out"
         className={TOOL_CLASS}
-        onClick={() => void flow.zoomOut({duration: still ? 0 : 200})}
+        onClick={() =>
+          void moves.glide(async () =>
+            flow.zoomOut({duration: still ? 0 : 200})
+          )
+        }
       >
         <MinusIcon />
       </TooltipButton>
@@ -93,11 +102,13 @@ export function CanvasControls({
         label="Fit the whole Tree"
         className={TOOL_CLASS}
         onClick={() =>
-          void flow.fitView({
-            padding: 0.15,
-            maxZoom: 1,
-            duration: still ? 0 : 300,
-          })
+          void moves.glide(async () =>
+            flow.fitView({
+              padding: 0.15,
+              maxZoom: 1,
+              duration: still ? 0 : 300,
+            })
+          )
         }
       >
         <ScanIcon />

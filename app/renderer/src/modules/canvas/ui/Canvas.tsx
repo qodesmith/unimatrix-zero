@@ -24,6 +24,7 @@ import {START_MARGIN, TURN_WIDTH, startZoom} from '../canvas-layout'
 import {useChatSlideout} from '../chat-slideout/use-chat-slideout'
 import {useDeletion} from '../deletion'
 import {useEscapeStops} from '../escape-stops'
+import {useMotion} from '../motion'
 import {useReducedMotion} from '../reduced-motion'
 import {slideMs} from '../slide'
 import {indexTurns, isEmpty, pathTo, previousReply} from '../tree'
@@ -193,6 +194,7 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
   const reducedMotion = useReducedMotion()
   const [inputAt, setInputAt] = useState<Viewport | null>(null)
   const [showMap, setShowMap] = useState(false)
+  const {moving, moves} = useMotion()
 
   const [expanded, setExpanded] = useState<Expanded>(() => ({
     ids: new Set(),
@@ -356,6 +358,7 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
       setDraft,
       limitTurnHeight,
       contextSizeMeter,
+      moves,
     }),
     [
       treeId,
@@ -374,6 +377,7 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
       setDraft,
       limitTurnHeight,
       contextSizeMeter,
+      moves,
     ]
   )
 
@@ -419,6 +423,7 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
                         setInputToFocus(activeReplyId)
                     }
               }
+              moves={moves}
               showMap={showMap}
               onToggleMap={() => setShowMap(shown => !shown)}
             />
@@ -436,6 +441,8 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
             deleted={deleted}
             switching={switching}
             showMap={showMap}
+            moving={moving}
+            moves={moves}
             onHover={setHoverTurnId}
           />
           {chatTurnId !== null && chatEnd && (

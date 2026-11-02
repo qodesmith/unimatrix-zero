@@ -1,4 +1,5 @@
 import type {CanvasLayout, Size} from './canvas-layout'
+import type {Moves} from './motion'
 import type {TreeIndex} from './tree'
 import type {Viewport} from '@xyflow/react'
 
@@ -39,6 +40,7 @@ interface FollowOptions {
   measured: Record<string, Size>
   nodeIdOf: (replyId: string) => string
   panMs: number
+  moves: Moves
 }
 
 /**
@@ -52,6 +54,7 @@ export function useFollow({
   measured,
   nodeIdOf,
   panMs,
+  moves,
 }: FollowOptions) {
   const flow = useReactFlow()
   const width = useStore(state => state.width)
@@ -85,11 +88,11 @@ export function useFollow({
     async (target: Viewport) => {
       const sequence = ++glides.current
       glide.current = sequence
-      await flow.setViewport(target, {duration: panMs})
+      await moves.glide(async () => flow.setViewport(target, {duration: panMs}))
 
       if (glide.current === sequence) glide.current = 0
     },
-    [flow, panMs]
+    [flow, panMs, moves]
   )
 
   const reveal = useCallback(
@@ -106,9 +109,10 @@ export function useFollow({
       const {x, y, zoom} = flow.getViewport()
       const target = {x: x + dx, y: y + dy, zoom}
 
-      void (gliding ? glideTo(target) : flow.setViewport(target))
+      if (gliding) void glideTo(target)
+      else moves.jump(async () => flow.setViewport(target))
     },
-    [boxOf, width, height, flow, glideTo]
+    [boxOf, width, height, flow, glideTo, moves]
   )
 
   useLayoutEffect(() => {

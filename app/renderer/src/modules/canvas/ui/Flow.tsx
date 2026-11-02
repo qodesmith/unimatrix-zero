@@ -1,5 +1,7 @@
 import type {Collapsed, Expanded} from '../canvas-context'
 import type {CanvasLayout, Size} from '../canvas-layout'
+import type {Deleted} from '../hold'
+import type {Moves} from '../motion'
 import type {TreeIndex} from '../tree'
 import type {Stem, TurnNode} from './TurnNodes'
 import type {CanvasOrientation} from '@uz/contract/settings'
@@ -13,17 +15,11 @@ import {
   useStore,
 } from '@xyflow/react'
 import {cn} from 'cn'
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 
 import {layoutCanvas, startZoom} from '../canvas-layout'
 import {useFollow} from '../follow'
+import {useHold} from '../hold'
 import {useReducedMotion} from '../reduced-motion'
 import {slideMs} from '../slide'
 import {isFork} from '../tree'
@@ -56,13 +52,10 @@ interface FlowProps {
   deleted: Deleted | null
   switching: boolean
   showMap: boolean
+  /** A glide of the canvas's own is running. */
+  moving: boolean
+  moves: Moves
   onHover: (turnId: string | null) => void
-}
-
-interface Deleted {
-  parentReplyId: string | null
-  /** Its box changes size once it is measured again. */
-  resizes: boolean
 }
 
 type Sizes = Record<CanvasOrientation, Record<string, Size>>
@@ -92,20 +85,6 @@ function stemOf(
   return outgoing.some(edge => isOnThread(edge, thread)) ? 'on-thread' : 'plain'
 }
 
-/** A Turn kept where it is on screen while the canvas layout changes. */
-interface Held {
-  turnId: string
-  /**
-   * Its box's size before its text was let out or capped, held until it
-   * changes.
-   */
-  resizing: Size | null
-}
-
-function settledSize(held: Held, size: Size | undefined) {
-  return held.resizing === null || size !== held.resizing
-}
-
 function inputOf(pane: HTMLDivElement | null, nodeId: string) {
   return pane
     ?.querySelector(`.react-flow__node[data-id="${CSS.escape(nodeId)}"]`)
@@ -130,6 +109,8 @@ export function Flow({
   deleted,
   switching,
   showMap,
+  moving,
+  moves,
   onHover,
 }: FlowProps) {
   const flow = useReactFlow<TurnNode>()
@@ -160,93 +141,24 @@ export function Flow({
     measured,
     nodeIdOf,
     panMs,
+    moves,
   })
 
   const allMeasured =
     canvasLayout.nodes.length > 0 &&
     canvasLayout.nodes.every(node => measured[node.id] !== undefined)
 
-  // Folding or unfolding a Fork moves its Reply in the canvas layout, and again
-  // as the boxes it shows are measured; the viewport moves by the same amount,
-  // scaled, so the Reply stays where it is on screen. A pan lets it go. Letting
-  // out or capping a Turn's text holds its Turn the same way until its box is
-  // measured anew, and lets a followed Reply go, so the text being read stays
-  // put. Deleting Turns from below a Reply holds the Reply too.
-  const lastCanvasLayout = useRef(canvasLayout)
-  const lastCollapsed = useRef(collapsed)
-  const lastExpanded = useRef(expanded)
-  const lastDeleted = useRef(deleted)
-  const held = useRef<Held | null>(null)
-
-  // Declared before the effect that moves the viewport for the held Turn, so it
-  // runs first in the render the Turns go.
-  useLayoutEffect(() => {
-    if (lastDeleted.current === deleted) return
-
-    lastDeleted.current = deleted
-    const turnId = deleted?.parentReplyId ?? null
-
-    if (deleted === null || turnId === null) return
-
-    held.current = {
-      turnId,
-      resizing: deleted.resizes ? (measured[nodeIdOf(turnId)] ?? null) : null,
-    }
-  }, [deleted, measured, nodeIdOf])
-
-  useLayoutEffect(() => {
-    const before = lastCanvasLayout.current
-    lastCanvasLayout.current = canvasLayout
-
-    if (lastCollapsed.current !== collapsed) {
-      lastCollapsed.current = collapsed
-      const turnId = collapsed.toggledReplyId
-      held.current = turnId === null ? null : {turnId, resizing: null}
-    }
-
-    if (lastExpanded.current !== expanded) {
-      lastExpanded.current = expanded
-      const turnId = expanded.toggledTurnId
-
-      held.current =
-        turnId === null
-          ? null
-          : {turnId, resizing: measured[nodeIdOf(turnId)] ?? null}
-
-      if (turnId !== null) letGo()
-    }
-
-    const {current} = held
-
-    if (current === null) return
-
-    const nodeId = nodeIdOf(current.turnId)
-
-    if (allMeasured && settledSize(current, measured[nodeId]))
-      held.current = null
-
-    const from = before.nodes.find(node => node.id === nodeId)?.position
-    const to = canvasLayout.nodes.find(node => node.id === nodeId)?.position
-
-    if (!from || !to) return
-
-    const {x, y, zoom} = flow.getViewport()
-
-    void flow.setViewport({
-      x: x - (to.x - from.x) * zoom,
-      y: y - (to.y - from.y) * zoom,
-      zoom,
-    })
-  }, [
+  const release = useHold({
     canvasLayout,
     collapsed,
     expanded,
+    deleted,
     measured,
     allMeasured,
     nodeIdOf,
-    flow,
     letGo,
-  ])
+    moves,
+  })
 
   const onNodesChange = useCallback(
     (changes: NodeChange<TurnNode>[]) => {
@@ -317,58 +229,67 @@ export function Flow({
   useEffect(() => {
     if (fitted || !allMeasured) return
 
-    void flow.fitView(FIT).then(() => setFitted(true))
-  }, [fitted, allMeasured, flow])
+    moves.jump(async () => {
+      const fit = await flow.fitView(FIT)
+      setFitted(true)
+
+      return fit
+    })
+  }, [fitted, allMeasured, flow, moves])
 
   const hasFork = index.replies.some(reply => isFork(index, reply.id))
 
   // The first Fork made here zooms out just enough to show the whole Tree, in
   // place of the pan to its Reply; a Tree loaded with Forks was fitted on load.
-  const forkShown = useRef(hasFork)
-  const centered = useRef(0)
+  const [forkShown, setForkShown] = useState(hasFork)
+  const [centered, setCentered] = useState(0)
 
   useEffect(() => {
-    if (forkShown.current || !hasFork || !allMeasured) return
+    if (forkShown || !hasFork || !allMeasured) return
 
-    forkShown.current = true
+    // oxlint-disable-next-line react/set-state-in-effect -- the render it causes ends the canvas's wait
+    setForkShown(true)
 
-    if (focus) centered.current = focus.sequence
+    if (focus) setCentered(focus.sequence)
 
     async function fitAll() {
-      await flow.fitView({
-        padding: 0.15,
-        maxZoom: flow.getZoom(),
-        duration: panMs,
-      })
+      await moves.glide(async () =>
+        flow.fitView({
+          padding: 0.15,
+          maxZoom: flow.getZoom(),
+          duration: panMs,
+        })
+      )
 
       if (focus?.mode === 'follow') follow(focus.replyId)
     }
 
     void fitAll()
-  }, [hasFork, allMeasured, focus, flow, panMs, follow])
+  }, [forkShown, hasFork, allMeasured, focus, flow, panMs, follow, moves])
 
   // A focus waits for its Reply's box to have a size, and while the first Fork
   // waits to be fitted, the fit takes it instead. A Reply folded away is not
   // panned to, then or once it is unfolded.
   useEffect(() => {
-    if (!focus || centered.current === focus.sequence) return
+    if (!focus || centered === focus.sequence) return
 
-    if (hasFork && !forkShown.current) return
+    if (hasFork && !forkShown) return
 
     const nodeId = nodeIdOf(focus.replyId)
     const node = canvasLayout.nodes.find(candidate => candidate.id === nodeId)
     const size = measured[nodeId]
 
     if (!node && index.replyById.has(focus.replyId)) {
-      centered.current = focus.sequence
+      // oxlint-disable-next-line react/set-state-in-effect -- the render it causes ends the canvas's wait
+      setCentered(focus.sequence)
 
       return
     }
 
     if (!node || !size) return
 
-    centered.current = focus.sequence
-    held.current = null
+    setCentered(focus.sequence)
+    release()
 
     if (focus.mode === 'follow') {
       follow(focus.replyId)
@@ -393,14 +314,18 @@ export function Flow({
           y: node.position.y + size.height / 2,
         }
 
-    void flow.setCenter(center.x, center.y, {
-      zoom: focus.mode === 'input' ? startZoom(canvasWidth) : flow.getZoom(),
-      duration: panMs,
-      interpolate: 'linear',
-    })
+    void moves.glide(async () =>
+      flow.setCenter(center.x, center.y, {
+        zoom: focus.mode === 'input' ? startZoom(canvasWidth) : flow.getZoom(),
+        duration: panMs,
+        interpolate: 'linear',
+      })
+    )
   }, [
     focus,
+    centered,
     hasFork,
+    forkShown,
     nodeIdOf,
     canvasLayout,
     index,
@@ -410,7 +335,20 @@ export function Flow({
     follow,
     unfollow,
     canvasWidth,
+    moves,
+    release,
   ])
+
+  const sized = canvasLayout.nodes.every(
+    node => measured[node.id] !== undefined
+  )
+
+  // A move the canvas has yet to start.
+  const waiting =
+    !fitted ||
+    !sized ||
+    (hasFork && !forkShown) ||
+    (focus !== null && centered !== focus.sequence)
 
   return (
     <ReactFlow<TurnNode>
@@ -420,7 +358,11 @@ export function Flow({
       nodeTypes={nodeTypes}
       onNodesChange={onNodesChange}
       defaultViewport={startAt ?? undefined}
-      onMoveStart={onMoveStart}
+      onMoveStart={event => {
+        if (event) moves.stop()
+
+        onMoveStart(event)
+      }}
       onMoveEnd={onMoveEnd}
       nodesDraggable={false}
       nodesConnectable={false}
@@ -431,6 +373,8 @@ export function Flow({
       minZoom={0.1}
       maxZoom={1.5}
       proOptions={{hideAttribution: true}}
+      // Tests wait on it before reading the viewport.
+      data-moving={moving || waiting ? '' : undefined}
       className={cn(
         switching && 'canvas-switching',
         !fitted && 'canvas-fitting'

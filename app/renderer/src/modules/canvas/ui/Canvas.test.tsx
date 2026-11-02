@@ -288,6 +288,15 @@ function zoomOf() {
   return scale === undefined ? Number.NaN : Number(scale)
 }
 
+/** The canvas is gliding, or has a move it is yet to start. */
+function moving() {
+  return document.querySelector('.react-flow')?.hasAttribute('data-moving')
+}
+
+/**
+ * The viewport once the canvas says it is still, and it held there across a
+ * poll: the poll gives a change the test just made time to render.
+ */
 async function settledViewport() {
   let last: string | null = null
 
@@ -295,7 +304,7 @@ async function settledViewport() {
     .poll(
       () => {
         const now = viewport()
-        const same = now === last
+        const same = moving() === false && now === last
         last = now
 
         return same
@@ -670,11 +679,12 @@ it('zooms out just enough to show the whole Tree on its first Fork, and keeps th
 
   await sendInto('Reply two', 'Carry on')
   await expect.poll(viewport).not.toBe(zoomedIn)
-  const continued = await settledViewport()
+  await settledViewport()
   expect(zoomOf()).toBe(zoom)
 
   await sendInto('Reply one', 'Another way')
-  await expect.poll(viewport).not.toBe(continued)
+  // A glide's zoom dips on the way, so only the zoom it ends at counts.
+  await expect.poll(zoomOf).toBeLessThan(zoom)
   await settledViewport()
   expect(zoomOf()).toBeLessThan(zoom)
   const fitted = zoomOf()
@@ -682,6 +692,55 @@ it('zooms out just enough to show the whole Tree on its first Fork, and keeps th
   await sendInto('Reply two', 'Yet another')
   await settledViewport()
   expect(zoomOf()).toBe(fitted)
+})
+
+/**
+ * The zoom at each change to the canvas once a Prompt with this text is drawn,
+ * and whether the canvas said it was moving.
+ */
+function promptDrawn(flow: Element, text: string) {
+  return [...flow.querySelectorAll('.react-flow__node-prompt')].some(node =>
+    node.textContent.includes(text)
+  )
+}
+
+function watchMovingOnceDrawn(text: string) {
+  const seen: {zoom: number; moving: boolean}[] = []
+  const flow = document.querySelector('.react-flow')
+
+  if (!flow) throw new Error('No canvas')
+
+  const observer = new MutationObserver(() => {
+    if (promptDrawn(flow, text))
+      seen.push({zoom: zoomOf(), moving: moving() === true})
+  })
+
+  observer.observe(flow, {subtree: true, childList: true, attributes: true})
+  onTestFinished(() => observer.disconnect())
+
+  return seen
+}
+
+it('says it is moving from the send that makes the first Fork until the zoom-out to show the whole Tree has ended', async () => {
+  await renderCanvas(linearTree())
+  await expect.element(page.getByText('Reply two')).toBeVisible()
+  await settledViewport()
+  const loaded = zoomOf()
+  await page.getByRole('button', {name: 'Zoom in'}).click()
+  await expect.poll(zoomOf).toBeGreaterThan(loaded * 1.1)
+  await settledViewport()
+  const zoomedIn = zoomOf()
+
+  await inputUnder('Reply one').fill('Another way')
+  await settledViewport()
+  const seen = watchMovingOnceDrawn('Another way')
+  await userEvent.keyboard('{Enter}')
+  await expect.element(page.getByText('Another way')).toBeVisible()
+  await expect.poll(zoomOf).toBeLessThan(zoomedIn)
+  await settledViewport()
+
+  const still = seen.filter(change => !change.moving).map(({zoom}) => zoom)
+  expect(new Set(still)).toEqual(new Set([zoomOf()]))
 })
 
 it('keeps the controls beside the Tree’s name, off the canvas, with only the minimap drawn on it', async () => {

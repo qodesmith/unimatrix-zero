@@ -6,6 +6,7 @@ import {cn} from 'cn'
 import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 
 import {atBottom} from '../at-bottom'
+import {useCanvas} from '../canvas-context'
 
 interface CappedTextProps {
   /** Off: the text takes its full height and there is nothing to show more of. */
@@ -50,6 +51,7 @@ export function CappedText({
   const toggle = useRef<Toggle | null>(null)
   const flow = useReactFlow()
   const store = useStoreApi()
+  const {moves} = useCanvas()
   const capped = limit && !expanded
   const toggles = limit && (overflows || expanded)
 
@@ -66,7 +68,8 @@ export function CappedText({
     const {x, y, zoom} = flow.getViewport()
     const moved = outer.scrollTop - current.from
 
-    if (moved !== 0) void flow.setViewport({x, y: y + moved * zoom, zoom})
+    if (moved !== 0)
+      moves.jump(async () => flow.setViewport({x, y: y + moved * zoom, zoom}))
   })
 
   function onClick() {
