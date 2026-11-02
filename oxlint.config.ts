@@ -35,27 +35,16 @@ const LUCIDE_ICON_SUFFIX = {
     'Import lucide icons with the Icon suffix, e.g. HomeIcon instead of Home.',
 }
 
-const VIEWPORT = {
-  name: '@xyflow/react',
-  importNames: ['useReactFlow'],
-  message:
-    'Move the canvas with useViewport from canvas/viewport.ts, so its data-moving counts the move.',
-}
-
 type RestrictedImports = NonNullable<
   OxlintConfig['rules']
 >['no-restricted-imports']
 
-function restrictedImports(input: {
-  vendorSdk: boolean
-  reactFlow: boolean
-}): RestrictedImports {
-  const {vendorSdk, reactFlow} = input
+function restrictedImports(input: {vendorSdk: boolean}): RestrictedImports {
+  const {vendorSdk} = input
 
   return [
     'error',
     {
-      paths: reactFlow ? [] : [VIEWPORT],
       patterns: [
         NO_AI_LIBRARY,
         LUCIDE_ICON_SUFFIX,
@@ -124,15 +113,6 @@ const config: OxlintConfig = {
       },
     },
     {
-      files: ['app/renderer/src/modules/canvas/viewport.ts'],
-      rules: {
-        'no-restricted-imports': restrictedImports({
-          vendorSdk: false,
-          reactFlow: true,
-        }),
-      },
-    },
-    {
       files: ['app/renderer/src/modules/theme/**'],
       rules: {
         'uz/no-hardcoded-colors': 'off',
@@ -152,10 +132,7 @@ const config: OxlintConfig = {
     {
       files: ['app/provider-host/**'],
       rules: {
-        'no-restricted-imports': restrictedImports({
-          vendorSdk: true,
-          reactFlow: false,
-        }),
+        'no-restricted-imports': restrictedImports({vendorSdk: true}),
       },
     },
     {
@@ -240,10 +217,7 @@ const config: OxlintConfig = {
     'no-object-constructor': 'error',
     'no-promise-executor-return': 'error',
     'no-proto': 'error',
-    'no-restricted-imports': restrictedImports({
-      vendorSdk: false,
-      reactFlow: false,
-    }),
+    'no-restricted-imports': restrictedImports({vendorSdk: false}),
     'no-return-assign': 'error',
     'no-script-url': 'error',
     'no-sequences': 'error',

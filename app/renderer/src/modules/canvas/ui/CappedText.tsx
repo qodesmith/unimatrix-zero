@@ -1,12 +1,11 @@
 import type {ReactNode} from 'react'
 
 import {Button} from '#shadcn/ui/button'
-import {useStoreApi} from '@xyflow/react'
+import {useReactFlow, useStoreApi} from '@xyflow/react'
 import {cn} from 'cn'
 import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 
 import {atBottom} from '../at-bottom'
-import {useViewport} from '../viewport'
 
 interface CappedTextProps {
   /** Off: the text takes its full height and there is nothing to show more of. */
@@ -49,7 +48,7 @@ export function CappedText({
   const content = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
   const toggle = useRef<Toggle | null>(null)
-  const viewport = useViewport()
+  const flow = useReactFlow()
   const store = useStoreApi()
   const capped = limit && !expanded
   const toggles = limit && (overflows || expanded)
@@ -64,10 +63,10 @@ export function CappedText({
     toggle.current = null
     outer.scrollTop = current.to
 
-    const {x, y, zoom} = viewport.getViewport()
+    const {x, y, zoom} = flow.getViewport()
     const moved = outer.scrollTop - current.from
 
-    if (moved !== 0) void viewport.setViewport({x, y: y + moved * zoom, zoom})
+    if (moved !== 0) void flow.setViewport({x, y: y + moved * zoom, zoom})
   })
 
   function onClick() {
@@ -76,8 +75,7 @@ export function CappedText({
     if (!outer) return
 
     const pane = store.getState().domNode?.getBoundingClientRect().top ?? 0
-    const zoom = viewport.getZoom()
-    const above = (pane - outer.getBoundingClientRect().top) / zoom
+    const above = (pane - outer.getBoundingClientRect().top) / flow.getZoom()
 
     toggle.current = expanded
       ? {from: 0, to: Math.max(0, above)}
