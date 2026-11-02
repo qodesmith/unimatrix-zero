@@ -1,9 +1,9 @@
 import type {Collapsed, Expanded} from './canvas-context'
 import type {CanvasLayout, Size} from './canvas-layout'
-import type {Moves} from './motion'
 
-import {useReactFlow} from '@xyflow/react'
 import {useCallback, useLayoutEffect, useRef} from 'react'
+
+import {useViewport} from './viewport'
 
 interface Held {
   turnId: string
@@ -33,7 +33,6 @@ interface HoldOptions {
   allMeasured: boolean
   nodeIdOf: (turnId: string) => string
   letGo: () => void
-  moves: Moves
 }
 
 /**
@@ -49,9 +48,8 @@ export function useHold({
   allMeasured,
   nodeIdOf,
   letGo,
-  moves,
 }: HoldOptions) {
-  const flow = useReactFlow()
+  const viewport = useViewport()
   const lastCanvasLayout = useRef(canvasLayout)
   const lastCollapsed = useRef(collapsed)
   const lastExpanded = useRef(expanded)
@@ -110,15 +108,13 @@ export function useHold({
 
     if (!from || !to) return
 
-    const {x, y, zoom} = flow.getViewport()
+    const {x, y, zoom} = viewport.getViewport()
 
-    moves.jump(async () =>
-      flow.setViewport({
-        x: x - (to.x - from.x) * zoom,
-        y: y - (to.y - from.y) * zoom,
-        zoom,
-      })
-    )
+    void viewport.setViewport({
+      x: x - (to.x - from.x) * zoom,
+      y: y - (to.y - from.y) * zoom,
+      zoom,
+    })
   }, [
     canvasLayout,
     collapsed,
@@ -126,9 +122,8 @@ export function useHold({
     measured,
     allMeasured,
     nodeIdOf,
-    flow,
+    viewport,
     letGo,
-    moves,
   ])
 
   return useCallback(() => {

@@ -1,4 +1,3 @@
-import type {Moves} from '../motion'
 import type {CanvasOrientation} from '@uz/contract/settings'
 
 import {Button} from '#shadcn/ui/button'
@@ -6,12 +5,12 @@ import {Toggle} from '#shadcn/ui/toggle'
 import {ToggleGroup, ToggleGroupItem} from '#shadcn/ui/toggle-group'
 import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
 import {CanvasOrientationSchema} from '@uz/contract/settings'
-import {useReactFlow} from '@xyflow/react'
 import {cn} from 'cn'
 import {FocusIcon, MapIcon, MinusIcon, PlusIcon, ScanIcon} from 'lucide-react'
 import {useRef} from 'react'
 
 import {useReducedMotion} from '../reduced-motion'
+import {useViewport} from '../viewport'
 import {TooltipButton} from './TooltipButton'
 
 interface CanvasControlsProps {
@@ -24,7 +23,6 @@ interface CanvasControlsProps {
   onJump: (replyId: string) => void
   /** Null while there is no Active Thread to zoom to. */
   onZoomToActive: (() => void) | null
-  moves: Moves
   showMap: boolean
   onToggleMap: () => void
 }
@@ -47,11 +45,10 @@ export function CanvasControls({
   failed,
   onJump,
   onZoomToActive,
-  moves,
   showMap,
   onToggleMap,
 }: CanvasControlsProps) {
-  const flow = useReactFlow()
+  const viewport = useViewport()
   const still = useReducedMotion()
 
   return (
@@ -81,20 +78,14 @@ export function CanvasControls({
       <TooltipButton
         label="Zoom in"
         className={TOOL_CLASS}
-        onClick={() =>
-          void moves.glide(async () => flow.zoomIn({duration: still ? 0 : 200}))
-        }
+        onClick={() => void viewport.zoomIn({duration: still ? 0 : 200})}
       >
         <PlusIcon />
       </TooltipButton>
       <TooltipButton
         label="Zoom out"
         className={TOOL_CLASS}
-        onClick={() =>
-          void moves.glide(async () =>
-            flow.zoomOut({duration: still ? 0 : 200})
-          )
-        }
+        onClick={() => void viewport.zoomOut({duration: still ? 0 : 200})}
       >
         <MinusIcon />
       </TooltipButton>
@@ -102,13 +93,11 @@ export function CanvasControls({
         label="Fit the whole Tree"
         className={TOOL_CLASS}
         onClick={() =>
-          void moves.glide(async () =>
-            flow.fitView({
-              padding: 0.15,
-              maxZoom: 1,
-              duration: still ? 0 : 300,
-            })
-          )
+          void viewport.fitView({
+            padding: 0.15,
+            maxZoom: 1,
+            duration: still ? 0 : 300,
+          })
         }
       >
         <ScanIcon />

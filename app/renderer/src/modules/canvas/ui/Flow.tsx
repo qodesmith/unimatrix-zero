@@ -1,19 +1,12 @@
 import type {Collapsed, Expanded} from '../canvas-context'
 import type {CanvasLayout, Size} from '../canvas-layout'
 import type {Deleted} from '../hold'
-import type {Moves} from '../motion'
 import type {TreeIndex} from '../tree'
 import type {Stem, TurnNode} from './TurnNodes'
 import type {CanvasOrientation} from '@uz/contract/settings'
 import type {Edge, NodeChange, Viewport} from '@xyflow/react'
 
-import {
-  Background,
-  MiniMap,
-  ReactFlow,
-  useReactFlow,
-  useStore,
-} from '@xyflow/react'
+import {Background, MiniMap, ReactFlow, useStore} from '@xyflow/react'
 import {cn} from 'cn'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 
@@ -23,6 +16,7 @@ import {useHold} from '../hold'
 import {useReducedMotion} from '../reduced-motion'
 import {slideMs} from '../slide'
 import {isFork} from '../tree'
+import {useViewport} from '../viewport'
 import {ExchangeNode, PromptNode, ReplyNode} from './TurnNodes'
 
 /** A request to bring a Reply into view; every request gets a new sequence. */
@@ -53,7 +47,6 @@ interface FlowProps {
   switching: boolean
   showMap: boolean
   moving: boolean
-  moves: Moves
   onHover: (turnId: string | null) => void
 }
 
@@ -109,10 +102,9 @@ export function Flow({
   switching,
   showMap,
   moving,
-  moves,
   onHover,
 }: FlowProps) {
-  const flow = useReactFlow<TurnNode>()
+  const viewport = useViewport()
   const pane = useRef<HTMLDivElement>(null)
   const canvasWidth = useStore(state => state.width)
   const reducedMotion = useReducedMotion()
@@ -140,7 +132,6 @@ export function Flow({
     measured,
     nodeIdOf,
     panMs,
-    moves,
   })
 
   const allMeasured =
@@ -156,7 +147,6 @@ export function Flow({
     allMeasured,
     nodeIdOf,
     letGo,
-    moves,
   })
 
   const onNodesChange = useCallback(
@@ -228,13 +218,13 @@ export function Flow({
   useEffect(() => {
     if (fitted || !allMeasured) return
 
-    moves.jump(async () => {
-      const fit = await flow.fitView(FIT)
+    async function fit() {
+      await viewport.fitView(FIT)
       setFitted(true)
+    }
 
-      return fit
-    })
-  }, [fitted, allMeasured, flow, moves])
+    void fit()
+  }, [fitted, allMeasured, viewport])
 
   const hasFork = index.replies.some(reply => isFork(index, reply.id))
 
@@ -252,19 +242,17 @@ export function Flow({
     if (focus) setCentered(focus.sequence)
 
     async function fitAll() {
-      await moves.glide(async () =>
-        flow.fitView({
-          padding: 0.15,
-          maxZoom: flow.getZoom(),
-          duration: panMs,
-        })
-      )
+      await viewport.fitView({
+        padding: 0.15,
+        maxZoom: viewport.getZoom(),
+        duration: panMs,
+      })
 
       if (focus?.mode === 'follow') follow(focus.replyId)
     }
 
     void fitAll()
-  }, [forkShown, hasFork, allMeasured, focus, flow, panMs, follow, moves])
+  }, [forkShown, hasFork, allMeasured, focus, viewport, panMs, follow])
 
   // A focus waits for its Reply's box to have a size, and while the first Fork
   // waits to be fitted, the fit takes it instead. A Reply folded away is not
@@ -304,7 +292,7 @@ export function Flow({
         : undefined
 
     const center = input
-      ? flow.screenToFlowPosition({
+      ? viewport.screenToFlowPosition({
           x: input.left + input.width / 2,
           y: input.top + input.height / 2,
         })
@@ -313,13 +301,12 @@ export function Flow({
           y: node.position.y + size.height / 2,
         }
 
-    void moves.glide(async () =>
-      flow.setCenter(center.x, center.y, {
-        zoom: focus.mode === 'input' ? startZoom(canvasWidth) : flow.getZoom(),
-        duration: panMs,
-        interpolate: 'linear',
-      })
-    )
+    void viewport.setCenter(center.x, center.y, {
+      zoom:
+        focus.mode === 'input' ? startZoom(canvasWidth) : viewport.getZoom(),
+      duration: panMs,
+      interpolate: 'linear',
+    })
   }, [
     focus,
     centered,
@@ -329,12 +316,11 @@ export function Flow({
     canvasLayout,
     index,
     measured,
-    flow,
+    viewport,
     panMs,
     follow,
     unfollow,
     canvasWidth,
-    moves,
     release,
   ])
 
@@ -353,7 +339,7 @@ export function Flow({
       onNodesChange={onNodesChange}
       defaultViewport={startAt ?? undefined}
       onMoveStart={event => {
-        if (event) moves.stop()
+        if (event) viewport.stop()
 
         onMoveStart(event)
       }}
@@ -380,8 +366,8 @@ export function Flow({
       {showMap && (
         <div
           className="contents"
-          onPointerDown={moves.stop}
-          onWheel={moves.stop}
+          onPointerDown={viewport.stop}
+          onWheel={viewport.stop}
         >
           <MiniMap
             pannable

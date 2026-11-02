@@ -24,10 +24,10 @@ import {START_MARGIN, TURN_WIDTH, startZoom} from '../canvas-layout'
 import {useChatSlideout} from '../chat-slideout/use-chat-slideout'
 import {useDeletion} from '../deletion'
 import {useEscapeStops} from '../escape-stops'
-import {useMotion} from '../motion'
 import {useReducedMotion} from '../reduced-motion'
 import {slideMs} from '../slide'
 import {indexTurns, isEmpty, pathTo, previousReply} from '../tree'
+import {useMotion} from '../viewport'
 import {CanvasControls} from './CanvasControls'
 import {ChatSlideout} from './ChatSlideout'
 import {Flow} from './Flow'
@@ -423,7 +423,6 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
                         setInputToFocus(activeReplyId)
                     }
               }
-              moves={moves}
               showMap={showMap}
               onToggleMap={() => setShowMap(shown => !shown)}
             />
@@ -442,7 +441,6 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
             switching={switching}
             showMap={showMap}
             moving={moving}
-            moves={moves}
             onHover={setHoverTurnId}
           />
           {chatTurnId !== null && chatEnd && (

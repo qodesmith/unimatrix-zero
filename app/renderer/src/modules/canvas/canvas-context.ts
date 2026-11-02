@@ -1,5 +1,5 @@
-import type {Moves} from './motion'
 import type {TreeIndex} from './tree'
+import type {Moves} from './viewport'
 
 import {createContext, use} from 'react'
 

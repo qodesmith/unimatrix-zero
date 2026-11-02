@@ -1,10 +1,11 @@
 import type {CanvasLayout, Size} from './canvas-layout'
-import type {Moves} from './motion'
 import type {TreeIndex} from './tree'
 import type {Viewport} from '@xyflow/react'
 
-import {useReactFlow, useStore} from '@xyflow/react'
+import {useStore} from '@xyflow/react'
 import {useCallback, useLayoutEffect, useRef} from 'react'
+
+import {useViewport} from './viewport'
 
 /** The room kept between a followed Reply's box and the canvas's edge, in px. */
 const MARGIN = 24
@@ -40,7 +41,6 @@ interface FollowOptions {
   measured: Record<string, Size>
   nodeIdOf: (replyId: string) => string
   panMs: number
-  moves: Moves
 }
 
 /**
@@ -54,9 +54,8 @@ export function useFollow({
   measured,
   nodeIdOf,
   panMs,
-  moves,
 }: FollowOptions) {
-  const flow = useReactFlow()
+  const viewport = useViewport()
   const width = useStore(state => state.width)
   const height = useStore(state => state.height)
   const followed = useRef<Followed | null>(null)
@@ -72,7 +71,7 @@ export function useFollow({
 
       if (!node || !size) return null
 
-      const {x, y, zoom} = flow.getViewport()
+      const {x, y, zoom} = viewport.getViewport()
       const left = node.position.x * zoom + x
       const top = node.position.y * zoom + y
 
@@ -81,18 +80,18 @@ export function useFollow({
         y: {start: top, end: top + size.height * zoom},
       }
     },
-    [nodeIdOf, canvasLayout, measured, flow]
+    [nodeIdOf, canvasLayout, measured, viewport]
   )
 
   const glideTo = useCallback(
     async (target: Viewport) => {
       const sequence = ++glides.current
       glide.current = sequence
-      await moves.glide(async () => flow.setViewport(target, {duration: panMs}))
+      await viewport.setViewport(target, {duration: panMs})
 
       if (glide.current === sequence) glide.current = 0
     },
-    [flow, panMs, moves]
+    [viewport, panMs]
   )
 
   const reveal = useCallback(
@@ -106,13 +105,13 @@ export function useFollow({
 
       if (dx === 0 && dy === 0) return
 
-      const {x, y, zoom} = flow.getViewport()
+      const {x, y, zoom} = viewport.getViewport()
       const target = {x: x + dx, y: y + dy, zoom}
 
       if (gliding) void glideTo(target)
-      else moves.jump(async () => flow.setViewport(target))
+      else void viewport.setViewport(target)
     },
-    [boxOf, width, height, flow, glideTo, moves]
+    [boxOf, width, height, viewport, glideTo]
   )
 
   useLayoutEffect(() => {
