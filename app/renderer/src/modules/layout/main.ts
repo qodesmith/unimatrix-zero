@@ -1,5 +1,7 @@
 export {LayoutProvider} from './ui/LayoutProvider'
 
-export {SidebarToggle} from './ui/SidebarToggle'
+export {LayoutSidebar} from './ui/LayoutSidebar'
 
-export {useLayout, useUpdateLayout} from './use-layout'
+export {SidebarSections} from './ui/SidebarSections'
+
+export {SidebarToggle} from './ui/SidebarToggle'

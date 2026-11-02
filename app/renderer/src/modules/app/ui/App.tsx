@@ -7,34 +7,18 @@ import {
 } from '#modules/connections/main'
 import {
   LayoutProvider,
+  LayoutSidebar,
   SidebarToggle,
-  useLayout,
-  useUpdateLayout,
 } from '#modules/layout/main'
-import {
-  FollowFontSize,
-  SettingsPage,
-  SettingsProvider,
-} from '#modules/settings/main'
-import {NoTreeOpen, TreeList, TreeTitle, useTrees} from '#modules/trees/main'
+import {FollowFontSize, SettingsProvider} from '#modules/settings/main'
+import {NoTreeOpen, TreeTitle, useTrees} from '#modules/trees/main'
 import {LiveReplies} from '#modules/turns/main'
-import {Alert, AlertDescription} from '#shadcn/ui/alert'
-import {Sheet, SheetContent, SheetTrigger} from '#shadcn/ui/sheet'
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-} from '#shadcn/ui/sidebar'
+import {SidebarInset} from '#shadcn/ui/sidebar'
 import {TooltipProvider} from '#shadcn/ui/tooltip'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
-import {SettingsIcon} from 'lucide-react'
 import {useState} from 'react'
+
+import {AppSidebar} from './AppSidebar'
 
 export function App() {
   // oxlint-disable-next-line react/hook-use-state -- created once and never replaced
@@ -60,18 +44,8 @@ export function App() {
 
 function AppLayout() {
   const connections = useConnections()
-  const layout = useLayout()
-  const updateLayout = useUpdateLayout()
-
-  const {
-    trees,
-    hasTrees,
-    openTree,
-    error: treesError,
-    open,
-    create,
-    rename,
-  } = useTrees()
+  const trees = useTrees()
+  const {hasTrees, openTree, create} = trees
 
   // Null until main says whether any Provider is connected.
   const [firstLaunch, setFirstLaunch] = useState<boolean | null>(null)
@@ -97,58 +71,14 @@ function AppLayout() {
   }
 
   return (
-    <SidebarProvider
-      className="h-full min-h-0"
-      open={layout.sidebarOpen}
-      onOpenChange={sidebarOpen => void updateLayout({sidebarOpen})}
+    <LayoutSidebar
+      sidebar={
+        <AppSidebar
+          trees={trees}
+          connections={<Connections connections={connections} />}
+        />
+      }
     >
-      <Sidebar
-        collapsible="offcanvas"
-        role="complementary"
-        inert={!layout.sidebarOpen}
-        className="border-r border-sidebar-border"
-      >
-        <SidebarHeader>
-          <h1 className="px-2 pt-2 text-sm font-semibold">Unimatrix Zero</h1>
-        </SidebarHeader>
-        <SidebarContent>
-          <TreeList
-            trees={trees}
-            hasTrees={hasTrees}
-            openTreeId={openTree?.id ?? null}
-            onCreate={() => void create()}
-            onOpen={treeId => void open(treeId)}
-            onRename={(treeId, title) => void rename(treeId, title)}
-          />
-          {treesError && (
-            <Alert variant="destructive" className="mx-2 w-auto">
-              <AlertDescription className="text-xs">
-                {treesError}
-              </AlertDescription>
-            </Alert>
-          )}
-        </SidebarContent>
-        <SidebarFooter>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <Sheet>
-                <SheetTrigger render={<SidebarMenuButton />}>
-                  <SettingsIcon />
-                  <span>Settings</span>
-                </SheetTrigger>
-                <SheetContent
-                  aria-label="Settings"
-                  className="w-full gap-0 p-0 data-[side=right]:sm:max-w-4xl"
-                >
-                  <SettingsPage
-                    connections={<Connections connections={connections} />}
-                  />
-                </SheetContent>
-              </Sheet>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarFooter>
-      </Sidebar>
       <SidebarInset className="min-h-0 min-w-0 bg-canvas-background">
         {openTree ? (
           <div className="min-h-0 flex-1">
@@ -170,6 +100,6 @@ function AppLayout() {
           </>
         )}
       </SidebarInset>
-    </SidebarProvider>
+    </LayoutSidebar>
   )
 }

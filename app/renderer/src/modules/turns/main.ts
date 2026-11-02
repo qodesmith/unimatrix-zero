@@ -6,7 +6,7 @@ export {LiveReplies} from './ui/LiveReplies'
 
 export {ReplyView} from './ui/ReplyView'
 
-export {useReply} from './use-live-reply'
+export {useReply, useTreeStreaming} from './use-live-reply'
 
 export {useReplyRun} from './reply-run/use-reply-run'
 

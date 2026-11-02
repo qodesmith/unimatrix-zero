@@ -4,7 +4,7 @@ import type {Tree} from '@uz/contract/trees'
 import {bridge} from '#modules/bridge/main'
 import {useEffect, useState} from 'react'
 
-import {applyEvent} from './apply-event'
+import {applyEvent, sortTrees} from './apply-event'
 
 /**
  * Main answers and sends on one ordered channel, so events folded in before
@@ -25,7 +25,7 @@ export function useTrees() {
       const outcome = await bridge().send({type: 'tree.list'})
 
       if (outcome.ok) {
-        setTrees(outcome.value.trees)
+        setTrees(sortTrees(outcome.value.trees))
         setListed(true)
       } else {
         setError(outcome.error.message)
@@ -36,6 +36,16 @@ export function useTrees() {
 
     return unsubscribe
   }, [])
+
+  const openTree = trees.find(tree => tree.id === openTreeId) ?? null
+  const failureInOpenTree = openTree?.unseenFailure === true
+
+  // The user is looking at the open Tree, so a failure in it is seen as it comes.
+  useEffect(() => {
+    if (openTreeId !== null && failureInOpenTree) {
+      void bridge().send({type: 'tree.open', treeId: openTreeId})
+    }
+  }, [openTreeId, failureInOpenTree])
 
   async function run<C extends Command>(command: C) {
     const outcome = await bridge().send(command)
@@ -60,14 +70,20 @@ export function useTrees() {
     await run({type: 'tree.rename', treeId, title})
   }
 
+  /** `TREE_DELETED` drops its row, which closes it if it's open. */
+  async function remove(treeId: string) {
+    await run({type: 'tree.delete', treeId})
+  }
+
   return {
     trees,
     /** Null until main lists the Trees, unless a live event already brought one. */
     hasTrees: trees.length > 0 ? true : listed ? false : null,
-    openTree: trees.find(tree => tree.id === openTreeId) ?? null,
+    openTree,
     error,
     open,
     create,
     rename,
+    remove,
   }
 }
