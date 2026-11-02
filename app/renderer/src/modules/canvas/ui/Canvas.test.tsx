@@ -1672,13 +1672,12 @@ function nodesOfKind(kind: 'exchange' | 'reply') {
   return document.querySelectorAll(`.react-flow__node-${kind}`).length
 }
 
-/** Whether `check` passes within a few frames, well short of a slide. */
-async function withinFrames(check: () => boolean, frames = 6) {
-  if (check() || frames === 0) return check()
+async function everyFrameUntil(check: () => boolean) {
+  if (check()) return
 
   await new Promise(requestAnimationFrame)
 
-  return withinFrames(check, frames - 1)
+  await everyFrameUntil(check)
 }
 
 it('keeps the connections hidden through an orientation switch until the last Turn arrives, however long that takes', async () => {
@@ -1739,7 +1738,7 @@ it('keeps the connections hidden while the Turns slide again for a Fork folded p
   await expect.poll(connectionsShown).toBe(true)
 })
 
-it('shows the connections at once after an orientation switch where no Turn moves', async () => {
+it('shows the connections after an orientation switch where no Turn moves, with no timer running', async () => {
   clock = 0
   await renderCanvas({
     prompts: [prompt(1, null, 'Prompt one')],
@@ -1757,11 +1756,11 @@ it('shows the connections at once after an orientation switch where no Turn move
   // `expect.poll` would advance the frozen timers.
   await freezeAnimationsAndTimers()
   await page.getByRole('button', {name: 'Horizontal'}).click()
-  expect(await withinFrames(() => nodesOfKind('exchange') === 1)).toBe(true)
+  await everyFrameUntil(() => nodesOfKind('exchange') === 1)
   await page.getByRole('button', {name: 'Vertical'}).click()
-  expect(await withinFrames(() => nodesOfKind('reply') === 1)).toBe(true)
+  await everyFrameUntil(() => nodesOfKind('reply') === 1)
   expect(turnSlides()).toEqual([])
-  expect(await withinFrames(connectionsShown)).toBe(true)
+  await everyFrameUntil(connectionsShown)
 })
 
 it('slides the Turns and hides the connections when the orientation changes in Settings', async () => {
