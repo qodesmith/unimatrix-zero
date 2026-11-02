@@ -388,29 +388,30 @@ function layoutUpdates(main: FakeMain) {
   return main.sent.filter(command => command.type === 'layout.update')
 }
 
-/** Each value the app sidebar's `data-state` held before it changed. */
-function watchSidebarState() {
-  const before: (string | null)[] = []
+/** Each width the main area is drawn at, from the first time it is drawn. */
+function watchCanvasWidths() {
+  const widths: number[] = []
 
-  const observer = new MutationObserver(records => {
-    for (const record of records) {
-      if (
-        record.target instanceof Element &&
-        record.target.matches('[data-slot="sidebar"]')
-      ) {
-        before.push(record.oldValue)
-      }
+  const resized = new ResizeObserver(entries => {
+    for (const entry of entries) widths.push(entry.contentRect.width)
+  })
+
+  const added = new MutationObserver(() => {
+    const canvas = document.querySelector('[data-slot="sidebar-inset"]')
+
+    if (canvas) {
+      resized.observe(canvas)
+      added.disconnect()
     }
   })
 
-  observer.observe(document.body, {
-    subtree: true,
-    attributeFilter: ['data-state'],
-    attributeOldValue: true,
+  added.observe(document.body, {subtree: true, childList: true})
+  onTestFinished(() => {
+    added.disconnect()
+    resized.disconnect()
   })
-  onTestFinished(() => observer.disconnect())
 
-  return before
+  return widths
 }
 
 describe('collapsing the sidebar', () => {
@@ -420,6 +421,7 @@ describe('collapsing the sidebar', () => {
     await renderApp()
     await expect.poll(sidebarRight).toBeGreaterThan(0)
     const besideSidebar = canvasWidth()
+    const moved = watchTransitions()
 
     await page.getByRole('button', {name: 'Toggle Sidebar'}).click()
 
@@ -431,6 +433,7 @@ describe('collapsing the sidebar', () => {
 
     await expect.poll(sidebarRight).toBeGreaterThan(0)
     await expect.poll(canvasWidth).toBe(besideSidebar)
+    expect(moved).toContain('resizable-panel')
     expect(layoutUpdates(main)).toEqual([
       {type: 'layout.update', changes: {sidebarOpen: false}},
       {type: 'layout.update', changes: {sidebarOpen: true}},
@@ -450,11 +453,7 @@ describe('collapsing the sidebar', () => {
     await userEvent.keyboard('{Meta>}b{/Meta}')
     await expect.poll(sidebarRight).toBeGreaterThan(0)
 
-    expect(
-      moved.filter(
-        slot => slot === 'sidebar-gap' || slot === 'sidebar-container'
-      )
-    ).toEqual([])
+    expect(moved.filter(slot => slot === 'resizable-panel')).toEqual([])
   })
 
   it('closes from the trigger beside an open Tree’s title', async () => {
@@ -508,7 +507,7 @@ describe('collapsing the sidebar', () => {
   })
 
   it('starts closed when main saved it closed, without showing it open first, then follows main', async () => {
-    const before = watchSidebarState()
+    const widths = watchCanvasWidths()
     const main = fakeMain({layout: {sidebarOpen: false}})
     globalThis.window.uz = main
     await renderApp()
@@ -518,7 +517,8 @@ describe('collapsing the sidebar', () => {
       .toBeVisible()
     await expect.poll(sidebarRight).toBeLessThanOrEqual(0)
     await expect.poll(canvasWidth).toBe(globalThis.innerWidth)
-    expect(before).toEqual([])
+    await expect.poll(() => widths.length).toBeGreaterThan(0)
+    expect(widths.filter(width => width !== globalThis.innerWidth)).toEqual([])
 
     main.publish({
       type: 'LAYOUT_CHANGED',

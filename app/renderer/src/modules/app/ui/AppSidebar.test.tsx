@@ -460,20 +460,34 @@ async function drag(element: Element, by: Point) {
   })
 }
 
+/** Playwright's `dblClick` refuses an element with no width, as the handle is. */
+async function doubleClick(element: Element) {
+  const at = {...centerOf(element), button: 'left'} as const
+
+  for (const clickCount of [1, 2]) {
+    await cdp().send('Input.dispatchMouseEvent', {
+      ...at,
+      clickCount,
+      type: 'mousePressed',
+    })
+    await cdp().send('Input.dispatchMouseEvent', {
+      ...at,
+      clickCount,
+      type: 'mouseReleased',
+    })
+  }
+}
+
 function layoutUpdates(main: FakeMain) {
   return main.sent.filter(command => command.type === 'layout.update')
 }
 
 function sidebarWidth() {
-  return (
-    document
-      .querySelector('[data-slot="sidebar-container"]')
-      ?.getBoundingClientRect().width ?? 0
-  )
+  return sidebar().element().getBoundingClientRect().width
 }
 
 function widthHandle() {
-  return sidebar().getByRole('separator', {name: 'Sidebar width'}).element()
+  return page.getByRole('separator', {name: 'Sidebar width'}).element()
 }
 
 describe('the sidebar’s width', () => {
@@ -491,7 +505,7 @@ describe('the sidebar’s width', () => {
     await drag(widthHandle(), {x: 500, y: 0})
     await expect.poll(sidebarWidth).toBe(640)
 
-    await userEvent.dblClick(widthHandle())
+    await doubleClick(widthHandle())
     await expect.poll(sidebarWidth).toBe(290)
 
     await drag(widthHandle(), {x: -100, y: 0})
@@ -503,7 +517,7 @@ describe('the sidebar’s width', () => {
     ])
   })
 
-  it('widens and narrows from the keyboard, saving each step', async () => {
+  it('widens and narrows from the keyboard, saving each width it lands on', async () => {
     const main = fakeMain()
     await renderApp(main)
     await expect.poll(sidebarWidth).toBe(290)
@@ -513,13 +527,20 @@ describe('the sidebar’s width', () => {
     if (!(handle instanceof HTMLElement)) throw new Error('No width handle')
 
     handle.focus()
-    await userEvent.keyboard('{ArrowRight}{ArrowRight}{ArrowLeft}')
+    await userEvent.keyboard('{ArrowRight}')
+    await expect.poll(sidebarWidth).toBeGreaterThan(290)
+    const wider = sidebarWidth()
 
-    await expect.poll(sidebarWidth).toBe(300)
+    await userEvent.keyboard('{ArrowRight}')
+    await expect.poll(sidebarWidth).toBeGreaterThan(wider)
+    const widest = sidebarWidth()
+
+    await userEvent.keyboard('{ArrowLeft}')
+    await expect.poll(sidebarWidth).toBe(wider)
     expect(layoutUpdates(main)).toEqual([
-      {type: 'layout.update', changes: {sidebarWidth: 300}},
-      {type: 'layout.update', changes: {sidebarWidth: 310}},
-      {type: 'layout.update', changes: {sidebarWidth: 300}},
+      {type: 'layout.update', changes: {sidebarWidth: wider}},
+      {type: 'layout.update', changes: {sidebarWidth: widest}},
+      {type: 'layout.update', changes: {sidebarWidth: wider}},
     ])
   })
 
