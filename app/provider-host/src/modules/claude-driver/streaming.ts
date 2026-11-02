@@ -43,6 +43,7 @@ export interface ClaudeRepliesDeps {
   whenIdle: WhenIdle
   maxWarm: number
   learnModels: (models: ModelInfo[]) => void
+  resolveModel: (id: string) => string
 }
 
 /** How a session's earlier Turns reach `claude`. */
@@ -107,6 +108,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   const warm = createWarmSessions<Live>({
     whenIdle: deps.whenIdle,
     max: deps.maxWarm,
+    resolveModel: deps.resolveModel,
   })
 
   const sessionStore = appSessionStore(deps.store)

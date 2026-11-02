@@ -36,7 +36,7 @@ export function spawnClaude({command, args, cwd, env, signal}: SpawnOptions) {
 }
 
 type ClaudeDriverOptions = Pick<ClaudeRepliesDeps, 'store'> &
-  Partial<Omit<ClaudeRepliesDeps, 'store' | 'learnModels'>>
+  Partial<Omit<ClaudeRepliesDeps, 'store' | 'learnModels' | 'resolveModel'>>
 
 export function createClaudeDriver({
   store,
@@ -56,6 +56,7 @@ export function createClaudeDriver({
     whenIdle,
     maxWarm,
     learnModels: models.learn,
+    resolveModel: models.resolve,
   })
 
   return {

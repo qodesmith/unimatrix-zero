@@ -15,6 +15,14 @@ function session(sessionId: string, messageId: string, model = 'haiku') {
   }
 }
 
+function warmSessions(max: number) {
+  return createWarmSessions({
+    whenIdle: idleFor(1000),
+    max,
+    resolveModel: id => id,
+  })
+}
+
 beforeEach(() => {
   vi.useFakeTimers()
 })
@@ -24,7 +32,7 @@ afterEach(() => {
 })
 
 it('gives back the idle session standing at that Reply', () => {
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
+  const warm = warmSessions(6)
   const one = session('s1', 'm1')
   warm.add(one)
   warm.release(one)
@@ -34,7 +42,7 @@ it('gives back the idle session standing at that Reply', () => {
 })
 
 it('closes one standing elsewhere in the session instead of giving it back', () => {
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
+  const warm = warmSessions(6)
   const one = session('s1', 'm2')
   warm.add(one)
   warm.release(one)
@@ -45,7 +53,7 @@ it('closes one standing elsewhere in the session instead of giving it back', () 
 })
 
 it('closes one on another Model instead of giving it back', () => {
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
+  const warm = warmSessions(6)
   const one = session('s1', 'm1', 'haiku')
   warm.add(one)
   warm.release(one)
@@ -56,7 +64,7 @@ it('closes one on another Model instead of giving it back', () => {
 })
 
 it('closes a session once it has been idle long enough, not before', () => {
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
+  const warm = warmSessions(6)
   const one = session('s1', 'm1')
   warm.add(one)
   warm.release(one)
@@ -69,7 +77,7 @@ it('closes a session once it has been idle long enough, not before', () => {
 })
 
 it('starts the idle wait over after each Reply', () => {
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
+  const warm = warmSessions(6)
   const one = session('s1', 'm1')
   warm.add(one)
   warm.release(one)
@@ -85,7 +93,7 @@ it('starts the idle wait over after each Reply', () => {
 })
 
 it('never closes a session claimed after being released twice', () => {
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
+  const warm = warmSessions(6)
   const one = session('s1', 'm1')
   warm.add(one)
   warm.release(one)
@@ -99,7 +107,7 @@ it('never closes a session claimed after being released twice', () => {
 })
 
 it('closes the longest idle when more than the most are open', () => {
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 2})
+  const warm = warmSessions(2)
   const one = session('s1', 'm')
   const two = session('s2', 'm')
   const three = session('s3', 'm')
@@ -117,7 +125,7 @@ it('closes the longest idle when more than the most are open', () => {
 
 it('says when every `claude` it closed in a session has ended', async () => {
   vi.useRealTimers()
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
+  const warm = warmSessions(6)
   const ending = Promise.withResolvers<undefined>()
   const one = {...session('s1', 'm2'), close: async () => ending.promise}
 
@@ -141,7 +149,7 @@ it('says when every `claude` it closed in a session has ended', async () => {
 })
 
 it('never closes a session writing a Reply to make room', () => {
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 1})
+  const warm = warmSessions(1)
   const one = session('s1', 'm')
   const two = session('s2', 'm')
 

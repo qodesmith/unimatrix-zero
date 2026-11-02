@@ -1,5 +1,6 @@
 import type {Model, ProviderStatus} from '@uz/contract/providers'
 
+import {DEFAULT_MODEL_ID} from '@uz/contract/providers'
 import {expect, it} from 'vitest'
 
 import {pickModel} from './pick-model'
@@ -335,7 +336,7 @@ it('leaves the choice to the first connected Provider while it hasn’t listed a
 
   expect(pick.selected).toEqual({
     provider: 'claude',
-    model: 'default',
+    model: DEFAULT_MODEL_ID,
     name: 'Default',
   })
   expect(pick.heldBecause).toBeNull()

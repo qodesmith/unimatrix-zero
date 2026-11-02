@@ -16,6 +16,8 @@ export interface WarmSession {
 interface WarmOptions {
   whenIdle: WhenIdle
   max: number
+  /** One id for every name of a Model. */
+  resolveModel: (id: string) => string
 }
 
 /**
@@ -25,6 +27,7 @@ interface WarmOptions {
 export function createWarmSessions<Session extends WarmSession>({
   whenIdle,
   max,
+  resolveModel,
 }: WarmOptions) {
   const open = new Set<Session>()
   /** The idle ones, longest idle first, each with what calls off its close. */
@@ -73,13 +76,18 @@ export function createWarmSessions<Session extends WarmSession>({
   return {
     /**
      * Closes it at any other point or on another Model, so `claude` never runs
-     * a session twice.
+     * a session twice. Another name for its Model keeps it.
      */
     claim(ref: SessionRef, model: string): Session | null {
+      const wanted = resolveModel(model)
+
       for (const session of idle.keys()) {
         if (session.sessionId !== ref.sessionId) continue
 
-        if (session.messageId === ref.messageId && session.model === model) {
+        if (
+          session.messageId === ref.messageId &&
+          resolveModel(session.model) === wanted
+        ) {
           wake(session)
 
           return session

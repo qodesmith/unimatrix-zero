@@ -39,3 +39,17 @@ it('tells a list once, and again only when a later `claude` lists other Models',
     needsAppUpdate: false,
   })
 })
+
+it('resolves a name to the Model it stands for, and a name with none to itself', () => {
+  const list = createModelList()
+
+  expect(list.resolve('opus')).toBe('opus')
+
+  list.learn([opus, haiku])
+
+  expect([
+    list.resolve('opus'),
+    list.resolve('haiku'),
+    list.resolve('sonnet'),
+  ]).toEqual(['claude-opus-5-5', 'haiku', 'sonnet'])
+})

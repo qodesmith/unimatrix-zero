@@ -1025,6 +1025,22 @@ it('resumes the session in a new `claude` on the Model a Prompt asks for, closin
   expect(resumed?.runningAtStart).toEqual([])
 })
 
+it('continues in the warm `claude` on another name for its Model', async () => {
+  const claude = await setUp(['warm.ndjson'])
+
+  const first = await claude.reply(FIRST_PROMPT, null, {model: 'default'})
+  await expect
+    .poll(async () => claude.driver.listModels(claude.vendorProgram))
+    .not.toBeNull()
+  await claude.reply(SECOND_PROMPT, recordedIn(first), {model: 'opus'})
+
+  await claude.allClosed()
+  const [warm] = claude.reports()
+
+  expect(claude.reports()).toHaveLength(1)
+  expect(warm?.prompts).toEqual([FIRST_PROMPT, SECOND_PROMPT])
+})
+
 it('lists no Models before a `claude` has run, then those of the newest one, telling each change', async () => {
   const claude = await setUp(['warm.ndjson', 'resumed.ndjson'])
   const changes: Model[][] = []

@@ -48,5 +48,10 @@ export function createModelList() {
     listeners.push(listener)
   }
 
-  return {learn, list: () => kept, onChanged}
+  /** The Model a listed name stands for, and any other name as it is. */
+  function resolve(id: string) {
+    return kept?.find(model => model.id === id)?.resolvesTo ?? id
+  }
+
+  return {learn, list: () => kept, onChanged, resolve}
 }
