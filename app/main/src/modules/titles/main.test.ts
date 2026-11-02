@@ -77,7 +77,7 @@ function sendPrompt(parentReplyId: string | null, text = 'Hi') {
 
 function finish(
   replyId: string,
-  status: 'complete' | 'failed' = 'complete',
+  status: 'complete' | 'stopped' | 'failed' = 'complete',
   text = 'Lisbon in May is mild.'
 ) {
   turns.hostEvent('claude', {type: 'TEXT_DELTA', treeId, replyId, delta: text})
@@ -209,6 +209,14 @@ describe('the automatic title', () => {
     expect(title()).toBeNull()
     expect(published).toEqual([])
     expect(oneShots).toHaveLength(1)
+  })
+
+  it('is written when the first Reply was stopped', async () => {
+    finish(sendPrompt(null), 'stopped')
+    lastOneShot().resolve('Trip to Lisbon')
+    await settled()
+
+    expect(title()).toBe('Trip to Lisbon')
   })
 
   it('waits for a failed first Reply to be retried and finish', async () => {

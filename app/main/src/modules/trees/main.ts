@@ -7,7 +7,7 @@ import {schema} from '#modules/database/main'
 import {TREE_TITLE_MAX_LENGTH} from '@uz/contract/trees'
 import {and, desc, eq, getColumns, isNull, sql} from 'drizzle-orm'
 
-const {trees, prompts} = schema
+const {trees, prompts, replies} = schema
 
 const rootText = sql<string | null>`(
   select ${prompts.text} from ${prompts}
@@ -22,8 +22,10 @@ const lastActiveAt = sql`coalesce(
   ${trees.createdAt}
 )`
 
+/** Prompts and Replies alike: each is a Turn. */
 const turnCount = sql<number>`(
-  select count(*) from ${prompts} where ${prompts.treeId} = ${trees.id}
+  (select count(*) from ${prompts} where ${prompts.treeId} = ${trees.id}) +
+  (select count(*) from ${replies} where ${replies.treeId} = ${trees.id})
 )`
 
 const rowFields = {

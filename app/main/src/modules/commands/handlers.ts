@@ -76,7 +76,6 @@ export const handlers: Handlers = {
       )
     }
 
-    // Its Provider sessions stay for now (#102).
     trees.delete(treeId)
     publish({type: 'TREE_DELETED', treeId})
 

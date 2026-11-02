@@ -6,7 +6,7 @@ import type {Command} from '@uz/contract/commands'
 import type {Tree} from '@uz/contract/trees'
 import type {ReactNode} from 'react'
 
-import {describe, expect, it} from 'vitest'
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {cdp, page, userEvent} from 'vitest/browser'
 
@@ -15,10 +15,15 @@ import {App} from './App'
 
 const MINUTE = 60_000
 
-/** Half a minute past `minutes` ago, so the row reads the same for 30 seconds. */
+const NOW = Date.parse('2026-11-01T12:00:00.000Z')
+
 function minutesAgo(minutes: number) {
-  return new Date(Date.now() - minutes * MINUTE - MINUTE / 2).toISOString()
+  return new Date(NOW - minutes * MINUTE).toISOString()
 }
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 /** The canvas fills its parent, so it needs one with a height. */
 function FullHeight({children}: {children: ReactNode}) {
@@ -48,6 +53,11 @@ function sentOf(main: FakeMain, type: string) {
 }
 
 describe('a Tree’s row', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({toFake: ['Date']})
+    vi.setSystemTime(NOW)
+  })
+
   it('shows the root Prompt’s first line in italics until the automatic title replaces it', async () => {
     const tree = savedTree({firstLine: 'Plan a week in Lisbon', turnCount: 2})
     const main = fakeMain({trees: [tree]})

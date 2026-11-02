@@ -265,7 +265,7 @@ describe('Trees', () => {
 })
 
 describe('a Tree’s row', () => {
-  it('shows the root Prompt’s first line, how many Prompts it has and when the last was sent, and tells every window as each is sent', async () => {
+  it('shows the root Prompt’s first line, how many Turns it has and when the last was sent, and tells every window as each is sent', async () => {
     const tree = await createTree()
     clock = new Date('2026-10-19T13:00:00.000Z')
 
@@ -282,13 +282,13 @@ describe('a Tree’s row', () => {
     const first = {
       ...tree,
       firstLine: 'Plan a trip to Lisbon',
-      turnCount: 1,
+      turnCount: 2,
       lastActiveAt: '2026-10-19T13:00:00.000Z',
     }
 
     const second = {
       ...first,
-      turnCount: 2,
+      turnCount: 4,
       lastActiveAt: '2026-10-19T14:00:00.000Z',
     }
 
@@ -332,8 +332,8 @@ describe('a Tree’s row', () => {
       promptId: next.prompt.id,
     })
 
-    expect(changed().at(-1)).toMatchObject({id: tree.id, turnCount: 1})
-    expect((await listed())[0]?.turnCount).toBe(1)
+    expect(changed().at(-1)).toMatchObject({id: tree.id, turnCount: 2})
+    expect((await listed())[0]?.turnCount).toBe(2)
   })
 
   it.each([

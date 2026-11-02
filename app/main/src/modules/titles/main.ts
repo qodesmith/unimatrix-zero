@@ -1,7 +1,7 @@
 import type {Trees} from '#modules/trees/main'
 import type {FinishedReply, Turns} from '#modules/turns/main'
 import type {AppEvent} from '@uz/contract/events'
-import type {SignInRequest} from '@uz/contract/host'
+import type {OneShotRequest, SignInRequest} from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
 import type {Reply} from '@uz/contract/turns'
 
@@ -9,6 +9,12 @@ import {TREE_TITLE_MAX_LENGTH} from '@uz/contract/trees'
 
 /** How much of the root Prompt, and of its Reply, the one-shot reads. */
 const EXCERPT_LENGTH = 2000
+
+/** A stopped Reply has finished too: its text so far is what it says. */
+const FINISHED: ReadonlySet<FinishedReply['status']> = new Set([
+  'complete',
+  'stopped',
+])
 
 const EDGE_MARKS = /^[\s#>*_`"'“”‘’]+|[\s*_`"'“”‘’.]+$/g
 
@@ -18,7 +24,7 @@ interface TitlesDeps {
   /** Rejects when the Provider can't answer. */
   runOneShot: (
     provider: ProviderId,
-    request: {prompt: string; vendorProgram: SignInRequest}
+    request: Omit<OneShotRequest, 'model'>
   ) => Promise<string>
   vendorProgramFor: (provider: ProviderId) => SignInRequest
   publish: (event: AppEvent) => void
@@ -62,7 +68,7 @@ export function createTitles({
 }: TitlesDeps) {
   /** The Reply when it answers the root Prompt of an untitled Tree. */
   function firstExchange({treeId, replyId, status}: FinishedReply) {
-    if (status !== 'complete' || trees.get(treeId)?.title !== null) return null
+    if (!FINISHED.has(status) || trees.get(treeId)?.title !== null) return null
 
     const {prompts, replies} = turnsOf(treeId)
     const reply = replies.find(candidate => candidate.id === replyId)

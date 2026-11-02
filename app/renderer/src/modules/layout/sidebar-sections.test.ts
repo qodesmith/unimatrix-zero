@@ -48,7 +48,6 @@ it('arranges a drag’s sizes back to the layout dragged to', () => {
 })
 
 it('resets two sections to the default split of their space, leaving the third alone', () => {
-  // The defaults are 55 / 30 / 15.
   expect(
     resetSplit(
       {

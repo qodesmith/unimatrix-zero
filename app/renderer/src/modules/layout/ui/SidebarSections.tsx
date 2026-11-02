@@ -16,7 +16,7 @@ import {useGroupRef} from 'react-resizable-panels'
 import {SECTION_IDS, arrange, resetSplit, resized} from '../sidebar-sections'
 import {useLayout, useUpdateLayout} from '../use-layout'
 
-export interface SidebarSection {
+export interface SectionContent {
   title: string
   /** Buttons at the header's end, shown while collapsed too. */
   actions?: ReactNode
@@ -63,7 +63,7 @@ function headerShare(
  * headers that collapse a section to themselves, all kept in the Layout.
  */
 export function SidebarSections(
-  props: Record<SidebarSectionId, SidebarSection>
+  props: Record<SidebarSectionId, SectionContent>
 ) {
   const {sidebarSections: sections} = useLayout()
   const updateLayout = useUpdateLayout()
@@ -169,7 +169,7 @@ export function SidebarSections(
   )
 }
 
-interface SectionProps extends SidebarSection {
+interface SectionProps extends SectionContent {
   collapsed: boolean
   headerRef: RefObject<HTMLDivElement | null> | undefined
   onToggle: () => void
