@@ -1621,8 +1621,7 @@ async function setPlaybackRate(playbackRate: number) {
   await cdp().send('Animation.setPlaybackRate', {playbackRate})
 }
 
-/** Freezes every animation and timer until the test lets them go. */
-async function freezeAnimations() {
+async function freezeAnimationsAndTimers() {
   await cdp().send('Animation.enable')
   await setPlaybackRate(0)
   onTestFinished(async () => setPlaybackRate(1))
@@ -1640,7 +1639,7 @@ it('keeps the slideout until its slide out ends, however long that takes', async
   const aside = slideout().element()
   await expect.poll(() => sliding(aside)).toBe(false)
 
-  await freezeAnimations()
+  await freezeAnimationsAndTimers()
   await slideout().getByRole('button', {name: 'Close'}).click()
   await expect.poll(() => sliding(aside)).toBe(true)
   vi.runOnlyPendingTimers()
@@ -1688,7 +1687,7 @@ it('keeps the connections hidden through an orientation switch until the last Tu
   await settledViewport()
   expect(connectionsShown()).toBe(true)
 
-  await freezeAnimations()
+  await freezeAnimationsAndTimers()
   await page.getByRole('button', {name: 'Horizontal'}).click()
   await expect.poll(() => turnSlides().length).toBeGreaterThan(0)
   vi.runOnlyPendingTimers()
@@ -1708,11 +1707,9 @@ it('keeps the connections hidden while the Turns slide again for a Fork folded p
   await expect.element(page.getByText('Reply five')).toBeVisible()
   await settledViewport()
 
-  await freezeAnimations()
+  await freezeAnimationsAndTimers()
   await page.getByRole('button', {name: 'Horizontal'}).click()
-  await expect
-    .poll(() => document.querySelectorAll('.react-flow__node-exchange').length)
-    .toBe(5)
+  await expect.poll(() => nodesOfKind('exchange')).toBe(5)
   await expect.poll(() => turnSlides().length).toBeGreaterThan(0)
   const firstSlides = new Set(turnSlides())
 
@@ -1758,7 +1755,7 @@ it('shows the connections at once after an orientation switch where no Turn move
   await expect.poll(connectionsShown).toBe(true)
 
   // `expect.poll` would advance the frozen timers.
-  await freezeAnimations()
+  await freezeAnimationsAndTimers()
   await page.getByRole('button', {name: 'Horizontal'}).click()
   expect(await withinFrames(() => nodesOfKind('exchange') === 1)).toBe(true)
   await page.getByRole('button', {name: 'Vertical'}).click()
@@ -1772,7 +1769,7 @@ it('slides the Turns and hides the connections when the orientation changes in S
   await expect.element(page.getByText('Reply five')).toBeVisible()
   await settledViewport()
 
-  await freezeAnimations()
+  await freezeAnimationsAndTimers()
   main.publish({
     type: 'SETTINGS_CHANGED',
     settings: {...DEFAULT_SETTINGS, canvasOrientation: 'horizontal'},
