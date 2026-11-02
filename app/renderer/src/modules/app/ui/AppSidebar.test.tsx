@@ -199,7 +199,15 @@ describe('renaming a Tree', () => {
   })
 
   it('renames it from its ⋯ menu, which holds only Rename and Delete…', async () => {
-    await renderApp(fakeMain({trees: [savedTree({title: 'Draft'})]}))
+    await renderApp(
+      fakeMain({
+        trees: [savedTree({title: 'Draft'}), savedTree({title: 'Other'})],
+      })
+    )
+    await sidebar().getByRole('button', {name: 'Actions for Other'}).click()
+    await expect.element(page.getByRole('menu')).toBeVisible()
+    await userEvent.keyboard('{Escape}')
+    await expect.element(page.getByRole('menu')).not.toBeInTheDocument()
 
     await sidebar().getByRole('button', {name: 'Actions for Draft'}).click()
     const menu = page.getByRole('menu')
@@ -212,10 +220,11 @@ describe('renaming a Tree', () => {
     ).toEqual(['Rename', 'Delete…'])
 
     await menu.getByRole('menuitem', {name: 'Rename'}).click()
+    await expect.element(menu).not.toBeInTheDocument()
+
     const input = page.getByRole('textbox', {name: 'Tree name'})
     await expect.element(input).toHaveFocus()
-    await input.fill('Trip planning')
-    await userEvent.keyboard('{Enter}')
+    await userEvent.keyboard('Trip planning{Enter}')
 
     await expect.element(treeRow('Trip planning')).toBeVisible()
   })

@@ -47,6 +47,7 @@ export function TreeRow({
   onDelete,
 }: TreeRowProps) {
   const detailsId = useId()
+  const renameChosen = useRef(false)
 
   function onKeyDown(event: KeyboardEvent) {
     if (event.key === 'F2') onStartRename()
@@ -76,15 +77,32 @@ export function TreeRow({
         </span>
       </SidebarMenuButton>
       <TreeDetails id={detailsId} tree={tree} />
-      <DropdownMenu>
+      <DropdownMenu
+        onOpenChange={open => {
+          if (open) renameChosen.current = false
+        }}
+      >
         <DropdownMenuTrigger
           render={<SidebarMenuAction showOnHover />}
           aria-label={`Actions for ${treeName(tree)}`}
         >
           <MoreHorizontalIcon />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-auto">
-          <DropdownMenuItem onClick={onStartRename}>Rename</DropdownMenuItem>
+        <DropdownMenuContent
+          align="end"
+          className="w-auto"
+          // Rename unmounts this trigger, so Base UI would return focus to an
+          // older element still on the page and blur the rename input.
+          finalFocus={() => !renameChosen.current}
+        >
+          <DropdownMenuItem
+            onClick={() => {
+              renameChosen.current = true
+              onStartRename()
+            }}
+          >
+            Rename
+          </DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onClick={onDelete}>
             Delete…
           </DropdownMenuItem>
@@ -161,6 +179,7 @@ function RenameInput({tree, onDone}: RenameInputProps) {
       className="h-8 bg-background px-2"
       value={title}
       onChange={event => setTitle(event.target.value)}
+      onFocus={event => event.currentTarget.select()}
       onKeyDown={onKeyDown}
       onBlur={commit}
     />
