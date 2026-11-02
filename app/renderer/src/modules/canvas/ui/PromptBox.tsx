@@ -1,6 +1,7 @@
 import type {PromptDeleteState} from '../prompt-delete/machine'
 import type {ReactNode} from 'react'
 
+import {DeleteTreeDialog, useTreeDelete} from '#modules/trees/main'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,6 +15,7 @@ import {
 import {cn} from 'cn'
 import {TrashIcon} from 'lucide-react'
 
+import {useCanvas} from '../canvas-context'
 import {usePromptDelete} from '../prompt-delete/use-prompt-delete'
 import {TooltipButton} from './TooltipButton'
 
@@ -81,19 +83,80 @@ function Confirmation({
   )
 }
 
+interface DeleteControlProps {
+  label: string
+  /** Shown only while the pointer or focus is on the Prompt. */
+  idle: boolean
+  onClick: () => void
+  children: ReactNode
+}
+
+function DeleteControl({label, idle, onClick, children}: DeleteControlProps) {
+  return (
+    <div
+      data-delete
+      className={cn(
+        'absolute top-1 right-1 z-10 transition-opacity',
+        idle &&
+          'opacity-0 group-hover/prompt:opacity-100 focus-within:opacity-100'
+      )}
+    >
+      <TooltipButton
+        label={label}
+        className="size-6 bg-card text-muted-foreground shadow-sm hover:text-destructive"
+        onClick={onClick}
+      >
+        <TrashIcon className="size-3.5" />
+      </TooltipButton>
+      {children}
+    </div>
+  )
+}
+
+/** Offered while its Replies stream too: main stops them first. */
+function TreeDelete() {
+  const {treeId} = useCanvas()
+  const {ask, dialog} = useTreeDelete(treeId)
+
+  return (
+    <DeleteControl label="Delete this Tree" idle={!dialog.open} onClick={ask}>
+      <DeleteTreeDialog {...dialog} />
+    </DeleteControl>
+  )
+}
+
+function PromptDelete({promptId}: {promptId: string}) {
+  const {state, offered, turnCount, arm, cancel, confirm} =
+    usePromptDelete(promptId)
+
+  if (!offered) return null
+
+  return (
+    <DeleteControl
+      label="Delete this Prompt and everything below it"
+      idle={state.status === 'idle'}
+      onClick={arm}
+    >
+      <Confirmation
+        state={state}
+        turnCount={turnCount}
+        onConfirm={confirm}
+        onCancel={cancel}
+      />
+    </DeleteControl>
+  )
+}
+
 interface PromptBoxProps {
   promptId: string
   className: string
   children: ReactNode
 }
 
-/**
- * A Prompt's box, with its delete control drawn over its top-right corner, so
- * it shifts nothing on the canvas.
- */
+/** The delete control overlays its corner, shifting nothing on the canvas. */
 export function PromptBox({promptId, className, children}: PromptBoxProps) {
-  const {state, offered, turnCount, arm, cancel, confirm} =
-    usePromptDelete(promptId)
+  const {index} = useCanvas()
+  const isRoot = index.promptById.get(promptId)?.parentReplyId === null
 
   return (
     <div
@@ -101,30 +164,7 @@ export function PromptBox({promptId, className, children}: PromptBoxProps) {
       className={cn('group/prompt relative', className)}
     >
       {children}
-      {offered && (
-        <div
-          data-delete
-          className={cn(
-            'absolute top-1 right-1 z-10 transition-opacity',
-            state.status === 'idle' &&
-              'opacity-0 group-hover/prompt:opacity-100 focus-within:opacity-100'
-          )}
-        >
-          <TooltipButton
-            label="Delete this Prompt and everything below it"
-            className="size-6 bg-card text-muted-foreground shadow-sm hover:text-destructive"
-            onClick={arm}
-          >
-            <TrashIcon className="size-3.5" />
-          </TooltipButton>
-          <Confirmation
-            state={state}
-            turnCount={turnCount}
-            onConfirm={confirm}
-            onCancel={cancel}
-          />
-        </div>
-      )}
+      {isRoot ? <TreeDelete /> : <PromptDelete promptId={promptId} />}
     </div>
   )
 }

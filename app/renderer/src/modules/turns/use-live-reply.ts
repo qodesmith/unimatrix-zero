@@ -34,6 +34,13 @@ export function useReply(reply: Reply | null) {
   )
 }
 
+/** Whether a Reply in the Tree is streaming in this window now. */
+export function useTreeStreaming(treeId: string) {
+  return useSelector(useReplyStore(), state =>
+    Object.values(state.replies).some(reply => reply.treeId === treeId)
+  )
+}
+
 const NO_BLOCKS: never[] = []
 
 /** The Reply's Thinking blocks, while this window has been open. */

@@ -37,15 +37,22 @@ export const TreeCreatedEvent = z.strictObject({
   tree: TreeSchema,
 })
 
-export const TreeRenamedEvent = z.strictObject({
-  type: z.literal('TREE_RENAMED'),
+/** Anything on its row changed: its title, activity or failure. */
+export const TreeChangedEvent = z.strictObject({
+  type: z.literal('TREE_CHANGED'),
   tree: TreeSchema,
+})
+
+export const TreeDeletedEvent = z.strictObject({
+  type: z.literal('TREE_DELETED'),
+  treeId: z.uuid(),
 })
 
 export const EventSchema = z.discriminatedUnion('type', [
   SnapshotEvent,
   TreeCreatedEvent,
-  TreeRenamedEvent,
+  TreeChangedEvent,
+  TreeDeletedEvent,
   SettingsChangedEvent,
   LayoutChangedEvent,
   ReplyEventSchema,

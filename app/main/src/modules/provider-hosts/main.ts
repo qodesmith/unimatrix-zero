@@ -1,5 +1,7 @@
 import type {
   HostCommand,
+  OneShotFinished,
+  OneShotRequest,
   PromptDropped,
   PromptRecorded,
   ReplyRecorded,
@@ -16,6 +18,7 @@ import type {
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {HostMessageSchema} from '@uz/contract/host'
+import {randomUUID} from 'node:crypto'
 
 export interface HostProcess {
   post(command: HostCommand): void
@@ -31,12 +34,22 @@ export const RESTART_DELAYS_MS = [1000, 5000, 30_000]
 /** A host that stays up this long after reporting ready has recovered. */
 export const STABLE_AFTER_MS = 60_000
 
+export const ONE_SHOT_TIMEOUT_MS = 60_000
+
+interface PendingOneShot {
+  resolve: (text: string) => void
+  reject: (error: Error) => void
+  timer: ReturnType<typeof setTimeout>
+}
+
 interface Host {
   process: HostProcess | null
   /** Set once the host reports ready. */
   models: Model[] | null
+  smallestModel: string | null
   restarts: number
   timers: Set<ReturnType<typeof setTimeout>>
+  oneShots: Map<string, PendingOneShot>
 }
 
 export type HostStatus = Extract<
@@ -104,10 +117,32 @@ export function createProviderHosts({
     host.timers.clear()
   }
 
+  function settleOneShot(host: Host, {requestId, outcome}: OneShotFinished) {
+    const pending = host.oneShots.get(requestId)
+
+    if (!pending) return
+
+    host.oneShots.delete(requestId)
+    clearTimeout(pending.timer)
+
+    if (outcome.ok) pending.resolve(outcome.text)
+    else pending.reject(new Error(outcome.message))
+  }
+
+  function failOneShots(host: Host, message: string) {
+    for (const pending of host.oneShots.values()) {
+      clearTimeout(pending.timer)
+      pending.reject(new Error(message))
+    }
+
+    host.oneShots.clear()
+  }
+
   function start(provider: ProviderId, host: Host) {
     const child = spawn(provider)
     host.process = child
     host.models = null
+    host.smallestModel = null
     onStatus(provider, 'starting')
 
     child.onMessage(raw => {
@@ -119,6 +154,7 @@ export function createProviderHosts({
 
       if (message.type === 'HOST_READY') {
         host.models = message.models
+        host.smallestModel = message.smallestModel
         later(host, STABLE_AFTER_MS, () => {
           host.restarts = 0
         })
@@ -136,6 +172,8 @@ export function createProviderHosts({
         onSessionCut(provider, message)
       } else if (message.type === 'REPLY_RECORDED') {
         onReplyRecorded(provider, message)
+      } else if (message.type === 'ONE_SHOT_FINISHED') {
+        settleOneShot(host, message)
       } else if (message.type === 'SESSION_STORE') {
         child.post({
           type: 'session-store.result',
@@ -152,7 +190,9 @@ export function createProviderHosts({
 
       host.process = null
       host.models = null
+      host.smallestModel = null
       clearTimers(host)
+      failOneShots(host, `The ${provider} host stopped unexpectedly.`)
       onCrash(provider)
 
       // Main may have stopped it while handling the crash.
@@ -180,6 +220,7 @@ export function createProviderHosts({
 
     hosts.delete(provider)
     clearTimers(host)
+    failOneShots(host, `The ${provider} host was stopped.`)
     const child = host.process
     host.process = null
     child?.kill()
@@ -192,15 +233,16 @@ export function createProviderHosts({
       const host: Host = {
         process: null,
         models: null,
+        smallestModel: null,
         restarts: 0,
         timers: new Set(),
+        oneShots: new Map(),
       }
 
       hosts.set(provider, host)
       start(provider, host)
     },
 
-    /** A ready host's Provider (`only`, if given) and its default Model. */
     ready(only?: ProviderId): {provider: ProviderId; model: Model} | null {
       for (const [provider, host] of hosts) {
         const model = host.models?.[0]
@@ -219,6 +261,39 @@ export function createProviderHosts({
       if (!child) throw new Error(`The ${provider} host is not running.`)
 
       child.post(command)
+    },
+
+    /**
+     * A tiny tool-free request outside any Tree, on the Provider's smallest
+     * Model; rejects when the host can't run it, exits first or takes too long.
+     */
+    async runOneShot(
+      provider: ProviderId,
+      request: Omit<OneShotRequest, 'model'>
+    ): Promise<string> {
+      const host = hosts.get(provider)
+      const child = host?.process
+      const model = host?.smallestModel
+
+      if (!host || !child || !host.models || !model) {
+        throw new Error(`The ${provider} host can’t run a one-shot.`)
+      }
+
+      const requestId = randomUUID()
+
+      return new Promise<string>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          host.oneShots.delete(requestId)
+          reject(new Error(`The ${provider} host took too long to answer.`))
+        }, ONE_SHOT_TIMEOUT_MS)
+
+        host.oneShots.set(requestId, {resolve, reject, timer})
+        child.post({
+          type: 'one-shot.run',
+          requestId,
+          request: {...request, model},
+        })
+      })
     },
 
     stop,

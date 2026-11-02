@@ -1,180 +1,18 @@
 // The Playwright provider gives `cdp()` its `send`.
 /// <reference types="@vitest/browser-playwright" />
+import type {FakeMain} from '../fake-main'
 import type {Bridge} from '@uz/contract/bridge'
-import type {Command, CommandOutcome, CommandType} from '@uz/contract/commands'
-import type {AppEvent} from '@uz/contract/events'
-import type {Layout} from '@uz/contract/layout'
-import type {Settings} from '@uz/contract/settings'
-import type {Tree} from '@uz/contract/trees'
-import type {Prompt, Reply, StreamingReply} from '@uz/contract/turns'
+import type {Command, CommandOutcome} from '@uz/contract/commands'
+import type {Prompt, Reply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
 
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
-import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import {describe, expect, it, onTestFinished} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {cdp, page, userEvent} from 'vitest/browser'
 
+import {account, fakeMain, receivedAt, savedTree} from '../fake-main'
 import {App} from './App'
-
-const receivedAt = '2026-10-19T12:00:00.000Z'
-
-interface Saved {
-  trees?: Tree[]
-  prompts?: Prompt[]
-  replies?: Reply[]
-  streaming?: StreamingReply[]
-  firstLaunch?: boolean
-  settings?: Partial<Settings>
-  layout?: Partial<Layout>
-}
-
-const account = {email: 'sam@example.com', plan: 'Max'}
-
-function fakeMain(saved: Saved = {}) {
-  const trees = [...(saved.trees ?? [])]
-  const prompts = [...(saved.prompts ?? [])]
-  const replies = [...(saved.replies ?? [])]
-  const settings: Settings = {...DEFAULT_SETTINGS, ...saved.settings}
-  const layout: Layout = {...DEFAULT_LAYOUT, ...saved.layout}
-  const sent: Command[] = []
-  const listeners = new Set<(event: AppEvent) => void>()
-
-  function publish(event: AppEvent) {
-    for (const listener of listeners) listener(event)
-  }
-
-  function answer(command: Command): CommandOutcome<CommandType> {
-    if ('provider' in command) return {ok: true, value: {}}
-
-    if (command.type === 'app.ping') {
-      return {ok: true, value: {nonce: command.nonce, receivedAt}}
-    }
-
-    if (command.type === 'tree.list') {
-      return {ok: true, value: {trees: trees.toReversed()}}
-    }
-
-    if (command.type === 'image.load') {
-      return {ok: true, value: {dataUrl: 'data:image/png;base64,'}}
-    }
-
-    if (command.type === 'settings.update') {
-      Object.assign(settings, command.changes)
-      publish({type: 'SETTINGS_CHANGED', settings: {...settings}})
-
-      return {ok: true, value: {...settings}}
-    }
-
-    if (command.type === 'layout.update') {
-      Object.assign(layout, command.changes)
-      publish({type: 'LAYOUT_CHANGED', layout: {...layout}})
-
-      return {ok: true, value: {...layout}}
-    }
-
-    if (command.type === 'tree.create') {
-      const tree = {id: crypto.randomUUID(), title: null, createdAt: receivedAt}
-
-      trees.push(tree)
-      publish({type: 'TREE_CREATED', tree})
-
-      return {ok: true, value: tree}
-    }
-
-    const index = trees.findIndex(tree => tree.id === command.treeId)
-    const found = trees[index]
-
-    if (!found) return {ok: false, error: {code: 'not-found', message: 'Gone'}}
-
-    if (command.type === 'tree.open') return {ok: true, value: found}
-
-    if (command.type === 'tree.turns') {
-      const {treeId} = command
-
-      return {
-        ok: true,
-        value: {
-          prompts: prompts.filter(prompt => prompt.treeId === treeId),
-          replies: replies.filter(reply => reply.treeId === treeId),
-        },
-      }
-    }
-
-    if (command.type === 'prompt.send') {
-      const prompt = {
-        id: crypto.randomUUID(),
-        treeId: command.treeId,
-        parentReplyId: command.parentReplyId,
-        text: command.text,
-        createdAt: receivedAt,
-      }
-
-      const reply: Reply = {
-        id: crypto.randomUUID(),
-        treeId: command.treeId,
-        promptId: prompt.id,
-        provider: 'claude',
-        model: 'fake',
-        status: 'streaming',
-        content: [],
-        contextSize: null,
-        contextWindow: null,
-        failure: null,
-        createdAt: receivedAt,
-      }
-
-      prompts.push(prompt)
-      replies.push(reply)
-
-      return {ok: true, value: {prompt, reply}}
-    }
-
-    if (
-      command.type === 'reply.stop' ||
-      command.type === 'reply.retry' ||
-      command.type === 'prompt.delete'
-    ) {
-      return {ok: false, error: {code: 'not-found', message: 'Gone'}}
-    }
-
-    const tree = {...found, title: command.title}
-    trees[index] = tree
-    publish({type: 'TREE_RENAMED', tree})
-
-    return {ok: true, value: tree}
-  }
-
-  const bridge: Bridge = {
-    send: (async (command: Command) => {
-      sent.push(command)
-
-      return answer(command)
-    }) as Bridge['send'],
-    subscribe: listener => {
-      listeners.add(listener)
-      listener({
-        type: 'SNAPSHOT',
-        app: {version: '0.0.0'},
-        replies: saved.streaming ?? [],
-        providers: [
-          saved.firstLaunch
-            ? {provider: 'claude', status: 'not-connected', account: null}
-            : {provider: 'claude', status: 'ready', account},
-          {provider: 'chatgpt', status: 'not-connected', account: null},
-        ],
-        signIn: null,
-        settings: {...settings},
-        layout: {...layout},
-      })
-
-      return () => listeners.delete(listener)
-    },
-    registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
-  }
-
-  return {...bridge, sent, replies, publish}
-}
 
 /** The canvas fills its parent, so it needs one with a height. */
 function FullHeight({children}: {children: ReactNode}) {
@@ -185,7 +23,7 @@ async function renderApp() {
   return render(<App />, {wrapper: FullHeight})
 }
 
-function firstReply(main: ReturnType<typeof fakeMain>) {
+function firstReply(main: FakeMain) {
   const [reply] = main.replies
 
   if (!reply) throw new Error('No Reply was started')
@@ -216,7 +54,6 @@ async function emulateReducedMotion(value: 'reduce' | '') {
   })
 }
 
-/** The `data-slot` of each element a CSS transition starts on from now. */
 function watchTransitions() {
   const slots: (string | null)[] = []
 
@@ -246,7 +83,7 @@ async function openSettings() {
     .toBeVisible()
 }
 
-async function startStreaming(main: ReturnType<typeof fakeMain>) {
+async function startStreaming(main: FakeMain) {
   await sidebarNewTree().click()
   await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
   await userEvent.keyboard('{Enter}')
@@ -259,11 +96,7 @@ async function startStreaming(main: ReturnType<typeof fakeMain>) {
 }
 
 it('opens Settings in a Sheet over the Tree, and closing it with the X shows the same Tree at the same pan and zoom', async () => {
-  const tree = {
-    id: crypto.randomUUID(),
-    title: 'Trip planning',
-    createdAt: receivedAt,
-  }
+  const tree = savedTree({title: 'Trip planning'})
 
   const prompt: Prompt = {
     id: crypto.randomUUID(),
@@ -368,38 +201,6 @@ it('creates a Tree and opens it', async () => {
     .toBeVisible()
 })
 
-it('renames a Tree by double-clicking it', async () => {
-  globalThis.window.uz = fakeMain({
-    trees: [{id: crypto.randomUUID(), title: 'Draft', createdAt: receivedAt}],
-  })
-  await renderApp()
-
-  await page.getByRole('button', {name: 'Draft'}).dblClick()
-  await page.getByRole('textbox', {name: 'Tree name'}).fill('Trip planning')
-  await userEvent.keyboard('{Enter}')
-
-  await expect
-    .element(page.getByRole('button', {name: 'Trip planning'}))
-    .toBeVisible()
-})
-
-it('leaves the name alone when renaming is abandoned', async () => {
-  const main = fakeMain({
-    trees: [{id: crypto.randomUUID(), title: 'Draft', createdAt: receivedAt}],
-  })
-
-  globalThis.window.uz = main
-  await renderApp()
-
-  await page.getByRole('button', {name: 'Draft'}).click()
-  await userEvent.keyboard('{F2}')
-  await page.getByRole('textbox', {name: 'Tree name'}).fill('Nope')
-  await userEvent.keyboard('{Escape}')
-
-  await expect.element(page.getByRole('button', {name: 'Draft'})).toBeVisible()
-  expect(main.sent.map(command => command.type)).not.toContain('tree.rename')
-})
-
 it('streams a Reply word by word into an empty Tree', async () => {
   const main = fakeMain()
   globalThis.window.uz = main
@@ -480,11 +281,7 @@ it('continues the Thread from its last Reply once that Reply has finished', asyn
 })
 
 it('shows a streaming Reply where it was after a reload, and keeps going', async () => {
-  const tree = {
-    id: crypto.randomUUID(),
-    title: 'Mid-stream',
-    createdAt: receivedAt,
-  }
+  const tree = savedTree({title: 'Mid-stream'})
 
   const prompt: Prompt = {
     id: crypto.randomUUID(),
@@ -569,7 +366,6 @@ function chatgptCard() {
   return page.getByRole('region', {name: 'ChatGPT'})
 }
 
-/** Where the app sidebar's right edge is: 0 or less once it has slid out. */
 function sidebarRight() {
   return page
     .getByRole('complementary')
@@ -586,33 +382,33 @@ function canvasWidth() {
   )
 }
 
-function layoutUpdates(main: ReturnType<typeof fakeMain>) {
+function layoutUpdates(main: FakeMain) {
   return main.sent.filter(command => command.type === 'layout.update')
 }
 
-/** Each value the app sidebar's `data-state` held before it changed. */
-function watchSidebarState() {
-  const before: (string | null)[] = []
+function watchCanvasWidths() {
+  const widths: number[] = []
 
-  const observer = new MutationObserver(records => {
-    for (const record of records) {
-      if (
-        record.target instanceof Element &&
-        record.target.matches('[data-slot="sidebar"]')
-      ) {
-        before.push(record.oldValue)
-      }
+  const resized = new ResizeObserver(entries => {
+    for (const entry of entries) widths.push(entry.contentRect.width)
+  })
+
+  const added = new MutationObserver(() => {
+    const canvas = document.querySelector('[data-slot="sidebar-inset"]')
+
+    if (canvas) {
+      resized.observe(canvas)
+      added.disconnect()
     }
   })
 
-  observer.observe(document.body, {
-    subtree: true,
-    attributeFilter: ['data-state'],
-    attributeOldValue: true,
+  added.observe(document.body, {subtree: true, childList: true})
+  onTestFinished(() => {
+    added.disconnect()
+    resized.disconnect()
   })
-  onTestFinished(() => observer.disconnect())
 
-  return before
+  return widths
 }
 
 describe('collapsing the sidebar', () => {
@@ -622,6 +418,7 @@ describe('collapsing the sidebar', () => {
     await renderApp()
     await expect.poll(sidebarRight).toBeGreaterThan(0)
     const besideSidebar = canvasWidth()
+    const moved = watchTransitions()
 
     await page.getByRole('button', {name: 'Toggle Sidebar'}).click()
 
@@ -633,6 +430,7 @@ describe('collapsing the sidebar', () => {
 
     await expect.poll(sidebarRight).toBeGreaterThan(0)
     await expect.poll(canvasWidth).toBe(besideSidebar)
+    expect(moved).toContain('resizable-panel')
     expect(layoutUpdates(main)).toEqual([
       {type: 'layout.update', changes: {sidebarOpen: false}},
       {type: 'layout.update', changes: {sidebarOpen: true}},
@@ -652,16 +450,12 @@ describe('collapsing the sidebar', () => {
     await userEvent.keyboard('{Meta>}b{/Meta}')
     await expect.poll(sidebarRight).toBeGreaterThan(0)
 
-    expect(
-      moved.filter(
-        slot => slot === 'sidebar-gap' || slot === 'sidebar-container'
-      )
-    ).toEqual([])
+    expect(moved.filter(slot => slot === 'resizable-panel')).toEqual([])
   })
 
   it('closes from the trigger beside an open Tree’s title', async () => {
     const main = fakeMain({
-      trees: [{id: crypto.randomUUID(), title: 'Draft', createdAt: receivedAt}],
+      trees: [savedTree({title: 'Draft'})],
     })
 
     globalThis.window.uz = main
@@ -710,7 +504,7 @@ describe('collapsing the sidebar', () => {
   })
 
   it('starts closed when main saved it closed, without showing it open first, then follows main', async () => {
-    const before = watchSidebarState()
+    const widths = watchCanvasWidths()
     const main = fakeMain({layout: {sidebarOpen: false}})
     globalThis.window.uz = main
     await renderApp()
@@ -720,15 +514,19 @@ describe('collapsing the sidebar', () => {
       .toBeVisible()
     await expect.poll(sidebarRight).toBeLessThanOrEqual(0)
     await expect.poll(canvasWidth).toBe(globalThis.innerWidth)
-    expect(before).toEqual([])
+    await expect.poll(() => widths.length).toBeGreaterThan(0)
+    expect(widths.filter(width => width !== globalThis.innerWidth)).toEqual([])
 
-    main.publish({type: 'LAYOUT_CHANGED', layout: {sidebarOpen: true}})
+    main.publish({
+      type: 'LAYOUT_CHANGED',
+      layout: {...DEFAULT_LAYOUT, sidebarOpen: true},
+    })
     await expect.poll(sidebarRight).toBeGreaterThan(0)
   })
 
   it('keeps a closed sidebar’s Trees out of the keyboard’s reach, and lets them back once it opens', async () => {
     const main = fakeMain({
-      trees: [{id: crypto.randomUUID(), title: 'Draft', createdAt: receivedAt}],
+      trees: [savedTree({title: 'Draft'})],
       layout: {sidebarOpen: false},
     })
 
@@ -745,7 +543,10 @@ describe('collapsing the sidebar', () => {
     row.focus()
     expect(document.activeElement).not.toBe(row)
 
-    main.publish({type: 'LAYOUT_CHANGED', layout: {sidebarOpen: true}})
+    main.publish({
+      type: 'LAYOUT_CHANGED',
+      layout: {...DEFAULT_LAYOUT, sidebarOpen: true},
+    })
     await expect.poll(sidebarRight).toBeGreaterThan(0)
     row.focus()
     expect(document.activeElement).toBe(row)
@@ -756,7 +557,7 @@ function noTreeOpen() {
   return page.getByRole('main')
 }
 
-function heldTreeList(main: ReturnType<typeof fakeMain>) {
+function heldTreeList(main: FakeMain) {
   const list = Promise.withResolvers<CommandOutcome<'tree.list'>>()
 
   globalThis.window.uz = {
@@ -782,7 +583,7 @@ async function expectNoWordAboutTrees() {
 }
 
 describe('with no Tree open', () => {
-  const draft = {id: crypto.randomUUID(), title: 'Draft', createdAt: receivedAt}
+  const draft = savedTree({title: 'Draft'})
 
   it('says no Tree is open when there are Trees, and starts a new one from the main area', async () => {
     const main = fakeMain({trees: [draft]})

@@ -27,6 +27,7 @@ export const TreeListResult = z.strictObject({
   trees: z.array(TreeSchema),
 })
 
+/** Opening a Tree shows its failures, so it no longer has an unseen one. */
 export const TreeOpenCommand = z.strictObject({
   type: z.literal('tree.open'),
   treeId: z.uuid(),
@@ -36,6 +37,12 @@ export const TreeRenameCommand = z.strictObject({
   type: z.literal('tree.rename'),
   treeId: z.uuid(),
   title: z.string().trim().min(1).max(TREE_TITLE_MAX_LENGTH),
+})
+
+/** The Tree and every Turn in it, for good, once its streaming Replies stop. */
+export const TreeDeleteCommand = z.strictObject({
+  type: z.literal('tree.delete'),
+  treeId: z.uuid(),
 })
 
 export const TreeTurnsCommand = z.strictObject({
@@ -148,6 +155,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   TreeListCommand,
   TreeOpenCommand,
   TreeRenameCommand,
+  TreeDeleteCommand,
   TreeTurnsCommand,
   PromptSendCommand,
   PromptDeleteCommand,
@@ -172,6 +180,7 @@ const resultSchemas = {
   'tree.list': TreeListResult,
   'tree.open': TreeSchema,
   'tree.rename': TreeSchema,
+  'tree.delete': Done,
   'tree.turns': TreeTurnsResult,
   'prompt.send': PromptSendResult,
   'prompt.delete': PromptDeleteResult,

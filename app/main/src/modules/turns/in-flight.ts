@@ -37,6 +37,13 @@ function providersReply(provider: ProviderId, treeId: string, replyId: string) {
   )
 }
 
+export interface FinishedReply {
+  provider: ProviderId
+  treeId: string
+  replyId: string
+  status: Extract<ReplyEvent, {type: 'RUN_FINISHED'}>['status']
+}
+
 interface Entry {
   provider: ProviderId
   reply: StreamingReply
@@ -44,13 +51,13 @@ interface Entry {
 }
 
 /**
- * The Replies a host is writing. A streaming Reply is saved before it is
- * published, so a window never shows what main has not saved or is not about
- * to save.
+ * A streaming Reply is saved before it is published, so a window never shows
+ * what main has not saved or is not about to save.
  */
 export function createInFlight(
   db: Database,
-  publish: (event: AppEvent) => void
+  publish: (event: AppEvent) => void,
+  onFinished: (finished: FinishedReply) => void
 ) {
   const entries = new Map<string, Entry>()
 
@@ -69,13 +76,7 @@ export function createInFlight(
     entry.saveTimer ??= setTimeout(() => save(entry), PARTIAL_SAVE_MS)
   }
 
-  function apply(provider: ProviderId, event: ReplyEvent) {
-    const entry = entries.get(event.replyId)
-
-    if (entry?.provider !== provider || entry.reply.treeId !== event.treeId) {
-      return
-    }
-
+  function advance(entry: Entry, event: ReplyEvent) {
     const before = entry.reply
     entry.reply = foldReplyEvent(before, event)
 
@@ -89,6 +90,21 @@ export function createInFlight(
     }
 
     publish(event)
+  }
+
+  function apply(provider: ProviderId, event: ReplyEvent) {
+    const entry = entries.get(event.replyId)
+
+    if (entry?.provider !== provider || entry.reply.treeId !== event.treeId) {
+      return
+    }
+
+    advance(entry, event)
+
+    if (event.type === 'RUN_FINISHED') {
+      const {treeId, replyId, status} = event
+      onFinished({provider, treeId, replyId, status})
+    }
   }
 
   function fail(entry: Entry, failure: RunFailure) {
@@ -143,7 +159,6 @@ export function createInFlight(
         .run()
     },
 
-    /** The Provider writing the Reply, or null when none is. */
     writer(treeId: string, replyId: string): ProviderId | null {
       const entry = entries.get(replyId)
 
@@ -162,11 +177,35 @@ export function createInFlight(
       }
     },
 
-    /** Saves any partial text still waiting on its timer. */
     saveAll() {
       for (const entry of entries.values()) {
         if (entry.saveTimer) save(entry)
       }
+    },
+
+    /**
+     * Stops the Tree's Replies without their hosts and returns them. Windows
+     * hear each end, but `onFinished` does not: the Tree is being deleted.
+     */
+    endIn(treeId: string): {provider: ProviderId; replyId: string}[] {
+      const ending = [...entries.values()].filter(
+        entry => entry.reply.treeId === treeId
+      )
+
+      for (const entry of ending) {
+        const {replyId} = entry.reply
+        advance(entry, {
+          type: 'RUN_FINISHED',
+          treeId,
+          replyId,
+          status: 'stopped',
+        })
+      }
+
+      return ending.map(({provider, reply}) => ({
+        provider,
+        replyId: reply.replyId,
+      }))
     },
 
     streaming(): StreamingReply[] {

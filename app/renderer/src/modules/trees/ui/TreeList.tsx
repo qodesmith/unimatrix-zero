@@ -1,26 +1,17 @@
 import type {Tree} from '@uz/contract/trees'
-import type {KeyboardEvent} from 'react'
 
-import {Input} from '#shadcn/ui/input'
-import {
-  SidebarGroup,
-  SidebarGroupAction,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from '#shadcn/ui/sidebar'
+import {Button} from '#shadcn/ui/button'
+import {SidebarMenu} from '#shadcn/ui/sidebar'
 import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
-import {TREE_TITLE_MAX_LENGTH} from '@uz/contract/trees'
 import {PlusIcon} from 'lucide-react'
-import {useRef, useState} from 'react'
+import {useState} from 'react'
+
+import {TreeRow} from './TreeRow'
 
 interface TreeListProps {
   trees: Tree[]
   hasTrees: boolean | null
   openTreeId: string | null
-  onCreate: () => void
   onOpen: (treeId: string) => void
   onRename: (treeId: string, title: string) => void
 }
@@ -29,128 +20,51 @@ export function TreeList({
   trees,
   hasTrees,
   openTreeId,
-  onCreate,
   onOpen,
   onRename,
 }: TreeListProps) {
   const [renamingId, setRenamingId] = useState<string | null>(null)
 
-  return (
-    <SidebarGroup role="region" aria-label="Trees">
-      <SidebarGroupLabel render={<h2 />}>Trees</SidebarGroupLabel>
-      <Tooltip>
-        <TooltipTrigger render={<SidebarGroupAction onClick={onCreate} />}>
-          <PlusIcon />
-          <span className="sr-only">New Tree</span>
-        </TooltipTrigger>
-        <TooltipContent side="right">New Tree</TooltipContent>
-      </Tooltip>
-      <SidebarGroupContent>
-        {hasTrees === false && (
-          <div className="px-2 text-xs text-muted-foreground">
-            <p className="font-medium">Start a new Tree</p>
-            <p>One conversation that can branch in any direction.</p>
-          </div>
-        )}
-        {hasTrees && (
-          <SidebarMenu>
-            {trees.map(tree => (
-              <SidebarMenuItem key={tree.id}>
-                {renamingId === tree.id ? (
-                  <RenameInput
-                    tree={tree}
-                    onDone={title => {
-                      setRenamingId(null)
+  if (hasTrees === false) {
+    return (
+      <div className="px-4 py-1 text-xs text-muted-foreground">
+        <p className="font-medium">Start a new Tree</p>
+        <p>One conversation that can branch in any direction.</p>
+      </div>
+    )
+  }
 
-                      if (title !== null) onRename(tree.id, title)
-                    }}
-                  />
-                ) : (
-                  <TreeButton
-                    tree={tree}
-                    isOpen={tree.id === openTreeId}
-                    onOpen={() => onOpen(tree.id)}
-                    onRename={() => setRenamingId(tree.id)}
-                  />
-                )}
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        )}
-      </SidebarGroupContent>
-    </SidebarGroup>
+  return (
+    <SidebarMenu className="px-2">
+      {trees.map(tree => (
+        <TreeRow
+          key={tree.id}
+          tree={tree}
+          isOpen={tree.id === openTreeId}
+          renaming={tree.id === renamingId}
+          onOpen={() => onOpen(tree.id)}
+          onStartRename={() => setRenamingId(tree.id)}
+          onRenamed={title => {
+            setRenamingId(null)
+
+            if (title !== null) onRename(tree.id, title)
+          }}
+        />
+      ))}
+    </SidebarMenu>
   )
 }
 
-export function TreeTitle({tree}: {tree: Tree}) {
-  return tree.title ?? <span className="italic">Untitled Tree</span>
-}
-
-interface TreeButtonProps {
-  tree: Tree
-  isOpen: boolean
-  onOpen: () => void
-  onRename: () => void
-}
-
-function TreeButton({tree, isOpen, onOpen, onRename}: TreeButtonProps) {
-  function onKeyDown(event: KeyboardEvent) {
-    if (event.key === 'F2') onRename()
-  }
-
+export function NewTreeButton({onCreate}: {onCreate: () => void}) {
   return (
-    <SidebarMenuButton
-      isActive={isOpen}
-      aria-current={isOpen ? 'page' : undefined}
-      onClick={onOpen}
-      onDoubleClick={onRename}
-      onKeyDown={onKeyDown}
-    >
-      <span>
-        <TreeTitle tree={tree} />
-      </span>
-    </SidebarMenuButton>
-  )
-}
-
-interface RenameInputProps {
-  tree: Tree
-  /** The new title, or null when renaming was abandoned. */
-  onDone: (title: string | null) => void
-}
-
-function RenameInput({tree, onDone}: RenameInputProps) {
-  const [title, setTitle] = useState(tree.title ?? '')
-  // Enter and Escape unmount the input, which can also fire a blur.
-  const done = useRef(false)
-
-  function finish(result: string | null) {
-    if (done.current) return
-    done.current = true
-    onDone(result)
-  }
-
-  function commit() {
-    const trimmed = title.trim()
-    finish(trimmed === '' || trimmed === tree.title ? null : trimmed)
-  }
-
-  function onKeyDown(event: KeyboardEvent) {
-    if (event.key === 'Enter') commit()
-
-    if (event.key === 'Escape') finish(null)
-  }
-
-  return (
-    <Input
-      aria-label="Tree name"
-      autoFocus
-      maxLength={TREE_TITLE_MAX_LENGTH}
-      className="h-8 bg-background px-2"
-      value={title}
-      onChange={event => setTitle(event.target.value)}
-      onKeyDown={onKeyDown}
-      onBlur={commit}
-    />
+    <Tooltip>
+      <TooltipTrigger
+        render={<Button variant="ghost" size="icon-xs" onClick={onCreate} />}
+      >
+        <PlusIcon />
+        <span className="sr-only">New Tree</span>
+      </TooltipTrigger>
+      <TooltipContent side="right">New Tree</TooltipContent>
+    </Tooltip>
   )
 }

@@ -18,7 +18,8 @@ import {createProviderHosts} from '#modules/provider-hosts/main'
 import {createRemoteImages} from '#modules/remote-images/main'
 import {createSessions} from '#modules/sessions/main'
 import {createSettings} from '#modules/settings/main'
-import {createTrees} from '#modules/trees/main'
+import {createTitles} from '#modules/titles/main'
+import {createTreeRows, createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
 import {signInRequestFor} from '#modules/vendor-programs/main'
 import {
@@ -96,6 +97,8 @@ function openWindow(db: Database) {
   }))
 
   const sessions = createSessions(db)
+  const trees = createTrees(db)
+  const treeRows = createTreeRows(trees, hub.publish)
 
   const hosts = createProviderHosts({
     spawn: utilityHost(hostsDist, dev?.fakeProvider ? ['--fake'] : []),
@@ -124,6 +127,15 @@ function openWindow(db: Database) {
     arch: process.arch,
   }
 
+  const titles = createTitles({
+    trees,
+    turnsOf: treeId => turns.list(treeId),
+    runOneShot: async (provider, request) =>
+      hosts.runOneShot(provider, request),
+    vendorProgramFor: provider => signInRequestFor(provider, machine),
+    publish: hub.publish,
+  })
+
   // Before any host starts, so a Reply left streaming is marked interrupted.
   const turns = createTurns({
     db,
@@ -131,6 +143,11 @@ function openWindow(db: Database) {
     hosts,
     vendorProgramFor: provider => signInRequestFor(provider, machine),
     now: () => new Date(),
+    onTurnsChanged: treeRows.turnsChanged,
+    onReplyFinished: finished => {
+      treeRows.replyFinished(finished)
+      void titles.replyFinished(finished)
+    },
   })
 
   const connections = createConnections({
@@ -159,7 +176,7 @@ function openWindow(db: Database) {
     event => ({isTopLevelAppFrame: fromAppWindow(event)}),
     {
       now: () => new Date(),
-      trees: createTrees(db),
+      trees,
       turns,
       connections,
       images: createRemoteImages(globalThis.fetch),

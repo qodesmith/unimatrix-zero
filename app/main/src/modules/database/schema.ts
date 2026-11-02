@@ -24,6 +24,9 @@ function createdAt() {
 export const trees = sqliteTable('trees', {
   id: id(),
   title: text('title'),
+  unseenFailure: integer('unseen_failure', {mode: 'boolean'})
+    .notNull()
+    .default(false),
   createdAt: createdAt(),
 })
 
@@ -74,15 +77,11 @@ export const replies = sqliteTable(
       .references(() => systemPrompts.id),
     sessionId: text('session_id'),
     sessionMessageId: text('session_message_id'),
-    /**
-     * Its Prompt in the Provider session, kept even when the Reply never
-     * finished.
-     */
+    /** Its Prompt in the Provider session, kept if the Reply never finished. */
     sessionPromptId: text('session_prompt_id'),
     /**
-     * Where its Provider session still holds Turns the Tree deleted from below
-     * it: their first Prompt there. The next Prompt from it cuts the session
-     * there, unless its Provider cut first.
+     * The first session Prompt of Turns deleted below it that the session still
+     * holds; the next Prompt from it cuts there, unless its Provider cut first.
      */
     sessionDropFrom: text('session_drop_from'),
     contextSize: integer('context_size'),

@@ -1,5 +1,5 @@
 import type {Database} from '#modules/database/main'
-import type {ReplyHosts} from './main'
+import type {FinishedReply, ReplyHosts} from './main'
 import type {AppEvent} from '@uz/contract/events'
 import type {HostCommand} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
@@ -20,13 +20,13 @@ const createdAt = new Date('2026-10-19T12:00:00.000Z')
 let db: Database
 let published: AppEvent[]
 let whenPublished: (event: AppEvent) => void
+let finished: FinishedReply[]
 let hostCommands: HostCommand[]
 let hostReady: boolean
 let hostReachable: boolean
 let turns: ReturnType<typeof createTurns>
 let treeId: string
 
-/** The Claude host, recording what it's asked; the only one that can be ready. */
 const hosts: ReplyHosts = {
   ready: only =>
     hostReady && (only ?? 'claude') === 'claude'
@@ -49,6 +49,8 @@ function launch() {
     hosts,
     vendorProgramFor: () => vendorProgram,
     now: () => createdAt,
+    onTurnsChanged: () => undefined,
+    onReplyFinished: reply => finished.push(reply),
   })
 }
 
@@ -57,6 +59,7 @@ beforeEach(() => {
   db = openDatabase({file: ':memory:', migrationsFolder})
   published = []
   whenPublished = () => undefined
+  finished = []
   hostCommands = []
   hostReady = true
   hostReachable = true
@@ -108,7 +111,6 @@ function finish(replyId: string) {
   fromHost(replyId, {type: 'RUN_FINISHED', status: 'complete'})
 }
 
-/** A root Reply the Provider saved, finished. */
 function savedRoot() {
   const replyId = sendPrompt(null)
   record(replyId)
@@ -117,7 +119,6 @@ function savedRoot() {
   return replyId
 }
 
-/** Stopped before Claude saved it. */
 function stopUnrecorded(replyId: string) {
   fromHost(replyId, {type: 'RUN_FINISHED', status: 'stopped'})
 }
@@ -579,6 +580,73 @@ describe('stopping a Reply', () => {
   })
 })
 
+describe('stopping every Reply in a Tree', () => {
+  it('ends each one as stopped at once, saving its text, and asks its host to stop', () => {
+    const replyId = sendPrompt(null)
+    fromHost(replyId, {type: 'TEXT_DELTA', delta: 'Half an answer'})
+
+    turns.stopAll(treeId)
+
+    expect(saved(replyId)).toMatchObject({
+      status: 'stopped',
+      content: [{type: 'text', text: 'Half an answer'}],
+    })
+    expect(published.at(-1)).toEqual({
+      type: 'RUN_FINISHED',
+      treeId,
+      replyId,
+      status: 'stopped',
+    })
+    expect(hostCommands).toEqual([{type: 'reply.stop', replyId}])
+  })
+
+  it('tells no one they finished, and still tells of a Reply in another Tree', () => {
+    const root = savedRoot()
+    sendPrompt(root)
+
+    const elsewhere = turns.sendPrompt({
+      treeId: createTrees(db).create(createdAt).id,
+      parentReplyId: null,
+      text: 'Hi',
+    })
+
+    if (!elsewhere) throw new Error('The root Prompt was refused')
+
+    finished = []
+    turns.stopAll(treeId)
+
+    turns.hostEvent('claude', {
+      type: 'RUN_FINISHED',
+      treeId: elsewhere.reply.treeId,
+      replyId: elsewhere.reply.id,
+      status: 'complete',
+    })
+
+    expect(finished.map(reply => reply.replyId)).toEqual([elsewhere.reply.id])
+  })
+
+  it('drops what their host sends after', () => {
+    const replyId = sendPrompt(null)
+    turns.stopAll(treeId)
+    const count = published.length
+
+    fromHost(replyId, {type: 'TEXT_DELTA', delta: 'Too late'})
+    fromHost(replyId, {type: 'RUN_FINISHED', status: 'stopped'})
+
+    expect(published).toHaveLength(count)
+    expect(saved(replyId).content).toEqual([])
+  })
+
+  it('ends them when their host can’t be reached', () => {
+    const replyId = sendPrompt(null)
+    hostReachable = false
+
+    turns.stopAll(treeId)
+
+    expect(saved(replyId).status).toBe('stopped')
+  })
+})
+
 describe('retrying a Reply', () => {
   it('runs the root Prompt again in place, from nothing, in a new session', () => {
     const replyId = sendPrompt(null)
@@ -848,7 +916,6 @@ const cutAtFirst = {
   dropFrom: 'p-m2',
 }
 
-/** A Thread of three Replies in `s1`, the last two deleted. */
 function deletedMidThread() {
   const first = savedRoot()
   const second = savedAt(first, 'm2')

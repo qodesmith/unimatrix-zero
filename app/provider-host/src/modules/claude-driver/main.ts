@@ -9,9 +9,16 @@ import {spawn} from 'node:child_process'
 
 import {readAccount} from './account'
 import {signOut, startLogin} from './login'
+import {runClaudeOneShot} from './one-shot'
 import {SIGN_IN_TIMEOUT_MS, createClaudeSignIn} from './sign-in'
 import {DEFAULT_MODEL, createClaudeReplies} from './streaming'
 import {IDLE_CLOSE_MS, MAX_WARM} from './warm'
+
+/**
+ * Claude Code's alias for its current Haiku. The SDK lists Models only from a
+ * running `claude`, with no size to rank them by.
+ */
+const SMALLEST_MODEL = 'haiku'
 
 async function notYet(): Promise<never> {
   throw new Error('Claude can’t do this yet.')
@@ -30,7 +37,6 @@ export function spawnClaude({command, args, cwd, env, signal}: SpawnOptions) {
 type ClaudeDriverOptions = Pick<ClaudeRepliesDeps, 'store'> &
   Partial<Omit<ClaudeRepliesDeps, 'store'>>
 
-/** Claude through its unmodified vendor program. */
 export function createClaudeDriver({
   store,
   query: run = query,
@@ -67,6 +73,7 @@ export function createClaudeDriver({
     }),
     readConnection: notYet,
     listModels: async () => [{id: DEFAULT_MODEL, name: 'Default'}],
+    smallestModel: async () => SMALLEST_MODEL,
     readUsage: notYet,
     startReply: replies.startReply,
     stop: replies.stop,
@@ -74,7 +81,7 @@ export function createClaudeDriver({
     forkSession: notYet,
     rebuildSession: notYet,
     cutSession: replies.cutSession,
-    runOneShot: notYet,
+    runOneShot: async request => runClaudeOneShot({query: run, env}, request),
     mcpSignIn: notYet,
   }
 }

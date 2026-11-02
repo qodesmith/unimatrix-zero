@@ -6,9 +6,10 @@ import {createConnections} from '#modules/connections/main'
 import {openDatabase} from '#modules/database/main'
 import {createLayout} from '#modules/layout/main'
 import {createSettings} from '#modules/settings/main'
-import {createTrees} from '#modules/trees/main'
+import {createTreeRows, createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
-import {PromptSendResult} from '@uz/contract/commands'
+import {PromptSendResult, TreeListResult} from '@uz/contract/commands'
+import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {TreeSchema} from '@uz/contract/trees'
 import path from 'node:path'
 import {beforeEach, describe, expect, it} from 'vitest'
@@ -18,21 +19,26 @@ import {dispatchCommand} from './main'
 const migrationsFolder = path.resolve(import.meta.dirname, '../../../drizzle')
 const trusted = {isTopLevelAppFrame: true}
 
+let clock: Date
+
 function now() {
-  return new Date('2026-10-19T12:00:00.000Z')
+  return clock
 }
 
 let published: AppEvent[]
 let hostCommands: HostCommand[]
 let hostReady: boolean
+let hostReachable: boolean
 let loaded: string[]
 let deps: Parameters<typeof dispatchCommand>[2]
 
 beforeEach(() => {
   const db = openDatabase({file: ':memory:', migrationsFolder})
+  clock = new Date('2026-10-19T12:00:00.000Z')
   published = []
   hostCommands = []
   hostReady = true
+  hostReachable = true
   loaded = []
 
   function publish(event: AppEvent) {
@@ -40,12 +46,17 @@ beforeEach(() => {
   }
 
   function sendToHost(_provider: string, command: HostCommand) {
+    if (!hostReachable) throw new Error('The claude host is not running.')
+
     hostCommands.push(command)
   }
 
+  const trees = createTrees(db)
+  const rows = createTreeRows(trees, publish)
+
   deps = {
     now,
-    trees: createTrees(db),
+    trees,
     turns: createTurns({
       db,
       publish,
@@ -58,6 +69,8 @@ beforeEach(() => {
       },
       vendorProgramFor: () => ({program: null, configDir: '/claude'}),
       now,
+      onTurnsChanged: rows.turnsChanged,
+      onReplyFinished: rows.replyFinished,
     }),
     connections: createConnections({
       db,
@@ -100,6 +113,48 @@ async function createTree() {
   if (!outcome.ok) throw new Error(outcome.error.message)
 
   return TreeSchema.parse(outcome.value)
+}
+
+async function sendPrompt(
+  treeId: string,
+  parentReplyId: string | null,
+  text = 'Hi'
+) {
+  const outcome = await send({type: 'prompt.send', treeId, parentReplyId, text})
+
+  if (!outcome.ok) throw new Error(outcome.error.message)
+
+  return PromptSendResult.parse(outcome.value)
+}
+
+function answer(treeId: string, replyId: string) {
+  deps.turns.hostRecorded('claude', {
+    type: 'REPLY_RECORDED',
+    treeId,
+    replyId,
+    model: 'fake',
+    session: {sessionId: 's1', messageId: replyId},
+  })
+  deps.turns.hostEvent('claude', {
+    type: 'RUN_FINISHED',
+    treeId,
+    replyId,
+    status: 'complete',
+  })
+}
+
+async function listed() {
+  const outcome = await send({type: 'tree.list'})
+
+  if (!outcome.ok) throw new Error(outcome.error.message)
+
+  return TreeListResult.parse(outcome.value).trees
+}
+
+function changed() {
+  return published.flatMap(event =>
+    event.type === 'TREE_CHANGED' ? [event.tree] : []
+  )
 }
 
 describe('app.ping', () => {
@@ -149,7 +204,7 @@ describe('Trees', () => {
 
   it('lists Trees newest first', async () => {
     const first = await createTree()
-    deps.now = () => new Date('2026-10-20T12:00:00.000Z')
+    clock = new Date('2026-10-20T12:00:00.000Z')
     const second = await createTree()
 
     expect(await send({type: 'tree.list'})).toEqual({
@@ -188,7 +243,7 @@ describe('Trees', () => {
     const renamed = {...tree, title: 'Trip planning'}
 
     expect(outcome).toEqual({ok: true, value: renamed})
-    expect(published.at(-1)).toEqual({type: 'TREE_RENAMED', tree: renamed})
+    expect(published.at(-1)).toEqual({type: 'TREE_CHANGED', tree: renamed})
     expect(await send({type: 'tree.list'})).toEqual({
       ok: true,
       value: {trees: [renamed]},
@@ -205,6 +260,203 @@ describe('Trees', () => {
     })
 
     expect(outcome).toMatchObject({ok: false, error: {code: 'invalid-command'}})
+  })
+})
+
+describe('a Tree’s row', () => {
+  it('shows the root Prompt’s first line and when the last Prompt was sent, and tells every window as each is sent', async () => {
+    const tree = await createTree()
+    clock = new Date('2026-10-19T13:00:00.000Z')
+
+    const root = await sendPrompt(
+      tree.id,
+      null,
+      '\n   \n  Plan a trip to Lisbon  \nin May'
+    )
+
+    answer(tree.id, root.reply.id)
+    clock = new Date('2026-10-19T14:00:00.000Z')
+    await sendPrompt(tree.id, root.reply.id, 'Make it cheaper')
+
+    const first = {
+      ...tree,
+      firstLine: 'Plan a trip to Lisbon',
+      lastActiveAt: '2026-10-19T13:00:00.000Z',
+    }
+
+    const second = {
+      ...first,
+      lastActiveAt: '2026-10-19T14:00:00.000Z',
+    }
+
+    expect(tree).toMatchObject({
+      firstLine: null,
+      lastActiveAt: '2026-10-19T12:00:00.000Z',
+      unseenFailure: false,
+    })
+    expect(await listed()).toEqual([second])
+    expect(changed()).toEqual([first, second])
+  })
+
+  it('cuts a long first line to the longest title', async () => {
+    const tree = await createTree()
+    await sendPrompt(tree.id, null, `${'a'.repeat(250)}\nmore`)
+
+    expect((await listed())[0]?.firstLine).toBe('a'.repeat(200))
+  })
+
+  it('lists the Tree last active first', async () => {
+    const older = await createTree()
+    clock = new Date('2026-10-20T12:00:00.000Z')
+    const newer = await createTree()
+    clock = new Date('2026-10-21T12:00:00.000Z')
+    await sendPrompt(older.id, null)
+
+    expect((await listed()).map(tree => tree.id)).toEqual([older.id, newer.id])
+  })
+
+  it('tells every window when a Prompt is deleted', async () => {
+    const tree = await createTree()
+    clock = new Date('2026-10-19T13:00:00.000Z')
+    const root = await sendPrompt(tree.id, null)
+    answer(tree.id, root.reply.id)
+    clock = new Date('2026-10-19T14:00:00.000Z')
+    const next = await sendPrompt(tree.id, root.reply.id)
+    answer(tree.id, next.reply.id)
+
+    await send({
+      type: 'prompt.delete',
+      treeId: tree.id,
+      promptId: next.prompt.id,
+    })
+
+    const lastActiveAt = '2026-10-19T13:00:00.000Z'
+
+    expect(changed().at(-1)).toMatchObject({id: tree.id, lastActiveAt})
+    expect((await listed())[0]?.lastActiveAt).toBe(lastActiveAt)
+  })
+
+  it.each([
+    [
+      'its host reports it failed',
+      (treeId: string, replyId: string) =>
+        deps.turns.hostEvent('claude', {
+          type: 'RUN_FINISHED',
+          treeId,
+          replyId,
+          status: 'failed',
+          failure: {code: 'provider-error', message: 'Overloaded.'},
+        }),
+    ],
+    ['its host crashes', () => deps.turns.hostCrashed('claude')],
+  ])(
+    'has an unseen failure once a Reply fails as %s, until the Tree is opened',
+    async (_case, failIt) => {
+      const tree = await createTree()
+      const {reply} = await sendPrompt(tree.id, null)
+      failIt(tree.id, reply.id)
+
+      expect(changed().at(-1)).toMatchObject({
+        id: tree.id,
+        unseenFailure: true,
+      })
+      expect((await listed())[0]?.unseenFailure).toBe(true)
+
+      const opened = await send({type: 'tree.open', treeId: tree.id})
+
+      expect(opened).toMatchObject({ok: true, value: {unseenFailure: false}})
+      expect(published.at(-1)).toMatchObject({
+        type: 'TREE_CHANGED',
+        tree: {id: tree.id, unseenFailure: false},
+      })
+      expect((await listed())[0]?.unseenFailure).toBe(false)
+
+      const count = published.length
+      await send({type: 'tree.open', treeId: tree.id})
+
+      expect(published).toHaveLength(count)
+    }
+  )
+
+  it('has an unseen failure when the host can’t be reached', async () => {
+    const tree = await createTree()
+    hostReachable = false
+    await sendPrompt(tree.id, null)
+
+    expect((await listed())[0]?.unseenFailure).toBe(true)
+  })
+})
+
+describe('deleting a Tree', () => {
+  it('deletes it with its Turns and tells every window', async () => {
+    const tree = await createTree()
+    const root = await sendPrompt(tree.id, null)
+    answer(tree.id, root.reply.id)
+    await sendPrompt(tree.id, root.reply.id)
+    deps.turns.hostCrashed('claude')
+
+    expect(await send({type: 'tree.delete', treeId: tree.id})).toEqual({
+      ok: true,
+      value: {},
+    })
+    expect(published.at(-1)).toEqual({type: 'TREE_DELETED', treeId: tree.id})
+    expect(await listed()).toEqual([])
+    expect(await send({type: 'tree.turns', treeId: tree.id})).toMatchObject({
+      ok: false,
+      error: {code: 'not-found'},
+    })
+  })
+
+  it('ends each Reply streaming in it, asks its host to stop, and deletes it at once', async () => {
+    const tree = await createTree()
+    const root = await sendPrompt(tree.id, null)
+    answer(tree.id, root.reply.id)
+    const first = await sendPrompt(tree.id, root.reply.id)
+    const second = await sendPrompt(tree.id, root.reply.id)
+    hostCommands = []
+
+    expect(await send({type: 'tree.delete', treeId: tree.id})).toEqual({
+      ok: true,
+      value: {},
+    })
+    expect(hostCommands).toEqual([
+      {type: 'reply.stop', replyId: first.reply.id},
+      {type: 'reply.stop', replyId: second.reply.id},
+    ])
+    expect(published.slice(-3)).toEqual([
+      {
+        type: 'RUN_FINISHED',
+        treeId: tree.id,
+        replyId: first.reply.id,
+        status: 'stopped',
+      },
+      {
+        type: 'RUN_FINISHED',
+        treeId: tree.id,
+        replyId: second.reply.id,
+        status: 'stopped',
+      },
+      {type: 'TREE_DELETED', treeId: tree.id},
+    ])
+    expect(await listed()).toEqual([])
+  })
+
+  it('deletes it when the host writing its Reply can’t be reached', async () => {
+    const tree = await createTree()
+    await sendPrompt(tree.id, null)
+    hostReachable = false
+
+    expect(await send({type: 'tree.delete', treeId: tree.id})).toEqual({
+      ok: true,
+      value: {},
+    })
+    expect(published.at(-1)).toEqual({type: 'TREE_DELETED', treeId: tree.id})
+  })
+
+  it('answers not-found for a Tree that does not exist', async () => {
+    expect(
+      await send({type: 'tree.delete', treeId: crypto.randomUUID()})
+    ).toMatchObject({ok: false, error: {code: 'not-found'}})
   })
 })
 
@@ -399,10 +651,10 @@ describe('the Layout', () => {
       changes: {sidebarOpen: false},
     })
 
-    expect(outcome).toEqual({ok: true, value: {sidebarOpen: false}})
-    expect(published).toEqual([
-      {type: 'LAYOUT_CHANGED', layout: {sidebarOpen: false}},
-    ])
-    expect(deps.layout.read()).toEqual({sidebarOpen: false})
+    const saved = {...DEFAULT_LAYOUT, sidebarOpen: false}
+
+    expect(outcome).toEqual({ok: true, value: saved})
+    expect(published).toEqual([{type: 'LAYOUT_CHANGED', layout: saved}])
+    expect(deps.layout.read()).toEqual(saved)
   })
 })

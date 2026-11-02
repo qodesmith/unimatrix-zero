@@ -1,4 +1,5 @@
 import type {Database} from '#modules/database/main'
+import type {FinishedReply} from './in-flight'
 import type {Command, CommandResult} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {
@@ -29,7 +30,8 @@ import {insertExchange, listTurns, resetReply, savedReply} from './rows'
 
 export {PARTIAL_SAVE_MS} from './in-flight'
 
-/** What a Reply needs of the Provider hosts. */
+export type {FinishedReply} from './in-flight'
+
 export interface ReplyHosts {
   /** A ready host's Provider (`only`, if given) and its default Model. */
   ready(only?: ProviderId): {provider: ProviderId; model: Model} | null
@@ -44,6 +46,9 @@ export interface TurnsDeps {
   /** The vendor program and configuration folder a Provider's Replies use. */
   vendorProgramFor: (provider: ProviderId) => SignInRequest
   now: () => Date
+  onTurnsChanged: (treeId: string) => void
+  /** Every way a Reply ends, a failure to reach its host included. */
+  onReplyFinished: (finished: FinishedReply) => void
 }
 
 export type NewPrompt = Omit<Extract<Command, {type: 'prompt.send'}>, 'type'>
@@ -51,9 +56,8 @@ export type NewPrompt = Omit<Extract<Command, {type: 'prompt.send'}>, 'type'>
 export type Turns = ReturnType<typeof createTurns>
 
 /**
- * A Tree's Prompts and Replies, and every Reply's run from its Prompt to its
- * end. Nothing streams before this runs, so a Reply still `streaming` was left
- * by the last quit: it becomes `interrupted` here, once per launch.
+ * Create once per launch, before any host starts: a Reply still `streaming` was
+ * left by the last quit, and becomes `interrupted` here.
  */
 export function createTurns({
   db,
@@ -61,8 +65,10 @@ export function createTurns({
   hosts,
   vendorProgramFor,
   now,
+  onTurnsChanged,
+  onReplyFinished,
 }: TurnsDeps) {
-  const inFlight = createInFlight(db, publish)
+  const inFlight = createInFlight(db, publish, onReplyFinished)
 
   db.update(schema.replies)
     .set({status: 'interrupted'})
@@ -88,7 +94,6 @@ export function createTurns({
   return {
     list: (treeId: string) => listTurns(db, treeId),
 
-    /** For a window that connects mid-stream. */
     streaming: () => inFlight.streaming(),
 
     /** Null when the Reply it answers is gone. */
@@ -125,18 +130,19 @@ export function createTurns({
         now: now(),
       })
 
-      return {
-        prompt,
-        reply: startOnHost(provider, {
-          treeId,
-          replyId: reply.id,
-          model: model.id,
-          systemPrompt,
-          prompt: {text},
-          vendorProgram: vendorProgramFor(provider),
-          session: continued?.session ?? null,
-        }),
-      }
+      const started = startOnHost(provider, {
+        treeId,
+        replyId: reply.id,
+        model: model.id,
+        systemPrompt,
+        prompt: {text},
+        vendorProgram: vendorProgramFor(provider),
+        session: continued?.session ?? null,
+      })
+
+      onTurnsChanged(treeId)
+
+      return {prompt, reply: started}
     },
 
     /** Runs a failed Reply's Prompt again in place; null when it's gone. */
@@ -173,13 +179,26 @@ export function createTurns({
       hosts.send(provider, {type: 'reply.stop', replyId})
     },
 
+    /**
+     * Ends the Tree's streaming Replies at once, for deleting it. Their hosts
+     * are asked to stop too, and anything they send after is dropped.
+     */
+    stopAll(treeId: string) {
+      for (const {provider, replyId} of inFlight.endIn(treeId)) {
+        try {
+          hosts.send(provider, {type: 'reply.stop', replyId})
+        } catch {
+          // A host that can't be reached writes nothing more.
+        }
+      }
+    },
+
     hostEvent: (provider: ProviderId, event: ReplyEvent) =>
       inFlight.apply(provider, event),
 
     /**
-     * Refused while a Reply below streams. The Provider is asked to cut the
-     * deleted Turns from its session now; one that can't cuts them with the
-     * next Prompt from the Reply the deleted Prompt answers.
+     * Refused while a Reply below streams. A Provider that can't cut now
+     * cuts with the next Prompt from the Reply the deleted Prompt answers.
      */
     deletePrompt(
       treeId: string,
@@ -205,6 +224,8 @@ export function createTurns({
         }
       }
 
+      onTurnsChanged(treeId)
+
       return {promptIds, replyIds}
     },
 
@@ -224,7 +245,6 @@ export function createTurns({
     hostRecorded: (provider: ProviderId, recorded: ReplyRecorded) =>
       inFlight.record(provider, recorded),
 
-    /** Fails the host's Replies with the text they last showed. */
     hostCrashed(provider: ProviderId) {
       inFlight.failAll(provider, {
         code: 'host-crashed',
