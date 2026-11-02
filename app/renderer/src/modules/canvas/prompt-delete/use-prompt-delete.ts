@@ -7,10 +7,7 @@ import {turnsFrom} from '../tree'
 import {askToDelete} from './actions'
 import {initialPromptDelete, promptDeleteTransition} from './machine'
 
-/**
- * Deleting a Prompt below the root and every Turn below it, offered only while
- * none of those Replies streams: main refuses then too.
- */
+/** Offered only while none of the Replies below streams: main refuses then too. */
 export function usePromptDelete(promptId: string) {
   const {treeId, index, onDeleteConfirmed} = useCanvas()
   const deletePrompt = useDeletePrompt(treeId)

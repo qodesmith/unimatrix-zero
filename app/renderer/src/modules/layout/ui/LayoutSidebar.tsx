@@ -29,10 +29,7 @@ interface LayoutSidebarProps {
   children: ReactNode
 }
 
-/**
- * The app sidebar beside the main area, open or closed and as wide as the
- * Layout says. A drag of the divider between them saves only where it ends.
- */
+/** A drag of the divider saves only where it ends. */
 export function LayoutSidebar({sidebar, children}: LayoutSidebarProps) {
   const layout = useLayout()
   const updateLayout = useUpdateLayout()

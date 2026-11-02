@@ -639,7 +639,6 @@ function header(name: 'Trees' | 'Files' | 'Usage') {
   return section(name).getByRole('button', {name, exact: true})
 }
 
-/** The dividers between the sections, top to bottom. */
 function dividers() {
   return sidebar()
     .getByRole('separator')

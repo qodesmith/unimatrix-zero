@@ -25,10 +25,7 @@ function free(sections: Sections, headerShare: number) {
   return 100 - (SECTION_IDS.length - openIds(sections).length) * headerShare
 }
 
-/**
- * Collapsed sections get `headerShare`, their header's share of the height;
- * the open ones share the rest as their sizes do.
- */
+/** Collapsed sections get `headerShare`; open ones split the rest by size. */
 export function arrange(
   sections: Sections,
   headerShare: number
@@ -56,10 +53,7 @@ export function arrange(
     : layout
 }
 
-/**
- * The sizes that `arrange` lays out as `layout`, a collapsed section keeping
- * its own.
- */
+/** The inverse of `arrange`: the sizes it lays out as `layout`. */
 export function resized(
   sections: Sections,
   layout: SectionLayout,
@@ -81,10 +75,6 @@ export function resized(
   }
 }
 
-/**
- * The two sections on either side of a divider split their space as the
- * defaults do.
- */
 export function resetSplit(
   sections: Sections,
   above: SidebarSectionId,

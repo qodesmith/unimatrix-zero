@@ -21,10 +21,7 @@ function dialogView(state: TreeDeleteState) {
   }
 }
 
-/**
- * Deleting a Tree after asking, the same from its sidebar row and its root
- * Prompt. `dialog` is what `DeleteTreeDialog` takes.
- */
+/** Deleting a Tree after asking, shared by its sidebar row and root Prompt. */
 export function useTreeDelete(treeId: string) {
   const [state, send] = useStateMachine({
     transition: treeDeleteTransition,

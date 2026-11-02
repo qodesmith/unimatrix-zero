@@ -15,16 +15,14 @@ import {PromptInput} from './PromptInput'
 import {TooltipButton} from './TooltipButton'
 
 interface ChatSlideoutProps {
-  /** The Reply the shown Thread ends at. */
   end: Reply
-  /** The Turn to start reading at, brought to the top as it changes. */
   scrollToTurnId: string
   /** Off: it slides away, then calls `onClosed` to be unmounted. */
   open: boolean
   onClose: () => void
   onClosed: () => void
   onFocus: (replyId: string) => void
-  /** A Prompt was sent from the Input and main started this Reply for it. */
+  /** Main started this Reply for a Prompt sent from the Input. */
   onSent: (replyId: string) => void
 }
 
@@ -227,10 +225,7 @@ interface ChatInputProps {
   onSent: (replyId: string) => void
 }
 
-/**
- * Shares its draft with the same Reply's Input on the canvas. Keyed by the
- * Reply, so a send redraws it for the new one, which takes the focus over.
- */
+/** Keyed by the Reply: a send redraws it for the new one, which takes focus. */
 function ChatInput({end, onFocus, onSent}: ChatInputProps) {
   const {treeId, drafts, setDraft} = useCanvas()
   const {status} = useReply(end)

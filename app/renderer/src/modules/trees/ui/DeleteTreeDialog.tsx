@@ -12,15 +12,12 @@ import {
 interface DeleteTreeDialogProps {
   open: boolean
   linkedFolder?: boolean
-  /** Main has been asked and hasn't answered yet. */
   deleting?: boolean
-  /** Main's refusal, shown until the user confirms again or cancels. */
   error?: string | null
   onCancel: () => void
   onConfirm: () => void
 }
 
-/** Asked before deleting a Tree, from its sidebar row or its root Prompt. */
 export function DeleteTreeDialog({
   open,
   linkedFolder = false,

@@ -47,7 +47,6 @@ function AppLayout() {
   const trees = useTrees()
   const {hasTrees, openTree, create} = trees
 
-  // Null until main says whether any Provider is connected.
   const [firstLaunch, setFirstLaunch] = useState<boolean | null>(null)
 
   if (firstLaunch === null && connections.state.loaded) {

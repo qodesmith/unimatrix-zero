@@ -58,10 +58,6 @@ function headerShare(
   return height === 0 ? 0 : ((header.current?.offsetHeight ?? 0) / height) * 100
 }
 
-/**
- * The sidebar's sections: dividers to drag, and headers that collapse a
- * section to themselves, all kept in the Layout.
- */
 export function SidebarSections(
   props: Record<SidebarSectionId, SectionContent>
 ) {

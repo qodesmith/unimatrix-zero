@@ -19,7 +19,6 @@ import {
 
 export * from './session-store'
 
-/** Where a Provider session stands: the session, and a message inside it. */
 export const SessionRefSchema = z.strictObject({
   sessionId: z.string(),
   messageId: z.string().nullable(),
@@ -27,7 +26,6 @@ export const SessionRefSchema = z.strictObject({
 
 export type SessionRef = z.infer<typeof SessionRefSchema>
 
-/** What a driver needs to connect its Provider. */
 export const SignInRequestSchema = z.strictObject({
   /** Null when the manifest names none; only the fake driver accepts that. */
   program: z
@@ -40,11 +38,8 @@ export const SignInRequestSchema = z.strictObject({
 export type SignInRequest = z.infer<typeof SignInRequestSchema>
 
 /**
- * The session keeps everything through `keepThrough` and drops `dropFrom`,
- * with all after it. That is a Retry's failed attempt, when the Reply its
- * Prompt answers was cut short before its Provider saved it, or Turns the Tree
- * deleted. Each Provider cuts at the one it can; a null one leaves the session
- * as it is.
+ * Keeps the session through `keepThrough` and drops `dropFrom` with all after
+ * it. Each Provider cuts at the one it can; a null one leaves the session be.
  */
 export const SessionCutSchema = SessionRefSchema.extend({
   type: z.literal('cut'),
@@ -64,10 +59,7 @@ export type DeletionCut = z.infer<typeof DeletionCutSchema>
 /** The Provider session a Reply is written in, at the Reply being answered. */
 export const ReplySessionSchema = z.discriminatedUnion('type', [
   SessionRefSchema.extend({type: z.literal('continue')}),
-  /**
-   * The Reply already has a Prompt after it, so the Provider forks there and
-   * the other Branch's session is never rewound.
-   */
+  /** The Reply already has a Prompt after it; forking spares that Branch. */
   SessionRefSchema.extend({type: z.literal('fork')}),
   /** The session may run past `messageId` with a failed turn, dropped first. */
   SessionRefSchema.extend({type: z.literal('rewind')}),
@@ -132,7 +124,6 @@ export const SessionCutMessage = z.strictObject({
 
 export type SessionCutReport = z.infer<typeof SessionCutMessage>
 
-/** A Thread as any Provider can take it: each Prompt and the Reply to it. */
 export const ThreadSchema = z.array(
   z.strictObject({prompt: z.string(), reply: z.array(ReplyPartSchema)})
 )
@@ -172,17 +163,14 @@ export interface ProviderDriver {
   submitSignInCode(code: string): void
   cancelSignIn(): void
   listModels(): Promise<Model[]>
-  /**
-   * The smallest Model on the account's plan, for one-shots; null when it can't
-   * run them.
-   */
+  /** For one-shots; null when the account can't run them. */
   smallestModel(): Promise<string | null>
   readUsage(): Promise<Usage>
   /**
    * Ends with `RUN_FINISHED`, including after `stop`. `PROMPT_DROPPED` comes
-   * once a Retry's cut drops `dropFrom`, `PROMPT_RECORDED` once the Provider
-   * session holds the Prompt, and `REPLY_RECORDED` before the end once the
-   * Provider has saved the Reply.
+   * once a Retry's cut drops `dropFrom`, `PROMPT_RECORDED` once the session
+   * holds the Prompt, and `REPLY_RECORDED`, before the end, once the Provider
+   * saved it.
    */
   startReply(request: ReplyRequest): AsyncIterable<StartReplyEvent>
   stop(replyId: string): Promise<void>

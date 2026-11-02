@@ -37,7 +37,6 @@ export function spawnClaude({command, args, cwd, env, signal}: SpawnOptions) {
 type ClaudeDriverOptions = Pick<ClaudeRepliesDeps, 'store'> &
   Partial<Omit<ClaudeRepliesDeps, 'store'>>
 
-/** Claude through its unmodified vendor program. */
 export function createClaudeDriver({
   store,
   query: run = query,

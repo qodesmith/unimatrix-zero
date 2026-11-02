@@ -27,7 +27,6 @@ let hostReachable: boolean
 let turns: ReturnType<typeof createTurns>
 let treeId: string
 
-/** The Claude host, recording what it's asked; the only one that can be ready. */
 const hosts: ReplyHosts = {
   ready: only =>
     hostReady && (only ?? 'claude') === 'claude'

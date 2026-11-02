@@ -46,7 +46,6 @@ export interface TurnsDeps {
   /** The vendor program and configuration folder a Provider's Replies use. */
   vendorProgramFor: (provider: ProviderId) => SignInRequest
   now: () => Date
-  /** A Prompt in the Tree was sent or deleted. */
   onTurnsChanged: (treeId: string) => void
   /** Every way a Reply ends, a failure to reach its host included. */
   onReplyFinished: (finished: FinishedReply) => void
@@ -57,9 +56,8 @@ export type NewPrompt = Omit<Extract<Command, {type: 'prompt.send'}>, 'type'>
 export type Turns = ReturnType<typeof createTurns>
 
 /**
- * A Tree's Prompts and Replies, and every Reply's run from its Prompt to its
- * end. Nothing streams before this runs, so a Reply still `streaming` was left
- * by the last quit: it becomes `interrupted` here, once per launch.
+ * Create once per launch, before any host starts: a Reply still `streaming` was
+ * left by the last quit, and becomes `interrupted` here.
  */
 export function createTurns({
   db,
@@ -96,7 +94,6 @@ export function createTurns({
   return {
     list: (treeId: string) => listTurns(db, treeId),
 
-    /** For a window that connects mid-stream. */
     streaming: () => inFlight.streaming(),
 
     /** Null when the Reply it answers is gone. */
@@ -200,9 +197,8 @@ export function createTurns({
       inFlight.apply(provider, event),
 
     /**
-     * Refused while a Reply below streams. The Provider is asked to cut the
-     * deleted Turns from its session now; one that can't cuts them with the
-     * next Prompt from the Reply the deleted Prompt answers.
+     * Refused while a Reply below streams. A Provider that can't cut now
+     * cuts with the next Prompt from the Reply the deleted Prompt answers.
      */
     deletePrompt(
       treeId: string,
@@ -249,7 +245,6 @@ export function createTurns({
     hostRecorded: (provider: ProviderId, recorded: ReplyRecorded) =>
       inFlight.record(provider, recorded),
 
-    /** Fails the host's Replies with the text they last showed. */
     hostCrashed(provider: ProviderId) {
       inFlight.failAll(provider, {
         code: 'host-crashed',

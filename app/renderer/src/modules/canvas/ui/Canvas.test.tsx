@@ -65,7 +65,6 @@ function reply(n: number, promptN: number, text: string): Reply {
   }
 }
 
-/** Reply one forks into Prompts two and three, Reply two into four and five. */
 function forkedTree(): Saved {
   clock = 0
 
@@ -102,10 +101,8 @@ function fakeMain(saved: Saved) {
   const settings: Settings = {...DEFAULT_SETTINGS, ...saved.settings}
   const sent: Command[] = []
   const listeners = new Set<(event: AppEvent) => void>()
-  /** What main says when it refuses a Stop; null takes every Stop. */
   const stops = {refusal: null as string | null}
   const deletes = {refusal: null as string | null}
-  /** While set, the Turns are fetched only once it settles. */
   const turnsLoads = {held: null as Promise<void> | null}
 
   function cutFrom(promptId: string) {
@@ -344,7 +341,7 @@ function inputUnder(replyText: string) {
   return nodeOf(replyText).getByRole('textbox', {name: 'Prompt'})
 }
 
-/** As the user does: the pointer comes over the Reply, sliding its Input out. */
+/** Hovering the Reply slides its Input out. */
 async function clickInputUnder(replyText: string) {
   await canvas().getByText(replyText).hover()
   await inputUnder(replyText).click()
@@ -378,7 +375,6 @@ it('draws every Turn as its own box, top-down, with an Input under every Reply',
   expect(two.left).toBeLessThan(three.left)
 })
 
-/** The thin line in a Reply's node from its box down to the node's bottom. */
 function stemUnder(replyText: string) {
   const node = nodeOf(replyText).element()
   const box = page.getByText(replyText).element().closest('[data-turn]')
@@ -622,7 +618,6 @@ it('moves focus to the streaming Reply’s Input a Prompt was sent for, hiding t
     .toBeDisabled()
 })
 
-/** Every viewport the canvas is painted at with a Turn showing, frame by frame. */
 function samplePainted() {
   const painted = new Set<string>()
   let sampling = true
@@ -915,8 +910,8 @@ it('keeps a Fork’s card put on unfolding Branches folded since before an orien
   await expect.element(page.getByText('Reply five')).toBeVisible()
   await expect.poll(viewport).not.toContain('translate(0px, 0px)')
 
-  // Reply five, the newest, ends the Active Thread: the switch has it to pan to
-  // but folded away, and the unfolded cards are measured only once they show.
+  // Reply five ends the Active Thread but is folded away: unfolded cards are
+  // measured only once they show.
   await nodeOf('Reply two').getByRole('button', {name: '2 Branches'}).click()
   await expect.element(page.getByText('Reply five')).not.toBeInTheDocument()
 
@@ -1039,7 +1034,6 @@ it('keeps a Reply let out by Show more open across an orientation switch', async
   expect(page.getByRole('button', {name: 'Show more'}).query()).toBeNull()
 })
 
-/** As the user does: the wheel over the canvas's empty space pans it. */
 async function wheel(deltaY: number) {
   const pane = document.querySelector('.react-flow__pane')
 
@@ -1058,7 +1052,6 @@ function lineTop(line: string) {
     .getBoundingClientRect().top
 }
 
-/** Scrolls the capped text holding `line` partway, then clicks its Show more. */
 async function showMoreScrolledTo(line: string) {
   const text = canvas().getByText(line, {exact: true}).element()
   const box = text.closest('.overflow-y-auto')
@@ -1588,7 +1581,6 @@ function fading(element: Element) {
   return transitionOf(element, 'opacity') !== undefined
 }
 
-/** How far the running slide carries the element, in px, either way. */
 function slideDistance(element: Element) {
   const {effect} = transitionOf(element, 'translate') ?? {}
 
@@ -2107,7 +2099,6 @@ it('keeps a streaming Reply’s bottom on the canvas as it grows, until the user
   await new Promise(requestAnimationFrame)
   expect(viewport()).toBe(scrolled)
 
-  // Past where it was, since the Reply grew while it was let go.
   await wheelGesture(500)
   expect(bottomOf(streaming)).toBeLessThanOrEqual(bottomOf(pane))
 

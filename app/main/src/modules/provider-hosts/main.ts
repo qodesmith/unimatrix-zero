@@ -243,7 +243,6 @@ export function createProviderHosts({
       start(provider, host)
     },
 
-    /** A ready host's Provider (`only`, if given) and its default Model. */
     ready(only?: ProviderId): {provider: ProviderId; model: Model} | null {
       for (const [provider, host] of hosts) {
         const model = host.models?.[0]

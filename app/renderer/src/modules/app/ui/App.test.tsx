@@ -54,7 +54,6 @@ async function emulateReducedMotion(value: 'reduce' | '') {
   })
 }
 
-/** The `data-slot` of each element a CSS transition starts on from now. */
 function watchTransitions() {
   const slots: (string | null)[] = []
 
@@ -367,7 +366,6 @@ function chatgptCard() {
   return page.getByRole('region', {name: 'ChatGPT'})
 }
 
-/** Where the app sidebar's right edge is: 0 or less once it has slid out. */
 function sidebarRight() {
   return page
     .getByRole('complementary')
@@ -388,7 +386,6 @@ function layoutUpdates(main: FakeMain) {
   return main.sent.filter(command => command.type === 'layout.update')
 }
 
-/** Each width the main area is drawn at, from the first time it is drawn. */
 function watchCanvasWidths() {
   const widths: number[] = []
 

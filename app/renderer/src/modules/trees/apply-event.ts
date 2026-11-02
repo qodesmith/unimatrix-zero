@@ -7,7 +7,6 @@ function lastActiveFirst(a: Tree, b: Tree) {
   )
 }
 
-/** The order the sidebar lists Trees in. */
 export function sortTrees(trees: Tree[]) {
   return trees.toSorted(lastActiveFirst)
 }

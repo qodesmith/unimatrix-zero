@@ -51,9 +51,8 @@ interface Entry {
 }
 
 /**
- * The Replies a host is writing. A streaming Reply is saved before it is
- * published, so a window never shows what main has not saved or is not about
- * to save.
+ * A streaming Reply is saved before it is published, so a window never shows
+ * what main has not saved or is not about to save.
  */
 export function createInFlight(
   db: Database,
@@ -77,7 +76,6 @@ export function createInFlight(
     entry.saveTimer ??= setTimeout(() => save(entry), PARTIAL_SAVE_MS)
   }
 
-  /** Saves what the event changed, then tells the windows. */
   function advance(entry: Entry, event: ReplyEvent) {
     const before = entry.reply
     entry.reply = foldReplyEvent(before, event)
@@ -161,7 +159,6 @@ export function createInFlight(
         .run()
     },
 
-    /** The Provider writing the Reply, or null when none is. */
     writer(treeId: string, replyId: string): ProviderId | null {
       const entry = entries.get(replyId)
 
@@ -180,7 +177,6 @@ export function createInFlight(
       }
     },
 
-    /** Saves any partial text still waiting on its timer. */
     saveAll() {
       for (const entry of entries.values()) {
         if (entry.saveTimer) save(entry)
@@ -188,9 +184,8 @@ export function createInFlight(
     },
 
     /**
-     * Ends the Tree's Replies as stopped without their hosts, and returns
-     * them. The windows hear each end, and nothing else follows from it: the
-     * Tree is about to be deleted.
+     * Stops the Tree's Replies without their hosts and returns them. Windows
+     * hear each end, but `onFinished` does not: the Tree is being deleted.
      */
     endIn(treeId: string): {provider: ProviderId; replyId: string}[] {
       const ending = [...entries.values()].filter(

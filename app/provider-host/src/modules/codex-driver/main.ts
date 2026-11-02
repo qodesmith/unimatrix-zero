@@ -39,7 +39,6 @@ interface CodexDriverOptions {
   timeoutMs?: number
 }
 
-/** ChatGPT through Codex's unmodified `codex app-server`. */
 export function createCodexDriver({
   store,
   spawn: start = spawnCodex,
@@ -75,7 +74,6 @@ export function createCodexDriver({
     ...createCodexSignIn({getProgramReady, open, portFree, timeoutMs}),
     readConnection: notYet,
     listModels: async () => [{id: DEFAULT_MODEL, name: 'Default'}],
-    // Without one-shots yet, main writes no automatic title.
     smallestModel: async () => null,
     readUsage: notYet,
     startReply: replies.startReply,

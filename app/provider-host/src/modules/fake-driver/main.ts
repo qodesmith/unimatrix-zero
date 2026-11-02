@@ -91,7 +91,6 @@ export function createFakeDriver({
   delayMs = 40,
   signInAnswerMs = 3000,
 }: FakeDriverOptions = {}): ProviderDriver {
-  /** Stop aborts the canned stream, which then ends as `stopped`. */
   async function* write(
     request: ReplyRequest,
     run: ReplyRun
@@ -109,7 +108,6 @@ export function createFakeDriver({
       finished: {...ids, type: 'RUN_FINISHED', status: 'stopped'},
     }
 
-    /** Returns false once the Reply is stopped. */
     async function* streamWords(
       type: 'TEXT_DELTA' | 'REASONING_DELTA',
       text: string,

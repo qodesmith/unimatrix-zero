@@ -153,10 +153,7 @@ interface PromptBoxProps {
   children: ReactNode
 }
 
-/**
- * A Prompt's box, with its delete control drawn over its top-right corner, so
- * it shifts nothing on the canvas. The root Prompt's deletes the Tree.
- */
+/** The delete control overlays its corner, shifting nothing on the canvas. */
 export function PromptBox({promptId, className, children}: PromptBoxProps) {
   const {index} = useCanvas()
   const isRoot = index.promptById.get(promptId)?.parentReplyId === null
