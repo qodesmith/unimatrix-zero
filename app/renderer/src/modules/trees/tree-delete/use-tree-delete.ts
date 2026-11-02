@@ -1,5 +1,6 @@
 import type {TreeDeleteState} from './machine'
 
+import {bridge} from '#modules/bridge/main'
 import {useStateMachine} from '#modules/state-machine/main'
 import {useCallback} from 'react'
 
@@ -35,7 +36,10 @@ export function useTreeDelete(treeId: string) {
     if (treeDeleteTransition(state, {type: 'confirmed'}) === state) return
 
     send({type: 'confirmed'})
-    void deleteTree({treeId, send})
+    void deleteTree({
+      runDelete: async () => bridge().send({type: 'tree.delete', treeId}),
+      send,
+    })
   }
 
   return {
