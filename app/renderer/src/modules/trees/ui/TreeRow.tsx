@@ -104,7 +104,7 @@ export function TreeRow({
             Rename
           </DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onClick={onDelete}>
-            Delete…
+            {tree.turnCount === 0 ? 'Delete' : 'Delete…'}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
