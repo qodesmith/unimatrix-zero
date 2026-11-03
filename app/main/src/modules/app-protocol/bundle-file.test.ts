@@ -22,8 +22,8 @@ it('serves assets with a fixed MIME type', () => {
 })
 
 it.each([
-  '/../secret',
-  '/%2e%2e/secret',
+  '/../secret.js',
+  '/%2e%2e/secret.js',
   '/a/..%2Fb.js',
   '/x%00.js',
   '/evil.exe',

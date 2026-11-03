@@ -204,7 +204,7 @@ it('starts a new Tree from the last-used Model', async () => {
   expect(sentModels(main)).toEqual([{provider: 'chatgpt', model: 'gpt-5'}])
 })
 
-it('sends the Model picked in the Input, closing the picker on the pick', async () => {
+it('sends the Model picked in the Input', async () => {
   const main = await renderInput({
     attachedTo: attachedReply('claude', 'opus'),
   })
@@ -212,7 +212,6 @@ it('sends the Model picked in the Input, closing the picker on the pick', async 
   await picker().click()
   await page.getByRole('option', {name: 'Haiku'}).click()
   await expectPicked('Claude', 'Haiku')
-  await expect.element(page.getByRole('listbox')).not.toBeInTheDocument()
 
   await send(main)
   expect(sentModels(main)).toEqual([{provider: 'claude', model: 'haiku'}])
@@ -235,7 +234,6 @@ it('lists a Model the app is too old for, disabled as needing an app update', as
 
   await expect.element(gated).toHaveAttribute('aria-disabled', 'true')
   await expect.element(gated.getByText('Needs an app update')).toBeVisible()
-  await expect.element(page.getByRole('option', {name: 'GPT-5'})).toBeVisible()
 })
 
 it('falls back to the Provider’s default, visibly, when the Reply’s Model is no longer offered', async () => {

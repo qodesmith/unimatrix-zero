@@ -26,10 +26,10 @@ it('leaves the space below the headers to the last section when all are collapse
 })
 
 it('keeps a collapsed section’s size, for expanding to, when the open ones are dragged', () => {
-  expect(resized(filesShut, {trees: 48, files: 4, usage: 48}, 4)).toEqual({
-    trees: {size: 35, collapsed: false},
+  expect(resized(filesShut, {trees: 72, files: 4, usage: 24}, 4)).toEqual({
+    trees: {size: 52.5, collapsed: false},
     files: {size: 30, collapsed: true},
-    usage: {size: 35, collapsed: false},
+    usage: {size: 17.5, collapsed: false},
   })
 })
 
@@ -45,7 +45,7 @@ it('arranges a drag’s sizes back to the layout dragged to', () => {
 })
 
 it('resets two sections to the default split of their space, leaving the third alone', () => {
-  const usage = {size: 15, collapsed: true}
+  const usage = {size: 32, collapsed: true}
 
   const reset = resetSplit(
     {

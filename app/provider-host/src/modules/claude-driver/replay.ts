@@ -58,8 +58,7 @@ const projects = path.join(configDir, 'projects', projectKey)
 const recordedProjects = path.join(start.configDir, 'projects', start.projectKey)
 const args = process.argv.slice(2)
 const resume = args.find(arg => arg.startsWith('--resume='))?.slice('--resume='.length)
-const resumeAt = args.find(arg => arg.startsWith('--resume-session-at='))?.slice('--resume-session-at='.length)
-const report = {args, configDir, runningAtStart, prompts: [], resumedFrom: [], resumedWith: [], toolResults: [], inputClosed: false, ended: null}
+const report = {args, configDir, runningAtStart, prompts: [], resumedFrom: [], toolResults: [], inputClosed: false, ended: null}
 
 function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
@@ -80,8 +79,6 @@ if (resume) {
   if (!fs.existsSync(transcript) || (temporary && process.env.FAKE_CLAUDE_REFUSE_STORE === 'yes')) refuse(resume)
   report.resumedFrom = fs.readFileSync(transcript, 'utf8').split('\\n').filter(Boolean)
     .map(line => JSON.parse(line).uuid).filter(Boolean)
-  const kept = resumeAt ? report.resumedFrom.indexOf(resumeAt) + 1 : report.resumedFrom.length
-  report.resumedWith = report.resumedFrom.slice(0, kept)
   const toolResults = path.join(projects, resume, 'tool-results')
   report.toolResults = fs.existsSync(toolResults) ? fs.readdirSync(toolResults) : []
 }

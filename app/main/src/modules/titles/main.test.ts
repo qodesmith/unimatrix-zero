@@ -14,7 +14,9 @@ import {createTitles} from './main'
 
 const migrationsFolder = path.resolve(import.meta.dirname, '../../../drizzle')
 
-const vendorProgram = {program: null, configDir: '/claude'}
+function vendorProgramFor(provider: ProviderId): SignInRequest {
+  return {program: null, configDir: `/${provider}`}
+}
 
 interface OneShot {
   provider: ProviderId
@@ -44,7 +46,7 @@ beforeEach(() => {
       new Promise((resolve, reject) => {
         oneShots.push({provider, request, resolve, reject})
       }),
-    vendorProgramFor: () => vendorProgram,
+    vendorProgramFor,
     publish: event => published.push(event),
   })
 
@@ -55,7 +57,7 @@ beforeEach(() => {
       ready: () => true,
       send: () => undefined,
     },
-    vendorProgramFor: () => vendorProgram,
+    vendorProgramFor,
     now: () => new Date('2026-10-19T12:00:00.000Z'),
     onTurnsChanged: () => undefined,
     onReplyFinished: finished => pending.push(titles.replyFinished(finished)),
@@ -124,7 +126,7 @@ describe('the automatic title', () => {
     expect(oneShots).toHaveLength(1)
     expect(lastOneShot()).toMatchObject({
       provider: 'claude',
-      request: {vendorProgram},
+      request: {vendorProgram: {program: null, configDir: '/claude'}},
     })
     expect(lastOneShot().request.prompt).toContain('Plan a trip to Lisbon')
     expect(lastOneShot().request.prompt).toContain('Lisbon in May is mild.')

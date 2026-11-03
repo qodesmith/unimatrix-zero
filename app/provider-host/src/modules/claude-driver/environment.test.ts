@@ -19,7 +19,7 @@ it('strips every variable that could outrank the subscription', () => {
     '/data/providers/claude'
   )
 
-  expect(env).toEqual({
+  expect(env).toStrictEqual({
     PATH: '/usr/bin',
     HOME: '/Users/sam',
     CLAUDE_CONFIG_DIR: '/data/providers/claude',

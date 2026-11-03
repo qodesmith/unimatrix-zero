@@ -57,13 +57,22 @@ it('adds a message that never streamed, and leaves one that matches', () => {
 it('passes reasoning on and reads each request’s own token count', () => {
   const mapper = createReplyMapper(ids)
 
-  const usage = {
+  const last = {
     totalTokens: 120,
     inputTokens: 100,
     cachedInputTokens: 80,
     cacheWriteInputTokens: 0,
     outputTokens: 20,
     reasoningOutputTokens: 5,
+  }
+
+  const total = {
+    totalTokens: 360,
+    inputTokens: 300,
+    cachedInputTokens: 240,
+    cacheWriteInputTokens: 0,
+    outputTokens: 60,
+    reasoningOutputTokens: 15,
   }
 
   expect([
@@ -75,7 +84,7 @@ it('passes reasoning on and reads each request’s own token count', () => {
       method: 'thread/tokenUsage/updated',
       params: {
         ...inTurn,
-        tokenUsage: {total: usage, last: usage, modelContextWindow: 475_000},
+        tokenUsage: {total, last, modelContextWindow: 475_000},
       },
     }),
   ]).toEqual([

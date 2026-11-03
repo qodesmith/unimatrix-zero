@@ -34,6 +34,28 @@ function fakeMain() {
   return {port, sent, command}
 }
 
+async function unhandledDuring(run: () => Promise<void>) {
+  const unhandled: unknown[] = []
+
+  function note(cause: unknown) {
+    unhandled.push(cause)
+  }
+
+  process.on('unhandledRejection', note)
+
+  try {
+    await run()
+    // Node reports a rejection as unhandled only once the microtasks drain.
+    await new Promise(resolve => {
+      setTimeout(resolve, 0)
+    })
+  } finally {
+    process.off('unhandledRejection', note)
+  }
+
+  return unhandled
+}
+
 async function finished(sent: HostMessage[]) {
   await expect.poll(() => sent.at(-1)?.type).toBe('RUN_FINISHED')
 }
@@ -111,10 +133,14 @@ it('tells main nothing when the driver can’t list its Models or fails to', asy
 
   await runHost(main.port, () => driver)
 
-  main.command({type: 'models.list', vendorProgram})
-  main.command({type: 'models.list', vendorProgram})
-  main.command({type: 'models.list', vendorProgram})
-  await expect.poll(() => main.sent.at(-1)?.type).toBe('MODELS_CHANGED')
+  const unhandled = await unhandledDuring(async () => {
+    main.command({type: 'models.list', vendorProgram})
+    main.command({type: 'models.list', vendorProgram})
+    main.command({type: 'models.list', vendorProgram})
+    await expect.poll(() => main.sent.at(-1)?.type).toBe('MODELS_CHANGED')
+  })
+
+  expect(unhandled).toEqual([])
 
   // The lists settle in order, so a post for either earlier one comes first.
   expect(
@@ -397,10 +423,14 @@ it('tells main nothing when the driver leaves the cut for later or fails it', as
 
   await runHost(main.port, () => driver)
 
-  main.command(cut)
-  main.command({...cut, replyId: failed})
-  main.command({...cut, replyId: made})
-  await expect.poll(() => main.sent.at(-1)?.type).toBe('SESSION_CUT')
+  const unhandled = await unhandledDuring(async () => {
+    main.command(cut)
+    main.command({...cut, replyId: failed})
+    main.command({...cut, replyId: made})
+    await expect.poll(() => main.sent.at(-1)?.type).toBe('SESSION_CUT')
+  })
+
+  expect(unhandled).toEqual([])
 
   // The cuts settle in order, so a post for either earlier one comes first.
   expect(main.sent.filter(message => message.type === 'SESSION_CUT')).toEqual([

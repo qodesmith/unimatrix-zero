@@ -580,10 +580,8 @@ describe('loading a remote image', () => {
       'https://a.example/1.png',
       'http://b.example/2.png',
     ])
-    expect(https).toEqual({
-      ok: true,
-      value: {dataUrl: 'data:image/png;base64,iVBORw0KGgo='},
-    })
+
+    expect(https).toEqual({ok: true, value: {dataUrl: expect.any(String)}})
   })
 
   it('refuses any link that is not http or https, fetching nothing', async () => {

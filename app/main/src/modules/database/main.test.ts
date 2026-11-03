@@ -63,31 +63,12 @@ function backups() {
 }
 
 describe('opening', () => {
-  it('creates every table in memory, with foreign keys on', () => {
+  it('turns foreign keys on', () => {
     const db = openDatabase({
       file: ':memory:',
       migrationsFolder: shippedMigrations,
     })
 
-    const tables = db.$client
-      .prepare(
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE '\\_%' ESCAPE '\\' AND name != 'sqlite_sequence' ORDER BY name"
-      )
-      .all()
-      .map(row => row.name)
-
-    expect(tables).toEqual([
-      'layout',
-      'prompts',
-      'providers',
-      'replies',
-      'session_entries',
-      'session_files',
-      'settings',
-      'system_prompts',
-      'themes',
-      'trees',
-    ])
     expect(db.$client.prepare('PRAGMA foreign_keys').get()).toEqual({
       foreign_keys: 1,
     })

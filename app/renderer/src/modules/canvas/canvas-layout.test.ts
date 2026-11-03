@@ -114,7 +114,7 @@ describe('vertical', () => {
     expect(pos('P4').x).toBeLessThan(pos('P5').x)
     expect(pos('P5').x).toBeLessThan(pos('P6').x)
     expect(pos('P5').x - pos('P4').x).toBeGreaterThanOrEqual(width)
-    expect(pos('P3').x - pos('R2').x).toBeGreaterThanOrEqual(width)
+    expect(pos('P3').x).toBeGreaterThanOrEqual(pos('P6').x + width)
   })
 
   it('centers a Fork over its Branches', () => {
@@ -218,7 +218,7 @@ function twoBranches(second: string) {
   const other = {...prompt('Pb', 'R1'), createdAt: second}
 
   return indexTurns({
-    prompts: [root, first, other],
+    prompts: [root, other, first],
     replies: [reply('R1', 'P1'), reply('Ra', 'Pa'), reply('Rb', 'Pb')],
   })
 }

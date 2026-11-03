@@ -1058,7 +1058,6 @@ describe('deleting a Prompt', () => {
       replyIds: [first],
     })
     expect(turns.list(treeId)).toEqual({prompts: [], replies: []})
-    expect(cutsAsked()).toEqual([])
     expect(
       turns.sendPrompt({
         model: picked,

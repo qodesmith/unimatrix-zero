@@ -17,7 +17,7 @@ it('strips every variable that could outrank the subscription', () => {
     '/data/providers/chatgpt'
   )
 
-  expect(env).toEqual({
+  expect(env).toStrictEqual({
     PATH: '/usr/bin',
     HOME: '/Users/sam',
     CODEX_HOME: '/data/providers/chatgpt',

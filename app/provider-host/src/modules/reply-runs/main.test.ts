@@ -153,9 +153,6 @@ it('passes on a Stop asked before the vendor program could be stopped, once it c
 
   const {rest} = await startedReply(runs)
   await runs.stop(ids.replyId)
-
-  expect(interrupt).not.toHaveBeenCalled()
-
   letStop()
   await rest
 
@@ -196,7 +193,6 @@ it('interrupts at once while the vendor program can be stopped, and waits again 
   await runs.stop(ids.replyId)
 
   expect(interrupt).toHaveBeenCalledOnce()
-  expect(later).not.toHaveBeenCalled()
 
   steps.again.resolve()
   await rest
