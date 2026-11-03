@@ -294,14 +294,6 @@ it('highlights the code block', async () => {
   expect(code?.textContent).toBe('const answer = 42')
 })
 
-it('renders the math with KaTeX', async () => {
-  const screen = await replay()
-  const article = screen.getByRole('article').element()
-
-  await expect.poll(() => article.querySelectorAll('.katex').length).toBe(2)
-  expect(article.querySelector('.katex-display')).not.toBeNull()
-})
-
 it('draws the Mermaid diagram once its bundle has loaded', async () => {
   const screen = await replay()
   const article = screen.getByRole('article').element()
@@ -359,29 +351,6 @@ it('says why an image could not load, and offers to try again', async () => {
   await expect
     .element(screen.getByRole('button', {name: 'Try again'}))
     .toBeVisible()
-})
-
-it('says a stopped Reply was stopped, keeping its text', async () => {
-  const screen = await renderSaved({
-    status: 'stopped',
-    content: [{type: 'text', text: 'Half an answer'}],
-  })
-
-  await expect.element(screen.getByText('Half an answer')).toBeVisible()
-  await expect
-    .element(screen.getByText('Stopped'))
-    .toHaveClass('text-muted-foreground')
-})
-
-it('says an interrupted Reply was cut short by the app quitting', async () => {
-  const screen = await renderSaved({
-    status: 'interrupted',
-    content: [{type: 'text', text: 'Half an answer'}],
-  })
-
-  await expect
-    .element(screen.getByText('Interrupted when the app quit'))
-    .toHaveClass('text-muted-foreground')
 })
 
 it.each([

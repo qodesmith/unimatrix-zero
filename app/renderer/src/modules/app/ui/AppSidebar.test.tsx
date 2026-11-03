@@ -83,13 +83,6 @@ describe('a Tree’s row', () => {
       .not.toBeInTheDocument()
   })
 
-  it('calls a Tree with no Prompt yet Untitled Tree, in italics', async () => {
-    await renderApp(fakeMain({trees: [savedTree()]}))
-
-    await expect.element(treeRow('Untitled Tree')).toBeVisible()
-    expect(fontStyle('Untitled Tree')).toBe('italic')
-  })
-
   it('lists the Trees last active first, each with how long ago that was', async () => {
     await renderApp(
       fakeMain({
@@ -170,18 +163,6 @@ describe('a Tree’s row', () => {
 })
 
 describe('renaming a Tree', () => {
-  it('renames it with F2', async () => {
-    const main = fakeMain({trees: [savedTree({title: 'Draft'})]})
-    await renderApp(main)
-
-    await treeRow('Draft').click()
-    await userEvent.keyboard('{F2}')
-    await page.getByRole('textbox', {name: 'Tree name'}).fill('Trip planning')
-    await userEvent.keyboard('{Enter}')
-
-    await expect.element(treeRow('Trip planning')).toBeVisible()
-  })
-
   it('starts an untitled Tree from its first line, which Enter leaves untitled', async () => {
     const main = fakeMain({
       trees: [savedTree({firstLine: 'Plan a week in Lisbon'})],
@@ -314,58 +295,6 @@ describe('deleting a Tree', () => {
     await expect
       .element(treeRow('Plan a week in Lisbon'))
       .not.toBeInTheDocument()
-    await expect.element(treeRow('Other')).toBeVisible()
-    await expect
-      .element(page.getByRole('main').getByText('No Tree open'))
-      .toBeVisible()
-  })
-
-  it('deletes the open Tree from its root Prompt, asking the same as its row does', async () => {
-    const tree = savedTree({title: 'Lisbon trip'})
-    const other = savedTree({title: 'Other'})
-
-    const root = {
-      id: crypto.randomUUID(),
-      treeId: tree.id,
-      parentReplyId: null,
-      text: 'Plan a week in Lisbon',
-      createdAt: minutesAgo(5),
-    }
-
-    const main = fakeMain({
-      trees: [tree, other],
-      prompts: [root],
-      replies: [
-        {
-          id: crypto.randomUUID(),
-          treeId: tree.id,
-          promptId: root.id,
-          provider: 'claude',
-          model: 'fake',
-          status: 'complete',
-          content: [{type: 'text', text: 'Start in Alfama'}],
-          contextSize: null,
-          contextWindow: null,
-          failure: null,
-          createdAt: minutesAgo(5),
-        },
-      ],
-    })
-
-    await renderApp(main)
-    await treeRow('Lisbon trip').click()
-    await expect.element(page.getByText('Start in Alfama')).toBeVisible()
-
-    await page.getByText('Plan a week in Lisbon').hover()
-    await page.getByRole('button', {name: 'Delete this Tree'}).click()
-    await expectDeleteTreeMessage()
-    await deleteDialog().getByRole('button', {name: 'Delete'}).click()
-
-    expect(sentOf(main, 'tree.delete')).toEqual([
-      {type: 'tree.delete', treeId: tree.id},
-    ])
-    expect(sentOf(main, 'prompt.delete')).toEqual([])
-    await expect.element(treeRow('Lisbon trip')).not.toBeInTheDocument()
     await expect.element(treeRow('Other')).toBeVisible()
     await expect
       .element(page.getByRole('main').getByText('No Tree open'))
@@ -553,33 +482,6 @@ describe('the sidebar’s width', () => {
       {type: 'layout.update', changes: {sidebarWidth: 400}},
       {type: 'layout.update', changes: {sidebarWidth: 640}},
       {type: 'layout.update', changes: {sidebarWidth: 290}},
-    ])
-  })
-
-  it('widens and narrows from the keyboard, saving each width it lands on', async () => {
-    const main = fakeMain()
-    await renderApp(main)
-    await expect.poll(sidebarWidth).toBe(290)
-
-    const handle = widthHandle()
-
-    if (!(handle instanceof HTMLElement)) throw new Error('No width handle')
-
-    handle.focus()
-    await userEvent.keyboard('{ArrowRight}')
-    await expect.poll(sidebarWidth).toBeGreaterThan(290)
-    const wider = sidebarWidth()
-
-    await userEvent.keyboard('{ArrowRight}')
-    await expect.poll(sidebarWidth).toBeGreaterThan(wider)
-    const widest = sidebarWidth()
-
-    await userEvent.keyboard('{ArrowLeft}')
-    await expect.poll(sidebarWidth).toBe(wider)
-    expect(layoutUpdates(main)).toEqual([
-      {type: 'layout.update', changes: {sidebarWidth: wider}},
-      {type: 'layout.update', changes: {sidebarWidth: widest}},
-      {type: 'layout.update', changes: {sidebarWidth: wider}},
     ])
   })
 

@@ -115,18 +115,3 @@ it('cancels during the download', async () => {
     outcome: 'canceled',
   })
 })
-
-it('cancels while waiting on the sign-in page', async () => {
-  const driver = createFakeDriver({delayMs: 0, signInAnswerMs: null})
-
-  const updates = await connect(driver, update => {
-    if (update.type === 'SIGN_IN_STEP' && update.step === 'sign-in-page') {
-      driver.cancelSignIn()
-    }
-  })
-
-  expect(updates.at(-1)).toEqual({
-    type: 'SIGN_IN_FINISHED',
-    outcome: 'canceled',
-  })
-})

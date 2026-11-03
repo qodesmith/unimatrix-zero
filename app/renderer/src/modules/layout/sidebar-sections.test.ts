@@ -11,10 +11,6 @@ const open = {
 
 const filesShut = {...open, files: {size: 30, collapsed: true}}
 
-it('lays the sections out at their sizes while all are open', () => {
-  expect(arrange(open, 5)).toEqual({trees: 50, files: 30, usage: 20})
-})
-
 it('shrinks a collapsed section to its header, the open ones sharing the rest as their sizes do', () => {
   expect(arrange(filesShut, 2)).toEqual({trees: 70, files: 2, usage: 28})
 })

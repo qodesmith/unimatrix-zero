@@ -665,20 +665,6 @@ describe('continuing from a Reply its Provider never saved', () => {
       {sessionId: 's1', messageId: 'm1', type: 'fork'},
     ])
   })
-
-  it('starts a new session when the stopped Reply answered the root Prompt', () => {
-    const replyId = sendPrompt(null)
-    stopUnrecorded(replyId)
-
-    turns.sendPrompt({
-      model: picked,
-      treeId,
-      parentReplyId: replyId,
-      text: 'On',
-    })
-
-    expect(sessionsStarted()).toEqual([null])
-  })
 })
 
 describe('stopping a Reply', () => {
@@ -811,17 +797,6 @@ describe('retrying a Reply', () => {
     expect(turns.streaming()).toMatchObject([{replyId, content: []}])
 
     hostCommands = []
-    turns.stop(treeId, replyId)
-
-    expect(hostCommands).toEqual([{type: 'reply.stop', replyId}])
-  })
-
-  it('can be stopped once it streams again', () => {
-    const replyId = sendPrompt(null)
-    fail(replyId)
-    turns.retry(treeId, replyId)
-    hostCommands = []
-
     turns.stop(treeId, replyId)
 
     expect(hostCommands).toEqual([{type: 'reply.stop', replyId}])

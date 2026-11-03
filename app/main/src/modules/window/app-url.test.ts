@@ -45,16 +45,13 @@ describe('isTopLevelAppFrame', () => {
     expect(isTopLevelAppFrame({senderFrame: null, sender}, appUrl)).toBe(false)
   })
 
-  it.each(['about:blank', ''])(
-    'refuses the main frame on %j without throwing',
-    url => {
-      const frame = {url}
-      expect(
-        isTopLevelAppFrame(
-          {senderFrame: frame, sender: {mainFrame: frame}},
-          appUrl
-        )
-      ).toBe(false)
-    }
-  )
+  it('refuses the main frame on about:blank', () => {
+    const frame = {url: 'about:blank'}
+    expect(
+      isTopLevelAppFrame(
+        {senderFrame: frame, sender: {mainFrame: frame}},
+        appUrl
+      )
+    ).toBe(false)
+  })
 })

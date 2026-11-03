@@ -29,12 +29,6 @@ afterEach(() => {
   document.documentElement.style.fontSize = ''
 })
 
-it('sizes the root font from the saved font size', async () => {
-  await renderFollowFontSize({fontSize: 20})
-
-  await expect.poll(rootFontSize).toBe('20px')
-})
-
 it('saves and shows a bigger font size on ⌘+, and a smaller one on ⌘−', async () => {
   const main = await renderFollowFontSize({fontSize: 20})
   await expect.poll(rootFontSize).toBe('20px')

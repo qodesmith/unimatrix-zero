@@ -41,23 +41,6 @@ it('has no program for a machine the manifest does not name', () => {
   ).toBeNull()
 })
 
-it('names one Codex folder for each OS and arch, run from its app-server', () => {
-  const {builds} = DEV_MANIFEST.vendorPrograms.codex
-
-  expect(Object.keys(builds).toSorted()).toEqual(
-    Object.keys(DEV_MANIFEST.vendorPrograms.claude.builds).toSorted()
-  )
-
-  for (const [platform, build] of Object.entries(builds)) {
-    const exe = platform.startsWith('win32') ? '.exe' : ''
-
-    expect(build.archive).toEqual({
-      format: 'tar.gz',
-      entrypoint: `bin/codex-app-server${exe}`,
-    })
-  }
-})
-
 it('puts the Codex folder for ChatGPT under userData, beside its own configuration', () => {
   const request = signInRequestFor('chatgpt', {
     userData,

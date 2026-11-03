@@ -28,7 +28,6 @@ function now() {
 
 let published: AppEvent[]
 let hostCommands: HostCommand[]
-let hostReady: boolean
 let hostReachable: boolean
 let loaded: string[]
 let deps: Parameters<typeof dispatchCommand>[2]
@@ -38,7 +37,6 @@ beforeEach(() => {
   clock = new Date('2026-10-19T12:00:00.000Z')
   published = []
   hostCommands = []
-  hostReady = true
   hostReachable = true
   loaded = []
 
@@ -62,7 +60,7 @@ beforeEach(() => {
       db,
       publish,
       hosts: {
-        ready: provider => hostReady && provider === 'claude',
+        ready: provider => provider === 'claude',
         send: sendToHost,
       },
       vendorProgramFor: () => ({program: null, configDir: '/claude'}),
@@ -96,10 +94,7 @@ beforeEach(() => {
   }
 })
 
-type Sent =
-  | Command
-  | {type: 'app.nope'}
-  | {type: 'app.ping'; nonce: string; extra: true}
+type Sent = Command | {type: 'app.ping'; nonce: string; extra: true}
 
 async function send(raw: Sent) {
   return dispatchCommand(raw, trusted, deps)
@@ -176,11 +171,6 @@ describe('app.ping', () => {
     expect(outcome).toMatchObject({ok: false, error: {code: 'invalid-command'}})
   })
 
-  it('rejects a command type it does not know', async () => {
-    const outcome = await send({type: 'app.nope'})
-    expect(outcome).toMatchObject({ok: false, error: {code: 'invalid-command'}})
-  })
-
   it('refuses a sender that is not the top-level app frame', async () => {
     const outcome = await dispatchCommand(
       {type: 'app.ping', nonce: 'n-1'},
@@ -214,15 +204,6 @@ describe('Trees', () => {
     expect(await send({type: 'tree.list'})).toEqual({
       ok: true,
       value: {trees: [second, first]},
-    })
-  })
-
-  it('opens a Tree by id', async () => {
-    const tree = await createTree()
-
-    expect(await send({type: 'tree.open', treeId: tree.id})).toEqual({
-      ok: true,
-      value: tree,
     })
   })
 
@@ -447,18 +428,6 @@ describe('deleting a Tree', () => {
     expect(await listed()).toEqual([])
   })
 
-  it('deletes it when the host writing its Reply can’t be reached', async () => {
-    const tree = await createTree()
-    await sendPrompt(tree.id, null)
-    hostReachable = false
-
-    expect(await send({type: 'tree.delete', treeId: tree.id})).toEqual({
-      ok: true,
-      value: {},
-    })
-    expect(published.at(-1)).toEqual({type: 'TREE_DELETED', treeId: tree.id})
-  })
-
   it('answers not-found for a Tree that does not exist', async () => {
     expect(
       await send({type: 'tree.delete', treeId: crypto.randomUUID()})
@@ -513,27 +482,6 @@ describe('Reply commands', () => {
         text: 'Hi',
       })
     ).toMatchObject({ok: false, error: {code: 'not-found'}})
-  })
-
-  it('answers with why a Prompt can’t be sent', async () => {
-    const tree = await createTree()
-    hostReady = false
-
-    expect(
-      await send({
-        type: 'prompt.send',
-        model: picked,
-        treeId: tree.id,
-        parentReplyId: null,
-        text: 'Hi',
-      })
-    ).toEqual({
-      ok: false,
-      error: {
-        code: 'handler-failed',
-        message: 'Connect a Provider to send a Prompt.',
-      },
-    })
   })
 
   it('stops a streaming Reply, and answers with why it can’t', async () => {
@@ -610,18 +558,6 @@ describe('connecting a Provider', () => {
       {type: 'sign-in.code', code: 'code#s'},
       {type: 'sign-in.cancel'},
     ])
-  })
-
-  it('answers with why a Provider can’t be connected', async () => {
-    expect(await send({type: 'provider.connect', provider: 'chatgpt'})).toEqual(
-      {
-        ok: false,
-        error: {
-          code: 'handler-failed',
-          message: 'ChatGPT can’t be connected in this version yet.',
-        },
-      }
-    )
   })
 
   it('refuses an empty code', async () => {

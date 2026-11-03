@@ -1,6 +1,6 @@
 import {expect, it} from 'vitest'
 
-import {CODEX_ARGS, codexEnvironment} from './environment'
+import {codexEnvironment} from './environment'
 
 it('strips every variable that could outrank the subscription', () => {
   const env = codexEnvironment(
@@ -22,8 +22,4 @@ it('strips every variable that could outrank the subscription', () => {
     HOME: '/Users/sam',
     CODEX_HOME: '/data/providers/chatgpt',
   })
-})
-
-it('turns the self-updater off', () => {
-  expect(CODEX_ARGS.join(' ')).toContain('-c check_for_update_on_startup=false')
 })

@@ -57,10 +57,3 @@ export function machine<S extends MachineState, E extends MachineEvent>(
     return shallowEqual(state, next) ? state : next
   }
 }
-
-/** The context of a compound that runs a machine in its provider. */
-export interface MachineContext<S, A, M = Record<string, never>> {
-  state: S
-  actions: A
-  meta: M
-}
