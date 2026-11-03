@@ -37,7 +37,7 @@ Main's SQLite schema lives in `app/main/src/modules/database/schema.ts`. After c
 
 Inside a package, code lives in deep modules: `src/modules/<name>/main.ts` is the only file another module may import, written as `#modules/<name>/main`. Everything else in the folder is private, tests sit beside their unit, and `.tsx` files live under a `ui/` folder. The `uz/module-boundaries` and `uz/tsx-under-ui` lint rules in `tooling/oxlint/uz/` enforce this.
 
-The renderer's shadcn components are the exception: they sit outside `src/modules/` in `app/renderer/src/shadcn/`, with no `main.ts`, and code imports each file directly (`#shadcn/ui/button`). The folder holds every component in shadcn's `base-vega` registry but the few `uz/no-excluded-shadcn` keeps out, used or not, so `knip.json` makes each file an entry: an unused component, and a package only components import, never fail `bun run knip`.
+The renderer's shadcn components are the exception: they sit outside `src/modules/` in `app/renderer/src/shadcn/`, with no `main.ts`, and code imports each file directly (`#shadcn/ui/button`). The folder holds every shadcn component, used or not (see `docs/code-style/styling-and-color.md`), so `knip.json` makes each file an entry: an unused component, and a package only components import, never fail `bun run knip`.
 
 ### Colors
 

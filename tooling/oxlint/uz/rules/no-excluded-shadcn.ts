@@ -7,7 +7,7 @@ const EXCLUDED = new Map([
   ['toast', 'Sonner (`#shadcn/ui/sonner`) is the toast'],
   [
     'code-block',
-    'Streamdown draws code, through `#modules/markdown/main`. Delete `ui/highlighter.tsx` and `hooks/use-highlighted-code.ts` with it',
+    'Streamdown draws code, through `#modules/markdown/main`. Delete `lib/highlighter.tsx` and `hooks/use-highlighted-code.ts` with it',
   ],
 ])
 
@@ -16,7 +16,7 @@ export const noExcludedShadcn: Rule = defineRule({
     type: 'problem',
     docs: {
       description:
-        'shadcn components we keep out, because another one already does the job',
+        'shadcn components we keep out, because another tool already does the job',
     },
     messages: {
       excluded:

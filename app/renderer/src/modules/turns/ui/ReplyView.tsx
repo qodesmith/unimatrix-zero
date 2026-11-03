@@ -28,6 +28,7 @@ import {
 } from '#shadcn/ui/trace'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {cn} from 'cn'
+import {ChevronRightIcon} from 'lucide-react'
 import {Fragment} from 'react'
 
 import {useReplyRun} from '../reply-run/use-reply-run'
@@ -244,7 +245,8 @@ function ThinkingBlockView({block}: {block: ThinkingBlock}) {
 
   return (
     <Collapsible className="rounded-md bg-muted/50 px-2 py-1 text-xs text-muted-foreground">
-      <CollapsibleTrigger className="cursor-pointer text-left select-none">
+      <CollapsibleTrigger className="group/thinking-trigger flex w-full cursor-pointer items-center gap-1 text-left select-none">
+        <ChevronRightIcon className="size-3 shrink-0 transition-transform group-aria-expanded/thinking-trigger:rotate-90" />
         {endedAt === null
           ? 'Thinking…'
           : `Thought for ${describeDuration(endedAt - startedAt)}`}

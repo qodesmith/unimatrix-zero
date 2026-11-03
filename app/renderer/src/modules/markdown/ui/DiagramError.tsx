@@ -6,6 +6,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '#shadcn/ui/collapsible'
+import {ChevronRightIcon} from 'lucide-react'
 
 /**
  * Replaces Streamdown's Mermaid error panel, which ships Tailwind's reds:
@@ -19,7 +20,8 @@ export function DiagramError({chart, error}: MermaidErrorComponentProps) {
           This diagram could not be drawn: {error}
         </span>
         <Collapsible>
-          <CollapsibleTrigger className="cursor-pointer text-muted-foreground select-none">
+          <CollapsibleTrigger className="group/show-code-trigger flex w-full cursor-pointer items-center gap-1 text-muted-foreground select-none">
+            <ChevronRightIcon className="size-3 shrink-0 transition-transform group-aria-expanded/show-code-trigger:rotate-90" />
             Show code
           </CollapsibleTrigger>
           <CollapsibleContent>
