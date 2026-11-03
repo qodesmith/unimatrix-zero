@@ -36,13 +36,13 @@ it.each(['darwin', 'win32', 'linux'] as const)(
       role !== undefined && /zoom|viewMenu/iu.test(role) ? [role] : []
     )
 
-    const zoomKeys = items.flatMap(({accelerator}) =>
+    const fontSizeKeys = items.flatMap(({accelerator}) =>
       accelerator !== undefined && takesFontSizeKey(accelerator)
         ? [accelerator]
         : []
     )
 
     expect(zoomRoles).toEqual([])
-    expect(zoomKeys).toEqual([])
+    expect(fontSizeKeys).toEqual([])
   }
 )

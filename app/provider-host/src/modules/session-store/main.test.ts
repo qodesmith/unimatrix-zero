@@ -93,10 +93,15 @@ it('rejects an answer that isn’t what the operation gives back', async () => {
   await expect(listed).rejects.toThrow(z.ZodError)
 })
 
-it('ignores an answer to a request it isn’t waiting for', () => {
-  const {client} = setUp()
+it('ignores an answer to a request it isn’t waiting for', async () => {
+  const {client, asked} = setUp()
+  const listed = client.listSubkeys(folder)
+  const [one] = asked()
 
-  expect(() => {
-    client.settle('unknown', {ok: true, value: null})
-  }).not.toThrow()
+  if (!one) throw new Error('Nothing was asked')
+
+  client.settle('unknown', {ok: true, value: ['wrong']})
+  client.settle(one.requestId, {ok: true, value: ['a']})
+
+  await expect(listed).resolves.toEqual(['a'])
 })
