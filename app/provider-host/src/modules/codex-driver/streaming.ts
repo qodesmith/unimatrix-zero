@@ -400,7 +400,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
           throw new ProgramCrashed('Codex stopped before finishing this Reply.')
         }
 
-        // Resuming repeats the last turn's token count, for instance.
+        // Other threads' notifications arrive here too, and a resume repeats the last turn's token count.
         if (turnOf(notification) !== turnId) continue
 
         yield* mapper.map(notification)

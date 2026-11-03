@@ -388,7 +388,7 @@ it('resumes the Provider session from the app’s copy alone, written back under
   ])
 })
 
-it('reports only its own turn’s token count, not the one a resume repeats or another thread’s', async () => {
+it('reports only its own turn’s token count, not the one a resume repeats or another Provider session’s', async () => {
   const crossed = edited('resumed.ndjson', text => {
     const lines = text.split('\n')
 
