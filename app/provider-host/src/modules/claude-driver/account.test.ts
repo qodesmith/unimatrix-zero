@@ -9,7 +9,7 @@ it('reads Claude Max 20x as the Max 20x plan', () => {
   expect(planOf('Claude Max 20x')).toBe('Max 20x')
 })
 
-it.each([['Claude API'], ['pro'], ['Claude ']])(
+it.each([['Claude API'], ['Anthropic Pro'], ['Claude ']])(
   'reads %s as no paid plan',
   subscriptionType => {
     expect(planOf(subscriptionType)).toBeNull()

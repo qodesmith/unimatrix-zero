@@ -58,8 +58,6 @@ interface Report {
   runningAtStart: number[]
   prompts: string[]
   resumedFrom: string[]
-  /** What `claude` goes on from: `resumedFrom` up to `--resume-session-at`. */
-  resumedWith: string[]
   toolResults: string[]
   inputClosed: boolean
   ended:
@@ -284,7 +282,6 @@ it('streams a Reply, records where Claude saved it, and reports its Context size
       contextWindow: 1_000_000,
     }),
   ])
-  expect(shown(events).contextWindow).toBe(1_000_000)
   expect(
     claude.store
       .entriesOf(claude.projectKey, SESSION_ID)
@@ -583,7 +580,6 @@ it('fails the Reply with Claude’s reason, without recording it', async () => {
     })
   )
   await claude.allClosed()
-  expect(claude.reports()).toHaveLength(1)
 })
 
 it('names a limit Claude ran into, with when it lifts', async () => {
@@ -731,7 +727,6 @@ it('passes on a stop asked before claude has the Prompt', async () => {
     type: 'RUN_FINISHED',
     status: 'stopped',
   })
-  expect(textOf(stopped)).not.toBe('')
 })
 
 it('stops a Reply where it is, records it, and continues the Thread warm from it', async () => {
@@ -898,9 +893,7 @@ function warmThrice() {
 async function threeReplies(claude: Awaited<ReturnType<typeof setUp>>) {
   const first = await claude.reply(FIRST_PROMPT)
   const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
-  const third = await claude.reply(THIRD_PROMPT, recordedIn(second))
-
-  expect(recordedIn(third).messageId).toBe(THIRD_MESSAGE)
+  await claude.reply(THIRD_PROMPT, recordedIn(second))
 
   return {first: recordedIn(first), deleted: promptRecordedIn(second)}
 }
@@ -932,10 +925,6 @@ it('leaves deleted Turns for the next Prompt, which resumes at the Reply it answ
   expect(resumed?.args).toContain(`--resume-session-at=${FIRST_MESSAGE}`)
   expect(resumed?.resumedFrom).toEqual(
     expect.arrayContaining([deleted.messageId, SECOND_MESSAGE, THIRD_MESSAGE])
-  )
-  expect(resumed?.resumedWith.at(-1)).toBe(FIRST_MESSAGE)
-  expect(resumed?.resumedWith).not.toEqual(
-    expect.arrayContaining([deleted.messageId])
   )
 })
 

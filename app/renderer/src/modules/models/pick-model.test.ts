@@ -101,10 +101,7 @@ it('prefers a Model’s own id over another’s resolved id', () => {
     statuses: connected,
     models: {
       ...models,
-      claude: [
-        model('opus', {isDefault: true, resolvesTo: 'haiku'}),
-        model('haiku'),
-      ],
+      claude: [model('opus', {resolvesTo: 'haiku'}), model('haiku')],
     },
   })
 

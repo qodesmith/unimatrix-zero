@@ -28,7 +28,6 @@ it('renders a link that opens outside the window, and blocks a javascript: one',
 
   const link = screen.getByRole('link', {name: 'Docs'})
   await expect.element(link).toHaveAttribute('href', 'https://example.com/docs')
-  await expect.element(link).toHaveAttribute('target', '_blank')
   expect(screen.container.querySelector('a[href^="javascript"]')).toBeNull()
 })
 

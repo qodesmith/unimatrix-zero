@@ -3,8 +3,8 @@ import {expect, it} from 'vitest'
 import {durationMs, slideMs} from './slide'
 
 it('reads a CSS time in milliseconds or seconds as milliseconds', () => {
-  expect(durationMs('400ms')).toBe(400)
-  expect(durationMs(' 0.4s')).toBe(400)
+  expect(durationMs('400ms ')).toBe(400)
+  expect(durationMs('0.4s')).toBe(400)
   expect(durationMs('0.25s, 0.25s')).toBe(250)
 })
 

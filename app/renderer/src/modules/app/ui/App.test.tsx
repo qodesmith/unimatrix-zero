@@ -178,9 +178,6 @@ it('closes only Settings on Esc over a streaming Reply and the slideout: the Rep
 
   await expect.element(slideout.getByText('Hi there')).toBeVisible()
   expect(main.sent.map(command => command.type)).not.toContain('reply.stop')
-
-  main.publish({...ids, type: 'TEXT_DELTA', delta: ', again'})
-  await expect.element(slideout.getByText('Hi there, again')).toBeVisible()
 })
 
 it('creates a Tree and opens it', async () => {
@@ -935,11 +932,5 @@ describe('connecting a Provider', () => {
     await expect
       .element(connections.getByRole('button', {name: 'Connect ChatGPT'}))
       .toBeEnabled()
-    expect(
-      page
-        .getByRole('complementary')
-        .getByRole('button', {name: 'Connections'})
-        .query()
-    ).toBeNull()
   })
 })

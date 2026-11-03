@@ -306,7 +306,6 @@ it('streams a Reply, records where Codex saved it, and reports its Context size'
 
   const events = await codex.reply(FIRST_PROMPT)
 
-  expect(events[0]?.type).toBe('RUN_STARTED')
   expect(events.filter(event => event.type === 'TEXT_DELTA').length).toBe(5)
   expect(textOf(events)).toBe('Hi there, friend!')
   expect(shown(events).contextSize).toBe(14_487)

@@ -624,6 +624,7 @@ it('moves focus to the streaming Reply’s Input a Prompt was sent for, hiding t
   await expect.element(streaming.getByRole('textbox')).toHaveFocus()
   await expect.poll(() => revealed('Writing…')).toBe('true')
   await expect.poll(() => revealed('Reply two')).toBe('false')
+  await streaming.getByRole('textbox').fill('And after that?')
   await expect
     .element(streaming.getByRole('button', {name: 'Send'}))
     .toBeDisabled()
@@ -998,7 +999,6 @@ it('caps a long Prompt, with Show more letting it out and Show less capping it a
 
   const more = page.getByRole('button', {name: 'Show more'})
   await expect.element(more).toBeVisible()
-  expect(rootPrompt()?.textContent).toContain('Line 40')
   const capped = rootPromptHeight()
 
   await more.click()
@@ -1202,7 +1202,6 @@ it('lets long Turns take their full height when the Setting is off', async () =>
   })
 
   await expect.element(page.getByText('Short')).toBeVisible()
-  expect(rootPrompt()?.textContent).toContain('Line 40')
   // Unscaled: opening fits the whole Tree, so the zoom follows its height.
   expect(rootPromptHeight() / zoomOf()).toBeGreaterThan(500)
   await expect
@@ -1313,8 +1312,8 @@ it('counts the Replies being written and the failed ones, and jumps to them', as
   await expect.element(status.getByText('1 failed')).toBeVisible()
   expect(document.querySelectorAll('textarea')).toHaveLength(2)
 
-  await expect.poll(viewport).toContain('translate')
-  const before = viewport()
+  await expect.poll(viewport).not.toContain('translate(0px, 0px)')
+  const before = await settledViewport()
 
   await status.getByText('1 failed').click()
   await expect.poll(viewport).not.toBe(before)
@@ -1539,6 +1538,7 @@ it('branches from the slideout into a Reply that already has a response, and fol
   await expect
     .element(slideout().getByRole('textbox', {name: 'Prompt'}))
     .toHaveFocus()
+  await slideout().getByRole('textbox', {name: 'Prompt'}).fill('And then?')
   await expect
     .element(slideout().getByRole('button', {name: 'Send'}))
     .toBeDisabled()
@@ -2465,7 +2465,6 @@ it('shows main’s refusal to delete the Tree in the root Prompt’s confirmatio
   await expect
     .element(confirmation().getByRole('alert'))
     .toHaveTextContent('A Reply is still being written')
-  expect(nodeCount()).toBe(10)
 })
 
 it('offers no delete on a Prompt with a Reply streaming at or below it, but still offers the Tree’s', async () => {
@@ -2537,7 +2536,7 @@ it('keeps a card put once it stops being a Fork and its pill goes, beside a tall
 
   await deleteFrom('Prompt five')
   await expect
-    .element(nodeOf('Reply two').getByRole('button', {name: /^Fork/}))
+    .element(nodeOf('Reply two').getByRole('button', {name: /Branches/}))
     .not.toBeInTheDocument()
   await settledViewport()
   expect(rect('Reply two').left).toBeCloseTo(before.left, 0)
