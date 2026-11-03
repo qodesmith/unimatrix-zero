@@ -123,9 +123,9 @@ function backUp(client: DatabaseSync, file: string): string {
 
   const numbered = names
     .flatMap(name => {
-      const number = NUMBERED_BACKUP_NAME.exec(name)?.[1]
+      const digits = NUMBERED_BACKUP_NAME.exec(name)?.[1]
 
-      return number === undefined ? [] : [{name, number: Number(number)}]
+      return digits === undefined ? [] : [{name, number: Number(digits)}]
     })
     .toSorted((a, b) => a.number - b.number)
 
