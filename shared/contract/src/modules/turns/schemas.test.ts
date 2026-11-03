@@ -9,7 +9,7 @@ const finished = {
   status: 'complete',
 }
 
-it('refuses a RUN_FINISHED from a Subagent, which would end its whole Reply', () => {
+it('refuses a RUN_FINISHED from a Subagent', () => {
   expect(ReplyEventSchema.safeParse(finished).success).toBe(true)
   expect(
     ReplyEventSchema.safeParse({...finished, subagentId: 's1'}).success
