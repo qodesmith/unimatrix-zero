@@ -69,6 +69,10 @@ function backupColumns(name: string) {
   return columns
 }
 
+function notesUpTo(last: number) {
+  return Array.from({length: last}, (_, index) => `note_${index + 1}`)
+}
+
 function backups() {
   const backupsFolder = path.join(folder, 'data', 'backups')
 
@@ -168,18 +172,48 @@ describe('migrating', () => {
     expect(backupColumns(backups()[0] ?? '')).not.toContain('note')
   })
 
-  it('keeps only three backups', () => {
+  it('keeps only the last three of eleven backups', () => {
     withTreeAndPrompt()
 
-    for (const n of [1, 2, 3, 4]) {
+    for (let n = 1; n <= 11; n++) {
       addMigration(
-        `2999010100000${n}_tree_note_${n}`,
+        `29990101${String(n).padStart(6, '0')}_tree_note_${n}`,
         `ALTER TABLE \`trees\` ADD \`note_${n}\` text;`
       )
       open().$client.close()
     }
 
+    const notesInEach = backups().map(name =>
+      backupColumns(name).filter(column => column.startsWith('note_'))
+    )
+
+    expect(notesInEach).toHaveLength(3)
+    expect(notesInEach).toEqual(
+      expect.arrayContaining([notesUpTo(8), notesUpTo(9), notesUpTo(10)])
+    )
+  })
+
+  it('prunes UUID-named backups from older versions before numbered ones', () => {
+    withTreeAndPrompt()
+    const backupsFolder = path.join(folder, 'data', 'backups')
+    fs.mkdirSync(backupsFolder)
+
+    const legacy = [1, 2, 3].map(
+      n => `unimatrix-019a0000-0000-7000-8000-00000000000${n}.sqlite`
+    )
+
+    for (const name of legacy)
+      fs.writeFileSync(path.join(backupsFolder, name), '')
+    addMigration(
+      '29990101000000_tree_note',
+      'ALTER TABLE `trees` ADD `note` text;'
+    )
+
+    open().$client.close()
+
     expect(backups()).toHaveLength(3)
+    expect(backups()).toEqual(expect.arrayContaining(legacy.slice(1)))
+    expect(backups().filter(name => !legacy.includes(name))).toHaveLength(1)
   })
 
   it('keeps child rows when a migration rebuilds a parent table', () => {
