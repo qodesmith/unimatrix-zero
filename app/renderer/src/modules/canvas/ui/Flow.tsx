@@ -49,7 +49,6 @@ interface FlowProps {
   expanded: Expanded
   focus: Focus | null
   fitOnLoad: boolean
-  /** Where the root Prompt is drawn at first, and how far zoomed. */
   startAt: Viewport | null
   /** A new one each time a Prompt and every Turn below it are deleted. */
   deleted: Deleted | null
@@ -59,7 +58,6 @@ interface FlowProps {
 
 interface Deleted {
   parentReplyId: string | null
-  /** Its box changes size once it is measured again. */
   resizes: boolean
 }
 
@@ -93,10 +91,7 @@ function stemOf(
 /** A Turn kept where it is on screen while the canvas layout changes. */
 interface Held {
   turnId: string
-  /**
-   * Its box's size before its text was let out or capped, held until it
-   * changes.
-   */
+  /** Its size before its text was let out or capped, held until it changes. */
   resizing: Size | null
 }
 

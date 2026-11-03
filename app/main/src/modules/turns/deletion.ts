@@ -11,7 +11,6 @@ const {prompts, replies} = schema
 
 type ReplyRow = typeof replies.$inferSelect
 
-/** Every Prompt from `promptId` down, and every Reply to them. */
 function below(db: Database, promptId: string) {
   const promptIds: string[] = []
   const found: ReplyRow[] = []
@@ -44,11 +43,6 @@ function below(db: Database, promptId: string) {
   return {promptIds, replies: found}
 }
 
-/**
- * Deletes the Prompt and every Turn below it; null when the Tree doesn't have
- * it. The Reply it answers keeps where its session holds the deleted Turns,
- * so the next Prompt from it cuts them unless its Provider cuts first.
- */
 export function deleteBelow(db: Database, treeId: string, promptId: string) {
   const prompt = db
     .select()
@@ -106,7 +100,6 @@ export function clearCutOnReport(
     .run()
 }
 
-/** The Reply that the Reply's Prompt answers, and that Prompt. */
 function parentOf(db: Database, treeId: string, replyId: string) {
   const row = db
     .select({promptId: prompts.id, parentReplyId: prompts.parentReplyId})

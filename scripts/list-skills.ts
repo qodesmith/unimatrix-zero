@@ -2,9 +2,6 @@ import {$} from 'bun'
 /**
  * Lists a repo's skills as JSON `{name, description, path}[]`, `path` relative
  * to the repo root. Mirrors `discoverSkills()` from vercel-labs/skills.
- *
- * Usage:
- * bun scripts/list-skills.ts <owner/repo | git URL | local path> [--full-depth]
  */
 import {mkdtemp, readFile, readdir, rm, stat} from 'node:fs/promises'
 import {tmpdir} from 'node:os'

@@ -23,7 +23,6 @@ interface ModelPickerProps {
   onPick: (choice: ModelChoice) => void
 }
 
-/** The Input's Model: a trigger with the Provider's mark, and "Sign in again". */
 export function ModelPicker({pick, onPick}: ModelPickerProps) {
   const {connect} = useConnections()
   const {selected, groups, signInAgain} = pick

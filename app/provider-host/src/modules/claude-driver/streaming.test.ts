@@ -55,7 +55,6 @@ type Streamed = StartReplyEvent
 interface Report {
   args: string[]
   configDir: string
-  /** The runs, by number, that hadn't ended as this one started. */
   runningAtStart: number[]
   prompts: string[]
   resumedFrom: string[]
@@ -93,7 +92,6 @@ function read(name: string): RecordedLine[] {
     .map(line => RecordedLineSchema.parse(JSON.parse(line)))
 }
 
-/** Writes a recording changed from one `claude` made, for a case it can't make. */
 function edited(name: string, edit: (lines: RecordedLine[]) => RecordedLine[]) {
   const file = path.join(folder('uz-recording-'), name)
   fs.writeFileSync(
@@ -199,7 +197,6 @@ async function setUp(
       )
   }
 
-  /** Lets idle time pass, then waits for every `claude` to end. */
   async function allClosed() {
     idle.pass()
     await expect
@@ -377,7 +374,6 @@ it('forks the session through a mid-Thread Reply into a new session, leaving the
 
   const [, resumed, fork] = claude.reports()
 
-  // No idle time has passed, so only the fork could have closed it.
   expect(resumed?.ended).toBeNull()
   expect(fork?.args).toEqual(
     expect.arrayContaining([
@@ -703,7 +699,6 @@ it('fails the Reply as a crash when `claude` exits before its result, keeping th
 })
 
 it('saves the Prompt while the Reply streams, so a quit mid-Reply keeps it', async () => {
-  // The recording streams up to the Stop it waits for, with no result yet.
   const claude = await setUp(['stopped.ndjson'])
   const replyId = crypto.randomUUID()
   const replying = claude.reply(COUNT_PROMPT, null, {replyId})
@@ -855,7 +850,6 @@ it('never rewinds in the warm session standing there: it closes, and a new `clau
 
   expect(textOf(rewound)).toBe('TEAL')
   expect(recordedIn(rewound).sessionId).toBe(REWOUND_SESSION_ID)
-  // No idle time has passed, so only the rewind could have closed it.
   await expect.poll(() => claude.reports()[0]?.ended).not.toBeNull()
 
   await claude.allClosed()
@@ -896,10 +890,7 @@ it('cuts a Retry’s session after the Prompt of the Reply cut short, which `cla
 
 const UUID = /[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}/g
 
-/**
- * `warm.ndjson` with its second Prompt sent again, every entry under a new
- * uuid.
- */
+/** `warm.ndjson` with its second Prompt sent again, under new uuids. */
 function warmThrice() {
   return edited('warm.ndjson', lines => {
     const second = lines.findLastIndex(
@@ -988,8 +979,7 @@ it('waits for the warm `claude` it closes to end before resuming that session at
   })
 
   await expect.poll(() => claude.reports()[0]?.inputClosed).toBe(true)
-  // The warm one holds on until told, so only the driver could have asked
-  // for the session to resume it by now.
+  // The warm one is held open, so any ask by now came from the driver.
   expect(
     claude.store.asked.slice(askedBefore).filter(op => op !== 'append')
   ).toEqual([])

@@ -8,7 +8,6 @@ import type {
 import {DEFAULT_MODEL_ID, PROVIDER_NAMES} from '@uz/contract/providers'
 
 export interface ModelPickInput {
-  /** The user's pick in this Input, else its Reply's Model, else the last-used. */
   wanted: ModelChoice | null
   /** The Provider of the Reply a continuing Thread's Input is attached to. */
   lockedTo: ProviderId | null
@@ -63,10 +62,7 @@ function selectedOf(provider: ProviderId, model: Model): SelectedModel {
 
 type Selection = Pick<ModelPick, 'selected' | 'heldBecause'>
 
-/**
- * The Provider's default, or why there is none to send with. Before it lists
- * any, the choice is left to it.
- */
+/** Before the Provider lists any Model, the choice is left to it. */
 function startOn(
   provider: ProviderId,
   models: Record<ProviderId, Model[]>
@@ -160,10 +156,7 @@ function fromWanted(
   return withNotice(`${name} isn’t connected`, startOnFirstConnected(input))
 }
 
-/**
- * What an Input's Model picker offers and shows, and whether it may send. The
- * selection never differs from the wanted Model without a notice saying so.
- */
+/** What an Input's Model picker offers and shows, and whether it may send. */
 export function pickModel(input: ModelPickInput): ModelPick {
   const {wanted, lockedTo, statuses, models} = input
 

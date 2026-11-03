@@ -22,7 +22,6 @@ const fakeModel: Model = {
   needsAppUpdate: false,
 }
 
-/** A Tree as main lists it, untouched since `receivedAt` unless told otherwise. */
 export function savedTree(fields: Partial<Tree> = {}): Tree {
   return {
     id: crypto.randomUUID(),

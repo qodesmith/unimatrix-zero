@@ -98,7 +98,6 @@ function behaviorOf(prompt: string): Behavior {
 }
 
 interface FakeDriverOptions {
-  /** Before each word, and between connect steps. */
   delayMs?: number
   /** Null: the fake sign-in page never answers by itself. */
   signInAnswerMs?: number | null

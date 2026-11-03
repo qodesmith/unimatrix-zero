@@ -48,7 +48,6 @@ export interface TurnsDeps {
   db: Database
   publish: (event: AppEvent) => void
   hosts: ReplyHosts
-  /** The vendor program and configuration folder a Provider's Replies use. */
   vendorProgramFor: (provider: ProviderId) => SignInRequest
   now: () => Date
   onTurnsChanged: (treeId: string) => void
@@ -80,7 +79,6 @@ export function createTurns({
     .where(eq(schema.replies.status, 'streaming'))
     .run()
 
-  /** The Reply as it now stands: failed when its host can't be reached. */
   function startOnHost(provider: ProviderId, request: ReplyRequest): Reply {
     inFlight.track(provider, request.treeId, request.replyId, request.model)
 
@@ -101,7 +99,6 @@ export function createTurns({
 
     streaming: () => inFlight.streaming(),
 
-    /** Where a new Tree starts. */
     lastModel: () => lastModel(db),
 
     /** Null when the Reply it answers is gone. */
@@ -194,10 +191,7 @@ export function createTurns({
       hosts.send(provider, {type: 'reply.stop', replyId})
     },
 
-    /**
-     * Ends the Tree's streaming Replies at once, for deleting it. Their hosts
-     * are asked to stop too, and anything they send after is dropped.
-     */
+    /** For deleting the Tree: anything its hosts send after this is dropped. */
     stopAll(treeId: string) {
       for (const {provider, replyId} of inFlight.endIn(treeId)) {
         try {

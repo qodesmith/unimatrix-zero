@@ -49,10 +49,7 @@ export function useSendPrompt(treeId: string, parentReplyId: string | null) {
 
 export type DeleteOutcome = {ok: true} | {ok: false; error: string}
 
-/**
- * Takes the deleted Turns out of the saved ones at once. Either way the saved
- * Turns are fetched again, since a refusal can mean they are out of date.
- */
+/** Refetches either way, since a refusal can mean the saved Turns are stale. */
 export function useDeletePrompt(treeId: string) {
   const queryClient = useQueryClient()
 

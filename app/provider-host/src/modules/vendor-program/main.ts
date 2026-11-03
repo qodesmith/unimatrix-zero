@@ -27,12 +27,10 @@ async function sha256Of(file: string) {
   return hash.digest('hex')
 }
 
-/** What a folder's build is noted in once it is unpacked, beside the folder. */
 function noteOf(folder: string) {
   return `${folder}.sha256`
 }
 
-/** The program to run: the file itself, or the entrypoint in its folder. */
 export function programOf({path: place, build}: ProgramTarget) {
   return build.archive
     ? path.join(place, ...build.archive.entrypoint.split('/'))

@@ -1,9 +1,8 @@
 import {defineConfig} from 'vitest/config'
 
 /**
- * Node tests start real processes and write real files, which a stalled
- * runner slows by seconds, so every limit only catches a hang. A wait gives
- * up first, so a hang names what it waited for.
+ * Every limit only catches a hang, sized for Node tests a stalled runner slows
+ * by seconds. A wait gives up first, so a hang names what it waited for.
  */
 const HANG_MS = 60_000
 

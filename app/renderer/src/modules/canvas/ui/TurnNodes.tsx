@@ -191,10 +191,6 @@ function FoldedStack({replyId}: {replyId: string | null}) {
 
 type InputState = 'none' | 'hidden' | 'revealed'
 
-/**
- * A failed Reply has no Input, Retry instead; any other shows it for the
- * Active Thread, a draft or the pointer over the node.
- */
 function useInputState(reply: Reply | null, hovered: boolean): InputState {
   const {activeReplyId, drafts} = useCanvas()
   const live = useReply(reply)
@@ -209,9 +205,9 @@ function useInputState(reply: Reply | null, hovered: boolean): InputState {
 }
 
 /**
- * Slid up behind the box above, not unmounted, so revealing it shifts
- * nothing. It starts a corner's radius up inside the box, padded to match, so
- * it fills the corners as they square; the clip is open below for the shadow.
+ * Slid up behind the box above, not unmounted, so revealing it shifts nothing.
+ * It starts a corner's radius up inside the box, so it fills the corners as
+ * they square.
  */
 function ReplyInput({
   reply,
@@ -281,7 +277,6 @@ function ReplyInput({
   )
 }
 
-/** The pointer being over a Reply's box, for revealing its Input. */
 function useHovered() {
   const [hovered, setHovered] = useState(false)
 
@@ -295,9 +290,8 @@ function useHovered() {
 }
 
 /**
- * Clears Card's own padding, gap and ring, because the Prompt and Reply pad
- * themselves, and its text-sm, so the text follows the font size Setting.
- * `joined` runs the box on into the revealed Input under it.
+ * `text-base` overrides Card's text-sm, so the text follows the font size
+ * Setting.
  */
 function replyFrame(status: Reply['status'], joined: boolean) {
   return cn(
@@ -308,7 +302,7 @@ function replyFrame(status: Reply['status'], joined: boolean) {
   )
 }
 
-/** Vertical: a Prompt on its own, the same width as a Reply. */
+/** Vertical: a Prompt on its own. */
 export function PromptNode({data}: NodeProps<TurnNode>) {
   const {turn} = data
 
@@ -332,7 +326,7 @@ export function PromptNode({data}: NodeProps<TurnNode>) {
   )
 }
 
-/** Vertical: a Reply on its own, with its Input once it is done. */
+/** Vertical: a Reply on its own. */
 export function ReplyNode({data}: NodeProps<TurnNode>) {
   const {turn} = data
   const {hovered, hoverProps} = useHovered()
@@ -377,7 +371,7 @@ function ReplyTurn({reply, joined}: {reply: Reply; joined: boolean}) {
   )
 }
 
-/** Horizontal: the Prompt as the card's header and its Reply as the body. */
+/** Horizontal: a Prompt and its Reply in one card. */
 export function ExchangeNode({data}: NodeProps<TurnNode>) {
   const {turn} = data
   const {hovered, hoverProps} = useHovered()

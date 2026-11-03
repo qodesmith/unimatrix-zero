@@ -7,7 +7,6 @@ const SkillsLock = z.looseObject({
   skills: z.record(z.string(), z.looseObject({})),
 })
 
-/** The names of the skills installed from `skills-lock.json` in `dir`. */
 export async function lockedSkillNames(dir: string) {
   const lock = SkillsLock.parse(
     JSON.parse(await readFile(join(dir, 'skills-lock.json'), 'utf8'))

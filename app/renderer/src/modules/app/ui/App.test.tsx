@@ -1,4 +1,3 @@
-// The Playwright provider gives `cdp()` its `send`.
 /// <reference types="@vitest/browser-playwright" />
 import type {FakeMain} from '../fake-main'
 import type {Bridge} from '@uz/contract/bridge'

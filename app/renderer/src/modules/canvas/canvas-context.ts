@@ -52,10 +52,7 @@ export function useCanvas(): CanvasState {
   return state
 }
 
-/**
- * Null at the root, whose Input on an empty Tree sits outside <Canvas>'s
- * context.
- */
+/** Null at the root, whose Input on an empty Tree sits outside <Canvas>. */
 export function useAttachedReply(parentReplyId: string | null): Reply | null {
   const state = use(CanvasContext)
 

@@ -40,7 +40,6 @@ const reply: Reply = {
 
 const sent: Command[] = []
 
-/** The Tree's saved Replies, as main answers `tree.turns`. */
 let saved: Reply[] = []
 
 function fakeMain(claude: ProviderStatus['status'] = 'ready') {
@@ -147,7 +146,6 @@ function Providers({children}: {children: ReactNode}) {
   )
 }
 
-/** Every saved Reply of the Tree, as the canvas shows them. */
 function SavedReplies() {
   const turns = useTurns(treeId)
 
@@ -158,7 +156,6 @@ function savedReply(id: string, changes: Partial<Reply>): Reply {
   return {...reply, id, ...changes}
 }
 
-/** Saves the Replies, then renders them once main has handed them over. */
 async function renderSaved(...replies: Partial<Reply>[]) {
   saved = replies.map((changes, nth) =>
     savedReply(nth === 0 ? replyId : crypto.randomUUID(), changes)
@@ -191,7 +188,6 @@ function before(type: AppEvent['type'], nth = 0) {
   )
 }
 
-/** Stops before `RUN_FINISHED`, so the Reply is still streaming. */
 async function replay(upTo = before('RUN_FINISHED')) {
   const screen = await renderSaved({})
 

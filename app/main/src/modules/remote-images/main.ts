@@ -29,8 +29,8 @@ function redirectTarget(from: URL, response: Response) {
 }
 
 /**
- * A redirect may move the image to another host, but never off the web, and
- * never off https when the chip was https.
+ * A redirect may change host, but never leave the web, nor drop to http when
+ * the chip was https.
  */
 function refusedHop(requested: URL, next: URL) {
   if (next.protocol === 'https:') return null
@@ -128,9 +128,8 @@ async function fetchImage(
 }
 
 /**
- * Node's fetch rather than the window session's, so the session's http
- * backstop stays absolute and no cookie jar or referrer travels with it
- * (ADR 0014).
+ * Node's fetch, not the window session's, so the session's http backstop stays
+ * absolute and no cookie or referrer goes along (ADR 0014).
  */
 export function createRemoteImages(
   fetch: typeof globalThis.fetch,

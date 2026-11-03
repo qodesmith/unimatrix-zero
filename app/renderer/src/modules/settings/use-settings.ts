@@ -15,7 +15,6 @@ function useSettingsStore() {
   return store
 }
 
-/** The user's global Settings, as main last reported them. */
 export function useSettings(): Settings {
   return useSelector(useSettingsStore(), state => state)
 }

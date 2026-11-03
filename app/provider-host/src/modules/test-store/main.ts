@@ -12,7 +12,6 @@ function keyText({projectKey, sessionId, subpath}: SessionKey) {
   return [projectKey, sessionId, subpath ?? ''].join('\n')
 }
 
-/** The ops main answers with an error, and the error's message. */
 type Refusals = Partial<Record<SessionStoreRequest['op'], string>>
 
 /**
@@ -96,7 +95,6 @@ export function fakeStore(refuses: Refusals = {}) {
 
   return {
     client,
-    /** Each op asked so far, oldest first. */
     asked,
     entriesOf(projectKey: string, sessionId: string) {
       return entries.get(keyText({projectKey, sessionId})) ?? []

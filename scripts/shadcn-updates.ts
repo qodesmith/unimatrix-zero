@@ -1,7 +1,6 @@
 /**
- * Diffs each shadcn file we own against what `shadcn add` writes today, in a
- * throwaway worktree. `bun run shadcn:updates [name...]` checks every
- * component, or only the ones named.
+ * Diffs each shadcn file we own, or only the components named, against what
+ * `shadcn add` writes today, in a throwaway worktree.
  */
 import {$, Glob} from 'bun'
 import {existsSync} from 'node:fs'

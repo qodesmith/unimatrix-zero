@@ -21,11 +21,8 @@ export const FONT_SIZE = {min: 12, max: 24, step: 2}
 export const SettingsSchema = z.strictObject({
   themeMode: ThemeModeSchema,
   canvasOrientation: CanvasOrientationSchema,
-  /** Long Prompts and Replies scroll inside a capped height. */
   limitTurnHeight: z.boolean(),
-  /** A thin bar on each Reply toward the Context window. */
   contextSizeMeter: z.boolean(),
-  /** The base font size, in pixels. */
   fontSize: z
     .int()
     .min(FONT_SIZE.min)

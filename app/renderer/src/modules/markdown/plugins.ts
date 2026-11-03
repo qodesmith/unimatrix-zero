@@ -25,7 +25,6 @@ function bundledTheme(name: string): BundledTheme {
   return name
 }
 
-/** The Theme's Shiki themes, light then dark. */
 function codeThemes(): [BundledTheme, BundledTheme] {
   const [light, dark] = shikiThemes()
 
@@ -51,10 +50,8 @@ function withoutRawHtml(): NonNullable<StreamdownProps['rehypePlugins']> {
 export const rehypePlugins = withoutRawHtml()
 
 /**
- * `trust: false` is the only gate on KaTeX's output (ADR 0014): Streamdown
- * runs the math plugin after the rehype plugins above, so the sanitizer never
- * sees it.
- * remark-math's default accepts a single `$`, turning "$5 and $10" into math.
+ * Streamdown runs math after the sanitizer, so `trust: false` is the only gate
+ * on KaTeX's output (ADR 0014). A single `$` would make "$5 and $10" math.
  */
 const math: MathPlugin = {
   name: 'katex',
@@ -89,9 +86,9 @@ export function loadedMermaid() {
 const IMAGE_NODE = /@\{[^}]*\bimg\s*:/u
 
 /**
- * Mermaid's image shape fetches its URL as soon as the diagram draws, and
- * strict mode does not stop it. A Reply never reaches the network on its own
- * (ADR 0014), so such a diagram is an error instead.
+ * Mermaid's image shape fetches its URL as soon as the diagram draws, even in
+ * strict mode, so such a diagram is an error: a Reply never reaches the network
+ * on its own (ADR 0014).
  */
 function withoutImages(plugin: DiagramPlugin): DiagramPlugin {
   return {
@@ -113,7 +110,6 @@ function withoutImages(plugin: DiagramPlugin): DiagramPlugin {
   }
 }
 
-/** Loads the Mermaid bundle once, the first time a Reply contains a diagram. */
 export async function loadMermaid(): Promise<DiagramPlugin> {
   loading ??= import('@streamdown/mermaid').then(({createMermaidPlugin}) => {
     mermaid = withoutImages(

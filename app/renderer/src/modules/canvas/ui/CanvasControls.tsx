@@ -34,10 +34,7 @@ const LABELS: Record<CanvasOrientation, string> = {
   horizontal: 'Horizontal',
 }
 
-/**
- * One row beside the Tree's name, off the canvas so it never covers a Turn.
- * The orientation toggle is a shortcut to the Setting.
- */
+/** Off the canvas, so it never covers a Turn. */
 export function CanvasControls({
   orientation,
   onOrientation,

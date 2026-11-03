@@ -75,9 +75,8 @@ function writeEntries(file: string, entries: SessionEntry[]) {
 }
 
 /**
- * The fallback restore (ADR 0004): writes the kept transcripts back where
- * `claude` reads them. A plain write, so the files are new and no cleanup
- * sweep takes them.
+ * The fallback restore (ADR 0004): a plain write, so the files are new and no
+ * cleanup sweep takes them.
  */
 export async function writeTranscriptBack(
   store: SessionStoreClient,
@@ -115,7 +114,6 @@ export async function writeTranscriptBack(
   return true
 }
 
-/** The folder beside a session that `claude` spills large tool results into. */
 const TOOL_RESULTS = 'tool-results'
 
 /** The session's tool result files not saved before, relative to its folder. */

@@ -25,7 +25,6 @@ type Input =
 type PageStep = Extract<SignInUpdate, {type: 'SIGN_IN_STEP'}>
 
 interface Page {
-  /** Which run of `claude auth login` is current. */
   run: number
   url: string | null
   /** Opened again by the app, so it shows a code. */
@@ -174,7 +173,6 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
 
       if (input.kind === 'exit') return onExit(input.code, input.output)
 
-      // Canceled, or the page never answered: this login is over.
       login.kill()
 
       return {

@@ -104,7 +104,7 @@ export const ReplyRetryResult = z.strictObject({
   reply: ReplySchema,
 })
 
-/** Starts connecting a Provider; `SIGN_IN_STEP` and `SIGN_IN_FINISHED` follow. */
+/** `SIGN_IN_STEP` and `SIGN_IN_FINISHED` follow. */
 export const ProviderConnectCommand = z.strictObject({
   type: z.literal('provider.connect'),
   provider: ProviderIdSchema,
@@ -137,13 +137,13 @@ export const ImageLoadResult = z.strictObject({
   dataUrl: z.string().startsWith('data:image/'),
 })
 
-/** Changes some Settings; `SETTINGS_CHANGED` follows with all of them. */
+/** `SETTINGS_CHANGED` follows with every Setting. */
 export const SettingsUpdateCommand = z.strictObject({
   type: z.literal('settings.update'),
   changes: SettingsUpdateSchema,
 })
 
-/** Changes some of the Layout; `LAYOUT_CHANGED` follows with all of it. */
+/** `LAYOUT_CHANGED` follows with the whole Layout. */
 export const LayoutUpdateCommand = z.strictObject({
   type: z.literal('layout.update'),
   changes: LayoutUpdateSchema,

@@ -44,7 +44,6 @@ interface PendingOneShot {
 
 interface Host {
   process: HostProcess | null
-  /** Set once the host reports ready, until its process exits. */
   ready: boolean
   smallestModel: string | null
   restarts: number

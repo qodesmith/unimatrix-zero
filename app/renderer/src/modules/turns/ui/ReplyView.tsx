@@ -106,10 +106,7 @@ const NOT_READY: Record<
   failed: name => `${name} isn't running`,
 }
 
-/**
- * Why Retry is held, or null when it may run; '' until main reports the
- * Provider's status.
- */
+/** Null when Retry may run; '' until main reports the Provider's status. */
 function retryHeldBecause(
   online: boolean,
   status: ProviderStatus['status'] | null,

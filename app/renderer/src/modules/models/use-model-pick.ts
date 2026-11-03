@@ -35,7 +35,6 @@ export function useModelPick(
   })
 }
 
-/** As the Provider lists it, else the id itself. */
 export function useModelName(provider: ProviderId, id: string) {
   const {state} = useConnections()
 

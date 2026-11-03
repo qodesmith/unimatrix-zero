@@ -158,7 +158,6 @@ const config: OxlintConfig = {
       rules: {
         'max-lines': 'off',
         'no-empty-function': 'off',
-        // Prefer shoehorn's `fromPartial` where it fits.
         'typescript/no-unsafe-type-assertion': 'off',
         'typescript/unbound-method': 'off',
       },

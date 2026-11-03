@@ -76,7 +76,6 @@ async function cleanedUpWith(body: () => Promise<Ending>) {
   return cleanUp.mock.calls
 }
 
-/** Starts the Reply and reads on past `RUN_STARTED`, to the end in `rest`. */
 async function startedReply(runs: ReturnType<typeof createReplyRuns>) {
   const events = runs.startReply(request)[Symbol.asyncIterator]()
   await events.next()

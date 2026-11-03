@@ -9,7 +9,6 @@ export function folderOf(threadId: string): SessionFolder {
   return {projectKey: 'codex', sessionId: threadId}
 }
 
-/** `file` relative to `home` with `/` between parts; null outside it. */
 function relativeIn(home: string, file: string) {
   const relative = path.relative(home, fs.realpathSync(file))
 
@@ -18,7 +17,6 @@ function relativeIn(home: string, file: string) {
   return relative.split(path.sep).join('/')
 }
 
-/** The rollout at `file` as it stands on disk; null outside `codexHome`. */
 export function rolloutAt(codexHome: string, file: string): SessionFile | null {
   const home = fs.realpathSync(codexHome)
   const relative = relativeIn(home, file)
@@ -62,7 +60,6 @@ export async function readRollouts(
   return files
 }
 
-/** A rollout on disk that starts with the saved copy is the same one, longer. */
 function startsWithSaved(target: string, saved: Buffer) {
   if (!fs.existsSync(target)) return false
 

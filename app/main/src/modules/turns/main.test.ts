@@ -1009,7 +1009,6 @@ describe('retrying a Reply', () => {
   })
 })
 
-/** Saved by Claude at `messageId`, its Prompt recorded as `p-<messageId>`. */
 function savedAt(parentReplyId: string, messageId: string, sessionId = 's1') {
   const replyId = sendPrompt(parentReplyId, `Prompt ${messageId}`)
   recordPrompt(replyId, `p-${messageId}`, sessionId)

@@ -68,7 +68,6 @@ function resultOf<M extends Method>(method: M, answer: Answer): ResponseOf<M> {
 
 export type OpenAppServer = (vendorProgram: SignInRequest) => Promise<AppServer>
 
-/** Starts `codex app-server` and introduces the app to it. */
 export async function startAppServer(
   spawn: SpawnCodex,
   command: CodexCommand,

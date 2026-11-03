@@ -65,7 +65,6 @@ function deps(overrides: Partial<ClaudeSignInDeps> = {}) {
 
 type SignIn = ReturnType<typeof createClaudeSignIn>
 
-/** Connects, letting `react` act on each update as the user would. */
 async function connect(
   signIn: SignIn,
   react: (update: SignInUpdate) => void = () => undefined

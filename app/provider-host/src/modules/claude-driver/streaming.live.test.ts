@@ -89,7 +89,6 @@ function liveDriver(files: string[]) {
     whenIdle: idle.whenIdle,
   })
 
-  /** Lets idle time pass, then waits for every `claude` to exit. */
   async function closed() {
     idle.pass()
     await Promise.all(exits)
@@ -171,7 +170,6 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     expect(textOf(third.events)).toMatch(/TEAL/)
     expect(textOf(third.events)).toMatch(/OTTER/)
 
-    // Through the first Reply only: OTTER never happened on this Branch.
     const forked = await live.reply(
       'Which word did you reply with? Just the word.',
       continuing(first.recorded.session, true)

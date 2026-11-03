@@ -16,7 +16,6 @@ export function heldIdle() {
   return {
     whenIdle: whenIdle satisfies WhenIdle,
 
-    /** Closes every program idle now. */
     pass() {
       const due = [...waiting]
       waiting.clear()

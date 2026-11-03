@@ -98,10 +98,7 @@ function sessionRef({sessionId, messageId}: SessionRef) {
   return {sessionId, messageId}
 }
 
-/**
- * Keeps the Reply, or only its Prompt when it was cut short before its
- * Provider saved it.
- */
+/** Keeps the Reply, or only its Prompt when its Provider never saved it. */
 function cutBack(
   row: ReplyRow,
   session: SessionRef,
@@ -117,10 +114,8 @@ function cutBack(
 
 /**
  * Forks when the Reply already has a Prompt after it other than `except`, the
- * Prompt being run again. A Reply cut short before its Provider saved it
- * continues from the Reply its own Prompt answers, whose session holds that
- * Prompt. A session still holding Turns deleted from below the Reply is cut
- * back to it.
+ * one being run again. A Reply its Provider never saved continues from the
+ * Reply its Prompt answers, and a session still holding deleted Turns is cut.
  */
 export function continuation(
   db: Database,
@@ -153,10 +148,8 @@ export function continuation(
 }
 
 /**
- * The cut that drops the deleted Replies from the session of the Reply the
- * deleted Prompt answers, from the first that went on in it; else null.
- * `deleted` is in order from the top, and a Branch below forks a session of
- * its own.
+ * The cut from the first deleted Reply that went on in the parent's session.
+ * `deleted` runs from the top; a Branch below forks a session of its own.
  */
 export function cutBelow(
   db: Database,
@@ -190,9 +183,8 @@ export function cutBelow(
 }
 
 /**
- * Rewinds the session to the Reply its Prompt answers. A Prompt that started a
- * Branch forks again instead, and one answering a Reply its Provider never
- * saved skips the rewind, which would drop that Reply's Prompt too.
+ * A Prompt that started a Branch forks again, and one answering a Reply its
+ * Provider never saved skips the rewind, which would drop that Reply's Prompt.
  */
 export function recovery(
   db: Database,
@@ -261,10 +253,9 @@ function promptIn(session: SessionRef, reply: ReplyRow | undefined) {
 }
 
 /**
- * Rewinds to the Reply answered once its Provider saved it. One cut short
- * before then left only its Prompt in the session, so the cut goes after that
- * Prompt and before the failed attempt's own. A cut of Turns deleted below the
- * Reply answered already drops the failed attempt with them.
+ * A cut of deleted Turns already drops the failed attempt. A parent its
+ * Provider never saved left only its Prompt in the session, so the cut goes
+ * after that Prompt and before the failed attempt's.
  */
 function rewound(
   session: ContinuedSession,
