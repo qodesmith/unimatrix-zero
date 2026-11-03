@@ -52,26 +52,36 @@ it('hangs partway when the Prompt asks it to, until stopped', async () => {
   const driver = createFakeDriver({delayMs: 0})
   const events: Streamed[] = []
 
-  const done = (async () => {
-    for await (const event of driver.startReply({
-      ...request,
-      prompt: {text: 'Please /hang'},
-    })) {
-      events.push(event)
+  const reply = driver.startReply({
+    ...request,
+    prompt: {text: 'Please /hang'},
+  })
 
-      if (textDeltas(events) === 12) {
-        setTimeout(() => void driver.stop(request.replyId), 20)
-      }
-    }
-  })()
+  const stream = reply[Symbol.asyncIterator]()
 
-  await done
+  while (textDeltas(events) < 12) {
+    const next = await stream.next()
 
-  expect(textOf(events)).not.toBe('')
-  expect(events.filter(event => event.type === 'TEXT_DELTA')).toHaveLength(12)
-  expect(events.at(-1)).toMatchObject({
-    type: 'RUN_FINISHED',
-    status: 'stopped',
+    if (next.done) throw new Error('The Reply ended before it hung')
+
+    events.push(next.value)
+  }
+
+  const after = stream.next()
+
+  await expect(
+    Promise.race([
+      after.then(() => 'went on'),
+      new Promise(resolve => {
+        setTimeout(resolve, 0, 'hanging')
+      }),
+    ])
+  ).resolves.toBe('hanging')
+
+  await driver.stop(request.replyId)
+
+  await expect(after).resolves.toMatchObject({
+    value: {type: 'RUN_FINISHED', status: 'stopped'},
   })
 })
 

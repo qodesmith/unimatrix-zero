@@ -84,7 +84,7 @@ describe('the Tree delete machine', () => {
       )
     })
 
-    it('asks again once confirmed', () => {
+    it('deletes again once confirmed', () => {
       expect(treeDeleteTransition(refused, {type: 'confirmed'})).toEqual(
         deleting
       )

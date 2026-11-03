@@ -7,6 +7,7 @@ import type {ProviderId} from '@uz/contract/providers'
 import {openDatabase} from '#modules/database/main'
 import {createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
+import {TREE_TITLE_MAX_LENGTH} from '@uz/contract/trees'
 import path from 'node:path'
 import {beforeEach, describe, expect, it} from 'vitest'
 
@@ -155,7 +156,7 @@ describe('the automatic title', () => {
     ['\n\n  **Trip to Lisbon**  \nA plan for May', 'Trip to Lisbon'],
     ['# “Trip to Lisbon”', 'Trip to Lisbon'],
     ['`Trip to Lisbon`', 'Trip to Lisbon'],
-    ['x'.repeat(250), 'x'.repeat(200)],
+    ['x'.repeat(TREE_TITLE_MAX_LENGTH + 50), 'x'.repeat(TREE_TITLE_MAX_LENGTH)],
   ])('cleans the answer %j to %j', async (answer, cleaned) => {
     finish(sendPrompt(null))
     lastOneShot().resolve(answer)

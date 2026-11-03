@@ -147,6 +147,37 @@ function sessionsStarted() {
   )
 }
 
+/** A root exchange in another Tree, recorded by its Provider and then failed. */
+function inAnotherTree() {
+  const sent = turns.sendPrompt({
+    model: picked,
+    treeId: createTrees(db).create(createdAt).id,
+    parentReplyId: null,
+    text: 'Elsewhere',
+  })
+
+  if (!sent) throw new Error('The root Prompt was refused')
+
+  const {treeId: otherTreeId, id: replyId} = sent.reply
+  turns.hostRecorded('claude', {
+    type: 'REPLY_RECORDED',
+    treeId: otherTreeId,
+    replyId,
+    model: 'claude-haiku-5-5',
+    session: {sessionId: 's-other', messageId: 'm-other'},
+  })
+  turns.hostEvent('claude', {
+    type: 'RUN_FINISHED',
+    treeId: otherTreeId,
+    replyId,
+    status: 'failed',
+    failure: {code: 'host-crashed', message: 'Claude stopped unexpectedly.'},
+  })
+  hostCommands = []
+
+  return sent
+}
+
 describe('sending the root Prompt', () => {
   it('saves the Prompt and a streaming Reply on the picked Model, and asks the host for it', () => {
     const opus = {provider: 'claude', model: 'claude-opus-5'} as const
@@ -582,12 +613,13 @@ describe('a Prompt answering a Reply', () => {
 
   it('answers nothing for a Reply the Tree doesn’t have', () => {
     savedRoot()
+    const {reply} = inAnotherTree()
 
     expect(
       turns.sendPrompt({
         model: picked,
         treeId,
-        parentReplyId: crypto.randomUUID(),
+        parentReplyId: reply.id,
         text: 'More',
       })
     ).toBeNull()
@@ -958,7 +990,9 @@ describe('retrying a Reply', () => {
   })
 
   it('answers nothing for a Reply the Tree doesn’t have', () => {
-    expect(turns.retry(treeId, crypto.randomUUID())).toBeNull()
+    const {reply} = inAnotherTree()
+
+    expect(turns.retry(treeId, reply.id)).toBeNull()
   })
 
   it('is refused, leaving the Reply as it is, when its Provider isn’t ready', () => {
@@ -1069,7 +1103,9 @@ describe('deleting a Prompt', () => {
   })
 
   it('answers nothing for a Prompt the Tree doesn’t have', () => {
-    expect(turns.deletePrompt(treeId, crypto.randomUUID())).toBeNull()
+    const {prompt} = inAnotherTree()
+
+    expect(turns.deletePrompt(treeId, prompt.id)).toBeNull()
   })
 
   it('is refused while a Reply below it streams, deleting nothing', () => {

@@ -277,7 +277,20 @@ it('cancels the download', async () => {
 })
 
 it('cancels on the sign-in page, ending claude auth login', async () => {
-  const signIn = createClaudeSignIn(deps())
+  let loginEnded = false
+
+  const signIn = createClaudeSignIn(
+    deps({
+      startLogin: (command, env, events) =>
+        startLogin(command, env, {
+          ...events,
+          onExit: (code, output) => {
+            loginEnded = true
+            events.onExit(code, output)
+          },
+        }),
+    })
+  )
 
   const updates = await connect(signIn, update => {
     if (isStep(update, 'sign-in-page')) signIn.cancelSignIn()
@@ -287,6 +300,7 @@ it('cancels on the sign-in page, ending claude auth login', async () => {
     type: 'SIGN_IN_FINISHED',
     outcome: 'canceled',
   })
+  await expect.poll(() => loginEnded).toBe(true)
 })
 
 it('cancels while the plan is read, even for a free account', async () => {

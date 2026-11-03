@@ -37,9 +37,10 @@ it('replaces what streamed when the finished message differs', () => {
 
 it('replaces only the last message, after the ones before it', () => {
   const mapper = createReplyMapper(ids)
-  mapper.map(message('a', 'One. '))
+  mapper.map(delta('a', 'One. '))
   mapper.map(delta('b', 'Tw'))
 
+  expect(mapper.map(message('a', 'One! '))).toEqual([])
   expect(mapper.map(message('b', 'Two.'))).toEqual([
     {...ids, type: 'TEXT_REPLACE', text: 'One. Two.'},
   ])

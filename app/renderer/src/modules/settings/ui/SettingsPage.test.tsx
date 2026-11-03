@@ -5,6 +5,7 @@ import {render} from 'vitest-browser-react'
 import {page} from 'vitest/browser'
 
 import {fakeMain} from '../fake-main'
+import {SECTIONS} from './settings-sections'
 import {SettingsPage} from './SettingsPage'
 import {SettingsProvider} from './SettingsProvider'
 
@@ -33,16 +34,9 @@ it('lists every section, with those not built yet unavailable', async () => {
     .elements()
     .map(button => [button.textContent, button.hasAttribute('disabled')])
 
-  expect(names).toEqual([
-    ['Appearance', false],
-    ['Chat', false],
-    ['System prompts', true],
-    ['Tools', true],
-    ['Connections', false],
-    ['Storage', true],
-    ['Archive & restore', true],
-    ['Updates & About', true],
-  ])
+  const built = new Set(['Appearance', 'Chat', 'Connections'])
+
+  expect(names).toEqual(SECTIONS.map(section => [section, !built.has(section)]))
 })
 
 it('opens on Appearance, showing the saved values', async () => {

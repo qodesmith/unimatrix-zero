@@ -70,10 +70,12 @@ async function cleanedUpWith(body: () => Promise<Ending>) {
   )
 
   for await (const event of runs.startReply(request)) {
-    if (event.type === 'RUN_FINISHED') break
+    if (event.type === 'REPLY_RECORDED' || event.type === 'RUN_FINISHED') {
+      return cleanUp.mock.calls.slice()
+    }
   }
 
-  return cleanUp.mock.calls
+  throw new Error('The Reply never finished')
 }
 
 async function startedReply(runs: ReturnType<typeof createReplyRuns>) {

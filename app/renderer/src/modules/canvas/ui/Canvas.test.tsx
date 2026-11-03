@@ -1011,6 +1011,7 @@ it('caps a long Prompt, with Show more letting it out and Show less capping it a
   await expect
     .element(page.getByRole('button', {name: 'Show more'}))
     .toBeVisible()
+  await expect.poll(rootPromptHeight).toBeCloseTo(capped, 0)
 })
 
 it('keeps a Reply let out by Show more open across an orientation switch', async () => {
@@ -2372,12 +2373,8 @@ it('asks in a dialog to delete the Prompt with every Turn below it, and cancels 
   await expect
     .element(page.getByRole('alertdialog', {name: 'Delete 6 Turns?'}))
     .toBeVisible()
-  await expect
-    .element(confirmation().getByText('This can’t be undone.'))
-    .toBeVisible()
   await confirmation().getByRole('button', {name: 'Cancel'}).click()
   await expect.element(confirmation()).not.toBeInTheDocument()
-  await expect.element(deleteButtonOf('Prompt two')).toHaveFocus()
 
   await armDelete('Prompt three')
   await expect

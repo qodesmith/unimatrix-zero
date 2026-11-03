@@ -41,11 +41,11 @@ it('keeps when a limit lifts, when the Provider said', () => {
 })
 
 it('takes when a limit lifts from the Provider over the message', () => {
-  expect(
-    failureOf('You’ve hit your limit · resets 3pm (Europe/London)', 1793970000)
-  ).toEqual({
+  const message = 'You’ve hit your limit · resets 2026-10-24T15:00:00Z'
+
+  expect(failureOf(message, 1793970000)).toEqual({
     code: 'limit-reached',
-    message: 'You’ve hit your limit · resets 3pm (Europe/London)',
+    message,
     resetsAt: '2026-11-06T13:00:00.000Z',
   })
   expect(failureOf('fetch failed', 1793970000)).toEqual({

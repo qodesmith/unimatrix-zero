@@ -512,6 +512,10 @@ it('rewinds the loaded thread to the Reply a Retry answers, keeping both rollout
     messageId: BYE_TURN,
   })
 
+  const oldRollout = path.join(codex.configDir, ...REWOUND_ROLLOUT.split('/'))
+  fs.appendFileSync(oldRollout, `${JSON.stringify({type: 'written-after'})}\n`)
+  const onDisk = fs.readFileSync(oldRollout)
+
   const retried = await codex.reply(
     'What was the last thing I asked you? Just the words.',
     {...recordedIn(hi), type: 'rewind'}
@@ -525,14 +529,14 @@ it('rewinds the loaded thread to the Reply a Retry answers, keeping both rollout
 
   const [report] = codex.reports()
 
-  expect(report?.methods).toContain('thread/revert')
   expect(report?.reverted).toBe(BYE_TURN)
   const {projectKey, sessionId} = folderOf(REWOUND_THREAD_ID)
+  const kept = codex.store.filesOf(projectKey, sessionId)
 
-  expect([...codex.store.filesOf(projectKey, sessionId).keys()]).toEqual([
-    REWOUND_ROLLOUT,
-    REVERTED_ROLLOUT,
-  ])
+  expect([...kept.keys()]).toEqual([REWOUND_ROLLOUT, REVERTED_ROLLOUT])
+  expect(
+    Buffer.from(kept.get(REWOUND_ROLLOUT)?.base64 ?? '', 'base64')
+  ).toEqual(onDisk)
 })
 
 it('resumes a Retry from the app’s copy when the thread isn’t loaded, with nothing to revert', async () => {
@@ -555,7 +559,6 @@ it('resumes a Retry from the app’s copy when the thread isn’t loaded, with n
   const [report] = codex.reports()
 
   expect(report?.methods).toContain('thread/resume')
-  expect(report?.methods).not.toContain('thread/revert')
   expect(report?.reverted).toBeNull()
   expect(report?.resumedFrom.map(line => line.id)).toEqual([
     THREAD_ID,

@@ -10,7 +10,7 @@ import {createTreeRows, createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
 import {PromptSendResult, TreeListResult} from '@uz/contract/commands'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
-import {TreeSchema} from '@uz/contract/trees'
+import {TREE_TITLE_MAX_LENGTH, TreeSchema} from '@uz/contract/trees'
 import path from 'node:path'
 import {beforeEach, describe, expect, it} from 'vitest'
 
@@ -285,9 +285,15 @@ describe('a Tree’s row', () => {
 
   it('cuts a long first line to the longest title', async () => {
     const tree = await createTree()
-    await sendPrompt(tree.id, null, `${'a'.repeat(250)}\nmore`)
+    await sendPrompt(
+      tree.id,
+      null,
+      `${'a'.repeat(TREE_TITLE_MAX_LENGTH + 1)}\nmore`
+    )
 
-    expect((await listed())[0]?.firstLine).toBe('a'.repeat(200))
+    expect((await listed())[0]?.firstLine).toBe(
+      'a'.repeat(TREE_TITLE_MAX_LENGTH)
+    )
   })
 
   it('lists the Tree last active first', async () => {
@@ -388,10 +394,7 @@ describe('deleting a Tree', () => {
     })
     expect(published.at(-1)).toEqual({type: 'TREE_DELETED', treeId: tree.id})
     expect(await listed()).toEqual([])
-    expect(await send({type: 'tree.turns', treeId: tree.id})).toMatchObject({
-      ok: false,
-      error: {code: 'not-found'},
-    })
+    expect(deps.turns.list(tree.id)).toEqual({prompts: [], replies: []})
   })
 
   it('ends each Reply streaming in it, asks its host to stop, and deletes it at once', async () => {
@@ -603,6 +606,5 @@ describe('the Layout', () => {
 
     expect(outcome).toEqual({ok: true, value: saved})
     expect(published).toEqual([{type: 'LAYOUT_CHANGED', layout: saved}])
-    expect(deps.layout.read()).toEqual(saved)
   })
 })

@@ -16,10 +16,20 @@ beforeEach(() => {
 })
 
 it('keeps a change across reopening and leaves the other Settings alone', () => {
+  const others = {
+    themeMode: 'dark',
+    limitTurnHeight: false,
+    contextSizeMeter: false,
+    fontSize: 20,
+    sendKey: 'mod-enter',
+    reReadNote: false,
+  } as const
+
+  createSettings(db).update(others)
   createSettings(db).update({canvasOrientation: 'horizontal'})
 
   expect(createSettings(db).read()).toEqual({
-    ...DEFAULT_SETTINGS,
+    ...others,
     canvasOrientation: 'horizontal',
   })
 })

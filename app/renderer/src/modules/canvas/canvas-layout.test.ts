@@ -2,7 +2,7 @@ import type {Prompt, Reply} from '@uz/contract/turns'
 
 import {describe, expect, it} from 'vitest'
 
-import {layoutCanvas} from './canvas-layout'
+import {GAPS, layoutCanvas} from './canvas-layout'
 import {indexTurns} from './tree'
 
 const treeId = '01a16096-00ad-7d3b-8205-6b76ddc26ce0'
@@ -206,7 +206,7 @@ describe('a collapsed Fork', () => {
     )
 
     expect(folded('P3').x).toBeLessThan(open('P3').x)
-    expect(folded('P3').x - folded('P2').x).toBe(width + 36)
+    expect(folded('P3').x - folded('P2').x).toBe(width + GAPS.vertical.branch)
   })
 })
 

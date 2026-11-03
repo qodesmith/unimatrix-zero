@@ -4,6 +4,8 @@ export {ConnectionsProvider} from './ui/ConnectionsProvider'
 
 export {ProviderMark} from './ui/ProviderMark'
 
+export {ABOUT} from './about'
+
 export {anyConnected} from './cards'
 
 export {useConnections} from './use-connections'

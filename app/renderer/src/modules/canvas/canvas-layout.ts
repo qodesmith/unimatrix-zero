@@ -68,7 +68,7 @@ interface Gap {
   branch: number
 }
 
-const GAPS: Record<CanvasOrientation, Gap> = {
+export const GAPS: Record<CanvasOrientation, Gap> = {
   vertical: {rank: 40, branch: 36},
   horizontal: {rank: 60, branch: 28},
 }

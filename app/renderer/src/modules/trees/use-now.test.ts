@@ -10,7 +10,7 @@ afterEach(() => {
 it('moves on while mounted, so a relative time stays fresh', async () => {
   vi.useFakeTimers({toFake: ['Date', 'setInterval', 'clearInterval']})
   vi.setSystemTime(Date.parse('2026-11-01T12:00:00.000Z'))
-  const {result, act} = await renderHook(() => useNow())
+  const {result, act, unmount} = await renderHook(() => useNow())
   expect(result.current).toBe(Date.parse('2026-11-01T12:00:00.000Z'))
 
   await act(() => {
@@ -18,4 +18,8 @@ it('moves on while mounted, so a relative time stays fresh', async () => {
   })
 
   expect(result.current).toBe(Date.parse('2026-11-01T12:01:00.000Z'))
+
+  await unmount()
+
+  expect(vi.getTimerCount()).toBe(0)
 })

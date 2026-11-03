@@ -5,6 +5,7 @@ import type {Command, CommandOutcome} from '@uz/contract/commands'
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
 
+import {ABOUT} from '#modules/connections/main'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {describe, expect, it, onTestFinished} from 'vitest'
 import {render} from 'vitest-browser-react'
@@ -631,9 +632,15 @@ describe('connecting a Provider', () => {
       )
       .toBeVisible()
     await expect
-      .element(page.getByText('Pro or Max · by Anthropic'))
+      .element(
+        page.getByText(`${ABOUT.claude.plans} · by ${ABOUT.claude.company}`)
+      )
       .toBeVisible()
-    await expect.element(page.getByText('Any plan · by OpenAI')).toBeVisible()
+    await expect
+      .element(
+        page.getByText(`${ABOUT.chatgpt.plans} · by ${ABOUT.chatgpt.company}`)
+      )
+      .toBeVisible()
     await expect
       .element(page.getByRole('button', {name: 'Start chatting →'}))
       .toBeDisabled()
@@ -907,7 +914,7 @@ describe('connecting a Provider', () => {
       .toHaveTextContent('ChatGPT can’t be connected in this version yet.')
   })
 
-  it('shows the same cards under Settings once connected, with no Connections button left in the sidebar', async () => {
+  it('shows the same cards under Settings once connected', async () => {
     globalThis.window.uz = fakeMain()
     await renderApp()
 
