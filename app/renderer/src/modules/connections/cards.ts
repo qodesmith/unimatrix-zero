@@ -21,7 +21,10 @@ export interface ConnectionsState {
   loaded: boolean
   statuses: ProviderStatus[]
   signIn: SignInStep | null
-  /** The connect reached a page with a code, so the card lists that step. */
+  /**
+   * The connect reached a page with a code, so the card lists that step. A
+   * finished connect leaves it as it was, so read it only beside `signIn`.
+   */
   pasting: boolean
   failures: Partial<Record<ProviderId, SignInFailure>>
   models: Record<ProviderId, Model[]>
@@ -105,7 +108,7 @@ export function applyConnectionEvent(
   }
 
   if (event.type === 'SIGN_IN_FINISHED') {
-    const finished = {...state, signIn: null, pasting: false}
+    const finished = {...state, signIn: null}
 
     return event.outcome === 'failed'
       ? withFailure(finished, event.provider, event.failure)

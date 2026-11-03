@@ -388,13 +388,29 @@ it('resumes the Provider session from the app’s copy alone, written back under
   ])
 })
 
-it('reports only its own turn’s token count when a resume repeats the last one', async () => {
+it('reports only its own turn’s token count, not the one a resume repeats or another thread’s', async () => {
+  const crossed = edited('resumed.ndjson', text => {
+    const lines = text.split('\n')
+
+    const at = lines.findIndex(line =>
+      line.includes(`"turnId":"${RESUMED_TURN}","tokenUsage"`)
+    )
+
+    const otherThread = lines[at]
+      ?.replaceAll(THREAD_ID, FORKED_THREAD_ID)
+      .replaceAll(RESUMED_TURN, FORKED_TURN)
+
+    if (otherThread === undefined) throw new Error('No token count to copy')
+
+    return lines.toSpliced(at, 0, otherThread).join('\n')
+  })
+
   const opened = await setUp(['started.ndjson'])
   const first = await opened.reply(FIRST_PROMPT)
   const second = await opened.reply(SECOND_PROMPT, recordedIn(first))
   await opened.allClosed()
 
-  const codex = await setUp(['resumed.ndjson'], {store: opened.store})
+  const codex = await setUp([crossed], {store: opened.store})
   const third = await codex.reply(THIRD_PROMPT, recordedIn(second))
 
   expect(third.filter(event => event.type === 'TOKENS')).toEqual([

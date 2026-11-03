@@ -95,7 +95,7 @@ export function LayoutSidebar({sidebar, children}: LayoutSidebarProps) {
         <ResizablePanel
           id="sidebar"
           panelRef={panelRef}
-          defaultSize={open ? `${width}px` : 0}
+          defaultSize={`${width}px`}
           minSize={`${SIDEBAR_MIN_WIDTH}px`}
           maxSize={`${SIDEBAR_MAX_WIDTH}px`}
           collapsible={!open}
