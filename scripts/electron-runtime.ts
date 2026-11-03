@@ -5,10 +5,8 @@ import {z} from 'zod'
 import {runElectronAsNode} from './electron-as-node'
 
 const probe = `
-  const {DatabaseSync} = require('node:sqlite')
-  const sqlite = new DatabaseSync(':memory:').prepare('select sqlite_version() v').get().v
   const {electron, node, chrome} = process.versions
-  console.log(JSON.stringify({electron, node, chrome, sqlite}))
+  console.log(JSON.stringify({electron, node, chrome}))
 `
 
 const result = runElectronAsNode(['-e', probe], {encoding: 'utf8'})
@@ -22,7 +20,6 @@ const Runtime = z.strictObject({
   electron: z.string(),
   node: z.string(),
   chrome: z.string(),
-  sqlite: z.string(),
 })
 
 const runtime = Runtime.parse(JSON.parse(String(result.stdout).trim()))

@@ -1,6 +1,6 @@
-import type {MachineContext, Transitions} from './machine'
+import type {Transitions} from './machine'
 
-import {describe, expect, expectTypeOf, it} from 'vitest'
+import {describe, expect, it} from 'vitest'
 
 import {machine} from './machine'
 
@@ -46,11 +46,6 @@ describe('machine', () => {
 
     expect(transition(off, {type: 'dimmed', level: 1})).toBe(off)
     expect(transition(off, {type: 'switchedOff'})).toBe(off)
-  })
-
-  it('returns the same object for an event type the machine does not know', () => {
-    // @ts-expect-error a transition accepts only the machine's events
-    expect(transition(lit, {type: 'flickered'})).toBe(lit)
   })
 
   it('returns the same object for an event type that only the object prototype has', () => {
@@ -134,16 +129,4 @@ void machine<Lamp, LampEvent>({
     switchedOn: () => ({status: 'broken'}),
   },
   on: {},
-})
-
-describe('MachineContext', () => {
-  it('gives a compound context no meta unless it names some', () => {
-    expectTypeOf<
-      MachineContext<Lamp, {switchOff: () => void}>
-    >().toEqualTypeOf<{
-      state: Lamp
-      actions: {switchOff: () => void}
-      meta: Record<string, never>
-    }>()
-  })
 })

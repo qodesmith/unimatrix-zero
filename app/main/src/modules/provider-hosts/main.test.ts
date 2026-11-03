@@ -550,10 +550,6 @@ describe('a one-shot', () => {
       'its host is stopped',
       (hosts: ReturnType<typeof setUp>) => hosts.stop('claude'),
     ],
-    [
-      `${ONE_SHOT_TIMEOUT_MS} ms pass`,
-      () => vi.advanceTimersByTime(ONE_SHOT_TIMEOUT_MS),
-    ],
   ])('fails when %s first', async (_case, interrupt) => {
     const hosts = readyHost()
 

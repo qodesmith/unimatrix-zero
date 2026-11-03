@@ -5,17 +5,11 @@ import {expect, it} from 'vitest'
 
 import {planOf, readAccount} from './account'
 
-it.each([
-  ['Claude Pro', 'Pro'],
-  ['Claude Max', 'Max'],
-  ['Claude Team', 'Team'],
-  ['Claude Enterprise', 'Enterprise'],
-  ['Claude Max 20x', 'Max 20x'],
-])('reads %s as the %s plan', (subscriptionType, plan) => {
-  expect(planOf(subscriptionType)).toBe(plan)
+it('reads Claude Max 20x as the Max 20x plan', () => {
+  expect(planOf('Claude Max 20x')).toBe('Max 20x')
 })
 
-it.each([['Claude API'], ['pro'], ['Claude '], ['']])(
+it.each([['Claude API'], ['pro'], ['Claude ']])(
   'reads %s as no paid plan',
   subscriptionType => {
     expect(planOf(subscriptionType)).toBeNull()

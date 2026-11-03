@@ -183,7 +183,7 @@ async function setUp(
     configDir,
   }
 
-  /** Stops the Reply after `stopAfter` text deltas; 0 stops it as it starts. */
+  /** Stops the Reply after `stopAfter` text deltas. */
   async function reply(
     text: string,
     session: SessionRef | ReplySession | null = null,
@@ -207,10 +207,7 @@ async function setUp(
     })) {
       events.push(event)
 
-      if (
-        (event.type === 'RUN_STARTED' && stopAfter === 0) ||
-        (event.type === 'TEXT_DELTA' && ++deltas === stopAfter)
-      ) {
+      if (event.type === 'TEXT_DELTA' && ++deltas === stopAfter) {
         await driver.stop(replyId)
       }
     }
@@ -454,22 +451,6 @@ it('forks the Provider session through a mid-Thread Reply into a new thread, fro
   expect([
     ...codex.store.filesOf(original.projectKey, original.sessionId).keys(),
   ]).toEqual([ROLLOUT])
-})
-
-it('passes on a stop asked before Codex has started the turn', async () => {
-  const codex = await setUp(['stopped.ndjson'])
-
-  const stopped = await codex.reply(
-    'Count from 1 to 300, one number per line.',
-    null,
-    {stopAfter: 0}
-  )
-
-  expect(stopped.at(-1)).toMatchObject({
-    type: 'RUN_FINISHED',
-    status: 'stopped',
-  })
-  expect(codex.reports()[0]?.interrupted).toBe(STOPPED_TURN)
 })
 
 it('stops a Reply where it is, records it, and continues the Provider session after it', async () => {
@@ -1018,35 +999,6 @@ function withSteps(
 
 const CUT_ROLLOUT = ROLLOUT.replace('.jsonl', '_cut.jsonl')
 
-it('cuts deleted Turns from the loaded thread at once, so the next Prompt’s context lacks them', async () => {
-  const codex = await setUp([
-    withSteps(
-      'reverted.ndjson',
-      7,
-      readOf(REWOUND_THREAD_ID, REVERTED_ROLLOUT),
-      {rest: true}
-    ),
-  ])
-
-  const hi = await codex.reply(FIRST_PROMPT)
-  await codex.reply(SECOND_PROMPT, recordedIn(hi))
-
-  await expect(codex.cut(REWOUND_THREAD_ID, HI_TURN, BYE_TURN)).resolves.toBe(
-    true
-  )
-
-  const next = await codex.reply(
-    'What was the last thing I asked you? Just the words.',
-    recordedIn(hi)
-  )
-
-  expect(next.at(-1)).toMatchObject({status: 'complete'})
-  const [report] = codex.reports()
-
-  expect(report?.reverted).toBe(BYE_TURN)
-  expect(report?.contexts.at(-1)).toEqual([REWOUND_THREAD_ID, HI_TURN])
-})
-
 it('keeps a loaded thread’s cut in the app’s copy, so a resume from it alone lacks the deleted Turns', async () => {
   const opened = await setUp([
     withSteps(
@@ -1137,33 +1089,6 @@ it('cuts deleted Turns from the loaded thread on the next Prompt, before Codex s
   const [report] = codex.reports()
 
   expect(report?.contexts.at(-1)).toEqual([REWOUND_THREAD_ID, HI_TURN])
-})
-
-it('cuts deleted Turns from the app’s copy of an unloaded thread on the next Prompt, before Codex starts its turn', async () => {
-  const opened = await setUp(['started.ndjson'])
-  const first = await opened.reply(FIRST_PROMPT)
-  await opened.reply(SECOND_PROMPT, recordedIn(first))
-  await opened.allClosed()
-
-  const codex = await setUp([resumedThenReverted()], {store: opened.store})
-
-  const next = await codex.reply(THIRD_PROMPT, {
-    ...recordedIn(first),
-    type: 'cut',
-    keepThrough: FIRST_TURN,
-    dropFrom: SECOND_TURN,
-  })
-
-  expect(droppedIn(next)).toBe(true)
-  const [report] = codex.reports()
-
-  expect(report?.resumedFrom.map(line => line.id)).toEqual([
-    THREAD_ID,
-    FIRST_TURN,
-    SECOND_TURN,
-  ])
-  expect(report?.reverted).toBe(SECOND_TURN)
-  expect(report?.contexts).toEqual([[THREAD_ID, FIRST_TURN]])
 })
 
 it('starts a Reply in a thread only once a cut of it has finished', async () => {

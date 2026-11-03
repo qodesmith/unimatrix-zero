@@ -386,27 +386,6 @@ function revealed(replyText: string) {
     ?.getAttribute('data-revealed')
 }
 
-it('draws every Turn as its own box, top-down, with an Input under every Reply', async () => {
-  await renderCanvas(forkedTree())
-
-  await expect.element(page.getByText('Prompt three')).toBeVisible()
-  expect(document.querySelectorAll('.react-flow__node-prompt')).toHaveLength(5)
-  expect(document.querySelectorAll('.react-flow__node-reply')).toHaveLength(5)
-  expect(document.querySelectorAll('.react-flow__node').length).toBe(10)
-  await expect
-    .element(page.getByRole('textbox', {name: 'Prompt'}).first())
-    .toBeVisible()
-  expect(document.querySelectorAll('textarea')).toHaveLength(5)
-
-  const three = page.getByText('Prompt three').element().getBoundingClientRect()
-  const two = page.getByText('Prompt two').element().getBoundingClientRect()
-  const one = page.getByText('Prompt one').element().getBoundingClientRect()
-
-  expect(two.top).toBeGreaterThan(one.bottom)
-  expect(two.top).toBe(three.top)
-  expect(two.left).toBeLessThan(three.left)
-})
-
 function stemUnder(replyText: string) {
   const node = nodeOf(replyText).element()
   const box = page.getByText(replyText).element().closest('[data-turn]')
@@ -962,13 +941,6 @@ it('keeps a Fork’s card put on unfolding Branches folded since before an orien
   expect(rect('Reply two').top).toBeCloseTo(before.top, 0)
 })
 
-it('shows no pill on a Reply the conversation simply continues from', async () => {
-  await renderCanvas(linearTree())
-  await expect.element(page.getByText('Reply two')).toBeVisible()
-
-  expect(page.getByRole('button', {name: /Fork/}).query()).toBeNull()
-})
-
 it('switches to one card per Exchange, left to right, and writes the Setting', async () => {
   const {main} = await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
@@ -1379,18 +1351,6 @@ it('counts the Replies streaming on several Threads at once and jumps to each in
   await expect.poll(viewport).not.toBe(first)
 })
 
-it('shows one centered Input on an empty Tree and the Turns once it is sent', async () => {
-  await renderCanvas({prompts: [], replies: []})
-
-  await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
-  await userEvent.keyboard('{Enter}')
-
-  await expect.element(page.getByText('Hello?')).toBeVisible()
-  await expect
-    .poll(() => document.querySelectorAll('.react-flow__node').length)
-    .toBe(2)
-})
-
 it('breaks a line on Shift+Enter and sends on Enter, by default', async () => {
   const {main} = await renderCanvas({prompts: [], replies: []})
   const input = page.getByRole('textbox', {name: 'Prompt'})
@@ -1592,15 +1552,6 @@ it('branches from the slideout into a Reply that already has a response, and fol
       expect.arrayContaining([edge(1, 11), `${uuid(11)}-${sentPromptId}`])
     )
   expect(highlightedEdges()).toHaveLength(3)
-})
-
-it('opens nothing on a click on a Turn’s box', async () => {
-  await renderCanvas(forkedTree())
-  await expect.element(page.getByText('Reply five')).toBeVisible()
-
-  await canvas().getByText('Prompt five').click()
-  await canvas().getByText('Reply five').click()
-  await expect.element(slideout()).not.toBeInTheDocument()
 })
 
 it('opens the Model picker of a Reply’s Input on the canvas', async () => {

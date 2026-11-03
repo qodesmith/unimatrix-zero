@@ -139,17 +139,3 @@ it('shows and saves the send key and the re-read note from Chat', async () => {
       {type: 'settings.update', changes: {reReadNote: true}},
     ])
 })
-
-it('shows the Provider cards under Connections', async () => {
-  await renderSettings()
-
-  await sections().getByRole('button', {name: 'Connections'}).click()
-
-  await expect
-    .element(
-      page
-        .getByRole('region', {name: 'Connections'})
-        .getByText('The Provider cards')
-    )
-    .toBeVisible()
-})

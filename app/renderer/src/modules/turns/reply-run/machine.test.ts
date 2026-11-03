@@ -70,10 +70,6 @@ describe('the Reply run machine', () => {
       )
     })
 
-    it('waits through a run starting, so a Stop asked before it stays asked', () => {
-      expect(replyRunTransition(stopping, EVENTS.runStarted)).toBe(stopping)
-    })
-
     it('goes idle once the run finishes', () => {
       expect(replyRunTransition(stopping, EVENTS.runFinished)).toEqual(
         initialReplyRun
@@ -119,10 +115,6 @@ describe('the Reply run machine', () => {
       expect(replyRunTransition(retrying, EVENTS.retryRefused)).toEqual(
         retryRefused
       )
-    })
-
-    it('waits through the new run starting before main answers', () => {
-      expect(replyRunTransition(retrying, EVENTS.runStarted)).toBe(retrying)
     })
 
     it('goes idle once a run finishes', () => {

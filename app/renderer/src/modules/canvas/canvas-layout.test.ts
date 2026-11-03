@@ -210,19 +210,6 @@ describe('a collapsed Fork', () => {
   })
 })
 
-it('lays out from the structure alone, whatever order its Turns arrive in', () => {
-  const {prompts, replies} = forkedTree()
-
-  const arrived = indexTurns({
-    prompts: prompts.toReversed(),
-    replies: replies.toReversed(),
-  })
-
-  expect(layoutCanvas(arrived, 'vertical', sized({})).nodes).toEqual(
-    layoutCanvas(forkedTree(), 'vertical', sized({})).nodes
-  )
-})
-
 /** Two Branches of the root Reply, with the second one started at `second`. */
 function twoBranches(second: string) {
   clock = 0

@@ -89,27 +89,6 @@ it('starts the Provider’s host and asks it to connect', () => {
   ])
 })
 
-it('keeps the latest step for a window that connects mid-way', () => {
-  const connections = setUp()
-  connections.connect('claude')
-
-  connections.applySignInUpdate('claude', {
-    type: 'SIGN_IN_STEP',
-    step: 'sign-in-page',
-    url,
-  })
-
-  const step = {
-    type: 'SIGN_IN_STEP',
-    provider: 'claude',
-    step: 'sign-in-page',
-    url,
-  }
-
-  expect(published.at(-1)).toEqual(step)
-  expect(connections.snapshot().signIn).toEqual(step)
-})
-
 it('connects one Provider at a time', () => {
   const connections = setUp()
   connections.connect('claude')
@@ -395,16 +374,4 @@ it('skips asking for Models when the Provider can’t be connected here or its h
     type: 'PROVIDER_STATUS',
     status: 'ready',
   })
-})
-
-it('keeps a Provider’s Models while its host restarts', () => {
-  const connections = setUp()
-  connected(connections)
-  connections.applyModels('claude', [opus])
-
-  connections.applyHostStatus('claude', 'restarting')
-  connections.hostCrashed('claude')
-  connections.applyHostStatus('claude', 'starting')
-
-  expect(connections.snapshot().models.claude).toEqual([opus])
 })

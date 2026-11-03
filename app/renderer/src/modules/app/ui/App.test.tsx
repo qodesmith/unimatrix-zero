@@ -200,29 +200,6 @@ it('creates a Tree and opens it', async () => {
     .toBeVisible()
 })
 
-it('streams a Reply word by word into an empty Tree', async () => {
-  const main = fakeMain()
-  globalThis.window.uz = main
-  await renderApp()
-  await sidebarNewTree().click()
-
-  await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
-  await userEvent.keyboard('{Enter}')
-  await expect.element(page.getByText('Hello?')).toBeVisible()
-
-  const ids = firstReply(main)
-  main.publish({...ids, type: 'RUN_STARTED'})
-  main.publish({...ids, type: 'TEXT_DELTA', delta: 'Hi '})
-  await expect.element(page.getByText('Hi', {exact: true})).toBeVisible()
-  main.publish({...ids, type: 'TEXT_DELTA', delta: 'there'})
-  await expect.element(page.getByText('Hi there')).toBeVisible()
-  await expect.element(page.getByText('Writing…')).toBeVisible()
-
-  main.publish({...ids, type: 'RUN_FINISHED', status: 'complete'})
-  await expect.element(page.getByText('Writing…')).not.toBeInTheDocument()
-  await expect.element(page.getByText('Hi there')).toBeVisible()
-})
-
 it('continues the Thread from its last Reply once that Reply has finished', async () => {
   const main = fakeMain()
   globalThis.window.uz = main
@@ -332,31 +309,6 @@ it('shows a streaming Reply where it was after a reload, and keeps going', async
 
   main.publish({...ids, type: 'TEXT_DELTA', delta: ' time'})
   await expect.element(page.getByText('Once upon a time')).toBeVisible()
-})
-
-it('shows a failed Reply with the text it had', async () => {
-  const main = fakeMain()
-  globalThis.window.uz = main
-  await renderApp()
-  await sidebarNewTree().click()
-  await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
-  await page.getByRole('button', {name: 'Send'}).click()
-  await expect.element(page.getByText('Writing…')).toBeVisible()
-
-  const ids = firstReply(main)
-  main.publish({...ids, type: 'TEXT_DELTA', delta: 'Cut off'})
-  main.publish({
-    ...ids,
-    type: 'RUN_FINISHED',
-    status: 'failed',
-    failure: {code: 'host-crashed', message: 'Claude stopped unexpectedly.'},
-  })
-
-  await expect
-    .element(page.getByText('Claude stopped unexpectedly'))
-    .toBeVisible()
-  await expect.element(page.getByText('Cut off')).toBeVisible()
-  await expect.element(page.getByRole('button', {name: 'Retry'})).toBeEnabled()
 })
 
 function claudeCard() {

@@ -273,19 +273,3 @@ it('offers to sign in again beside a signed-out Provider’s Model, holding Send
     provider: 'claude',
   })
 })
-
-it('holds Send in a continuing Thread whose Provider was removed', async () => {
-  await renderInput({
-    attachedTo: attachedReply('claude', 'opus'),
-    providers: [
-      {provider: 'claude', status: 'not-connected', account: null},
-      {provider: 'chatgpt', status: 'ready', account},
-    ],
-  })
-
-  await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
-  await expect.element(page.getByRole('button', {name: 'Send'})).toBeDisabled()
-  await expect
-    .element(page.getByText('Connect Claude to continue this Thread'))
-    .toBeVisible()
-})

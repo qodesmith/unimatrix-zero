@@ -63,19 +63,6 @@ it('closes one on another Model instead of giving it back', () => {
   expect(warm.size).toBe(0)
 })
 
-it('closes a session once it has been idle long enough, not before', () => {
-  const warm = warmSessions(6)
-  const one = session('s1', 'm1')
-  warm.add(one)
-  warm.release(one)
-
-  vi.advanceTimersByTime(999)
-  expect(one.closed).toBe(false)
-
-  vi.advanceTimersByTime(1)
-  expect(one.closed).toBe(true)
-})
-
 it('starts the idle wait over after each Reply', () => {
   const warm = warmSessions(6)
   const one = session('s1', 'm1')

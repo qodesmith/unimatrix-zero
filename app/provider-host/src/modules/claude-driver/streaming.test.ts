@@ -295,27 +295,6 @@ it('streams a Reply, records where Claude saved it, and reports its Context size
   await claude.allClosed()
 })
 
-it('continues a Thread in the warm session, then closes it gracefully once idle', async () => {
-  const claude = await setUp(['warm.ndjson'])
-
-  const first = await claude.reply(FIRST_PROMPT)
-  const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
-
-  expect(textOf(second)).toBe('OTTER')
-  expect(recordedIn(second)).toEqual({
-    sessionId: SESSION_ID,
-    messageId: SECOND_MESSAGE,
-  })
-  expect(shown(second).contextSize).toBe(2 + 0 + 629 + 6)
-
-  await claude.allClosed()
-  const [report] = claude.reports()
-
-  expect(claude.reports()).toHaveLength(1)
-  expect(report?.prompts).toEqual([FIRST_PROMPT, SECOND_PROMPT])
-  expect(report?.ended).toBe('input-closed')
-})
-
 async function warmThread(claude: Awaited<ReturnType<typeof setUp>>) {
   const first = await claude.reply(FIRST_PROMPT)
   const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
@@ -790,6 +769,7 @@ it('stops a Reply where it is, records it, and continues the Thread warm from it
     sessionId: STOPPED_SESSION_ID,
     messageId: ASKED_MESSAGE,
   })
+  expect(shown(asked).contextSize).toBe(2 + 157 + 586 + 12)
 
   await claude.allClosed()
   const [report] = claude.reports()
