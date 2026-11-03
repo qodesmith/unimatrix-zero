@@ -12,7 +12,6 @@ export * as schema from './schema'
 export type Database = NodeSQLiteDatabase & {$client: DatabaseSync}
 
 const KEPT_BACKUPS = 3
-const BACKUP_DIGITS = 10
 const BACKUP_NAME = /^unimatrix-(\d+)\.sqlite$/
 const UUID_BACKUP_NAME = /^unimatrix-[\da-f-]{36}\.sqlite$/
 const MIGRATIONS_TABLE = '__drizzle_migrations'
@@ -146,12 +145,8 @@ function backUp(client: DatabaseSync, file: string): string {
   return backup
 }
 
-// Zero-padded so a version that sorts backups by name, keeping the last three,
-// counts these as older than its own UUIDv7 names and keeps the one it just made.
 function backupPath(folder: string, number: number) {
-  const padded = String(number).padStart(BACKUP_DIGITS, '0')
-
-  return path.join(folder, `unimatrix-${padded}.sqlite`)
+  return path.join(folder, `unimatrix-${number}.sqlite`)
 }
 
 function restore(file: string, backup: string | undefined) {

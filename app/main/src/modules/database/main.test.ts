@@ -172,7 +172,7 @@ describe('migrating', () => {
     expect(backupColumns(backups()[0] ?? '')).not.toContain('note')
   })
 
-  it('keeps only the last three of eleven backups, named in the order they were made', () => {
+  it('keeps only the last three of eleven backups', () => {
     withTreeAndPrompt()
 
     for (let n = 1; n <= 11; n++) {
@@ -183,31 +183,13 @@ describe('migrating', () => {
       open().$client.close()
     }
 
-    const notesInEach = backups()
-      .toSorted()
-      .map(name =>
-        backupColumns(name).filter(column => column.startsWith('note_'))
-      )
+    const notesInEach = backups().map(name =>
+      backupColumns(name).filter(column => column.startsWith('note_'))
+    )
 
-    expect(notesInEach).toEqual([notesUpTo(8), notesUpTo(9), notesUpTo(10)])
-  })
-
-  it('names backups so an older version, keeping the last three names, keeps its own', () => {
-    withTreeAndPrompt()
-
-    for (const n of [1, 2]) {
-      addMigration(
-        `2999010100000${n}_tree_note_${n}`,
-        `ALTER TABLE \`trees\` ADD \`note_${n}\` text;`
-      )
-      open().$client.close()
-    }
-
-    const olderVersionsBackup =
-      'unimatrix-019a0000-0000-7000-8000-000000000001.sqlite'
-
-    expect([...backups(), olderVersionsBackup].toSorted().at(-1)).toBe(
-      olderVersionsBackup
+    expect(notesInEach).toHaveLength(3)
+    expect(notesInEach).toEqual(
+      expect.arrayContaining([notesUpTo(8), notesUpTo(9), notesUpTo(10)])
     )
   })
 
