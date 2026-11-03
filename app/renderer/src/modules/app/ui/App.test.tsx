@@ -234,6 +234,7 @@ it('continues the Thread from its last Reply once that Reply has finished', asyn
   const first = firstReply(main)
   main.publish({...first, type: 'TEXT_DELTA', delta: 'Hi there'})
   await expect.element(page.getByText('Hi there')).toBeVisible()
+  await expect.element(page.getByText('Writing…')).toBeVisible()
 
   const input = page.getByRole('textbox', {name: 'Prompt'})
   const send = page.getByRole('button', {name: 'Send'})
@@ -256,6 +257,7 @@ it('continues the Thread from its last Reply once that Reply has finished', asyn
     content: [{type: 'text', text: 'Hi there'}],
   }
   await expect.element(send).toBeEnabled()
+  await expect.element(page.getByText('Writing…')).not.toBeInTheDocument()
   await expect.element(input).toHaveValue('And then?')
   await userEvent.keyboard('{Enter}')
 
@@ -966,14 +968,20 @@ describe('connecting a Provider', () => {
       .getByRole('button', {name: 'Connections'})
       .click()
 
+    const connections = page.getByRole('region', {name: 'Connections'})
+
     await expect
-      .element(page.getByRole('heading', {name: 'Connections'}))
+      .element(connections.getByRole('heading', {name: 'Connections'}))
       .toBeVisible()
     await expect
-      .element(claudeCard().getByText('sam@example.com'))
+      .element(
+        connections
+          .getByRole('region', {name: 'Claude'})
+          .getByText('sam@example.com')
+      )
       .toBeVisible()
     await expect
-      .element(page.getByRole('button', {name: 'Connect ChatGPT'}))
+      .element(connections.getByRole('button', {name: 'Connect ChatGPT'}))
       .toBeEnabled()
     expect(
       page

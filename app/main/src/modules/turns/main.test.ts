@@ -773,7 +773,7 @@ describe('stopping every Reply in a Tree', () => {
 })
 
 describe('retrying a Reply', () => {
-  it('runs the root Prompt again in place, from nothing, in a new session', () => {
+  it('runs the root Prompt again in place, from nothing, in a new session, as a stream that can be stopped', () => {
     const replyId = sendPrompt(null)
     fromHost(replyId, {type: 'TEXT_DELTA', delta: 'H'})
     fromHost(replyId, {
@@ -809,6 +809,11 @@ describe('retrying a Reply', () => {
       },
     ])
     expect(turns.streaming()).toMatchObject([{replyId, content: []}])
+
+    hostCommands = []
+    turns.stop(treeId, replyId)
+
+    expect(hostCommands).toEqual([{type: 'reply.stop', replyId}])
   })
 
   it('can be stopped once it streams again', () => {
