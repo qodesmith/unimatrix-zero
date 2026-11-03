@@ -1,6 +1,7 @@
 import type {HostMessage, SessionStoreRequest} from '@uz/contract/host'
 
 import {expect, it} from 'vitest'
+import {z} from 'zod'
 
 import {createSessionStoreClient} from './main'
 
@@ -89,7 +90,7 @@ it('rejects an answer that isn’t what the operation gives back', async () => {
 
   client.settle(one.requestId, {ok: true, value: null})
 
-  await expect(listed).rejects.toThrow('expected array')
+  await expect(listed).rejects.toThrow(z.ZodError)
 })
 
 it('ignores an answer to a request it isn’t waiting for', () => {
