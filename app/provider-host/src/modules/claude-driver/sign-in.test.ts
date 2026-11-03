@@ -1,3 +1,4 @@
+import type {LoginEvents} from './login'
 import type {ClaudeSignInDeps} from './sign-in'
 import type {AccountInfo, ModelInfo} from '@anthropic-ai/claude-agent-sdk'
 import type {SignInUpdate} from '@uz/contract/providers'
@@ -235,6 +236,88 @@ it('starts a new sign-in when Claude refuses the code', async () => {
   expect(updates.at(-1)).toMatchObject({outcome: 'connected'})
 })
 
+it('never shows the page of a login replaced after Claude refused its code', async () => {
+  const logins: LoginEvents[] = []
+
+  const signIn = createClaudeSignIn(
+    deps({
+      startLogin: (command, env, events) => {
+        logins.push(events)
+
+        return startLogin(command, env, events)
+      },
+    })
+  )
+
+  const onPage = [
+    () => signIn.submitSignInCode(`expired#${FAKE_STATE}`),
+    () => signIn.submitSignInCode(FAKE_CODE),
+  ]
+
+  const updates = await connect(signIn, update => {
+    if (isStep(update, 'sign-in-page')) signIn.signInPageOpened()
+
+    if (update.type === 'SIGN_IN_STEP' && update.wrongCode && !update.url) {
+      logins[0]?.onUrl('https://claude.com/cai/oauth/authorize?state=replaced')
+    }
+
+    if (
+      update.type === 'SIGN_IN_STEP' &&
+      update.url &&
+      isStep(update, 'paste-code')
+    ) {
+      onPage.shift()?.()
+    }
+  })
+
+  expect(updates.filter(update => isStep(update, 'paste-code'))).toEqual([
+    {type: 'SIGN_IN_STEP', step: 'paste-code', url: FAKE_CODE_PAGE},
+    {type: 'SIGN_IN_STEP', step: 'paste-code', wrongCode: true},
+    {
+      type: 'SIGN_IN_STEP',
+      step: 'paste-code',
+      url: FAKE_CODE_PAGE,
+      wrongCode: true,
+    },
+  ])
+  expect(updates.at(-1)).toMatchObject({outcome: 'connected'})
+})
+
+it('stops flagging the refused code once the new page is opened', async () => {
+  const signIn = createClaudeSignIn(deps())
+
+  const onPage = [
+    () => signIn.submitSignInCode(`expired#${FAKE_STATE}`),
+    () => signIn.signInPageOpened(),
+    () => signIn.submitSignInCode(FAKE_CODE),
+  ]
+
+  const updates = await connect(signIn, update => {
+    if (isStep(update, 'sign-in-page')) signIn.signInPageOpened()
+
+    if (
+      update.type === 'SIGN_IN_STEP' &&
+      update.url &&
+      isStep(update, 'paste-code')
+    ) {
+      onPage.shift()?.()
+    }
+  })
+
+  expect(updates.filter(update => isStep(update, 'paste-code'))).toEqual([
+    {type: 'SIGN_IN_STEP', step: 'paste-code', url: FAKE_CODE_PAGE},
+    {type: 'SIGN_IN_STEP', step: 'paste-code', wrongCode: true},
+    {
+      type: 'SIGN_IN_STEP',
+      step: 'paste-code',
+      url: FAKE_CODE_PAGE,
+      wrongCode: true,
+    },
+    {type: 'SIGN_IN_STEP', step: 'paste-code', url: FAKE_CODE_PAGE},
+  ])
+  expect(updates.at(-1)).toMatchObject({outcome: 'connected'})
+})
+
 it('fails with one plain reason when the download fails', async () => {
   const used = deps({
     // oxlint-disable-next-line require-yield -- offline before the first byte
@@ -351,6 +434,23 @@ it('gives up when Claude’s page never answers', async () => {
     outcome: 'failed',
     failure: {reason: 'no-answer'},
   })
+})
+
+it('stops waiting for Claude’s page once signed in', async () => {
+  vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']})
+
+  try {
+    const updates = await connect(
+      createClaudeSignIn(
+        deps({env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'}})
+      )
+    )
+
+    expect(updates.at(-1)).toMatchObject({outcome: 'connected'})
+    expect(vi.getTimerCount()).toBe(0)
+  } finally {
+    vi.useRealTimers()
+  }
 })
 
 it('signs a free account out again and refuses it', async () => {

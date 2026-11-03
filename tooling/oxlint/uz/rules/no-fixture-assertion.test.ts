@@ -29,6 +29,18 @@ const cases = {
       renderHook(() => useWholeList(paged))
       expect(paged.fetchNextPage).not.toHaveBeenCalled()
     })`,
+  'spy-on-fixture': `
+    it('logs', () => {
+      const spies = {log: vi.spyOn(console, 'log')}
+      run()
+      expect(spies.log).toHaveBeenCalledOnce()
+    })`,
+  'array-of-spies': `
+    it('logs', () => {
+      const spies = [vi.spyOn(console, 'log')]
+      run()
+      expect(spies[0].mock.calls).toEqual([['hi']])
+    })`,
   'recording-array': `
     it('sends nothing', async () => {
       const seen = []
@@ -75,7 +87,9 @@ it.each(['built-object', 'file-level-fixture', 'only-used-as-expected'])(
 
 it.each([
   'mock-on-fixture',
+  'spy-on-fixture',
   'recording-array',
+  'array-of-spies',
   'written-by-unit',
   'compared-to-unit',
   'shadowed-by-result',

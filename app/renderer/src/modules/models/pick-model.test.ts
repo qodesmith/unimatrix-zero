@@ -61,6 +61,21 @@ it('starts from the first connected Provider’s default when nothing is wanted'
   expect(pick.heldBecause).toBeNull()
 })
 
+it('passes over a signed-out Provider when nothing is wanted', () => {
+  const pick = pickModel({
+    wanted: null,
+    lockedTo: null,
+    statuses: only('claude', 'signed-out'),
+    models,
+  })
+
+  expect(pick.selected).toEqual({
+    provider: 'chatgpt',
+    model: 'gpt-5',
+    name: 'GPT-5',
+  })
+})
+
 function opus() {
   return {provider: 'claude', model: 'opus', name: 'OPUS'}
 }
@@ -199,6 +214,17 @@ it('offers no Models of a Provider that isn’t connected', () => {
   })
 
   expect(pick.groups.map(group => group.provider)).toEqual(['claude'])
+})
+
+it('offers no group for a connected Provider that hasn’t listed any Models', () => {
+  const pick = pickModel({
+    wanted: null,
+    lockedTo: null,
+    statuses: connected,
+    models: {...models, claude: []},
+  })
+
+  expect(pick.groups).toEqual([{provider: 'chatgpt', models: chatgptModels}])
 })
 
 it('offers only the locked Provider’s Models in a continuing Thread', () => {

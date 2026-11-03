@@ -519,6 +519,33 @@ describe('the sidebar’s width', () => {
 
     await expect.poll(sidebarWidth).toBe(500)
   })
+
+  it('saves nothing when a double-click finds it at its default width', async () => {
+    const main = fakeMain()
+    await renderApp(main)
+    await expect.poll(sidebarWidth).toBe(290)
+
+    await doubleClick(widthHandle())
+    await drag(widthHandle(), {x: 110, y: 0})
+
+    await expect.poll(sidebarWidth).toBe(400)
+    expect(layoutUpdates(main)).toEqual([
+      {type: 'layout.update', changes: {sidebarWidth: 400}},
+    ])
+  })
+
+  it('saves no width it only opened at, even one main saved between whole pixels', async () => {
+    const main = fakeMain({layout: {sidebarWidth: 400.4}})
+    await renderApp(main)
+    await expect.poll(sidebarWidth).toBeCloseTo(400.4, 0)
+
+    await drag(widthHandle(), {x: 110, y: 0})
+
+    await expect.poll(sidebarWidth).toBeCloseTo(510.4, 0)
+    expect(layoutUpdates(main)).toEqual([
+      {type: 'layout.update', changes: {sidebarWidth: 510}},
+    ])
+  })
 })
 
 function section(name: 'Trees' | 'Files' | 'Usage') {
@@ -611,6 +638,26 @@ describe('the sidebar’s sections', () => {
       files: {size: 30, collapsed: false},
       usage: {size: 15, collapsed: false},
     })
+  })
+
+  it('keeps the open sections’ split beside a collapsed one when the window grows', async () => {
+    const {container} = await renderApp(fakeMain())
+    const frame = container.firstElementChild
+
+    if (!(frame instanceof HTMLElement)) throw new Error('No frame')
+
+    const headerHeight = header('Files')
+      .element()
+      .getBoundingClientRect().height
+
+    await header('Files').click()
+    await expect.poll(() => heightOf('Files')).toBe(headerHeight)
+    const split = heightOf('Trees') / heightOf('Usage')
+
+    frame.style.height = '200vh'
+    await expect.poll(() => heightOf('Files')).toBeCloseTo(headerHeight, 0)
+
+    expect(heightOf('Trees') / heightOf('Usage')).toBeCloseTo(split, 1)
   })
 
   it('opens with the split and collapsed sections it was saved with', async () => {

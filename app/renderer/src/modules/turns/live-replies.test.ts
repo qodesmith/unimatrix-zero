@@ -53,6 +53,21 @@ it('closes the block once the words start, and opens another before the next par
   ])
 })
 
+it('keeps a Subagent’s thinking and words from touching the Reply’s Thinking block', () => {
+  const subagent = {...ids, subagentId: 'subagent-1'}
+
+  const blocks = thinkingAfter([
+    {...ids, type: 'RUN_STARTED'},
+    {...ids, type: 'REASONING_DELTA', delta: 'The Reply’s.'},
+    {...subagent, type: 'REASONING_DELTA', delta: 'The Subagent’s.'},
+    {...subagent, type: 'TEXT_DELTA', delta: 'Its words.'},
+  ])
+
+  expect(blocks).toEqual([
+    {text: 'The Reply’s.', beforePart: 0, startedAt: 1200, endedAt: null},
+  ])
+})
+
 const saved: Reply = {
   id: ids.replyId,
   treeId: ids.treeId,
