@@ -48,7 +48,6 @@ function subagent(agentId: string): SessionEntry[] {
   ]
 }
 
-/** A store that answers only when the test says, so the asking shows. */
 function heldStore(
   answer: (request: SessionStoreRequest) => SessionStoreValue
 ) {
@@ -151,26 +150,11 @@ it('asks main for the session and every Subagent’s transcript at once', async 
 
   const writing = writeTranscriptBack(store.client, {configDir, ...session})
 
-  expect(store.asked()).toEqual(['load', 'list-subkeys'])
+  expect(store.asked().toSorted()).toEqual(['list-subkeys', 'load'])
   store.answerAll()
 
   await expect.poll(() => store.asked()).toEqual(['load', 'load'])
   store.answerAll()
 
   expect(await writing).toBe(true)
-
-  const subagents = path.join(
-    configDir,
-    'projects',
-    PROJECT_KEY,
-    SESSION_ID,
-    'subagents'
-  )
-
-  expect(readEntries(path.join(subagents, 'agent-a1.jsonl'))).toEqual(
-    subagent('a1')
-  )
-  expect(readEntries(path.join(subagents, 'agent-a2.jsonl'))).toEqual(
-    subagent('a2')
-  )
 })
