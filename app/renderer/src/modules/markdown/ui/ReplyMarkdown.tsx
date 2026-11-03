@@ -45,7 +45,6 @@ function useMermaid(needed: boolean): DiagramPlugin | null {
 
 interface ReplyMarkdownProps {
   text: string
-  /** Still being written: incomplete Markdown is closed as it renders. */
   streaming: boolean
 }
 

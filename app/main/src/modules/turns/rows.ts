@@ -63,7 +63,6 @@ export function listTurns(db: Database, treeId: string) {
   }
 }
 
-/** The Provider and Model of the newest Reply in any Tree. */
 export function lastModel(db: Database): ModelChoice | null {
   const row = db
     .select({provider: replies.provider, model: replies.model})
@@ -101,7 +100,6 @@ function saveSystemPrompt(db: Database, text: string) {
 
 export interface NewExchange {
   treeId: string
-  /** The Reply it answers; null for the root Prompt. */
   parentReplyId: string | null
   text: string
   provider: ProviderId
@@ -110,7 +108,6 @@ export interface NewExchange {
   now: Date
 }
 
-/** The Prompt and its Reply, streaming, saved together. */
 export function insertExchange(
   db: Database,
   next: NewExchange

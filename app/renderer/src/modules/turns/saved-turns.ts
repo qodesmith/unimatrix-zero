@@ -8,7 +8,6 @@ export function turnsKey(treeId: string) {
   return ['turns', treeId] as const
 }
 
-/** A saved Reply as far as its run has got. */
 export function withProgress(
   reply: Reply,
   {status, content, contextSize, contextWindow, failure}: ReplyProgress

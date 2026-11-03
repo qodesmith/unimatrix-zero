@@ -5,12 +5,10 @@ import {PROVIDER_NAMES} from '@uz/contract/providers'
 export const ABOUT: Record<
   ProviderId,
   {
-    /** Which of the Provider's plans can connect. */
     plans: string
     company: string
     mark: string
     program: string
-    /** Why an account the vendor program refuses can't connect. */
     refused: string
   }
 > = {

@@ -6,16 +6,13 @@ import type {SignInFinished, SignInUpdate} from '@uz/contract/providers'
 import {createInbox} from '#modules/inbox/main'
 import {SIGN_IN_CANCELED, signInFailed} from '@uz/contract/providers'
 
-/** What the user does while connecting, as main passes it on. */
 export type UserInput =
   | {kind: 'page-opened'}
   | {kind: 'code'; code: string}
   | {kind: 'cancel'}
 
-/** One go at connecting, from Connect to its end. */
 export interface Attempt<Input extends object> {
   inbox: Inbox<Input | UserInput>
-  /** Aborted by cancel. */
   signal: AbortSignal
   /** A function so it is read afresh after each wait. */
   canceled: () => boolean

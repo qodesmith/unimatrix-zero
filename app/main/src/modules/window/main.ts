@@ -78,10 +78,7 @@ function lockNavigation(contents: WebContents, appUrl: string) {
   contents.on('will-attach-webview', event => event.preventDefault())
 }
 
-/**
- * Electron's default menu, less its zoom items and its Help menu: the window
- * never zooms.
- */
+/** Electron's default menu, less zoom and Help: the window never zooms. */
 export function setAppMenu() {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(menuTemplate(process.platform))

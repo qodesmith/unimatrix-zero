@@ -6,7 +6,6 @@ import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 
 export type SettingsStore = Store<Settings>
 
-/** The defaults until main's SNAPSHOT says otherwise. */
 export function createSettingsStore(): SettingsStore {
   return new Store<Settings>(DEFAULT_SETTINGS)
 }

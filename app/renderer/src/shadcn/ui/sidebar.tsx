@@ -85,7 +85,6 @@ function SidebarProvider({
     [setOpenProp]
   )
 
-  // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
     if (isMobile) {
       setOpenMobile(!openMobile)
@@ -94,7 +93,6 @@ function SidebarProvider({
     }
   }, [isMobile, open, openMobile, setOpen])
 
-  // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (
@@ -229,7 +227,6 @@ function Sidebar({
         data-side={side}
         className={cn(
           'fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-slide ease-slide data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] motion-reduce:transition-none md:flex',
-          // Adjust the padding for floating and inset variants.
           variant === 'floating' || variant === 'inset'
             ? 'p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]'
             : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l',
@@ -588,7 +585,6 @@ function SidebarMenuBadge({className, ...props}: React.ComponentProps<'div'>) {
   )
 }
 
-// Random width between 50 to 90%.
 function randomSkeletonWidth() {
   return `${Math.floor(Math.random() * 40) + 50}%`
 }

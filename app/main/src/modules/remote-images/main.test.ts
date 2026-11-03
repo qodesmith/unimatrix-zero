@@ -11,10 +11,6 @@ interface Served {
   body?: Uint8Array | ReadableStream<Uint8Array>
 }
 
-/**
- * Addresses in `redirects` answer with a 302 to where they point; any other
- * serves the image.
- */
 function fakeFetch(
   {status = 200, type = 'image/png', length, body = png}: Served,
   redirects: Record<string, string> = {}

@@ -18,7 +18,6 @@ afterEach(async () => {
   await claude.cleanUp()
 })
 
-/** Runs the login, typing each code once the page is printed. */
 async function login(command: ClaudeCommand, codes: string[]) {
   const urls: string[] = []
 

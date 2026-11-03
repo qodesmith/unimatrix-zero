@@ -7,10 +7,6 @@ export function durationMs(time: string) {
   return time.trim().endsWith('ms') ? value : value * 1000
 }
 
-/**
- * The shared slide motion's length, `--transition-duration-slide` in
- * styles.css.
- */
 export function slideMs() {
   return durationMs(
     getComputedStyle(document.documentElement).getPropertyValue(

@@ -15,7 +15,6 @@ function useLayoutStore() {
   return store
 }
 
-/** How the window is arranged, as main last reported it. */
 export function useLayout(): Layout {
   return useSelector(useLayoutStore(), state => state)
 }

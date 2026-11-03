@@ -1,6 +1,4 @@
 /**
- * Live, against a real ChatGPT sign-in; runs only when asked:
- *
  * UZ_LIVE_CODEX_PROGRAM=<userData>/vendor/chatgpt/<version>\
  * UZ_LIVE_CODEX_HOME=<userData>/providers/chatgpt\
  * bun run test:node app/provider-host/src/modules/codex-driver/streaming.live
@@ -80,7 +78,6 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       })
     }
 
-    /** Lets idle time pass, then waits for every `codex` to exit. */
     async function closed() {
       idle.pass()
       await Promise.all(exits)
@@ -219,7 +216,6 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       })
     }
 
-    /** Lets idle time pass, then waits for every `codex` to exit. */
     async function closed() {
       idle.pass()
       await Promise.all(exits)
@@ -379,7 +375,6 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       })
     }
 
-    /** Lets idle time pass, then waits for every `codex` to exit. */
     async function closed() {
       idle.pass()
       await Promise.all(exits)

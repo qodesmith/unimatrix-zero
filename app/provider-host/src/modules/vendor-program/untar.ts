@@ -5,7 +5,6 @@ import {createGunzip} from 'node:zlib'
 
 const BLOCK = 512
 
-/** Reads a stream by exact sizes, however its chunks fall. */
 function byteReader(source: AsyncIterable<Buffer>) {
   const chunks = source[Symbol.asyncIterator]()
   let buffered = Buffer.alloc(0)
@@ -21,7 +20,6 @@ function byteReader(source: AsyncIterable<Buffer>) {
   }
 
   return {
-    /** Exactly `size` bytes; null when the stream ends first. */
     async read(size: number) {
       while (buffered.length < size) {
         if (!(await fill())) return null
@@ -33,7 +31,6 @@ function byteReader(source: AsyncIterable<Buffer>) {
       return bytes
     },
 
-    /** Exactly `size` bytes; throws when the stream ends first. */
     async exactly(size: number) {
       const bytes = await this.read(size)
 
@@ -71,7 +68,6 @@ function octal(header: Buffer, start: number, length: number) {
   return Number.parseInt(text(header, start, length).trim() || '0', 8)
 }
 
-/** The `path` a pax extended header gives the entry after it, if any. */
 function paxPath(records: Buffer) {
   for (const line of records.toString('utf8').split('\n')) {
     const match = /^\d+ path=(.*)$/s.exec(line)
@@ -98,7 +94,6 @@ async function writeFile(
   }
 }
 
-/** `name` resolved in `folder`; throws when it would land outside it. */
 function inside(folder: string, name: string) {
   const target = path.resolve(folder, name)
 
@@ -111,10 +106,6 @@ function inside(folder: string, name: string) {
   return target
 }
 
-/**
- * Keeps each file's permission bits. Anything but files, folders and pax
- * headers, or a path outside `folder`, throws.
- */
 export async function untar(
   archive: string,
   folder: string,

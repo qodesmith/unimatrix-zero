@@ -3,7 +3,6 @@ import os from 'node:os'
 import path from 'node:path'
 import {z} from 'zod'
 
-/** One recording per app-server that ran. */
 export const RECORDINGS = path.join(import.meta.dirname, 'recordings')
 
 /** What a recording says in place of the `CODEX_HOME` it ran with. */
@@ -26,8 +25,7 @@ export type RecordedLine = z.infer<typeof RecordedLineSchema>
  * `FAKE_CODEX_RECORDINGS`, matching each message by method. Like `codex`, it
  * resumes or forks only a thread whose rollout is in place under `sessions/`,
  * and a revert writes the thread a new rollout that points into the old one
- * just before the reverted turn. `contexts` holds, for each `turn/start`, the
- * ids of what the thread's rollouts held then.
+ * just before the reverted turn.
  */
 const SCRIPT = `
 import fs from 'node:fs'

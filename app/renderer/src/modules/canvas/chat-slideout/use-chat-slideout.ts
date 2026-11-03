@@ -6,7 +6,6 @@ import {useCallback} from 'react'
 import {replyOf} from '../tree'
 import {chatTransition, initialChat} from './machine'
 
-/** The chat slideout over one Tree's canvas. */
 export function useChatSlideout(index: TreeIndex) {
   const [chat, send] = useStateMachine({
     transition: chatTransition,

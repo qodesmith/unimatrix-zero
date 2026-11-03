@@ -44,7 +44,6 @@ export function turnOf(notification: Notification) {
  */
 export function createReplyMapper(ids: ReplyIds) {
   let shown = ''
-  /** `before` is `shown` when the message began. */
   const messages = new Map<string, {before: string; text: string}>()
   let last: string | null = null
 

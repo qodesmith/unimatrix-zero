@@ -1,8 +1,6 @@
 /**
  * The standalone `codex-app-server` the app runs can't generate its types, so
  * this takes the full `codex`: the one on PATH, or the path given.
- *
- * Usage: bun run codex-protocol [path/to/codex]
  */
 import {spawnSync} from 'node:child_process'
 import fs from 'node:fs'

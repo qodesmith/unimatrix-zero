@@ -36,10 +36,7 @@ interface ConnectionsOptions {
 
 export type Connections = ReturnType<typeof createConnections>
 
-/**
- * Main keeps the latest sign-in step for windows that connect mid-way. A host
- * started only to connect is stopped if connecting doesn't finish.
- */
+/** Keeps the latest sign-in step for windows that connect mid-way. */
 export function createConnections({
   db,
   hosts,
@@ -62,7 +59,6 @@ export function createConnections({
     return row ?? null
   }
 
-  /** Empty when the Provider has no account saved or never listed them. */
   function modelsOf(provider: ProviderId): Model[] {
     const row = db
       .select({models: providers.models})
@@ -257,7 +253,6 @@ export function createConnections({
 
     applyModels,
 
-    /** Every saved Model whose id, or the id it resolves to, is `modelId`. */
     markNeedsAppUpdate(provider: ProviderId, modelId: string) {
       const models = modelsOf(provider)
 

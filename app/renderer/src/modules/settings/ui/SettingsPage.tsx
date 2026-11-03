@@ -29,11 +29,9 @@ const SECTIONS = [
 type Section = (typeof SECTIONS)[number]
 
 interface SettingsPageProps {
-  /** The Provider cards, which belong to the connections module. */
   connections: ReactNode
 }
 
-/** Every global Setting, one section at a time. */
 export function SettingsPage({connections}: SettingsPageProps) {
   const [openSection, setOpenSection] = useState<Section>('Appearance')
 

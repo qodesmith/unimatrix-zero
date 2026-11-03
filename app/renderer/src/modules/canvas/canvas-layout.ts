@@ -20,7 +20,6 @@ export const TURN_WIDTH = 768
 /** The space an empty Tree's Input keeps from each edge of the canvas. */
 export const START_MARGIN = 24
 
-/** The zoom a new Tree starts at. */
 export function startZoom(canvasWidth: number) {
   return Math.min(1, (canvasWidth - 2 * START_MARGIN) / TURN_WIDTH)
 }
@@ -90,7 +89,6 @@ type CollapsedReplyIds = ReadonlySet<string>
 
 const NONE_COLLAPSED: CollapsedReplyIds = new Set()
 
-/** Vertical: every Turn its own box, a Reply under its Prompt. */
 function turnGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
   const nodes: Unplaced[] = []
   const edges: CanvasLayoutEdge[] = []
@@ -130,7 +128,6 @@ function turnGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
   return {nodes, edges, children, roots}
 }
 
-/** Horizontal: one card per Exchange, Branches fanning out to the right. */
 function exchangeGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
   const nodes: Unplaced[] = []
   const edges: CanvasLayoutEdge[] = []
@@ -188,12 +185,10 @@ export function layoutCanvas(
     return sizeOf(id) ?? DEFAULT_SIZE
   }
 
-  /** A box's extent in the reading direction. */
   function along(id: string) {
     return vertical ? size(id).height : size(id).width
   }
 
-  /** A box's extent across it. */
   function across(id: string) {
     return vertical ? size(id).width : size(id).height
   }
@@ -206,7 +201,6 @@ export function layoutCanvas(
     return gap.branch * Math.max(0, kids.length - 1)
   }
 
-  /** The room a subtree needs across the reading direction. */
   function measure(id: string): number {
     const kids = childrenOf(id)
 

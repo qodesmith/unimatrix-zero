@@ -46,7 +46,6 @@ export interface ClaudeRepliesDeps {
   resolveModel: (id: string) => string
 }
 
-/** How a session's earlier Turns reach `claude`. */
 type Restore = 'none' | 'store' | 'file'
 
 interface Live extends ClaudeSession {
@@ -55,11 +54,8 @@ interface Live extends ClaudeSession {
   projectKey: string
   /** The SDK swaps in its own configuration folder on a restore. */
   activeConfigDir: () => string
-  /** Tool result files already in the app's copy. */
   saved: Set<string>
-  /** The session the app's copy holds this entry in, once it does. */
   storedIn(uuid: string): string | null
-  /** Waits for the entries on their way to the app's copy. */
   stored(): Promise<void>
 }
 
@@ -307,9 +303,8 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   }
 
   /**
-   * A rewind or a Retry's cut can't take the warm session: it has gone past
-   * the message the cut keeps, and only a new `claude` resumes at it. Nor can
-   * a Prompt on another Model, which `claude` takes only as it starts.
+   * A rewind or a Retry's cut needs a new `claude` to resume at the cut, and
+   * `claude` takes a Model only as it starts.
    */
   function claimable(request: ReplyRequest): Live | null {
     const {session} = request
@@ -328,9 +323,8 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   }
 
   /**
-   * A warm `claude` that exited while idle answers nothing, so a new one
-   * resumes in its place. When the restore from the store doesn't get
-   * `claude` going, the transcript is written back and it goes again.
+   * A warm `claude` that exited while idle is replaced; a store restore that
+   * `claude` refuses falls back to the transcript written back.
    */
   async function* answer(
     request: ReplyRequest,
@@ -378,7 +372,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     }
   }
 
-  /** A failed Reply's `claude` closes; a refused save fails the Reply too. */
+  /** A refused save of the tool results fails the Reply. */
   async function* write(
     request: ReplyRequest,
     run: ReplyRun

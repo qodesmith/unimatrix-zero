@@ -8,7 +8,6 @@ import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 import {atBottom} from '../at-bottom'
 
 interface CappedTextProps {
-  /** Off: the text takes its full height and there is nothing to show more of. */
   limit: boolean
   maxHeightClass: string
   expanded: boolean
@@ -29,9 +28,8 @@ interface Toggle {
 
 /**
  * `nowheel` makes the wheel scroll capped text instead of panning the canvas.
- * Show more and Show less keep the text being read where it is on screen:
- * capping scrolls the box to the text at the canvas's top edge, and the canvas
- * moves by however far the box's scroll changed.
+ * A toggle keeps the text being read where it is on screen: the canvas moves by
+ * however far the box's scroll changed.
  */
 export function CappedText({
   limit,

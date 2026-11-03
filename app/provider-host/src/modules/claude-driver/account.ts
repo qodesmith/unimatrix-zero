@@ -17,7 +17,6 @@ const PREFIX = 'Claude '
 /** `accountInfo()` names a paid plan "Claude <name>", and no plan "Claude API". */
 const NO_PLAN = 'Claude API'
 
-/** The plan's name, or null when the account has no paid plan. */
 export function planOf(subscriptionType: string): string | null {
   if (!subscriptionType.startsWith(PREFIX) || subscriptionType === NO_PLAN) {
     return null
@@ -34,7 +33,6 @@ interface SessionOptions {
 
 export interface AccountRead {
   account: AccountInfo
-  /** What the account may pick, as this `claude` listed them. */
   models: ModelInfo[]
 }
 
@@ -88,9 +86,8 @@ export async function readAccount({
 
     return {account, models}
   } finally {
-    // The SDK ends `claude`'s input once the Prompts run out, but closing the
-    // session kills `claude` 2 s later, so it closes only once `claude` has
-    // exited, or is stuck.
+    // Closing the session kills `claude` 2 s later, so it closes only once
+    // `claude` has exited on its input ending, or is stuck.
     input.resolve()
     const stuck = new AbortController()
     await Promise.race([

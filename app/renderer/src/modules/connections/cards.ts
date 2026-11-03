@@ -18,7 +18,6 @@ export type Card =
   | {kind: 'connected'; account: Account}
 
 export interface ConnectionsState {
-  /** False until main's `SNAPSHOT` arrives. */
   loaded: boolean
   statuses: ProviderStatus[]
   signIn: SignInStep | null

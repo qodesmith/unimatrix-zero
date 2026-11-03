@@ -55,7 +55,6 @@ interface Running {
   server: AppServer
   threads: Map<string, LoadedThread>
   writing: number
-  /** Calls off the idle close. */
   wake: (() => void) | undefined
 }
 
@@ -64,7 +63,6 @@ interface LoadedThread {
   model: string
   /** Oldest first: the turn it was opened at, then each one started here. */
   turns: string[]
-  /** Its rollout, which a revert leaves for a new one. */
   path: string | null
 }
 
@@ -73,7 +71,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   let current: Running | null = null
   let starting: Promise<Running> | null = null
   let limits: RateLimits = {primary: null, secondary: null}
-  /** Each thread's cuts so far: a Reply in it waits for them. */
   const cuts = new Map<string, Promise<unknown>>()
 
   function onRateLimits(notification: Notification) {
@@ -299,10 +296,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     return load(running, opened, messageId === null ? [] : [messageId])
   }
 
-  /**
-   * After the thread's cut before it. The app's copy then holds the thread as
-   * reverted, so a resume from it alone leaves out what the cut dropped.
-   */
+  /** Saves the reverted rollout, so a later resume lacks what it dropped. */
   async function cutThread(
     {session, vendorProgram}: CutRequest,
     before: Promise<unknown> | undefined
@@ -356,7 +350,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     }
   }
 
-  /** Stop interrupts the turn once Codex has started it. */
   async function* send(
     running: Running,
     request: ReplyRequest,
@@ -445,9 +438,8 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   }
 
   /**
-   * An app-server that exited while idle answers nothing: try once more on a
-   * new one. Codex keeps a cut on disk, so the second attempt doesn't cut
-   * again.
+   * An app-server that exited while idle answers nothing, so try once more on
+   * a new one. Codex keeps a cut on disk, so the retry doesn't cut again.
    */
   async function* write(
     request: ReplyRequest,

@@ -1,4 +1,3 @@
-// The Playwright provider gives `cdp()` its `send`.
 /// <reference types="@vitest/browser-playwright" />
 import type {FakeMain} from '../fake-main'
 import type {Bridge} from '@uz/contract/bridge'
@@ -446,7 +445,6 @@ function centerOf(element: Element): Point {
   return {x: rect.left + rect.width / 2, y: rect.top + rect.height / 2}
 }
 
-/** A real mouse drag, in steps, the way a hand moves one. */
 async function drag(element: Element, by: Point) {
   const from = centerOf(element)
   const mouse = {button: 'left', clickCount: 1} as const

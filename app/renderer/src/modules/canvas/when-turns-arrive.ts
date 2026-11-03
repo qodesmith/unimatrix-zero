@@ -11,9 +11,9 @@ function turnSlidesIn(pane: HTMLElement) {
 }
 
 /**
- * Calls `onArrived` once no Turn in the pane is sliding. Returns a cancel.
- * React Flow cancels and restarts the slides as it measures the Turns, so it
- * looks again after each round ends, until a frame passes with none.
+ * Calls `onArrived` once no Turn in the pane is sliding; returns a cancel.
+ * React Flow restarts the slides as it measures the Turns, so it waits until a
+ * frame passes with none.
  */
 export function whenTurnsArrive(pane: HTMLElement, onArrived: () => void) {
   let current = true

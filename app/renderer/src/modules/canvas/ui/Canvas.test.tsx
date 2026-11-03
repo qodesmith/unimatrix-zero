@@ -697,7 +697,6 @@ it('zooms out just enough to show the whole Tree on its first Fork, and keeps th
   await expect.poll(viewport).not.toContain('translate(0px, 0px)')
   await settledViewport()
 
-  // Zoomed in, two Branches side by side no longer fit the window.
   const loaded = zoomOf()
   await page.getByRole('button', {name: 'Zoom in'}).click()
   await expect.poll(zoomOf).toBeGreaterThan(loaded * 1.1)
@@ -942,8 +941,7 @@ it('keeps a Fork’s card put on unfolding Branches folded since before an orien
   await expect.element(page.getByText('Reply five')).toBeVisible()
   await expect.poll(viewport).not.toContain('translate(0px, 0px)')
 
-  // Reply five ends the Active Thread but is folded away: unfolded cards are
-  // measured only once they show.
+  // Folded before the switch, its cards are measured only once they show.
   await nodeOf('Reply two').getByRole('button', {name: '2 Branches'}).click()
   await expect.element(page.getByText('Reply five')).not.toBeInTheDocument()
 
@@ -1968,7 +1966,6 @@ it('scrolls the slideout to the Reply it opened from, expands to cover the canva
   clock = 0
   await renderCanvas({
     prompts: [prompt(1, null, 'Prompt one'), prompt(2, 11, 'Prompt two')],
-    // Long enough for Reply two to reach the top.
     replies: [
       reply(11, 1, `Reply one\n\n${longReply}`),
       reply(12, 2, `Reply two\n\n${longReply}`),

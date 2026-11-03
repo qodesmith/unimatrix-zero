@@ -119,7 +119,6 @@ export function createWarmSessions<Session extends WarmSession>({
       close(session)
     },
 
-    /** Resolves once every `claude` closing in the session has ended. */
     async closed(sessionId: string) {
       await Promise.all(closing.get(sessionId) ?? new Set<Promise<void>>())
     },

@@ -19,7 +19,6 @@ interface Pending {
   reject: (error: Error) => void
 }
 
-/** The host's way to its sessions, which main keeps in the database. */
 export function createSessionStoreClient(post: (message: HostMessage) => void) {
   const pending = new Map<string, Pending>()
 
@@ -64,7 +63,6 @@ export function createSessionStoreClient(post: (message: HostMessage) => void) {
       )
     },
 
-    /** Main answered; an answer to nothing pending is dropped. */
     settle(requestId: string, outcome: Outcome) {
       const waiting = pending.get(requestId)
 

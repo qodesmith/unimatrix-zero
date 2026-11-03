@@ -14,7 +14,6 @@ type RunFinished = Extract<ReplyEvent, {type: 'RUN_FINISHED'}>
 
 type FinishedStatus = RunFinished['status']
 
-/** What a driver streams between the run's `RUN_STARTED` and `RUN_FINISHED`. */
 export type ContentEvent = Exclude<
   ReplyEvent,
   {type: 'RUN_STARTED' | 'RUN_FINISHED'}
@@ -26,7 +25,6 @@ export interface Ending {
   recorded?: ReplyRecorded | null
 }
 
-/** Thrown when the vendor program goes away while it writes the Reply. */
 export class ProgramCrashed extends Error {}
 
 export interface ReplyRun {
@@ -41,7 +39,6 @@ export interface ReplyRun {
 
 export type WriteReplyEvent = ContentEvent | PromptRecorded | PromptDropped
 
-/** The vendor program's part of one Reply: its content, then how it ended. */
 export type WriteReply = (
   request: ReplyRequest,
   run: ReplyRun

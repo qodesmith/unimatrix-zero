@@ -26,15 +26,11 @@ interface PromptInputProps {
   draft?: string
   /** The draft as it changes; empty again once sent. */
   onDraftChange?: (draft: string) => void
-  /**
-   * False while the Reply it continues from streams: it takes a draft, not a
-   * send.
-   */
+  /** False while the parent Reply streams: it takes a draft, not a send. */
   canSend?: boolean
   ref?: Ref<HTMLTextAreaElement>
 }
 
-/** Where the user types the next Prompt. */
 export function PromptInput({
   treeId,
   parentReplyId,

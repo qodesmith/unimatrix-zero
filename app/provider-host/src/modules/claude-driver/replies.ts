@@ -29,7 +29,6 @@ type ReplyIds = Pick<ReplyRequest, 'treeId' | 'replyId'>
  * was silently resent has its text replaced; Subagent messages are left out.
  */
 export function createReplyMapper(ids: ReplyIds) {
-  /** The current text part's text, as the events so far show it. */
   let shown = ''
   let atMessageStart = ''
   let atBlockStart = ''
@@ -37,7 +36,6 @@ export function createReplyMapper(ids: ReplyIds) {
   let messageOpen = false
   let mirrorFailed = false
   let lastMessage: {uuid: string; model: string} | null = null
-  /** When the limit refusing Claude's requests lifts; undefined while none does. */
   let limitLifts: number | undefined
 
   function replace(text: string): ContentEvent[] {

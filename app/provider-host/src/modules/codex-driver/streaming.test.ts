@@ -62,9 +62,7 @@ interface Report {
   vendorVariables: string[]
   methods: string[]
   prompts: string[]
-  /** Each `turn/start`'s Model; null where it left the Model out. */
   turnModels: (string | null)[]
-  /** Each `model/list`'s params. */
   modelLists: object[]
   resumedFrom: {type: string; id: string}[]
   /** At each `turn/start`, the ids of what the thread held. */
@@ -230,7 +228,6 @@ async function setUp(
       )
   }
 
-  /** Lets idle time pass, then waits for every `codex` to end. */
   async function allClosed() {
     idle.pass()
     await expect
@@ -244,7 +241,6 @@ async function setUp(
     await Promise.all(exits)
   })
 
-  /** Drops the Turns from `dropFrom` on, as deleting a Prompt does. */
   async function cut(sessionId: string, keptTurn: string, dropFrom: string) {
     return driver.cutSession({
       session: {
@@ -587,7 +583,6 @@ it('resumes a Retry from the app’s copy when the thread isn’t loaded, with n
   ])
 })
 
-/** `resumed.ndjson` with a `thread/revert` before the turn named `failed`. */
 function resumedThenReverted() {
   const reverted = ROLLOUT.replace('.jsonl', '_reverted.jsonl')
 
@@ -705,10 +700,6 @@ it('doesn’t cut again when Codex stops after the cut and a new app-server take
   expect(fresh?.methods).not.toContain('thread/revert')
 })
 
-/**
- * `resumed.ndjson` where Codex refuses the `thread/revert` before the turn
- * named `failed`, then lists `turnIds` as the thread's turns.
- */
 function resumedThenRevertRefused(turnIds: string[]) {
   return edited('resumed.ndjson', text => {
     const lines = text.split('\n')
@@ -1000,10 +991,6 @@ function readOf(threadId: string, rollout: string) {
   ]
 }
 
-/**
- * `name` with `steps` after its answer to request `afterId`, then its rest or
- * only its end.
- */
 function withSteps(
   name: string,
   afterId: number,
@@ -1243,7 +1230,6 @@ it('switches a loaded thread to the Model each Prompt asks for, and records the 
   expect(codex.reports()[0]?.turnModels).toEqual([null, 'gpt-6-luna'])
 })
 
-/** A `model/list` entry as Codex 0.166 gives one, cut to the fields read. */
 function modelEntry(slug: string, displayName: string, isDefault = false) {
   return {
     id: slug,

@@ -271,7 +271,6 @@ export const OneShotFinishedMessage = z.strictObject({
 
 export type OneShotFinished = z.infer<typeof OneShotFinishedMessage>
 
-/** Asks main to keep, or give back, part of a Provider session. */
 export const SessionStoreMessage = z.strictObject({
   type: z.literal('SESSION_STORE'),
   requestId: z.string(),
