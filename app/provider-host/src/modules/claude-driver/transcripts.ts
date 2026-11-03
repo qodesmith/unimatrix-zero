@@ -74,6 +74,22 @@ function writeEntries(file: string, entries: SessionEntry[]) {
   )
 }
 
+function writeSubagent(stem: string, entries: SessionEntry[]) {
+  const metadata = entries.filter(entry => entry.type === 'agent_metadata')
+
+  writeEntries(
+    `${stem}.jsonl`,
+    entries.filter(entry => entry.type !== 'agent_metadata')
+  )
+
+  const last = metadata.at(-1)
+
+  if (last) {
+    const {type: _type, ...meta} = last
+    fs.writeFileSync(`${stem}.meta.json`, JSON.stringify(meta), {mode: 0o600})
+  }
+}
+
 /**
  * The fallback restore (ADR 0004): a plain write, so the files are new and no
  * cleanup sweep takes them.
@@ -83,33 +99,33 @@ export async function writeTranscriptBack(
   place: SessionPlace
 ) {
   const {projectKey, sessionId} = place
-  const entries = await store.load({projectKey, sessionId})
 
-  if (!entries) return false
+  const [own, subpaths] = await Promise.all([
+    store.load({projectKey, sessionId}),
+    store.listSubkeys({projectKey, sessionId}),
+  ])
+
+  if (!own) return false
 
   const folder = sessionFolder(place)
-  writeEntries(`${folder}.jsonl`, entries)
 
-  for (const subpath of await store.listSubkeys({projectKey, sessionId})) {
-    const file = within(folder, subpath)
+  const subagents = await Promise.all(
+    subpaths.flatMap(subpath => {
+      const stem = within(folder, subpath)
 
-    if (!file) continue
+      return stem === null
+        ? []
+        : [
+            store
+              .load({projectKey, sessionId, subpath})
+              .then(kept => ({stem, entries: kept ?? []})),
+          ]
+    })
+  )
 
-    const kept = (await store.load({projectKey, sessionId, subpath})) ?? []
-    const metadata = kept.filter(entry => entry.type === 'agent_metadata')
+  writeEntries(`${folder}.jsonl`, own)
 
-    writeEntries(
-      `${file}.jsonl`,
-      kept.filter(entry => entry.type !== 'agent_metadata')
-    )
-
-    const last = metadata.at(-1)
-
-    if (last) {
-      const {type: _type, ...meta} = last
-      fs.writeFileSync(`${file}.meta.json`, JSON.stringify(meta), {mode: 0o600})
-    }
-  }
+  for (const {stem, entries} of subagents) writeSubagent(stem, entries)
 
   return true
 }

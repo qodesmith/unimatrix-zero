@@ -1,5 +1,10 @@
-import type {SessionEntry} from '@uz/contract/host'
+import type {
+  SessionEntry,
+  SessionStoreRequest,
+  SessionStoreValue,
+} from '@uz/contract/host'
 
+import {createSessionStoreClient} from '#modules/session-store/main'
 import {fakeStore} from '#modules/test-store/main'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -41,6 +46,26 @@ function subagent(agentId: string): SessionEntry[] {
     {type: 'user', uuid: `${agentId}-1`, isSidechain: true, agentId},
     {type: 'assistant', uuid: `${agentId}-2`, isSidechain: true, agentId},
   ]
+}
+
+function heldStore(
+  answers: Partial<Record<SessionStoreRequest['op'], SessionStoreValue>>
+) {
+  const waiting: {requestId: string; request: SessionStoreRequest}[] = []
+
+  const client = createSessionStoreClient(message => {
+    if (message.type === 'SESSION_STORE') waiting.push(message)
+  })
+
+  return {
+    client,
+    pending: () => waiting.map(({request}) => request.op),
+    answerAll() {
+      for (const {requestId, request} of waiting.splice(0)) {
+        client.settle(requestId, {ok: true, value: answers[request.op] ?? null})
+      }
+    },
+  }
 }
 
 it('writes each Subagent’s transcript and metadata back beside the session', async () => {
@@ -103,4 +128,24 @@ it('skips a Subagent whose subpath would land outside the session’s folder', a
   expect(fs.readdirSync(path.join(configDir, 'projects', PROJECT_KEY))).toEqual(
     [`${SESSION_ID}.jsonl`]
   )
+})
+
+it('asks main for the session and every Subagent’s transcript at once', async () => {
+  const configDir = configFolder()
+  const session = {projectKey: PROJECT_KEY, sessionId: SESSION_ID}
+
+  const store = heldStore({
+    'list-subkeys': ['subagents/agent-a1', 'subagents/agent-a2'],
+    load: [{type: 'user', uuid: 'main-1'}],
+  })
+
+  const writing = writeTranscriptBack(store.client, {configDir, ...session})
+
+  expect(store.pending().toSorted()).toEqual(['list-subkeys', 'load'])
+  store.answerAll()
+
+  await expect.poll(() => store.pending()).toEqual(['load', 'load'])
+  store.answerAll()
+
+  expect(await writing).toBe(true)
 })
