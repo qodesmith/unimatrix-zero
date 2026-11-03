@@ -158,10 +158,18 @@ it('leaves out a compressed rollout Codex has since rewritten plain', () => {
 })
 
 it('skips a path that would land outside CODEX_HOME', () => {
-  writeRolloutsBack(home, [{path: '../escaped.jsonl', base64: btoa('x')}], {
-    rewind: false,
-  })
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-outside-'))
+  const nested = path.join(outside, 'home')
+  fs.mkdirSync(nested)
 
-  expect(fs.existsSync(path.join(home, '..', 'escaped.jsonl'))).toBe(false)
-  expect(fs.readdirSync(home)).toEqual([])
+  try {
+    writeRolloutsBack(nested, [{path: '../escaped.jsonl', base64: btoa('x')}], {
+      rewind: false,
+    })
+
+    expect(fs.readdirSync(outside)).toEqual(['home'])
+    expect(fs.readdirSync(nested)).toEqual([])
+  } finally {
+    fs.rmSync(outside, {recursive: true, force: true})
+  }
 })

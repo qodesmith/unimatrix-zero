@@ -114,7 +114,8 @@ function parentMap(root: Node) {
 
 /**
  * Each `const` binding, and whether it starts as an object literal. Arrays
- * don't count: a test hands `const seen = []` to a fake to record into.
+ * don't count: `const spies = [vi.spyOn(console, 'log')]` appears only inside
+ * `expect`, yet the unit writes each spy's calls.
  */
 function literalBindings(root: Node, into: Map<string, boolean>) {
   for (const node of walk(root)) {

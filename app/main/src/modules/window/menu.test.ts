@@ -4,20 +4,45 @@ import {expect, it} from 'vitest'
 
 import {menuTemplate} from './menu'
 
-function roles(items: MenuItemConstructorOptions[]): string[] {
+const COMMAND =
+  /^(?:cmd|command|ctrl|control|cmdorctrl|commandorcontrol|meta|super)$/iu
+
+const FONT_SIZE_KEY = /^(?:plus|=|-|_|0|numadd|numsub|num0)$/iu
+
+function everyItem(
+  items: MenuItemConstructorOptions[]
+): MenuItemConstructorOptions[] {
   return items.flatMap(item => [
-    ...(item.role === undefined ? [] : [item.role]),
-    ...(Array.isArray(item.submenu) ? roles(item.submenu) : []),
+    item,
+    ...(Array.isArray(item.submenu) ? everyItem(item.submenu) : []),
   ])
 }
 
+function takesFontSizeKey(accelerator: string) {
+  const parts = accelerator.split('+')
+
+  return (
+    parts.slice(0, -1).some(part => COMMAND.test(part)) &&
+    FONT_SIZE_KEY.test(parts.at(-1) ?? '')
+  )
+}
+
 it.each(['darwin', 'win32', 'linux'] as const)(
-  'offers no way to zoom the window on %s',
+  'offers no way to zoom the window on %s, leaving its keys to the font size',
   platform => {
-    const zooms = roles(menuTemplate(platform)).filter(role =>
-      /zoom|viewMenu/i.test(role)
+    const items = everyItem(menuTemplate(platform))
+
+    const zoomRoles = items.flatMap(({role}) =>
+      role !== undefined && /zoom|viewMenu/iu.test(role) ? [role] : []
     )
 
-    expect(zooms).toEqual([])
+    const zoomKeys = items.flatMap(({accelerator}) =>
+      accelerator !== undefined && takesFontSizeKey(accelerator)
+        ? [accelerator]
+        : []
+    )
+
+    expect(zoomRoles).toEqual([])
+    expect(zoomKeys).toEqual([])
   }
 )

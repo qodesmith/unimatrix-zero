@@ -1,4 +1,4 @@
-import type {LoginEvents} from './login'
+import type {ClaudeCommand, LoginEvents} from './login'
 import type {ClaudeSignInDeps} from './sign-in'
 import type {AccountInfo, ModelInfo} from '@anthropic-ai/claude-agent-sdk'
 import type {SignInUpdate} from '@uz/contract/providers'
@@ -336,48 +336,48 @@ it('fails with one plain reason when the download fails', async () => {
   expect(used.startLogin).not.toHaveBeenCalled()
 })
 
-it('cancels the download', async () => {
+it('stops the download when the user cancels', async () => {
+  const signals: AbortSignal[] = []
+
   const signIn = createClaudeSignIn(
     deps({
       async *getProgramReady(_target, {signal}) {
+        signals.push(signal)
         yield {receivedBytes: 0, totalBytes: 1000}
-
-        if (!signal.aborted) {
-          await new Promise(resolve => {
-            signal.addEventListener('abort', resolve)
-          })
-        }
-
-        signal.throwIfAborted()
       },
     })
   )
 
-  const updates = await connect(signIn, update => {
+  await connect(signIn, update => {
     if (update.type === 'SIGN_IN_STEP' && update.progress) signIn.cancelSignIn()
   })
 
-  expect(updates.at(-1)).toEqual({
-    type: 'SIGN_IN_FINISHED',
-    outcome: 'canceled',
-  })
+  expect(signals.map(signal => signal.aborted)).toEqual([true])
 })
 
-it('cancels on the sign-in page, ending claude auth login', async () => {
-  let loginEnded = false
+function watchedLogin() {
+  const login = {ended: false}
 
-  const signIn = createClaudeSignIn(
-    deps({
-      startLogin: (command, env, events) =>
-        startLogin(command, env, {
-          ...events,
-          onExit: (code, output) => {
-            loginEnded = true
-            events.onExit(code, output)
-          },
-        }),
+  function start(
+    command: ClaudeCommand,
+    env: Record<string, string>,
+    events: LoginEvents
+  ) {
+    return startLogin(command, env, {
+      ...events,
+      onExit: (code, output) => {
+        login.ended = true
+        events.onExit(code, output)
+      },
     })
-  )
+  }
+
+  return {login, start}
+}
+
+it('cancels on the sign-in page, ending claude auth login', async () => {
+  const {login, start} = watchedLogin()
+  const signIn = createClaudeSignIn(deps({startLogin: start}))
 
   const updates = await connect(signIn, update => {
     if (isStep(update, 'sign-in-page')) signIn.cancelSignIn()
@@ -387,7 +387,7 @@ it('cancels on the sign-in page, ending claude auth login', async () => {
     type: 'SIGN_IN_FINISHED',
     outcome: 'canceled',
   })
-  await expect.poll(() => loginEnded).toBe(true)
+  await expect.poll(() => login.ended).toBe(true)
 })
 
 it('cancels while the plan is read, even for a free account', async () => {
@@ -427,13 +427,18 @@ it('fails when Claude’s page is declined', async () => {
   })
 })
 
-it('gives up when Claude’s page never answers', async () => {
-  const updates = await connect(createClaudeSignIn(deps({timeoutMs: 50})))
+it('gives up when Claude’s page never answers, ending claude auth login', async () => {
+  const {login, start} = watchedLogin()
+
+  const updates = await connect(
+    createClaudeSignIn(deps({startLogin: start, timeoutMs: 50}))
+  )
 
   expect(updates.at(-1)).toMatchObject({
     outcome: 'failed',
     failure: {reason: 'no-answer'},
   })
+  await expect.poll(() => login.ended).toBe(true)
 })
 
 it('stops waiting for Claude’s page once signed in', async () => {

@@ -409,20 +409,17 @@ it('says only that a Reply failed when it has no reason', async () => {
 })
 
 it('says when a reached limit lifts, in local time', async () => {
-  const resetsAt = '2026-10-19T15:05:00.000Z'
-  const local = new Date(resetsAt)
-  const hour = local.getHours()
-  const minutes = String(local.getMinutes()).padStart(2, '0')
-
   const screen = await renderSaved(
-    failed({code: 'limit-reached', message: '5-hour limit', resetsAt})
+    failed({
+      code: 'limit-reached',
+      message: '5-hour limit',
+      resetsAt: '2026-10-19T15:05:00.000Z',
+    })
   )
 
   await expect
     .element(screen.getByText(/^Limit reached · resets at /))
-    .toMatchTextContent(
-      new RegExp(`at 0?(${hour}|${hour % 12 || 12}):${minutes}\\b`, 'u')
-    )
+    .toMatchTextContent(/at (20|0?8):35\b/u)
 })
 
 it('says only that the limit was reached when the Provider gave no reset time', async () => {
