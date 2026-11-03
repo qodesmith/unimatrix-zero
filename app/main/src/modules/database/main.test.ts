@@ -198,11 +198,11 @@ describe('migrating', () => {
     const backupsFolder = path.join(folder, 'data', 'backups')
     fs.mkdirSync(backupsFolder)
 
-    const legacy = [1, 2, 3].map(
+    const legacy = [2, 3].map(
       n => `unimatrix-019a0000-0000-7000-8000-00000000000${n}.sqlite`
     )
 
-    for (const name of legacy)
+    for (const name of [...legacy, 'unimatrix-1.sqlite'])
       fs.writeFileSync(path.join(backupsFolder, name), '')
     addMigration(
       '29990101000000_tree_note',
@@ -211,9 +211,11 @@ describe('migrating', () => {
 
     open().$client.close()
 
-    expect(backups()).toHaveLength(3)
-    expect(backups()).toEqual(expect.arrayContaining(legacy.slice(1)))
-    expect(backups().filter(name => !legacy.includes(name))).toHaveLength(1)
+    expect(backups().toSorted()).toEqual([
+      legacy[1],
+      'unimatrix-1.sqlite',
+      'unimatrix-2.sqlite',
+    ])
   })
 
   it('prunes a zero-padded backup by the name it has on disk', () => {
