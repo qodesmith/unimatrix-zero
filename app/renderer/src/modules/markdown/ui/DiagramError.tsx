@@ -1,6 +1,11 @@
 import type {MermaidErrorComponentProps} from 'streamdown'
 
 import {Alert, AlertDescription} from '#shadcn/ui/alert'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '#shadcn/ui/collapsible'
 
 /**
  * Replaces Streamdown's Mermaid error panel, which ships Tailwind's reds:
@@ -13,14 +18,16 @@ export function DiagramError({chart, error}: MermaidErrorComponentProps) {
         <span className="text-destructive">
           This diagram could not be drawn: {error}
         </span>
-        <details>
-          <summary className="cursor-pointer text-muted-foreground select-none">
+        <Collapsible>
+          <CollapsibleTrigger className="cursor-pointer text-muted-foreground select-none">
             Show code
-          </summary>
-          <pre className="mt-1 overflow-x-auto whitespace-pre-wrap text-foreground">
-            {chart}
-          </pre>
-        </details>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <pre className="mt-1 overflow-x-auto whitespace-pre-wrap text-foreground">
+              {chart}
+            </pre>
+          </CollapsibleContent>
+        </Collapsible>
       </AlertDescription>
     </Alert>
   )

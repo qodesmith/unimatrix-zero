@@ -13,6 +13,11 @@ import {useModelName} from '#modules/models/main'
 import {Badge} from '#shadcn/ui/badge'
 import {Button} from '#shadcn/ui/button'
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '#shadcn/ui/collapsible'
+import {
   Trace,
   TraceCollapsible,
   TraceCollapsibleContent,
@@ -238,14 +243,16 @@ function ThinkingBlockView({block}: {block: ThinkingBlock}) {
   const {text, startedAt, endedAt} = block
 
   return (
-    <details className="rounded-md bg-muted/50 px-2 py-1 text-xs text-muted-foreground">
-      <summary className="cursor-pointer select-none">
+    <Collapsible className="rounded-md bg-muted/50 px-2 py-1 text-xs text-muted-foreground">
+      <CollapsibleTrigger className="cursor-pointer text-left select-none">
         {endedAt === null
           ? 'Thinking…'
           : `Thought for ${describeDuration(endedAt - startedAt)}`}
-      </summary>
-      <p className="mt-1 whitespace-pre-wrap">{text}</p>
-    </details>
+      </CollapsibleTrigger>
+      <CollapsibleContent keepMounted>
+        <p className="mt-1 whitespace-pre-wrap">{text}</p>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 

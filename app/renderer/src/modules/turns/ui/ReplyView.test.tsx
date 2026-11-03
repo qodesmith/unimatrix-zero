@@ -205,7 +205,7 @@ function failed(failure: RunFailure): Partial<Reply> {
 }
 
 function visibleOrder(article: Element) {
-  return [...article.querySelectorAll('p, details, [role="group"]')].map(node =>
+  return [...article.querySelectorAll('p, [data-slot="collapsible"], [role="group"]')].map(node =>
     node.textContent.slice(0, 20)
   )
 }

@@ -5,6 +5,11 @@ import type {Layout as PanelLayout} from 'react-resizable-panels'
 
 import {Button} from '#shadcn/ui/button'
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '#shadcn/ui/collapsible'
+import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
@@ -190,33 +195,37 @@ function Section({
   onToggle,
 }: SectionProps) {
   const headingId = useId()
-  const bodyId = useId()
 
   return (
-    <section aria-labelledby={headingId} className="flex h-full flex-col">
+    <Collapsible
+      open={!collapsed}
+      onOpenChange={onToggle}
+      render={<section aria-labelledby={headingId} />}
+      className="flex h-full flex-col"
+    >
       <div ref={headerRef} className="flex h-8 shrink-0 items-center pr-2">
         <h2 id={headingId} className="min-w-0 flex-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-expanded={!collapsed}
-            aria-controls={bodyId}
-            className="h-8 w-full justify-start gap-1 rounded-none px-2 text-xs font-semibold hover:bg-transparent aria-expanded:bg-transparent dark:hover:bg-transparent"
-            onClick={onToggle}
+          <CollapsibleTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-full justify-start gap-1 rounded-none px-2 text-xs font-semibold hover:bg-transparent aria-expanded:bg-transparent dark:hover:bg-transparent"
+              />
+            }
           >
             {collapsed ? <ChevronRightIcon /> : <ChevronDownIcon />}
             {title}
-          </Button>
+          </CollapsibleTrigger>
         </h2>
         {actions}
       </div>
-      <div
-        id={bodyId}
-        hidden={collapsed}
+      <CollapsibleContent
+        keepMounted
         className="min-h-0 flex-1 overflow-y-auto"
       >
         {children}
-      </div>
-    </section>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
