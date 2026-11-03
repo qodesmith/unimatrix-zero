@@ -1225,23 +1225,30 @@ const LISTED = [
 ]
 
 it('lists the Models page by page on a new app-server, which closes when idle', async () => {
-  const codex = await setUp([
-    withSteps(
-      'started.ndjson',
-      1,
-      [{kind: 'in', message: {method: 'initialized'}}, ...modelListSteps(2)],
-      {rest: false}
-    ),
-  ])
+  const listing = withSteps(
+    'started.ndjson',
+    1,
+    [
+      {kind: 'in', message: {method: 'initialized'}},
+      ...modelListSteps(2),
+      ...modelListSteps(4),
+    ],
+    {rest: false}
+  )
+
+  const codex = await setUp([listing, listing])
 
   await expect(codex.driver.listModels(codex.vendorProgram)).resolves.toEqual(
     LISTED
   )
+  expect(codex.reports()[0]?.modelLists).toEqual([
+    {cursor: null},
+    {cursor: 'page-2'},
+  ])
 
-  const [listed] = codex.reports()
+  await codex.driver.listModels(codex.vendorProgram)
 
-  expect(listed?.modelLists).toEqual([{cursor: null}, {cursor: 'page-2'}])
-  expect(listed?.ended).toBeNull()
+  expect(codex.reports()).toHaveLength(1)
 
   await codex.allClosed()
 

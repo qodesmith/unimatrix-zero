@@ -156,11 +156,15 @@ it('runs claude in its own folder, with no key that outranks the subscription', 
 
 it('takes the code from the page opened again', async () => {
   const signIn = createClaudeSignIn(deps())
+  let submitted = false
 
   const updates = await connect(signIn, update => {
     if (isStep(update, 'sign-in-page')) signIn.signInPageOpened()
 
-    if (isStep(update, 'paste-code')) signIn.submitSignInCode(` ${FAKE_CODE}\n`)
+    if (isStep(update, 'paste-code') && !submitted) {
+      submitted = true
+      signIn.submitSignInCode(` ${FAKE_CODE}\n`)
+    }
   })
 
   expect(updates.filter(update => isStep(update, 'paste-code'))).toEqual([

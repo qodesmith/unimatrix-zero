@@ -14,6 +14,7 @@ import {LiveReplies} from '#modules/turns/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
+import {useLayoutEffect, useState} from 'react'
 import {expect, it, onTestFinished, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {cdp, page, userEvent} from 'vitest/browser'
@@ -260,12 +261,40 @@ function fakeMain(saved: Saved) {
   return {...bridge, sent, publish, replies, stops, deletes, turnsLoads}
 }
 
+const probe = {render: async () => {}}
+
+/**
+ * An update made outside React lands in the same lane as every other such
+ * update, so the commit that renders this one commits those queued before it
+ * too, and flushes every effect still pending from earlier commits.
+ */
+function RenderProbe() {
+  const [rendered, setRendered] = useState<{done: () => void} | null>(null)
+
+  useLayoutEffect(() => rendered?.done(), [rendered])
+
+  useLayoutEffect(() => {
+    probe.render = async () =>
+      new Promise(resolve => {
+        setRendered({done: () => resolve()})
+      })
+  }, [])
+
+  return null
+}
+
+/** Resolves once React has committed every update queued before the call. */
+async function reactCaughtUp() {
+  await probe.render()
+}
+
 function Providers({children}: {children: ReactNode}) {
   return (
     <QueryClientProvider client={new QueryClient()}>
       <SettingsProvider>
         <ConnectionsProvider>
           <LiveReplies>
+            <RenderProbe />
             <div style={{height: '100vh'}}>{children}</div>
           </LiveReplies>
         </ConnectionsProvider>
@@ -1601,35 +1630,44 @@ function expectShortFadingSlide(element: Element) {
   expect(slideDistance(element)).toBeLessThan(element.clientWidth / 4)
 }
 
-it('slides the slideout a short way in as it opens and out as it closes, fading as it goes', async () => {
-  await renderCanvas(forkedTree())
-  await expect.element(page.getByText('Reply five')).toBeVisible()
-
-  await openChatAt('Reply four')
-  await expect.element(slideout()).toBeInTheDocument()
-  const aside = slideout().element()
-  expectShortFadingSlide(aside)
-  await expect.poll(() => sliding(aside)).toBe(false)
-
-  await slideout().getByRole('button', {name: 'Close'}).click()
-  expect(aside.isConnected).toBe(true)
-  expectShortFadingSlide(aside)
-  await expect.poll(() => aside.isConnected).toBe(false)
-})
-
 async function setPlaybackRate(playbackRate: number) {
   await cdp().send('Animation.setPlaybackRate', {playbackRate})
 }
 
-async function freezeAnimationsAndTimers() {
+/** Holds every animation where it starts until `setPlaybackRate(1)`. */
+async function freezeAnimations() {
   await cdp().send('Animation.enable')
   await setPlaybackRate(0)
   onTestFinished(async () => setPlaybackRate(1))
+}
+
+async function freezeAnimationsAndTimers() {
+  await freezeAnimations()
   vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']})
   onTestFinished(() => {
     vi.useRealTimers()
   })
 }
+
+it('slides the slideout a short way in as it opens and out as it closes, fading as it goes', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await freezeAnimations()
+  await openChatAt('Reply four')
+  await expect.element(slideout()).toBeInTheDocument()
+  const aside = slideout().element()
+  expectShortFadingSlide(aside)
+  await setPlaybackRate(1)
+  await expect.poll(() => sliding(aside)).toBe(false)
+
+  await setPlaybackRate(0)
+  await slideout().getByRole('button', {name: 'Close'}).click()
+  expect(aside.isConnected).toBe(true)
+  expectShortFadingSlide(aside)
+  await setPlaybackRate(1)
+  await expect.poll(() => aside.isConnected).toBe(false)
+})
 
 it('keeps the slideout until its slide out ends, however long that takes', async () => {
   await renderCanvas(forkedTree())
@@ -1710,7 +1748,12 @@ it('keeps the connections hidden while the Turns slide again for a Fork folded p
   await page.getByRole('button', {name: 'Horizontal'}).click()
   await expect.poll(() => nodesOfKind('exchange')).toBe(5)
   await expect.poll(() => turnSlides().length).toBeGreaterThan(0)
+  // The canvas starts its wait in an effect and looks for slides a frame later.
+  await reactCaughtUp()
+  await new Promise(requestAnimationFrame)
   const firstSlides = new Set(turnSlides())
+  // A canceled slide's `finished` is replaced by one that never settles.
+  const firstEnds = [...firstSlides].map(async slide => slide.finished)
 
   // Frozen mid-slide, the card sits out of a pointer's and a role query's reach.
   const pill = [
@@ -1728,9 +1771,10 @@ it('keeps the connections hidden while the Turns slide again for a Fork folded p
     if (slide.playState === 'running') slide.finish()
   }
 
+  await Promise.allSettled(firstEnds)
   vi.useRealTimers()
   await new Promise(requestAnimationFrame)
-  await new Promise(requestAnimationFrame)
+  await reactCaughtUp()
   expect(turnSlides().length).toBeGreaterThan(0)
   expect(connectionsShown()).toBe(false)
 
@@ -1814,16 +1858,20 @@ it('slides the Context size drawer a short way in as it opens and out as it clos
   })
   await expect.element(page.getByText('10.0k ctx')).toBeVisible()
 
-  await page.getByRole('button', {name: 'Context size details'}).click()
-
+  // Held at its start, the drawer is still invisible.
   const drawer = page.getByRole('complementary', {
     name: 'Context size details',
+    includeHidden: true,
   })
 
-  await expect.element(drawer).toBeVisible()
+  await freezeAnimations()
+  await page.getByRole('button', {name: 'Context size details'}).click()
   expectShortFadingSlide(drawer.element())
+  await setPlaybackRate(1)
+  await expect.element(drawer).toBeVisible()
   await expect.poll(() => sliding(drawer.element())).toBe(false)
 
+  await setPlaybackRate(0)
   await drawer.getByRole('button', {name: 'Close'}).click()
   expectShortFadingSlide(drawer.element())
 })
@@ -1839,12 +1887,16 @@ it('widens the slideout to full screen and back with a transition rather than a 
 
   const canvasWidth = canvas().element().getBoundingClientRect().width
 
+  await freezeAnimations()
   await slideout().getByRole('button', {name: 'Full screen'}).click()
   expect(transitionOf(aside, 'width')).toBeDefined()
+  await setPlaybackRate(1)
   await expect.poll(slideoutWidth).toBe(canvasWidth)
 
+  await setPlaybackRate(0)
   await slideout().getByRole('button', {name: 'Exit full screen'}).click()
   expect(transitionOf(aside, 'width')).toBeDefined()
+  await setPlaybackRate(1)
   await expect.poll(slideoutWidth).toBeLessThan(canvasWidth / 2)
 })
 
@@ -1861,6 +1913,8 @@ it('opens, widens and closes the slideout without sliding, fading or growing whe
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
+  // Held at its start, a transition the slideout starts is still there to see.
+  await freezeAnimations()
   await openChatAt('Reply four')
   await expect.element(slideout()).toBeInTheDocument()
   const aside = slideout().element()
