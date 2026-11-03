@@ -11,6 +11,7 @@ it('keeps the failed diagram’s code folded until Show code is clicked', async 
       retry={() => undefined}
     />
   )
+
   const code = screen.getByText(/flowchart LR/)
 
   await expect.element(screen.getByText(/Parse error/)).toBeVisible()

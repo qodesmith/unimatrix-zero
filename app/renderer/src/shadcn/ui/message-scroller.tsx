@@ -1,10 +1,5 @@
 import {Button} from '#shadcn/ui/button'
-import {
-  MessageScroller as MessageScrollerPrimitive,
-  useMessageScroller,
-  useMessageScrollerScrollable,
-  useMessageScrollerVisibility,
-} from '@shadcn/react/message-scroller'
+import {MessageScroller as MessageScrollerPrimitive} from '@shadcn/react/message-scroller'
 import {cn} from 'cn'
 import {ArrowDownIcon} from 'lucide-react'
 import * as React from 'react'
@@ -121,7 +116,10 @@ export {
   MessageScrollerContent,
   MessageScrollerItem,
   MessageScrollerButton,
+}
+
+export {
   useMessageScroller,
   useMessageScrollerScrollable,
   useMessageScrollerVisibility,
-}
+} from '@shadcn/react/message-scroller'

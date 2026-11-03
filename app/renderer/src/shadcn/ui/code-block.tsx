@@ -92,7 +92,7 @@ function CodeBlockCopyButton({
 
   React.useEffect(() => {
     if (!copied) {
-      return
+      return undefined
     }
 
     const timeout = setTimeout(() => setCopied(false), 2000)
@@ -114,7 +114,7 @@ function CodeBlockCopyButton({
           navigator.clipboard
             .writeText(value)
             .then(() => setCopied(true))
-            .catch(() => {})
+            .catch(() => setCopied(false))
         }}
         {...props}
       >
@@ -125,6 +125,10 @@ function CodeBlockCopyButton({
       </span>
     </>
   )
+}
+
+function isText(children: React.ReactNode): children is string {
+  return typeof children === 'string'
 }
 
 function CodeBlockContent({
@@ -158,11 +162,12 @@ function CodeBlockContent({
         data-slot="code-block-code"
         className="grid min-h-lh min-w-max content-start in-data-numbered:grid-cols-[auto_1fr] in-data-wrap:min-w-0"
       >
-        {lineNumbers && typeof children === 'string'
+        {lineNumbers && isText(children)
           ? children
               .replace(/\n$/, '')
               .split('\n')
               .map((line, index) => (
+                // oxlint-disable-next-line react/no-array-index-key -- lines of a string repeat, and each render rebuilds the list
                 <CodeBlockLine key={index}>{line}</CodeBlockLine>
               ))
           : children}

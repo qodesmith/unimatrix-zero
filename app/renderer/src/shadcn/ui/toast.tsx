@@ -13,6 +13,10 @@ import * as React from 'react'
 
 const toast = ToastPrimitive.createToastManager()
 
+const toastActionRender = <Button variant="outline" size="sm" />
+
+const toastCloseRender = <Button variant="ghost" size="icon-sm" />
+
 function ToastProvider({...props}: ToastPrimitive.Provider.Props) {
   return <ToastPrimitive.Provider {...props} />
 }
@@ -99,7 +103,7 @@ function ToastDescription({
 
 function ToastAction({
   className,
-  render = <Button variant="outline" size="sm" />,
+  render = toastActionRender,
   ...props
 }: ToastPrimitive.Action.Props) {
   return (
@@ -115,7 +119,7 @@ function ToastAction({
 function ToastClose({
   className,
   children,
-  render = <Button variant="ghost" size="icon-sm" />,
+  render = toastCloseRender,
   ...props
 }: ToastPrimitive.Close.Props) {
   return (

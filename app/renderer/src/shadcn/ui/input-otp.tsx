@@ -9,9 +9,7 @@ function InputOTP({
   className,
   containerClassName,
   ...props
-}: React.ComponentProps<typeof OTPInput> & {
-  containerClassName?: string
-}) {
+}: React.ComponentProps<typeof OTPInput>) {
   return (
     <OTPInput
       data-slot="input-otp"
