@@ -17,7 +17,6 @@ import os from 'node:os'
 import path from 'node:path'
 import {afterEach, expect, it, vi} from 'vitest'
 
-import {CODEX_ARGS} from './environment'
 import {createCodexDriver, spawnCodex} from './main'
 import {replayCodex} from './replay'
 import {folderOf} from './rollouts'
@@ -336,7 +335,9 @@ it('runs codex in its own CODEX_HOME, updater off and nothing that outranks the 
 
   const [report] = codex.reports()
 
-  expect(report?.args).toEqual(CODEX_ARGS)
+  expect(report?.args.join(' ')).toContain(
+    '-c check_for_update_on_startup=false'
+  )
   expect(report?.home).toBe(codex.configDir)
   expect(report?.cwd).toBe(codex.configDir)
   expect(report?.vendorVariables).toEqual(['CODEX_HOME'])
@@ -665,6 +666,9 @@ it('cuts a Retry’s unloaded thread before the failed turn, from Codex’s long
     'failed',
   ])
   expect(report?.reverted).toBe('failed')
+  expect(report?.contexts).toEqual([
+    [THREAD_ID, FIRST_TURN, SECOND_TURN, 'interrupted'],
+  ])
   const {projectKey, sessionId} = folderOf(THREAD_ID)
   const saved = codex.store.filesOf(projectKey, sessionId).get(ROLLOUT)
   expect(

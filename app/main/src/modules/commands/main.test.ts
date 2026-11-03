@@ -367,17 +367,19 @@ describe('a Tree’s row', () => {
       expect((await listed())[0]?.unseenFailure).toBe(true)
 
       const opened = await send({type: 'tree.open', treeId: tree.id})
+      const [seen] = await listed()
 
-      expect(opened).toMatchObject({ok: true, value: {unseenFailure: false}})
+      expect(seen?.unseenFailure).toBe(false)
+      expect(opened).toEqual({ok: true, value: seen})
       expect(published.at(-1)).toMatchObject({
         type: 'TREE_CHANGED',
         tree: {id: tree.id, unseenFailure: false},
       })
-      expect((await listed())[0]?.unseenFailure).toBe(false)
 
       const count = published.length
-      await send({type: 'tree.open', treeId: tree.id})
+      const openedAgain = await send({type: 'tree.open', treeId: tree.id})
 
+      expect(openedAgain).toEqual({ok: true, value: seen})
       expect(published).toHaveLength(count)
     }
   )

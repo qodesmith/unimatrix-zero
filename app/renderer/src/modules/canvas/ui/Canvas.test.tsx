@@ -1380,15 +1380,12 @@ it('counts the Replies streaming on several Threads at once and jumps to each in
 })
 
 it('shows one centered Input on an empty Tree and the Turns once it is sent', async () => {
-  const {main} = await renderCanvas({prompts: [], replies: []})
+  await renderCanvas({prompts: [], replies: []})
 
   await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
   await userEvent.keyboard('{Enter}')
 
   await expect.element(page.getByText('Hello?')).toBeVisible()
-  expect(main.sent.filter(command => command.type === 'prompt.send')).toEqual([
-    expect.objectContaining({parentReplyId: null, text: 'Hello?'}),
-  ])
   await expect
     .poll(() => document.querySelectorAll('.react-flow__node').length)
     .toBe(2)
@@ -1439,7 +1436,7 @@ it.each([
   async ({width}) => {
     await page.viewport(width, 800)
     onTestFinished(async () => page.viewport(1280, 800))
-    await renderCanvas({prompts: [], replies: []})
+    const {main} = await renderCanvas({prompts: [], replies: []})
     const input = page.getByRole('textbox', {name: 'Prompt'})
     await expect.element(input).toBeVisible()
     const before = input.element().closest('form')?.getBoundingClientRect()
@@ -1449,6 +1446,9 @@ it.each([
     const stop = samplePainted()
     await input.fill('Hello?')
     await userEvent.keyboard('{Enter}')
+    await expect
+      .poll(() => main.sent.filter(command => command.type === 'prompt.send'))
+      .toEqual([expect.objectContaining({parentReplyId: null, text: 'Hello?'})])
     await expect.element(canvas().getByText('Hello?')).toBeVisible()
     await expect.element(canvas().getByText('Writing…')).toBeVisible()
     const held = await settledViewport()
