@@ -1,9 +1,9 @@
 # Styling and color
 
-## Build the UI from shadcn components on Base UI. Enforced by: uz/shadcn-base-ui, uz/no-rsc-directives
+## Build the UI from shadcn components on Base UI. Enforced by: uz/shadcn-base-ui, uz/no-rsc-directives, uz/no-excluded-shadcn
 
 - The decision is [ADR 0020](../adr/0020-renderer-ui-is-shadcn-on-base-ui.md). Where the components live and how code imports them are in [README.md](../../README.md), section Modules.
-- Every component in the `base-vega` registry is installed, so the matching one is always there to import. Build each control from the component made for it: a choice of one value is a `Select`, a disclosure a `Collapsible`, a floating panel a `Popover`, a modal a `Dialog`. Restyling a different component into the part (a `DropdownMenu` posing as a select) loses the role and keyboard behavior the matching one carries, and ends in patches to undo the borrowed one's own.
+- Every component in the `base-vega` registry is installed, so the matching one is always there to import. The exceptions are the ones `uz/no-excluded-shadcn` keeps out, because another tool already does their job; its message names the replacement. To keep out another, add it to that rule. Build each control from the component made for it: a choice of one value is a `Select`, a disclosure a `Collapsible`, a floating panel a `Popover`, a modal a `Dialog`. Restyling a different component into the part (a `DropdownMenu` posing as a select) loses the role and keyboard behavior the matching one carries, and ends in patches to undo the borrowed one's own.
 - When shadcn publishes a new component, add it with `shadcn add` from `app/renderer` (the `base-vega` style in `components.json`).
 - Never let `shadcn add` overwrite a component we already have: our copies carry lint fixes and changes of our own. `bun run shadcn:updates [component...]` shows how each of ours differs from what `shadcn add` writes today; bring in by hand the upstream changes worth having.
 - AI Elements (Message, Bubble, Trace and the rest) are shadcn registry components like any other: add them with `shadcn add`, never by copying from their docs pages. They take our own data as props, with no AI SDK. Use only shadcn's set, never Vercel's separate AI Elements registry (`registry.ai-sdk.dev`).
