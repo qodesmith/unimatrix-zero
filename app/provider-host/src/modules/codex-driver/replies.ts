@@ -24,10 +24,6 @@ function aboutTheAccount(
   return notification.method.startsWith('account/')
 }
 
-export function threadOf(notification: Notification) {
-  return aboutTheAccount(notification) ? null : notification.params.threadId
-}
-
 export function turnOf(notification: Notification) {
   if (notification.method === 'turn/completed') {
     return notification.params.turn.id

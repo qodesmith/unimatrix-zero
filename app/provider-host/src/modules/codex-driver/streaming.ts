@@ -21,7 +21,7 @@ import {ProgramCrashed, createReplyRuns} from '#modules/reply-runs/main'
 import {DEFAULT_MODEL_ID} from '@uz/contract/providers'
 
 import {readModels} from './models'
-import {createReplyMapper, threadOf, turnOf} from './replies'
+import {createReplyMapper, turnOf} from './replies'
 import {requestRevert} from './revert'
 import {folderOf, readRollouts, rolloutAt, writeRolloutsBack} from './rollouts'
 
@@ -361,9 +361,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     const inbox = createInbox<Notification | {method: 'exited'}>()
     void server.exited.then(() => inbox.push({method: 'exited'}))
 
-    const unlisten = server.listen(notification => {
-      if (threadOf(notification) === thread.id) inbox.push(notification)
-    })
+    const unlisten = server.listen(notification => inbox.push(notification))
 
     let unstoppable: (() => void) | null = null
 
@@ -402,7 +400,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
           throw new ProgramCrashed('Codex stopped before finishing this Reply.')
         }
 
-        // Resuming repeats the last turn's token count, for instance.
+        // Other threads' notifications arrive here too, and a resume repeats the last turn's token count.
         if (turnOf(notification) !== turnId) continue
 
         yield* mapper.map(notification)

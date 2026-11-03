@@ -448,6 +448,25 @@ async function nextFrame() {
   })
 }
 
+async function renderAppWithNoRoom(main: FakeMain) {
+  globalThis.window.uz = main
+  const room = document.createElement('div')
+  room.style.height = '100vh'
+  room.style.width = '0px'
+  document.body.append(room)
+  onTestFinished(() => room.remove())
+
+  await render(<App />, {container: room})
+
+  return room
+}
+
+function savedSidebarWidth() {
+  return getComputedStyle(sidebar().element()).getPropertyValue(
+    '--sidebar-width'
+  )
+}
+
 function widthHandle() {
   return page.getByRole('separator', {name: 'Sidebar width'}).element()
 }
@@ -518,6 +537,18 @@ describe('the sidebar’s width', () => {
     await renderApp(fakeMain({layout: {sidebarWidth: 500}}))
 
     await expect.poll(sidebarWidth).toBe(500)
+  })
+
+  it('opens as wide as it was saved when it mounts with no width, then gets some', async () => {
+    const room = await renderAppWithNoRoom(
+      fakeMain({layout: {sidebarWidth: 400}})
+    )
+
+    await expect.poll(savedSidebarWidth).toBe('400px')
+
+    room.style.width = '1000px'
+
+    await expect.poll(sidebarWidth).toBe(400)
   })
 
   it('saves nothing when a double-click finds it at its default width', async () => {

@@ -81,6 +81,16 @@ it('keeps the paste step listed once a page with a code was opened', () => {
   })
 })
 
+it('forgets the paste step when a connect finishes', () => {
+  const state = fold([
+    snapshot,
+    {type: 'SIGN_IN_STEP', provider: 'claude', step: 'paste-code', url},
+    {type: 'SIGN_IN_FINISHED', provider: 'claude', outcome: 'canceled'},
+  ])
+
+  expect(state.pasting).toBe(false)
+})
+
 it('lists no paste step on another Provider’s connect', () => {
   const state = fold([
     snapshot,
