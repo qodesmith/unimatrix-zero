@@ -8,6 +8,7 @@ import type {
   ProviderId,
   ProviderStatus,
 } from '@uz/contract/providers'
+import type {Settings} from '@uz/contract/settings'
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
 
@@ -74,9 +75,14 @@ interface Setup {
   attachedTo?: Reply
   lastModel?: ModelChoice | null
   providers?: ProviderStatus[]
+  sendKey?: Settings['sendKey']
 }
 
-function fakeMain({lastModel = null, providers = READY}: Setup) {
+function fakeMain({
+  lastModel = null,
+  providers = READY,
+  sendKey = DEFAULT_SETTINGS.sendKey,
+}: Setup) {
   const sent: Command[] = []
 
   const bridge: Bridge = {
@@ -115,7 +121,7 @@ function fakeMain({lastModel = null, providers = READY}: Setup) {
         models: MODELS,
         lastModel,
         signIn: null,
-        settings: DEFAULT_SETTINGS,
+        settings: {...DEFAULT_SETTINGS, sendKey},
         layout: DEFAULT_LAYOUT,
       })
 
@@ -154,6 +160,12 @@ async function renderInput(setup: Setup = {}) {
   )
 
   return main
+}
+
+function sentTexts(main: ReturnType<typeof fakeMain>) {
+  return main.sent.flatMap(command =>
+    command.type === 'prompt.send' ? [command.text] : []
+  )
 }
 
 function sentModels(main: ReturnType<typeof fakeMain>) {
@@ -271,3 +283,30 @@ it('offers to sign in again beside a signed-out Provider’s Model, holding Send
     provider: 'claude',
   })
 })
+
+it('breaks a line on Shift+Enter and sends on Enter, by default', async () => {
+  const main = await renderInput()
+  const input = page.getByRole('textbox', {name: 'Prompt'})
+
+  await input.fill('Hello?')
+  await userEvent.keyboard('{Shift>}{Enter}{/Shift}')
+  await expect.element(input).toHaveValue('Hello?\n')
+  await userEvent.keyboard('There{Enter}')
+
+  await expect.poll(() => sentTexts(main)).toEqual(['Hello?\nThere'])
+})
+
+it.each(['Meta', 'Control'])(
+  'breaks a line on Enter and sends on %s+Enter when the send key Setting says so',
+  async held => {
+    const main = await renderInput({sendKey: 'mod-enter'})
+    const input = page.getByRole('textbox', {name: 'Prompt'})
+
+    await input.fill('Hello?')
+    await userEvent.keyboard('{Enter}')
+    await expect.element(input).toHaveValue('Hello?\n')
+    await userEvent.keyboard(`There{${held}>}{Enter}{/${held}}`)
+
+    await expect.poll(() => sentTexts(main)).toEqual(['Hello?\nThere'])
+  }
+)
