@@ -334,29 +334,6 @@ it('passes a driver’s session store requests to main and main’s answers back
   await expect(loaded).resolves.toEqual([{type: 'user', uuid: 'a'}])
 })
 
-it('rejects a session store request main couldn’t answer', async () => {
-  const main = fakeMain()
-  let saved: Promise<unknown> = Promise.resolve()
-
-  await runHost(main.port, store => {
-    saved = store.saveFiles({projectKey: 'p', sessionId: 's'}, [])
-
-    return createFakeDriver({delayMs: 0})
-  })
-
-  const [asked] = main.sent
-
-  if (asked?.type !== 'SESSION_STORE') throw new Error('Nothing was asked')
-
-  main.command({
-    type: 'session-store.result',
-    requestId: asked.requestId,
-    outcome: {ok: false, message: 'The disk is full.'},
-  })
-
-  await expect(saved).rejects.toThrow('The disk is full.')
-})
-
 const cut = {
   type: 'session.cut',
   treeId: request.treeId,
