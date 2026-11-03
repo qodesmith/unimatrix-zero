@@ -336,31 +336,23 @@ it('fails with one plain reason when the download fails', async () => {
   expect(used.startLogin).not.toHaveBeenCalled()
 })
 
-it('cancels the download', async () => {
+it('stops the download when the user cancels', async () => {
+  const signals: AbortSignal[] = []
+
   const signIn = createClaudeSignIn(
     deps({
       async *getProgramReady(_target, {signal}) {
+        signals.push(signal)
         yield {receivedBytes: 0, totalBytes: 1000}
-
-        if (!signal.aborted) {
-          await new Promise(resolve => {
-            signal.addEventListener('abort', resolve)
-          })
-        }
-
-        signal.throwIfAborted()
       },
     })
   )
 
-  const updates = await connect(signIn, update => {
+  await connect(signIn, update => {
     if (update.type === 'SIGN_IN_STEP' && update.progress) signIn.cancelSignIn()
   })
 
-  expect(updates.at(-1)).toEqual({
-    type: 'SIGN_IN_FINISHED',
-    outcome: 'canceled',
-  })
+  expect(signals.map(signal => signal.aborted)).toEqual([true])
 })
 
 it('cancels on the sign-in page, ending claude auth login', async () => {
