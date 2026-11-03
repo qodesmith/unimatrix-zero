@@ -11,7 +11,6 @@ import {
 import {Input} from '#shadcn/ui/input'
 import {
   SidebarMenuAction,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from '#shadcn/ui/sidebar'
@@ -120,9 +119,9 @@ function TreeDetails({id, tree}: {id: string; tree: Tree}) {
   const now = useNow()
 
   return (
-    <SidebarMenuBadge
+    <span
       id={id}
-      className="gap-1.5 font-normal text-muted-foreground group-focus-within/menu-item:opacity-0 group-hover/menu-item:opacity-0 group-has-aria-expanded/menu-item:opacity-0 peer-hover/menu-button:text-muted-foreground peer-data-active/menu-button:text-muted-foreground"
+      className="pointer-events-none absolute top-1.5 right-2 flex h-5 items-center gap-1.5 text-xs text-muted-foreground tabular-nums group-focus-within/menu-item:opacity-0 group-hover/menu-item:opacity-0 group-has-aria-expanded/menu-item:opacity-0"
     >
       <time dateTime={tree.lastActiveAt}>
         {relativeTime(tree.lastActiveAt, now)}
@@ -139,7 +138,7 @@ function TreeDetails({id, tree}: {id: string; tree: Tree}) {
           <span className="sr-only">A Reply failed</span>
         </span>
       )}
-    </SidebarMenuBadge>
+    </span>
   )
 }
 

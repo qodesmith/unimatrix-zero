@@ -4,7 +4,6 @@ import {cn} from 'cn'
 import * as React from 'react'
 import * as RechartsPrimitive from 'recharts'
 
-// Format: [THEME_NAME, CSS_SELECTOR]
 const THEMES = [
   ['light', ''],
   ['dark', "[data-mode='dark']"],
