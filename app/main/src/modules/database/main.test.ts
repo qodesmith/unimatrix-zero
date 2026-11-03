@@ -216,6 +216,27 @@ describe('migrating', () => {
     expect(backups().filter(name => !legacy.includes(name))).toHaveLength(1)
   })
 
+  it('prunes a zero-padded backup by the name it has on disk', () => {
+    withTreeAndPrompt()
+    const backupsFolder = path.join(folder, 'data', 'backups')
+    fs.mkdirSync(backupsFolder)
+
+    for (const n of ['007', '008', '009'])
+      fs.writeFileSync(path.join(backupsFolder, `unimatrix-${n}.sqlite`), '')
+    addMigration(
+      '29990101000000_tree_note',
+      'ALTER TABLE `trees` ADD `note` text;'
+    )
+
+    open().$client.close()
+
+    expect(backups().toSorted()).toEqual([
+      'unimatrix-008.sqlite',
+      'unimatrix-009.sqlite',
+      'unimatrix-10.sqlite',
+    ])
+  })
+
   it('keeps child rows when a migration rebuilds a parent table', () => {
     withTreeAndPrompt()
     addMigration(

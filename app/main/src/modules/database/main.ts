@@ -12,7 +12,7 @@ export * as schema from './schema'
 export type Database = NodeSQLiteDatabase & {$client: DatabaseSync}
 
 const KEPT_BACKUPS = 3
-const BACKUP_NAME = /^unimatrix-(\d+)\.sqlite$/
+const NUMBERED_BACKUP_NAME = /^unimatrix-(\d+)\.sqlite$/
 const UUID_BACKUP_NAME = /^unimatrix-[\da-f-]{36}\.sqlite$/
 const MIGRATIONS_TABLE = '__drizzle_migrations'
 
@@ -121,32 +121,29 @@ function backUp(client: DatabaseSync, file: string): string {
 
   const names = fs.readdirSync(folder)
 
-  const numbers = names
-    .map(name => BACKUP_NAME.exec(name)?.[1])
-    .filter(number => number !== undefined)
-    .map(Number)
-    .toSorted((a, b) => a - b)
+  const numbered = names
+    .flatMap(name => {
+      const number = NUMBERED_BACKUP_NAME.exec(name)?.[1]
 
-  const next = (numbers.at(-1) ?? 0) + 1
-  const backup = backupPath(folder, next)
+      return number === undefined ? [] : [{name, number: Number(number)}]
+    })
+    .toSorted((a, b) => a.number - b.number)
+
+  const next = (numbered.at(-1)?.number ?? 0) + 1
+  const backup = path.join(folder, `unimatrix-${next}.sqlite`)
   client.prepare('VACUUM INTO ?').run(backup)
 
   // Versions before numbered backups named them by UUIDv7, so those are older.
   const oldestFirst = [
-    ...names
-      .filter(name => UUID_BACKUP_NAME.test(name))
-      .toSorted()
-      .map(name => path.join(folder, name)),
-    ...[...numbers, next].map(number => backupPath(folder, number)),
+    ...names.filter(name => UUID_BACKUP_NAME.test(name)).toSorted(),
+    ...numbered.map(({name}) => name),
   ]
+    .map(name => path.join(folder, name))
+    .concat(backup)
 
   for (const stale of oldestFirst.slice(0, -KEPT_BACKUPS)) fs.rmSync(stale)
 
   return backup
-}
-
-function backupPath(folder: string, number: number) {
-  return path.join(folder, `unimatrix-${number}.sqlite`)
 }
 
 function restore(file: string, backup: string | undefined) {
