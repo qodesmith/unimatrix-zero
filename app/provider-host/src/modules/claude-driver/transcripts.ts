@@ -74,42 +74,58 @@ function writeEntries(file: string, entries: SessionEntry[]) {
   )
 }
 
+function writeSubagent(file: string, kept: SessionEntry[]) {
+  const metadata = kept.filter(entry => entry.type === 'agent_metadata')
+
+  writeEntries(
+    `${file}.jsonl`,
+    kept.filter(entry => entry.type !== 'agent_metadata')
+  )
+
+  const last = metadata.at(-1)
+
+  if (last) {
+    const {type: _type, ...meta} = last
+    fs.writeFileSync(`${file}.meta.json`, JSON.stringify(meta), {mode: 0o600})
+  }
+}
+
 /**
  * The fallback restore (ADR 0004): a plain write, so the files are new and no
- * cleanup sweep takes them.
+ * cleanup sweep takes them. Every read of the store goes out at once, since
+ * each is a round trip to main.
  */
 export async function writeTranscriptBack(
   store: SessionStoreClient,
   place: SessionPlace
 ) {
   const {projectKey, sessionId} = place
-  const entries = await store.load({projectKey, sessionId})
+
+  const [entries, subpaths] = await Promise.all([
+    store.load({projectKey, sessionId}),
+    store.listSubkeys({projectKey, sessionId}),
+  ])
 
   if (!entries) return false
 
   const folder = sessionFolder(place)
   writeEntries(`${folder}.jsonl`, entries)
 
-  for (const subpath of await store.listSubkeys({projectKey, sessionId})) {
-    const file = within(folder, subpath)
+  const subagents = await Promise.all(
+    subpaths.flatMap(subpath => {
+      const file = within(folder, subpath)
 
-    if (!file) continue
+      return file === null
+        ? []
+        : [
+            store
+              .load({projectKey, sessionId, subpath})
+              .then(kept => ({file, kept: kept ?? []})),
+          ]
+    })
+  )
 
-    const kept = (await store.load({projectKey, sessionId, subpath})) ?? []
-    const metadata = kept.filter(entry => entry.type === 'agent_metadata')
-
-    writeEntries(
-      `${file}.jsonl`,
-      kept.filter(entry => entry.type !== 'agent_metadata')
-    )
-
-    const last = metadata.at(-1)
-
-    if (last) {
-      const {type: _type, ...meta} = last
-      fs.writeFileSync(`${file}.meta.json`, JSON.stringify(meta), {mode: 0o600})
-    }
-  }
+  for (const {file, kept} of subagents) writeSubagent(file, kept)
 
   return true
 }
