@@ -85,6 +85,12 @@ export async function runHost(
     }
   }
 
+  async function listModels(vendorProgram: SignInRequest) {
+    const models = await driver.listModels(vendorProgram).catch(() => null)
+
+    if (models) port.postMessage({type: 'MODELS_CHANGED', models})
+  }
+
   async function oneShot({
     requestId,
     request,
@@ -141,11 +147,18 @@ export async function runHost(
       case 'sign-in.cancel':
         driver.cancelSignIn()
         break
+      case 'models.list':
+        void listModels(command.vendorProgram)
+        break
       case 'session-store.result':
         store.settle(command.requestId, command.outcome)
         break
     }
   }
+
+  driver.onModelsChanged(models => {
+    port.postMessage({type: 'MODELS_CHANGED', models})
+  })
 
   port.on('message', ({data}) => {
     const command = HostCommandSchema.safeParse(data)
@@ -155,7 +168,6 @@ export async function runHost(
 
   port.postMessage({
     type: 'HOST_READY',
-    models: await driver.listModels(),
     smallestModel: await driver.smallestModel().catch(() => null),
   })
 }

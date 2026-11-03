@@ -21,6 +21,8 @@ function setUp() {
     app: {version: '1.0.0'},
     replies: [],
     providers: [],
+    models: {claude: [], chatgpt: []},
+    lastModel: null,
     signIn: null,
     settings: DEFAULT_SETTINGS,
     layout: DEFAULT_LAYOUT,

@@ -162,7 +162,13 @@ export interface ProviderDriver {
   signInPageOpened(): void
   submitSignInCode(code: string): void
   cancelSignIn(): void
-  listModels(): Promise<Model[]>
+  /**
+   * The Models the account may pick now; null when the driver can't tell
+   * without starting a session it wouldn't otherwise start.
+   */
+  listModels(vendorProgram: SignInRequest): Promise<Model[] | null>
+  /** Lists the driver learned on its own, such as from a session it started. */
+  onModelsChanged(listener: (models: Model[]) => void): void
   /** For one-shots; null when the account can't run them. */
   smallestModel(): Promise<string | null>
   readUsage(): Promise<Usage>
@@ -227,6 +233,11 @@ export const HostCommandSchema = z.discriminatedUnion('type', [
   z.strictObject({type: z.literal('sign-in.page-opened')}),
   z.strictObject({type: z.literal('sign-in.code'), code: z.string()}),
   z.strictObject({type: z.literal('sign-in.cancel')}),
+  /** `MODELS_CHANGED` follows once the driver can list them. */
+  z.strictObject({
+    type: z.literal('models.list'),
+    vendorProgram: SignInRequestSchema,
+  }),
   z.strictObject({
     type: z.literal('session-store.result'),
     requestId: z.string(),
@@ -241,9 +252,12 @@ export type HostCommand = z.infer<typeof HostCommandSchema>
 
 export const HostReadyMessage = z.strictObject({
   type: z.literal('HOST_READY'),
-  /** Empty until the driver can write Replies. */
-  models: z.array(ModelSchema),
   smallestModel: z.string().min(1).nullable(),
+})
+
+export const HostModelsChangedMessage = z.strictObject({
+  type: z.literal('MODELS_CHANGED'),
+  models: z.array(ModelSchema),
 })
 
 export const OneShotFinishedMessage = z.strictObject({
@@ -267,6 +281,7 @@ export const SessionStoreMessage = z.strictObject({
 /** Provider host → main. */
 export const HostMessageSchema = z.discriminatedUnion('type', [
   HostReadyMessage,
+  HostModelsChangedMessage,
   ReplyEventSchema,
   PromptRecordedMessage,
   PromptDroppedMessage,

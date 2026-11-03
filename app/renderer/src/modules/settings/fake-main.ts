@@ -28,6 +28,8 @@ export function fakeMain(saved: Partial<Settings> = {}) {
         app: {version: '0.0.0'},
         replies: [],
         providers: [],
+        models: {claude: [], chatgpt: []},
+        lastModel: null,
         signIn: null,
         settings: {...settings},
         layout: DEFAULT_LAYOUT,

@@ -1,5 +1,5 @@
 import type {ClaudeSignInDeps} from './sign-in'
-import type {AccountInfo} from '@anthropic-ai/claude-agent-sdk'
+import type {AccountInfo, ModelInfo} from '@anthropic-ai/claude-agent-sdk'
 import type {SignInUpdate} from '@uz/contract/providers'
 
 import {afterEach, beforeEach, expect, it, vi} from 'vitest'
@@ -25,6 +25,16 @@ const maxAccount: AccountInfo = {
   subscriptionType: 'Claude Max',
 }
 
+function read(account: AccountInfo, models: ModelInfo[] = []) {
+  return {account, models}
+}
+
+const haiku: ModelInfo = {
+  value: 'haiku',
+  displayName: 'Haiku 5.5',
+  description: '',
+}
+
 let claude: Awaited<ReturnType<typeof fakeClaude>>
 
 beforeEach(async () => {
@@ -42,8 +52,11 @@ function deps(overrides: Partial<ClaudeSignInDeps> = {}) {
     },
     commandFor: () => claude,
     startLogin: vi.fn<ClaudeSignInDeps['startLogin']>(startLogin),
-    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () => maxAccount),
+    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () =>
+      read(maxAccount)
+    ),
     signOut: vi.fn<ClaudeSignInDeps['signOut']>(async () => undefined),
+    learnModels: vi.fn<ClaudeSignInDeps['learnModels']>(),
     env: {...process.env, ANTHROPIC_API_KEY: 'sk-ant-api'},
     timeoutMs: 10_000,
     ...overrides,
@@ -93,9 +106,27 @@ it('downloads, signs in on Claude’s page and reads the plan', async () => {
   ])
 })
 
+it('learns the Models the account read at connect listed', async () => {
+  const used = deps({
+    env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
+    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () =>
+      read(maxAccount, [haiku])
+    ),
+  })
+
+  const updates = await connect(createClaudeSignIn(used))
+
+  expect(updates.at(-1)).toMatchObject({outcome: 'connected'})
+  expect(used.learnModels).toHaveBeenCalledOnce()
+  expect(used.learnModels).toHaveBeenCalledWith([haiku])
+})
+
 it('runs claude in its own folder, with no key that outranks the subscription', async () => {
   const login = vi.fn<ClaudeSignInDeps['startLogin']>(startLogin)
-  const account = vi.fn<ClaudeSignInDeps['readAccount']>(async () => maxAccount)
+
+  const account = vi.fn<ClaudeSignInDeps['readAccount']>(async () =>
+    read(maxAccount)
+  )
 
   await connect(
     createClaudeSignIn(
@@ -262,10 +293,12 @@ it('cancels on the sign-in page, ending claude auth login', async () => {
 it('cancels while the plan is read, even for a free account', async () => {
   const used = deps({
     env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
-    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () => ({
-      email: 'sam@example.com',
-      subscriptionType: 'Claude API',
-    })),
+    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () =>
+      read({
+        email: 'sam@example.com',
+        subscriptionType: 'Claude API',
+      })
+    ),
   })
 
   const signIn = createClaudeSignIn(used)
@@ -306,14 +339,14 @@ it('gives up when Claude’s page never answers', async () => {
 it('signs a free account out again and refuses it', async () => {
   const used = deps({
     env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
-    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () => ({
-      email: 'sam@example.com',
-      subscriptionType: 'Claude API',
-    })),
+    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () =>
+      read({email: 'sam@example.com', subscriptionType: 'Claude API'}, [haiku])
+    ),
   })
 
   const updates = await connect(createClaudeSignIn(used))
 
+  expect(used.learnModels).not.toHaveBeenCalled()
   expect(used.signOut).toHaveBeenCalledOnce()
   expect(updates.at(-1)).toMatchObject({
     outcome: 'failed',
@@ -324,9 +357,11 @@ it('signs a free account out again and refuses it', async () => {
 it('still refuses a free account when signing it out fails', async () => {
   const used = deps({
     env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
-    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () => ({
-      subscriptionType: 'Claude API',
-    })),
+    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () =>
+      read({
+        subscriptionType: 'Claude API',
+      })
+    ),
     signOut: vi.fn<ClaudeSignInDeps['signOut']>(async () => {
       throw new Error('claude auth logout exited with 1')
     }),
@@ -340,9 +375,11 @@ it('still refuses a free account when signing it out fails', async () => {
 it('keeps an account whose plan isn’t reported, saying it wasn’t read', async () => {
   const used = deps({
     env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
-    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () => ({
-      email: 'sam@example.com',
-    })),
+    readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () =>
+      read({
+        email: 'sam@example.com',
+      })
+    ),
   })
 
   const updates = await connect(createClaudeSignIn(used))

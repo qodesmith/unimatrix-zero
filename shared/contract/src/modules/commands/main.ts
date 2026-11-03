@@ -1,5 +1,5 @@
 import {LayoutSchema, LayoutUpdateSchema} from '#modules/layout/main'
-import {ProviderIdSchema} from '#modules/providers/main'
+import {ModelChoiceSchema, ProviderIdSchema} from '#modules/providers/main'
 import {SettingsSchema, SettingsUpdateSchema} from '#modules/settings/main'
 import {TREE_TITLE_MAX_LENGTH, TreeSchema} from '#modules/trees/main'
 import {PromptSchema, ReplySchema} from '#modules/turns/main'
@@ -62,6 +62,8 @@ export const PromptSendCommand = z.strictObject({
   /** Null for the root Prompt. */
   parentReplyId: z.uuid().nullable(),
   text: z.string().trim().min(1),
+  /** As the Input's picker shows it; main never swaps it for another. */
+  model: ModelChoiceSchema,
 })
 
 export const PromptSendResult = z.strictObject({

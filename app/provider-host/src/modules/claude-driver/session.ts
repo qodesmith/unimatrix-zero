@@ -1,4 +1,5 @@
 import type {
+  ModelInfo,
   Options,
   Query,
   SDKMessage,
@@ -32,6 +33,8 @@ export interface ClaudeSession {
   interrupt(): Promise<void>
   /** Waits for `claude` to exit by itself, to finish writing; else stops it. */
   close(): Promise<void>
+  /** What `claude` answered as it started, which the Prompts never wait on. */
+  models(): Promise<ModelInfo[]>
 }
 
 export function openSession(query: QueryFn, options: Options): ClaudeSession {
@@ -109,6 +112,10 @@ export function openSession(query: QueryFn, options: Options): ClaudeSession {
 
     async interrupt() {
       await running.interrupt()
+    },
+
+    async models() {
+      return (await running.initializationResult()).models
     },
 
     async close() {

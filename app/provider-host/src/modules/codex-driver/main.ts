@@ -12,7 +12,7 @@ import {startAppServer} from './app-server'
 import {CODEX_ARGS, codexEnvironment} from './environment'
 import {portFree} from './port'
 import {SIGN_IN_TIMEOUT_MS, createCodexSignIn} from './sign-in'
-import {DEFAULT_MODEL, IDLE_CLOSE_MS, createCodexReplies} from './streaming'
+import {IDLE_CLOSE_MS, createCodexReplies} from './streaming'
 
 async function notYet(): Promise<never> {
   throw new Error('ChatGPT can’t do this yet.')
@@ -73,7 +73,8 @@ export function createCodexDriver({
     },
     ...createCodexSignIn({getProgramReady, open, portFree, timeoutMs}),
     readConnection: notYet,
-    listModels: async () => [{id: DEFAULT_MODEL, name: 'Default'}],
+    listModels: replies.listModels,
+    onModelsChanged: () => undefined,
     smallestModel: async () => null,
     readUsage: notYet,
     startReply: replies.startReply,

@@ -3,6 +3,7 @@ import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {ClaudeSession, QueryFn} from './session'
 import type {
+  ModelInfo,
   Options,
   SDKResultMessage,
   SpawnOptions,
@@ -19,6 +20,7 @@ import type {UUID} from 'node:crypto'
 
 import {failureOf} from '#modules/failures/main'
 import {createReplyRuns} from '#modules/reply-runs/main'
+import {DEFAULT_MODEL_ID} from '@uz/contract/providers'
 import {randomUUID} from 'node:crypto'
 
 import {claudeEnvironment} from './environment'
@@ -33,9 +35,6 @@ import {
 } from './transcripts'
 import {createWarmSessions} from './warm'
 
-/** The Model id that leaves the choice to Claude: the plan's default. */
-export const DEFAULT_MODEL = 'default'
-
 export interface ClaudeRepliesDeps {
   store: SessionStoreClient
   query: QueryFn
@@ -43,12 +42,15 @@ export interface ClaudeRepliesDeps {
   env: NodeJS.ProcessEnv
   whenIdle: WhenIdle
   maxWarm: number
+  learnModels: (models: ModelInfo[]) => void
+  resolveModel: (id: string) => string
 }
 
 /** How a session's earlier Turns reach `claude`. */
 type Restore = 'none' | 'store' | 'file'
 
 interface Live extends ClaudeSession {
+  model: string
   restore: Restore
   projectKey: string
   /** The SDK swaps in its own configuration folder on a restore. */
@@ -106,6 +108,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   const warm = createWarmSessions<Live>({
     whenIdle: deps.whenIdle,
     max: deps.maxWarm,
+    resolveModel: deps.resolveModel,
   })
 
   const sessionStore = appSessionStore(deps.store)
@@ -148,7 +151,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       includePartialMessages: true,
       thinking: {type: 'adaptive', display: 'summarized'},
       systemPrompt: request.systemPrompt,
-      ...(request.model === DEFAULT_MODEL ? {} : {model: request.model}),
+      ...(request.model === DEFAULT_MODEL_ID ? {} : {model: request.model}),
       ...(resume ? {resume} : {}),
       ...(fork ? {forkSession: true} : {}),
       ...(upTo ? {resumeSessionAt: upTo} : {}),
@@ -188,7 +191,15 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       },
     }
 
-    return Object.assign(openSession(deps.query, options), {
+    const session = openSession(deps.query, options)
+
+    void session
+      .models()
+      .then(deps.learnModels)
+      .catch(() => undefined)
+
+    return Object.assign(session, {
+      model: request.model,
       restore,
       projectKey,
       activeConfigDir: () => activeConfigDir,
@@ -297,14 +308,15 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
   /**
    * A rewind or a Retry's cut can't take the warm session: it has gone past
-   * the message the cut keeps, and only a new `claude` resumes at it.
+   * the message the cut keeps, and only a new `claude` resumes at it. Nor can
+   * a Prompt on another Model, which `claude` takes only as it starts.
    */
   function claimable(request: ReplyRequest): Live | null {
     const {session} = request
 
     if (!session || session.type === 'fork') return null
 
-    const claimed = warm.claim(session)
+    const claimed = warm.claim(session, request.model)
 
     if (claimed && cutAt(session) !== null) {
       warm.drop(claimed)

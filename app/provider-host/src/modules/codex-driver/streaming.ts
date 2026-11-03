@@ -18,13 +18,12 @@ import type {
 
 import {createInbox} from '#modules/inbox/main'
 import {ProgramCrashed, createReplyRuns} from '#modules/reply-runs/main'
+import {DEFAULT_MODEL_ID} from '@uz/contract/providers'
 
+import {readModels} from './models'
 import {createReplyMapper, threadOf, turnOf} from './replies'
 import {requestRevert} from './revert'
 import {folderOf, readRollouts, rolloutAt, writeRolloutsBack} from './rollouts'
-
-/** The Model id that leaves the choice to Codex. */
-export const DEFAULT_MODEL = 'default'
 
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
 
@@ -205,7 +204,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       cwd: configDir,
       sandbox: 'read-only',
       approvalPolicy: 'never',
-      model: request.model === DEFAULT_MODEL ? null : request.model,
+      model: request.model === DEFAULT_MODEL_ID ? null : request.model,
       developerInstructions: request.systemPrompt || null,
     } satisfies ParamsOf<'thread/start'>
 
@@ -347,6 +346,16 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     return cutting
   }
 
+  async function listModels(vendorProgram: SignInRequest) {
+    const running = await claim(vendorProgram)
+
+    try {
+      return await readModels(running.server)
+    } finally {
+      release(running)
+    }
+  }
+
   /** Stop interrupts the turn once Codex has started it. */
   async function* send(
     running: Running,
@@ -366,10 +375,16 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     let unstoppable: (() => void) | null = null
 
     try {
+      // A thread loaded on another Model switches to this one from here on.
+      const model = request.model === DEFAULT_MODEL_ID ? null : request.model
+
       const started = await server.request('turn/start', {
         threadId: thread.id,
         input: [{type: 'text', text: request.prompt.text, text_elements: []}],
+        model,
       })
+
+      if (model !== null) thread.model = model
 
       const turnId = started.turn.id
       thread.turns.push(turnId)
@@ -482,5 +497,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   return {
     ...createReplyRuns(write, {limitLifts: () => limitLifts(limits)}),
     cutSession,
+    listModels,
   }
 }

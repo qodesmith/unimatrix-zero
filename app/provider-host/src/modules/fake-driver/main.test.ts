@@ -160,3 +160,15 @@ it('records each Reply in the session it continues, or a new one', async () => {
     })
   )
 })
+
+it('records each Reply on the Model it was asked for', async () => {
+  const driver = createFakeDriver({delayMs: 0})
+
+  const events = await collect(
+    driver.startReply({...request, model: 'fake-pro', prompt: {text: 'Hi'}})
+  )
+
+  expect(events).toContainEqual(
+    expect.objectContaining({type: 'REPLY_RECORDED', model: 'fake-pro'})
+  )
+})

@@ -7,8 +7,10 @@ import type {
   RunFailure,
 } from '@uz/contract/turns'
 
-import {useProviderStatus} from '#modules/connections/main'
+import {ProviderMark, useProviderStatus} from '#modules/connections/main'
 import {ReplyMarkdown} from '#modules/markdown/main'
+import {useModelName} from '#modules/models/main'
+import {Badge} from '#shadcn/ui/badge'
 import {Button} from '#shadcn/ui/button'
 import {
   Trace,
@@ -52,6 +54,7 @@ export function ReplyView({reply}: {reply: Reply}) {
       aria-busy={streaming}
       className="flex flex-col gap-2 text-sm"
     >
+      <WrittenBy reply={reply} />
       {content.map((part, index) => (
         // oxlint-disable-next-line react/no-array-index-key -- parts only ever append, so positions are stable
         <Fragment key={index}>
@@ -76,6 +79,19 @@ export function ReplyView({reply}: {reply: Reply}) {
       <StatusLine status={status} failure={failure} provider={reply.provider} />
       {status === 'failed' && <RetryControls reply={reply} />}
     </article>
+  )
+}
+
+function WrittenBy({reply}: {reply: Reply}) {
+  const name = useModelName(reply.provider, reply.model)
+
+  return (
+    <div className="flex items-center gap-1.5 text-muted-foreground">
+      <ProviderMark provider={reply.provider} />
+      <Badge variant="outline" className="font-normal text-muted-foreground">
+        {name}
+      </Badge>
+    </div>
   )
 }
 
@@ -177,6 +193,7 @@ const FAILURE_LINES: Record<
   'host-unreachable': (_, name) => `${name} could not be reached`,
   'driver-error': ({message}) => message,
   'provider-error': ({message}) => message,
+  'needs-app-update': () => 'Needs an app update',
   'fake-failure': ({message}) => message,
 }
 

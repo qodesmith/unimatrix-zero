@@ -18,6 +18,7 @@ import {dispatchCommand} from './main'
 
 const migrationsFolder = path.resolve(import.meta.dirname, '../../../drizzle')
 const trusted = {isTopLevelAppFrame: true}
+const picked = {provider: 'claude', model: 'fake'} as const
 
 let clock: Date
 
@@ -61,10 +62,7 @@ beforeEach(() => {
       db,
       publish,
       hosts: {
-        ready: only =>
-          hostReady && (only ?? 'claude') === 'claude'
-            ? {provider: 'claude', model: {id: 'fake', name: 'Fake model'}}
-            : null,
+        ready: provider => hostReady && provider === 'claude',
         send: sendToHost,
       },
       vendorProgramFor: () => ({program: null, configDir: '/claude'}),
@@ -120,7 +118,13 @@ async function sendPrompt(
   parentReplyId: string | null,
   text = 'Hi'
 ) {
-  const outcome = await send({type: 'prompt.send', treeId, parentReplyId, text})
+  const outcome = await send({
+    type: 'prompt.send',
+    model: picked,
+    treeId,
+    parentReplyId,
+    text,
+  })
 
   if (!outcome.ok) throw new Error(outcome.error.message)
 
@@ -466,6 +470,7 @@ describe('Reply commands', () => {
 
     const outcome = await send({
       type: 'prompt.send',
+      model: picked,
       treeId: tree.id,
       parentReplyId: null,
       text: ' Hello ',
@@ -499,7 +504,12 @@ describe('Reply commands', () => {
     ],
   ])('answers not-found for a Prompt into %s', async (_case, where) => {
     expect(
-      await send({type: 'prompt.send', ...(await where()), text: 'Hi'})
+      await send({
+        type: 'prompt.send',
+        model: picked,
+        ...(await where()),
+        text: 'Hi',
+      })
     ).toMatchObject({ok: false, error: {code: 'not-found'}})
   })
 
@@ -510,6 +520,7 @@ describe('Reply commands', () => {
     expect(
       await send({
         type: 'prompt.send',
+        model: picked,
         treeId: tree.id,
         parentReplyId: null,
         text: 'Hi',
@@ -528,6 +539,7 @@ describe('Reply commands', () => {
 
     const sent = await send({
       type: 'prompt.send',
+      model: picked,
       treeId: tree.id,
       parentReplyId: null,
       text: 'Hi',

@@ -3,15 +3,24 @@ import {afterEach, beforeEach, expect, it, vi} from 'vitest'
 
 import {createWarmSessions} from './warm'
 
-function session(sessionId: string, messageId: string) {
+function session(sessionId: string, messageId: string, model = 'haiku') {
   return {
     sessionId,
     messageId,
+    model,
     closed: false,
     async close() {
       this.closed = true
     },
   }
+}
+
+function warmSessions(max: number) {
+  return createWarmSessions({
+    whenIdle: idleFor(1000),
+    max,
+    resolveModel: id => id,
+  })
 }
 
 beforeEach(() => {
@@ -23,28 +32,39 @@ afterEach(() => {
 })
 
 it('gives back the idle session standing at that Reply', () => {
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
+  const warm = warmSessions(6)
   const one = session('s1', 'm1')
   warm.add(one)
   warm.release(one)
 
-  expect(warm.claim({sessionId: 's1', messageId: 'm1'})).toBe(one)
-  expect(warm.claim({sessionId: 's1', messageId: 'm1'})).toBeNull()
+  expect(warm.claim({sessionId: 's1', messageId: 'm1'}, 'haiku')).toBe(one)
+  expect(warm.claim({sessionId: 's1', messageId: 'm1'}, 'haiku')).toBeNull()
 })
 
 it('closes one standing elsewhere in the session instead of giving it back', () => {
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
+  const warm = warmSessions(6)
   const one = session('s1', 'm2')
   warm.add(one)
   warm.release(one)
 
-  expect(warm.claim({sessionId: 's1', messageId: 'm1'})).toBeNull()
+  expect(warm.claim({sessionId: 's1', messageId: 'm1'}, 'haiku')).toBeNull()
+  expect(one.closed).toBe(true)
+  expect(warm.size).toBe(0)
+})
+
+it('closes one on another Model instead of giving it back', () => {
+  const warm = warmSessions(6)
+  const one = session('s1', 'm1', 'haiku')
+  warm.add(one)
+  warm.release(one)
+
+  expect(warm.claim({sessionId: 's1', messageId: 'm1'}, 'sonnet')).toBeNull()
   expect(one.closed).toBe(true)
   expect(warm.size).toBe(0)
 })
 
 it('closes a session once it has been idle long enough, not before', () => {
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
+  const warm = warmSessions(6)
   const one = session('s1', 'm1')
   warm.add(one)
   warm.release(one)
@@ -57,13 +77,13 @@ it('closes a session once it has been idle long enough, not before', () => {
 })
 
 it('starts the idle wait over after each Reply', () => {
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
+  const warm = warmSessions(6)
   const one = session('s1', 'm1')
   warm.add(one)
   warm.release(one)
   vi.advanceTimersByTime(900)
 
-  warm.claim({sessionId: 's1', messageId: 'm1'})
+  warm.claim({sessionId: 's1', messageId: 'm1'}, 'haiku')
   vi.advanceTimersByTime(5000)
   expect(one.closed).toBe(false)
 
@@ -73,21 +93,21 @@ it('starts the idle wait over after each Reply', () => {
 })
 
 it('never closes a session claimed after being released twice', () => {
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
+  const warm = warmSessions(6)
   const one = session('s1', 'm1')
   warm.add(one)
   warm.release(one)
   vi.advanceTimersByTime(500)
   warm.release(one)
 
-  warm.claim({sessionId: 's1', messageId: 'm1'})
+  warm.claim({sessionId: 's1', messageId: 'm1'}, 'haiku')
   vi.advanceTimersByTime(5000)
 
   expect(one.closed).toBe(false)
 })
 
 it('closes the longest idle when more than the most are open', () => {
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 2})
+  const warm = warmSessions(2)
   const one = session('s1', 'm')
   const two = session('s2', 'm')
   const three = session('s3', 'm')
@@ -105,13 +125,13 @@ it('closes the longest idle when more than the most are open', () => {
 
 it('says when every `claude` it closed in a session has ended', async () => {
   vi.useRealTimers()
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 6})
+  const warm = warmSessions(6)
   const ending = Promise.withResolvers<undefined>()
   const one = {...session('s1', 'm2'), close: async () => ending.promise}
 
   warm.add(one)
   warm.release(one)
-  warm.claim({sessionId: 's1', messageId: 'm1'})
+  warm.claim({sessionId: 's1', messageId: 'm1'}, 'haiku')
   const closed = warm.closed('s1')
 
   await expect(
@@ -129,7 +149,7 @@ it('says when every `claude` it closed in a session has ended', async () => {
 })
 
 it('never closes a session writing a Reply to make room', () => {
-  const warm = createWarmSessions({whenIdle: idleFor(1000), max: 1})
+  const warm = warmSessions(1)
   const one = session('s1', 'm')
   const two = session('s2', 'm')
 

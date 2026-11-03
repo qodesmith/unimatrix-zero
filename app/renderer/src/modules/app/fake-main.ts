@@ -2,6 +2,7 @@ import type {Bridge} from '@uz/contract/bridge'
 import type {Command, CommandOutcome, CommandType} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {Layout} from '@uz/contract/layout'
+import type {Model} from '@uz/contract/providers'
 import type {Settings} from '@uz/contract/settings'
 import type {Tree} from '@uz/contract/trees'
 import type {Prompt, Reply, StreamingReply} from '@uz/contract/turns'
@@ -12,6 +13,14 @@ import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 export const receivedAt = '2026-10-19T12:00:00.000Z'
 
 export const account = {email: 'sam@example.com', plan: 'Max'}
+
+const fakeModel: Model = {
+  id: 'fake',
+  name: 'Fake',
+  isDefault: true,
+  resolvesTo: null,
+  needsAppUpdate: false,
+}
 
 /** A Tree as main lists it, untouched since `receivedAt` unless told otherwise. */
 export function savedTree(fields: Partial<Tree> = {}): Tree {
@@ -143,8 +152,8 @@ export function fakeMain(saved: Saved = {}) {
         id: crypto.randomUUID(),
         treeId: command.treeId,
         promptId: prompt.id,
-        provider: 'claude',
-        model: 'fake',
+        provider: command.model.provider,
+        model: command.model.model,
         status: 'streaming',
         content: [],
         contextSize: null,
@@ -185,6 +194,8 @@ export function fakeMain(saved: Saved = {}) {
             : {provider: 'claude', status: 'ready', account},
           {provider: 'chatgpt', status: 'not-connected', account: null},
         ],
+        models: {claude: [fakeModel], chatgpt: []},
+        lastModel: null,
         signIn: null,
         settings: {...settings},
         layout: {...layout},

@@ -234,6 +234,19 @@ function fakeMain(saved: Saved) {
         app: {version: '0.0.0'},
         replies: [],
         providers: PROVIDERS,
+        models: {
+          claude: [
+            {
+              id: 'fake',
+              name: 'Fake',
+              isDefault: true,
+              resolvesTo: null,
+              needsAppUpdate: false,
+            },
+          ],
+          chatgpt: [],
+        },
+        lastModel: null,
         signIn: null,
         settings: {...settings},
         layout: DEFAULT_LAYOUT,
@@ -1220,7 +1233,8 @@ it('lets long Turns take their full height when the Setting is off', async () =>
 
   await expect.element(page.getByText('Short')).toBeVisible()
   expect(rootPrompt()?.textContent).toContain('Line 40')
-  expect(rootPromptHeight()).toBeGreaterThan(500)
+  // Unscaled: opening fits the whole Tree, so the zoom follows its height.
+  expect(rootPromptHeight() / zoomOf()).toBeGreaterThan(500)
   await expect
     .element(page.getByRole('button', {name: 'Show more'}))
     .not.toBeInTheDocument()
@@ -1454,9 +1468,18 @@ function slideout() {
   return page.getByRole('complementary', {name: 'Chat'})
 }
 
+/** Each Turn's text, without the Provider's mark and Model pill a Reply shows. */
 function chatTurns() {
   return [...slideout().element().querySelectorAll('[data-chat-turn]')].map(
-    turn => turn.textContent.trim()
+    turn => {
+      const label = [
+        ...turn.querySelectorAll('[role="img"], [data-slot="badge"]'),
+      ]
+        .map(part => part.textContent)
+        .join('')
+
+      return turn.textContent.replace(label, '').trim()
+    }
   )
 }
 
@@ -1580,6 +1603,14 @@ it('opens nothing on a click on a Turn’s box', async () => {
   await canvas().getByText('Prompt five').click()
   await canvas().getByText('Reply five').click()
   await expect.element(slideout()).not.toBeInTheDocument()
+})
+
+it('opens the Model picker of a Reply’s Input on the canvas', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await nodeOf('Reply five').getByRole('combobox', {name: 'Model'}).click()
+  await expect.element(page.getByRole('option', {name: 'Fake'})).toBeVisible()
 })
 
 function transitionOf(element: Element, property: string) {
@@ -1949,9 +1980,12 @@ it('scrolls the slideout to the Reply it opened from, expands to cover the canva
   await expect.element(slideout()).toBeVisible()
 
   const scroller = slideout().element().querySelector('.overflow-y-auto')
-  const turn = slideout().getByText('Reply two').element()
 
-  if (!scroller) throw new Error('The slideout does not scroll')
+  const turn = slideout()
+    .element()
+    .querySelector(`[data-chat-turn="${uuid(12)}"]`)
+
+  if (!scroller || !turn) throw new Error('The slideout does not scroll')
 
   expect(scroller.scrollTop).toBeGreaterThan(0)
   expect(

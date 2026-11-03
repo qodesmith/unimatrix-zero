@@ -42,10 +42,15 @@ export interface FinishedReply {
   treeId: string
   replyId: string
   status: Extract<ReplyEvent, {type: 'RUN_FINISHED'}>['status']
+  /** As the Reply's row records it. */
+  model: string
+  failure: RunFailure | null
 }
 
 interface Entry {
   provider: ProviderId
+  /** The Model asked for, until its Provider reports the one it used. */
+  model: string
   reply: StreamingReply
   saveTimer: ReturnType<typeof setTimeout> | null
 }
@@ -103,7 +108,15 @@ export function createInFlight(
 
     if (event.type === 'RUN_FINISHED') {
       const {treeId, replyId, status} = event
-      onFinished({provider, treeId, replyId, status})
+      const {model, reply} = entry
+      onFinished({
+        provider,
+        treeId,
+        replyId,
+        status,
+        model,
+        failure: reply.failure,
+      })
     }
   }
 
@@ -120,9 +133,15 @@ export function createInFlight(
   }
 
   return {
-    track(provider: ProviderId, treeId: string, replyId: string) {
+    track(
+      provider: ProviderId,
+      treeId: string,
+      replyId: string,
+      model: string
+    ) {
       entries.set(replyId, {
         provider,
+        model,
         reply: {...NEW_REPLY, treeId, replyId},
         saveTimer: null,
       })
@@ -148,6 +167,11 @@ export function createInFlight(
 
     record(provider: ProviderId, recorded: ReplyRecorded) {
       const {treeId, replyId, model, session} = recorded
+      const entry = entries.get(replyId)
+
+      if (entry?.provider === provider && entry.reply.treeId === treeId) {
+        entry.model = model
+      }
 
       db.update(replies)
         .set({

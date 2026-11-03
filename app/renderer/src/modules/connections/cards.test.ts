@@ -22,6 +22,8 @@ const snapshot: AppEvent = {
     {provider: 'claude', status: 'not-connected', account: null},
     {provider: 'chatgpt', status: 'not-connected', account: null},
   ],
+  models: {claude: [], chatgpt: []},
+  lastModel: null,
   signIn: null,
   settings: DEFAULT_SETTINGS,
   layout: DEFAULT_LAYOUT,
@@ -126,4 +128,41 @@ it('picks up a connect in progress from the SNAPSHOT', () => {
     step,
     pasting: true,
   })
+})
+
+const opus = {
+  id: 'opus',
+  name: 'Opus',
+  isDefault: true,
+  resolvesTo: null,
+  needsAppUpdate: false,
+}
+
+it("keeps each Provider's Models from the SNAPSHOT, then from each refresh", () => {
+  const sonnet = {...opus, id: 'sonnet', name: 'Sonnet', isDefault: false}
+  const loaded = fold([{...snapshot, models: {claude: [opus], chatgpt: []}}])
+
+  expect(loaded.models.claude).toEqual([opus])
+
+  const refreshed = applyConnectionEvent(loaded, {
+    type: 'MODELS_CHANGED',
+    provider: 'claude',
+    models: [opus, sonnet],
+  })
+
+  expect(refreshed.models).toEqual({claude: [opus, sonnet], chatgpt: []})
+})
+
+it('follows the last-used Model from the SNAPSHOT, then from each send', () => {
+  const first = {provider: 'claude', model: 'opus'} as const
+  const loaded = fold([{...snapshot, lastModel: first}])
+
+  expect(loaded.lastModel).toEqual(first)
+
+  const next = {provider: 'chatgpt', model: 'gpt-5'} as const
+
+  expect(
+    applyConnectionEvent(loaded, {type: 'LAST_MODEL_CHANGED', model: next})
+      .lastModel
+  ).toEqual(next)
 })

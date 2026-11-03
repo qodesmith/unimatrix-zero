@@ -62,6 +62,7 @@ export const RunFailureSchema = z.strictObject({
     'host-unreachable',
     'driver-error',
     'provider-error',
+    'needs-app-update',
     'fake-failure',
   ]),
   message: z.string(),

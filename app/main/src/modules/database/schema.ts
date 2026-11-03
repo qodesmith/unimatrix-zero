@@ -161,6 +161,8 @@ export const providers = sqliteTable(
     email: text('email').notNull(),
     plan: text('plan').notNull(),
     connectedAt: integer('connected_at', {mode: 'timestamp_ms'}).notNull(),
+    /** As the Provider last listed them, as `ModelSchema`. */
+    models: text('models', {mode: 'json'}).notNull().default([]),
   },
   table => [uniqueIndex('providers_provider').on(table.provider)]
 )

@@ -1,6 +1,8 @@
 import type {AppEvent} from '@uz/contract/events'
 import type {
   Account,
+  Model,
+  ModelChoice,
   ProviderId,
   ProviderStatus,
   SignInFailure,
@@ -23,6 +25,8 @@ export interface ConnectionsState {
   /** The connect reached a page with a code, so the card lists that step. */
   pasting: boolean
   failures: Partial<Record<ProviderId, SignInFailure>>
+  models: Record<ProviderId, Model[]>
+  lastModel: ModelChoice | null
 }
 
 export const NOT_LOADED: ConnectionsState = {
@@ -35,6 +39,8 @@ export const NOT_LOADED: ConnectionsState = {
   signIn: null,
   pasting: false,
   failures: {},
+  models: {claude: [], chatgpt: []},
+  lastModel: null,
 }
 
 function withoutFailure(state: ConnectionsState, provider: ProviderId) {
@@ -64,7 +70,17 @@ export function applyConnectionEvent(
       signIn: event.signIn,
       pasting: event.signIn?.step === 'paste-code',
       failures: {},
+      models: event.models,
+      lastModel: event.lastModel,
     }
+  }
+
+  if (event.type === 'MODELS_CHANGED') {
+    return {...state, models: {...state.models, [event.provider]: event.models}}
+  }
+
+  if (event.type === 'LAST_MODEL_CHANGED') {
+    return {...state, lastModel: event.model}
   }
 
   if (event.type === 'PROVIDER_STATUS') {

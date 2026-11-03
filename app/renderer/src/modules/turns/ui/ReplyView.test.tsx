@@ -94,6 +94,19 @@ function fakeMain(claude: ProviderStatus['status'] = 'ready') {
           {provider: 'claude', status: claude, account: null},
           {provider: 'chatgpt', status: 'not-connected', account: null},
         ],
+        models: {
+          claude: [
+            {
+              id: 'opus',
+              name: 'Opus',
+              isDefault: true,
+              resolvesTo: 'opus-4-7',
+              needsAppUpdate: false,
+            },
+          ],
+          chatgpt: [],
+        },
+        lastModel: null,
         signIn: null,
         settings: DEFAULT_SETTINGS,
         layout: DEFAULT_LAYOUT,
@@ -393,6 +406,10 @@ it.each([
   ],
   [{code: 'driver-error', message: 'Bad frame'}, 'Bad frame'],
   [{code: 'fake-failure', message: 'Asked to fail'}, 'Asked to fail'],
+  [
+    {code: 'needs-app-update', message: 'Model needs Codex 0.50'},
+    'Needs an app update',
+  ],
 ] satisfies [RunFailure, string][])(
   'says why a Reply failed: %o reads "%s"',
   async (failure, line) => {
@@ -402,6 +419,22 @@ it.each([
     await expect.element(screen.getByText(line)).toHaveClass('text-destructive')
   }
 )
+
+it('shows the Provider’s icon and the name of the Model the Reply was written on', async () => {
+  const screen = await renderSaved({status: 'complete', model: 'opus-4-7'})
+  const article = screen.getByRole('article', {name: 'Reply'})
+
+  await expect.element(article.getByRole('img', {name: 'Claude'})).toBeVisible()
+  await expect.element(article.getByText('Opus', {exact: true})).toBeVisible()
+})
+
+it('shows the Model’s id when its Provider doesn’t list it', async () => {
+  const screen = await renderSaved({status: 'complete', model: 'sonnet-3'})
+
+  await expect
+    .element(screen.getByText('sonnet-3', {exact: true}))
+    .toBeVisible()
+})
 
 it('says only that a Reply failed when it has no reason', async () => {
   const screen = await renderSaved({

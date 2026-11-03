@@ -52,10 +52,7 @@ beforeEach(() => {
     db,
     publish: () => undefined,
     hosts: {
-      ready: () => ({
-        provider: 'claude',
-        model: {id: 'fake', name: 'Fake model'},
-      }),
+      ready: () => true,
       send: () => undefined,
     },
     vendorProgramFor: () => vendorProgram,
@@ -68,7 +65,12 @@ beforeEach(() => {
 })
 
 function sendPrompt(parentReplyId: string | null, text = 'Hi') {
-  const sent = turns.sendPrompt({treeId, parentReplyId, text})
+  const sent = turns.sendPrompt({
+    treeId,
+    parentReplyId,
+    text,
+    model: {provider: 'claude', model: 'fake'},
+  })
 
   if (!sent) throw new Error('The Reply it answers is gone')
 

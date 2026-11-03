@@ -62,6 +62,10 @@ interface Report {
   vendorVariables: string[]
   methods: string[]
   prompts: string[]
+  /** Each `turn/start`'s Model; null where it left the Model out. */
+  turnModels: (string | null)[]
+  /** Each `model/list`'s params. */
+  modelLists: object[]
   resumedFrom: {type: string; id: string}[]
   /** At each `turn/start`, the ids of what the thread held. */
   contexts: string[][]
@@ -186,7 +190,10 @@ async function setUp(
   async function reply(
     text: string,
     session: SessionRef | ReplySession | null = null,
-    {stopAfter = Infinity}: {stopAfter?: number} = {}
+    {
+      stopAfter = Infinity,
+      model = 'default',
+    }: {stopAfter?: number; model?: string} = {}
   ) {
     const replyId = crypto.randomUUID()
     const events: Streamed[] = []
@@ -195,7 +202,7 @@ async function setUp(
     for await (const event of driver.startReply({
       treeId,
       replyId,
-      model: 'default',
+      model,
       systemPrompt: 'You answer in as few words as you can.',
       prompt: {text},
       vendorProgram,
@@ -255,6 +262,7 @@ async function setUp(
     configDir,
     store,
     driver,
+    vendorProgram,
     reply,
     cut,
     reports: reportsSoFar,
@@ -1215,4 +1223,123 @@ it('fails a cut when Codex can’t start', async () => {
       vendorProgram: {program: null, configDir: codex.configDir},
     })
   ).rejects.toThrow('The manifest names no Codex program.')
+})
+
+it('switches a loaded thread to the Model each Prompt asks for, and records the Reply on it', async () => {
+  const codex = await setUp(['started.ndjson'])
+
+  const first = await codex.reply(FIRST_PROMPT)
+
+  const second = await codex.reply(SECOND_PROMPT, recordedIn(first), {
+    model: 'gpt-6-luna',
+  })
+
+  expect(first).toContainEqual(
+    expect.objectContaining({type: 'REPLY_RECORDED', model: MODEL})
+  )
+  expect(second).toContainEqual(
+    expect.objectContaining({type: 'REPLY_RECORDED', model: 'gpt-6-luna'})
+  )
+  expect(codex.reports()[0]?.turnModels).toEqual([null, 'gpt-6-luna'])
+})
+
+/** A `model/list` entry as Codex 0.166 gives one, cut to the fields read. */
+function modelEntry(slug: string, displayName: string, isDefault = false) {
+  return {
+    id: slug,
+    model: slug,
+    upgrade: null,
+    displayName,
+    description: '',
+    hidden: false,
+    isDefault,
+  }
+}
+
+function modelListSteps(firstId: number) {
+  return [
+    {kind: 'in', message: {id: firstId, method: 'model/list', params: {}}},
+    {
+      kind: 'out',
+      message: {
+        id: firstId,
+        result: {
+          data: [
+            modelEntry('gpt-6.1-sol', 'GPT-6.1-Sol', true),
+            modelEntry('gpt-6-luna', 'GPT-6-Luna'),
+          ],
+          nextCursor: 'page-2',
+        },
+      },
+    },
+    {kind: 'in', message: {id: firstId + 1, method: 'model/list', params: {}}},
+    {
+      kind: 'out',
+      message: {
+        id: firstId + 1,
+        result: {data: [modelEntry('gpt-5.5', 'GPT-5.5')], nextCursor: null},
+      },
+    },
+  ]
+}
+
+const LISTED = [
+  {
+    id: 'gpt-6.1-sol',
+    name: 'GPT-6.1-Sol',
+    isDefault: true,
+    resolvesTo: null,
+    needsAppUpdate: false,
+  },
+  {
+    id: 'gpt-6-luna',
+    name: 'GPT-6-Luna',
+    isDefault: false,
+    resolvesTo: null,
+    needsAppUpdate: false,
+  },
+  {
+    id: 'gpt-5.5',
+    name: 'GPT-5.5',
+    isDefault: false,
+    resolvesTo: null,
+    needsAppUpdate: false,
+  },
+]
+
+it('lists the Models page by page on a new app-server, which closes when idle', async () => {
+  const codex = await setUp([
+    withSteps(
+      'started.ndjson',
+      1,
+      [{kind: 'in', message: {method: 'initialized'}}, ...modelListSteps(2)],
+      {rest: false}
+    ),
+  ])
+
+  await expect(codex.driver.listModels(codex.vendorProgram)).resolves.toEqual(
+    LISTED
+  )
+
+  const [listed] = codex.reports()
+
+  expect(listed?.modelLists).toEqual([{cursor: null}, {cursor: 'page-2'}])
+  expect(listed?.ended).toBeNull()
+
+  await codex.allClosed()
+
+  expect(codex.reports()[0]?.ended).toBe('input-closed')
+})
+
+it('lists the Models on the app-server a Reply already started', async () => {
+  const codex = await setUp([
+    withSteps('started.ndjson', 4, modelListSteps(10), {rest: false}),
+  ])
+
+  await codex.reply(FIRST_PROMPT)
+
+  await expect(codex.driver.listModels(codex.vendorProgram)).resolves.toEqual(
+    LISTED
+  )
+  expect(codex.reports()).toHaveLength(1)
 })

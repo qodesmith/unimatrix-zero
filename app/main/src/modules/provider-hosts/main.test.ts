@@ -8,7 +8,7 @@ import type {
   SessionCutReport,
   SessionStoreRequest,
 } from '@uz/contract/host'
-import type {ProviderId, SignInUpdate} from '@uz/contract/providers'
+import type {Model, ProviderId, SignInUpdate} from '@uz/contract/providers'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
@@ -20,9 +20,7 @@ import {
   createProviderHosts,
 } from './main'
 
-const models = [{id: 'fake', name: 'Fake model'}]
-
-const hostReady = {type: 'HOST_READY', models, smallestModel: 'fake-small'}
+const hostReady = {type: 'HOST_READY', smallestModel: 'fake-small'}
 
 const vendorProgram = {program: null, configDir: '/claude'}
 
@@ -72,6 +70,7 @@ let storeRequests: SessionStoreRequest[]
 let signInUpdates: SignInUpdate[]
 let statuses: HostStatus[]
 let crashes: ProviderId[]
+let modelLists: {provider: ProviderId; models: Model[]}[]
 
 function setUp() {
   return createProviderHosts({
@@ -96,6 +95,7 @@ function setUp() {
     },
     onStatus: (_provider, status) => statuses.push(status),
     onCrash: provider => crashes.push(provider),
+    onModels: (provider, models) => modelLists.push({provider, models}),
   })
 }
 
@@ -119,6 +119,7 @@ beforeEach(() => {
   signInUpdates = []
   statuses = []
   crashes = []
+  modelLists = []
 })
 
 afterEach(() => {
@@ -136,15 +137,35 @@ it('starts a host only when its Provider is connected, and only once', () => {
   expect(spawned).toHaveLength(1)
 })
 
-it('is ready once the host says so, with its first Model', () => {
+it('is ready once the host says so', () => {
   const hosts = setUp()
   hosts.connect('claude')
 
-  expect(hosts.ready()).toBeNull()
+  expect(hosts.ready('claude')).toBe(false)
 
   latest().say(hostReady)
 
-  expect(hosts.ready()).toEqual({provider: 'claude', model: models[0]})
+  expect(hosts.ready('claude')).toBe(true)
+})
+
+it('passes on the Models a host lists', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+
+  const models = [
+    {
+      id: 'opus',
+      name: 'Opus',
+      isDefault: true,
+      resolvesTo: null,
+      needsAppUpdate: false,
+    },
+  ]
+
+  latest().say({type: 'MODELS_CHANGED', models})
+
+  expect(modelLists).toEqual([{provider: 'claude', models}])
+  expect(events).toEqual([])
 })
 
 it('passes on Reply events and drops messages that do not parse', () => {
@@ -274,8 +295,8 @@ it('is ready for a given Provider only when that Provider’s host is', () => {
   hosts.connect('claude')
   latest().say(hostReady)
 
-  expect(hosts.ready('claude')).toEqual({provider: 'claude', model: models[0]})
-  expect(hosts.ready('chatgpt')).toBeNull()
+  expect(hosts.ready('claude')).toBe(true)
+  expect(hosts.ready('chatgpt')).toBe(false)
 })
 
 it('sends commands to the Provider’s host', () => {
@@ -307,7 +328,7 @@ it('reports a crash and restarts after 1 s, 5 s, then 30 s, then stays down', ()
   for (const delay of RESTART_DELAYS_MS) {
     latest().say(hostReady)
     latest().crash()
-    expect(hosts.ready()).toBeNull()
+    expect(hosts.ready('claude')).toBe(false)
 
     const before = spawned.length
     vi.advanceTimersByTime(delay - 1)
@@ -434,6 +455,7 @@ it('does not restart a host that was stopped while its crash was handled', () =>
     onSessionCut: () => undefined,
     onReplyRecorded: () => undefined,
     onSignInUpdate: () => undefined,
+    onModels: () => undefined,
     onSessionStore: () => null,
     onStatus: (_provider, status) => statuses.push(status),
     onCrash: provider => hosts?.stop(provider),

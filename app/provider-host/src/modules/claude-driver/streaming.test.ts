@@ -7,6 +7,7 @@ import type {
   SessionRef,
   StartReplyEvent,
 } from '@uz/contract/host'
+import type {Model} from '@uz/contract/providers'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -144,12 +145,25 @@ async function setUp(
     /** 0 stops the Reply as it starts. */
     stopAfterDeltas?: number
     replyId?: string
+    model?: string
+  }
+
+  const vendorProgram = {
+    program: {
+      path: fake.program,
+      build: {url: 'https://example.com/claude', sha256: '', size: 0},
+    },
+    configDir,
   }
 
   async function reply(
     text: string,
     session: SessionRef | ReplySession | null = null,
-    {stopAfterDeltas, replyId = crypto.randomUUID()}: ReplyOptions = {}
+    {
+      stopAfterDeltas,
+      replyId = crypto.randomUUID(),
+      model = 'haiku',
+    }: ReplyOptions = {}
   ) {
     const events: Streamed[] = []
     let deltas = 0
@@ -157,16 +171,10 @@ async function setUp(
     for await (const event of driver.startReply({
       treeId,
       replyId,
-      model: 'haiku',
+      model,
       systemPrompt: '',
       prompt: {text},
-      vendorProgram: {
-        program: {
-          path: fake.program,
-          build: {url: 'https://example.com/claude', sha256: '', size: 0},
-        },
-        configDir,
-      },
+      vendorProgram,
       session: session && {type: 'continue', ...session},
     })) {
       events.push(event)
@@ -207,6 +215,7 @@ async function setUp(
 
   return {
     driver,
+    vendorProgram,
     configDir,
     projectKey: projectKeyOf(configDir),
     store,
@@ -993,4 +1002,108 @@ it('waits for the warm `claude` it closes to end before resuming that session at
   expect(warm?.prompts).toEqual([FIRST_PROMPT, SECOND_PROMPT, THIRD_PROMPT])
   expect(resumed?.args).toContain(`--resume-session-at=${FIRST_MESSAGE}`)
   expect(resumed?.runningAtStart).toEqual([])
+})
+
+it('resumes the session in a new `claude` on the Model a Prompt asks for, closing the warm one on the old Model first', async () => {
+  const claude = await setUp(['warm.ndjson', 'resumed.ndjson'])
+
+  const first = await claude.reply(FIRST_PROMPT)
+  const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
+
+  const third = await claude.reply(THIRD_PROMPT, recordedIn(second), {
+    model: 'sonnet',
+  })
+
+  expect(textOf(third)).toBe('TEAL OTTER')
+  const [warm, resumed] = claude.reports()
+
+  expect(warm?.prompts).toEqual([FIRST_PROMPT, SECOND_PROMPT])
+  expect(warm?.ended).toBe('input-closed')
+  expect(resumed?.args).toEqual(
+    expect.arrayContaining([`--resume=${SESSION_ID}`, '--model=sonnet'])
+  )
+  expect(resumed?.runningAtStart).toEqual([])
+})
+
+it('continues in the warm `claude` on another name for its Model', async () => {
+  const claude = await setUp(['warm.ndjson'])
+
+  const first = await claude.reply(FIRST_PROMPT, null, {model: 'default'})
+  await expect
+    .poll(async () => claude.driver.listModels(claude.vendorProgram))
+    .not.toBeNull()
+  await claude.reply(SECOND_PROMPT, recordedIn(first), {model: 'opus'})
+
+  await claude.allClosed()
+  const [warm] = claude.reports()
+
+  expect(claude.reports()).toHaveLength(1)
+  expect(warm?.prompts).toEqual([FIRST_PROMPT, SECOND_PROMPT])
+})
+
+it('lists no Models before a `claude` has run, then those of the newest one, telling each change', async () => {
+  const claude = await setUp(['warm.ndjson', 'resumed.ndjson'])
+  const changes: Model[][] = []
+  claude.driver.onModelsChanged(models => changes.push(models))
+
+  await expect(
+    claude.driver.listModels(claude.vendorProgram)
+  ).resolves.toBeNull()
+
+  const first = await claude.reply(FIRST_PROMPT)
+  const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
+  await expect.poll(() => changes.length).toBe(1)
+
+  expect(changes[0]?.slice(0, 2)).toEqual([
+    {
+      id: 'default',
+      name: 'Default (recommended)',
+      isDefault: true,
+      resolvesTo: 'claude-opus-5-5',
+      needsAppUpdate: false,
+    },
+    {
+      id: 'opus',
+      name: 'Opus 5.5',
+      isDefault: false,
+      resolvesTo: 'claude-opus-5-5',
+      needsAppUpdate: false,
+    },
+  ])
+  expect(changes[0]).toHaveLength(13)
+
+  await claude.reply(THIRD_PROMPT, recordedIn(second), {model: 'sonnet'})
+  await expect.poll(() => changes.length).toBe(2)
+
+  expect(changes[1]?.[0]).toMatchObject({resolvesTo: 'claude-fable-5-1'})
+  await expect(claude.driver.listModels(claude.vendorProgram)).resolves.toEqual(
+    changes[1]
+  )
+})
+
+it('learns nothing from a `claude` whose Models can’t be read, and writes the Reply all the same', async () => {
+  const claude = await setUp([
+    edited('warm.ndjson', lines =>
+      lines.map(line =>
+        RecordedLineSchema.parse(
+          JSON.parse(JSON.stringify(line).replaceAll('"models":', '"gone":'))
+        )
+      )
+    ),
+    'resumed.ndjson',
+  ])
+
+  const changes: Model[][] = []
+  claude.driver.onModelsChanged(models => changes.push(models))
+
+  const first = await claude.reply(FIRST_PROMPT)
+
+  expect(textOf(first)).toBe('TEAL')
+  expect(first.at(-1)).toMatchObject({status: 'complete'})
+
+  const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
+  await claude.reply(THIRD_PROMPT, recordedIn(second), {model: 'sonnet'})
+  await expect.poll(() => changes.length).toBe(1)
+
+  expect(changes[0]?.[0]).toMatchObject({resolvesTo: 'claude-fable-5-1'})
 })

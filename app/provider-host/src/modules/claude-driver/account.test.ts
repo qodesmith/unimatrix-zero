@@ -42,7 +42,10 @@ process.stdin.on('data', chunk => {
     buffer = buffer.slice(end + 1)
     if (message.type !== 'control_request') continue
     const response = message.request.subtype === 'initialize'
-      ? {account: {email: 'sam@example.com', subscriptionType: 'Claude Pro'}}
+      ? {
+          account: {email: 'sam@example.com', subscriptionType: 'Claude Pro'},
+          models: [{value: 'haiku', displayName: 'Haiku 5.5', description: ''}],
+        }
       : {}
     process.stdout.write(JSON.stringify({
       type: 'control_response',
@@ -58,7 +61,7 @@ process.stdin.on('end', () => {
 })
 `
 
-it('waits for claude to exit by itself after reading the account', async () => {
+it('waits for claude to exit by itself after reading the account and its Models', async () => {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'uz-fake-session-'))
   // The SDK runs a `.mjs` with the `node` on PATH.
   const program = path.join(folder, 'claude.mjs')
@@ -66,13 +69,16 @@ it('waits for claude to exit by itself after reading the account', async () => {
   await fs.writeFile(program, SESSION)
 
   try {
-    const account = await readAccount({
+    const read = await readAccount({
       program,
       env: {PATH: process.env.PATH ?? '', FAKE_ENDED: endedFile},
       cwd: folder,
     })
 
-    expect(account).toMatchObject({email: 'sam@example.com'})
+    expect(read.account).toMatchObject({email: 'sam@example.com'})
+    expect(read.models).toEqual([
+      {value: 'haiku', displayName: 'Haiku 5.5', description: ''},
+    ])
     expect(await fs.readFile(endedFile, 'utf8')).toBe('exited')
   } finally {
     await fs.rm(folder, {recursive: true, force: true})

@@ -92,6 +92,7 @@ function openWindow(db: Database) {
     app: {version: app.getVersion()},
     replies: turns.streaming(),
     ...connections.snapshot(),
+    lastModel: turns.lastModel(),
     settings: settings.read(),
     layout: layout.read(),
   }))
@@ -113,6 +114,7 @@ function openWindow(db: Database) {
     onSessionStore: sessions.handle,
     onSignInUpdate: (provider, update) =>
       connections.applySignInUpdate(provider, update),
+    onModels: (provider, models) => connections.applyModels(provider, models),
     onStatus: (provider, status) =>
       connections.applyHostStatus(provider, status),
     onCrash: provider => {
@@ -145,6 +147,10 @@ function openWindow(db: Database) {
     now: () => new Date(),
     onTurnsChanged: treeRows.turnsChanged,
     onReplyFinished: finished => {
+      if (finished.failure?.code === 'needs-app-update') {
+        connections.markNeedsAppUpdate(finished.provider, finished.model)
+      }
+
       treeRows.replyFinished(finished)
       void titles.replyFinished(finished)
     },

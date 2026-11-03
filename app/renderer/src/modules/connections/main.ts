@@ -2,6 +2,8 @@ export {Connections} from './ui/Connections'
 
 export {ConnectionsProvider} from './ui/ConnectionsProvider'
 
+export {ProviderMark} from './ui/ProviderMark'
+
 export {anyConnected} from './cards'
 
 export {useConnections} from './use-connections'
