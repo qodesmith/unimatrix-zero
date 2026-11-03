@@ -108,7 +108,6 @@ export async function writeTranscriptBack(
   if (!own) return false
 
   const folder = sessionFolder(place)
-  writeEntries(`${folder}.jsonl`, own)
 
   const subagents = await Promise.all(
     subpaths.flatMap(subpath => {
@@ -123,6 +122,8 @@ export async function writeTranscriptBack(
           ]
     })
   )
+
+  writeEntries(`${folder}.jsonl`, own)
 
   for (const {stem, entries} of subagents) writeSubagent(stem, entries)
 
