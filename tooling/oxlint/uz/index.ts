@@ -12,9 +12,9 @@ const plugin = definePlugin({
   meta: {name: 'uz'},
   rules: {
     'module-boundaries': moduleBoundaries,
+    'no-excluded-shadcn': noExcludedShadcn,
     'no-fixture-assertion': noFixtureAssertion,
     'no-hardcoded-colors': noHardcodedColors,
-    'no-excluded-shadcn': noExcludedShadcn,
     'no-rsc-directives': noRscDirectives,
     'shadcn-base-ui': shadcnBaseUi,
     'tsx-under-ui': tsxUnderUi,

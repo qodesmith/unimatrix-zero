@@ -440,9 +440,9 @@ const config: OxlintConfig = {
     ////////////////////////
 
     'uz/module-boundaries': 'error',
+    'uz/no-excluded-shadcn': 'error',
     // Top level, not a test override: it reads only `it`/`test` callbacks.
     'uz/no-fixture-assertion': 'error',
-    'uz/no-excluded-shadcn': 'error',
     'uz/no-rsc-directives': 'error',
     // Top level: a Radix import fails anywhere; plain controls only exist in the renderer.
     'uz/shadcn-base-ui': 'error',

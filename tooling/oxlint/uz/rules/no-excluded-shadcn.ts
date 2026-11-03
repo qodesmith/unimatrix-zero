@@ -25,14 +25,15 @@ export const noExcludedShadcn: Rule = defineRule({
     schema: [],
   },
   create(context) {
-    const [file, folder, root] = context.physicalFilename
+    const [file, folder, grandparent] = context.physicalFilename
       .split(path.sep)
       .toReversed()
 
     const name = file?.replace(/\.tsx?$/, '') ?? ''
     const reason = EXCLUDED.get(name)
 
-    if (folder !== 'ui' || root !== 'shadcn' || reason === undefined) return {}
+    if (folder !== 'ui' || grandparent !== 'shadcn' || reason === undefined)
+      return {}
 
     return {
       Program(node) {
