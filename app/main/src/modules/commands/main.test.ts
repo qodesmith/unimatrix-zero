@@ -386,7 +386,6 @@ describe('deleting a Tree', () => {
     const root = await sendPrompt(tree.id, null)
     answer(tree.id, root.reply.id)
     await sendPrompt(tree.id, root.reply.id)
-    deps.turns.hostCrashed('claude')
 
     expect(await send({type: 'tree.delete', treeId: tree.id})).toEqual({
       ok: true,
