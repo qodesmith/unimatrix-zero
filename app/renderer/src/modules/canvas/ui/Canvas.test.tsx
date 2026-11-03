@@ -105,6 +105,7 @@ function fakeMain(saved: Saved) {
   const stops = {refusal: null as string | null}
   const deletes = {refusal: null as string | null}
   const turnsLoads = {held: null as Promise<void> | null}
+  const sends = {failure: null as Reply['failure']}
 
   function cutFrom(promptId: string) {
     const promptIds = [promptId]
@@ -169,8 +170,9 @@ function fakeMain(saved: Saved) {
           ...reply(0, 0, ''),
           id: crypto.randomUUID(),
           promptId: sentPrompt.id,
-          status: 'streaming',
+          status: sends.failure === null ? 'streaming' : 'failed',
           content: [],
+          failure: sends.failure,
           createdAt,
         }
 
@@ -258,7 +260,7 @@ function fakeMain(saved: Saved) {
     registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
   }
 
-  return {...bridge, sent, publish, replies, stops, deletes, turnsLoads}
+  return {...bridge, sent, publish, replies, stops, deletes, turnsLoads, sends}
 }
 
 const probe = {render: async () => {}}
@@ -591,6 +593,39 @@ it('moves the highlight to the Reply a leaf Input sends for, and keeps hovering 
   await expect
     .poll(highlightedEdges)
     .toEqual([edge(1, 11), edge(11, 2), edge(2, 12), edge(12, 4)].toSorted())
+})
+
+it('moves the Active Thread to a Reply that fails as it starts, with no Input to take focus', async () => {
+  const {main} = await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply three')).toBeVisible()
+  main.sends.failure = {code: 'host-unreachable', message: 'No host'}
+
+  await inputUnder('Reply three').fill('A thought')
+  await userEvent.keyboard('{Enter}')
+  await expect
+    .element(page.getByText('Claude could not be reached'))
+    .toBeVisible()
+  await hoverAway()
+  expect(
+    nodeOf('Claude could not be reached')
+      .getByRole('textbox', {name: 'Prompt'})
+      .query()
+  ).toBeNull()
+
+  const sentPromptId = nodeOf('A thought').element().getAttribute('data-id')
+  const failedId = main.replies.at(-1)?.id
+
+  await expect
+    .poll(highlightedEdges)
+    .toEqual(
+      [
+        edge(1, 11),
+        edge(11, 3),
+        edge(3, 13),
+        `${uuid(13)}-${sentPromptId}`,
+        `${sentPromptId}-${failedId}`,
+      ].toSorted()
+    )
 })
 
 function rect(turnText: string) {
@@ -1066,7 +1101,7 @@ it('keeps a Reply let out by Show more open across an orientation switch', async
   expect(page.getByRole('button', {name: 'Show more'}).query()).toBeNull()
 })
 
-async function wheel(deltaY: number) {
+function wheelOnce(deltaY: number) {
   const pane = document.querySelector('.react-flow__pane')
 
   if (!pane) throw new Error('The canvas is not drawn')
@@ -1074,6 +1109,10 @@ async function wheel(deltaY: number) {
   pane.dispatchEvent(
     new WheelEvent('wheel', {deltaY, bubbles: true, cancelable: true})
   )
+}
+
+async function wheel(deltaY: number) {
+  wheelOnce(deltaY)
   await settledViewport()
 }
 
@@ -2303,8 +2342,25 @@ it('keeps a streaming Reply’s bottom on the canvas as it grows, until the user
   expect(bottomOf(streaming)).toBeLessThanOrEqual(bottomOf(pane))
   expect(streaming.getBoundingClientRect().top).toBeLessThan(0)
 
-  await wheelGesture(-300)
+  // Faked so d3-zoom’s wheel-idle timer can’t end the gesture while the test waits.
+  vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']})
+  onTestFinished(() => {
+    vi.useRealTimers()
+  })
+  wheelOnce(-300)
+  await reactCaughtUp()
   const scrolled = viewport()
+
+  main.publish({...ids, type: 'TEXT_DELTA', delta: '\n\nA line mid-scroll'})
+  await everyFrameUntil(
+    () => canvas().getByText('A line mid-scroll').query() !== null
+  )
+  // The canvas measures the grown Reply as that frame draws.
+  await new Promise(requestAnimationFrame)
+  await reactCaughtUp()
+  expect(viewport()).toBe(scrolled)
+  vi.runOnlyPendingTimers()
+  vi.useRealTimers()
 
   main.publish({...ids, type: 'TEXT_DELTA', delta: '\n\nThe last line'})
   await expect.element(canvas().getByText('The last line')).toBeInTheDocument()

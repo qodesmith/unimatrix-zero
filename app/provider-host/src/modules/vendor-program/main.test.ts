@@ -103,6 +103,15 @@ it('throws and keeps nothing when the download does not match the manifest', asy
   expect(await filesIn(folder)).toEqual(['2.1.307'])
 })
 
+it('throws and keeps nothing when the download runs past the manifest’s size', async () => {
+  const longer = new Uint8Array([...bytes, ...bytes])
+
+  await expect(ready(serving(longer))).rejects.toThrow(
+    'larger than the manifest'
+  )
+  expect(await filesIn(folder)).toEqual(['2.1.307'])
+})
+
 it('throws when the server refuses', async () => {
   await expect(ready(serving(new Uint8Array(), 404))).rejects.toThrow('404')
 })

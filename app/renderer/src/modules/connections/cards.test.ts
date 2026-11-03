@@ -81,6 +81,19 @@ it('keeps the paste step listed once a page with a code was opened', () => {
   })
 })
 
+it('lists no paste step on another Provider’s connect', () => {
+  const state = fold([
+    snapshot,
+    {type: 'SIGN_IN_STEP', provider: 'claude', step: 'paste-code', url},
+    {type: 'SIGN_IN_STEP', provider: 'chatgpt', step: 'check-plan'},
+  ])
+
+  expect(cardOf(state, 'chatgpt')).toMatchObject({
+    kind: 'connecting',
+    pasting: false,
+  })
+})
+
 it('shows a failure until connecting starts again', () => {
   const failure = {reason: 'plan-refused', message: 'No plan.'} as const
 
@@ -101,6 +114,22 @@ it('shows a failure until connecting starts again', () => {
       'claude'
     )
   ).toMatchObject({kind: 'connecting'})
+})
+
+it('drops a failure when a SNAPSHOT arrives', () => {
+  const state = fold([
+    snapshot,
+    {type: 'SIGN_IN_STEP', provider: 'claude', step: 'check-plan'},
+    {
+      type: 'SIGN_IN_FINISHED',
+      provider: 'claude',
+      outcome: 'failed',
+      failure: {reason: 'plan-refused', message: 'No plan.'},
+    },
+    snapshot,
+  ])
+
+  expect(cardOf(state, 'claude')).toEqual({kind: 'idle'})
 })
 
 it('goes back to Connect when connecting is canceled', () => {

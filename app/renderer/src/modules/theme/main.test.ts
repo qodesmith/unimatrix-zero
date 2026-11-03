@@ -49,6 +49,14 @@ it('follows the system when it switches mode', () => {
   expect(root.dataset.mode).toBe('light')
 })
 
+it('draws the browser’s own controls in the mode it follows', () => {
+  const {window, root, switchTo} = fakeWindow(true)
+  followColorScheme(undefined, window)
+  expect(root.style.colorScheme).toBe('dark')
+  switchTo('light')
+  expect(root.style.colorScheme).toBe('light')
+})
+
 it('stops following once unsubscribed', () => {
   const {window, root, switchTo} = fakeWindow(false)
   const stop = followColorScheme(undefined, window)

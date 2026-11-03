@@ -422,6 +422,40 @@ describe('a streaming Reply', () => {
     expect(turns.streaming()[0]?.content).toEqual([])
   })
 
+  it('drops events that name another Tree', () => {
+    turns.hostEvent('claude', {
+      type: 'TEXT_DELTA',
+      treeId: crypto.randomUUID(),
+      replyId,
+      delta: 'x',
+    })
+
+    expect(published).toEqual([])
+    expect(turns.streaming()[0]?.content).toEqual([])
+  })
+
+  it('keeps its Model and session when a host that is not writing it says it saved it', () => {
+    turns.hostRecorded('chatgpt', {
+      type: 'REPLY_RECORDED',
+      treeId,
+      replyId,
+      model: 'gpt-5.5',
+      session: {sessionId: 's1', messageId: 'm1'},
+    })
+    finish(replyId)
+
+    expect(saved(replyId).model).toBe('fake')
+    expect(finished).toMatchObject([{replyId, model: 'fake'}])
+    expect(() =>
+      turns.sendPrompt({
+        model: picked,
+        treeId,
+        parentReplyId: replyId,
+        text: 'More',
+      })
+    ).toThrow('This Reply can’t be continued: its Provider never saved it.')
+  })
+
   it('saves the Model its Provider reports', () => {
     record(replyId)
 
@@ -834,6 +868,24 @@ describe('retrying a Reply', () => {
     expect(hostCommands).toEqual([{type: 'reply.stop', replyId}])
   })
 
+  it('forgets where its Provider saved the failed attempt', () => {
+    const replyId = sendPrompt(null)
+    record(replyId)
+    fail(replyId)
+    turns.retry(treeId, replyId)
+    stopUnrecorded(replyId)
+    hostCommands = []
+
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: replyId,
+      text: 'On',
+    })
+
+    expect(sessionsStarted()).toEqual([null])
+  })
+
   it('rewinds the Provider session to the Reply the Prompt answers', () => {
     const replyId = savedRoot()
     const failed = sendPrompt(replyId, 'And then?')
@@ -1187,6 +1239,40 @@ describe('deleting a Prompt', () => {
       parentReplyId: first,
       text: 'Again',
     })
+
+    expect(sessionsStarted()).toEqual([cutAtFirst])
+  })
+
+  it('asks for no cut while the host isn’t ready, and cuts with the next Prompt', () => {
+    const first = savedRoot()
+    const second = savedAt(first, 'm2')
+    hostReady = false
+
+    turns.deletePrompt(treeId, promptOf(second))
+
+    expect(cutsAsked()).toEqual([])
+
+    hostReady = true
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: first,
+      text: 'Again',
+    })
+
+    expect(sessionsStarted()).toEqual([cutAtFirst])
+  })
+
+  it('keeps cutting after a Branch’s Prompt went into a forked session', () => {
+    const first = deletedMidThread()
+    const unsent = sendPrompt(first, 'Again')
+    fail(unsent)
+    const branch = sendPrompt(first, 'Or instead?')
+    recordPrompt(branch, 'p-branch', 's-fork')
+    finish(branch)
+    turns.deletePrompt(treeId, promptOf(branch))
+
+    turns.retry(treeId, unsent)
 
     expect(sessionsStarted()).toEqual([cutAtFirst])
   })

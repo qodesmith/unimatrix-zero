@@ -388,6 +388,20 @@ it('resumes the Provider session from the app’s copy alone, written back under
   ])
 })
 
+it('reports only its own turn’s token count when a resume repeats the last one', async () => {
+  const opened = await setUp(['started.ndjson'])
+  const first = await opened.reply(FIRST_PROMPT)
+  const second = await opened.reply(SECOND_PROMPT, recordedIn(first))
+  await opened.allClosed()
+
+  const codex = await setUp(['resumed.ndjson'], {store: opened.store})
+  const third = await codex.reply(THIRD_PROMPT, recordedIn(second))
+
+  expect(third.filter(event => event.type === 'TOKENS')).toEqual([
+    expect.objectContaining({contextSize: 16_789}),
+  ])
+})
+
 it('resumes from Codex’s rollout when it carries the app’s copy further, as after a quit mid-Reply', async () => {
   const opened = await setUp(['started.ndjson'])
   const first = await opened.reply(FIRST_PROMPT)
@@ -537,6 +551,38 @@ it('rewinds the loaded thread to the Reply a Retry answers, keeping both rollout
   expect(
     Buffer.from(kept.get(REWOUND_ROLLOUT)?.base64 ?? '', 'base64')
   ).toEqual(onDisk)
+})
+
+function retriedTwice() {
+  return edited('reverted.ndjson', text => {
+    const lines = text.split('\n').filter(Boolean)
+
+    const retry = lines.findIndex(line =>
+      line.includes('"method":"thread/revert"')
+    )
+
+    const end = lines.findIndex(line => line === '{"kind":"end"}')
+
+    return [
+      ...lines.slice(0, end),
+      ...lines.slice(retry, end),
+      ...lines.slice(end),
+    ].join('\n')
+  })
+}
+
+it('rewinds a loaded thread past the first Retry’s Reply when the same Reply is retried again', async () => {
+  const codex = await setUp([retriedTwice()])
+  const hi = await codex.reply(FIRST_PROMPT)
+  await codex.reply(SECOND_PROMPT, recordedIn(hi))
+  const retry = {...recordedIn(hi), type: 'rewind'} as const
+  const prompt = 'What was the last thing I asked you? Just the words.'
+
+  await codex.reply(prompt, retry)
+  const again = await codex.reply(prompt, retry)
+
+  expect(again.at(-1)).toMatchObject({status: 'complete'})
+  expect(codex.reports()[0]?.reverted).toBe(RETRIED_TURN)
 })
 
 it('resumes a Retry from the app’s copy when the thread isn’t loaded, with nothing to revert', async () => {
@@ -892,6 +938,46 @@ it('names when a limit lifts by the full window Codex reported', async () => {
         '"status":"failed","error":{"message":"You’ve hit your usage limit."}'
       )
   )
+
+  vi.useFakeTimers({toFake: ['Date'], now: new Date('2026-10-23T09:00:00Z')})
+  const codex = await setUp([limited])
+
+  const events = await codex.reply(FIRST_PROMPT)
+
+  expect(events.at(-1)).toMatchObject({
+    status: 'failed',
+    failure: {code: 'limit-reached', resetsAt: '2026-10-29T18:43:34.000Z'},
+  })
+})
+
+it('names when a limit lifts by a full window a later update leaves out', async () => {
+  const limited = edited('started.ndjson', text => {
+    const lines = text
+      .replace('"usedPercent":0', '"usedPercent":100')
+      .replace(
+        '"status":"completed","error":null',
+        '"status":"failed","error":{"message":"You’ve hit your usage limit."}'
+      )
+      .split('\n')
+
+    const at = lines.findIndex(line =>
+      line.includes('account/rateLimits/updated')
+    )
+
+    return lines
+      .toSpliced(
+        at + 1,
+        0,
+        JSON.stringify({
+          kind: 'out',
+          message: {
+            method: 'account/rateLimits/updated',
+            params: {rateLimits: {primary: null, secondary: null}},
+          },
+        })
+      )
+      .join('\n')
+  })
 
   vi.useFakeTimers({toFake: ['Date'], now: new Date('2026-10-23T09:00:00Z')})
   const codex = await setUp([limited])

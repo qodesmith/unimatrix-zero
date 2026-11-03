@@ -1,5 +1,6 @@
 import type {Settings} from '@uz/contract/settings'
 
+import {FONT_SIZE} from '@uz/contract/settings'
 import {afterEach, expect, it} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {userEvent} from 'vitest/browser'
@@ -61,6 +62,42 @@ it('steps twice for two presses that come before a render', async () => {
   expect(main.sent).toEqual([
     {type: 'settings.update', changes: {fontSize: 22}},
     {type: 'settings.update', changes: {fontSize: 24}},
+  ])
+})
+
+function pressMeta(key: string) {
+  const press = new KeyboardEvent('keydown', {
+    key,
+    metaKey: true,
+    cancelable: true,
+  })
+
+  globalThis.dispatchEvent(press)
+
+  return press
+}
+
+it('keeps ⌘+ and ⌘− from zooming the page', async () => {
+  await renderFollowFontSize({fontSize: 20})
+  await expect.poll(rootFontSize).toBe('20px')
+
+  expect(pressMeta('=').defaultPrevented).toBe(true)
+  expect(pressMeta('-').defaultPrevented).toBe(true)
+})
+
+it('saves nothing on ⌘+ at the largest font size', async () => {
+  const main = await renderFollowFontSize({fontSize: FONT_SIZE.max})
+  await expect.poll(rootFontSize).toBe(`${FONT_SIZE.max}px`)
+
+  pressMeta('=')
+  pressMeta('-')
+
+  await expect.poll(() => main.sent.length).toBeGreaterThan(0)
+  expect(main.sent).toEqual([
+    {
+      type: 'settings.update',
+      changes: {fontSize: FONT_SIZE.max - FONT_SIZE.step},
+    },
   ])
 })
 
