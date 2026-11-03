@@ -449,7 +449,7 @@ it('fails the Reply when the app can’t save its files, and closes its `claude`
     status: 'failed',
     failure: {code: 'disk-full'},
   })
-  await claude.allClosed()
+  await expect.poll(() => claude.reports()[0]?.inputClosed).toBe(true)
 })
 
 it('replaces the text when a broken stream is sent again', async () => {

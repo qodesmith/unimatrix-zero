@@ -9,6 +9,7 @@ import {
   FAKE_CODE,
   FAKE_FREE_CODE,
   FAKE_SIGN_IN_URL,
+  PROGRAM_BYTES,
 } from './sign-in'
 
 const request = {program: null, configDir: '/nowhere'}
@@ -44,7 +45,7 @@ it('downloads, then connects once the sign-in page answers', async () => {
   expect(updates.find(update => update.type === 'SIGN_IN_STEP')).toEqual({
     type: 'SIGN_IN_STEP',
     step: 'get-ready',
-    progress: {receivedBytes: 0, totalBytes: 100_000_000},
+    progress: {receivedBytes: 0, totalBytes: PROGRAM_BYTES},
   })
   expect(updates.at(-1)).toEqual({
     type: 'SIGN_IN_FINISHED',

@@ -55,7 +55,7 @@ process.stdin.on('end', () => {
 })
 `
 
-it('waits for claude to exit by itself after reading the account and its Models', async () => {
+it('lets claude exit by itself after reading the account and its Models', async () => {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'uz-fake-session-'))
   // The SDK runs a `.mjs` with the `node` on PATH.
   const program = path.join(folder, 'claude.mjs')

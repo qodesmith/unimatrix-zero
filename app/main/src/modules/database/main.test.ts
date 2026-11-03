@@ -56,6 +56,19 @@ function count(table: string) {
   return Number(row?.n)
 }
 
+function backupColumns(name: string) {
+  const backup = new DatabaseSync(path.join(folder, 'data', 'backups', name))
+
+  const columns = backup
+    .prepare('SELECT name FROM pragma_table_info(?)')
+    .all('trees')
+    .map(row => String(row.name))
+
+  backup.close()
+
+  return columns
+}
+
 function backups() {
   const backupsFolder = path.join(folder, 'data', 'backups')
 
@@ -151,9 +164,11 @@ describe('migrating', () => {
       n: 1,
     })
     backup.close()
+
+    expect(backupColumns(backups()[0] ?? '')).not.toContain('note')
   })
 
-  it('keeps only the last three backups', () => {
+  it('keeps only three backups', () => {
     withTreeAndPrompt()
 
     for (const n of [1, 2, 3, 4]) {

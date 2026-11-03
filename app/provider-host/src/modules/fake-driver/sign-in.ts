@@ -4,7 +4,7 @@ import type {SignInUpdate} from '@uz/contract/providers'
 import {createSignIn} from '#modules/sign-in/main'
 import {SIGN_IN_CANCELED, signInFailed} from '@uz/contract/providers'
 
-const PROGRAM_BYTES = 100_000_000
+export const PROGRAM_BYTES = 100_000_000
 
 const DOWNLOAD_STEPS = 25
 

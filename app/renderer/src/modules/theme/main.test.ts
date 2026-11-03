@@ -3,6 +3,7 @@ import type {ResolvedThemeMode} from '@uz/contract/theme'
 import {fromPartial} from '@total-typescript/shoehorn'
 import {expect, it} from 'vitest'
 
+import {hearth} from './hearth'
 import {followColorScheme} from './main'
 
 function fakeWindow(prefersDark: boolean) {
@@ -33,10 +34,10 @@ function fakeWindow(prefersDark: boolean) {
   }
 }
 
-it('applies the clay accent of the mode the system prefers', () => {
+it('applies the accent of the mode the system prefers', () => {
   const {window, root} = fakeWindow(true)
   followColorScheme(undefined, window)
-  expect(root.style.getPropertyValue('--primary')).toBe('#e07a52')
+  expect(root.style.getPropertyValue('--primary')).toBe(hearth.dark?.primary)
   expect(root.dataset.mode).toBe('dark')
 })
 
@@ -44,7 +45,7 @@ it('follows the system when it switches mode', () => {
   const {window, root, switchTo} = fakeWindow(true)
   followColorScheme(undefined, window)
   switchTo('light')
-  expect(root.style.getPropertyValue('--primary')).toBe('#c2562f')
+  expect(root.style.getPropertyValue('--primary')).toBe(hearth.light?.primary)
   expect(root.dataset.mode).toBe('light')
 })
 

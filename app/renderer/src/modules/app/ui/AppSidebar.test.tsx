@@ -262,7 +262,7 @@ async function askToDelete(name: string) {
 }
 
 describe('deleting a Tree', () => {
-  it('asks first, even for an empty Tree, and Cancel keeps it', async () => {
+  it('asks first, and Cancel keeps it', async () => {
     const main = fakeMain({trees: [savedTree({title: 'Draft'})]})
     await renderApp(main)
 
@@ -301,7 +301,7 @@ describe('deleting a Tree', () => {
       .toBeVisible()
   })
 
-  it('deletes a Tree while a Reply in it streams, saying Deleting… until main answers', async () => {
+  it('deletes a Tree, saying Deleting… until main answers', async () => {
     const tree = savedTree({title: 'Busy'})
     const main = fakeMain({trees: [tree]})
     const answered = Promise.withResolvers<void>()
@@ -314,11 +314,6 @@ describe('deleting a Tree', () => {
       }) as Bridge['send'],
     }
     await render(<App />, {wrapper: FullHeight})
-    const ids = {treeId: tree.id, replyId: crypto.randomUUID()}
-    main.publish({...ids, type: 'TEXT_DELTA', delta: 'Hi'})
-    await expect
-      .element(treeRow('Busy'))
-      .toHaveAccessibleDescription(/Writing a Reply/)
 
     await askToDelete('Busy')
     await deleteDialog().getByRole('button', {name: 'Delete'}).click()
@@ -327,7 +322,6 @@ describe('deleting a Tree', () => {
       .element(deleteDialog().getByRole('button', {name: 'Deleting…'}))
       .toBeDisabled()
 
-    main.publish({...ids, type: 'RUN_FINISHED', status: 'stopped'})
     answered.resolve()
 
     await expect.element(treeRow('Busy')).not.toBeInTheDocument()

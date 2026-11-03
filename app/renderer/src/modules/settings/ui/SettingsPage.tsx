@@ -1,3 +1,4 @@
+import type {Section} from './settings-sections'
 import type {ReactNode} from 'react'
 
 import {
@@ -14,19 +15,7 @@ import {
 import {useState} from 'react'
 
 import {AppearanceSection, ChatSection} from './Sections'
-
-const SECTIONS = [
-  'Appearance',
-  'Chat',
-  'System prompts',
-  'Tools',
-  'Connections',
-  'Storage',
-  'Archive & restore',
-  'Updates & About',
-] as const
-
-type Section = (typeof SECTIONS)[number]
+import {SECTIONS} from './settings-sections'
 
 interface SettingsPageProps {
   connections: ReactNode

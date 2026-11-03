@@ -121,8 +121,10 @@ it('keeps why the Reply failed, and clears it when it ends another way', () => {
   expect(fold({type: 'RUN_FINISHED', status: 'failed', failure})).toMatchObject(
     {status: 'failed', failure}
   )
-  expect(fold({type: 'RUN_FINISHED', status: 'stopped'})).toMatchObject({
-    status: 'stopped',
-    failure: null,
-  })
+  expect(
+    fold(
+      {type: 'RUN_FINISHED', status: 'failed', failure},
+      {type: 'RUN_FINISHED', status: 'stopped'}
+    )
+  ).toMatchObject({status: 'stopped', failure: null})
 })

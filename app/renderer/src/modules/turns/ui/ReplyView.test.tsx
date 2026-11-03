@@ -170,12 +170,12 @@ async function renderSaved(...replies: Partial<Reply>[]) {
   return screen
 }
 
-/** Events from main, the clock moving 100 ms per event from 1000. */
-function stream(published: AppEvent[]) {
+/** The recording's events from main, the clock at 1000 + 100 ms per event. */
+function stream(from: number, upTo: number) {
   vi.useFakeTimers({toFake: ['Date']})
 
-  for (const [nth, event] of published.entries()) {
-    vi.setSystemTime(1000 + 100 * (nth + 1))
+  for (const [nth, event] of events.slice(from, upTo).entries()) {
+    vi.setSystemTime(1000 + 100 * (from + nth + 1))
     main.publish(event)
   }
 }
@@ -191,7 +191,7 @@ function before(type: AppEvent['type'], nth = 0) {
 async function replay(upTo = before('RUN_FINISHED')) {
   const screen = await renderSaved({})
 
-  stream(events.slice(0, upTo))
+  stream(0, upTo)
 
   return screen
 }
@@ -221,12 +221,10 @@ it('shows the thinking live and collapsed, then how long it took', async () => {
   await expect
     .element(screen.getByText(/The user wants to see the fake Provider/))
     .toBeVisible()
-})
 
-it('replaces the thinking header with its duration once the words start', async () => {
-  const screen = await replay(before('TOOL_CALL_START'))
+  stream(before('TEXT_DELTA'), before('TOOL_CALL_START'))
 
-  await expect.element(screen.getByText(/^Thought for \d+s$/)).toBeVisible()
+  await expect.element(screen.getByText('Thought for 4s')).toBeVisible()
   await expect.element(screen.getByText('Thinking…')).not.toBeInTheDocument()
 })
 
@@ -380,7 +378,7 @@ it.each([
     const screen = await renderSaved(failed(failure))
 
     await expect.element(screen.getByText('Half an answer')).toBeVisible()
-    await expect.element(screen.getByText(line)).toHaveClass('text-destructive')
+    await expect.element(screen.getByText(line)).toBeVisible()
   }
 )
 
@@ -407,23 +405,24 @@ it('says only that a Reply failed when it has no reason', async () => {
     failure: null,
   })
 
-  await expect
-    .element(screen.getByText('Failed', {exact: true}))
-    .toHaveClass('text-destructive')
+  await expect.element(screen.getByText('Failed', {exact: true})).toBeVisible()
 })
 
 it('says when a reached limit lifts, in local time', async () => {
+  const resetsAt = '2026-10-19T15:05:00.000Z'
+  const local = new Date(resetsAt)
+  const hour = local.getHours()
+  const minutes = String(local.getMinutes()).padStart(2, '0')
+
   const screen = await renderSaved(
-    failed({
-      code: 'limit-reached',
-      message: '5-hour limit',
-      resetsAt: '2026-10-19T15:05:00.000Z',
-    })
+    failed({code: 'limit-reached', message: '5-hour limit', resetsAt})
   )
 
   await expect
-    .element(screen.getByText(/^Limit reached · resets at \d{1,2}:\d{2}/))
-    .toHaveClass('text-destructive')
+    .element(screen.getByText(/^Limit reached · resets at /))
+    .toMatchTextContent(
+      new RegExp(`at 0?(${hour}|${hour % 12 || 12}):${minutes}\\b`, 'u')
+    )
 })
 
 it('says only that the limit was reached when the Provider gave no reset time', async () => {

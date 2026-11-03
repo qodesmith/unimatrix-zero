@@ -182,7 +182,7 @@ it('streams a requested Reply back to main', async () => {
   expect(main.sent.at(-1)).toMatchObject({status: 'complete'})
 })
 
-it('stops a Reply on main’s word, keeping the text so far', async () => {
+it('stops a Reply on main’s word', async () => {
   const main = fakeMain()
   await runHost(main.port, () => createFakeDriver({delayMs: 1}))
 
