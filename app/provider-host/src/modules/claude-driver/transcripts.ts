@@ -74,26 +74,25 @@ function writeEntries(file: string, entries: SessionEntry[]) {
   )
 }
 
-function writeSubagent(file: string, kept: SessionEntry[]) {
-  const metadata = kept.filter(entry => entry.type === 'agent_metadata')
+function writeSubagent(stem: string, entries: SessionEntry[]) {
+  const metadata = entries.filter(entry => entry.type === 'agent_metadata')
 
   writeEntries(
-    `${file}.jsonl`,
-    kept.filter(entry => entry.type !== 'agent_metadata')
+    `${stem}.jsonl`,
+    entries.filter(entry => entry.type !== 'agent_metadata')
   )
 
   const last = metadata.at(-1)
 
   if (last) {
     const {type: _type, ...meta} = last
-    fs.writeFileSync(`${file}.meta.json`, JSON.stringify(meta), {mode: 0o600})
+    fs.writeFileSync(`${stem}.meta.json`, JSON.stringify(meta), {mode: 0o600})
   }
 }
 
 /**
  * The fallback restore (ADR 0004): a plain write, so the files are new and no
- * cleanup sweep takes them. Every read of the store goes out at once, since
- * each is a round trip to main.
+ * cleanup sweep takes them.
  */
 export async function writeTranscriptBack(
   store: SessionStoreClient,
@@ -101,31 +100,31 @@ export async function writeTranscriptBack(
 ) {
   const {projectKey, sessionId} = place
 
-  const [entries, subpaths] = await Promise.all([
+  const [own, subpaths] = await Promise.all([
     store.load({projectKey, sessionId}),
     store.listSubkeys({projectKey, sessionId}),
   ])
 
-  if (!entries) return false
+  if (!own) return false
 
   const folder = sessionFolder(place)
-  writeEntries(`${folder}.jsonl`, entries)
+  writeEntries(`${folder}.jsonl`, own)
 
   const subagents = await Promise.all(
     subpaths.flatMap(subpath => {
-      const file = within(folder, subpath)
+      const stem = within(folder, subpath)
 
-      return file === null
+      return stem === null
         ? []
         : [
             store
               .load({projectKey, sessionId, subpath})
-              .then(kept => ({file, kept: kept ?? []})),
+              .then(kept => ({stem, entries: kept ?? []})),
           ]
     })
   )
 
-  for (const {file, kept} of subagents) writeSubagent(file, kept)
+  for (const {stem, entries} of subagents) writeSubagent(stem, entries)
 
   return true
 }

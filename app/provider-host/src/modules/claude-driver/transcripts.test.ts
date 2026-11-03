@@ -49,7 +49,7 @@ function subagent(agentId: string): SessionEntry[] {
 }
 
 function heldStore(
-  answer: (request: SessionStoreRequest) => SessionStoreValue
+  answers: Partial<Record<SessionStoreRequest['op'], SessionStoreValue>>
 ) {
   const waiting: {requestId: string; request: SessionStoreRequest}[] = []
 
@@ -59,10 +59,10 @@ function heldStore(
 
   return {
     client,
-    asked: () => waiting.map(({request}) => request.op),
+    pending: () => waiting.map(({request}) => request.op),
     answerAll() {
       for (const {requestId, request} of waiting.splice(0)) {
-        client.settle(requestId, {ok: true, value: answer(request)})
+        client.settle(requestId, {ok: true, value: answers[request.op] ?? null})
       }
     },
   }
@@ -134,26 +134,17 @@ it('asks main for the session and every Subagent’s transcript at once', async 
   const configDir = configFolder()
   const session = {projectKey: PROJECT_KEY, sessionId: SESSION_ID}
 
-  const store = heldStore(request => {
-    if (request.op === 'list-subkeys') {
-      return ['subagents/agent-a1', 'subagents/agent-a2']
-    }
-
-    if (request.op !== 'load') return null
-
-    const agentId = request.key.subpath?.split('agent-')[1]
-
-    return agentId === undefined
-      ? [{type: 'user', uuid: 'main-1'}]
-      : subagent(agentId)
+  const store = heldStore({
+    'list-subkeys': ['subagents/agent-a1', 'subagents/agent-a2'],
+    load: [{type: 'user', uuid: 'main-1'}],
   })
 
   const writing = writeTranscriptBack(store.client, {configDir, ...session})
 
-  expect(store.asked().toSorted()).toEqual(['list-subkeys', 'load'])
+  expect(store.pending().toSorted()).toEqual(['list-subkeys', 'load'])
   store.answerAll()
 
-  await expect.poll(() => store.asked()).toEqual(['load', 'load'])
+  await expect.poll(() => store.pending()).toEqual(['load', 'load'])
   store.answerAll()
 
   expect(await writing).toBe(true)
