@@ -3,18 +3,20 @@ import type {Prompt, Reply} from '@uz/contract/turns'
 import {ReplyView, useReply} from '#modules/turns/main'
 import {Bubble, BubbleContent} from '#shadcn/ui/bubble'
 import {Message, MessageContent} from '#shadcn/ui/message'
+import {Sheet, SheetContent} from '#shadcn/ui/sheet'
 import {cn} from 'cn'
 import {Maximize2Icon, Minimize2Icon, XIcon} from 'lucide-react'
-import {useEffect, useLayoutEffect, useRef, useState} from 'react'
+import {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react'
 
 import {atBottom} from '../at-bottom'
 import {useCanvas} from '../canvas-context'
-import {dialogOpen} from '../dialog-open'
 import {pathTo} from '../tree'
 import {PromptInput} from './PromptInput'
 import {TooltipButton} from './TooltipButton'
 
 interface ChatSlideoutProps {
+  /** The canvas's body, which the slideout covers rather than the window. */
+  container: HTMLElement | null
   end: Reply
   scrollToTurnId: string
   /** Off: it slides away, then calls `onClosed` to be unmounted. */
@@ -31,6 +33,7 @@ const SCROLL_MARGIN = 12
 
 /** Chat mode: one Thread as a conventional chat in a slideout over the canvas. */
 export function ChatSlideout({
+  container,
   end,
   scrollToTurnId,
   open,
@@ -41,80 +44,46 @@ export function ChatSlideout({
 }: ChatSlideoutProps) {
   const {index} = useCanvas()
   const [full, setFull] = useState(false)
-  const aside = useRef<HTMLElement>(null)
+  const panel = useRef<HTMLDivElement>(null)
   const body = useRef<HTMLDivElement>(null)
+  // The portal draws the body a render after the slideout mounts.
+  const [bodyShown, setBodyShown] = useState(false)
   const content = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
   const thread = pathTo(index, end.id)
 
-  // Esc in a field elsewhere, like a Tree's name, belongs to that field.
-  useEffect(() => {
-    if (!open) return undefined
+  function inFieldElsewhere({target}: Event) {
+    return (
+      target instanceof Element &&
+      target.matches('input, textarea') &&
+      !panel.current?.contains(target)
+    )
+  }
 
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape' || event.defaultPrevented || dialogOpen()) {
-        return
-      }
-
-      const {target} = event
-
-      if (
-        target instanceof Element &&
-        target.matches('input, textarea') &&
-        !aside.current?.contains(target)
-      ) {
-        return
-      }
-
-      onClose()
-    }
-
-    globalThis.addEventListener('keydown', onKeyDown)
-
-    return () => globalThis.removeEventListener('keydown', onKeyDown)
-  }, [open, onClose])
-
-  useEffect(() => {
-    if (open) return undefined
-
-    let current = true
-
-    async function slidOut() {
-      await Promise.allSettled(
-        (aside.current?.getAnimations() ?? []).map(
-          async animation => animation.finished
-        )
-      )
-
-      if (current) onClosed()
-    }
-
-    void slidOut()
-
-    return () => {
-      current = false
-    }
-  }, [open, onClosed])
+  const showBody = useCallback((node: HTMLDivElement | null) => {
+    body.current = node
+    setBodyShown(node !== null)
+  }, [])
 
   useLayoutEffect(() => {
     const scroller = body.current
     const turn = scroller?.querySelector(`[data-chat-turn="${scrollToTurnId}"]`)
 
-    if (!scroller || !turn) return
+    if (!bodyShown || !scroller || !turn) return
 
     scroller.scrollTop +=
       turn.getBoundingClientRect().top -
       scroller.getBoundingClientRect().top -
       SCROLL_MARGIN
     pinned.current = atBottom(scroller)
-  }, [scrollToTurnId])
+  }, [scrollToTurnId, bodyShown])
 
   // The Thread stays on the newest text until the user scrolls up.
   useEffect(() => {
     const scroller = body.current
     const inner = content.current
 
-    if (!scroller || !inner) return undefined
+    if (!bodyShown || !scroller || !inner) return undefined
 
     const observer = new ResizeObserver(() => {
       if (pinned.current) scroller.scrollTop = scroller.scrollHeight
@@ -124,49 +93,79 @@ export function ChatSlideout({
     observer.observe(inner)
 
     return () => observer.disconnect()
-  }, [])
+  }, [bodyShown])
 
   return (
-    <aside
-      ref={aside}
-      aria-label="Chat"
-      inert={!open}
-      className={cn(
-        'absolute inset-y-0 right-0 z-10 flex max-w-full flex-col bg-background transition-[translate,opacity,width,box-shadow] duration-slide ease-slide motion-reduce:transition-none starting:translate-x-[2.5rem] starting:opacity-0',
-        full ? 'w-full' : 'w-110 border-l border-border shadow-xl',
-        !open && 'translate-x-[2.5rem] opacity-0'
-      )}
+    <Sheet
+      open={open}
+      modal={false}
+      disablePointerDismissal
+      onOpenChange={(next, details) => {
+        if (next) return
+
+        // Esc that a stop took, or Esc in a field elsewhere like a Tree's name, isn't the slideout's.
+        if (
+          details.reason === 'escape-key' &&
+          (details.event.defaultPrevented || inFieldElsewhere(details.event))
+        ) {
+          details.cancel()
+
+          return
+        }
+
+        onClose()
+      }}
+      onOpenChangeComplete={opened => {
+        if (!opened) onClosed()
+      }}
     >
-      <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2">
-        <h2 className="text-xs text-muted-foreground">Thread</h2>
-        <div className="flex gap-1">
-          <TooltipButton
-            label={full ? 'Exit full screen' : 'Full screen'}
-            className="size-7"
-            onClick={() => setFull(!full)}
-          >
-            {full ? <Minimize2Icon /> : <Maximize2Icon />}
-          </TooltipButton>
-          <TooltipButton label="Close" className="size-7" onClick={onClose}>
-            <XIcon />
-          </TooltipButton>
-        </div>
-      </header>
-      <div
-        ref={body}
-        onScroll={event => {
-          pinned.current = atBottom(event.currentTarget)
-        }}
-        className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
+      <SheetContent
+        ref={panel}
+        container={container}
+        overlay={false}
+        showCloseButton={false}
+        initialFocus={false}
+        finalFocus={false}
+        aria-label="Chat"
+        data-slideout=""
+        className={cn(
+          'absolute z-10 max-w-full gap-0 bg-background text-base text-foreground transition-[translate,opacity,width,box-shadow] data-[side=right]:sm:max-w-full starting:translate-x-[2.5rem] starting:opacity-0',
+          full
+            ? 'shadow-none data-[side=right]:w-full data-[side=right]:border-l-0'
+            : 'shadow-xl data-[side=right]:w-110'
+        )}
       >
-        <div ref={content} className="mx-auto flex max-w-180 flex-col gap-3">
-          {thread.map(turnId => (
-            <ChatTurn key={turnId} turnId={turnId} />
-          ))}
+        <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2">
+          <h2 className="text-xs text-muted-foreground">Thread</h2>
+          <div className="flex gap-1">
+            <TooltipButton
+              label={full ? 'Exit full screen' : 'Full screen'}
+              className="size-7"
+              onClick={() => setFull(!full)}
+            >
+              {full ? <Minimize2Icon /> : <Maximize2Icon />}
+            </TooltipButton>
+            <TooltipButton label="Close" className="size-7" onClick={onClose}>
+              <XIcon />
+            </TooltipButton>
+          </div>
+        </header>
+        <div
+          ref={showBody}
+          onScroll={event => {
+            pinned.current = atBottom(event.currentTarget)
+          }}
+          className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
+        >
+          <div ref={content} className="mx-auto flex max-w-180 flex-col gap-3">
+            {thread.map(turnId => (
+              <ChatTurn key={turnId} turnId={turnId} />
+            ))}
+          </div>
         </div>
-      </div>
-      <ChatInput end={end} onFocus={onFocus} onSent={onSent} />
-    </aside>
+        <ChatInput end={end} onFocus={onFocus} onSent={onSent} />
+      </SheetContent>
+    </Sheet>
   )
 }
 

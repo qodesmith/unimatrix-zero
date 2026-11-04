@@ -1455,7 +1455,7 @@ it.each([
 )
 
 function slideout() {
-  return page.getByRole('complementary', {name: 'Chat'})
+  return page.getByRole('dialog', {name: 'Chat'})
 }
 
 /** Each Turn's text, without the Provider's mark and Model pill a Reply shows. */
@@ -1659,17 +1659,17 @@ it('slides the slideout a short way in as it opens and out as it closes, fading 
   await freezeAnimations()
   await openChatAt('Reply four')
   await expect.element(slideout()).toBeInTheDocument()
-  const aside = slideout().element()
-  expectShortFadingSlide(aside)
+  const panel = slideout().element()
+  expectShortFadingSlide(panel)
   await setPlaybackRate(1)
-  await expect.poll(() => sliding(aside)).toBe(false)
+  await expect.poll(() => sliding(panel)).toBe(false)
 
   await setPlaybackRate(0)
   await slideout().getByRole('button', {name: 'Close'}).click()
-  expect(aside.isConnected).toBe(true)
-  expectShortFadingSlide(aside)
+  expect(panel.isConnected).toBe(true)
+  expectShortFadingSlide(panel)
   await setPlaybackRate(1)
-  await expect.poll(() => aside.isConnected).toBe(false)
+  await expect.poll(() => panel.isConnected).toBe(false)
 })
 
 it('keeps the slideout until its slide out ends, however long that takes', async () => {
@@ -1677,20 +1677,20 @@ it('keeps the slideout until its slide out ends, however long that takes', async
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
   await openChatAt('Reply four')
-  const aside = slideout().element()
-  await expect.poll(() => sliding(aside)).toBe(false)
+  const panel = slideout().element()
+  await expect.poll(() => sliding(panel)).toBe(false)
 
   await freezeAnimationsAndTimers()
   await slideout().getByRole('button', {name: 'Close'}).click()
-  await expect.poll(() => sliding(aside)).toBe(true)
+  await expect.poll(() => sliding(panel)).toBe(true)
   vi.runOnlyPendingTimers()
   vi.useRealTimers()
   await new Promise(requestAnimationFrame)
   await new Promise(requestAnimationFrame)
-  expect(aside.isConnected).toBe(true)
+  expect(panel.isConnected).toBe(true)
 
   await setPlaybackRate(1)
-  await expect.poll(() => aside.isConnected).toBe(false)
+  await expect.poll(() => panel.isConnected).toBe(false)
 })
 
 function turnSlides() {
@@ -1885,20 +1885,20 @@ it('widens the slideout to full screen and back with a transition rather than a 
 
   await openChatAt('Reply four')
   await expect.element(slideout()).toBeVisible()
-  const aside = slideout().element()
-  await expect.poll(() => sliding(aside)).toBe(false)
+  const panel = slideout().element()
+  await expect.poll(() => sliding(panel)).toBe(false)
 
   const canvasWidth = canvas().element().getBoundingClientRect().width
 
   await freezeAnimations()
   await slideout().getByRole('button', {name: 'Full screen'}).click()
-  expect(transitionOf(aside, 'width')).toBeDefined()
+  expect(transitionOf(panel, 'width')).toBeDefined()
   await setPlaybackRate(1)
   await expect.poll(slideoutWidth).toBe(canvasWidth)
 
   await setPlaybackRate(0)
   await slideout().getByRole('button', {name: 'Exit full screen'}).click()
-  expect(transitionOf(aside, 'width')).toBeDefined()
+  expect(transitionOf(panel, 'width')).toBeDefined()
   await setPlaybackRate(1)
   await expect.poll(slideoutWidth).toBeLessThan(canvasWidth / 2)
 })
@@ -1920,17 +1920,17 @@ it('opens, widens and closes the slideout without sliding, fading or growing whe
   await freezeAnimations()
   await openChatAt('Reply four')
   await expect.element(slideout()).toBeInTheDocument()
-  const aside = slideout().element()
-  expect(sliding(aside)).toBe(false)
-  expect(fading(aside)).toBe(false)
+  const panel = slideout().element()
+  expect(sliding(panel)).toBe(false)
+  expect(fading(panel)).toBe(false)
 
   await slideout().getByRole('button', {name: 'Full screen'}).click()
-  expect(transitionOf(aside, 'width')).toBeUndefined()
+  expect(transitionOf(panel, 'width')).toBeUndefined()
 
   await slideout().getByRole('button', {name: 'Close'}).click()
-  expect(sliding(aside)).toBe(false)
-  expect(fading(aside)).toBe(false)
-  await expect.poll(() => aside.isConnected).toBe(false)
+  expect(sliding(panel)).toBe(false)
+  expect(fading(panel)).toBe(false)
+  await expect.poll(() => panel.isConnected).toBe(false)
 })
 
 it('zooms and switches orientation without gliding or hiding the connections when the OS asks for reduced motion', async () => {
@@ -1971,7 +1971,17 @@ it('zooms and switches orientation without gliding or hiding the connections whe
   expect(hidden).toBe(false)
 })
 
-it('scrolls the slideout to the Reply it opened from, expands to cover the canvas, and closes with Esc or its close control', async () => {
+function fieldElsewhere() {
+  const field = document.createElement('input')
+
+  field.setAttribute('aria-label', 'Tree name')
+  document.body.append(field)
+  onTestFinished(() => field.remove())
+
+  return page.getByRole('textbox', {name: 'Tree name'})
+}
+
+it('scrolls the slideout to the Reply it opened from, expands to cover the canvas, and closes with Esc unless the user is typing elsewhere, or with its close control', async () => {
   clock = 0
   await renderCanvas({
     prompts: [prompt(1, null, 'Prompt one'), prompt(2, 11, 'Prompt two')],
@@ -2001,6 +2011,13 @@ it('scrolls the slideout to the Reply it opened from, expands to cover the canva
   const canvasWidth = canvas().element().getBoundingClientRect().width
 
   expect(slideoutWidth()).toBeLessThan(canvasWidth / 2)
+
+  await fieldElsewhere().fill('A name')
+  await userEvent.keyboard('{Escape}')
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  expect(slideout().element()).toHaveAttribute('data-open')
+
   await slideout().getByRole('button', {name: 'Full screen'}).click()
   await expect.poll(slideoutWidth).toBe(canvasWidth)
   await slideout().getByRole('button', {name: 'Exit full screen'}).click()
@@ -2092,16 +2109,6 @@ it('retries a failed Reply in place: the same Reply streams again from nothing',
   await expect.element(page.getByText('Second try')).toBeVisible()
 })
 
-function fieldElsewhere() {
-  const field = document.createElement('input')
-
-  field.setAttribute('aria-label', 'Tree name')
-  document.body.append(field)
-  onTestFinished(() => field.remove())
-
-  return page.getByRole('textbox', {name: 'Tree name'})
-}
-
 it('stops the streaming Reply at the end of the Active Thread with Esc, unless the user is typing elsewhere', async () => {
   const {main} = await renderCanvas(endingIn('streaming', ''))
   await expect.element(page.getByText('Writing…')).toBeVisible()
@@ -2164,7 +2171,9 @@ it('stops the slideout’s streaming Reply with Esc rather than closing the slid
   expect(main.sent.filter(command => command.type === 'reply.stop')).toEqual([
     {type: 'reply.stop', treeId, replyId: uuid(12)},
   ])
-  await expect.element(slideout()).toBeVisible()
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  expect(slideout().element()).toHaveAttribute('data-open')
 
   main.publish({
     treeId,
