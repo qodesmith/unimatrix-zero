@@ -1,4 +1,5 @@
 import type {Prompt, Reply} from '@uz/contract/turns'
+import type {Ref} from 'react'
 
 import {ReplyView, useReply} from '#modules/turns/main'
 import {Bubble, BubbleContent} from '#shadcn/ui/bubble'
@@ -47,6 +48,8 @@ export function ChatSlideout({
   // The portal draws the body a render after the slideout mounts.
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null)
   const content = useRef<HTMLDivElement>(null)
+  const input = useRef<HTMLTextAreaElement>(null)
+  const opener = useRef<HTMLElement | null>(null)
   const pinned = useRef(true)
   const thread = pathTo(index, end.id)
 
@@ -58,10 +61,22 @@ export function ChatSlideout({
     )
   }
 
+  /** Closing hands focus back to the opener, unless the user took it elsewhere. */
+  function returnFocus() {
+    const {activeElement} = document
+
+    const elsewhere =
+      activeElement !== document.body &&
+      !activeElement?.closest('[data-slideout]')
+
+    return elsewhere ? false : (opener.current ?? false)
+  }
+
+  // Opening at a Turn, or following a send to its Reply, scrolls there and puts the user in the Input.
   useLayoutEffect(() => {
     const turn = scroller?.querySelector(`[data-chat-turn="${scrollToTurnId}"]`)
 
-    if (!scroller || !turn) return
+    if (!open || !scroller || !turn) return
 
     scroller.scrollBy({
       top:
@@ -70,7 +85,18 @@ export function ChatSlideout({
         SCROLL_MARGIN,
     })
     pinned.current = atBottom(scroller)
-  }, [scrollToTurnId, scroller])
+
+    const {activeElement} = document
+
+    if (
+      activeElement instanceof HTMLElement &&
+      !panel.current?.contains(activeElement)
+    ) {
+      opener.current = activeElement
+    }
+
+    input.current?.focus({preventScroll: true})
+  }, [open, scrollToTurnId, scroller])
 
   // The Thread stays on the newest text until the user scrolls up.
   useEffect(() => {
@@ -118,7 +144,7 @@ export function ChatSlideout({
         overlay={false}
         showCloseButton={false}
         initialFocus={false}
-        finalFocus={false}
+        finalFocus={returnFocus}
         aria-label="Chat"
         inert={!open}
         data-slideout=""
@@ -158,7 +184,7 @@ export function ChatSlideout({
             ))}
           </div>
         </div>
-        <ChatInput end={end} onFocus={onFocus} onSent={onSent} />
+        <ChatInput ref={input} end={end} onFocus={onFocus} onSent={onSent} />
       </SheetContent>
     </Sheet>
   )
@@ -214,24 +240,16 @@ function ChatReply({reply}: {reply: Reply}) {
 }
 
 interface ChatInputProps {
+  ref: Ref<HTMLTextAreaElement>
   end: Reply
   onFocus: (replyId: string) => void
   onSent: (replyId: string) => void
 }
 
-/** Keyed by the Reply: a send redraws it for the new one, which takes focus. */
-function ChatInput({end, onFocus, onSent}: ChatInputProps) {
+/** Keyed by the Reply: a send redraws it for the new one. */
+function ChatInput({ref, end, onFocus, onSent}: ChatInputProps) {
   const {treeId, drafts, setDraft} = useCanvas()
   const {status} = useReply(end)
-  const textarea = useRef<HTMLTextAreaElement>(null)
-  const sentFor = useRef<string | null>(null)
-
-  useEffect(() => {
-    if (sentFor.current !== end.id) return
-
-    sentFor.current = null
-    textarea.current?.focus()
-  }, [end.id])
 
   if (status === 'failed') return null
 
@@ -240,15 +258,12 @@ function ChatInput({end, onFocus, onSent}: ChatInputProps) {
       <div className="mx-auto max-w-180">
         <PromptInput
           key={end.id}
-          ref={textarea}
+          ref={ref}
           treeId={treeId}
           parentReplyId={end.id}
           canSend={status !== 'streaming'}
           onFocus={() => onFocus(end.id)}
-          onSent={replyId => {
-            sentFor.current = replyId
-            onSent(replyId)
-          }}
+          onSent={onSent}
           draft={drafts.get(end.id) ?? ''}
           onDraftChange={text => setDraft(end.id, text)}
         />

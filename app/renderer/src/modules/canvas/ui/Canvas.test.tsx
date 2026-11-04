@@ -1458,6 +1458,14 @@ function slideout() {
   return page.getByRole('dialog', {name: 'Chat'})
 }
 
+function slideoutInput() {
+  return slideout().getByRole('textbox', {name: 'Prompt'})
+}
+
+function chatButtonOf(replyText: string) {
+  return nodeOf(replyText).getByRole('button', {name: 'Open in Chat mode'})
+}
+
 /** Each Turn's text, without the Provider's mark and Model pill a Reply shows. */
 function chatTurns() {
   return [...slideout().element().querySelectorAll('[data-chat-turn]')].map(
@@ -1484,16 +1492,14 @@ function threadToReplyFour() {
 }
 
 async function openChatAt(replyText: string) {
-  return nodeOf(replyText)
-    .getByRole('button', {name: 'Open in Chat mode'})
-    .click()
+  return chatButtonOf(replyText).click()
 }
 
 function slideoutWidth() {
   return slideout().element().getBoundingClientRect().width
 }
 
-it('opens the slideout on a Reply’s Thread from its button, with one Input at its end and that Thread highlighted', async () => {
+it('opens the slideout on a Reply’s Thread from its button, with one Input at its end that takes focus, and that Thread highlighted', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
@@ -1508,15 +1514,14 @@ it('opens the slideout on a Reply’s Thread from its button, with one Input at 
     'Prompt four',
     'Reply four',
   ])
-  expect(
-    slideout().getByRole('textbox', {name: 'Prompt'}).elements()
-  ).toHaveLength(1)
+  expect(slideoutInput().elements()).toHaveLength(1)
+  await expect.element(slideoutInput()).toHaveFocus()
 
   await hoverAway()
   await expect.poll(highlightedEdges).toEqual(threadToReplyFour())
 })
 
-it('switches the slideout to another Reply’s Thread, and closes it when a canvas Input takes focus', async () => {
+it('switches the slideout to another Reply’s Thread with its Input focused, and closes it when a canvas Input takes focus, leaving focus there', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
@@ -1537,11 +1542,13 @@ it('switches the slideout to another Reply’s Thread, and closes it when a canv
       'Prompt four',
       'Reply four',
     ])
+  await expect.element(slideoutInput()).toHaveFocus()
   await hoverAway()
   await expect.poll(highlightedEdges).toEqual(threadToReplyFour())
 
   await clickInputUnder('Reply two')
   await expect.element(slideout()).not.toBeInTheDocument()
+  await expect.element(inputUnder('Reply two')).toHaveFocus()
   await hoverAway()
   await expect
     .poll(highlightedEdges)
@@ -1555,7 +1562,7 @@ it('branches from the slideout into a Reply that already has a response, and fol
   await openChatAt('Reply one')
   await expect.poll(chatTurns).toEqual(['Prompt one', 'Reply one'])
 
-  await slideout().getByRole('textbox', {name: 'Prompt'}).fill('A third way')
+  await slideoutInput().fill('A third way')
   await userEvent.keyboard('{Enter}')
 
   await expect
@@ -1568,10 +1575,8 @@ it('branches from the slideout into a Reply that already has a response, and fol
   await expect
     .poll(chatTurns)
     .toEqual(['Prompt one', 'Reply one', 'A third way', 'Writing…Stop'])
-  await expect
-    .element(slideout().getByRole('textbox', {name: 'Prompt'}))
-    .toHaveFocus()
-  await slideout().getByRole('textbox', {name: 'Prompt'}).fill('And then?')
+  await expect.element(slideoutInput()).toHaveFocus()
+  await slideoutInput().fill('And then?')
   await expect
     .element(slideout().getByRole('button', {name: 'Send'}))
     .toBeDisabled()
@@ -1982,7 +1987,7 @@ function fieldElsewhere() {
   return page.getByRole('textbox', {name: 'Tree name'})
 }
 
-it('scrolls the slideout to the Reply it opened from, expands to cover the canvas, and closes with Esc unless the user is typing elsewhere, or with its close control', async () => {
+it('scrolls the slideout to the Reply it opened from, expands to cover the canvas, and closes with Esc unless the user is typing elsewhere, or with its close control, handing focus back to the button that opened it', async () => {
   clock = 0
   await renderCanvas({
     prompts: [prompt(1, null, 'Prompt one'), prompt(2, 11, 'Prompt two')],
@@ -2024,10 +2029,13 @@ it('scrolls the slideout to the Reply it opened from, expands to cover the canva
 
   await userEvent.keyboard('{Escape}')
   await expect.element(slideout()).not.toBeInTheDocument()
+  await expect.element(chatButtonOf('Reply two')).toHaveFocus()
 
+  await openChatAt('Reply two')
   await openChatAt('Reply one')
   await slideout().getByRole('button', {name: 'Close'}).click()
   await expect.element(slideout()).not.toBeInTheDocument()
+  await expect.element(chatButtonOf('Reply one')).toHaveFocus()
 })
 
 function endingIn(status: Reply['status'], text = 'Reply two'): Saved {
@@ -2157,13 +2165,14 @@ it('shares a Stop from Esc with the Reply’s button: Stopping… until it ends,
   expect(page.getByText('Claude is not running.').query()).toBeNull()
 })
 
-it('stops the slideout’s streaming Reply with Esc rather than closing the slideout', async () => {
+it('stops the slideout’s streaming Reply with Esc from its Input rather than closing the slideout', async () => {
   const {main} = await renderCanvas(endingIn('streaming', ''))
   await expect.element(page.getByText('Writing…')).toBeVisible()
 
   await openChatAt('Writing…')
   await expect.element(slideout()).toBeVisible()
   await expect.element(slideout().getByText('Writing…')).toBeVisible()
+  await expect.element(slideoutInput()).toHaveFocus()
 
   await userEvent.keyboard('{Escape}')
 

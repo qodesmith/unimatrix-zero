@@ -47,7 +47,12 @@ export function useEscapeStops({
 
       const {target} = event
 
-      if (target instanceof Element && target.closest('input, textarea')) {
+      // Esc in a field belongs to it, but the slideout's Input has no use for Esc.
+      if (
+        target instanceof Element &&
+        target.closest('input, textarea') &&
+        !target.closest('[data-slideout]')
+      ) {
         return
       }
 
