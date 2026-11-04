@@ -2015,8 +2015,6 @@ it('scrolls the slideout to the Reply it opened from, expands to cover the canva
 
   await fieldElsewhere().fill('A name')
   await userEvent.keyboard('{Escape}')
-  await new Promise(requestAnimationFrame)
-  await new Promise(requestAnimationFrame)
   expect(slideout().element()).toHaveAttribute('data-open')
 
   await slideout().getByRole('button', {name: 'Full screen'}).click()
@@ -2172,8 +2170,6 @@ it('stops the slideout’s streaming Reply with Esc rather than closing the slid
   expect(main.sent.filter(command => command.type === 'reply.stop')).toEqual([
     {type: 'reply.stop', treeId, replyId: uuid(12)},
   ])
-  await new Promise(requestAnimationFrame)
-  await new Promise(requestAnimationFrame)
   expect(slideout().element()).toHaveAttribute('data-open')
 
   main.publish({
