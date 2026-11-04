@@ -1,6 +1,7 @@
 import type {CanvasLayoutNode} from '../canvas-layout'
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Node, NodeProps} from '@xyflow/react'
+import type {Ref} from 'react'
 
 import {ReplyView, useReply} from '#modules/turns/main'
 import {Card} from '#shadcn/ui/card'
@@ -57,6 +58,7 @@ function ReplyBody({reply}: {reply: Reply}) {
 
   const {status, contextSize, contextWindow} = useReply(reply)
   const previous = previousReply(index, reply)
+  const bottomChatButton = useRef<HTMLButtonElement>(null)
 
   return (
     <>
@@ -68,11 +70,7 @@ function ReplyBody({reply}: {reply: Reply}) {
             contextWindow={contextWindow}
           />
         )}
-        <OpenChatButton
-          replyId={reply.id}
-          label="Open in Chat mode"
-          className="ml-auto"
-        />
+        <OpenChatButton replyId={reply.id} className="ml-auto" />
       </header>
       <CappedText
         limit={limitTurnHeight}
@@ -93,12 +91,12 @@ function ReplyBody({reply}: {reply: Reply}) {
                 treeId={reply.treeId}
                 replyId={reply.id}
                 className="size-6 text-muted-foreground"
+                onGoneWithFocus={() =>
+                  bottomChatButton.current?.focus({preventScroll: true})
+                }
               />
             )}
-            <OpenChatButton
-              replyId={reply.id}
-              label="Open this Reply in Chat mode"
-            />
+            <OpenChatButton ref={bottomChatButton} replyId={reply.id} />
           </>
         }
         className="px-3.5 py-2"
@@ -114,18 +112,19 @@ function ReplyBody({reply}: {reply: Reply}) {
 
 function OpenChatButton({
   replyId,
-  label,
   className,
+  ref,
 }: {
   replyId: string
-  label: string
   className?: string
+  ref?: Ref<HTMLButtonElement>
 }) {
   const {openChat} = useCanvas()
 
   return (
     <TooltipButton
-      label={label}
+      ref={ref}
+      label="Open in Chat mode"
       className={cn('size-6 text-muted-foreground', className)}
       onClick={() => openChat(replyId)}
     >

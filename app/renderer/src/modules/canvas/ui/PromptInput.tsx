@@ -11,7 +11,7 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from '#shadcn/ui/input-group'
-import {useState} from 'react'
+import {useRef, useState} from 'react'
 
 import {useAttachedReply} from '../canvas-context'
 import {StopButton} from './StopButton'
@@ -47,6 +47,7 @@ export function PromptInput({
 }: PromptInputProps) {
   const sendPrompt = useSendPrompt(treeId, parentReplyId)
   const {sendKey} = useSettings()
+  const form = useRef<HTMLFormElement>(null)
   const [ownDraft, setOwnDraft] = useState('')
   const draft = kept ?? ownDraft
   const [sending, setSending] = useState(false)
@@ -95,6 +96,7 @@ export function PromptInput({
 
   return (
     <form
+      ref={form}
       className="nowheel nopan w-full"
       onSubmit={event => {
         event.preventDefault()
@@ -134,6 +136,9 @@ export function PromptInput({
                 treeId={treeId}
                 replyId={stopReplyId}
                 variant="default"
+                onGoneWithFocus={() =>
+                  form.current?.querySelector('textarea')?.focus()
+                }
               />
             )}
           </div>

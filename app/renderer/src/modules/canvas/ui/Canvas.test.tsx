@@ -1462,8 +1462,11 @@ function slideoutInput() {
   return slideout().getByRole('textbox', {name: 'Prompt'})
 }
 
+/** The one in the card's header, before the one under the Reply's text. */
 function chatButtonOf(replyText: string) {
-  return nodeOf(replyText).getByRole('button', {name: 'Open in Chat mode'})
+  return nodeOf(replyText)
+    .getByRole('button', {name: 'Open in Chat mode'})
+    .first()
 }
 
 /** Each Turn's text, without the Provider's mark and Model pill a Reply shows. */
@@ -2275,10 +2278,11 @@ it('leaves a streaming Reply going on Esc with the Setting off, on the canvas an
   expect(main.sent.map(command => command.type)).not.toContain('reply.stop')
 })
 
+/** The one in the row under the Reply's text, after the header's. */
 function bottomChatButtonOf(replyText: string) {
-  return nodeOf(replyText).getByRole('button', {
-    name: 'Open this Reply in Chat mode',
-  })
+  return nodeOf(replyText)
+    .getByRole('button', {name: 'Open in Chat mode'})
+    .last()
 }
 
 function chatTurnIds() {
@@ -2301,6 +2305,9 @@ it.each([true, false])(
     await renderCanvas({...saved, settings: {limitTurnHeight}})
     await expect.element(page.getByText('Reply five')).toBeVisible()
 
+    expect(bottomChatButtonOf('Reply one').element().closest('header')).toBe(
+      null
+    )
     await bottomChatButtonOf('Reply one').click()
     await expect.poll(chatTurnIds).toEqual([uuid(1), uuid(11)])
 
@@ -2312,7 +2319,7 @@ it.each([true, false])(
     await expect.element(chatButtonOf('Reply one')).toBeInTheDocument()
     expect(
       nodeOf('Prompt two')
-        .getByRole('button', {name: /Chat mode/})
+        .getByRole('button', {name: 'Open in Chat mode'})
         .query()
     ).toBeNull()
   }
@@ -2394,6 +2401,53 @@ it('swaps Send for Stop in the slideout’s Input while its Reply streams, keepi
     .toBeEnabled()
   expect(slideout().getByRole('button', {name: /Stop/}).query()).toBeNull()
   await expect.element(slideoutInput()).toHaveValue('And then?')
+  await expect.element(slideoutInput()).toHaveFocus()
+})
+
+async function pressStop(stop: ReturnType<typeof slideout>) {
+  const button = stop.element()
+
+  if (!(button instanceof HTMLElement)) throw new Error('Stop is not a button')
+
+  button.focus()
+  await userEvent.keyboard('{Enter}')
+}
+
+it('keeps focus on a card’s Stop pressed from the keyboard through Stopping…, then hands it to the card’s slideout button', async () => {
+  const {main} = await renderCanvas(endingIn('streaming', ''))
+
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  await pressStop(nodeOf('Writing…').getByRole('button', {name: 'Stop'}))
+  await expect
+    .element(nodeOf('Writing…').getByRole('button', {name: 'Stopping…'}))
+    .toHaveFocus()
+
+  main.publish({
+    treeId,
+    replyId: uuid(12),
+    type: 'RUN_FINISHED',
+    status: 'stopped',
+  })
+  await expect.element(canvas().getByText('Stopped')).toBeVisible()
+  await expect.element(bottomChatButtonOf('Stopped')).toHaveFocus()
+})
+
+it('keeps focus on the slideout’s Stop pressed from the keyboard through Stopping…, then hands it to the Input', async () => {
+  const {main} = await renderCanvas(endingIn('streaming', ''))
+
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  await openChatAt('Writing…')
+  await pressStop(slideout().getByRole('button', {name: 'Stop'}))
+  await expect
+    .element(slideout().getByRole('button', {name: 'Stopping…'}))
+    .toHaveFocus()
+
+  main.publish({
+    treeId,
+    replyId: uuid(12),
+    type: 'RUN_FINISHED',
+    status: 'stopped',
+  })
   await expect.element(slideoutInput()).toHaveFocus()
 })
 
