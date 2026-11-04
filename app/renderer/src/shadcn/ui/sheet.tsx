@@ -38,14 +38,19 @@ function SheetContent({
   children,
   side = 'right',
   showCloseButton = true,
+  overlay = true,
+  container,
   ...props
 }: SheetPrimitive.Popup.Props & {
   side?: 'top' | 'right' | 'bottom' | 'left'
   showCloseButton?: boolean
+  /** Off for a non-modal sheet, which leaves what's behind it clickable. */
+  overlay?: boolean
+  container?: SheetPrimitive.Portal.Props['container']
 }) {
   return (
-    <SheetPortal>
-      <SheetOverlay />
+    <SheetPortal container={container}>
+      {overlay && <SheetOverlay />}
       <SheetPrimitive.Popup
         data-slot="sheet-content"
         data-side={side}

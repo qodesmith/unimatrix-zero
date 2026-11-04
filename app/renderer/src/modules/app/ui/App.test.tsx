@@ -169,7 +169,7 @@ it('closes only Settings on Esc over a streaming Reply and the slideout: the Rep
   await renderApp()
   const ids = await startStreaming(main)
   await page.getByRole('button', {name: 'Open in Chat mode'}).click()
-  const slideout = page.getByRole('complementary', {name: 'Chat'})
+  const slideout = page.getByRole('dialog', {name: 'Chat'})
   await expect.element(slideout).toBeVisible()
 
   await openSettings()
@@ -177,6 +177,7 @@ it('closes only Settings on Esc over a streaming Reply and the slideout: the Rep
   await userEvent.keyboard('{Escape}')
   await expect.element(settingsSheet()).not.toBeInTheDocument()
 
+  expect(slideout.element()).toHaveAttribute('data-open')
   await expect.element(slideout.getByText('Hi there')).toBeVisible()
   expect(main.sent.map(command => command.type)).not.toContain('reply.stop')
 })

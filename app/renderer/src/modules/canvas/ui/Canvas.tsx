@@ -4,7 +4,7 @@ import type {TreeIndex} from '../tree'
 import type {Focus} from './Flow'
 import type {CanvasOrientation} from '@uz/contract/settings'
 import type {Viewport} from '@xyflow/react'
-import type {ReactNode} from 'react'
+import type {ReactNode, Ref} from 'react'
 
 import {useSettings, useUpdateSettings} from '#modules/settings/main'
 import {useTurns} from '#modules/turns/main'
@@ -102,6 +102,7 @@ function EmptyTree({treeId, onPlaced, onSent}: EmptyTreeProps) {
 type CanvasFrameProps = HeadingProps & {
   controls?: ReactNode
   children?: ReactNode
+  bodyRef?: Ref<HTMLDivElement>
 }
 
 function CanvasFrame({
@@ -109,6 +110,7 @@ function CanvasFrame({
   sidebarToggle,
   controls,
   children,
+  bodyRef,
 }: CanvasFrameProps) {
   return (
     <div className="flex h-full flex-col">
@@ -119,7 +121,9 @@ function CanvasFrame({
         </h2>
         {controls}
       </header>
-      <div className="relative min-h-0 flex-1">{children}</div>
+      <div ref={bodyRef} className="relative min-h-0 flex-1">
+        {children}
+      </div>
     </div>
   )
 }
@@ -180,6 +184,7 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
   const [focus, setFocus] = useState<Focus | null>(null)
   const [inputAt, setInputAt] = useState<Viewport | null>(null)
   const [showMap, setShowMap] = useState(false)
+  const [frameBody, setFrameBody] = useState<HTMLDivElement | null>(null)
 
   const [expanded, setExpanded] = useState<Expanded>(() => ({
     ids: new Set(),
@@ -372,6 +377,7 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
       <ReactFlowProvider>
         <CanvasFrame
           {...heading}
+          bodyRef={setFrameBody}
           controls={
             <CanvasControls
               orientation={canvasOrientation}
@@ -409,6 +415,7 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
           />
           {chatTurnId !== null && chatEnd && (
             <ChatSlideout
+              container={frameBody}
               end={chatEnd}
               scrollToTurnId={chatTurnId}
               open={chatOpen}
