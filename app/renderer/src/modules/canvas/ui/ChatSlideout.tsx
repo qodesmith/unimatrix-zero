@@ -247,7 +247,6 @@ interface ChatInputProps {
   onSent: (replyId: string) => void
 }
 
-/** Keyed by the Reply: a send redraws it for the new one. */
 function ChatInput({ref, end, onFocus, onSent}: ChatInputProps) {
   const {treeId, drafts, setDraft} = useCanvas()
   const {status} = useReply(end)
