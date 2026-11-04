@@ -1,8 +1,5 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreIssues": {
-    "app/renderer/src/shadcn/**": ["exports", "types"]
-  },
   "workspaces": {
     ".": {
       "entry": ["scripts/*.ts"],
@@ -23,6 +20,7 @@
       "project": ["src/**/*.ts"]
     },
     "app/renderer": {
+      "entry": ["src/shadcn/**/*.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx,css}"]
     },
     "app/provider-host": {

@@ -205,9 +205,9 @@ function failed(failure: RunFailure): Partial<Reply> {
 }
 
 function visibleOrder(article: Element) {
-  return [...article.querySelectorAll('p, details, [role="group"]')].map(node =>
-    node.textContent.slice(0, 20)
-  )
+  return [
+    ...article.querySelectorAll('p, [data-slot="collapsible"], [role="group"]'),
+  ].map(node => node.textContent.slice(0, 20))
 }
 
 it('shows the thinking live and collapsed, then how long it took', async () => {

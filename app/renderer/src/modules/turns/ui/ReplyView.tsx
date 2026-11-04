@@ -13,6 +13,11 @@ import {useModelName} from '#modules/models/main'
 import {Badge} from '#shadcn/ui/badge'
 import {Button} from '#shadcn/ui/button'
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '#shadcn/ui/collapsible'
+import {
   Trace,
   TraceCollapsible,
   TraceCollapsibleContent,
@@ -23,6 +28,7 @@ import {
 } from '#shadcn/ui/trace'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {cn} from 'cn'
+import {ChevronRightIcon} from 'lucide-react'
 import {Fragment} from 'react'
 
 import {useReplyRun} from '../reply-run/use-reply-run'
@@ -238,14 +244,17 @@ function ThinkingBlockView({block}: {block: ThinkingBlock}) {
   const {text, startedAt, endedAt} = block
 
   return (
-    <details className="rounded-md bg-muted/50 px-2 py-1 text-xs text-muted-foreground">
-      <summary className="cursor-pointer select-none">
+    <Collapsible className="rounded-md bg-muted/50 px-2 py-1 text-xs text-muted-foreground">
+      <CollapsibleTrigger className="group/thinking-trigger flex w-full cursor-pointer items-center gap-1 text-left select-none">
+        <ChevronRightIcon className="size-3 shrink-0 transition-transform group-aria-expanded/thinking-trigger:rotate-90" />
         {endedAt === null
           ? 'Thinking…'
           : `Thought for ${describeDuration(endedAt - startedAt)}`}
-      </summary>
-      <p className="mt-1 whitespace-pre-wrap">{text}</p>
-    </details>
+      </CollapsibleTrigger>
+      <CollapsibleContent keepMounted>
+        <p className="mt-1 whitespace-pre-wrap">{text}</p>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 
