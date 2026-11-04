@@ -6,7 +6,7 @@ import {Message, MessageContent} from '#shadcn/ui/message'
 import {Sheet, SheetContent} from '#shadcn/ui/sheet'
 import {cn} from 'cn'
 import {Maximize2Icon, Minimize2Icon, XIcon} from 'lucide-react'
-import {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react'
+import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 
 import {atBottom} from '../at-bottom'
 import {useCanvas} from '../canvas-context'
@@ -44,9 +44,8 @@ export function ChatSlideout({
   const {index} = useCanvas()
   const [full, setFull] = useState(false)
   const panel = useRef<HTMLDivElement>(null)
-  const body = useRef<HTMLDivElement>(null)
   // The portal draws the body a render after the slideout mounts.
-  const [bodyMounted, setBodyMounted] = useState(false)
+  const [scroller, setScroller] = useState<HTMLDivElement | null>(null)
   const content = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
   const thread = pathTo(index, end.id)
@@ -59,30 +58,25 @@ export function ChatSlideout({
     )
   }
 
-  const trackBody = useCallback((node: HTMLDivElement | null) => {
-    body.current = node
-    setBodyMounted(node !== null)
-  }, [])
-
   useLayoutEffect(() => {
-    const scroller = body.current
     const turn = scroller?.querySelector(`[data-chat-turn="${scrollToTurnId}"]`)
 
-    if (!bodyMounted || !scroller || !turn) return
+    if (!scroller || !turn) return
 
-    scroller.scrollTop +=
-      turn.getBoundingClientRect().top -
-      scroller.getBoundingClientRect().top -
-      SCROLL_MARGIN
+    scroller.scrollBy({
+      top:
+        turn.getBoundingClientRect().top -
+        scroller.getBoundingClientRect().top -
+        SCROLL_MARGIN,
+    })
     pinned.current = atBottom(scroller)
-  }, [scrollToTurnId, bodyMounted])
+  }, [scrollToTurnId, scroller])
 
   // The Thread stays on the newest text until the user scrolls up.
   useEffect(() => {
-    const scroller = body.current
     const inner = content.current
 
-    if (!bodyMounted || !scroller || !inner) return undefined
+    if (!scroller || !inner) return undefined
 
     const observer = new ResizeObserver(() => {
       if (pinned.current) scroller.scrollTop = scroller.scrollHeight
@@ -92,7 +86,7 @@ export function ChatSlideout({
     observer.observe(inner)
 
     return () => observer.disconnect()
-  }, [bodyMounted])
+  }, [scroller])
 
   return (
     <Sheet
@@ -152,7 +146,7 @@ export function ChatSlideout({
           </div>
         </header>
         <div
-          ref={trackBody}
+          ref={setScroller}
           onScroll={event => {
             pinned.current = atBottom(event.currentTarget)
           }}
