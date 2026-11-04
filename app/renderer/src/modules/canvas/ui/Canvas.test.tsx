@@ -2328,14 +2328,15 @@ it('stops a streaming Reply off the Active Thread from its card’s bottom row, 
   const {main} = await renderCanvas(saved)
   await expect.element(page.getByText('Prompt five')).toBeVisible()
 
-  const card = document.querySelector(`[data-turn="${uuid(13)}"]`)
+  // In layout pixels: the canvas may still be zooming to fit.
+  const card = document.querySelector<HTMLElement>(`[data-turn="${uuid(13)}"]`)
 
   if (!card) throw new Error('Reply three has no card')
 
   const stop = nodeOf('Writing…').getByRole('button', {name: 'Stop'})
 
   await expect.element(stop).toBeVisible()
-  const {height} = card.getBoundingClientRect()
+  const height = card.offsetHeight
 
   await stop.click()
 
@@ -2353,7 +2354,7 @@ it('stops a streaming Reply off the Active Thread from its card’s bottom row, 
   expect(
     nodeOf('Stopped').getByRole('button', {name: /Stop/}).query()
   ).toBeNull()
-  expect(card.getBoundingClientRect().height).toBe(height)
+  expect(card.offsetHeight).toBe(height)
 })
 
 it('swaps Send for Stop in the slideout’s Input while its Reply streams, keeping focus and the draft, with Stopping… and a refusal shown', async () => {
