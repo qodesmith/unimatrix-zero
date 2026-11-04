@@ -23,9 +23,7 @@ export function StopButton({
   return (
     <>
       {state.status === 'stopRefused' && (
-        <span className="min-w-0 truncate text-xs text-destructive">
-          {state.error}
-        </span>
+        <span className="min-w-0 text-xs text-destructive">{state.error}</span>
       )}
       <TooltipButton
         label={stopping ? 'Stopping…' : 'Stop'}

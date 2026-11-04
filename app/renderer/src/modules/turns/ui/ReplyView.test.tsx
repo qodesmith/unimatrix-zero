@@ -428,7 +428,7 @@ it('says only that the limit was reached when the Provider gave no reset time', 
   await expect.element(screen.getByText('Limit reached')).toBeVisible()
 })
 
-it('draws no Stop while the Reply streams, since its content scrolls and would carry Stop away', async () => {
+it('draws no Stop in a streaming Reply’s content', async () => {
   const screen = await replay(before('TOOL_CALL_START'))
   const article = screen.getByRole('article', {name: 'Reply'})
 

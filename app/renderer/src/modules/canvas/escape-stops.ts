@@ -18,8 +18,7 @@ interface EscapeStops {
 
 /**
  * Esc stops the streaming Reply in view, the slideout's end else the Active
- * Thread's, capturing the key before the slideout closes on it. Off in
- * Settings, it leaves Esc alone.
+ * Thread's, capturing the key before the slideout closes on it.
  */
 export function useEscapeStops({
   treeId,
