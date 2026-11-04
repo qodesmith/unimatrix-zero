@@ -15,7 +15,6 @@ import {PromptInput} from './PromptInput'
 import {TooltipButton} from './TooltipButton'
 
 interface ChatSlideoutProps {
-  /** The canvas's body, which the slideout covers rather than the window. */
   container: HTMLElement | null
   end: Reply
   scrollToTurnId: string
