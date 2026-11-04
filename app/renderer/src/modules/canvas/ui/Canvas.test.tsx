@@ -1592,6 +1592,21 @@ it('branches from the slideout into a Reply that already has a response, and fol
   expect(highlightedEdges()).toHaveLength(3)
 })
 
+it('hands focus back to the button that opened the slideout when it closes after a send from its Input', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await openChatAt('Reply five')
+  await slideoutInput().fill('And then?')
+  await userEvent.keyboard('{Enter}')
+  await expect.poll(chatTurns).toContain('Writing…Stop')
+  await expect.element(slideoutInput()).toHaveFocus()
+
+  await slideout().getByRole('button', {name: 'Close'}).click()
+  await expect.element(slideout()).not.toBeInTheDocument()
+  await expect.element(chatButtonOf('Reply five')).toHaveFocus()
+})
+
 it('opens the Model picker of a Reply’s Input on the canvas', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()

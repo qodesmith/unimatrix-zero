@@ -61,10 +61,10 @@ export function ChatSlideout({
     )
   }
 
-  /** Closing hands focus back to the opener, unless the user took it elsewhere. */
   function returnFocus() {
     const {activeElement} = document
 
+    // The closing panel is inert, which drops its focus to the body, so the body counts as the slideout's.
     const elsewhere =
       activeElement !== document.body &&
       !activeElement?.closest('[data-slideout]')
@@ -90,6 +90,7 @@ export function ChatSlideout({
 
     if (
       activeElement instanceof HTMLElement &&
+      activeElement !== document.body &&
       !panel.current?.contains(activeElement)
     ) {
       opener.current = activeElement
