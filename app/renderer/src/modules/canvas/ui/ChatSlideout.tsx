@@ -47,7 +47,7 @@ export function ChatSlideout({
   const panel = useRef<HTMLDivElement>(null)
   const body = useRef<HTMLDivElement>(null)
   // The portal draws the body a render after the slideout mounts.
-  const [bodyShown, setBodyShown] = useState(false)
+  const [bodyMounted, setBodyMounted] = useState(false)
   const content = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
   const thread = pathTo(index, end.id)
@@ -60,30 +60,30 @@ export function ChatSlideout({
     )
   }
 
-  const showBody = useCallback((node: HTMLDivElement | null) => {
+  const trackBody = useCallback((node: HTMLDivElement | null) => {
     body.current = node
-    setBodyShown(node !== null)
+    setBodyMounted(node !== null)
   }, [])
 
   useLayoutEffect(() => {
     const scroller = body.current
     const turn = scroller?.querySelector(`[data-chat-turn="${scrollToTurnId}"]`)
 
-    if (!bodyShown || !scroller || !turn) return
+    if (!bodyMounted || !scroller || !turn) return
 
     scroller.scrollTop +=
       turn.getBoundingClientRect().top -
       scroller.getBoundingClientRect().top -
       SCROLL_MARGIN
     pinned.current = atBottom(scroller)
-  }, [scrollToTurnId, bodyShown])
+  }, [scrollToTurnId, bodyMounted])
 
   // The Thread stays on the newest text until the user scrolls up.
   useEffect(() => {
     const scroller = body.current
     const inner = content.current
 
-    if (!bodyShown || !scroller || !inner) return undefined
+    if (!bodyMounted || !scroller || !inner) return undefined
 
     const observer = new ResizeObserver(() => {
       if (pinned.current) scroller.scrollTop = scroller.scrollHeight
@@ -93,7 +93,7 @@ export function ChatSlideout({
     observer.observe(inner)
 
     return () => observer.disconnect()
-  }, [bodyShown])
+  }, [bodyMounted])
 
   return (
     <Sheet
@@ -127,9 +127,11 @@ export function ChatSlideout({
         initialFocus={false}
         finalFocus={false}
         aria-label="Chat"
+        inert={!open}
         data-slideout=""
+        // Base UI plays no enter for a popup that mounts open, so `starting:` slides it in.
         className={cn(
-          'absolute z-10 max-w-full gap-0 bg-background text-base text-foreground transition-[translate,opacity,width,box-shadow] data-[side=right]:sm:max-w-full starting:translate-x-[2.5rem] starting:opacity-0',
+          'absolute z-10 max-w-full gap-0 bg-background bg-clip-border text-base text-foreground transition-[translate,opacity,width,box-shadow] data-[side=right]:sm:max-w-full starting:translate-x-[2.5rem] starting:opacity-0',
           full
             ? 'shadow-none data-[side=right]:w-full data-[side=right]:border-l-0'
             : 'shadow-xl data-[side=right]:w-110'
@@ -151,7 +153,7 @@ export function ChatSlideout({
           </div>
         </header>
         <div
-          ref={showBody}
+          ref={trackBody}
           onScroll={event => {
             pinned.current = atBottom(event.currentTarget)
           }}

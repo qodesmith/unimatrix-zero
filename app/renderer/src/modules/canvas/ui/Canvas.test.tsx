@@ -1672,7 +1672,7 @@ it('slides the slideout a short way in as it opens and out as it closes, fading 
   await expect.poll(() => panel.isConnected).toBe(false)
 })
 
-it('keeps the slideout until its slide out ends, however long that takes', async () => {
+it('keeps the slideout, inert, until its slide out ends, however long that takes', async () => {
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
@@ -1688,6 +1688,7 @@ it('keeps the slideout until its slide out ends, however long that takes', async
   await new Promise(requestAnimationFrame)
   await new Promise(requestAnimationFrame)
   expect(panel.isConnected).toBe(true)
+  expect(panel).toHaveAttribute('inert')
 
   await setPlaybackRate(1)
   await expect.poll(() => panel.isConnected).toBe(false)
