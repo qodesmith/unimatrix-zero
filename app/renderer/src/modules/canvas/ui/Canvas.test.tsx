@@ -1708,7 +1708,12 @@ it('keeps the slideout, inert, until its slide out ends, however long that takes
   await new Promise(requestAnimationFrame)
   await new Promise(requestAnimationFrame)
   expect(panel.isConnected).toBe(true)
-  expect(panel).toHaveAttribute('inert')
+  const input = panel.querySelector('textarea')
+
+  if (!input) throw new Error('The slideout has no Input')
+
+  input.focus()
+  expect(document.activeElement).not.toBe(input)
 
   await setPlaybackRate(1)
   await expect.poll(() => panel.isConnected).toBe(false)
