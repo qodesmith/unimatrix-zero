@@ -77,10 +77,7 @@ export function ReplyView({reply}: {reply: Reply}) {
       ))}
       {thinkingBefore(content.length)}
       {streaming && (
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">Writing…</span>
-          <StopButton treeId={reply.treeId} replyId={reply.id} />
-        </div>
+        <span className="text-xs text-muted-foreground">Writing…</span>
       )}
       <StatusLine status={status} failure={failure} provider={reply.provider} />
       {status === 'failed' && <RetryControls reply={reply} />}
@@ -152,27 +149,6 @@ function RetryControls({reply}: {reply: Reply}) {
         )
       )}
     </div>
-  )
-}
-
-function StopButton({treeId, replyId}: {treeId: string; replyId: string}) {
-  const {state, stop} = useReplyRun(treeId, replyId)
-
-  return (
-    <>
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-6 px-2 text-xs"
-        disabled={state.status === 'stopping'}
-        onClick={stop}
-      >
-        {state.status === 'stopping' ? 'Stopping…' : 'Stop'}
-      </Button>
-      {state.status === 'stopRefused' && (
-        <span className="text-xs text-destructive">{state.error}</span>
-      )}
-    </>
   )
 }
 

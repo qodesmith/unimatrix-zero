@@ -1325,7 +1325,7 @@ it('shows each Reply’s Context size, its details in a drawer the info button o
   // The drawer covers the Reply's left, so the click lands on its right.
   await replyTwo.click({
     force: true,
-    position: {x: replyTwo.element().clientWidth - 4, y: 4},
+    position: {x: replyTwo.element().getBoundingClientRect().width - 4, y: 4},
   })
   await expect.element(details).not.toBeVisible()
 
@@ -1574,12 +1574,12 @@ it('branches from the slideout into a Reply that already has a response, and fol
 
   await expect
     .poll(chatTurns)
-    .toEqual(['Prompt one', 'Reply one', 'A third way', 'Writing…Stop'])
+    .toEqual(['Prompt one', 'Reply one', 'A third way', 'Writing…'])
   await expect.element(slideoutInput()).toHaveFocus()
   await slideoutInput().fill('And then?')
   await expect
-    .element(slideout().getByRole('button', {name: 'Send'}))
-    .toBeDisabled()
+    .element(slideout().getByRole('button', {name: 'Stop'}))
+    .toBeVisible()
 
   const sentPromptId = nodeOf('A third way').element().getAttribute('data-id')
 
@@ -1599,7 +1599,7 @@ it('hands focus back to the button that opened the slideout when it closes after
   await openChatAt('Reply five')
   await slideoutInput().fill('And then?')
   await userEvent.keyboard('{Enter}')
-  await expect.poll(chatTurns).toContain('Writing…Stop')
+  await expect.poll(chatTurns).toContain('Writing…')
   await expect.element(slideoutInput()).toHaveFocus()
 
   await slideout().getByRole('button', {name: 'Close'}).click()
@@ -2254,6 +2254,146 @@ it('stops the streaming Reply with Esc from the Context size drawer rather than 
   await userEvent.keyboard('{Escape}')
   await expect.element(info).toHaveAttribute('aria-expanded', 'false')
   await expect.element(details).not.toBeVisible()
+})
+
+it('leaves a streaming Reply going on Esc with the Setting off, on the canvas and in the slideout, which Esc closes', async () => {
+  const {main} = await renderCanvas({
+    ...endingIn('streaming', ''),
+    settings: {escStopsReply: false},
+  })
+
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+
+  await page.getByRole('button', {name: 'Zoom in'}).click()
+  await userEvent.keyboard('{Escape}')
+
+  await openChatAt('Writing…')
+  await expect.element(slideoutInput()).toHaveFocus()
+  await userEvent.keyboard('{Escape}')
+  await expect.element(slideout()).not.toBeInTheDocument()
+
+  expect(main.sent.map(command => command.type)).not.toContain('reply.stop')
+})
+
+function bottomChatButtonOf(replyText: string) {
+  return nodeOf(replyText).getByRole('button', {
+    name: 'Open this Reply in Chat mode',
+  })
+}
+
+function chatTurnIds() {
+  return [...slideout().element().querySelectorAll('[data-chat-turn]')].map(
+    turn => turn.getAttribute('data-chat-turn')
+  )
+}
+
+it.each([true, false])(
+  'opens a Reply in the slideout from the bottom of its card, long or short, with a Fork pill or not (Limit Turn height %s), and keeps the header’s button',
+  async limitTurnHeight => {
+    const saved = forkedTree()
+
+    saved.replies = saved.replies.map(one =>
+      one.id === uuid(11)
+        ? {...one, content: [{type: 'text', text: `Reply one\n\n${longReply}`}]}
+        : one
+    )
+
+    await renderCanvas({...saved, settings: {limitTurnHeight}})
+    await expect.element(page.getByText('Reply five')).toBeVisible()
+
+    await bottomChatButtonOf('Reply one').click()
+    await expect.poll(chatTurnIds).toEqual([uuid(1), uuid(11)])
+
+    await bottomChatButtonOf('Reply four').click()
+    await expect
+      .poll(chatTurnIds)
+      .toEqual([uuid(1), uuid(11), uuid(2), uuid(12), uuid(4), uuid(14)])
+
+    await expect.element(chatButtonOf('Reply one')).toBeInTheDocument()
+    expect(
+      nodeOf('Prompt two')
+        .getByRole('button', {name: /Chat mode/})
+        .query()
+    ).toBeNull()
+  }
+)
+
+it('stops a streaming Reply off the Active Thread from its card’s bottom row, which keeps its height as Stop goes', async () => {
+  const saved = forkedTree()
+
+  saved.replies = saved.replies.map(one =>
+    one.id === uuid(13) ? {...one, status: 'streaming', content: []} : one
+  )
+
+  const {main} = await renderCanvas(saved)
+  await expect.element(page.getByText('Prompt five')).toBeVisible()
+
+  const card = document.querySelector(`[data-turn="${uuid(13)}"]`)
+
+  if (!card) throw new Error('Reply three has no card')
+
+  const stop = nodeOf('Writing…').getByRole('button', {name: 'Stop'})
+
+  await expect.element(stop).toBeVisible()
+  const {height} = card.getBoundingClientRect()
+
+  await stop.click()
+
+  expect(main.sent.filter(command => command.type === 'reply.stop')).toEqual([
+    {type: 'reply.stop', treeId, replyId: uuid(13)},
+  ])
+
+  main.publish({
+    treeId,
+    replyId: uuid(13),
+    type: 'RUN_FINISHED',
+    status: 'stopped',
+  })
+  await expect.element(canvas().getByText('Stopped')).toBeVisible()
+  expect(
+    nodeOf('Stopped').getByRole('button', {name: /Stop/}).query()
+  ).toBeNull()
+  expect(card.getBoundingClientRect().height).toBe(height)
+})
+
+it('swaps Send for Stop in the slideout’s Input while its Reply streams, keeping focus and the draft, with Stopping… and a refusal shown', async () => {
+  const {main} = await renderCanvas(endingIn('streaming', ''))
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+
+  await openChatAt('Writing…')
+  await slideoutInput().fill('And then?')
+  expect(slideout().getByRole('button', {name: 'Send'}).query()).toBeNull()
+
+  main.stops.refusal = 'Claude is not running.'
+  await slideout().getByRole('button', {name: 'Stop'}).click()
+  await expect
+    .element(slideout().getByText('Claude is not running.'))
+    .toBeVisible()
+  await expect.element(slideoutInput()).toHaveFocus()
+
+  main.stops.refusal = null
+  await slideout().getByRole('button', {name: 'Stop'}).click()
+  await expect
+    .element(slideout().getByRole('button', {name: 'Stopping…'}))
+    .toBeDisabled()
+  expect(slideout().getByText('Claude is not running.').query()).toBeNull()
+  expect(main.sent.filter(command => command.type === 'reply.stop')).toEqual([
+    {type: 'reply.stop', treeId, replyId: uuid(12)},
+    {type: 'reply.stop', treeId, replyId: uuid(12)},
+  ])
+
+  main.publish({
+    treeId,
+    replyId: uuid(12),
+    type: 'RUN_FINISHED',
+    status: 'stopped',
+  })
+  await expect
+    .element(slideout().getByRole('button', {name: 'Send'}))
+    .toBeEnabled()
+  expect(slideout().getByRole('button', {name: /Stop/}).query()).toBeNull()
+  await expect.element(slideoutInput()).toHaveValue('And then?')
+  await expect.element(slideoutInput()).toHaveFocus()
 })
 
 it('keeps the slideout on the newest text of a streaming Reply until the user scrolls up', async () => {

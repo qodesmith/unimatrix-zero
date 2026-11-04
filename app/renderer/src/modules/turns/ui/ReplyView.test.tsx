@@ -63,8 +63,6 @@ function fakeMain(claude: ProviderStatus['status'] = 'ready') {
         }
       }
 
-      if (command.type === 'reply.stop') return {ok: true, value: {}}
-
       if (command.type === 'reply.retry') {
         const again: Reply = {
           ...reply,
@@ -430,24 +428,12 @@ it('says only that the limit was reached when the Provider gave no reset time', 
   await expect.element(screen.getByText('Limit reached')).toBeVisible()
 })
 
-it('stops a streaming Reply from its button, which waits as Stopping… until the Reply ends', async () => {
+it('draws no Stop while the Reply streams, since its content scrolls and would carry Stop away', async () => {
   const screen = await replay(before('TOOL_CALL_START'))
+  const article = screen.getByRole('article', {name: 'Reply'})
 
-  await expect.element(screen.getByText('Writing…')).toBeVisible()
-  await screen.getByRole('button', {name: 'Stop'}).click()
-
-  expect(sent.filter(command => command.type === 'reply.stop')).toEqual([
-    {type: 'reply.stop', treeId, replyId},
-  ])
-  await expect
-    .element(screen.getByRole('button', {name: 'Stopping…'}))
-    .toBeDisabled()
-
-  main.publish({type: 'RUN_FINISHED', treeId, replyId, status: 'stopped'})
-
-  await expect.element(screen.getByText('Stopped')).toBeVisible()
-  await expect.element(screen.getByText(/Let me look/)).toBeVisible()
-  expect(screen.getByRole('button', {name: /Stop/}).query()).toBeNull()
+  await expect.element(article.getByText('Writing…')).toBeVisible()
+  expect(article.getByRole('button', {name: /Stop/}).query()).toBeNull()
 })
 
 const lost: RunFailure = {code: 'connection-lost', message: 'ECONNRESET'}

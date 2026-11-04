@@ -112,6 +112,12 @@ export function ChatSection() {
         checked={settings.reReadNote}
         onChange={reReadNote => void update({reReadNote})}
       />
+      <Toggle
+        label="Esc stops a Reply"
+        description="Pressing Esc while a Reply streams stops it."
+        checked={settings.escStopsReply}
+        onChange={escStopsReply => void update({escStopsReply})}
+      />
     </>
   )
 }

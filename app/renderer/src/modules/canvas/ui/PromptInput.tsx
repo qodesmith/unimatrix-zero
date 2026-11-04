@@ -14,6 +14,7 @@ import {
 import {useState} from 'react'
 
 import {useAttachedReply} from '../canvas-context'
+import {StopButton} from './StopButton'
 
 interface PromptInputProps {
   treeId: string
@@ -28,6 +29,8 @@ interface PromptInputProps {
   onDraftChange?: (draft: string) => void
   /** False while the parent Reply streams: it takes a draft, not a send. */
   canSend?: boolean
+  /** The streaming Reply whose Stop takes Send's place. */
+  stopReplyId?: string
   ref?: Ref<HTMLTextAreaElement>
 }
 
@@ -39,6 +42,7 @@ export function PromptInput({
   draft: kept,
   onDraftChange,
   canSend = true,
+  stopReplyId,
   ref,
 }: PromptInputProps) {
   const sendPrompt = useSendPrompt(treeId, parentReplyId)
@@ -116,14 +120,22 @@ export function PromptInput({
           <FieldError className="text-xs">{error}</FieldError>
           <div className="ml-auto flex items-center gap-1">
             <ModelPicker pick={pick} onPick={setPicked} />
-            <InputGroupButton
-              type="submit"
-              variant="default"
-              size="sm"
-              disabled={held || !selected || draft.trim() === ''}
-            >
-              Send
-            </InputGroupButton>
+            {stopReplyId === undefined ? (
+              <InputGroupButton
+                type="submit"
+                variant="default"
+                size="sm"
+                disabled={held || !selected || draft.trim() === ''}
+              >
+                Send
+              </InputGroupButton>
+            ) : (
+              <StopButton
+                treeId={treeId}
+                replyId={stopReplyId}
+                variant="default"
+              />
+            )}
           </div>
           {(pick.notice ?? pick.heldBecause) && (
             <p className="flex w-full flex-wrap justify-end gap-x-2 text-xs font-normal text-muted-foreground">

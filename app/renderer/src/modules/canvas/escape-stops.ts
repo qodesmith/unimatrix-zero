@@ -1,6 +1,7 @@
 import type {TreeIndex} from './tree'
 import type {Reply} from '@uz/contract/turns'
 
+import {useSettings} from '#modules/settings/main'
 import {useReply, useReplyRun} from '#modules/turns/main'
 import {useEffect} from 'react'
 
@@ -17,7 +18,8 @@ interface EscapeStops {
 
 /**
  * Esc stops the streaming Reply in view, the slideout's end else the Active
- * Thread's, capturing the key before the slideout closes on it.
+ * Thread's, capturing the key before the slideout closes on it. Off in
+ * Settings, it leaves Esc alone.
  */
 export function useEscapeStops({
   treeId,
@@ -36,9 +38,10 @@ export function useEscapeStops({
 
   const streaming = status === 'streaming' ? replyId : null
   const {stop} = useReplyRun(treeId, streaming)
+  const {escStopsReply} = useSettings()
 
   useEffect(() => {
-    if (streaming === null) return undefined
+    if (streaming === null || !escStopsReply) return undefined
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape' || event.defaultPrevented || dialogOpen()) {
@@ -63,5 +66,5 @@ export function useEscapeStops({
     globalThis.addEventListener('keydown', onKeyDown, true)
 
     return () => globalThis.removeEventListener('keydown', onKeyDown, true)
-  }, [streaming, stop])
+  }, [streaming, stop, escStopsReply])
 }

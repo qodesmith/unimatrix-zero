@@ -3,21 +3,21 @@ import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Node, NodeProps} from '@xyflow/react'
 
 import {ReplyView, useReply} from '#modules/turns/main'
-import {Button} from '#shadcn/ui/button'
 import {Card} from '#shadcn/ui/card'
-import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
 import {Handle, Position} from '@xyflow/react'
 import {cn} from 'cn'
-import {ChevronDownIcon, ChevronRightIcon} from 'lucide-react'
+import {ChevronRightIcon} from 'lucide-react'
 import {useEffect, useRef, useState} from 'react'
 
 import {useCanvas} from '../canvas-context'
 import {TURN_WIDTH} from '../canvas-layout'
-import {branchesOf, isFork, previousReply, repliesUnder} from '../tree'
+import {branchesOf, isFork, previousReply} from '../tree'
 import {CappedText} from './CappedText'
 import {ContextMeter, ContextSize} from './ContextSize'
+import {FoldedStack, ForkPill} from './ForkPill'
 import {PromptBox} from './PromptBox'
 import {PromptInput} from './PromptInput'
+import {StopButton} from './StopButton'
 import {TooltipButton} from './TooltipButton'
 
 /** A vertical Reply's line down through its Input's space, drawn as its edge. */
@@ -68,7 +68,11 @@ function ReplyBody({reply}: {reply: Reply}) {
             contextWindow={contextWindow}
           />
         )}
-        <OpenChatButton replyId={reply.id} />
+        <OpenChatButton
+          replyId={reply.id}
+          label="Open in Chat mode"
+          className="ml-auto"
+        />
       </header>
       <CappedText
         limit={limitTurnHeight}
@@ -77,12 +81,25 @@ function ReplyBody({reply}: {reply: Reply}) {
         onToggle={() => toggleExpanded(reply.id)}
         streaming={status === 'streaming'}
         trailing={
-          isFork(index, reply.id) && (
-            <ForkPill
+          <>
+            {isFork(index, reply.id) && (
+              <ForkPill
+                replyId={reply.id}
+                branches={branchesOf(index, reply.id).length}
+              />
+            )}
+            {status === 'streaming' && (
+              <StopButton
+                treeId={reply.treeId}
+                replyId={reply.id}
+                className="size-6 text-muted-foreground"
+              />
+            )}
+            <OpenChatButton
               replyId={reply.id}
-              branches={branchesOf(index, reply.id).length}
+              label="Open this Reply in Chat mode"
             />
-          )
+          </>
         }
         className="px-3.5 py-2"
       >
@@ -95,97 +112,25 @@ function ReplyBody({reply}: {reply: Reply}) {
   )
 }
 
-function OpenChatButton({replyId}: {replyId: string}) {
+function OpenChatButton({
+  replyId,
+  label,
+  className,
+}: {
+  replyId: string
+  label: string
+  className?: string
+}) {
   const {openChat} = useCanvas()
 
   return (
     <TooltipButton
-      label="Open in Chat mode"
-      className="ml-auto size-6 text-muted-foreground"
+      label={label}
+      className={cn('size-6 text-muted-foreground', className)}
       onClick={() => openChat(replyId)}
     >
       <ChevronRightIcon />
     </TooltipButton>
-  )
-}
-
-function ForkPill({replyId, branches}: {replyId: string; branches: number}) {
-  const {index, toggleCollapsed} = useCanvas()
-  const folded = useFolded(replyId)
-
-  const streaming = folded
-    ? repliesUnder(index, replyId).filter(one => one.status === 'streaming')
-    : []
-
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="xs"
-            aria-expanded={!folded}
-            aria-label={
-              streaming.length > 0
-                ? `${branches} Branches, ${streaming.length} streaming`
-                : undefined
-            }
-            className={cn(
-              'h-auto gap-1 rounded-full border-border py-0.5 pr-2.5 pl-1.5 text-[0.6875rem] font-normal',
-              folded
-                ? 'bg-muted font-medium text-foreground shadow-xs hover:bg-muted dark:hover:bg-muted'
-                : 'text-muted-foreground aria-expanded:bg-transparent aria-expanded:text-muted-foreground aria-expanded:hover:bg-muted aria-expanded:hover:text-foreground',
-              streaming.length > 0 && 'border-primary/50'
-            )}
-            onClick={() => toggleCollapsed(replyId)}
-          />
-        }
-      >
-        <ChevronDownIcon
-          className={cn(
-            'transition-transform duration-slide ease-slide motion-reduce:transition-none',
-            folded && '-rotate-90'
-          )}
-        />
-        {branches} Branches
-        {streaming.length > 0 && (
-          <span className="ml-0.5 size-1.5 animate-pulse rounded-full bg-primary motion-reduce:animate-none" />
-        )}
-      </TooltipTrigger>
-      <TooltipContent>
-        {folded ? 'Show Branches' : 'Hide Branches'}
-      </TooltipContent>
-    </Tooltip>
-  )
-}
-
-function useFolded(replyId: string | null) {
-  const {index, collapsedReplyIds} = useCanvas()
-
-  return (
-    replyId !== null && isFork(index, replyId) && collapsedReplyIds.has(replyId)
-  )
-}
-
-/**
- * Needs a positioned parent, and the box it peeks out under drawn after it. It
- * reaches no lower than the Input's -mt-3, or a hidden Input's stack shows
- * below the card.
- */
-function FoldedStack({replyId}: {replyId: string | null}) {
-  if (!useFolded(replyId)) return null
-
-  return (
-    <>
-      <div
-        aria-hidden
-        className="absolute inset-x-4 -bottom-3 h-6 rounded-b-xl border border-border bg-card shadow-sm"
-      />
-      <div
-        aria-hidden
-        className="absolute inset-x-2 -bottom-1.5 h-6 rounded-b-xl border border-border bg-card shadow-sm"
-      />
-    </>
   )
 }
 
