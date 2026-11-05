@@ -2305,7 +2305,7 @@ it.each([true, false])(
       .poll(chatTurnIds)
       .toEqual([uuid(1), uuid(11), uuid(2), uuid(12), uuid(4), uuid(14)])
 
-    await expect.element(chatButtonOf('Reply one')).toBeInTheDocument()
+    expect(chatButtonOf('Reply one').element().closest('header')).not.toBeNull()
     expect(
       nodeOf('Prompt two')
         .getByRole('button', {name: 'Open in Chat mode'})
@@ -2332,6 +2332,9 @@ it('stops a streaming Reply off the Active Thread from its card’s bottom row, 
   const stop = nodeOf('Writing…').getByRole('button', {name: 'Stop'})
 
   await expect.element(stop).toBeVisible()
+  expect(stop.element().parentElement).toBe(
+    bottomChatButtonOf('Writing…').element().parentElement
+  )
   const height = card.offsetHeight
 
   await stop.click()
