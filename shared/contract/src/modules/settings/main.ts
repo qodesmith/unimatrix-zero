@@ -31,6 +31,7 @@ export const SettingsSchema = z.strictObject({
   sendKey: SendKeySchema,
   /** The note above the Input before a step that re-reads the Thread cold. */
   reReadNote: z.boolean(),
+  escStopsReply: z.boolean(),
 })
 
 export type Settings = z.infer<typeof SettingsSchema>
@@ -43,6 +44,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fontSize: 16,
   sendKey: 'enter',
   reReadNote: true,
+  escStopsReply: true,
 }
 
 export const SettingsUpdateSchema = SettingsSchema.partial()

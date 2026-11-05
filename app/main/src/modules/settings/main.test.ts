@@ -23,6 +23,7 @@ it('keeps a change across reopening and leaves the other Settings alone', () => 
     fontSize: 20,
     sendKey: 'mod-enter',
     reReadNote: false,
+    escStopsReply: false,
   } as const
 
   createSettings(db).update(others)

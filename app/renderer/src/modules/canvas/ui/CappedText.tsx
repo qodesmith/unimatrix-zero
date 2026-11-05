@@ -121,7 +121,11 @@ export function CappedText({
               {expanded ? 'Show less' : 'Show more'}
             </Button>
           )}
-          {trailing && <div className="ml-auto">{trailing}</div>}
+          {trailing && (
+            <div className="ml-auto flex min-w-0 items-center gap-1">
+              {trailing}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -133,3 +133,18 @@ it('shows and saves the send key and the re-read note from Chat', async () => {
       {type: 'settings.update', changes: {reReadNote: true}},
     ])
 })
+
+it('has Esc stop a Reply by default, and saves turning it off from Chat', async () => {
+  const main = await renderSettings()
+  const escStops = page.getByRole('switch', {name: /Esc stops a Reply/})
+
+  await sections().getByRole('button', {name: 'Chat'}).click()
+  await expect.element(escStops).toBeChecked()
+
+  await escStops.click()
+
+  await expect
+    .poll(() => main.sent)
+    .toEqual([{type: 'settings.update', changes: {escStopsReply: false}}])
+  await expect.element(escStops).not.toBeChecked()
+})

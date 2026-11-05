@@ -250,6 +250,7 @@ interface ChatInputProps {
 function ChatInput({ref, end, onFocus, onSent}: ChatInputProps) {
   const {treeId, drafts, setDraft} = useCanvas()
   const {status} = useReply(end)
+  const streaming = status === 'streaming'
 
   if (status === 'failed') return null
 
@@ -261,7 +262,8 @@ function ChatInput({ref, end, onFocus, onSent}: ChatInputProps) {
           ref={ref}
           treeId={treeId}
           parentReplyId={end.id}
-          canSend={status !== 'streaming'}
+          canSend={!streaming}
+          stopReplyId={streaming ? end.id : undefined}
           onFocus={() => onFocus(end.id)}
           onSent={onSent}
           draft={drafts.get(end.id) ?? ''}
