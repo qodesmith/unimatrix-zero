@@ -16,7 +16,6 @@ type StopButtonProps = Pick<
   onGoneWithFocus: () => void
 }
 
-/** Taking no focus from a click, so it stays in the Input being written in. */
 export function StopButton({
   treeId,
   replyId,
@@ -50,6 +49,7 @@ export function StopButton({
         className={className}
         disabled={stopping}
         focusableWhenDisabled
+        // A click takes no focus, so focus stays where it was, such as in the Input.
         onMouseDown={event => event.preventDefault()}
         onClick={stop}
       >

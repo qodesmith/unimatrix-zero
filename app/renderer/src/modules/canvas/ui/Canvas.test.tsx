@@ -7,6 +7,7 @@ import type {ProviderStatus} from '@uz/contract/providers'
 import type {Settings} from '@uz/contract/settings'
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
+import type {Locator} from 'vitest/browser'
 
 import {ConnectionsProvider} from '#modules/connections/main'
 import {SettingsProvider} from '#modules/settings/main'
@@ -2061,6 +2062,10 @@ it('scrolls the slideout to the Reply it opened from, expands to cover the canva
   await expect.element(chatButtonOf('Reply one')).toHaveFocus()
 })
 
+function finishStopped(main: ReturnType<typeof fakeMain>, replyId: string) {
+  main.publish({treeId, replyId, type: 'RUN_FINISHED', status: 'stopped'})
+}
+
 function endingIn(status: Reply['status'], text = 'Reply two'): Saved {
   clock = 0
 
@@ -2154,12 +2159,7 @@ it('stops the streaming Reply at the end of the Active Thread with Esc, unless t
     {type: 'reply.stop', treeId, replyId: uuid(12)},
   ])
 
-  main.publish({
-    treeId,
-    replyId: uuid(12),
-    type: 'RUN_FINISHED',
-    status: 'stopped',
-  })
+  finishStopped(main, uuid(12))
   await expect.element(page.getByText('Stopped')).toBeVisible()
   await expect.element(inputUnder('Stopped')).toBeInTheDocument()
 })
@@ -2204,12 +2204,7 @@ it('stops the slideout’s streaming Reply with Esc from its Input rather than c
   ])
   expect(slideout().element()).toHaveAttribute('data-open')
 
-  main.publish({
-    treeId,
-    replyId: uuid(12),
-    type: 'RUN_FINISHED',
-    status: 'stopped',
-  })
+  finishStopped(main, uuid(12))
   await expect.element(slideout().getByText('Stopped')).toBeVisible()
 
   await userEvent.keyboard('{Escape}')
@@ -2246,12 +2241,7 @@ it('stops the streaming Reply with Esc from the Context size drawer rather than 
   ])
   await expect.element(info).toHaveAttribute('aria-expanded', 'true')
 
-  main.publish({
-    treeId,
-    replyId: uuid(12),
-    type: 'RUN_FINISHED',
-    status: 'stopped',
-  })
+  finishStopped(main, uuid(12))
   await expect.element(page.getByText('Stopped')).toBeVisible()
 
   await userEvent.keyboard('{Escape}')
@@ -2278,7 +2268,6 @@ it('leaves a streaming Reply going on Esc with the Setting off, on the canvas an
   expect(main.sent.map(command => command.type)).not.toContain('reply.stop')
 })
 
-/** The one in the row under the Reply's text, after the header's. */
 function bottomChatButtonOf(replyText: string) {
   return nodeOf(replyText)
     .getByRole('button', {name: 'Open in Chat mode'})
@@ -2351,12 +2340,7 @@ it('stops a streaming Reply off the Active Thread from its card’s bottom row, 
     {type: 'reply.stop', treeId, replyId: uuid(13)},
   ])
 
-  main.publish({
-    treeId,
-    replyId: uuid(13),
-    type: 'RUN_FINISHED',
-    status: 'stopped',
-  })
+  finishStopped(main, uuid(13))
   await expect.element(canvas().getByText('Stopped')).toBeVisible()
   expect(
     nodeOf('Stopped').getByRole('button', {name: /Stop/}).query()
@@ -2390,12 +2374,7 @@ it('swaps Send for Stop in the slideout’s Input while its Reply streams, keepi
     {type: 'reply.stop', treeId, replyId: uuid(12)},
   ])
 
-  main.publish({
-    treeId,
-    replyId: uuid(12),
-    type: 'RUN_FINISHED',
-    status: 'stopped',
-  })
+  finishStopped(main, uuid(12))
   await expect
     .element(slideout().getByRole('button', {name: 'Send'}))
     .toBeEnabled()
@@ -2404,7 +2383,7 @@ it('swaps Send for Stop in the slideout’s Input while its Reply streams, keepi
   await expect.element(slideoutInput()).toHaveFocus()
 })
 
-async function pressStop(stop: ReturnType<typeof slideout>) {
+async function pressStop(stop: Locator) {
   const button = stop.element()
 
   if (!(button instanceof HTMLElement)) throw new Error('Stop is not a button')
@@ -2422,12 +2401,7 @@ it('keeps focus on a card’s Stop pressed from the keyboard through Stopping…
     .element(nodeOf('Writing…').getByRole('button', {name: 'Stopping…'}))
     .toHaveFocus()
 
-  main.publish({
-    treeId,
-    replyId: uuid(12),
-    type: 'RUN_FINISHED',
-    status: 'stopped',
-  })
+  finishStopped(main, uuid(12))
   await expect.element(canvas().getByText('Stopped')).toBeVisible()
   await expect.element(bottomChatButtonOf('Stopped')).toHaveFocus()
 })
@@ -2442,12 +2416,7 @@ it('keeps focus on the slideout’s Stop pressed from the keyboard through Stopp
     .element(slideout().getByRole('button', {name: 'Stopping…'}))
     .toHaveFocus()
 
-  main.publish({
-    treeId,
-    replyId: uuid(12),
-    type: 'RUN_FINISHED',
-    status: 'stopped',
-  })
+  finishStopped(main, uuid(12))
   await expect.element(slideoutInput()).toHaveFocus()
 })
 
