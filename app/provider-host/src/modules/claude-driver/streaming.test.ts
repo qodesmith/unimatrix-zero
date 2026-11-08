@@ -984,13 +984,63 @@ it('resumes the session in a new `claude` on the Model a Prompt asks for, closin
   expect(resumed?.runningAtStart).toEqual([])
 })
 
+it('starts the next Prompt’s `claude` on the Model it asks for after a Reply failed on a Model that doesn’t exist', async () => {
+  const failedFirst = edited('warm.ndjson', lines => {
+    const failing = lines.map(line =>
+      line.kind === 'out' && line.message.type === 'result'
+        ? {
+            ...line,
+            message: {
+              ...line.message,
+              is_error: true,
+              result:
+                'There’s an issue with the selected model (claude-nonexistent-201). It may not exist or you may not have access to it.',
+            },
+          }
+        : line
+    )
+
+    const second = failing.findIndex(
+      (line, at) => at > 2 && line.kind === 'in' && line.message.type === 'user'
+    )
+
+    const end = failing.findIndex(line => line.kind === 'end')
+
+    // Only the failed Prompt: a second one in this `claude` is unexpected.
+    return failing.toSpliced(second, end - second)
+  })
+
+  const claude = await setUp([failedFirst, 'resumed.ndjson'])
+
+  const failed = await claude.reply(FIRST_PROMPT, null, {
+    model: 'claude-nonexistent-201',
+  })
+
+  const next = await claude.reply(SECOND_PROMPT, promptRecordedIn(failed), {
+    model: MODEL,
+  })
+
+  expect(failed.at(-1)).toMatchObject({status: 'failed'})
+  expect(next.at(-1)).toMatchObject({status: 'complete'})
+  const [bad, resumed] = claude.reports()
+
+  expect(bad?.args).toContain('--model=claude-nonexistent-201')
+  expect(bad?.ended).toBe('input-closed')
+  expect(resumed?.args).toEqual(
+    expect.arrayContaining([`--resume=${SESSION_ID}`, `--model=${MODEL}`])
+  )
+})
+
 it('continues in the warm `claude` on another name for its Model', async () => {
   const claude = await setUp(['warm.ndjson'])
+  const changes: Model[][] = []
+  claude.driver.onModelsChanged(models => changes.push(models))
 
-  const first = await claude.reply(FIRST_PROMPT, null, {model: 'default'})
-  await expect
-    .poll(async () => claude.driver.listModels(claude.vendorProgram))
-    .not.toBeNull()
+  const first = await claude.reply(FIRST_PROMPT, null, {
+    model: 'claude-opus-5-5',
+  })
+
+  await expect.poll(() => changes.length).toBe(1)
   await claude.reply(SECOND_PROMPT, recordedIn(first), {model: 'opus'})
 
   await claude.allClosed()
@@ -1000,18 +1050,34 @@ it('continues in the warm `claude` on another name for its Model', async () => {
   expect(warm?.prompts).toEqual([FIRST_PROMPT, SECOND_PROMPT])
 })
 
-it('lists no Models before a `claude` has run, then those of the newest one, telling each change', async () => {
-  const claude = await setUp(['warm.ndjson', 'resumed.ndjson'])
+/** `warm.ndjson`'s `claude` as it starts, asked for no Prompt. */
+function listedOnly() {
+  return edited('warm.ndjson', lines =>
+    lines.filter(
+      line =>
+        line.kind === 'start' ||
+        line.kind === 'end' ||
+        line.message.type === 'control_request' ||
+        line.message.type === 'control_response'
+    )
+  )
+}
+
+it('lists the Models from a `claude` it starts before any Prompt, then those of the newest one, telling each change', async () => {
+  const claude = await setUp([listedOnly(), 'warm.ndjson', 'resumed.ndjson'])
   const changes: Model[][] = []
   claude.driver.onModelsChanged(models => changes.push(models))
 
-  await expect(
-    claude.driver.listModels(claude.vendorProgram)
-  ).resolves.toBeNull()
+  const listed = await claude.driver.listModels(claude.vendorProgram)
+
+  expect(changes).toEqual([listed])
+  const [reader] = claude.reports()
+
+  expect(reader?.configDir).toBe(claude.configDir)
+  expect(reader?.ended).toBe('input-closed')
 
   const first = await claude.reply(FIRST_PROMPT)
   const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
-  await expect.poll(() => changes.length).toBe(1)
 
   expect(changes[0]?.slice(0, 2)).toEqual([
     {
@@ -1038,6 +1104,15 @@ it('lists no Models before a `claude` has run, then those of the newest one, tel
   await expect(claude.driver.listModels(claude.vendorProgram)).resolves.toEqual(
     changes[1]
   )
+  expect(claude.reports()).toHaveLength(3)
+})
+
+it('fails to list the Models when the manifest names no Claude program', async () => {
+  const claude = await setUp([])
+
+  await expect(
+    claude.driver.listModels({program: null, configDir: claude.configDir})
+  ).rejects.toThrow('The manifest names no Claude program.')
 })
 
 it('learns nothing from a `claude` whose Models can’t be read, and writes the Reply all the same', async () => {

@@ -12,7 +12,7 @@ const ids = {
 
 const request: ReplyRequest = {
   ...ids,
-  model: 'default',
+  model: 'gpt-6.1-sol',
   systemPrompt: '',
   prompt: {text: 'Hello'},
   vendorProgram: {program: null, configDir: '/config'},
@@ -26,7 +26,7 @@ const complete: Ending = {
   recorded: {
     ...ids,
     type: 'REPLY_RECORDED',
-    model: 'default',
+    model: 'gpt-6.1-sol',
     session: {sessionId: 's1', messageId: 'm1'},
   },
 }

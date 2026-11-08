@@ -41,7 +41,7 @@ const [, ...steps] = fs.readFileSync(recording, 'utf8')
 const home = process.env.CODEX_HOME
 const standIn = ${JSON.stringify(CODEX_HOME_STAND_IN)}
 const vendorVariables = Object.keys(process.env).filter(name => /^(OPENAI|CODEX|ANTHROPIC|CLAUDE)_/i.test(name))
-const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], turnModels: [], modelLists: [], resumedFrom: [], contexts: [], forkedThrough: null, interrupted: null, reverted: null, ended: null}
+const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], threadModels: [], turnModels: [], modelLists: [], resumedFrom: [], contexts: [], forkedThrough: null, interrupted: null, reverted: null, ended: null}
 
 function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
@@ -155,6 +155,9 @@ process.stdin.on('data', chunk => {
         end('refused', 1)
       }
       if (message.method === 'thread/fork') report.forkedThrough = message.params.lastTurnId
+    }
+    if (message.method === 'thread/start' || message.method === 'thread/fork' || message.method === 'thread/resume') {
+      report.threadModels.push(message.params.model ?? null)
     }
     if (message.method === 'turn/start') {
       report.prompts.push(message.params.input[0].text)
