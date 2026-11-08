@@ -26,7 +26,7 @@ interface ChatSlideoutProps {
   onClosed: () => void
   onFocus: (replyId: string) => void
   /** Main started this Reply for a Prompt sent from the Input. */
-  onSent: (replyId: string) => void
+  onSent: (replyId: string, parentReplyId: string | null) => void
 }
 
 /** Room left above the Turn scrolled to, in px. */
@@ -205,7 +205,7 @@ export function ChatSlideout({
           ref={input}
           parentReplyId={inputAt}
           onFocus={() => onFocus(inputAt ?? end.id)}
-          onSent={onSent}
+          onSent={sent => onSent(sent, inputAt)}
         />
       </SheetContent>
     </Sheet>

@@ -289,12 +289,11 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
   )
 
   const sentFromChat = useCallback(
-    (replyId: string) => {
-      if (chatEnd) onSent(replyId, chatEnd.id)
-
+    (replyId: string, parentReplyId: string | null) => {
+      onSent(replyId, parentReplyId)
       followFromChat(replyId)
     },
-    [chatEnd, onSent, followFromChat]
+    [onSent, followFromChat]
   )
 
   const jumpTo = useCallback(

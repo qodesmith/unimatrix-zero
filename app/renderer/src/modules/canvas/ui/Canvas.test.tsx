@@ -2422,6 +2422,37 @@ it('shows a failed root Prompt as the chip over the root Input holding it, and s
   ])
 })
 
+it('shows a root Reply that fails with the slideout open on it only as the chip, its Prompt back in the slideout’s Input, and sends from there a new root', async () => {
+  clock = 0
+
+  const {main} = await renderCanvas({
+    prompts: [prompt(1, null, 'First try')],
+    replies: [{...reply(11, 1, ''), status: 'streaming', content: []}],
+  })
+
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  await openChatAt('Writing…')
+  finish(main, uuid(11), 'failed')
+
+  await expect.element(slideout().getByText('Connection lost')).toBeVisible()
+  expect(chatTurns()).toEqual(['FailedConnection lostRetry'])
+  await expect.element(slideoutInput()).toHaveValue('First try')
+
+  await slideoutInput().click()
+  await userEvent.keyboard('{Enter}')
+
+  await expect.element(slideout().getByText('Writing…')).toBeVisible()
+  expect(main.sent.filter(command => command.type === 'prompt.send')).toEqual([
+    {
+      type: 'prompt.send',
+      treeId,
+      parentReplyId: null,
+      text: 'First try',
+      model: {provider: 'claude', model: 'fake'},
+    },
+  ])
+})
+
 it('stops the streaming Reply at the end of the Active Thread with Esc, unless the user is typing elsewhere', async () => {
   const {main} = await renderCanvas(endingIn('streaming', ''))
   await expect.element(page.getByText('Writing…')).toBeVisible()
