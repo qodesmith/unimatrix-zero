@@ -11,6 +11,7 @@ import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 
 import {atBottom} from '../at-bottom'
 import {useCanvas} from '../canvas-context'
+import {EMPTY_DRAFT} from '../drafts'
 import {pathTo} from '../tree'
 import {PromptInput} from './PromptInput'
 import {TooltipButton} from './TooltipButton'
@@ -280,7 +281,7 @@ function ChatInput({ref, at, onFocus, onSent}: ChatInputProps) {
             if (at !== null) onFocus(at)
           }}
           onSent={onSent}
-          draft={drafts.get(at)}
+          draft={drafts.get(at) ?? EMPTY_DRAFT}
           onDraftChange={draft => setDraft(at, draft)}
         />
       </div>

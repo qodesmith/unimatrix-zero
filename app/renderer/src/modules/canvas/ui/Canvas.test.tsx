@@ -2278,7 +2278,7 @@ function modelIn(input: Locator) {
     ?.textContent
 }
 
-it('sends the restored Prompt unchanged as Retry would, on its Model, in place of the failed one so the Reply above stays no Fork', async () => {
+it('sends the restored Prompt unchanged as Retry would, on its Model, in place of the failed one so the Reply above stays no Fork, before the Turns are fetched again', async () => {
   const saved = endingIn('failed', 'Cut off')
   saved.replies = saved.replies.map(one =>
     one.id === uuid(12) ? {...one, model: 'swift'} : one
@@ -2288,6 +2288,7 @@ it('sends the restored Prompt unchanged as Retry would, on its Model, in place o
   await chipDrawn()
   await expect.element(inputUnder('Reply one')).toHaveValue('Prompt two')
   expect(modelIn(inputUnder('Reply one'))).toContain('Swift')
+  main.turnsLoads.held = new Promise(() => {})
 
   await inputUnder('Reply one').click()
   await userEvent.keyboard('{Enter}')

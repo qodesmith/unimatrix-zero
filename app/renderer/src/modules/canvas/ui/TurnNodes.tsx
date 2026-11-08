@@ -13,6 +13,7 @@ import {useEffect, useRef, useState} from 'react'
 
 import {useCanvas} from '../canvas-context'
 import {TURN_WIDTH} from '../canvas-layout'
+import {EMPTY_DRAFT} from '../drafts'
 import {branchesOf, isFork, previousReply} from '../tree'
 import {CappedText} from './CappedText'
 import {ContextMeter, ContextSize} from './ContextSize'
@@ -212,7 +213,7 @@ function ReplyInput({
               canSend={!streaming}
               onFocus={() => onInputFocus(replyId)}
               onSent={sent => onSent(sent, replyId)}
-              draft={drafts.get(replyId)}
+              draft={drafts.get(replyId) ?? EMPTY_DRAFT}
               onDraftChange={draft => setDraft(replyId, draft)}
             />
           </div>
@@ -388,7 +389,7 @@ function RootInput() {
         treeId={treeId}
         parentReplyId={null}
         onSent={sent => onSent(sent, null)}
-        draft={drafts.get(null)}
+        draft={drafts.get(null) ?? EMPTY_DRAFT}
         onDraftChange={draft => setDraft(null, draft)}
       />
     </div>
