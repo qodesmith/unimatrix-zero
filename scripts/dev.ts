@@ -9,8 +9,23 @@ import {electronPath} from './electron-as-node'
 const root = path.resolve(import.meta.dirname, '..')
 
 const worktree = createHash('sha256').update(root).digest('hex').slice(0, 8)
-const vitePort = 5173 + (parseInt(worktree, 16) % 2000)
-const debugPort = 9222 + (parseInt(worktree, 16) % 1000)
+
+// fetch refuses the Fetch spec's "bad ports", so main can't proxy to Vite on
+// one. These are the ones inside the ranges below.
+const fetchBlockedPorts = new Set([
+  6000, 6566, 6665, 6666, 6667, 6668, 6669, 6679, 6697, 10080,
+])
+
+function worktreePort(base: number, span: number) {
+  let port = base + (parseInt(worktree, 16) % span)
+
+  while (fetchBlockedPorts.has(port)) port++
+
+  return port
+}
+
+const vitePort = worktreePort(5173, 2000)
+const debugPort = worktreePort(9222, 1000)
 const fakeProvider = process.argv.includes('--fake')
 
 // A fake connection saved in the real data would pass for a real one.
