@@ -37,8 +37,8 @@ export const ModelSchema = z.strictObject({
 export type Model = z.infer<typeof ModelSchema>
 
 /**
- * The picker resolves an alias or a default before sending, so no driver gets
- * one.
+ * A Prompt's `model` is always concrete, but a Retry resends the failed Reply's
+ * recorded one, which an older row may hold as an alias or `default`.
  */
 export const ModelChoiceSchema = z.strictObject({
   provider: ProviderIdSchema,
