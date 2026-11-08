@@ -1,3 +1,4 @@
+import type {Draft, DraftKey} from './drafts'
 import type {TreeIndex} from './tree'
 import type {Reply} from '@uz/contract/turns'
 
@@ -22,8 +23,8 @@ export interface CanvasState {
   activeReplyId: string | null
   /** Its Thread becomes the Active Thread and the slideout closes. */
   onInputFocus: (replyId: string) => void
-  /** A Prompt was sent into a Reply's Input and main started this Reply for it. */
-  onSent: (replyId: string, parentReplyId: string) => void
+  /** A Prompt was sent into an Input and main started this Reply for it. */
+  onSent: (replyId: string, parentReplyId: string | null) => void
   /** The Reply whose Input takes focus once it is drawn: the one just sent for. */
   inputToFocus: string | null
   /** Before main is asked, so the canvas is ready the moment the Turns go. */
@@ -35,9 +36,9 @@ export interface CanvasState {
   toggleExpanded: (turnId: string) => void
   collapsedReplyIds: ReadonlySet<string>
   toggleCollapsed: (replyId: string) => void
-  /** By Reply id; kept here so a draft outlives its box folding or redrawing. */
-  drafts: ReadonlyMap<string, string>
-  setDraft: (replyId: string, draft: string) => void
+  /** Kept here so a draft outlives its box folding or redrawing. */
+  drafts: ReadonlyMap<DraftKey, Draft>
+  setDraft: (at: DraftKey, draft: Draft) => void
   limitTurnHeight: boolean
   contextSizeMeter: boolean
 }

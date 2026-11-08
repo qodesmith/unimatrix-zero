@@ -1,4 +1,5 @@
 import type {Database} from '#modules/database/main'
+import type {Removal} from './deletion'
 import type {ModelChoice, ProviderId} from '@uz/contract/providers'
 import type {Prompt, Reply} from '@uz/contract/turns'
 
@@ -7,6 +8,8 @@ import {NEW_REPLY, ReplyPartSchema, RunFailureSchema} from '@uz/contract/turns'
 import {and, asc, desc, eq, isNull} from 'drizzle-orm'
 import {createHash} from 'node:crypto'
 import {z} from 'zod'
+
+import {removeTurns} from './deletion'
 
 const {prompts, replies, systemPrompts} = schema
 
@@ -106,6 +109,7 @@ export interface NewExchange {
   model: string
   systemPrompt: string
   now: Date
+  replacing: Removal | null
 }
 
 export function insertExchange(
@@ -116,6 +120,8 @@ export function insertExchange(
   const {treeId, parentReplyId} = next
 
   return db.transaction(tx => {
+    if (next.replacing) removeTurns(tx, next.replacing)
+
     const root =
       parentReplyId === null &&
       tx

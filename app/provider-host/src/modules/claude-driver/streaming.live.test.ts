@@ -241,4 +241,62 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     await live.done()
   }, 180_000)
+
+  it('forgets a failed Prompt once the next is sent from the Reply above it, for two failures in one session', async () => {
+    const live = liveDriver([])
+
+    async function failed(text: string, above: SessionRef) {
+      const events = await Array.fromAsync(
+        live.driver.startReply({
+          ...live.request(text, continuing(above)),
+          model: 'claude-made-up-0',
+        })
+      )
+
+      expect(events.at(-1)).toMatchObject({
+        type: 'RUN_FINISHED',
+        status: 'failed',
+        failure: expect.anything(),
+      })
+    }
+
+    const recall =
+      'Quote every message I sent you before this one, word for word.'
+
+    const first = await live.reply('Reply with the single word TEAL.', null)
+
+    await failed(
+      'Remember the codeword ZANZIBAR and reply with it.',
+      first.recorded.session
+    )
+
+    const second = await live.reply(recall, {
+      ...first.recorded.session,
+      type: 'rewind',
+    })
+
+    expect(second.recorded.session.sessionId).toBe(
+      first.recorded.session.sessionId
+    )
+    expect(textOf(second.events)).toMatch(/TEAL/)
+    expect(textOf(second.events)).not.toMatch(/ZANZIBAR/i)
+
+    await failed(
+      'Remember the codeword MARMALADE and reply with it.',
+      second.recorded.session
+    )
+
+    const third = await live.reply(recall, {
+      ...second.recorded.session,
+      type: 'rewind',
+    })
+
+    expect(third.recorded.session.sessionId).toBe(
+      first.recorded.session.sessionId
+    )
+    expect(textOf(third.events)).toMatch(/TEAL/)
+    expect(textOf(third.events)).not.toMatch(/ZANZIBAR|MARMALADE/i)
+
+    await live.done()
+  }, 180_000)
 })

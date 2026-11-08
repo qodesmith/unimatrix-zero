@@ -1,8 +1,7 @@
 import type {Bridge} from '@uz/contract/bridge'
 import type {Command} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
-import type {ProviderStatus} from '@uz/contract/providers'
-import type {Reply, RunFailure} from '@uz/contract/turns'
+import type {Reply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
 
 import {ConnectionsProvider} from '#modules/connections/main'
@@ -10,7 +9,7 @@ import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {EventSchema} from '@uz/contract/events'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
-import {afterEach, beforeEach, expect, it, onTestFinished, vi} from 'vitest'
+import {afterEach, beforeEach, expect, it, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
 
 import recording from '../fake-reply.json'
@@ -42,7 +41,7 @@ const sent: Command[] = []
 
 let saved: Reply[] = []
 
-function fakeMain(claude: ProviderStatus['status'] = 'ready') {
+function fakeMain() {
   const listeners = new Set<(event: AppEvent) => void>()
 
   const bridge: Bridge = {
@@ -63,19 +62,6 @@ function fakeMain(claude: ProviderStatus['status'] = 'ready') {
         }
       }
 
-      if (command.type === 'reply.retry') {
-        const again: Reply = {
-          ...reply,
-          status: 'streaming',
-          content: [],
-          failure: null,
-        }
-
-        saved = saved.map(one => (one.id === command.replyId ? again : one))
-
-        return {ok: true, value: {reply: again}}
-      }
-
       return {
         ok: false,
         error: {code: 'not-found', message: 'Not in this test'},
@@ -88,7 +74,7 @@ function fakeMain(claude: ProviderStatus['status'] = 'ready') {
         app: {version: '0.0.0'},
         replies: [],
         providers: [
-          {provider: 'claude', status: claude, account: null},
+          {provider: 'claude', status: 'ready', account: null},
           {provider: 'chatgpt', status: 'not-connected', account: null},
         ],
         models: {
@@ -192,14 +178,6 @@ async function replay(upTo = before('RUN_FINISHED')) {
   stream(0, upTo)
 
   return screen
-}
-
-function failed(failure: RunFailure): Partial<Reply> {
-  return {
-    status: 'failed',
-    content: [{type: 'text', text: 'Half an answer'}],
-    failure,
-  }
 }
 
 function visibleOrder(article: Element) {
@@ -348,38 +326,6 @@ it('says why an image could not load, and offers to try again', async () => {
     .toBeVisible()
 })
 
-it.each([
-  [{code: 'connection-lost', message: 'ECONNRESET'}, 'Connection lost'],
-  [
-    {code: 'program-crashed', message: 'exit 137'},
-    'Claude stopped unexpectedly',
-  ],
-  [{code: 'host-crashed', message: 'exit 1'}, 'Claude stopped unexpectedly'],
-  [{code: 'disk-full', message: 'ENOSPC'}, 'Disk full'],
-  [
-    {code: 'host-unreachable', message: 'no reply in 5s'},
-    'Claude could not be reached',
-  ],
-  [
-    {code: 'provider-error', message: 'Overloaded, try again later'},
-    'Overloaded, try again later',
-  ],
-  [{code: 'driver-error', message: 'Bad frame'}, 'Bad frame'],
-  [{code: 'fake-failure', message: 'Asked to fail'}, 'Asked to fail'],
-  [
-    {code: 'needs-app-update', message: 'Model needs Codex 0.50'},
-    'Needs an app update',
-  ],
-] satisfies [RunFailure, string][])(
-  'says why a Reply failed: %o reads "%s"',
-  async (failure, line) => {
-    const screen = await renderSaved(failed(failure))
-
-    await expect.element(screen.getByText('Half an answer')).toBeVisible()
-    await expect.element(screen.getByText(line)).toBeVisible()
-  }
-)
-
 it('shows the Provider’s icon and the name of the Model the Reply was written on', async () => {
   const screen = await renderSaved({status: 'complete', model: 'opus-4-7'})
   const article = screen.getByRole('article', {name: 'Reply'})
@@ -396,62 +342,12 @@ it('shows the Model’s id when its Provider doesn’t list it', async () => {
     .toBeVisible()
 })
 
-it('says only that a Reply failed when it has no reason', async () => {
-  const screen = await renderSaved({
-    status: 'failed',
-    content: [{type: 'text', text: 'Half an answer'}],
-    failure: null,
-  })
-
-  await expect.element(screen.getByText('Failed', {exact: true})).toBeVisible()
-})
-
-it('says when a reached limit lifts, in local time', async () => {
-  const screen = await renderSaved(
-    failed({
-      code: 'limit-reached',
-      message: '5-hour limit',
-      resetsAt: '2026-10-19T15:05:00.000Z',
-    })
-  )
-
-  await expect
-    .element(screen.getByText(/^Limit reached · resets at /))
-    .toMatchTextContent(/at (20|0?8):35\b/u)
-})
-
-it('says only that the limit was reached when the Provider gave no reset time', async () => {
-  const screen = await renderSaved(
-    failed({code: 'limit-reached', message: '5-hour limit'})
-  )
-
-  await expect.element(screen.getByText('Limit reached')).toBeVisible()
-})
-
 it('draws no Stop in a streaming Reply’s content', async () => {
   const screen = await replay(before('TOOL_CALL_START'))
   const article = screen.getByRole('article', {name: 'Reply'})
 
   await expect.element(article.getByText('Writing…')).toBeVisible()
   expect(article.getByRole('button', {name: /Stop/}).query()).toBeNull()
-})
-
-const lost: RunFailure = {code: 'connection-lost', message: 'ECONNRESET'}
-
-it('retries a failed Reply in place: it streams again from nothing', async () => {
-  const screen = await renderSaved(failed(lost))
-
-  await expect.element(screen.getByText('Connection lost')).toBeVisible()
-  await screen.getByRole('button', {name: 'Retry'}).click()
-
-  expect(sent.filter(command => command.type === 'reply.retry')).toEqual([
-    {type: 'reply.retry', treeId, replyId},
-  ])
-
-  main.publish({type: 'RUN_STARTED', treeId, replyId})
-  await expect.element(screen.getByText('Writing…')).toBeVisible()
-  expect(screen.getByText('Half an answer').query()).toBeNull()
-  expect(screen.getByText('Connection lost').query()).toBeNull()
 })
 
 it('offers no Retry on a Reply the app quit on: it goes on like a stopped one', async () => {
@@ -461,100 +357,4 @@ it('offers no Retry on a Reply the app quit on: it goes on like a stopped one', 
     .element(screen.getByText('Interrupted when the app quit'))
     .toBeVisible()
   expect(screen.getByRole('button', {name: 'Retry'}).query()).toBeNull()
-})
-
-it('shows why main refused a retry, beside the button', async () => {
-  globalThis.window.uz = {
-    ...main,
-    send: (async (command: Command) =>
-      command.type === 'reply.retry'
-        ? {
-            ok: false,
-            error: {
-              code: 'handler-failed',
-              message: 'Connect Claude to retry.',
-            },
-          }
-        : main.send(command)) as Bridge['send'],
-  }
-  const screen = await renderSaved(failed(lost))
-
-  await screen.getByRole('button', {name: 'Retry'}).click()
-
-  await expect
-    .element(screen.getByText('Connect Claude to retry.'))
-    .toBeVisible()
-  await expect
-    .element(screen.getByRole('button', {name: 'Retry'}))
-    .toBeEnabled()
-})
-
-function goOffline() {
-  Object.defineProperty(navigator, 'onLine', {
-    configurable: true,
-    get: () => false,
-  })
-  globalThis.dispatchEvent(new Event('offline'))
-  onTestFinished(() => {
-    goOnline()
-  })
-}
-
-function goOnline() {
-  Reflect.deleteProperty(navigator, 'onLine')
-  globalThis.dispatchEvent(new Event('online'))
-}
-
-it('holds Retry while offline, saying so, and frees it once the connection is back', async () => {
-  goOffline()
-  const screen = await renderSaved(failed(lost))
-  const retry = screen.getByRole('button', {name: 'Retry'})
-
-  await expect.element(retry).toBeDisabled()
-  await expect
-    .element(screen.getByText('Offline · Retry waits for the connection'))
-    .toBeVisible()
-
-  goOnline()
-  await expect.element(retry).toBeEnabled()
-  expect(screen.getByText(/Offline/).query()).toBeNull()
-})
-
-it.each([
-  ['signed-out', 'Sign in to Claude again to retry'],
-  ['not-connected', 'Connect Claude to retry'],
-  ['starting', 'Claude is starting…'],
-  ['restarting', 'Claude is starting…'],
-  ['failed', "Claude isn't running"],
-] satisfies [ProviderStatus['status'], string][])(
-  'holds Retry while Claude is %s: "%s"',
-  async (status, reason) => {
-    main = fakeMain(status)
-    globalThis.window.uz = main
-    const screen = await renderSaved(failed(lost))
-
-    await expect
-      .element(screen.getByRole('button', {name: 'Retry'}))
-      .toBeDisabled()
-    await expect.element(screen.getByText(reason)).toBeVisible()
-  }
-)
-
-it('gates every failed Reply on one subscription to the Provider statuses', async () => {
-  let subscriptions = 0
-  globalThis.window.uz = {
-    ...main,
-    subscribe: listener => {
-      subscriptions += 1
-
-      return main.subscribe(listener)
-    },
-  }
-  const screen = await renderSaved(failed(lost), failed(lost))
-
-  await expect
-    .element(screen.getByRole('button', {name: 'Retry'}).nth(1))
-    .toBeEnabled()
-  // One for the live Replies, one for the Provider statuses.
-  expect(subscriptions).toBe(2)
 })

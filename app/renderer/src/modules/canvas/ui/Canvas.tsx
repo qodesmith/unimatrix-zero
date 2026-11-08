@@ -1,5 +1,6 @@
 import type {Turns} from '#modules/turns/main'
 import type {CanvasState, Collapsed, Expanded} from '../canvas-context'
+import type {Draft, DraftKey} from '../drafts'
 import type {TreeIndex} from '../tree'
 import type {Focus} from './Flow'
 import type {CanvasOrientation} from '@uz/contract/settings'
@@ -16,6 +17,7 @@ import {CanvasContext} from '../canvas-context'
 import {START_MARGIN, TURN_WIDTH, startZoom} from '../canvas-layout'
 import {useChatSlideout} from '../chat-slideout/use-chat-slideout'
 import {useDeletion} from '../deletion'
+import {NO_DRAFTS, reconcileDrafts, withDraft} from '../drafts'
 import {useEscapeStops} from '../escape-stops'
 import {indexTurns, isEmpty, pathTo, previousReply} from '../tree'
 import {CanvasControls} from './CanvasControls'
@@ -196,9 +198,18 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
     toggledReplyId: null,
   }))
 
-  const [drafts, setDrafts] = useState<ReadonlyMap<string, string>>(
-    () => new Map()
+  const [draftState, setDraftState] = useState(() =>
+    reconcileDrafts(NO_DRAFTS, index)
   )
+
+  const [draftsFor, setDraftsFor] = useState(index)
+
+  if (draftsFor !== index) {
+    setDraftsFor(index)
+    setDraftState(current => reconcileDrafts(current, index))
+  }
+
+  const drafts = draftState.byInput
 
   const {deleted, activeReplyId, onDeleteConfirmed} = useDeletion(
     index,
@@ -243,15 +254,8 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
     }))
   }, [])
 
-  const setDraft = useCallback((replyId: string, draft: string) => {
-    setDrafts(current => {
-      const next = new Map(current)
-
-      if (draft === '') next.delete(replyId)
-      else next.set(replyId, draft)
-
-      return next
-    })
+  const setDraft = useCallback((at: DraftKey, draft: Draft) => {
+    setDraftState(current => withDraft(current, at, draft))
   }, [])
 
   const onSent = useCallback(
@@ -285,12 +289,11 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
   )
 
   const sentFromChat = useCallback(
-    (replyId: string) => {
-      if (chatEnd) onSent(replyId, chatEnd.id)
-
+    (replyId: string, parentReplyId: string | null) => {
+      onSent(replyId, parentReplyId)
       followFromChat(replyId)
     },
-    [chatEnd, onSent, followFromChat]
+    [onSent, followFromChat]
   )
 
   const jumpTo = useCallback(

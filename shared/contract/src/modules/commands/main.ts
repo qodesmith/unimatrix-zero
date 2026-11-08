@@ -55,7 +55,10 @@ export const TreeTurnsResult = z.strictObject({
   replies: z.array(ReplySchema),
 })
 
-/** Into a Reply that already has a Prompt after it, the Prompt starts a Branch. */
+/**
+ * Into a Reply that already has a Prompt after it, the Prompt starts a Branch.
+ * A failed Prompt there, or a failed root Prompt, goes in the same step.
+ */
 export const PromptSendCommand = z.strictObject({
   type: z.literal('prompt.send'),
   treeId: z.uuid(),
@@ -66,9 +69,21 @@ export const PromptSendCommand = z.strictObject({
   model: ModelChoiceSchema,
 })
 
+const TurnIdsSchema = z.strictObject({
+  promptIds: z.array(z.uuid()),
+  replyIds: z.array(z.uuid()),
+})
+
+export type TurnIds = z.infer<typeof TurnIdsSchema>
+
 export const PromptSendResult = z.strictObject({
   prompt: PromptSchema,
   reply: ReplySchema,
+  /**
+   * The failed Prompts and Replies the new Prompt took the place of, with any
+   * Turns below them.
+   */
+  removed: TurnIdsSchema,
 })
 
 /** The Prompt and every Turn below it, for good; refused while one streams. */
@@ -78,10 +93,7 @@ export const PromptDeleteCommand = z.strictObject({
   promptId: z.uuid(),
 })
 
-export const PromptDeleteResult = z.strictObject({
-  promptIds: z.array(z.uuid()),
-  replyIds: z.array(z.uuid()),
-})
+export const PromptDeleteResult = TurnIdsSchema
 
 /**
  * Keeps the text so far. The Reply ends with its `RUN_FINISHED` once the

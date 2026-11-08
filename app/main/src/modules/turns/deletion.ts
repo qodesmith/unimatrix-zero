@@ -3,13 +3,33 @@ import type {PromptRecorded, SessionCutReport} from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
 
 import {schema} from '#modules/database/main'
-import {and, eq, inArray} from 'drizzle-orm'
+import {and, asc, eq, inArray, isNull} from 'drizzle-orm'
 
-import {continuation, cutBelow} from './continuation'
+import {continuation, cutBelow, recovery} from './continuation'
 
 const {prompts, replies} = schema
 
 type ReplyRow = typeof replies.$inferSelect
+
+type Writer = Pick<Database, 'update' | 'delete'>
+
+export interface Removal {
+  promptIds: string[]
+  cut: ReturnType<typeof cutBelow>
+}
+
+/** Sets the cut on the Reply above in the same step. */
+export function removeTurns(tx: Writer, {promptIds, cut}: Removal) {
+  if (cut) {
+    tx.update(replies)
+      .set({sessionDropFrom: cut.session.dropFrom})
+      .where(eq(replies.id, cut.replyId))
+      .run()
+  }
+
+  // The Turns below go by cascade. Their Provider session data stays.
+  tx.delete(prompts).where(inArray(prompts.id, promptIds)).run()
+}
 
 function below(db: Database, promptId: string) {
   const promptIds: string[] = []
@@ -62,22 +82,58 @@ export function deleteBelow(db: Database, treeId: string, promptId: string) {
 
   const cut = cutBelow(db, treeId, prompt, deleted.replies)
 
-  db.transaction(tx => {
-    if (cut) {
-      tx.update(replies)
-        .set({sessionDropFrom: cut.session.dropFrom})
-        .where(eq(replies.id, cut.replyId))
-        .run()
-    }
-
-    // The Turns below go by cascade. Their Provider session data stays.
-    tx.delete(prompts).where(eq(prompts.id, promptId)).run()
-  })
+  db.transaction(tx => removeTurns(tx, {promptIds: [promptId], cut}))
 
   return {
     promptIds: deleted.promptIds,
     replyIds: deleted.replies.map(reply => reply.id),
     cut,
+  }
+}
+
+/**
+ * The failed exchanges a Prompt sent from `parentReplyId`, or as the root when
+ * null, takes the place of, and the session a Retry of one would resume: it
+ * holds nothing of the failed attempt.
+ */
+export function failedToReplace(
+  db: Database,
+  treeId: string,
+  parentReplyId: string | null
+) {
+  const failed = db
+    .select({promptId: prompts.id, replyId: replies.id})
+    .from(prompts)
+    .innerJoin(replies, eq(replies.promptId, prompts.id))
+    .where(
+      and(
+        eq(prompts.treeId, treeId),
+        parentReplyId === null
+          ? isNull(prompts.parentReplyId)
+          : eq(prompts.parentReplyId, parentReplyId),
+        eq(replies.status, 'failed')
+      )
+    )
+    .orderBy(asc(prompts.createdAt), asc(prompts.id))
+    .all()
+
+  const [first] = failed
+
+  if (!first) return null
+
+  const removed = failed.map(row => below(db, row.promptId))
+  const removedReplies = removed.flatMap(turns => turns.replies)
+
+  return {
+    promptIds: removed.flatMap(turns => turns.promptIds),
+    replyIds: removedReplies.map(reply => reply.id),
+    session: recovery(db, treeId, first.replyId)?.session ?? null,
+    cut: cutBelow(
+      db,
+      treeId,
+      {id: first.promptId, parentReplyId},
+      removedReplies
+    ),
   }
 }
 
