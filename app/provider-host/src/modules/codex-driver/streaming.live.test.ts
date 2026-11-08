@@ -9,6 +9,7 @@
 import type {
   PromptRecorded,
   ReplyRecorded,
+  ReplySession,
   SessionRef,
   SignInRequest,
   StartReplyEvent,
@@ -486,6 +487,131 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       await closed()
     } finally {
       for (const home of homes) fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 180_000)
+
+  it('forgets a failed Prompt once the next is sent from the Reply above it, for two failures in one thread', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const treeId = crypto.randomUUID()
+
+    const idle = heldIdle()
+    const exits: Promise<unknown>[] = []
+
+    const driver = createCodexDriver({
+      store: fakeStore().client,
+      spawn: (command, options) => {
+        const child = spawnCodex(command, options)
+        exits.push(once(child, 'exit').catch(() => undefined))
+
+        return child
+      },
+      whenIdle: idle.whenIdle,
+    })
+
+    async function startReply(
+      text: string,
+      model: string,
+      session: ReplySession | null
+    ) {
+      return Array.fromAsync(
+        driver.startReply({
+          treeId,
+          replyId: crypto.randomUUID(),
+          model,
+          systemPrompt: 'You answer in as few words as you can.',
+          prompt: {text},
+          vendorProgram: {
+            program: {
+              path: folder ?? '',
+              build: {
+                url: 'https://example.com/codex.tar.gz',
+                sha256: '0'.repeat(64),
+                size: 1,
+                archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+              },
+            },
+            configDir: home,
+          },
+          session,
+        })
+      )
+    }
+
+    async function reply(text: string, session: ReplySession | null) {
+      const events = await startReply(text, MODEL, session)
+
+      expectComplete(events)
+
+      const recorded = events.find(
+        (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+      )
+
+      if (!recorded) throw new Error('The Reply was not recorded')
+
+      const answer = events
+        .flatMap(event => (event.type === 'TEXT_DELTA' ? [event.delta] : []))
+        .join('')
+
+      return {recorded, answer}
+    }
+
+    async function failed(text: string, above: SessionRef) {
+      const events = await startReply(text, 'gpt-made-up-0', {
+        ...above,
+        type: 'continue',
+      })
+
+      expect(events.at(-1)).toMatchObject({
+        type: 'RUN_FINISHED',
+        status: 'failed',
+        failure: expect.anything(),
+      })
+    }
+
+    const recall =
+      'Quote every message I sent you before this one, word for word.'
+
+    try {
+      const first = await reply('Reply with the single word TEAL.', null)
+
+      await failed(
+        'Remember the codeword ZANZIBAR and reply with it.',
+        first.recorded.session
+      )
+
+      const second = await reply(recall, {
+        ...first.recorded.session,
+        type: 'rewind',
+      })
+
+      expect(second.recorded.session.sessionId).toBe(
+        first.recorded.session.sessionId
+      )
+      expect(second.answer).toMatch(/TEAL/)
+      expect(second.answer).not.toMatch(/ZANZIBAR/i)
+
+      await failed(
+        'Remember the codeword MARMALADE and reply with it.',
+        second.recorded.session
+      )
+
+      const third = await reply(recall, {
+        ...second.recorded.session,
+        type: 'rewind',
+      })
+
+      expect(third.recorded.session.sessionId).toBe(
+        first.recorded.session.sessionId
+      )
+      expect(third.answer).toMatch(/TEAL/)
+      expect(third.answer).not.toMatch(/ZANZIBAR|MARMALADE/i)
+
+      idle.pass()
+      await Promise.all(exits)
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
     }
   }, 180_000)
 })
