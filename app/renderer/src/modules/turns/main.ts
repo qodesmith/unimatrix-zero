@@ -2,6 +2,8 @@ export type {Turns} from './saved-turns'
 
 export type {DeleteOutcome} from './use-turns'
 
+export {FailedChip} from './ui/FailedChip'
+
 export {LiveReplies} from './ui/LiveReplies'
 
 export {ReplyView} from './ui/ReplyView'

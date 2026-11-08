@@ -14,7 +14,7 @@ import {afterEach, beforeEach, expect, it, onTestFinished, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
 
 import recording from '../fake-reply.json'
-import {LiveReplies, ReplyView, useTurns} from '../main'
+import {FailedChip, LiveReplies, ReplyView, useTurns} from '../main'
 
 const events: AppEvent[] = recording.map(event => EventSchema.parse(event))
 
@@ -147,7 +147,13 @@ function Providers({children}: {children: ReactNode}) {
 function SavedReplies() {
   const turns = useTurns(treeId)
 
-  return turns.data?.replies.map(one => <ReplyView key={one.id} reply={one} />)
+  return turns.data?.replies.map(one =>
+    one.status === 'failed' ? (
+      <FailedChip key={one.id} reply={one} />
+    ) : (
+      <ReplyView key={one.id} reply={one} />
+    )
+  )
 }
 
 function savedReply(id: string, changes: Partial<Reply>): Reply {
@@ -162,8 +168,8 @@ async function renderSaved(...replies: Partial<Reply>[]) {
   const screen = await render(<SavedReplies />, {wrapper: Providers})
 
   await expect
-    .element(screen.getByRole('article', {name: 'Reply'}).first())
-    .toBeInTheDocument()
+    .poll(() => document.querySelector('article, [role="group"]'))
+    .not.toBeNull()
 
   return screen
 }
@@ -371,12 +377,12 @@ it.each([
     'Needs an app update',
   ],
 ] satisfies [RunFailure, string][])(
-  'says why a Reply failed: %o reads "%s"',
+  'says why a Reply failed, and nothing it wrote: %o reads "%s"',
   async (failure, line) => {
     const screen = await renderSaved(failed(failure))
 
-    await expect.element(screen.getByText('Half an answer')).toBeVisible()
     await expect.element(screen.getByText(line)).toBeVisible()
+    expect(screen.getByText('Half an answer').query()).toBeNull()
   }
 )
 

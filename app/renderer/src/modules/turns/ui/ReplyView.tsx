@@ -1,17 +1,10 @@
 import type {ThinkingBlock} from '../live-replies'
-import type {ProviderId, ProviderStatus} from '@uz/contract/providers'
-import type {
-  Reply,
-  ReplyPart,
-  ReplyStatus,
-  RunFailure,
-} from '@uz/contract/turns'
+import type {Reply, ReplyPart, ReplyStatus} from '@uz/contract/turns'
 
-import {ProviderMark, useProviderStatus} from '#modules/connections/main'
+import {ProviderMark} from '#modules/connections/main'
 import {ReplyMarkdown} from '#modules/markdown/main'
 import {useModelName} from '#modules/models/main'
 import {Badge} from '#shadcn/ui/badge'
-import {Button} from '#shadcn/ui/button'
 import {
   Collapsible,
   CollapsibleContent,
@@ -26,21 +19,18 @@ import {
   TraceLine,
   TraceTitle,
 } from '#shadcn/ui/trace'
-import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {cn} from 'cn'
 import {ChevronRightIcon} from 'lucide-react'
 import {Fragment} from 'react'
 
-import {useReplyRun} from '../reply-run/use-reply-run'
 import {useReply, useThinking} from '../use-live-reply'
-import {useOnline} from '../use-online'
 
 type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 
 /** A Reply's content, live while it streams; the caller owns its box. */
 export function ReplyView({reply}: {reply: Reply}) {
   const blocks = useThinking(reply.id)
-  const {status, content, failure} = useReply(reply)
+  const {status, content} = useReply(reply)
   const streaming = status === 'streaming'
 
   function thinkingBefore(part: number) {
@@ -79,8 +69,7 @@ export function ReplyView({reply}: {reply: Reply}) {
       {streaming && (
         <span className="text-xs text-muted-foreground">Writing…</span>
       )}
-      <StatusLine status={status} failure={failure} provider={reply.provider} />
-      {status === 'failed' && <RetryControls reply={reply} />}
+      <StatusLine status={status} />
     </article>
   )
 }
@@ -98,105 +87,7 @@ function WrittenBy({reply}: {reply: Reply}) {
   )
 }
 
-const NOT_READY: Record<
-  Exclude<ProviderStatus['status'], 'ready'>,
-  (name: string) => string
-> = {
-  'signed-out': name => `Sign in to ${name} again to retry`,
-  'not-connected': name => `Connect ${name} to retry`,
-  starting: name => `${name} is starting…`,
-  restarting: name => `${name} is starting…`,
-  failed: name => `${name} isn't running`,
-}
-
-/** Null when Retry may run; '' until main reports the Provider's status. */
-function retryHeldBecause(
-  online: boolean,
-  status: ProviderStatus['status'] | null,
-  provider: ProviderId
-) {
-  if (!online) return 'Offline · Retry waits for the connection'
-
-  if (status === null) return ''
-
-  if (status === 'ready') return null
-
-  return NOT_READY[status](PROVIDER_NAMES[provider])
-}
-
-function RetryControls({reply}: {reply: Reply}) {
-  const {state, retry} = useReplyRun(reply.treeId, reply.id)
-  const online = useOnline()
-  const providerStatus = useProviderStatus(reply.provider)
-  const held = retryHeldBecause(online, providerStatus, reply.provider)
-
-  return (
-    <div className="flex items-center gap-3">
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-6 px-2 text-xs"
-        disabled={held !== null || state.status === 'retrying'}
-        onClick={retry}
-      >
-        Retry
-      </Button>
-      {held ? (
-        <span className="text-xs text-muted-foreground">{held}</span>
-      ) : (
-        state.status === 'retryRefused' && (
-          <span className="text-xs text-destructive">{state.error}</span>
-        )
-      )}
-    </div>
-  )
-}
-
-const resetTime = new Intl.DateTimeFormat(undefined, {
-  hour: 'numeric',
-  minute: '2-digit',
-})
-
-const FAILURE_LINES: Record<
-  RunFailure['code'],
-  (failure: RunFailure, name: string) => string
-> = {
-  'connection-lost': () => 'Connection lost',
-  'limit-reached': ({resetsAt}) =>
-    resetsAt === undefined
-      ? 'Limit reached'
-      : `Limit reached · resets at ${resetTime.format(new Date(resetsAt))}`,
-  'program-crashed': (_, name) => `${name} stopped unexpectedly`,
-  'host-crashed': (_, name) => `${name} stopped unexpectedly`,
-  'disk-full': () => 'Disk full',
-  'host-unreachable': (_, name) => `${name} could not be reached`,
-  'driver-error': ({message}) => message,
-  'provider-error': ({message}) => message,
-  'needs-app-update': () => 'Needs an app update',
-  'fake-failure': ({message}) => message,
-}
-
-function describeFailure(failure: RunFailure, provider: ProviderId) {
-  return FAILURE_LINES[failure.code](failure, PROVIDER_NAMES[provider])
-}
-
-function StatusLine({
-  status,
-  failure,
-  provider,
-}: {
-  status: ReplyStatus
-  failure: RunFailure | null
-  provider: ProviderId
-}) {
-  if (status === 'failed') {
-    return (
-      <span className="text-xs text-destructive">
-        {failure ? describeFailure(failure, provider) : 'Failed'}
-      </span>
-    )
-  }
-
+function StatusLine({status}: {status: ReplyStatus}) {
   if (status === 'stopped' || status === 'interrupted') {
     return (
       <span className="text-xs text-muted-foreground">

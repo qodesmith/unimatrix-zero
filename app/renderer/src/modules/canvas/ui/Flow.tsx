@@ -28,7 +28,7 @@ import {useReducedMotion} from '../reduced-motion'
 import {slideMs} from '../slide'
 import {isFork} from '../tree'
 import {whenTurnsArrive} from '../when-turns-arrive'
-import {ExchangeNode, PromptNode, ReplyNode} from './TurnNodes'
+import {ExchangeNode, FailedNode, PromptNode, ReplyNode} from './TurnNodes'
 
 /** A request to bring a Reply into view; every request gets a new sequence. */
 export interface Focus {
@@ -67,7 +67,12 @@ const NO_SIZES: Sizes = {vertical: {}, horizontal: {}}
 
 const FIT = {padding: 0.15, maxZoom: 1}
 
-const nodeTypes = {prompt: PromptNode, reply: ReplyNode, exchange: ExchangeNode}
+const nodeTypes = {
+  prompt: PromptNode,
+  reply: ReplyNode,
+  exchange: ExchangeNode,
+  failed: FailedNode,
+}
 
 function isOnThread(
   edge: CanvasLayout['edges'][number],
@@ -108,7 +113,9 @@ function inputOf(pane: HTMLDivElement | null, nodeId: string) {
 function hoverIdOf(node: TurnNode) {
   const {turn} = node.data
 
-  return turn.kind === 'exchange' ? (turn.reply?.id ?? turn.prompt.id) : node.id
+  return turn.kind === 'exchange' || turn.kind === 'failed'
+    ? (turn.reply?.id ?? turn.prompt.id)
+    : node.id
 }
 
 export function Flow({
@@ -138,11 +145,15 @@ export function Flow({
     [index, orientation, measured, collapsed.ids]
   )
 
+  // A failed Reply shows as a chip in its Prompt's place.
   const nodeIdOf = useCallback(
-    (replyId: string) =>
-      orientation === 'vertical'
+    (replyId: string) => {
+      const reply = index.replyById.get(replyId)
+
+      return orientation === 'vertical' && reply?.status !== 'failed'
         ? replyId
-        : (index.replyById.get(replyId)?.promptId ?? replyId),
+        : (reply?.promptId ?? replyId)
+    },
     [orientation, index]
   )
 

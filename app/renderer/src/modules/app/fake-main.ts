@@ -164,7 +164,10 @@ export function fakeMain(saved: Saved = {}) {
       prompts.push(prompt)
       replies.push(reply)
 
-      return {ok: true, value: {prompt, reply}}
+      return {
+        ok: true,
+        value: {prompt, reply, removed: {promptIds: [], replyIds: []}},
+      }
     }
 
     if (command.type === 'tree.rename') {

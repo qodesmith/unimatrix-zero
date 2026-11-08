@@ -1,7 +1,7 @@
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Ref} from 'react'
 
-import {ReplyView, useReply} from '#modules/turns/main'
+import {FailedChip, ReplyView, useReply} from '#modules/turns/main'
 import {Bubble, BubbleContent} from '#shadcn/ui/bubble'
 import {Message, MessageContent} from '#shadcn/ui/message'
 import {Sheet, SheetContent} from '#shadcn/ui/sheet'
@@ -51,7 +51,17 @@ export function ChatSlideout({
   const input = useRef<HTMLTextAreaElement>(null)
   const opener = useRef<HTMLElement | null>(null)
   const pinned = useRef(true)
+
+  const {status} = useReply(end)
+  const failed = status === 'failed'
   const thread = pathTo(index, end.id)
+
+  // A failed Reply shows only as a chip; its Prompt went back to the Input above.
+  const shown = failed ? thread.slice(0, -2) : thread
+
+  const inputAt = failed
+    ? (index.promptById.get(end.promptId)?.parentReplyId ?? null)
+    : end.id
 
   function inFieldElsewhere({target}: Event) {
     return (
@@ -180,12 +190,17 @@ export function ChatSlideout({
           className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
         >
           <div ref={content} className="mx-auto flex max-w-180 flex-col gap-3">
-            {thread.map(turnId => (
+            {shown.map(turnId => (
               <ChatTurn key={turnId} turnId={turnId} />
             ))}
+            {failed && (
+              <div data-chat-turn={end.id}>
+                <FailedChip reply={end} />
+              </div>
+            )}
           </div>
         </div>
-        <ChatInput ref={input} end={end} onFocus={onFocus} onSent={onSent} />
+        <ChatInput ref={input} at={inputAt} onFocus={onFocus} onSent={onSent} />
       </SheetContent>
     </Sheet>
   )
@@ -225,8 +240,6 @@ function ChatReply({reply}: {reply: Reply}) {
           variant="card"
           className={cn(
             'w-full max-w-full',
-            status === 'failed' &&
-              '*:data-[slot=bubble-content]:border-destructive',
             status === 'streaming' &&
               '*:data-[slot=bubble-content]:border-primary/50'
           )}
@@ -242,32 +255,33 @@ function ChatReply({reply}: {reply: Reply}) {
 
 interface ChatInputProps {
   ref: Ref<HTMLTextAreaElement>
-  end: Reply
+  /** The Reply the Input continues from; null for the root Input. */
+  at: string | null
   onFocus: (replyId: string) => void
   onSent: (replyId: string) => void
 }
 
-function ChatInput({ref, end, onFocus, onSent}: ChatInputProps) {
-  const {treeId, drafts, setDraft} = useCanvas()
-  const {status} = useReply(end)
-  const streaming = status === 'streaming'
-
-  if (status === 'failed') return null
+function ChatInput({ref, at, onFocus, onSent}: ChatInputProps) {
+  const {treeId, index, drafts, setDraft} = useCanvas()
+  const live = useReply(at === null ? null : (index.replyById.get(at) ?? null))
+  const streaming = live?.status === 'streaming'
 
   return (
     <footer className="shrink-0 border-t border-border px-4 py-3">
       <div className="mx-auto max-w-180">
         <PromptInput
-          key={end.id}
+          key={at ?? 'root'}
           ref={ref}
           treeId={treeId}
-          parentReplyId={end.id}
+          parentReplyId={at}
           canSend={!streaming}
-          stopReplyId={streaming ? end.id : undefined}
-          onFocus={() => onFocus(end.id)}
+          stopReplyId={streaming && at !== null ? at : undefined}
+          onFocus={() => {
+            if (at !== null) onFocus(at)
+          }}
           onSent={onSent}
-          draft={drafts.get(end.id) ?? ''}
-          onDraftChange={text => setDraft(end.id, text)}
+          draft={drafts.get(at)}
+          onDraftChange={draft => setDraft(at, draft)}
         />
       </div>
     </footer>

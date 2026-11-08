@@ -46,7 +46,15 @@ interface ExchangeTurns {
   reply: Reply | null
 }
 
-type Unplaced = PromptTurn | ReplyTurn | ExchangeTurns
+/** A failed Reply and its Prompt as one chip, keyed by the Prompt. */
+interface FailedTurns {
+  id: string
+  kind: 'failed'
+  prompt: Prompt
+  reply: Reply
+}
+
+type Unplaced = PromptTurn | ReplyTurn | ExchangeTurns | FailedTurns
 
 export type CanvasLayoutNode = Unplaced & {position: Point}
 
@@ -96,8 +104,16 @@ function turnGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
   const roots: string[] = []
 
   function visit(prompt: Prompt) {
-    nodes.push({id: prompt.id, kind: 'prompt', prompt})
     const reply = index.replyByPrompt.get(prompt.id)
+
+    if (reply?.status === 'failed') {
+      nodes.push({id: prompt.id, kind: 'failed', prompt, reply})
+      children.set(prompt.id, [])
+
+      return
+    }
+
+    nodes.push({id: prompt.id, kind: 'prompt', prompt})
 
     if (!reply) {
       children.set(prompt.id, [])
@@ -136,10 +152,18 @@ function exchangeGraph(index: TreeIndex, collapsed: CollapsedReplyIds): Graph {
 
   function visit(prompt: Prompt) {
     const reply = index.replyByPrompt.get(prompt.id) ?? null
-    nodes.push({id: prompt.id, kind: 'exchange', prompt, reply})
+    const failed = reply?.status === 'failed'
+
+    nodes.push(
+      reply && failed
+        ? {id: prompt.id, kind: 'failed', prompt, reply}
+        : {id: prompt.id, kind: 'exchange', prompt, reply}
+    )
 
     const branches =
-      reply && !collapsed.has(reply.id) ? branchesOf(index, reply.id) : []
+      reply && !failed && !collapsed.has(reply.id)
+        ? branchesOf(index, reply.id)
+        : []
 
     children.set(
       prompt.id,

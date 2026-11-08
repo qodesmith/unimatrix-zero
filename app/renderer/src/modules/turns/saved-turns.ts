@@ -15,17 +15,6 @@ export function withProgress(
   return {...reply, status, content, contextSize, contextWindow, failure}
 }
 
-export function addSent(
-  queryClient: QueryClient,
-  treeId: string,
-  {prompt, reply}: CommandResult<'prompt.send'>
-) {
-  queryClient.setQueryData<Turns>(turnsKey(treeId), turns => ({
-    prompts: [...(turns?.prompts ?? []), prompt],
-    replies: [...(turns?.replies ?? []), reply],
-  }))
-}
-
 /** Leaves the Turns alone when they aren't loaded or hold no such Reply. */
 export function updateSavedReply(
   queryClient: QueryClient,
@@ -44,20 +33,40 @@ export function updateSavedReply(
   )
 }
 
-export function removeDeleted(
-  queryClient: QueryClient,
-  treeId: string,
-  {promptIds, replyIds}: CommandResult<'prompt.delete'>
-) {
+type TurnIds = CommandResult<'prompt.delete'>
+
+function without(turns: Turns, {promptIds, replyIds}: TurnIds): Turns {
   const prompts = new Set(promptIds)
   const replies = new Set(replyIds)
 
+  return {
+    prompts: turns.prompts.filter(prompt => !prompts.has(prompt.id)),
+    replies: turns.replies.filter(reply => !replies.has(reply.id)),
+  }
+}
+
+export function removeDeleted(
+  queryClient: QueryClient,
+  treeId: string,
+  deleted: TurnIds
+) {
   queryClient.setQueryData<Turns>(turnsKey(treeId), turns =>
-    turns
-      ? {
-          prompts: turns.prompts.filter(prompt => !prompts.has(prompt.id)),
-          replies: turns.replies.filter(reply => !replies.has(reply.id)),
-        }
-      : turns
+    turns ? without(turns, deleted) : turns
   )
+}
+
+/** The failed Turns the Prompt took the place of go in the same update. */
+export function addSent(
+  queryClient: QueryClient,
+  treeId: string,
+  {prompt, reply, removed}: CommandResult<'prompt.send'>
+) {
+  queryClient.setQueryData<Turns>(turnsKey(treeId), turns => {
+    const kept = turns ? without(turns, removed) : {prompts: [], replies: []}
+
+    return {
+      prompts: [...kept.prompts, prompt],
+      replies: [...kept.replies, reply],
+    }
+  })
 }

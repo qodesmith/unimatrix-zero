@@ -1,4 +1,4 @@
-import type {WantedModel} from '#modules/models/main'
+import type {Draft} from '../drafts'
 import type {KeyboardEvent, Ref} from 'react'
 
 import {ModelPicker, useModelPick} from '#modules/models/main'
@@ -14,6 +14,7 @@ import {
 import {useRef, useState} from 'react'
 
 import {useAttachedReply} from '../canvas-context'
+import {EMPTY_DRAFT} from '../drafts'
 import {StopButton} from './StopButton'
 
 interface PromptInputProps {
@@ -24,9 +25,9 @@ interface PromptInputProps {
   /** The Reply main started for the sent Prompt. */
   onSent?: (replyId: string) => void
   /** The draft, kept by the caller so it outlives this Input's box. */
-  draft?: string
-  /** The draft as it changes; empty again once sent. */
-  onDraftChange?: (draft: string) => void
+  draft?: Draft
+  /** The draft as it changes; its text empty again once sent. */
+  onDraftChange?: (draft: Draft) => void
   /** False while the parent Reply streams: it takes a draft, not a send. */
   canSend?: boolean
   /** The streaming Reply whose Stop takes Send's place. */
@@ -48,18 +49,19 @@ export function PromptInput({
   const sendPrompt = useSendPrompt(treeId, parentReplyId)
   const {sendKey} = useSettings()
   const form = useRef<HTMLFormElement>(null)
-  const [ownDraft, setOwnDraft] = useState('')
-  const draft = kept ?? ownDraft
+  const [ownDraft, setOwnDraft] = useState(EMPTY_DRAFT)
+  const {text: draft, model: picked} = kept ?? ownDraft
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [picked, setPicked] = useState<WantedModel | null>(null)
   const pick = useModelPick(picked, useAttachedReply(parentReplyId))
   const {selected} = pick
   const held = !canSend || sending || pick.heldBecause !== null
 
-  function updateDraft(text: string) {
-    setOwnDraft(text)
-    onDraftChange?.(text)
+  function updateDraft(changes: Partial<Draft>) {
+    const next = {...(kept ?? ownDraft), ...changes}
+
+    setOwnDraft(next)
+    onDraftChange?.(next)
   }
 
   async function send() {
@@ -78,7 +80,7 @@ export function PromptInput({
     }
 
     setError(null)
-    updateDraft('')
+    updateDraft({text: ''})
     onSent?.(outcome.reply.id)
   }
 
@@ -112,7 +114,7 @@ export function PromptInput({
           className="field-sizing-fixed min-h-0 px-3 text-sm md:text-sm"
           value={draft}
           onFocus={onFocus}
-          onChange={event => updateDraft(event.target.value)}
+          onChange={event => updateDraft({text: event.target.value})}
           onKeyDown={onKeyDown}
         />
         <InputGroupAddon
@@ -121,7 +123,7 @@ export function PromptInput({
         >
           <FieldError className="text-xs">{error}</FieldError>
           <div className="ml-auto flex items-center gap-1">
-            <ModelPicker pick={pick} onPick={setPicked} />
+            <ModelPicker pick={pick} onPick={model => updateDraft({model})} />
             {stopReplyId === undefined ? (
               <InputGroupButton
                 type="submit"

@@ -112,6 +112,7 @@ function fakeMain({
             status: 'streaming',
             content: [],
           },
+          removed: {promptIds: [], replyIds: []},
         },
       }
     }) as Bridge['send'],

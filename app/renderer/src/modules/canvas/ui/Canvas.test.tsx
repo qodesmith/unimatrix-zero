@@ -159,6 +159,22 @@ function fakeMain(saved: Saved) {
       }
 
       if (command.type === 'prompt.send') {
+        const failedThere = prompts.filter(
+          one =>
+            one.parentReplyId === command.parentReplyId &&
+            replies.some(
+              answer => answer.promptId === one.id && answer.status === 'failed'
+            )
+        )
+
+        const removed = {promptIds: [] as string[], replyIds: [] as string[]}
+
+        for (const one of failedThere) {
+          const cut = cutFrom(one.id)
+          removed.promptIds.push(...cut.promptIds)
+          removed.replyIds.push(...cut.replyIds)
+        }
+
         const sentPrompt: Prompt = {
           id: crypto.randomUUID(),
           treeId,
@@ -180,7 +196,7 @@ function fakeMain(saved: Saved) {
         prompts.push(sentPrompt)
         replies.push(started)
 
-        return {ok: true, value: {prompt: sentPrompt, reply: started}}
+        return {ok: true, value: {prompt: sentPrompt, reply: started, removed}}
       }
 
       if (command.type === 'reply.stop') {
@@ -244,6 +260,13 @@ function fakeMain(saved: Saved) {
               id: 'fake',
               name: 'Fake',
               isDefault: true,
+              resolvesTo: null,
+              needsAppUpdate: false,
+            },
+            {
+              id: 'swift',
+              name: 'Swift',
+              isDefault: false,
               resolvesTo: null,
               needsAppUpdate: false,
             },
@@ -596,7 +619,34 @@ it('moves the highlight to the Reply a leaf Input sends for, and keeps hovering 
     .toEqual([edge(1, 11), edge(11, 2), edge(2, 12), edge(12, 4)].toSorted())
 })
 
-it('moves the Active Thread to a Reply that fails as it starts, with no Input to take focus', async () => {
+function chip() {
+  return canvas().getByRole('group', {name: 'Failed Reply'})
+}
+
+/** Waits for the canvas to draw a Failed chip. */
+async function chipDrawn() {
+  await expect
+    .element(page.getByRole('group', {name: 'Failed Reply'}).first())
+    .toBeVisible()
+}
+
+/** Text the canvas shows as a Turn, not as a draft in an Input. */
+function shownOnCanvas(text: string) {
+  return canvas()
+    .getByText(text, {exact: true})
+    .elements()
+    .filter(element => element.tagName !== 'TEXTAREA')
+}
+
+function chipNode() {
+  const box = chip().element().closest('.react-flow__node')
+
+  if (!box) throw new Error('No Failed chip on the canvas')
+
+  return page.elementLocator(box)
+}
+
+it('moves the Active Thread to a Reply that fails as it starts, and sends its Prompt back to the Input it came from', async () => {
   const {main} = await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply three')).toBeVisible()
   main.sends.failure = {code: 'host-unreachable', message: 'No host'}
@@ -604,17 +654,16 @@ it('moves the Active Thread to a Reply that fails as it starts, with no Input to
   await inputUnder('Reply three').fill('A thought')
   await userEvent.keyboard('{Enter}')
   await expect
-    .element(page.getByText('Claude could not be reached'))
+    .element(chip().getByText('Claude could not be reached'))
     .toBeVisible()
   await hoverAway()
-  expect(
-    nodeOf('Claude could not be reached')
-      .getByRole('textbox', {name: 'Prompt'})
-      .query()
-  ).toBeNull()
 
-  const sentPromptId = nodeOf('A thought').element().getAttribute('data-id')
-  const failedId = main.replies.at(-1)?.id
+  await expect.element(inputUnder('Reply three')).toHaveValue('A thought')
+  await expect.poll(() => revealed('Reply three')).toBe('true')
+  expect(chipNode().getByRole('textbox').query()).toBeNull()
+  expect(shownOnCanvas('A thought')).toEqual([])
+
+  const chipId = chipNode().element().getAttribute('data-id')
 
   await expect
     .poll(highlightedEdges)
@@ -623,8 +672,7 @@ it('moves the Active Thread to a Reply that fails as it starts, with no Input to
         edge(1, 11),
         edge(11, 3),
         edge(3, 13),
-        `${uuid(13)}-${sentPromptId}`,
-        `${sentPromptId}-${failedId}`,
+        `${uuid(13)}-${chipId}`,
       ].toSorted()
     )
 })
@@ -824,7 +872,7 @@ it('zooms to the Active Thread’s Input at the zoom a new Tree starts at, howev
   await expect.element(inputUnder('Reply one')).toHaveFocus()
 })
 
-it('zooms to a failed Active Reply’s card at the zoom a new Tree starts at, and leaves the cursor alone once a Retry gives it an Input', async () => {
+it('zooms to a failed Active Reply’s chip at the zoom a new Tree starts at, and leaves the cursor alone once a Retry gives it an Input', async () => {
   await renderCanvas(endingIn('failed', 'Cut off'))
   await expect.element(page.getByText('Connection lost')).toBeVisible()
   await settledViewport()
@@ -838,9 +886,9 @@ it('zooms to a failed Active Reply’s card at the zoom a new Tree starts at, an
   await settledViewport()
 
   expect(zoomOf()).toBe(1)
-  expect(offCenter(nodeOf('Cut off').element())).toBeLessThan(2)
+  expect(offCenter(chip().element())).toBeLessThan(2)
 
-  await nodeOf('Cut off').getByRole('button', {name: 'Retry'}).click()
+  await chip().getByRole('button', {name: 'Retry'}).click()
   await expect.element(inputUnder('Writing…')).toBeVisible()
   await expect.element(inputUnder('Writing…')).not.toHaveFocus()
 })
@@ -2085,7 +2133,7 @@ function endingIn(status: Reply['status'], text = 'Reply two'): Saved {
   }
 }
 
-it('gives a stopped Reply an Input and a failed one Retry instead, on the canvas and in the slideout', async () => {
+it('gives a stopped Reply an Input and shows a failed one only as a Failed chip with Retry, with no Input, on the canvas and in the slideout', async () => {
   clock = 0
   const saved = forkedTree()
 
@@ -2103,34 +2151,70 @@ it('gives a stopped Reply an Input and a failed one Retry instead, on the canvas
     return one
   })
 
-  await renderCanvas(saved)
-  await expect.element(page.getByText('Disk full')).toBeVisible()
+  const {main} = await renderCanvas(saved)
+  await chipDrawn()
+  await expect.element(chip().getByText('Disk full')).toBeVisible()
 
   expect(document.querySelectorAll('textarea')).toHaveLength(4)
   await expect.element(inputUnder('Reply two')).toBeInTheDocument()
-  expect(nodeOf('Reply three').getByRole('textbox').query()).toBeNull()
+  expect(chipNode().getByRole('textbox').query()).toBeNull()
   await expect
-    .element(nodeOf('Reply three').getByRole('button', {name: 'Retry'}))
+    .element(chip().getByRole('button', {name: 'Retry'}))
     .toBeVisible()
+  expect(chip().element().textContent).toBe('FailedDisk fullRetry')
+  expect(shownOnCanvas('Prompt three')).toEqual([])
+  expect(canvas().getByText('Reply three').query()).toBeNull()
 
-  await openChatAt('Reply three')
-  await expect.element(slideout()).toBeVisible()
-  expect(slideout().getByRole('textbox').query()).toBeNull()
+  await openChatAt('Reply four')
+  main.sends.failure = {code: 'connection-lost', message: 'ECONNRESET'}
+  await slideoutInput().fill('A thought')
+  await userEvent.keyboard('{Enter}')
+  await expect.element(slideout().getByText('Connection lost')).toBeVisible()
+
+  expect(chatTurns()).toEqual([
+    'Prompt one',
+    'Reply one',
+    'Prompt two',
+    'Reply twoStopped',
+    'Prompt four',
+    'Reply four',
+    'FailedConnection lostRetry',
+  ])
+  await expect.element(slideoutInput()).toHaveValue('A thought')
   await expect
     .element(slideout().getByRole('button', {name: 'Retry'}))
     .toBeVisible()
 })
 
-it('retries a failed Reply in place: the same Reply streams again from nothing', async () => {
-  const {main} = await renderCanvas(endingIn('failed', 'Cut off'))
-  await expect.element(page.getByText('Connection lost')).toBeVisible()
+function finish(
+  main: ReturnType<typeof fakeMain>,
+  replyId: string,
+  status: 'complete' | 'failed'
+) {
+  main.publish({
+    treeId,
+    replyId,
+    type: 'RUN_FINISHED',
+    status,
+    ...(status === 'failed' && {
+      failure: {code: 'connection-lost', message: 'ECONNRESET'},
+    }),
+  })
+}
 
-  await nodeOf('Cut off').getByRole('button', {name: 'Retry'}).click()
+it('retries a failed Reply in place: its Prompt and the same Reply stream again from nothing, and a failed Retry collapses back to the chip', async () => {
+  const {main} = await renderCanvas(endingIn('failed', 'Cut off'))
+  await chipDrawn()
+  await expect.element(chip().getByText('Connection lost')).toBeVisible()
+  expect(shownOnCanvas('Prompt two')).toEqual([])
+
+  await chip().getByRole('button', {name: 'Retry'}).click()
 
   expect(main.sent.filter(command => command.type === 'reply.retry')).toEqual([
     {type: 'reply.retry', treeId, replyId: uuid(12)},
   ])
   await expect.element(page.getByText('Writing…')).toBeVisible()
+  await expect.poll(() => shownOnCanvas('Prompt two')).toHaveLength(1)
   expect(page.getByText('Cut off').query()).toBeNull()
   expect(page.getByText('Connection lost').query()).toBeNull()
   await expect
@@ -2142,6 +2226,167 @@ it('retries a failed Reply in place: the same Reply streams again from nothing',
   main.publish({...ids, type: 'RUN_STARTED'})
   main.publish({...ids, type: 'TEXT_DELTA', delta: 'Second try'})
   await expect.element(page.getByText('Second try')).toBeVisible()
+
+  finish(main, uuid(12), 'failed')
+  await expect.element(chip().getByText('Connection lost')).toBeVisible()
+  expect(shownOnCanvas('Prompt two')).toEqual([])
+  expect(page.getByText('Second try').query()).toBeNull()
+  await expect.element(inputUnder('Reply one')).toHaveValue('Prompt two')
+})
+
+it('takes the failed Prompt back out of the Input once a Retry succeeds, unless the user changed it', async () => {
+  const {main} = await renderCanvas(endingIn('failed', 'Cut off'))
+  await chipDrawn()
+  await expect.element(inputUnder('Reply one')).toHaveValue('Prompt two')
+
+  await chip().getByRole('button', {name: 'Retry'}).click()
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  await expect.element(inputUnder('Reply one')).toHaveValue('Prompt two')
+  finish(main, uuid(12), 'complete')
+  await expect.element(inputUnder('Reply one')).toHaveValue('')
+
+  finish(main, uuid(12), 'failed')
+  await expect.element(inputUnder('Reply one')).toHaveValue('Prompt two')
+  await inputUnder('Reply one').fill('Prompt two, reworded')
+  await chip().getByRole('button', {name: 'Retry'}).click()
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  finish(main, uuid(12), 'complete')
+  await expect.element(page.getByText('Writing…')).not.toBeInTheDocument()
+  await expect
+    .element(inputUnder('Reply one'))
+    .toHaveValue('Prompt two, reworded')
+})
+
+it('puts a failed Prompt below the draft already in its Input, after a blank line', async () => {
+  const {main} = await renderCanvas(linearTree())
+  await expect.element(page.getByText('Reply two')).toBeVisible()
+
+  await sendInto('Reply two', 'And then?')
+  const failedId = main.replies.at(-1)?.id ?? ''
+  await clickInputUnder('Reply two')
+  await userEvent.keyboard('Meanwhile')
+
+  finish(main, failedId, 'failed')
+  await expect.element(chip()).toBeVisible()
+  await expect
+    .element(inputUnder('Reply two'))
+    .toHaveValue('Meanwhile\n\nAnd then?')
+})
+
+function modelIn(input: Locator) {
+  return input.element().closest('form')?.querySelector('[role="combobox"]')
+    ?.textContent
+}
+
+it('sends the restored Prompt unchanged as Retry would, on its Model, in place of the failed one so the Reply above stays no Fork', async () => {
+  const saved = endingIn('failed', 'Cut off')
+  saved.replies = saved.replies.map(one =>
+    one.id === uuid(12) ? {...one, model: 'swift'} : one
+  )
+
+  const {main} = await renderCanvas(saved)
+  await chipDrawn()
+  await expect.element(inputUnder('Reply one')).toHaveValue('Prompt two')
+  expect(modelIn(inputUnder('Reply one'))).toContain('Swift')
+
+  await inputUnder('Reply one').click()
+  await userEvent.keyboard('{Enter}')
+
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  expect(main.sent.filter(command => command.type === 'prompt.send')).toEqual([
+    {
+      type: 'prompt.send',
+      treeId,
+      parentReplyId: uuid(11),
+      text: 'Prompt two',
+      model: {provider: 'claude', model: 'swift'},
+    },
+  ])
+  expect(chip().query()).toBeNull()
+  await expect.poll(() => shownOnCanvas('Prompt two')).toHaveLength(1)
+  expect(nodeCount()).toBe(4)
+  expect(
+    nodeOf('Reply one')
+      .getByRole('button', {name: /Branches/})
+      .query()
+  ).toBeNull()
+})
+
+it('holds Send on a restored Model that is no longer offered, until another is picked', async () => {
+  const saved = endingIn('failed', 'Cut off')
+  saved.replies = saved.replies.map(one =>
+    one.id === uuid(12) ? {...one, model: 'retired'} : one
+  )
+
+  const {main} = await renderCanvas(saved)
+  await chipDrawn()
+  const node = nodeOf('Reply one')
+  await expect.element(inputUnder('Reply one')).toHaveValue('Prompt two')
+  await expect
+    .element(node.getByText('retired is no longer offered'))
+    .toBeVisible()
+  await expect.element(node.getByRole('button', {name: 'Send'})).toBeDisabled()
+
+  await node.getByRole('combobox', {name: 'Model'}).click()
+  await page.getByRole('option', {name: 'Fake'}).click()
+  await node.getByRole('button', {name: 'Send'}).click()
+
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  expect(
+    main.sent.flatMap(command =>
+      command.type === 'prompt.send' ? [command.model] : []
+    )
+  ).toEqual([{provider: 'claude', model: 'fake'}])
+})
+
+it('shows a failed root Prompt as the chip over the root Input holding it, and sends from there a new root, keeping the Tree', async () => {
+  clock = 0
+
+  const {main} = await renderCanvas({
+    prompts: [prompt(1, null, 'First try')],
+    replies: [
+      {
+        ...reply(11, 1, 'Cut off'),
+        status: 'failed',
+        failure: {code: 'connection-lost', message: 'ECONNRESET'},
+      },
+    ],
+  })
+
+  await chipDrawn()
+  await expect.element(chip().getByText('Connection lost')).toBeVisible()
+  expect(nodeCount()).toBe(1)
+  expect(shownOnCanvas('First try')).toEqual([])
+  expect(canvas().getByText('Cut off').query()).toBeNull()
+
+  const rootInput = chipNode().getByRole('textbox', {name: 'Prompt'})
+  await expect.element(rootInput).toHaveValue('First try')
+  expect(rootInput.element().getBoundingClientRect().top).toBeGreaterThan(
+    chip().element().getBoundingClientRect().bottom
+  )
+
+  await rootInput.click()
+  await userEvent.keyboard('{Enter}')
+
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  await expect.poll(() => shownOnCanvas('First try')).toHaveLength(1)
+  expect(chip().query()).toBeNull()
+  expect(nodeCount()).toBe(2)
+  expect(
+    main.sent.flatMap(command =>
+      command.type === 'prompt.send' || command.type === 'tree.delete'
+        ? [command]
+        : []
+    )
+  ).toEqual([
+    {
+      type: 'prompt.send',
+      treeId,
+      parentReplyId: null,
+      text: 'First try',
+      model: {provider: 'claude', model: 'fake'},
+    },
+  ])
 })
 
 it('stops the streaming Reply at the end of the Active Thread with Esc, unless the user is typing elsewhere', async () => {

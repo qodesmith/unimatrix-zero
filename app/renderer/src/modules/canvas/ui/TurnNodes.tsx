@@ -3,7 +3,8 @@ import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Node, NodeProps} from '@xyflow/react'
 import type {Ref} from 'react'
 
-import {ReplyView, useReply} from '#modules/turns/main'
+import {useSettings} from '#modules/settings/main'
+import {FailedChip, ReplyView, useReply} from '#modules/turns/main'
 import {Card} from '#shadcn/ui/card'
 import {Handle, Position} from '@xyflow/react'
 import {cn} from 'cn'
@@ -141,7 +142,7 @@ function useInputState(reply: Reply | null, hovered: boolean): InputState {
 
   if (!live || live.status === 'failed') return 'none'
 
-  const draft = drafts.get(live.id) ?? ''
+  const draft = drafts.get(live.id)?.text ?? ''
 
   return activeReplyId === live.id || draft.trim() !== '' || hovered
     ? 'revealed'
@@ -211,8 +212,8 @@ function ReplyInput({
               canSend={!streaming}
               onFocus={() => onInputFocus(replyId)}
               onSent={sent => onSent(sent, replyId)}
-              draft={drafts.get(replyId) ?? ''}
-              onDraftChange={text => setDraft(replyId, text)}
+              draft={drafts.get(replyId)}
+              onDraftChange={draft => setDraft(replyId, draft)}
             />
           </div>
         </div>
@@ -240,7 +241,6 @@ function useHovered() {
 function replyFrame(status: Reply['status'], joined: boolean) {
   return cn(
     'relative z-10 gap-0 rounded-xl border border-border py-0 text-base shadow-sm ring-0 transition-[border-radius,border-color] duration-slide ease-slide motion-reduce:transition-none',
-    status === 'failed' && 'border-destructive',
     status === 'streaming' && 'border-primary/50',
     joined && 'rounded-b-none border-b-transparent'
   )
@@ -374,6 +374,48 @@ function ExchangeTurns({
           </div>
         )}
       </Card>
+    </div>
+  )
+}
+
+/** The Input a failed root Prompt went back to, with nothing above it. */
+function RootInput() {
+  const {treeId, onSent, drafts, setDraft} = useCanvas()
+
+  return (
+    <div data-revealed="true" className="mt-3">
+      <PromptInput
+        treeId={treeId}
+        parentReplyId={null}
+        onSent={sent => onSent(sent, null)}
+        draft={drafts.get(null)}
+        onDraftChange={draft => setDraft(null, draft)}
+      />
+    </div>
+  )
+}
+
+/** Either orientation: a failed Reply and its Prompt as one chip. */
+export function FailedNode({data}: NodeProps<TurnNode>) {
+  const {turn} = data
+  const vertical = useSettings().canvasOrientation === 'vertical'
+
+  if (turn.kind !== 'failed') return null
+
+  return (
+    <div style={{width: TURN_WIDTH}}>
+      <Handle
+        type="target"
+        position={vertical ? Position.Top : Position.Left}
+        className={hiddenHandle}
+      />
+      <FailedChip reply={turn.reply} />
+      {turn.prompt.parentReplyId === null && <RootInput />}
+      <Handle
+        type="source"
+        position={vertical ? Position.Bottom : Position.Right}
+        className={hiddenHandle}
+      />
     </div>
   )
 }
