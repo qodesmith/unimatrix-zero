@@ -1,4 +1,4 @@
-import type {ModelChoice} from '@uz/contract/providers'
+import type {WantedModel} from '#modules/models/main'
 import type {KeyboardEvent, Ref} from 'react'
 
 import {ModelPicker, useModelPick} from '#modules/models/main'
@@ -52,7 +52,7 @@ export function PromptInput({
   const draft = kept ?? ownDraft
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [picked, setPicked] = useState<ModelChoice | null>(null)
+  const [picked, setPicked] = useState<WantedModel | null>(null)
   const pick = useModelPick(picked, useAttachedReply(parentReplyId))
   const {selected} = pick
   const held = !canSend || sending || pick.heldBecause !== null
