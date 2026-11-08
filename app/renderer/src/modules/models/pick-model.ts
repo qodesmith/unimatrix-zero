@@ -5,10 +5,16 @@ import type {
   ProviderStatus,
 } from '@uz/contract/providers'
 
-import {DEFAULT_MODEL_ID, PROVIDER_NAMES} from '@uz/contract/providers'
+import {PROVIDER_NAMES} from '@uz/contract/providers'
+
+/**
+ * The Model an Input wants: `entry` is the listed entry the user picked it by,
+ * null when it came from a Reply.
+ */
+export type WantedModel = ModelChoice & {entry: string | null}
 
 export interface ModelPickInput {
-  wanted: ModelChoice | null
+  wanted: WantedModel | null
   /** The Provider of the Reply a continuing Thread's Input is attached to. */
   lockedTo: ProviderId | null
   statuses: ProviderStatus[]
@@ -20,15 +26,26 @@ interface ModelGroup {
   models: Model[]
 }
 
-type SelectedModel = ModelChoice & {name: string}
+type SelectedModel = WantedModel & {name: string}
 
 export interface ModelPick {
   groups: ModelGroup[]
+  /** `model` is the concrete id to send, whatever entry names it. */
   selected: SelectedModel | null
-  /** Set whenever the selection differs from the wanted Model. */
   notice: string | null
   signInAgain: ProviderId | null
   heldBecause: string | null
+}
+
+const LOADING = 'Loading Models…'
+
+function concreteOf(model: Model) {
+  return model.resolvesTo ?? model.id
+}
+
+/** Resolved now, so a later move of the alias or default leaves it be. */
+export function pickedFrom(provider: ProviderId, model: Model): WantedModel {
+  return {provider, model: concreteOf(model), entry: model.id}
 }
 
 /**
@@ -57,24 +74,18 @@ function defaultOf(models: Model[]) {
 }
 
 function selectedOf(provider: ProviderId, model: Model): SelectedModel {
-  return {provider, model: model.id, name: model.name}
+  return {...pickedFrom(provider, model), name: model.name}
 }
 
 type Selection = Pick<ModelPick, 'selected' | 'heldBecause'>
 
-/** Before the Provider lists any Model, the choice is left to it. */
 function startOn(
   provider: ProviderId,
   models: Record<ProviderId, Model[]>
 ): Selection {
   const listed = models[provider]
 
-  if (listed.length === 0) {
-    return {
-      selected: {provider, model: DEFAULT_MODEL_ID, name: 'Default'},
-      heldBecause: null,
-    }
-  }
+  if (listed.length === 0) return {selected: null, heldBecause: LOADING}
 
   const fallback = defaultOf(listed)
 
@@ -94,56 +105,66 @@ function startOnFirstConnected({statuses, models}: ModelPickInput): Selection {
     : {selected: null, heldBecause: 'Connect a Provider to send'}
 }
 
-function withNotice(gone: string, selection: Selection) {
-  return {
-    ...selection,
-    notice: selection.selected
-      ? `${gone} · using ${selection.selected.name}`
-      : gone,
-  }
+/**
+ * The picked entry while it still names the Model picked on it, else the entry
+ * listed under that Model.
+ */
+function entryOf(listed: Model[], wanted: WantedModel) {
+  const picked = listed.find(
+    model => model.id === wanted.entry && concreteOf(model) === wanted.model
+  )
+
+  return picked ?? findModel(listed, wanted.model)
 }
 
-/** The wanted Model's Provider is connected. */
-function fromList(wanted: ModelChoice, models: Record<ProviderId, Model[]>) {
+function pickAnother(notice: string) {
+  return {selected: null, notice, heldBecause: 'Pick a Model to send'}
+}
+
+/** The wanted Model's Provider is connected; never sends on a fallback. */
+function fromList(wanted: WantedModel, models: Record<ProviderId, Model[]>) {
   const listed = models[wanted.provider]
-  const found = findModel(listed, wanted.model)
 
   if (listed.length === 0) {
-    return {selected: {...wanted, name: wanted.model}, heldBecause: null}
+    return {selected: null, notice: null, heldBecause: LOADING}
   }
 
-  if (found && !found.needsAppUpdate) {
-    return {selected: selectedOf(wanted.provider, found), heldBecause: null}
-  }
+  const found = entryOf(listed, wanted)
 
-  return withNotice(
-    found
-      ? `${found.name} needs an app update`
-      : `${wanted.model} is no longer offered`,
-    startOn(wanted.provider, models)
-  )
+  if (!found) return pickAnother(`${wanted.model} is no longer offered`)
+
+  if (found.needsAppUpdate)
+    return pickAnother(`${found.name} needs an app update`)
+
+  return {
+    selected: selectedOf(wanted.provider, found),
+    notice: null,
+    heldBecause: null,
+  }
 }
 
 function fromWanted(
-  wanted: ModelChoice,
+  wanted: WantedModel,
   input: ModelPickInput
 ): Omit<ModelPick, 'groups' | 'signInAgain'> {
   const status = input.statuses.find(one => one.provider === wanted.provider)
   const name = PROVIDER_NAMES[wanted.provider]
 
   if (status?.status === 'signed-out') {
-    const found = findModel(input.models[wanted.provider], wanted.model)
+    const found = entryOf(input.models[wanted.provider], wanted)
 
     return {
-      selected: {...wanted, name: found?.name ?? wanted.model},
+      selected: {
+        ...wanted,
+        name: found?.name ?? wanted.model,
+        entry: found?.id ?? null,
+      },
       notice: null,
       heldBecause: `Sign in to ${name} again to send`,
     }
   }
 
-  if (status && isConnected(status)) {
-    return {notice: null, ...fromList(wanted, input.models)}
-  }
+  if (status && isConnected(status)) return fromList(wanted, input.models)
 
   if (input.lockedTo !== null) {
     return {
@@ -153,7 +174,15 @@ function fromWanted(
     }
   }
 
-  return withNotice(`${name} isn’t connected`, startOnFirstConnected(input))
+  const started = startOnFirstConnected(input)
+  const notice = `${name} isn’t connected`
+
+  return {
+    ...started,
+    notice: started.selected
+      ? `${notice} · using ${started.selected.name}`
+      : notice,
+  }
 }
 
 /** What an Input's Model picker offers and shows, and whether it may send. */

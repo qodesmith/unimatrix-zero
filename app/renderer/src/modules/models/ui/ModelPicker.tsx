@@ -1,5 +1,4 @@
-import type {ModelPick} from '../pick-model'
-import type {ModelChoice} from '@uz/contract/providers'
+import type {ModelPick, WantedModel} from '../pick-model'
 
 import {ProviderMark, useConnections} from '#modules/connections/main'
 import {InputGroupButton} from '#shadcn/ui/input-group'
@@ -14,13 +13,15 @@ import {
 } from '#shadcn/ui/select'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
 
-function sameChoice(a: ModelChoice, b: ModelChoice) {
-  return a.provider === b.provider && a.model === b.model
+import {pickedFrom} from '../pick-model'
+
+function sameEntry(a: WantedModel, b: WantedModel) {
+  return a.provider === b.provider && a.entry === b.entry
 }
 
 interface ModelPickerProps {
   pick: ModelPick
-  onPick: (choice: ModelChoice) => void
+  onPick: (picked: WantedModel) => void
 }
 
 export function ModelPicker({pick, onPick}: ModelPickerProps) {
@@ -37,11 +38,11 @@ export function ModelPicker({pick, onPick}: ModelPickerProps) {
           Sign in again
         </InputGroupButton>
       )}
-      <Select<ModelChoice>
-        value={selected && {provider: selected.provider, model: selected.model}}
-        isItemEqualToValue={sameChoice}
-        onValueChange={choice => {
-          if (choice) onPick(choice)
+      <Select<WantedModel>
+        value={selected}
+        isItemEqualToValue={sameEntry}
+        onValueChange={picked => {
+          if (picked) onPick(picked)
         }}
       >
         <SelectTrigger
@@ -69,7 +70,7 @@ export function ModelPicker({pick, onPick}: ModelPickerProps) {
               {models.map(model => (
                 <SelectItem
                   key={model.id}
-                  value={{provider, model: model.id}}
+                  value={pickedFrom(provider, model)}
                   disabled={model.needsAppUpdate}
                 >
                   {model.name}

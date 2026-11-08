@@ -18,7 +18,6 @@ import type {
 
 import {createInbox} from '#modules/inbox/main'
 import {ProgramCrashed, createReplyRuns} from '#modules/reply-runs/main'
-import {DEFAULT_MODEL_ID} from '@uz/contract/providers'
 
 import {readModels} from './models'
 import {createReplyMapper, turnOf} from './replies'
@@ -201,7 +200,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       cwd: configDir,
       sandbox: 'read-only',
       approvalPolicy: 'never',
-      model: request.model === DEFAULT_MODEL_ID ? null : request.model,
+      model: request.model,
       developerInstructions: request.systemPrompt || null,
     } satisfies ParamsOf<'thread/start'>
 
@@ -367,15 +366,13 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
 
     try {
       // A thread loaded on another Model switches to this one from here on.
-      const model = request.model === DEFAULT_MODEL_ID ? null : request.model
-
       const started = await server.request('turn/start', {
         threadId: thread.id,
         input: [{type: 'text', text: request.prompt.text, text_elements: []}],
-        model,
+        model: request.model,
       })
 
-      if (model !== null) thread.model = model
+      thread.model = request.model
 
       const turnId = started.turn.id
       thread.turns.push(turnId)

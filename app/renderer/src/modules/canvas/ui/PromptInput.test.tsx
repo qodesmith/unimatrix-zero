@@ -75,15 +75,18 @@ interface Setup {
   attachedTo?: Reply
   lastModel?: ModelChoice | null
   providers?: ProviderStatus[]
+  models?: Record<ProviderId, Model[]>
   sendKey?: Settings['sendKey']
 }
 
 function fakeMain({
   lastModel = null,
   providers = READY,
+  models = MODELS,
   sendKey = DEFAULT_SETTINGS.sendKey,
 }: Setup) {
   const sent: Command[] = []
+  const listeners: ((event: AppEvent) => void)[] = []
 
   const bridge: Bridge = {
     send: (async (command: Command) => {
@@ -113,12 +116,13 @@ function fakeMain({
       }
     }) as Bridge['send'],
     subscribe: (listener: (event: AppEvent) => void) => {
+      listeners.push(listener)
       listener({
         type: 'SNAPSHOT',
         app: {version: '0.0.0'},
         replies: [],
         providers,
-        models: MODELS,
+        models,
         lastModel,
         signIn: null,
         settings: {...DEFAULT_SETTINGS, sendKey},
@@ -130,7 +134,11 @@ function fakeMain({
     registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
   }
 
-  return {...bridge, sent}
+  function publish(event: AppEvent) {
+    for (const listener of listeners) listener(event)
+  }
+
+  return {...bridge, sent, publish}
 }
 
 async function renderInput(setup: Setup = {}) {
@@ -193,7 +201,7 @@ async function send(main: ReturnType<typeof fakeMain>) {
   await expect.poll(() => sentModels(main).length).toBe(1)
 }
 
-it('defaults to the Model of the Reply it is attached to, and sends with it', async () => {
+it('defaults to the exact Model the attached Reply recorded, and sends on it', async () => {
   const main = await renderInput({
     attachedTo: attachedReply('claude', 'opus-4-7'),
     lastModel: {provider: 'chatgpt', model: 'gpt-5'},
@@ -202,7 +210,7 @@ it('defaults to the Model of the Reply it is attached to, and sends with it', as
   await expectPicked('Claude', 'Opus')
 
   await send(main)
-  expect(sentModels(main)).toEqual([{provider: 'claude', model: 'opus'}])
+  expect(sentModels(main)).toEqual([{provider: 'claude', model: 'opus-4-7'}])
 })
 
 it('starts a new Tree from the last-used Model', async () => {
@@ -218,7 +226,7 @@ it('starts a new Tree from the last-used Model', async () => {
 
 it('sends the Model picked in the Input', async () => {
   const main = await renderInput({
-    attachedTo: attachedReply('claude', 'opus'),
+    attachedTo: attachedReply('claude', 'opus-4-7'),
   })
 
   await picker().click()
@@ -229,8 +237,31 @@ it('sends the Model picked in the Input', async () => {
   expect(sentModels(main)).toEqual([{provider: 'claude', model: 'haiku'}])
 })
 
+it('sends the Model the default resolved to when picked, still showing the default, and stays on it after the default moves', async () => {
+  const main = await renderInput({
+    attachedTo: attachedReply('claude', 'haiku'),
+  })
+
+  await picker().click()
+  await page.getByRole('option', {name: 'Opus', exact: true}).click()
+  await expectPicked('Claude', 'Opus')
+
+  main.publish({
+    type: 'MODELS_CHANGED',
+    provider: 'claude',
+    models: [
+      model('opus', 'Opus', {isDefault: true, resolvesTo: 'opus-5-5'}),
+      model('opus-4-7', 'Opus 4.7'),
+    ],
+  })
+  await expectPicked('Claude', 'Opus 4.7')
+
+  await send(main)
+  expect(sentModels(main)).toEqual([{provider: 'claude', model: 'opus-4-7'}])
+})
+
 it('lists only the Thread’s own Provider in a continuing Thread', async () => {
-  await renderInput({attachedTo: attachedReply('claude', 'opus')})
+  await renderInput({attachedTo: attachedReply('claude', 'opus-4-7')})
 
   await picker().click()
   await expect.element(page.getByRole('option', {name: 'Haiku'})).toBeVisible()
@@ -248,17 +279,42 @@ it('lists a Model the app is too old for, disabled as needing an app update', as
   await expect.element(gated.getByText('Needs an app update')).toBeVisible()
 })
 
-it('falls back to the Provider’s default, visibly, when the Reply’s Model is no longer offered', async () => {
+it('holds Send, saying which Model is gone, until another is picked', async () => {
   const main = await renderInput({
     attachedTo: attachedReply('claude', 'sonnet-3'),
   })
 
+  await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
   await expect
-    .element(page.getByText('sonnet-3 is no longer offered · using Opus'))
+    .element(page.getByText('sonnet-3 is no longer offered'))
     .toBeVisible()
+  await expect.element(page.getByRole('button', {name: 'Send'})).toBeDisabled()
+
+  await picker().click()
+  await page.getByRole('option', {name: 'Haiku'}).click()
 
   await send(main)
-  expect(sentModels(main)).toEqual([{provider: 'claude', model: 'opus'}])
+  expect(sentModels(main)).toEqual([{provider: 'claude', model: 'haiku'}])
+})
+
+it('holds Send, saying so, until its Provider has listed its Models', async () => {
+  const main = await renderInput({
+    models: {...MODELS, claude: []},
+    attachedTo: attachedReply('claude', 'opus-4-7'),
+  })
+
+  await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
+  await expect.element(page.getByText('Loading Models…')).toBeVisible()
+  await expect.element(page.getByRole('button', {name: 'Send'})).toBeDisabled()
+
+  main.publish({
+    type: 'MODELS_CHANGED',
+    provider: 'claude',
+    models: MODELS.claude,
+  })
+
+  await send(main)
+  expect(sentModels(main)).toEqual([{provider: 'claude', model: 'opus-4-7'}])
 })
 
 it('offers to sign in again beside a signed-out Provider’s Model, holding Send', async () => {

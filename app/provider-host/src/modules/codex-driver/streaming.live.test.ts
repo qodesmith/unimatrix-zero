@@ -29,6 +29,9 @@ import {RECORDINGS} from './replay'
 const folder = process.env.UZ_LIVE_CODEX_PROGRAM
 const signedIn = process.env.UZ_LIVE_CODEX_HOME
 
+/** The Model ChatGPT's `model/list` marked as its default when recorded. */
+const MODEL = 'gpt-6.1-sol'
+
 function homeFrom(source: string) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-codex-'))
   fs.copyFileSync(path.join(source, 'auth.json'), path.join(home, 'auth.json'))
@@ -94,7 +97,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         on.startReply({
           treeId,
           replyId: crypto.randomUUID(),
-          model: 'default',
+          model: MODEL,
           systemPrompt: 'You answer in as few words as you can.',
           prompt: {text},
           vendorProgram: {
@@ -235,7 +238,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       for await (const event of on.startReply({
         treeId,
         replyId,
-        model: 'default',
+        model: MODEL,
         systemPrompt: 'You answer in as few words as you can.',
         prompt: {text},
         vendorProgram: {
@@ -405,7 +408,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         on.startReply({
           treeId,
           replyId: crypto.randomUUID(),
-          model: 'default',
+          model: MODEL,
           systemPrompt: 'You answer in as few words as you can.',
           prompt: {text},
           vendorProgram: vendorProgram(home),

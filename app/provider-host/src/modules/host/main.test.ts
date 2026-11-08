@@ -90,7 +90,7 @@ const pro = {
   needsAppUpdate: false,
 }
 
-function listing(outcomes: (() => Promise<Model[] | null>)[]) {
+function listing(outcomes: (() => Promise<Model[]>)[]) {
   const asked: unknown[] = []
 
   const driver: ProviderDriver = {
@@ -120,11 +120,10 @@ it('lists the driver’s Models for main', async () => {
   expect(main.sent.at(-1)).toEqual({type: 'MODELS_CHANGED', models: [pro]})
 })
 
-it('tells main nothing when the driver can’t list its Models or fails to', async () => {
+it('tells main nothing when the driver fails to list its Models', async () => {
   const main = fakeMain()
 
   const {driver} = listing([
-    async () => null,
     async () => {
       throw new Error('codex would not start')
     },
@@ -136,13 +135,12 @@ it('tells main nothing when the driver can’t list its Models or fails to', asy
   const unhandled = await unhandledDuring(async () => {
     main.command({type: 'models.list', vendorProgram})
     main.command({type: 'models.list', vendorProgram})
-    main.command({type: 'models.list', vendorProgram})
     await expect.poll(() => main.sent.at(-1)?.type).toBe('MODELS_CHANGED')
   })
 
   expect(unhandled).toEqual([])
 
-  // The lists settle in order, so a post for either earlier one comes first.
+  // The lists settle in order, so a post for the failed one comes first.
   expect(
     main.sent.filter(message => message.type === 'MODELS_CHANGED')
   ).toEqual([{type: 'MODELS_CHANGED', models: [pro]}])

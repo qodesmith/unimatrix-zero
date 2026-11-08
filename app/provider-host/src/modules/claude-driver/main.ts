@@ -1,3 +1,4 @@
+import type {ReadModels} from './models'
 import type {ClaudeRepliesDeps} from './streaming'
 import type {SpawnOptions} from '@anthropic-ai/claude-agent-sdk'
 import type {ProviderDriver} from '@uz/contract/host'
@@ -8,6 +9,7 @@ import {query} from '@anthropic-ai/claude-agent-sdk'
 import {spawn} from 'node:child_process'
 
 import {readAccount} from './account'
+import {claudeEnvironment} from './environment'
 import {signOut, startLogin} from './login'
 import {createModelList} from './models'
 import {runClaudeOneShot} from './one-shot'
@@ -35,6 +37,20 @@ export function spawnClaude({command, args, cwd, env, signal}: SpawnOptions) {
   })
 }
 
+function readModelsWith(env: NodeJS.ProcessEnv): ReadModels {
+  return async ({program, configDir}) => {
+    if (!program) throw new Error('The manifest names no Claude program.')
+
+    const {models} = await readAccount({
+      program: program.path,
+      env: claudeEnvironment(env, configDir),
+      cwd: configDir,
+    })
+
+    return models
+  }
+}
+
 type ClaudeDriverOptions = Pick<ClaudeRepliesDeps, 'store'> &
   Partial<Omit<ClaudeRepliesDeps, 'store' | 'learnModels' | 'resolveModel'>>
 
@@ -46,7 +62,7 @@ export function createClaudeDriver({
   whenIdle = idleFor(IDLE_CLOSE_MS),
   maxWarm = MAX_WARM,
 }: ClaudeDriverOptions): ProviderDriver {
-  const models = createModelList()
+  const models = createModelList(readModelsWith(env))
 
   const replies = createClaudeReplies({
     store,
@@ -78,7 +94,7 @@ export function createClaudeDriver({
       timeoutMs: SIGN_IN_TIMEOUT_MS,
     }),
     readConnection: notYet,
-    listModels: async () => models.list(),
+    listModels: models.list,
     onModelsChanged: models.onChanged,
     smallestModel: async () => SMALLEST_MODEL,
     readUsage: notYet,

@@ -15,7 +15,7 @@ The exact, unmodified `claude` or `codex` build the app downloads for a Provider
 _Avoid_: CLI, binary, the user's installed copy
 
 **Model**:
-A specific AI offered by a Provider (e.g. Claude Opus, GPT-5.1). Chosen per Prompt: the Input defaults to the Model of the Reply it's attached to, and each Reply records the Model that wrote it. One Thread may pass through several Models and Providers.
+A specific AI offered by a Provider (e.g. Claude Opus, GPT-5.1). Chosen per Prompt: the Input defaults to the Model of the Reply it's attached to, and each Reply records the Model that wrote it. Some Models a Provider lists, such as its "Default" and aliases like "Haiku", stand for whichever Model the Provider points them at: picking one picks the Model it points at then, and the Thread stays on that Model until the user picks another. One Thread may pass through several Models and Providers.
 _Avoid_: Engine, bot, assistant
 
 **Provider session**:

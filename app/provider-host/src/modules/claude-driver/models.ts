@@ -1,7 +1,7 @@
 import type {ModelInfo} from '@anthropic-ai/claude-agent-sdk'
+import type {SignInRequest} from '@uz/contract/host'
 import type {Model} from '@uz/contract/providers'
 
-import {DEFAULT_MODEL_ID} from '@uz/contract/providers'
 import {isDeepStrictEqual} from 'node:util'
 import {z} from 'zod'
 
@@ -15,12 +15,19 @@ const ModelInfosSchema = z.array(
   Pick<ModelInfo, 'value' | 'displayName' | 'resolvedModel'>[]
 >
 
+/** The SDK's entry for the Model `claude` runs when given none. */
+const SDK_DEFAULT = 'default'
+
+/** Starts a `claude` to read the Models it lists. */
+export type ReadModels = (vendorProgram: SignInRequest) => Promise<ModelInfo[]>
+
 /**
  * The SDK lists Models only from a running `claude`, so the list is the one
- * the newest `claude` the driver ran gave, and null before any ran.
+ * the newest `claude` the driver ran gave. Before any ran, `list` starts one.
  */
-export function createModelList() {
+export function createModelList(read: ReadModels) {
   let kept: Model[] | null = null
+  let reading: Promise<Model[]> | null = null
   const listeners: ((models: Model[]) => void)[] = []
 
   /** A list that doesn't parse changes nothing. */
@@ -32,7 +39,7 @@ export function createModelList() {
     const models = parsed.data.map(({value, displayName, resolvedModel}) => ({
       id: value,
       name: displayName,
-      isDefault: value === DEFAULT_MODEL_ID,
+      isDefault: value === SDK_DEFAULT,
       resolvesTo: resolvedModel ?? null,
       needsAppUpdate: false,
     }))
@@ -53,5 +60,23 @@ export function createModelList() {
     return kept?.find(model => model.id === id)?.resolvesTo ?? id
   }
 
-  return {learn, list: () => kept, onChanged, resolve}
+  async function readList(vendorProgram: SignInRequest) {
+    learn(await read(vendorProgram))
+
+    if (!kept) throw new Error('Claude listed no Models the app can read.')
+
+    return kept
+  }
+
+  async function list(vendorProgram: SignInRequest) {
+    if (kept) return kept
+
+    reading ??= readList(vendorProgram).finally(() => {
+      reading = null
+    })
+
+    return reading
+  }
+
+  return {learn, list, onChanged, resolve}
 }

@@ -61,6 +61,8 @@ interface Report {
   vendorVariables: string[]
   methods: string[]
   prompts: string[]
+  /** At each `thread/start`, `thread/fork` and `thread/resume`. */
+  threadModels: (string | null)[]
   turnModels: (string | null)[]
   modelLists: object[]
   resumedFrom: {type: string; id: string}[]
@@ -189,7 +191,7 @@ async function setUp(
     session: SessionRef | ReplySession | null = null,
     {
       stopAfter = Infinity,
-      model = 'default',
+      model = MODEL,
     }: {stopAfter?: number; model?: string} = {}
   ) {
     const replyId = crypto.randomUUID()
@@ -1245,7 +1247,7 @@ it('fails a cut when Codex can’t start', async () => {
   ).rejects.toThrow('The manifest names no Codex program.')
 })
 
-it('switches a loaded thread to the Model each Prompt asks for, and records the Reply on it', async () => {
+it('opens a thread on the Prompt’s Model, switches it to the Model each later Prompt asks for, and records each Reply on it', async () => {
   const codex = await setUp(['started.ndjson'])
 
   const first = await codex.reply(FIRST_PROMPT)
@@ -1260,7 +1262,37 @@ it('switches a loaded thread to the Model each Prompt asks for, and records the 
   expect(second).toContainEqual(
     expect.objectContaining({type: 'REPLY_RECORDED', model: 'gpt-6-luna'})
   )
-  expect(codex.reports()[0]?.turnModels).toEqual([null, 'gpt-6-luna'])
+  const [report] = codex.reports()
+
+  expect(report?.threadModels).toEqual([MODEL])
+  expect(report?.turnModels).toEqual([MODEL, 'gpt-6-luna'])
+})
+
+it('runs the next Prompt on the Model it asks for after a turn failed on a Model that doesn’t exist', async () => {
+  const failedFirst = edited('started.ndjson', text =>
+    text
+      .replace(
+        '"status":"completed","error":null',
+        '"status":"failed","error":{"message":"The \'gpt-nonexistent-201\' model is not supported when using Codex with a ChatGPT account."}'
+      )
+      .split('\n')
+      .filter(line => !line.includes('"id":4,'))
+      .join('\n')
+  )
+
+  const codex = await setUp([failedFirst])
+
+  const failed = await codex.reply(FIRST_PROMPT, null, {
+    model: 'gpt-nonexistent-201',
+  })
+
+  const next = await codex.reply(SECOND_PROMPT, promptRecordedIn(failed))
+
+  expect(failed.at(-1)).toMatchObject({status: 'failed'})
+  expect(next).toContainEqual(
+    expect.objectContaining({type: 'REPLY_RECORDED', model: MODEL})
+  )
+  expect(codex.reports()[0]?.turnModels).toEqual(['gpt-nonexistent-201', MODEL])
 })
 
 function modelEntry(slug: string, displayName: string, isDefault = false) {
