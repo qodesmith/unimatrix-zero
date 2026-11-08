@@ -37,7 +37,7 @@ export function spawnClaude({command, args, cwd, env, signal}: SpawnOptions) {
   })
 }
 
-function readModelsIn(env: NodeJS.ProcessEnv): ReadModels {
+function readModelsWith(env: NodeJS.ProcessEnv): ReadModels {
   return async ({program, configDir}) => {
     if (!program) throw new Error('The manifest names no Claude program.')
 
@@ -62,7 +62,7 @@ export function createClaudeDriver({
   whenIdle = idleFor(IDLE_CLOSE_MS),
   maxWarm = MAX_WARM,
 }: ClaudeDriverOptions): ProviderDriver {
-  const models = createModelList(readModelsIn(env))
+  const models = createModelList(readModelsWith(env))
 
   const replies = createClaudeReplies({
     store,

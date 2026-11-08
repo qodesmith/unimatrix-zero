@@ -68,7 +68,6 @@ export function createModelList(read: ReadModels) {
     return kept
   }
 
-  /** Calls that wait for the same read share it. */
   async function list(vendorProgram: SignInRequest) {
     if (kept) return kept
 

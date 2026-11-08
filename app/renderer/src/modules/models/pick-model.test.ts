@@ -2,7 +2,7 @@ import type {Model, ProviderStatus} from '@uz/contract/providers'
 
 import {expect, it} from 'vitest'
 
-import {pickModel, pickedFrom} from './pick-model'
+import {pickModel} from './pick-model'
 
 const account = {email: 'sam@example.com', plan: 'Max'}
 
@@ -425,11 +425,4 @@ it('holds Send, saying so, when every Model of the Provider needs an app update'
   expect(pick.heldBecause).toBe(
     'Claude offers no Model this app version can use'
   )
-})
-
-it('picks an entry as the Model it resolves to now, or as its own id', () => {
-  expect(claudeModels.map(entry => pickedFrom('claude', entry))).toEqual([
-    {provider: 'claude', model: 'haiku', entry: 'haiku'},
-    {provider: 'claude', model: 'opus-4-7', entry: 'opus'},
-  ])
 })

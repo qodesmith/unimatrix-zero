@@ -39,7 +39,6 @@ export interface ModelPick {
 
 const LOADING = 'Loading Models…'
 
-/** The Model an entry names now: an alias's or the default's, or its own id. */
 function concreteOf(model: Model) {
   return model.resolvesTo ?? model.id
 }
@@ -115,7 +114,7 @@ function entryOf(listed: Model[], wanted: WantedModel) {
   return picked ?? findModel(listed, wanted.model)
 }
 
-function gone(notice: string) {
+function pickAnother(notice: string) {
   return {selected: null, notice, heldBecause: 'Pick a Model to send'}
 }
 
@@ -129,9 +128,10 @@ function fromList(wanted: WantedModel, models: Record<ProviderId, Model[]>) {
 
   const found = entryOf(listed, wanted)
 
-  if (!found) return gone(`${wanted.model} is no longer offered`)
+  if (!found) return pickAnother(`${wanted.model} is no longer offered`)
 
-  if (found.needsAppUpdate) return gone(`${found.name} needs an app update`)
+  if (found.needsAppUpdate)
+    return pickAnother(`${found.name} needs an app update`)
 
   return {
     selected: selectedOf(wanted.provider, found),

@@ -36,7 +36,10 @@ export const ModelSchema = z.strictObject({
 
 export type Model = z.infer<typeof ModelSchema>
 
-/** `model` is a concrete id, never an alias or a default the Provider resolves. */
+/**
+ * The picker resolves an alias or a default before sending, so no driver gets
+ * one.
+ */
 export const ModelChoiceSchema = z.strictObject({
   provider: ProviderIdSchema,
   model: z.string().min(1),
