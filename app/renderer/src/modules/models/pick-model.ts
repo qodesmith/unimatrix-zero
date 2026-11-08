@@ -105,7 +105,10 @@ function startOnFirstConnected({statuses, models}: ModelPickInput): Selection {
     : {selected: null, heldBecause: 'Connect a Provider to send'}
 }
 
-/** The picked entry while it still names the Model picked on it. */
+/**
+ * The picked entry while it still names the Model picked on it, else the entry
+ * listed under that Model.
+ */
 function entryOf(listed: Model[], wanted: WantedModel) {
   const picked = listed.find(
     model => model.id === wanted.entry && concreteOf(model) === wanted.model

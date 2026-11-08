@@ -237,20 +237,7 @@ it('sends the Model picked in the Input', async () => {
   expect(sentModels(main)).toEqual([{provider: 'claude', model: 'haiku'}])
 })
 
-it('sends the Model the default resolves to when picked, still showing the default', async () => {
-  const main = await renderInput({
-    attachedTo: attachedReply('claude', 'haiku'),
-  })
-
-  await picker().click()
-  await page.getByRole('option', {name: 'Opus', exact: true}).click()
-  await expectPicked('Claude', 'Opus')
-
-  await send(main)
-  expect(sentModels(main)).toEqual([{provider: 'claude', model: 'opus-4-7'}])
-})
-
-it('stays on the Model an alias resolved to when picked, after the alias moves', async () => {
+it('sends the Model the default resolved to when picked, still showing the default, and stays on it after the default moves', async () => {
   const main = await renderInput({
     attachedTo: attachedReply('claude', 'haiku'),
   })
