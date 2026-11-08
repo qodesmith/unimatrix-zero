@@ -81,11 +81,11 @@ Ending a streaming Reply early, by its button or Esc; a Setting turns Esc's part
 _Avoid_: Cancel, abort, interrupt (the Providers' word for what Stop asks of them)
 
 **Retry**:
-Running a failed Reply's Prompt again in the same place: the Reply streams again from nothing, in the Provider session rewound to the Reply its Prompt answers. It is a recovery, never a Fork, and the app never retries on its own.
+Running a failed Reply's Prompt again in the same place, from its Failed chip: the chip gives way to the Prompt and its Reply, which streams again from nothing in the Provider session rewound to the Reply its Prompt answers. It is a recovery, never a Fork, and the app never retries on its own.
 _Avoid_: Regenerate, resend, re-run
 
 **Failed chip**:
-All the Thread shows of a failed Reply, which is an exchange that didn't happen: the AI never remembers it, so the chip holds only "Failed", what went wrong, and Retry, while its Prompt goes back to the Input it was sent from. The next Prompt sent from that Input takes the failed exchange's place.
+All the Thread shows of a failed Reply, which is an Exchange that didn't happen: the AI never remembers it, so the chip holds only "Failed", what went wrong, and Retry, while its Prompt goes back to the Input it was sent from. The next Prompt sent from that Input takes the failed Exchange's place.
 _Avoid_: Error card, failed box, error state
 
 **Thinking block**:

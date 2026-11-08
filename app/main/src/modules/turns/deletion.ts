@@ -3,7 +3,7 @@ import type {PromptRecorded, SessionCutReport} from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
 
 import {schema} from '#modules/database/main'
-import {and, eq, inArray, isNull} from 'drizzle-orm'
+import {and, asc, eq, inArray, isNull} from 'drizzle-orm'
 
 import {continuation, cutBelow, recovery} from './continuation'
 
@@ -114,6 +114,7 @@ export function failedToReplace(
         eq(replies.status, 'failed')
       )
     )
+    .orderBy(asc(prompts.createdAt), asc(prompts.id))
     .all()
 
   const [first] = failed
