@@ -57,7 +57,7 @@ export function ChatSlideout({
   const failed = status === 'failed'
   const thread = pathTo(index, end.id)
 
-  // A failed Reply shows only as a chip; its Prompt went back to the Input above.
+  // A failed Reply shows only as a chip; its Prompt went back to the Input of the Reply above, or the root Input.
   const shown = failed ? thread.slice(0, -2) : thread
 
   const inputAt = failed

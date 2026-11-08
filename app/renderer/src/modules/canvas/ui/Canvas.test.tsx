@@ -2305,6 +2305,47 @@ it('puts a failed Prompt below the draft already in its Input, after a blank lin
     .toHaveValue('Meanwhile\n\nAnd then?')
 })
 
+function chipFor({promptId}: Reply) {
+  const box = canvas()
+    .element()
+    .querySelector(`.react-flow__node[data-id="${promptId}"]`)
+
+  if (!box) throw new Error('No Failed chip for this Reply on the canvas')
+
+  return page.elementLocator(box)
+}
+
+it('takes each failed Prompt back out of an Input that holds two once its Retry succeeds, leaving the other', async () => {
+  const {main} = await renderCanvas(linearTree())
+  await expect.element(page.getByText('Reply two')).toBeVisible()
+
+  await sendInto('Reply two', 'First ask')
+  const first = main.replies.at(-1)
+  await clickInputUnder('Reply two')
+  await userEvent.keyboard('Second ask{Enter}')
+  await expect.element(page.getByText('Second ask')).toBeVisible()
+  const second = main.replies.at(-1)
+
+  if (!first || !second) throw new Error('The sends made no Replies')
+
+  finish(main, first.id, 'failed')
+  await expect.element(inputUnder('Reply two')).toHaveValue('First ask')
+  finish(main, second.id, 'failed')
+  await expect
+    .element(inputUnder('Reply two'))
+    .toHaveValue('First ask\n\nSecond ask')
+
+  await chipFor(first).getByRole('button', {name: 'Retry'}).click()
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  finish(main, first.id, 'complete')
+  await expect.element(inputUnder('Reply two')).toHaveValue('Second ask')
+
+  await chipFor(second).getByRole('button', {name: 'Retry'}).click()
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  finish(main, second.id, 'complete')
+  await expect.element(inputUnder('Reply two')).toHaveValue('')
+})
+
 function modelIn(input: Locator) {
   return input.element().closest('form')?.querySelector('[role="combobox"]')
     ?.textContent

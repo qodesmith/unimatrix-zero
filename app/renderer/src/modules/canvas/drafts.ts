@@ -60,6 +60,58 @@ export function withDraft(drafts: Drafts, at: DraftKey, draft: Draft): Drafts {
   return {...drafts, byInput}
 }
 
+function withPromptBelow(draft: Draft | undefined, text: string) {
+  return draft?.text.trim() ? `${draft.text}\n\n${text}` : text
+}
+
+/** The restore made on top of `under`'s, while the Input still holds it. */
+function stackedOn(
+  restored: ReadonlyMap<string, Restored>,
+  byInput: ReadonlyMap<DraftKey, Draft>,
+  under: Restored
+) {
+  for (const [replyId, over] of restored) {
+    if (
+      over.at === under.at &&
+      sameDraft(over.before, under.after) &&
+      sameDraft(byInput.get(over.at), over.after)
+    ) {
+      return {replyId, over}
+    }
+  }
+
+  return null
+}
+
+function takeOut(
+  byInput: Map<DraftKey, Draft>,
+  restored: Map<string, Restored>,
+  taken: Restored,
+  index: TreeIndex
+) {
+  const {at, before, after} = taken
+
+  if (sameDraft(byInput.get(at), after)) {
+    put(byInput, at, before)
+
+    return
+  }
+
+  const stacked = stackedOn(restored, byInput, taken)
+  const reply = stacked && index.replyById.get(stacked.replyId)
+  const prompt = reply && index.promptById.get(reply.promptId)
+
+  if (!stacked || !prompt) return
+
+  const rebased: Draft = {
+    text: withPromptBelow(before, prompt.text),
+    model: stacked.over.after.model,
+  }
+
+  byInput.set(at, rebased)
+  restored.set(stacked.replyId, {at, before, after: rebased})
+}
+
 /**
  * A failed Reply sends its Prompt back to the Input it was sent from, below a
  * draft already there. A Retry that succeeds, or a Prompt sent in its place
@@ -70,16 +122,14 @@ export function reconcileDrafts(drafts: Drafts, index: TreeIndex): Drafts {
   const restored = new Map(drafts.restored)
   let changed = false
 
-  for (const [replyId, {at, before, after}] of drafts.restored) {
+  for (const replyId of drafts.restored.keys()) {
+    const taken = restored.get(replyId)
     const status = index.replyById.get(replyId)?.status
 
-    if (status === 'failed' || status === 'streaming') continue
-
-    if (sameDraft(byInput.get(at), after)) {
-      put(byInput, at, before)
-    }
+    if (!taken || status === 'failed' || status === 'streaming') continue
 
     restored.delete(replyId)
+    takeOut(byInput, restored, taken, index)
     changed = true
   }
 
@@ -92,10 +142,9 @@ export function reconcileDrafts(drafts: Drafts, index: TreeIndex): Drafts {
 
     const at = prompt.parentReplyId
     const before = byInput.get(at)
-    const kept = before?.text.trim() ? `${before.text}\n\n` : ''
 
     const after: Draft = {
-      text: `${kept}${prompt.text}`,
+      text: withPromptBelow(before, prompt.text),
       model: {provider: reply.provider, model: reply.model, entry: null},
     }
 
