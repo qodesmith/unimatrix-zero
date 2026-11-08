@@ -151,7 +151,7 @@ function fromWanted(
   const name = PROVIDER_NAMES[wanted.provider]
 
   if (status?.status === 'signed-out') {
-    const found = findModel(input.models[wanted.provider], wanted.model)
+    const found = entryOf(input.models[wanted.provider], wanted)
 
     return {
       selected: {

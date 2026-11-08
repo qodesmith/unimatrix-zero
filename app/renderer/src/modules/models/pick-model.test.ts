@@ -331,6 +331,32 @@ it('keeps a signed-out Provider’s Model, offering to sign in again and holding
   expect(pick.heldBecause).toBe('Sign in to Claude again to send')
 })
 
+it('keeps the picked default named as the default while its Provider is signed out', () => {
+  const pick = pickModel({
+    wanted: {provider: 'claude', model: 'opus-4-7', entry: 'default'},
+    lockedTo: null,
+    statuses: only('claude', 'signed-out'),
+    models: {
+      ...models,
+      claude: [
+        model('default', {
+          name: 'Default',
+          isDefault: true,
+          resolvesTo: 'opus-4-7',
+        }),
+        model('opus', {resolvesTo: 'opus-4-7'}),
+      ],
+    },
+  })
+
+  expect(pick.selected).toEqual({
+    provider: 'claude',
+    model: 'opus-4-7',
+    name: 'Default',
+    entry: 'default',
+  })
+})
+
 it('keeps a signed-out Provider’s Model by its id when the list doesn’t know it', () => {
   const pick = pickModel({
     wanted: recorded('claude', 'opus-4-7'),
