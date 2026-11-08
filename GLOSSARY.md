@@ -81,11 +81,11 @@ Ending a streaming Reply early, by its button or Esc; a Setting turns Esc's part
 _Avoid_: Cancel, abort, interrupt (the Providers' word for what Stop asks of them)
 
 **Retry**:
-Running a failed Reply's Prompt again in the same place: the Failed chip gives way to the Prompt, and the Reply streams again from nothing, in the Provider session rewound to the Reply its Prompt answers. It is a recovery, never a Fork, and the app never retries on its own. A Retry that fails collapses back to the chip; one that succeeds takes the failed Prompt back out of the Input above, unless the user changed it there.
+Running a failed Reply's Prompt again in the same place: the Reply streams again from nothing, in the Provider session rewound to the Reply its Prompt answers. It is a recovery, never a Fork, and the app never retries on its own.
 _Avoid_: Regenerate, resend, re-run
 
 **Failed chip**:
-All the Thread shows of a failed Reply: "Failed", what went wrong, and Retry. A failed Reply is an exchange that didn't happen: the AI never remembers it, so neither its Prompt nor any text it wrote shows anywhere in the Thread. Its Prompt, with its Model, goes back to the Input it was sent from, below any draft there. A failed Reply has no Input, so it is never a Fork. Sending from the Input above removes the failed Prompt and Reply in the same step, and the new Prompt runs in the Provider session as it was before the failed one; a failed root Prompt leaves the Tree empty but kept, with the chip over the root Input.
+All the Thread shows of a failed Reply, which is an exchange that didn't happen: the AI never remembers it, so the chip holds only "Failed", what went wrong, and Retry, while its Prompt goes back to the Input it was sent from. The next Prompt sent from that Input takes the failed exchange's place.
 _Avoid_: Error card, failed box, error state
 
 **Thinking block**:

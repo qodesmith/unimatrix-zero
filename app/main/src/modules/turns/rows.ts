@@ -109,7 +109,6 @@ export interface NewExchange {
   model: string
   systemPrompt: string
   now: Date
-  /** The failed Turns the new Prompt takes the place of. */
   replacing: Removal | null
 }
 

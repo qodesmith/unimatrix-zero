@@ -8,7 +8,7 @@ import {defineConfig} from 'vite'
 const cn = path.join(import.meta.dirname, 'node_modules/cn')
 
 /** Runs outside UTC: in CI's UTC, a reset time formatted in UTC passes as local. */
-const ZONED = 'src/modules/turns/ui/ReplyView.test.tsx'
+const ZONED = 'src/modules/turns/ui/FailedChip.test.tsx'
 
 export default defineConfig({
   root: import.meta.dirname,

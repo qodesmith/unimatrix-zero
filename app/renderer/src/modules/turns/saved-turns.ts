@@ -1,5 +1,5 @@
 import type {QueryClient} from '@tanstack/react-query'
-import type {CommandResult} from '@uz/contract/commands'
+import type {CommandResult, TurnIds} from '@uz/contract/commands'
 import type {Reply, ReplyProgress} from '@uz/contract/turns'
 
 export type Turns = CommandResult<'tree.turns'>
@@ -32,8 +32,6 @@ export function updateSavedReply(
       : turns
   )
 }
-
-type TurnIds = CommandResult<'prompt.delete'>
 
 function without(turns: Turns, {promptIds, replyIds}: TurnIds): Turns {
   const prompts = new Set(promptIds)

@@ -141,6 +141,38 @@ function fakeMain(saved: Saved) {
     for (const listener of listeners) listener(event)
   }
 
+  function snapshot(): AppEvent {
+    return {
+      type: 'SNAPSHOT',
+      app: {version: '0.0.0'},
+      replies: [],
+      providers: PROVIDERS,
+      models: {
+        claude: [
+          {
+            id: 'fake',
+            name: 'Fake',
+            isDefault: true,
+            resolvesTo: null,
+            needsAppUpdate: false,
+          },
+          {
+            id: 'swift',
+            name: 'Swift',
+            isDefault: false,
+            resolvesTo: null,
+            needsAppUpdate: false,
+          },
+        ],
+        chatgpt: [],
+      },
+      lastModel: null,
+      signIn: null,
+      settings: {...settings},
+      layout: DEFAULT_LAYOUT,
+    }
+  }
+
   const bridge: Bridge = {
     send: (async (command: Command) => {
       sent.push(command)
@@ -249,42 +281,24 @@ function fakeMain(saved: Saved) {
     }) as Bridge['send'],
     subscribe: listener => {
       listeners.add(listener)
-      listener({
-        type: 'SNAPSHOT',
-        app: {version: '0.0.0'},
-        replies: [],
-        providers: PROVIDERS,
-        models: {
-          claude: [
-            {
-              id: 'fake',
-              name: 'Fake',
-              isDefault: true,
-              resolvesTo: null,
-              needsAppUpdate: false,
-            },
-            {
-              id: 'swift',
-              name: 'Swift',
-              isDefault: false,
-              resolvesTo: null,
-              needsAppUpdate: false,
-            },
-          ],
-          chatgpt: [],
-        },
-        lastModel: null,
-        signIn: null,
-        settings: {...settings},
-        layout: DEFAULT_LAYOUT,
-      })
+      listener(snapshot())
 
       return () => listeners.delete(listener)
     },
     registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
   }
 
-  return {...bridge, sent, publish, replies, stops, deletes, turnsLoads, sends}
+  return {
+    ...bridge,
+    sent,
+    publish,
+    snapshot,
+    replies,
+    stops,
+    deletes,
+    turnsLoads,
+    sends,
+  }
 }
 
 const probe = {render: async () => {}}
@@ -623,7 +637,6 @@ function chip() {
   return canvas().getByRole('group', {name: 'Failed Reply'})
 }
 
-/** Waits for the canvas to draw a Failed chip. */
 async function chipDrawn() {
   await expect
     .element(page.getByRole('group', {name: 'Failed Reply'}).first())
@@ -2255,6 +2268,25 @@ it('takes the failed Prompt back out of the Input once a Retry succeeds, unless 
   await expect
     .element(inputUnder('Reply one'))
     .toHaveValue('Prompt two, reworded')
+})
+
+it('takes the failed Prompt back out of the Input once another window sends in its place', async () => {
+  const {main} = await renderCanvas(endingIn('failed', 'Cut off'))
+  await chipDrawn()
+  await expect.element(inputUnder('Reply one')).toHaveValue('Prompt two')
+
+  await main.send({
+    type: 'prompt.send',
+    treeId,
+    parentReplyId: uuid(11),
+    text: 'Sent elsewhere',
+    model: {provider: 'claude', model: 'fake'},
+  })
+  main.publish(main.snapshot())
+
+  await expect.element(page.getByText('Sent elsewhere')).toBeVisible()
+  expect(chip().query()).toBeNull()
+  await expect.element(inputUnder('Reply one')).toHaveValue('')
 })
 
 it('puts a failed Prompt below the draft already in its Input, after a blank line', async () => {

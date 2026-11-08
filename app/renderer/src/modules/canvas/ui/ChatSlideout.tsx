@@ -201,7 +201,12 @@ export function ChatSlideout({
             )}
           </div>
         </div>
-        <ChatInput ref={input} at={inputAt} onFocus={onFocus} onSent={onSent} />
+        <ChatInput
+          ref={input}
+          parentReplyId={inputAt}
+          onFocus={() => onFocus(inputAt ?? end.id)}
+          onSent={onSent}
+        />
       </SheetContent>
     </Sheet>
   )
@@ -256,33 +261,36 @@ function ChatReply({reply}: {reply: Reply}) {
 
 interface ChatInputProps {
   ref: Ref<HTMLTextAreaElement>
-  /** The Reply the Input continues from; null for the root Input. */
-  at: string | null
-  onFocus: (replyId: string) => void
+  /** Null for the root Input. */
+  parentReplyId: string | null
+  onFocus: () => void
   onSent: (replyId: string) => void
 }
 
-function ChatInput({ref, at, onFocus, onSent}: ChatInputProps) {
+function ChatInput({ref, parentReplyId, onFocus, onSent}: ChatInputProps) {
   const {treeId, index, drafts, setDraft} = useCanvas()
-  const live = useReply(at === null ? null : (index.replyById.get(at) ?? null))
-  const streaming = live?.status === 'streaming'
+
+  const attached =
+    parentReplyId === null ? null : index.replyById.get(parentReplyId)
+
+  const streaming = useReply(attached ?? null)?.status === 'streaming'
 
   return (
     <footer className="shrink-0 border-t border-border px-4 py-3">
       <div className="mx-auto max-w-180">
         <PromptInput
-          key={at ?? 'root'}
+          key={parentReplyId ?? 'root'}
           ref={ref}
           treeId={treeId}
-          parentReplyId={at}
+          parentReplyId={parentReplyId}
           canSend={!streaming}
-          stopReplyId={streaming && at !== null ? at : undefined}
-          onFocus={() => {
-            if (at !== null) onFocus(at)
-          }}
+          stopReplyId={
+            streaming && parentReplyId !== null ? parentReplyId : undefined
+          }
+          onFocus={onFocus}
           onSent={onSent}
-          draft={drafts.get(at) ?? EMPTY_DRAFT}
-          onDraftChange={draft => setDraft(at, draft)}
+          draft={drafts.get(parentReplyId) ?? EMPTY_DRAFT}
+          onDraftChange={draft => setDraft(parentReplyId, draft)}
         />
       </div>
     </footer>

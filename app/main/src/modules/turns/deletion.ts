@@ -96,7 +96,7 @@ export function deleteBelow(db: Database, treeId: string, promptId: string) {
  * null, takes the place of, and the session a Retry of one would resume: it
  * holds nothing of the failed attempt.
  */
-export function failedAt(
+export function failedToReplace(
   db: Database,
   treeId: string,
   parentReplyId: string | null

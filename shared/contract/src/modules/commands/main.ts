@@ -74,6 +74,8 @@ const TurnIdsSchema = z.strictObject({
   replyIds: z.array(z.uuid()),
 })
 
+export type TurnIds = z.infer<typeof TurnIdsSchema>
+
 export const PromptSendResult = z.strictObject({
   prompt: PromptSchema,
   reply: ReplySchema,

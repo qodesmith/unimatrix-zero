@@ -380,14 +380,15 @@ function ExchangeTurns({
 }
 
 /** The Input a failed root Prompt went back to, with nothing above it. */
-function RootInput() {
-  const {treeId, onSent, drafts, setDraft} = useCanvas()
+function RootInput({failedReplyId}: {failedReplyId: string}) {
+  const {treeId, onInputFocus, onSent, drafts, setDraft} = useCanvas()
 
   return (
     <div data-revealed="true" className="mt-3">
       <PromptInput
         treeId={treeId}
         parentReplyId={null}
+        onFocus={() => onInputFocus(failedReplyId)}
         onSent={sent => onSent(sent, null)}
         draft={drafts.get(null) ?? EMPTY_DRAFT}
         onDraftChange={draft => setDraft(null, draft)}
@@ -411,7 +412,9 @@ export function FailedNode({data}: NodeProps<TurnNode>) {
         className={hiddenHandle}
       />
       <FailedChip reply={turn.reply} />
-      {turn.prompt.parentReplyId === null && <RootInput />}
+      {turn.prompt.parentReplyId === null && (
+        <RootInput failedReplyId={turn.reply.id} />
+      )}
       <Handle
         type="source"
         position={vertical ? Position.Bottom : Position.Right}

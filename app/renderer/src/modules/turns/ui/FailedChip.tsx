@@ -4,7 +4,6 @@ import type {Reply, RunFailure} from '@uz/contract/turns'
 import {useProviderStatus} from '#modules/connections/main'
 import {Button} from '#shadcn/ui/button'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
-import {cn} from 'cn'
 
 import {useReplyRun} from '../reply-run/use-reply-run'
 import {useReply} from '../use-live-reply'
@@ -96,23 +95,14 @@ function describeFailure(failure: RunFailure, provider: ProviderId) {
  * A failed Reply in the Thread: the exchange the AI never saw, so neither its
  * Prompt nor any text it wrote shows. The caller owns its place.
  */
-export function FailedChip({
-  reply,
-  className,
-}: {
-  reply: Reply
-  className?: string
-}) {
+export function FailedChip({reply}: {reply: Reply}) {
   const {failure} = useReply(reply)
 
   return (
     <div
       role="group"
       aria-label="Failed Reply"
-      className={cn(
-        'flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-destructive bg-card px-3.5 py-2 text-xs shadow-sm',
-        className
-      )}
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-destructive bg-card px-3.5 py-2 text-xs shadow-sm"
     >
       <span className="font-medium text-destructive">Failed</span>
       {failure && (

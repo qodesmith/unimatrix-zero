@@ -25,7 +25,7 @@ import {
   clearCutOnPrompt,
   clearCutOnReport,
   deleteBelow,
-  failedAt,
+  failedToReplace,
 } from './deletion'
 import {createInFlight} from './in-flight'
 import {
@@ -138,7 +138,7 @@ export function createTurns({
 
       refuseUnsendable(continued, provider)
 
-      const failed = failedAt(db, treeId, parentReplyId)
+      const failed = failedToReplace(db, treeId, parentReplyId)
       const systemPrompt = ''
 
       const {prompt, reply} = insertExchange(db, {

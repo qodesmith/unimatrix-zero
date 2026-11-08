@@ -1,7 +1,6 @@
 import type {WantedModel} from '#modules/models/main'
 import type {TreeIndex} from './tree'
 
-/** What an Input holds: its text, and the Model picked in it if any. */
 export interface Draft {
   text: string
   model: WantedModel | null
@@ -63,8 +62,8 @@ export function withDraft(drafts: Drafts, at: DraftKey, draft: Draft): Drafts {
 
 /**
  * A failed Reply sends its Prompt back to the Input it was sent from, below a
- * draft already there. A Retry that succeeds takes it out again, unless the
- * user has changed it since.
+ * draft already there. A Retry that succeeds, or a Prompt sent in its place
+ * from another window, takes it out again, unless the user has changed it.
  */
 export function reconcileDrafts(drafts: Drafts, index: TreeIndex): Drafts {
   const byInput = new Map(drafts.byInput)
@@ -76,7 +75,7 @@ export function reconcileDrafts(drafts: Drafts, index: TreeIndex): Drafts {
 
     if (status === 'failed' || status === 'streaming') continue
 
-    if (status !== undefined && sameDraft(byInput.get(at), after)) {
+    if (sameDraft(byInput.get(at), after)) {
       put(byInput, at, before)
     }
 
