@@ -162,7 +162,10 @@ export interface ProviderDriver {
   signInPageOpened(): void
   submitSignInCode(code: string): void
   cancelSignIn(): void
-  /** The Models the account may pick now, starting a session if it must. */
+  /**
+   * The Models the account may pick now, starting its vendor program if it
+   * must.
+   */
   listModels(vendorProgram: SignInRequest): Promise<Model[]>
   /** Lists the driver learned on its own, such as from a session it started. */
   onModelsChanged(listener: (models: Model[]) => void): void
