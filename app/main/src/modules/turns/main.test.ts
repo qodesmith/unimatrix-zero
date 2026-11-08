@@ -1266,8 +1266,8 @@ describe('deleting a Prompt', () => {
   it('keeps cutting after a Branch’s Prompt went into a forked session', () => {
     const first = deletedMidThread()
     const unsent = sendPrompt(first, 'Again')
-    fail(unsent)
     const branch = sendPrompt(first, 'Or instead?')
+    fail(unsent)
     recordPrompt(branch, 'p-branch', 's-fork')
     finish(branch)
     turns.deletePrompt(treeId, promptOf(branch))
@@ -1405,5 +1405,139 @@ describe('deleting a Prompt', () => {
         },
       },
     ])
+  })
+})
+
+/** An exchange its Provider saved, Prompt and Reply, before it failed. */
+function failedAt(parentReplyId: string | null, sessionId = 's1') {
+  const replyId = sendPrompt(parentReplyId, 'Failing')
+  recordPrompt(replyId, 'p-failed', sessionId)
+  turns.hostRecorded('claude', {
+    type: 'REPLY_RECORDED',
+    treeId,
+    replyId,
+    model: 'claude-haiku-5-5',
+    session: {sessionId, messageId: 'm-failed'},
+  })
+  fail(replyId)
+  hostCommands = []
+
+  return {replyId, promptId: promptOf(replyId)}
+}
+
+/** Sorted, since Turns sent in the same millisecond list in any order. */
+function savedReplyIds() {
+  return turns
+    .list(treeId)
+    .replies.map(reply => reply.id)
+    .toSorted()
+}
+
+function sendInstead(parentReplyId: string | null) {
+  const sent = turns.sendPrompt({
+    model: picked,
+    treeId,
+    parentReplyId,
+    text: 'Instead',
+  })
+
+  if (!sent) throw new Error('The Reply it answers is gone')
+
+  return sent
+}
+
+describe('sending a Prompt where one failed', () => {
+  it('takes the failed Prompt’s place, rewinding the session as a Retry would so the Reply above doesn’t fork', () => {
+    const first = savedRoot()
+    const failed = failedAt(first)
+
+    const sent = sendInstead(first)
+
+    expect(sent.removed).toEqual({
+      promptIds: [failed.promptId],
+      replyIds: [failed.replyId],
+    })
+    expect(savedReplyIds()).toEqual([first, sent.reply.id].toSorted())
+    expect(sessionsStarted()).toEqual([
+      {sessionId: 's1', messageId: 'm1', type: 'rewind'},
+    ])
+  })
+
+  it('makes the new Prompt the root in place of a failed one, in a new session, keeping the Tree and its settings', () => {
+    const trees = createTrees(db)
+    trees.rename(treeId, 'Lisbon')
+    const failed = failedAt(null)
+
+    const sent = sendInstead(null)
+
+    expect(sent.removed).toEqual({
+      promptIds: [failed.promptId],
+      replyIds: [failed.replyId],
+    })
+    expect(turns.list(treeId)).toEqual({
+      prompts: [sent.prompt],
+      replies: [sent.reply],
+    })
+    expect(sessionsStarted()).toEqual([null])
+    expect(trees.list()).toMatchObject([
+      {id: treeId, title: 'Lisbon', firstLine: 'Instead'},
+    ])
+  })
+
+  it('forks the session as a Retry would when the Reply above has a Branch too', () => {
+    const first = savedRoot()
+    const branch = savedAt(first, 'm-b')
+    const failed = failedAt(first, 's-fork')
+
+    const sent = sendInstead(first)
+
+    expect(sent.removed).toEqual({
+      promptIds: [failed.promptId],
+      replyIds: [failed.replyId],
+    })
+    expect(savedReplyIds()).toEqual([first, branch, sent.reply.id].toSorted())
+    expect(sessionsStarted()).toEqual([
+      {sessionId: 's1', messageId: 'm1', type: 'fork'},
+    ])
+  })
+
+  it('removes nothing where no Prompt failed, with failed ones elsewhere', () => {
+    const elsewhere = inAnotherTree()
+    const first = savedRoot()
+    const done = savedAt(first, 'm2')
+    const failedBelow = failedAt(done)
+
+    const sent = sendInstead(first)
+
+    expect(sent.removed).toEqual({promptIds: [], replyIds: []})
+    expect(savedReplyIds()).toEqual(
+      [first, done, failedBelow.replyId, sent.reply.id].toSorted()
+    )
+    expect(turns.list(elsewhere.prompt.treeId).prompts).toEqual([
+      elsewhere.prompt,
+    ])
+  })
+
+  it('still drops the failed attempt when the new Prompt fails before reaching the session', () => {
+    const first = savedRoot()
+    const interrupted = sendPrompt(first, 'And then?')
+    recordPrompt(interrupted, 'p-interrupted')
+    turns.quitting()
+    turns = launch()
+    failedAt(interrupted)
+    const next = sendInstead(interrupted).reply.id
+    fail(next)
+
+    turns.retry(treeId, next)
+
+    const cut = {
+      sessionId: 's1',
+      messageId: 'm1',
+      type: 'cut',
+      keepThrough: 'p-interrupted',
+      dropFrom: 'p-failed',
+    }
+
+    expect(sessionsStarted()).toEqual([cut, cut])
   })
 })

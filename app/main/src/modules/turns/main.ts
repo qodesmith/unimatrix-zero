@@ -1,4 +1,5 @@
 import type {Database} from '#modules/database/main'
+import type {Continuation} from './continuation'
 import type {FinishedReply} from './in-flight'
 import type {Command, CommandResult} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
@@ -24,6 +25,7 @@ import {
   clearCutOnPrompt,
   clearCutOnReport,
   deleteBelow,
+  failedAt,
 } from './deletion'
 import {createInFlight} from './in-flight'
 import {
@@ -94,6 +96,25 @@ export function createTurns({
     return savedReply(db, request.replyId)
   }
 
+  function refuseUnsendable(
+    continued: Continuation | null,
+    provider: ProviderId
+  ) {
+    if (continued && continued.provider !== provider) {
+      throw new Error(
+        `Pick a ${PROVIDER_NAMES[continued.provider]} Model to continue this Thread.`
+      )
+    }
+
+    if (!hosts.ready(provider)) {
+      throw new Error(
+        continued
+          ? `Connect ${PROVIDER_NAMES[provider]} to continue this Thread.`
+          : 'Connect a Provider to send a Prompt.'
+      )
+    }
+  }
+
   return {
     list: (treeId: string) => listTurns(db, treeId),
 
@@ -115,20 +136,9 @@ export function createTurns({
 
       const {provider, model} = picked
 
-      if (continued && continued.provider !== provider) {
-        throw new Error(
-          `Pick a ${PROVIDER_NAMES[continued.provider]} Model to continue this Thread.`
-        )
-      }
+      refuseUnsendable(continued, provider)
 
-      if (!hosts.ready(provider)) {
-        throw new Error(
-          continued
-            ? `Connect ${PROVIDER_NAMES[provider]} to continue this Thread.`
-            : 'Connect a Provider to send a Prompt.'
-        )
-      }
-
+      const failed = failedAt(db, treeId, parentReplyId)
       const systemPrompt = ''
 
       const {prompt, reply} = insertExchange(db, {
@@ -139,6 +149,7 @@ export function createTurns({
         model,
         systemPrompt,
         now: now(),
+        replacing: failed,
       })
 
       const started = startOnHost(provider, {
@@ -148,13 +159,20 @@ export function createTurns({
         systemPrompt,
         prompt: {text},
         vendorProgram: vendorProgramFor(provider),
-        session: continued?.session ?? null,
+        session: failed ? failed.session : (continued?.session ?? null),
       })
 
       onTurnsChanged(treeId)
       publish({type: 'LAST_MODEL_CHANGED', model: picked})
 
-      return {prompt, reply: started}
+      return {
+        prompt,
+        reply: started,
+        removed: {
+          promptIds: failed?.promptIds ?? [],
+          replyIds: failed?.replyIds ?? [],
+        },
+      }
     },
 
     /** Runs a failed Reply's Prompt again in place; null when it's gone. */
