@@ -162,11 +162,8 @@ export interface ProviderDriver {
   signInPageOpened(): void
   submitSignInCode(code: string): void
   cancelSignIn(): void
-  /**
-   * The Models the account may pick now; null when the driver can't tell
-   * without starting a session it wouldn't otherwise start.
-   */
-  listModels(vendorProgram: SignInRequest): Promise<Model[] | null>
+  /** The Models the account may pick now, starting a session if it must. */
+  listModels(vendorProgram: SignInRequest): Promise<Model[]>
   /** Lists the driver learned on its own, such as from a session it started. */
   onModelsChanged(listener: (models: Model[]) => void): void
   /** For one-shots; null when the account can't run them. */

@@ -25,7 +25,10 @@ export const ModelSchema = z.strictObject({
   name: z.string().min(1),
   /** The Provider's current default; at most one in a list. */
   isDefault: z.boolean(),
-  /** The id a Reply written on it records, when that isn't `id`. */
+  /**
+   * The Model an alias or the Provider's default names now, when that isn't
+   * `id`: what a Prompt picked on it sends and its Reply records.
+   */
   resolvesTo: z.string().min(1).nullable(),
   /** The vendor program is too old for it, so the picker shows it disabled. */
   needsAppUpdate: z.boolean(),
@@ -33,12 +36,7 @@ export const ModelSchema = z.strictObject({
 
 export type Model = z.infer<typeof ModelSchema>
 
-/**
- * Leaves the choice to the Provider: every driver takes it, so an Input can
- * send before its Provider has listed any Models.
- */
-export const DEFAULT_MODEL_ID = 'default'
-
+/** `model` is a concrete id, never an alias or a default the Provider resolves. */
 export const ModelChoiceSchema = z.strictObject({
   provider: ProviderIdSchema,
   model: z.string().min(1),
