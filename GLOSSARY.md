@@ -81,8 +81,12 @@ Ending a streaming Reply early, by its button or Esc; a Setting turns Esc's part
 _Avoid_: Cancel, abort, interrupt (the Providers' word for what Stop asks of them)
 
 **Retry**:
-Running a failed Reply's Prompt again in the same place: the Reply streams again from nothing, in the Provider session rewound to the Reply its Prompt answers. It is a recovery, never a Fork, and the app never retries on its own.
+Running a failed Reply's Prompt again in the same place: the Failed chip gives way to the Prompt, and the Reply streams again from nothing, in the Provider session rewound to the Reply its Prompt answers. It is a recovery, never a Fork, and the app never retries on its own. A Retry that fails collapses back to the chip; one that succeeds takes the failed Prompt back out of the Input above, unless the user changed it there.
 _Avoid_: Regenerate, resend, re-run
+
+**Failed chip**:
+All the Thread shows of a failed Reply: "Failed", what went wrong, and Retry. A failed Reply is an exchange that didn't happen: the AI never remembers it, so neither its Prompt nor any text it wrote shows anywhere in the Thread. Its Prompt, with its Model, goes back to the Input it was sent from, below any draft there. A failed Reply has no Input, so it is never a Fork. Sending from the Input above removes the failed Prompt and Reply in the same step, and the new Prompt runs in the Provider session as it was before the failed one; a failed root Prompt leaves the Tree empty but kept, with the chip over the root Input.
+_Avoid_: Error card, failed box, error state
 
 **Thinking block**:
 One contiguous run of the Model's reasoning, streamed by the Provider before a content part of a Reply: before the first word, and again between tool calls, so a Reply may hold several. Shown live and collapsed while the window is open, with how long it took. A Thinking block sits beside the Reply, not in its content: it is not a part, is never stored, and a reload loses it.
@@ -130,7 +134,7 @@ One Thread of a Tree shown as a conventional vertical chat, in a slideout over c
 _Avoid_: Drawer, chat view
 
 **Input**:
-The place the user types the next Prompt, always attached to a Reply, except on an empty Tree, where a single Input creates the root Prompt. Chat mode has exactly one, at the end of the shown Thread. In canvas mode every Reply can have one: it is always shown on the Active Thread and revealed on hover elsewhere, and submitting into a Reply that already has a response branches.
+The place the user types the next Prompt, always attached to a Reply, except on an empty Tree or one whose root Prompt failed, where a single Input creates the root Prompt. Chat mode has exactly one, at the end of the shown Thread. In canvas mode every Reply can have one: it is always shown on the Active Thread and revealed on hover elsewhere, and submitting into a Reply that already has a response branches.
 _Avoid_: Composer, prompt box, head
 
 **Active Thread**:
