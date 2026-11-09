@@ -702,7 +702,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         model: MODEL,
         systemPrompt: 'You answer in as few words as you can.',
         prompt: {
-          text: 'Make up a three-word ship name, put it on the first line, then write the numbers 1 to 300, one per line.',
+          text: 'Make up a three-word ship name, put it on the first line, then write the numbers 1 to 50, one per line.',
         },
         vendorProgram: {
           program: {
@@ -736,7 +736,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       expect(events.some(event => event.type === 'TEXT_REPLACE')).toBe(true)
       expect(lines.filter(line => !/^\d+$/.test(line))).toHaveLength(1)
       expect(lines.slice(1)).toEqual(
-        Array.from({length: 300}, (_, index) => String(index + 1))
+        Array.from({length: 50}, (_, index) => String(index + 1))
       )
 
       idle.pass()

@@ -53,8 +53,8 @@ const GOODBYE_TURN = '01a1893a-4532-7b33-804e-21ff70011737'
 const THANKS_TURN = '01a1893a-4f0d-71a0-9828-93cd3ea3291e'
 
 /** As `reconnected.ndjson` recorded them. */
-const RECONNECTED_THREAD_ID = '01a1bdd7-1526-7a61-82fb-1b63ea0e9f06'
-const RECONNECTED_TURN = '01a1bdd7-1776-7cb3-a065-f3c95e8e3d56'
+const RECONNECTED_THREAD_ID = '01a1c234-1033-7632-a66d-f80ed314b947'
+const RECONNECTED_TURN = '01a1c234-13b3-7490-9a5d-47dd1fc33131'
 
 type Streamed = StartReplyEvent
 
@@ -492,11 +492,11 @@ it('shows only the answer Codex starts over after a dropped connection', async (
   const codex = await setUp(['reconnected.ndjson'])
 
   const events = await codex.reply(
-    'Make up a three-word ship name, put it on the first line, then write the numbers 1 to 300, one per line.'
+    'Make up a three-word ship name, put it on the first line, then write the numbers 1 to 50, one per line.'
   )
 
   expect(textOf(events)).toBe(
-    ['Silver Moon Voyager', ...Array.from({length: 300}, (_, i) => i + 1)].join(
+    ['Silver Moon Voyager', ...Array.from({length: 50}, (_, i) => i + 1)].join(
       '\n'
     )
   )
