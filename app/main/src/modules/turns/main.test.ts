@@ -24,6 +24,7 @@ let published: AppEvent[]
 let whenPublished: (event: AppEvent) => void
 let finished: FinishedReply[]
 let hostCommands: HostCommand[]
+let sentPromptIds: Map<string, string>
 let hostReady: boolean
 let clock: Date
 let hostReachable: boolean
@@ -36,6 +37,11 @@ const hosts: ReplyHosts = {
     if (!hostReachable) throw new Error('The claude host is not running.')
 
     hostCommands.push(command)
+
+    if (command.type === 'reply.start') {
+      const {replyId, prompt} = command.request
+      sentPromptIds.set(replyId, prompt.messageId)
+    }
   },
 }
 
@@ -61,6 +67,7 @@ beforeEach(() => {
   whenPublished = () => undefined
   finished = []
   hostCommands = []
+  sentPromptIds = new Map()
   hostReady = true
   clock = createdAt
   hostReachable = true
@@ -107,6 +114,17 @@ function recordPrompt(replyId: string, messageId: string, sessionId = 's1') {
     replyId,
     session: {sessionId, messageId},
   })
+}
+
+/** Main's copy of the session takes the Prompt, under the id main last sent. */
+function storePrompt(replyId: string, sessionId = 's1') {
+  const messageId = sentPromptIds.get(replyId)
+
+  if (!messageId) throw new Error('The Prompt was not sent')
+
+  turns.hostSessionAppended('claude', sessionId, [messageId])
+
+  return messageId
 }
 
 function finish(replyId: string) {
@@ -207,7 +225,7 @@ describe('sending the root Prompt', () => {
           replyId: sent.reply.id,
           model: 'claude-opus-5',
           systemPrompt: '',
-          prompt: {text: 'Hello'},
+          prompt: {text: 'Hello', messageId: expect.any(String)},
           vendorProgram,
           session: null,
         },
@@ -571,7 +589,7 @@ describe('a Prompt answering a Reply', () => {
           replyId: sent?.reply.id,
           model: 'fake',
           systemPrompt: '',
-          prompt: {text: 'And then?'},
+          prompt: {text: 'And then?', messageId: expect.any(String)},
           vendorProgram,
           session: {
             sessionId: 's1',
@@ -854,7 +872,7 @@ describe('retrying a Reply', () => {
           replyId,
           model: 'fake',
           systemPrompt: '',
-          prompt: {text: 'Hi'},
+          prompt: {text: 'Hi', messageId: expect.any(String)},
           vendorProgram,
           session: null,
         },
@@ -935,7 +953,55 @@ describe('retrying a Reply', () => {
     ])
   })
 
-  it('leaves out a recorded Prompt that went into another session', () => {
+  it('cuts after the Prompt a Retry stored before the app quit, not the one of the attempt before', () => {
+    const replyId = savedRoot()
+    const retried = sendPrompt(replyId, 'And then?')
+    recordPrompt(retried, 'p-first-attempt')
+    fail(retried)
+    turns.retry(treeId, retried)
+    const stored = storePrompt(retried)
+    turns.quitting()
+    turns = launch()
+    const failed = sendPrompt(retried, 'Go on')
+    recordPrompt(failed, 'p-failed')
+    fail(failed)
+
+    turns.retry(treeId, failed)
+
+    expect(sessionsStarted()).toEqual([
+      {
+        sessionId: 's1',
+        messageId: 'm1',
+        type: 'cut',
+        keepThrough: stored,
+        dropFrom: 'p-failed',
+      },
+    ])
+  })
+
+  it('cuts after the Reply before, when the interrupted Reply’s Prompt never reached the session', () => {
+    const replyId = savedRoot()
+    const interrupted = sendPrompt(replyId, 'And then?')
+    turns.quitting()
+    turns = launch()
+    const failed = sendPrompt(interrupted, 'Go on')
+    recordPrompt(failed, 'p-failed')
+    fail(failed)
+
+    turns.retry(treeId, failed)
+
+    expect(sessionsStarted()).toEqual([
+      {
+        sessionId: 's1',
+        messageId: 'm1',
+        type: 'cut',
+        keepThrough: 'm1',
+        dropFrom: 'p-failed',
+      },
+    ])
+  })
+
+  it('cuts after the Reply before, when the interrupted Reply’s Prompt went into another session', () => {
     const replyId = savedRoot()
     const interrupted = sendPrompt(replyId, 'And then?')
     recordPrompt(interrupted, 'p-interrupted', 's-other')
@@ -952,7 +1018,7 @@ describe('retrying a Reply', () => {
         sessionId: 's1',
         messageId: 'm1',
         type: 'cut',
-        keepThrough: null,
+        keepThrough: 'm1',
         dropFrom: 'p-failed',
       },
     ])
@@ -1401,6 +1467,34 @@ describe('deleting a Prompt', () => {
           sessionId: 's1',
           messageId: 'm1',
           keepThrough: 'p-stopped',
+          dropFrom: 'p-below',
+        },
+      },
+    ])
+  })
+
+  it('cuts after the Prompt a Retry stored before the app quit, when the Turns below it are deleted', () => {
+    const first = savedRoot()
+    const retried = sendPrompt(first, 'And then?')
+    recordPrompt(retried, 'p-first-attempt')
+    fail(retried)
+    turns.retry(treeId, retried)
+    const stored = storePrompt(retried)
+    turns.quitting()
+    turns = launch()
+    const below = sendPrompt(retried, 'Go on')
+    recordPrompt(below, 'p-below')
+    finish(below)
+
+    turns.deletePrompt(treeId, promptOf(below))
+
+    expect(cutsAsked()).toMatchObject([
+      {
+        replyId: retried,
+        session: {
+          sessionId: 's1',
+          messageId: 'm1',
+          keepThrough: stored,
           dropFrom: 'p-below',
         },
       },

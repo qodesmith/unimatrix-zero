@@ -39,7 +39,7 @@ export async function recordFakeReply(): Promise<ReplyEvent[]> {
     ...RECORDED_IDS,
     model: 'fake',
     systemPrompt: '',
-    prompt: {text: 'Show me everything'},
+    prompt: {text: 'Show me everything', messageId: crypto.randomUUID()},
     vendorProgram: {program: null, configDir: '/fake'},
     session: null,
   })) {

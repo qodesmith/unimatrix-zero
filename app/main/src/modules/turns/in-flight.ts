@@ -4,6 +4,7 @@ import type {
   PromptDropped,
   PromptRecorded,
   ReplyRecorded,
+  ReplyRequest,
 } from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
 import type {
@@ -51,6 +52,8 @@ interface Entry {
   provider: ProviderId
   /** The Model asked for, until its Provider reports the one it used. */
   model: string
+  /** The id main asked the Provider to store the Prompt under. */
+  promptMessageId: string
   reply: StreamingReply
   saveTimer: ReturnType<typeof setTimeout> | null
 }
@@ -135,13 +138,12 @@ export function createInFlight(
   return {
     track(
       provider: ProviderId,
-      treeId: string,
-      replyId: string,
-      model: string
+      {treeId, replyId, model, prompt}: ReplyRequest
     ) {
       entries.set(replyId, {
         provider,
         model,
+        promptMessageId: prompt.messageId,
         reply: {...NEW_REPLY, treeId, replyId},
         saveTimer: null,
       })
@@ -156,6 +158,21 @@ export function createInFlight(
         .set({sessionId: session.sessionId, sessionPromptId: session.messageId})
         .where(providersReply(provider, treeId, replyId))
         .run()
+    },
+
+    /** The Reply whose Prompt is among entries a Provider session took. */
+    promptAmong(uuids: string[]) {
+      const entry = [...entries.values()].find(one =>
+        uuids.includes(one.promptMessageId)
+      )
+
+      return entry
+        ? {
+            treeId: entry.reply.treeId,
+            replyId: entry.reply.replyId,
+            messageId: entry.promptMessageId,
+          }
+        : null
     },
 
     dropPrompt(provider: ProviderId, {treeId, replyId}: PromptDropped) {

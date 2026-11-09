@@ -14,7 +14,7 @@ const request: ReplyRequest = {
   ...ids,
   model: 'gpt-6.1-sol',
   systemPrompt: '',
-  prompt: {text: 'Hello'},
+  prompt: {text: 'Hello', messageId: crypto.randomUUID()},
   vendorProgram: {program: null, configDir: '/config'},
   session: null,
 }

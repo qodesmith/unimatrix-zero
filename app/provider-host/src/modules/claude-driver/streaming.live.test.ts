@@ -105,7 +105,7 @@ function liveDriver(files: string[]) {
       replyId: crypto.randomUUID(),
       model: 'haiku',
       systemPrompt: 'You answer in as few words as you can.',
-      prompt: {text},
+      prompt: {text, messageId: crypto.randomUUID()},
       vendorProgram: {
         program: {
           path: program,
@@ -299,4 +299,94 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     await live.done()
   }, 180_000)
+
+  it('cuts after the Prompt of a Retry the app quit in, for a Retry below it and for Turns deleted below it', async () => {
+    const live = liveDriver([])
+
+    const recall =
+      'Quote every message I sent you before this one, word for word.'
+
+    async function ended(request: ReplyRequest, stopAtText = false) {
+      let last: Streamed | null = null
+      let stopping = false
+
+      for await (const event of live.driver.startReply(request)) {
+        last = event
+
+        if (stopAtText && event.type === 'TEXT_DELTA' && !stopping) {
+          stopping = true
+          await live.driver.stop(request.replyId)
+        }
+      }
+
+      return last
+    }
+
+    /**
+     * A Prompt fails under the first Reply, and its Retry is stopped at its
+     * first text, which leaves the session as a quit there would. The cut
+     * keeps through the Retry's Prompt, the one main records as it stores it.
+     */
+    async function quitInRetry() {
+      const first = await live.reply('Reply with the single word TEAL.', null)
+      const above = first.recorded.session
+
+      await ended({
+        ...live.request('Remember the codeword ZANZIBAR.', continuing(above)),
+        model: 'claude-made-up-0',
+      })
+
+      const retry = live.request(
+        'Remember the codeword PELICAN, and write three sentences about pelicans.',
+        {...above, type: 'rewind'}
+      )
+
+      expect(await ended(retry, true)).toMatchObject({status: 'stopped'})
+
+      return {above, keepThrough: retry.prompt.messageId}
+    }
+
+    const retried = await quitInRetry()
+
+    const failing = {
+      ...live.request(
+        'Remember the codeword MARMALADE.',
+        continuing(retried.above)
+      ),
+      model: 'claude-made-up-0',
+    }
+
+    expect(await ended(failing)).toMatchObject({status: 'failed'})
+
+    const afterRetry = await live.reply(recall, {
+      ...retried.above,
+      type: 'cut',
+      keepThrough: retried.keepThrough,
+      dropFrom: failing.prompt.messageId,
+    })
+
+    expect(textOf(afterRetry.events)).toMatch(/pelican/i)
+    expect(textOf(afterRetry.events)).not.toMatch(/ZANZIBAR|MARMALADE/i)
+
+    const deleted = await quitInRetry()
+
+    const below = live.request(
+      'Remember the codeword FERRET.',
+      continuing(deleted.above)
+    )
+
+    expect(await ended(below)).toMatchObject({status: 'complete'})
+
+    const afterDeletion = await live.reply(recall, {
+      ...deleted.above,
+      type: 'cut',
+      keepThrough: deleted.keepThrough,
+      dropFrom: below.prompt.messageId,
+    })
+
+    expect(textOf(afterDeletion.events)).toMatch(/pelican/i)
+    expect(textOf(afterDeletion.events)).not.toMatch(/ZANZIBAR|FERRET/i)
+
+    await live.done()
+  }, 300_000)
 })

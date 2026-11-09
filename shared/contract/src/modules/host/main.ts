@@ -68,12 +68,18 @@ export const ReplySessionSchema = z.discriminatedUnion('type', [
 
 export type ReplySession = z.infer<typeof ReplySessionSchema>
 
+type MessageId = `${string}-${string}-${string}-${string}-${string}`
+
 export const ReplyRequestSchema = z.strictObject({
   treeId: z.uuid(),
   replyId: z.uuid(),
   model: z.string().min(1),
   systemPrompt: z.string(),
-  prompt: z.strictObject({text: z.string()}),
+  prompt: z.strictObject({
+    text: z.string(),
+    /** Main's name for the Prompt in the session, for a Provider that takes one. */
+    messageId: z.uuid().pipe(z.custom<MessageId>()),
+  }),
   vendorProgram: SignInRequestSchema,
   /** Null starts a session. */
   session: ReplySessionSchema.nullable(),

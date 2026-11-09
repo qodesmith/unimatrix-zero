@@ -144,7 +144,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           replyId: crypto.randomUUID(),
           model: MODEL,
           systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text},
+          prompt: {text, messageId: crypto.randomUUID()},
           vendorProgram: {
             program: {
               path: folder ?? '',
@@ -285,7 +285,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         replyId,
         model: MODEL,
         systemPrompt: 'You answer in as few words as you can.',
-        prompt: {text},
+        prompt: {text, messageId: crypto.randomUUID()},
         vendorProgram: {
           program: {
             path: folder ?? '',
@@ -455,7 +455,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           replyId: crypto.randomUUID(),
           model: MODEL,
           systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text},
+          prompt: {text, messageId: crypto.randomUUID()},
           vendorProgram: vendorProgram(home),
           session: session && {...session, type: 'continue'},
         })
@@ -565,7 +565,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           replyId: crypto.randomUUID(),
           model,
           systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text},
+          prompt: {text, messageId: crypto.randomUUID()},
           vendorProgram: {
             program: {
               path: folder ?? '',
@@ -697,6 +697,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         systemPrompt: 'You answer in as few words as you can.',
         prompt: {
           text: 'Make up a three-word ship name, put it on the first line, then write the numbers 1 to 50, one per line.',
+          messageId: crypto.randomUUID(),
         },
         vendorProgram: {
           program: {

@@ -18,6 +18,7 @@ import type {Reply, ReplyEvent} from '@uz/contract/turns'
 import {schema} from '#modules/database/main'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {eq} from 'drizzle-orm'
+import {randomUUID} from 'node:crypto'
 
 import {continuation, recovery} from './continuation'
 import {
@@ -82,7 +83,7 @@ export function createTurns({
     .run()
 
   function startOnHost(provider: ProviderId, request: ReplyRequest): Reply {
-    inFlight.track(provider, request.treeId, request.replyId, request.model)
+    inFlight.track(provider, request)
 
     try {
       hosts.send(provider, {type: 'reply.start', request})
@@ -94,6 +95,11 @@ export function createTurns({
     }
 
     return savedReply(db, request.replyId)
+  }
+
+  function promptRecorded(provider: ProviderId, recorded: PromptRecorded) {
+    inFlight.recordPrompt(provider, recorded)
+    clearCutOnPrompt(db, recorded)
   }
 
   function refuseUnsendable(
@@ -157,7 +163,7 @@ export function createTurns({
         replyId: reply.id,
         model,
         systemPrompt,
-        prompt: {text},
+        prompt: {text, messageId: randomUUID()},
         vendorProgram: vendorProgramFor(provider),
         session: failed ? failed.session : (continued?.session ?? null),
       })
@@ -194,7 +200,7 @@ export function createTurns({
         replyId,
         model,
         systemPrompt,
-        prompt: {text},
+        prompt: {text, messageId: randomUUID()},
         vendorProgram: vendorProgramFor(provider),
         session,
       })
@@ -256,9 +262,28 @@ export function createTurns({
       return {promptIds, replyIds}
     },
 
-    hostPromptRecorded(provider: ProviderId, recorded: PromptRecorded) {
-      inFlight.recordPrompt(provider, recorded)
-      clearCutOnPrompt(db, recorded)
+    hostPromptRecorded: promptRecorded,
+
+    /**
+     * Records a Prompt sent under main's id in the step that stores it, so a
+     * quit never leaves its Reply naming a Prompt from the attempt before.
+     */
+    hostSessionAppended(
+      provider: ProviderId,
+      sessionId: string,
+      uuids: string[]
+    ) {
+      const prompt = inFlight.promptAmong(uuids)
+
+      if (!prompt) return
+
+      const {treeId, replyId, messageId} = prompt
+      promptRecorded(provider, {
+        type: 'PROMPT_RECORDED',
+        treeId,
+        replyId,
+        session: {sessionId, messageId},
+      })
     },
 
     hostPromptDropped(provider: ProviderId, dropped: PromptDropped) {
