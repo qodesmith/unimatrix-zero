@@ -97,7 +97,7 @@ export function createReplyMapper(ids: ReplyIds) {
 
     message.done = true
 
-    // A later message has streamed since, so this one stands as shown.
+    // A later message started and dropped this one, so its finish changes nothing.
     if (message.text === text || last !== itemId) return []
 
     message.text = text
