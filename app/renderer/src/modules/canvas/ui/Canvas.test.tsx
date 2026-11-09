@@ -2737,6 +2737,7 @@ it('swaps Send for Stop in the slideout’s Input while its Reply streams, keepi
 })
 
 async function pressStop(stop: Locator) {
+  await expect.element(stop).toBeVisible()
   const button = stop.element()
 
   if (!(button instanceof HTMLElement)) throw new Error('Stop is not a button')
