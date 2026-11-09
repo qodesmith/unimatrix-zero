@@ -35,9 +35,7 @@ it('replaces what streamed when the finished message differs', () => {
   ])
 })
 
-// After a lost connection, `codex` may retry without telling the client, so
-// a new message starting is the only sign the unfinished one was abandoned.
-it('drops an unfinished message once the next one starts, and ignores its late finish', () => {
+it('drops an unfinished message once the next one starts, and ignores its late delta and finish', () => {
   const mapper = createReplyMapper(ids)
   mapper.map(delta('a', 'One. '))
   mapper.map(message('a', 'One. '))
@@ -49,6 +47,7 @@ it('drops an unfinished message once the next one starts, and ignores its late f
   expect(mapper.map(delta('c', '\n1'))).toEqual([
     {...ids, type: 'TEXT_DELTA', delta: '\n1'},
   ])
+  expect(mapper.map(delta('b', '2'))).toEqual([])
   expect(mapper.map(message('b', 'Silver Moon\n1\n2'))).toEqual([])
   expect(mapper.map(message('c', 'Silver Dawn\n1!'))).toEqual([
     {...ids, type: 'TEXT_REPLACE', text: 'One. Silver Dawn\n1!'},

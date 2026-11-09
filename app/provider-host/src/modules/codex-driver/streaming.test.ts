@@ -488,7 +488,7 @@ it('forks the Provider session through a mid-Thread Reply into a new thread, fro
   ]).toEqual([ROLLOUT])
 })
 
-it('shows only the answer Codex starts over after a dropped connection', async () => {
+it('shows only the message Codex starts over after a dropped connection', async () => {
   const codex = await setUp(['reconnected.ndjson'])
 
   const events = await codex.reply(

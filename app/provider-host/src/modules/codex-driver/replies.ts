@@ -82,9 +82,10 @@ export function createReplyMapper(ids: ReplyIds) {
 
     if (!message) return addMessage(itemId, delta, false)
 
+    if (last !== itemId) return []
+
     message.text += delta
     shown += delta
-    last = itemId
 
     return [{...ids, type: 'TEXT_DELTA', delta}]
   }

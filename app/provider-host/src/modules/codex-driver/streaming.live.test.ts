@@ -659,7 +659,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 180_000)
 
-  it('shows only the answer Codex starts over after its connection drops mid-Reply', async () => {
+  it('shows only the message Codex starts over after its connection drops mid-Reply', async () => {
     if (!folder || !signedIn) return
 
     const proxy = await startProxy()
