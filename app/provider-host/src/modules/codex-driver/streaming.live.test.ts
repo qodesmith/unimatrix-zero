@@ -17,11 +17,16 @@ import type {
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
+import {isReplyEvent} from '@uz/contract/host'
+import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {once} from 'node:events'
 import fs from 'node:fs'
+import http from 'node:http'
+import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import {describe, expect, it} from 'vitest'
+import {z} from 'zod'
 
 import {createCodexDriver, spawnCodex} from './main'
 import {createRecorder} from './recording'
@@ -41,6 +46,51 @@ function homeFrom(source: string) {
 }
 
 type Streamed = StartReplyEvent
+
+/** A CONNECT proxy that can drop the network the way `codex` sees it drop. */
+async function startProxy() {
+  const open = new Set<net.Socket>()
+  let refusingUntil = 0
+  const server = http.createServer((_request, response) => response.end())
+
+  server.on('connect', (request, client: net.Socket) => {
+    if (Date.now() < refusingUntil) {
+      client.resetAndDestroy()
+
+      return
+    }
+
+    const [host = '', port = '443'] = (request.url ?? '').split(':')
+
+    const upstream = net.connect(Number(port), host, () => {
+      client.write('HTTP/1.1 200 Connection Established\r\n\r\n')
+      upstream.pipe(client)
+      client.pipe(upstream)
+    })
+
+    for (const socket of [client, upstream]) {
+      open.add(socket)
+      socket.on('close', () => open.delete(socket))
+    }
+
+    client.on('error', () => upstream.destroy())
+    upstream.on('error', () => client.destroy())
+  })
+
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const {port} = z.looseObject({port: z.number()}).parse(server.address())
+
+  return {
+    url: `http://127.0.0.1:${port}`,
+    dropNetworkFor(seconds: number) {
+      refusingUntil = Date.now() + seconds * 1000
+
+      for (const socket of open) socket.resetAndDestroy()
+    },
+    close: () => server.close(),
+  }
+}
 
 function expectComplete(events: Streamed[]) {
   const last = events.at(-1)
@@ -614,4 +664,86 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       fs.rmSync(home, {recursive: true, force: true})
     }
   }, 180_000)
+
+  it('shows only the answer Codex starts over after every connection drops mid-Reply', async () => {
+    if (!folder || !signedIn) return
+
+    const proxy = await startProxy()
+    const home = homeFrom(signedIn)
+    const recording = process.env.UZ_RECORD === 'yes'
+
+    const recorder = createRecorder([
+      path.join(RECORDINGS, 'reconnected.ndjson'),
+    ])
+
+    const idle = heldIdle()
+    const exits: Promise<unknown>[] = []
+    const start = recording ? recorder.spawn : spawnCodex
+
+    const driver = createCodexDriver({
+      store: fakeStore().client,
+      spawn: (command, options) => {
+        const child = start(command, options)
+        exits.push(once(child, 'exit').catch(() => undefined))
+
+        return child
+      },
+      env: {...process.env, HTTPS_PROXY: proxy.url},
+      whenIdle: idle.whenIdle,
+    })
+
+    const events: Streamed[] = []
+    let deltas = 0
+
+    try {
+      for await (const event of driver.startReply({
+        treeId: crypto.randomUUID(),
+        replyId: crypto.randomUUID(),
+        model: MODEL,
+        systemPrompt: 'You answer in as few words as you can.',
+        prompt: {
+          text: 'Make up a three-word ship name, put it on the first line, then write the numbers 1 to 300, one per line.',
+        },
+        vendorProgram: {
+          program: {
+            path: folder,
+            build: {
+              url: 'https://example.com/codex.tar.gz',
+              sha256: '0'.repeat(64),
+              size: 1,
+              archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+            },
+          },
+          configDir: home,
+        },
+        session: null,
+      })) {
+        events.push(event)
+
+        if (event.type === 'TEXT_DELTA' && ++deltas === 12)
+          proxy.dropNetworkFor(20)
+      }
+
+      expectComplete(events)
+
+      const lines = events
+        .filter(isReplyEvent)
+        .reduce(foldReplyEvent, NEW_REPLY)
+        .content.flatMap(part => (part.type === 'text' ? [part.text] : []))
+        .join('')
+        .split('\n')
+
+      expect(events.some(event => event.type === 'TEXT_REPLACE')).toBe(true)
+      expect(lines.filter(line => !/^\d+$/.test(line))).toHaveLength(1)
+      expect(lines.slice(1)).toEqual(
+        Array.from({length: 300}, (_, index) => String(index + 1))
+      )
+
+      idle.pass()
+      await Promise.all(exits)
+    } finally {
+      proxy.close()
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 600_000)
 })

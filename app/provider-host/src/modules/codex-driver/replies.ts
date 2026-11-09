@@ -40,13 +40,57 @@ export function turnOf(notification: Notification) {
  */
 export function createReplyMapper(ids: ReplyIds) {
   let shown = ''
-  const messages = new Map<string, {before: string; text: string}>()
+
+  const messages = new Map<
+    string,
+    {before: string; text: string; done: boolean}
+  >()
+
   let last: string | null = null
+  let abandoned: string | null = null
+
+  function onReconnect() {
+    abandoned = last
+  }
+
+  /**
+   * After reconnecting, `codex` starts a cut-off message over as a new one and
+   * never finishes the old, so the new one's arrival drops the old one's text.
+   */
+  function dropAbandoned() {
+    const message = abandoned === null ? undefined : messages.get(abandoned)
+    abandoned = null
+
+    if (!message || message.done) return false
+
+    shown = message.before
+
+    return true
+  }
+
+  function addMessage(
+    itemId: string,
+    text: string,
+    done: boolean
+  ): ContentEvent[] {
+    const dropped = dropAbandoned()
+    messages.set(itemId, {before: shown, text, done})
+    shown += text
+    last = itemId
+
+    if (dropped) return [{...ids, type: 'TEXT_REPLACE', text: shown}]
+
+    return text === '' ? [] : [{...ids, type: 'TEXT_DELTA', delta: text}]
+  }
 
   function onDelta(itemId: string, delta: string): ContentEvent[] {
-    const message = messages.get(itemId) ?? {before: shown, text: ''}
+    const message = messages.get(itemId)
+
+    if (!message) return addMessage(itemId, delta, false)
+
+    if (abandoned === itemId) abandoned = null
+
     message.text += delta
-    messages.set(itemId, message)
     shown += delta
     last = itemId
 
@@ -56,13 +100,9 @@ export function createReplyMapper(ids: ReplyIds) {
   function onMessage(itemId: string, text: string): ContentEvent[] {
     const message = messages.get(itemId)
 
-    if (!message) {
-      messages.set(itemId, {before: shown, text})
-      shown += text
-      last = itemId
+    if (!message) return addMessage(itemId, text, true)
 
-      return text === '' ? [] : [{...ids, type: 'TEXT_DELTA', delta: text}]
-    }
+    message.done = true
 
     // A later message has streamed since, so this one stands as shown.
     if (message.text === text || last !== itemId) return []
@@ -79,6 +119,12 @@ export function createReplyMapper(ids: ReplyIds) {
 
       if (method === 'item/agentMessage/delta') {
         return onDelta(params.itemId, params.delta)
+      }
+
+      if (method === 'error') {
+        if (params.willRetry) onReconnect()
+
+        return []
       }
 
       if (method === 'item/completed') {

@@ -52,6 +52,10 @@ const HELLO_TURN = '01a1893a-3439-7c23-9c2d-69d52b12a8b4'
 const GOODBYE_TURN = '01a1893a-4532-7b33-804e-21ff70011737'
 const THANKS_TURN = '01a1893a-4f0d-71a0-9828-93cd3ea3291e'
 
+/** As `reconnected.ndjson` recorded them. */
+const RECONNECTED_THREAD_ID = '01a1bdd7-1526-7a61-82fb-1b63ea0e9f06'
+const RECONNECTED_TURN = '01a1bdd7-1776-7cb3-a065-f3c95e8e3d56'
+
 type Streamed = StartReplyEvent
 
 interface Report {
@@ -482,6 +486,25 @@ it('forks the Provider session through a mid-Thread Reply into a new thread, fro
   expect([
     ...codex.store.filesOf(original.projectKey, original.sessionId).keys(),
   ]).toEqual([ROLLOUT])
+})
+
+it('shows only the answer Codex starts over after a dropped connection', async () => {
+  const codex = await setUp(['reconnected.ndjson'])
+
+  const events = await codex.reply(
+    'Make up a three-word ship name, put it on the first line, then write the numbers 1 to 300, one per line.'
+  )
+
+  expect(textOf(events)).toBe(
+    ['Silver Moon Voyager', ...Array.from({length: 300}, (_, i) => i + 1)].join(
+      '\n'
+    )
+  )
+  expect(shown(events).status).toBe('complete')
+  expect(recordedIn(events)).toEqual({
+    sessionId: RECONNECTED_THREAD_ID,
+    messageId: RECONNECTED_TURN,
+  })
 })
 
 it('stops a Reply where it is, records it, and continues the Provider session after it', async () => {
