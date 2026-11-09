@@ -53,8 +53,8 @@ const GOODBYE_TURN = '01a1893a-4532-7b33-804e-21ff70011737'
 const THANKS_TURN = '01a1893a-4f0d-71a0-9828-93cd3ea3291e'
 
 /** As `reconnected.ndjson` recorded them. */
-const RECONNECTED_THREAD_ID = '01a1c234-1033-7632-a66d-f80ed314b947'
-const RECONNECTED_TURN = '01a1c234-13b3-7490-9a5d-47dd1fc33131'
+const RECONNECTED_THREAD_ID = '01a1c264-7cf0-7403-a69a-cdef675814f6'
+const RECONNECTED_TURN = '01a1c264-7f60-77f1-8637-990e960884d7'
 
 type Streamed = StartReplyEvent
 

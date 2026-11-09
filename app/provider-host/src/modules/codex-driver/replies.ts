@@ -47,19 +47,13 @@ export function createReplyMapper(ids: ReplyIds) {
   >()
 
   let last: string | null = null
-  let abandoned: string | null = null
-
-  function onReconnect() {
-    abandoned = last
-  }
 
   /**
-   * After reconnecting, `codex` starts a cut-off message over as a new one and
-   * never finishes the old, so the new one's arrival drops the old one's text.
+   * After a lost connection, `codex` starts the message over as a new one and
+   * never finishes the old, at times without notifying that it retried.
    */
-  function dropAbandoned() {
-    const message = abandoned === null ? undefined : messages.get(abandoned)
-    abandoned = null
+  function dropUnfinished() {
+    const message = last === null ? undefined : messages.get(last)
 
     if (!message || message.done) return false
 
@@ -73,7 +67,7 @@ export function createReplyMapper(ids: ReplyIds) {
     text: string,
     done: boolean
   ): ContentEvent[] {
-    const dropped = dropAbandoned()
+    const dropped = dropUnfinished()
     messages.set(itemId, {before: shown, text, done})
     shown += text
     last = itemId
@@ -87,8 +81,6 @@ export function createReplyMapper(ids: ReplyIds) {
     const message = messages.get(itemId)
 
     if (!message) return addMessage(itemId, delta, false)
-
-    if (abandoned === itemId) abandoned = null
 
     message.text += delta
     shown += delta
@@ -119,12 +111,6 @@ export function createReplyMapper(ids: ReplyIds) {
 
       if (method === 'item/agentMessage/delta') {
         return onDelta(params.itemId, params.delta)
-      }
-
-      if (method === 'error') {
-        if (params.willRetry) onReconnect()
-
-        return []
       }
 
       if (method === 'item/completed') {

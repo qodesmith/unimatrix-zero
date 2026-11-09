@@ -3,7 +3,6 @@ import type {ServerNotification} from './protocol/ServerNotification'
 import type {Account} from './protocol/v2/Account'
 import type {AccountLoginCompletedNotification} from './protocol/v2/AccountLoginCompletedNotification'
 import type {AgentMessageDeltaNotification} from './protocol/v2/AgentMessageDeltaNotification'
-import type {ErrorNotification} from './protocol/v2/ErrorNotification'
 import type {LoginAccountResponse} from './protocol/v2/LoginAccountResponse'
 import type {Model as CodexModel} from './protocol/v2/Model'
 import type {ModelListResponse} from './protocol/v2/ModelListResponse'
@@ -180,12 +179,6 @@ export const NotificationSchema = z.discriminatedUnion('method', [
         z.looseObject({type: z.string()}),
       ]),
     })
-  ),
-  notification(
-    'error',
-    z.looseObject({...inTurn, willRetry: z.boolean()}) satisfies z.ZodType<
-      Pick<ErrorNotification, 'threadId' | 'turnId' | 'willRetry'>
-    >
   ),
   notification(
     'thread/tokenUsage/updated',

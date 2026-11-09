@@ -35,70 +35,48 @@ it('replaces what streamed when the finished message differs', () => {
   ])
 })
 
-it('replaces only the last message, after the ones before it', () => {
-  const mapper = createReplyMapper(ids)
-  mapper.map(delta('a', 'One. '))
-  mapper.map(delta('b', 'Tw'))
-
-  expect(mapper.map(message('a', 'One! '))).toEqual([])
-  expect(mapper.map(message('b', 'Two.'))).toEqual([
-    {...ids, type: 'TEXT_REPLACE', text: 'One. Two.'},
-  ])
-})
-
-function reconnecting(): Notification {
-  return {
-    method: 'error',
-    params: {
-      ...inTurn,
-      error: {message: 'Reconnecting... 2/5'},
-      willRetry: true,
-    },
-  }
-}
-
-it('drops a message cut off by a reconnect once the next one streams', () => {
+// After a lost connection, `codex` may retry without telling the client, so
+// a new message starting is the only sign the unfinished one was abandoned.
+it('drops an unfinished message once the next one starts, and ignores its late finish', () => {
   const mapper = createReplyMapper(ids)
   mapper.map(delta('a', 'One. '))
   mapper.map(message('a', 'One. '))
   mapper.map(delta('b', 'Silver Moon\n1\n'))
 
-  mapper.map(reconnecting())
   expect(mapper.map(delta('c', 'Silver Dawn'))).toEqual([
     {...ids, type: 'TEXT_REPLACE', text: 'One. Silver Dawn'},
   ])
   expect(mapper.map(delta('c', '\n1'))).toEqual([
     {...ids, type: 'TEXT_DELTA', delta: '\n1'},
   ])
+  expect(mapper.map(message('b', 'Silver Moon\n1\n2'))).toEqual([])
   expect(mapper.map(message('c', 'Silver Dawn\n1!'))).toEqual([
     {...ids, type: 'TEXT_REPLACE', text: 'One. Silver Dawn\n1!'},
   ])
 })
 
-it('keeps a finished message, and one that streams on, through a reconnect', () => {
+it('drops an unfinished message for one that arrives already finished', () => {
   const mapper = createReplyMapper(ids)
-  mapper.map(delta('a', 'One. '))
-  mapper.map(message('a', 'One. '))
-  mapper.map(reconnecting())
+  mapper.map(delta('a', 'Silver Moon\n1\n'))
 
-  expect(mapper.map(delta('b', 'Two'))).toEqual([
-    {...ids, type: 'TEXT_DELTA', delta: 'Two'},
+  expect(mapper.map(message('b', 'Silver Dawn\n1'))).toEqual([
+    {...ids, type: 'TEXT_REPLACE', text: 'Silver Dawn\n1'},
+  ])
+})
+
+it('keeps every finished message as the next one starts', () => {
+  const mapper = createReplyMapper(ids)
+  mapper.map(delta('a', 'One.'))
+  mapper.map(message('a', 'One.'))
+
+  expect(mapper.map(delta('b', ' Two.'))).toEqual([
+    {...ids, type: 'TEXT_DELTA', delta: ' Two.'},
   ])
 
-  mapper.map(reconnecting())
+  mapper.map(message('b', ' Two.'))
 
-  expect(mapper.map(delta('b', '.'))).toEqual([
-    {...ids, type: 'TEXT_DELTA', delta: '.'},
-  ])
-  expect(mapper.map(delta('c', ' Three'))).toEqual([
-    {...ids, type: 'TEXT_DELTA', delta: ' Three'},
-  ])
-
-  mapper.map(reconnecting())
-  mapper.map(message('c', ' Three'))
-
-  expect(mapper.map(delta('d', ' Four'))).toEqual([
-    {...ids, type: 'TEXT_DELTA', delta: ' Four'},
+  expect(mapper.map(message('c', ' Three.'))).toEqual([
+    {...ids, type: 'TEXT_DELTA', delta: ' Three.'},
   ])
 })
 

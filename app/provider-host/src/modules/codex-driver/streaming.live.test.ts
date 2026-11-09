@@ -47,19 +47,15 @@ function homeFrom(source: string) {
 
 type Streamed = StartReplyEvent
 
-/** A CONNECT proxy that can drop the network the way `codex` sees it drop. */
+/**
+ * A CONNECT proxy that can cut every open connection, the way a dropped Wi-Fi
+ * ends `codex`'s stream, while letting the reconnect through at once.
+ */
 async function startProxy() {
   const open = new Set<net.Socket>()
-  let refusingUntil = 0
   const server = http.createServer((_request, response) => response.end())
 
   server.on('connect', (request, client: net.Socket) => {
-    if (Date.now() < refusingUntil) {
-      client.resetAndDestroy()
-
-      return
-    }
-
     const [host = '', port = '443'] = (request.url ?? '').split(':')
 
     const upstream = net.connect(Number(port), host, () => {
@@ -83,9 +79,7 @@ async function startProxy() {
 
   return {
     url: `http://127.0.0.1:${port}`,
-    dropNetworkFor(seconds: number) {
-      refusingUntil = Date.now() + seconds * 1000
-
+    cutConnections() {
       for (const socket of open) socket.resetAndDestroy()
     },
     close: () => server.close(),
@@ -665,7 +659,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 180_000)
 
-  it('shows only the answer Codex starts over after every connection drops mid-Reply', async () => {
+  it('shows only the answer Codex starts over after its connection drops mid-Reply', async () => {
     if (!folder || !signedIn) return
 
     const proxy = await startProxy()
@@ -721,7 +715,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         events.push(event)
 
         if (event.type === 'TEXT_DELTA' && ++deltas === 12)
-          proxy.dropNetworkFor(20)
+          proxy.cutConnections()
       }
 
       expectComplete(events)
