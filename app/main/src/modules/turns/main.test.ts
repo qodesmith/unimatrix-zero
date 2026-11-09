@@ -1001,13 +1001,15 @@ describe('retrying a Reply', () => {
     ])
   })
 
-  it('cuts after the Reply before, when the interrupted Reply’s Prompt went into another session', () => {
+  it('cuts after the Reply before, when the Reply answered forked into a session it left once its sibling was deleted', () => {
     const replyId = savedRoot()
-    const interrupted = sendPrompt(replyId, 'And then?')
-    recordPrompt(interrupted, 'p-interrupted', 's-other')
-    turns.quitting()
-    turns = launch()
-    const failed = sendPrompt(interrupted, 'Go on')
+    const sibling = sendPrompt(replyId, 'One way')
+    stopUnrecorded(sibling)
+    const forked = sendPrompt(replyId, 'Another way')
+    recordPrompt(forked, 'p-forked', 's-fork')
+    stopUnrecorded(forked)
+    turns.deletePrompt(treeId, promptOf(sibling))
+    const failed = sendPrompt(forked, 'Go on')
     recordPrompt(failed, 'p-failed')
     fail(failed)
 
@@ -1554,6 +1556,50 @@ describe('sending a Prompt where one failed', () => {
     expect(savedReplyIds()).toEqual([first, sent.reply.id].toSorted())
     expect(sessionsStarted()).toEqual([
       {sessionId: 's1', messageId: 'm1', type: 'rewind'},
+    ])
+  })
+
+  it('cuts after the Prompt a Retry stored before the app quit, as a Retry of the failed one would', () => {
+    const first = savedRoot()
+    const retried = sendPrompt(first, 'And then?')
+    recordPrompt(retried, 'p-first-attempt')
+    fail(retried)
+    turns.retry(treeId, retried)
+    const stored = storePrompt(retried)
+    turns.quitting()
+    turns = launch()
+    failedAt(retried)
+
+    sendInstead(retried)
+
+    expect(sessionsStarted()).toEqual([
+      {
+        sessionId: 's1',
+        messageId: 'm1',
+        type: 'cut',
+        keepThrough: stored,
+        dropFrom: 'p-failed',
+      },
+    ])
+  })
+
+  it('cuts after the Reply before, when the interrupted Reply above never reached the session', () => {
+    const first = savedRoot()
+    const interrupted = sendPrompt(first, 'And then?')
+    turns.quitting()
+    turns = launch()
+    failedAt(interrupted)
+
+    sendInstead(interrupted)
+
+    expect(sessionsStarted()).toEqual([
+      {
+        sessionId: 's1',
+        messageId: 'm1',
+        type: 'cut',
+        keepThrough: 'm1',
+        dropFrom: 'p-failed',
+      },
     ])
   })
 

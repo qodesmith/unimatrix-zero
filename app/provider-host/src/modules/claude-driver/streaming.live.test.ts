@@ -322,19 +322,17 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       return last
     }
 
-    /**
-     * A Prompt fails under the first Reply, and its Retry is stopped at its
-     * first text, which leaves the session as a quit there would. The cut
-     * keeps through the Retry's Prompt, the one main records as it stores it.
-     */
+    /** Stopping the Retry at its first text leaves the session as a quit would. */
     async function quitInRetry() {
       const first = await live.reply('Reply with the single word TEAL.', null)
       const above = first.recorded.session
 
-      await ended({
+      const firstAttempt = {
         ...live.request('Remember the codeword ZANZIBAR.', continuing(above)),
         model: 'claude-made-up-0',
-      })
+      }
+
+      expect(await ended(firstAttempt)).toMatchObject({status: 'failed'})
 
       const retry = live.request(
         'Remember the codeword PELICAN, and write three sentences about pelicans.',

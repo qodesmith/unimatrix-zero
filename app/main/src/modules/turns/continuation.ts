@@ -255,9 +255,8 @@ function promptIn(session: SessionRef, reply: ReplyRow | undefined) {
 /**
  * A cut of deleted Turns already drops the failed attempt. A parent its
  * Provider never saved left only its Prompt in the session, so the cut goes
- * after that Prompt and before the failed attempt's. With no Prompt of the
- * parent's in the session, it goes after the Reply the session continues from:
- * Claude resumes a cut that names nothing to keep at the failed attempt.
+ * after that Prompt and before the failed attempt's. It always names what to
+ * keep: Claude resumes a cut that names nothing at the failed attempt.
  */
 function rewound(
   session: ContinuedSession,

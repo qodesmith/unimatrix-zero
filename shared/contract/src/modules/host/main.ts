@@ -68,7 +68,18 @@ export const ReplySessionSchema = z.discriminatedUnion('type', [
 
 export type ReplySession = z.infer<typeof ReplySessionSchema>
 
-type MessageId = `${string}-${string}-${string}-${string}-${string}`
+/** The shape `node:crypto` types a UUID as, which the Claude SDK asks for. */
+const UuidPartsSchema = z.templateLiteral([
+  z.string(),
+  '-',
+  z.string(),
+  '-',
+  z.string(),
+  '-',
+  z.string(),
+  '-',
+  z.string(),
+])
 
 export const ReplyRequestSchema = z.strictObject({
   treeId: z.uuid(),
@@ -78,7 +89,7 @@ export const ReplyRequestSchema = z.strictObject({
   prompt: z.strictObject({
     text: z.string(),
     /** Main's name for the Prompt in the session, for a Provider that takes one. */
-    messageId: z.uuid().pipe(z.custom<MessageId>()),
+    messageId: z.uuid().pipe(UuidPartsSchema),
   }),
   vendorProgram: SignInRequestSchema,
   /** Null starts a session. */

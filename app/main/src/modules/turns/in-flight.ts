@@ -160,8 +160,7 @@ export function createInFlight(
         .run()
     },
 
-    /** The Reply whose Prompt is among entries a Provider session took. */
-    promptAmong(uuids: string[]) {
+    replyPromptedBy(uuids: string[]) {
       const entry = [...entries.values()].find(one =>
         uuids.includes(one.promptMessageId)
       )

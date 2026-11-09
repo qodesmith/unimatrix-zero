@@ -273,7 +273,7 @@ export function createTurns({
       sessionId: string,
       uuids: string[]
     ) {
-      const prompt = inFlight.promptAmong(uuids)
+      const prompt = inFlight.replyPromptedBy(uuids)
 
       if (!prompt) return
 
