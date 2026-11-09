@@ -40,15 +40,52 @@ export function turnOf(notification: Notification) {
  */
 export function createReplyMapper(ids: ReplyIds) {
   let shown = ''
-  const messages = new Map<string, {before: string; text: string}>()
+
+  const messages = new Map<
+    string,
+    {before: string; text: string; done: boolean}
+  >()
+
   let last: string | null = null
 
-  function onDelta(itemId: string, delta: string): ContentEvent[] {
-    const message = messages.get(itemId) ?? {before: shown, text: ''}
-    message.text += delta
-    messages.set(itemId, message)
-    shown += delta
+  /**
+   * After a lost connection, `codex` starts the message over as a new one and
+   * never finishes the old, at times without notifying that it retried.
+   */
+  function dropUnfinished() {
+    const message = last === null ? undefined : messages.get(last)
+
+    if (!message || message.done) return false
+
+    shown = message.before
+
+    return true
+  }
+
+  function addMessage(
+    itemId: string,
+    text: string,
+    done: boolean
+  ): ContentEvent[] {
+    const dropped = dropUnfinished()
+    messages.set(itemId, {before: shown, text, done})
+    shown += text
     last = itemId
+
+    if (dropped) return [{...ids, type: 'TEXT_REPLACE', text: shown}]
+
+    return text === '' ? [] : [{...ids, type: 'TEXT_DELTA', delta: text}]
+  }
+
+  function onDelta(itemId: string, delta: string): ContentEvent[] {
+    const message = messages.get(itemId)
+
+    if (!message) return addMessage(itemId, delta, false)
+
+    if (last !== itemId) return []
+
+    message.text += delta
+    shown += delta
 
     return [{...ids, type: 'TEXT_DELTA', delta}]
   }
@@ -56,15 +93,11 @@ export function createReplyMapper(ids: ReplyIds) {
   function onMessage(itemId: string, text: string): ContentEvent[] {
     const message = messages.get(itemId)
 
-    if (!message) {
-      messages.set(itemId, {before: shown, text})
-      shown += text
-      last = itemId
+    if (!message) return addMessage(itemId, text, true)
 
-      return text === '' ? [] : [{...ids, type: 'TEXT_DELTA', delta: text}]
-    }
+    message.done = true
 
-    // A later message has streamed since, so this one stands as shown.
+    // A later message started and dropped this one, so its finish changes nothing.
     if (message.text === text || last !== itemId) return []
 
     message.text = text

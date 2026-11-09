@@ -35,14 +35,47 @@ it('replaces what streamed when the finished message differs', () => {
   ])
 })
 
-it('replaces only the last message, after the ones before it', () => {
+it('drops an unfinished message once the next one starts, and ignores its late delta and finish', () => {
   const mapper = createReplyMapper(ids)
   mapper.map(delta('a', 'One. '))
-  mapper.map(delta('b', 'Tw'))
+  mapper.map(message('a', 'One. '))
+  mapper.map(delta('b', 'Silver Moon\n1\n'))
 
-  expect(mapper.map(message('a', 'One! '))).toEqual([])
-  expect(mapper.map(message('b', 'Two.'))).toEqual([
-    {...ids, type: 'TEXT_REPLACE', text: 'One. Two.'},
+  expect(mapper.map(delta('c', 'Silver Dawn'))).toEqual([
+    {...ids, type: 'TEXT_REPLACE', text: 'One. Silver Dawn'},
+  ])
+  expect(mapper.map(delta('c', '\n1'))).toEqual([
+    {...ids, type: 'TEXT_DELTA', delta: '\n1'},
+  ])
+  expect(mapper.map(delta('b', '2'))).toEqual([])
+  expect(mapper.map(message('b', 'Silver Moon\n1\n2'))).toEqual([])
+  expect(mapper.map(message('c', 'Silver Dawn\n1!'))).toEqual([
+    {...ids, type: 'TEXT_REPLACE', text: 'One. Silver Dawn\n1!'},
+  ])
+})
+
+it('drops an unfinished message for one that arrives already finished', () => {
+  const mapper = createReplyMapper(ids)
+  mapper.map(delta('a', 'Silver Moon\n1\n'))
+
+  expect(mapper.map(message('b', 'Silver Dawn\n1'))).toEqual([
+    {...ids, type: 'TEXT_REPLACE', text: 'Silver Dawn\n1'},
+  ])
+})
+
+it('keeps every finished message as the next one starts', () => {
+  const mapper = createReplyMapper(ids)
+  mapper.map(delta('a', 'One.'))
+  mapper.map(message('a', 'One.'))
+
+  expect(mapper.map(delta('b', ' Two.'))).toEqual([
+    {...ids, type: 'TEXT_DELTA', delta: ' Two.'},
+  ])
+
+  mapper.map(message('b', ' Two.'))
+
+  expect(mapper.map(message('c', ' Three.'))).toEqual([
+    {...ids, type: 'TEXT_DELTA', delta: ' Three.'},
   ])
 })
 
