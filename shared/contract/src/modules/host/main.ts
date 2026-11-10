@@ -68,12 +68,29 @@ export const ReplySessionSchema = z.discriminatedUnion('type', [
 
 export type ReplySession = z.infer<typeof ReplySessionSchema>
 
+/** The shape `node:crypto` types a UUID as, which the Claude SDK asks for. */
+const UuidPartsSchema = z.templateLiteral([
+  z.string(),
+  '-',
+  z.string(),
+  '-',
+  z.string(),
+  '-',
+  z.string(),
+  '-',
+  z.string(),
+])
+
 export const ReplyRequestSchema = z.strictObject({
   treeId: z.uuid(),
   replyId: z.uuid(),
   model: z.string().min(1),
   systemPrompt: z.string(),
-  prompt: z.strictObject({text: z.string()}),
+  prompt: z.strictObject({
+    text: z.string(),
+    /** Main's name for the Prompt in the session, for a Provider that takes one. */
+    messageId: z.uuid().pipe(UuidPartsSchema),
+  }),
   vendorProgram: SignInRequestSchema,
   /** Null starts a session. */
   session: ReplySessionSchema.nullable(),
@@ -174,9 +191,10 @@ export interface ProviderDriver {
   readUsage(): Promise<Usage>
   /**
    * Ends with `RUN_FINISHED`, including after `stop`. `PROMPT_DROPPED` comes
-   * once a Retry's cut drops `dropFrom`, `PROMPT_RECORDED` once the session
-   * holds the Prompt, and `REPLY_RECORDED`, before the end, once the Provider
-   * saved it.
+   * once a Retry's cut drops `dropFrom`, `PROMPT_RECORDED`, from a driver that
+   * names the Prompt itself, once the session holds it, and `REPLY_RECORDED`,
+   * before the end, once the Provider saved it. Main records a Prompt stored
+   * under `prompt.messageId` as it stores the entry.
    */
   startReply(request: ReplyRequest): AsyncIterable<StartReplyEvent>
   stop(replyId: string): Promise<void>

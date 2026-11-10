@@ -11,9 +11,19 @@ const migrationsFolder = path.resolve(import.meta.dirname, '../../../drizzle')
 const key = {projectKey: 'project', sessionId: 'session'}
 
 let sessions: ReturnType<typeof createSessions>
+let appended: {provider: string; sessionId: string; uuids: string[]}[]
+let whenAppended: () => void
 
 beforeEach(() => {
-  sessions = createSessions(openDatabase({file: ':memory:', migrationsFolder}))
+  appended = []
+  whenAppended = () => undefined
+  sessions = createSessions(
+    openDatabase({file: ':memory:', migrationsFolder}),
+    (provider, sessionId, uuids) => {
+      appended.push({provider, sessionId, uuids})
+      whenAppended()
+    }
+  )
 })
 
 function append(entries: SessionEntry[], subpath?: string) {
@@ -71,6 +81,31 @@ it('keeps a Subagent’s transcript apart and lists it under the session', () =>
   expect(sessions.handle('claude', {op: 'list-subkeys', ...key})).toEqual([
     'subagents/agent-1',
   ])
+})
+
+it('tells which entries a session’s own transcript took, and nothing of a Subagent’s', () => {
+  append([{type: 'user', uuid: 'a'}, {type: 'mode'}])
+  append([{type: 'user', uuid: 'b'}], 'subagents/agent-1')
+  append([
+    {type: 'user', uuid: 'a'},
+    {type: 'assistant', uuid: 'c'},
+  ])
+
+  expect(appended).toEqual([
+    {provider: 'claude', sessionId: 'session', uuids: ['a']},
+    {provider: 'claude', sessionId: 'session', uuids: ['c']},
+  ])
+})
+
+it('stores nothing of an append its listener refuses', () => {
+  whenAppended = () => {
+    throw new Error('The Reply was not saved.')
+  }
+
+  expect(() => append([{type: 'user', uuid: 'a'}])).toThrow(
+    'The Reply was not saved.'
+  )
+  expect(sessions.handle('claude', {op: 'load', key})).toBeNull()
 })
 
 function file(text: string) {

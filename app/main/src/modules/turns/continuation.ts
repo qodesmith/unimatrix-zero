@@ -255,7 +255,8 @@ function promptIn(session: SessionRef, reply: ReplyRow | undefined) {
 /**
  * A cut of deleted Turns already drops the failed attempt. A parent its
  * Provider never saved left only its Prompt in the session, so the cut goes
- * after that Prompt and before the failed attempt's.
+ * after that Prompt and before the failed attempt's. It always names what to
+ * keep: Claude resumes a cut that names nothing at the failed attempt.
  */
 function rewound(
   session: ContinuedSession,
@@ -270,10 +271,16 @@ function rewound(
     return {type: 'rewind', sessionId, messageId}
   }
 
-  const keepThrough = promptIn(session, parent)
+  const kept = promptIn(session, parent)
   const dropFrom = promptIn(session, failed)
 
-  return keepThrough === null && dropFrom === null
-    ? session
-    : {type: 'cut', sessionId, messageId, keepThrough, dropFrom}
+  if (kept === null && dropFrom === null) return session
+
+  return {
+    type: 'cut',
+    sessionId,
+    messageId,
+    keepThrough: kept ?? messageId,
+    dropFrom,
+  }
 }

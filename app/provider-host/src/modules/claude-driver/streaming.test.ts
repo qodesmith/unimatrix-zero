@@ -1,8 +1,8 @@
 import type {RecordedLine} from './replay'
 import type {SDKPartialAssistantMessage} from '@anthropic-ai/claude-agent-sdk'
 import type {
-  PromptRecorded,
   ReplyRecorded,
+  ReplyRequest,
   ReplySession,
   SessionRef,
   StartReplyEvent,
@@ -142,6 +142,7 @@ async function setUp(
     stopAfterDeltas?: number
     replyId?: string
     model?: string
+    messageId?: ReplyRequest['prompt']['messageId']
   }
 
   const vendorProgram = {
@@ -159,6 +160,7 @@ async function setUp(
       stopAfterDeltas,
       replyId = crypto.randomUUID(),
       model = 'haiku',
+      messageId = crypto.randomUUID(),
     }: ReplyOptions = {}
   ) {
     const events: Streamed[] = []
@@ -169,7 +171,7 @@ async function setUp(
       replyId,
       model,
       systemPrompt: '',
-      prompt: {text},
+      prompt: {text, messageId},
       vendorProgram,
       session: session && {type: 'continue', ...session},
     })) {
@@ -226,16 +228,6 @@ function recordedIn(events: Streamed[]) {
   )
 
   if (!recorded) throw new Error('The Reply was not recorded')
-
-  return recorded.session
-}
-
-function promptRecordedIn(events: Streamed[]) {
-  const recorded = events.find(
-    (event): event is PromptRecorded => event.type === 'PROMPT_RECORDED'
-  )
-
-  if (!recorded) throw new Error('The Prompt was not recorded')
 
   return recorded.session
 }
@@ -401,11 +393,17 @@ it('writes the transcript back when resuming from the store fails', async () => 
   )
 
   const session = await warmThread(claude)
+  const messageId = crypto.randomUUID()
 
-  const third = await claude.reply(THIRD_PROMPT, session)
+  const third = await claude.reply(THIRD_PROMPT, session, {messageId})
 
   expect(textOf(third)).toBe('TEAL OTTER')
   expect(third.at(-1)).toMatchObject({status: 'complete'})
+  expect(
+    claude.store
+      .entriesOf(claude.projectKey, SESSION_ID)
+      .map(entry => entry.uuid)
+  ).toContain(messageId)
 
   await claude.allClosed()
   const [, refused, fallback] = claude.reports()
@@ -659,11 +657,17 @@ it('fails the Reply as a crash when `claude` exits before its result, keeping th
 
   const claude = await setUp([crashing], {FAKE_CLAUDE_EXIT_AFTER: '1'})
 
-  const events = await claude.reply(FIRST_PROMPT)
+  const messageId = crypto.randomUUID()
+
+  const events = await claude.reply(FIRST_PROMPT, null, {messageId})
 
   expect(textOf(events)).toBe('TEAL')
   expect(events.map(event => event.type)).not.toContain('REPLY_RECORDED')
-  expect(promptRecordedIn(events).sessionId).toBe(SESSION_ID)
+  expect(
+    claude.store
+      .entriesOf(claude.projectKey, SESSION_ID)
+      .map(entry => entry.uuid)
+  ).toContain(messageId)
   expect(events.at(-1)).toMatchObject({
     type: 'RUN_FINISHED',
     status: 'failed',
@@ -692,30 +696,17 @@ it('saves the Prompt while the Reply streams, so a quit mid-Reply keeps it', asy
   }
 })
 
-it('records the Prompt once the app’s copy of the session holds it, under the id the driver gave it', async () => {
+it('stores the Prompt in the app’s copy of the session under the id main gave it', async () => {
   const claude = await setUp(['warm.ndjson'])
+  const messageId = crypto.randomUUID()
 
-  const events = await claude.reply(FIRST_PROMPT)
-  const recorded = promptRecordedIn(events)
+  await claude.reply(FIRST_PROMPT, null, {messageId})
 
-  expect(recorded.sessionId).toBe(SESSION_ID)
   expect(
     claude.store
       .entriesOf(claude.projectKey, SESSION_ID)
       .flatMap(entry => (entry.type === 'user' ? [entry.uuid] : []))
-  ).toEqual([recorded.messageId])
-})
-
-it('records no Prompt when the app’s copy of the session never got it', async () => {
-  const claude = await setUp(
-    ['warm.ndjson'],
-    {},
-    fakeStore({append: 'database or disk is full'})
-  )
-
-  const events = await claude.reply(FIRST_PROMPT)
-
-  expect(events.map(event => event.type)).not.toContain('PROMPT_RECORDED')
+  ).toEqual([messageId])
 })
 
 it('passes on a stop asked before claude has the Prompt', async () => {
@@ -839,9 +830,9 @@ it('cuts a Retry’s session after the Prompt of the Reply cut short, which `cla
   const claude = await setUp(['rewound-warm.ndjson', 'rewound.ndjson'])
 
   const first = await claude.reply(FIRST_PROMPT)
-  const cutShort = await claude.reply(SECOND_PROMPT, recordedIn(first))
+  const keepThrough = crypto.randomUUID()
+  await claude.reply(SECOND_PROMPT, recordedIn(first), {messageId: keepThrough})
   await claude.allClosed()
-  const keepThrough = promptRecordedIn(cutShort).messageId
 
   await claude.reply(FORK_PROMPT, {
     ...recordedIn(first),
@@ -892,10 +883,18 @@ function warmThrice() {
 
 async function threeReplies(claude: Awaited<ReturnType<typeof setUp>>) {
   const first = await claude.reply(FIRST_PROMPT)
-  const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
+  const messageId = crypto.randomUUID()
+
+  const second = await claude.reply(SECOND_PROMPT, recordedIn(first), {
+    messageId,
+  })
+
   await claude.reply(THIRD_PROMPT, recordedIn(second))
 
-  return {first: recordedIn(first), deleted: promptRecordedIn(second)}
+  return {
+    first: recordedIn(first),
+    deleted: {sessionId: recordedIn(second).sessionId, messageId},
+  }
 }
 
 it('leaves deleted Turns for the next Prompt, which resumes at the Reply it answers, so the AI’s context lacks them', async () => {
@@ -1012,13 +1011,18 @@ it('starts the next Prompt’s `claude` on the Model it asks for after a Reply f
 
   const claude = await setUp([failedFirst, 'resumed.ndjson'])
 
+  const messageId = crypto.randomUUID()
+
   const failed = await claude.reply(FIRST_PROMPT, null, {
     model: 'claude-nonexistent-201',
+    messageId,
   })
 
-  const next = await claude.reply(SECOND_PROMPT, promptRecordedIn(failed), {
-    model: MODEL,
-  })
+  const next = await claude.reply(
+    SECOND_PROMPT,
+    {sessionId: SESSION_ID, messageId},
+    {model: MODEL}
+  )
 
   expect(failed.at(-1)).toMatchObject({status: 'failed'})
   expect(next.at(-1)).toMatchObject({status: 'complete'})

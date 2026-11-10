@@ -42,8 +42,15 @@ function whereKey(provider: ProviderId, key: SessionKey) {
   )
 }
 
-/** The app's own copy of every Provider session, so any can be restored exactly. */
-export function createSessions(db: Database) {
+/**
+ * The app's own copy of every Provider session, so any can be restored exactly.
+ * `onAppended` hears the entries appended to a session's own transcript, in the
+ * step that stores them: if it throws, they aren't stored.
+ */
+export function createSessions(
+  db: Database,
+  onAppended: (provider: ProviderId, sessionId: string, uuids: string[]) => void
+) {
   /** Appends in order, skipping entries whose `uuid` is already kept. */
   function append(
     provider: ProviderId,
@@ -58,6 +65,7 @@ export function createSessions(db: Database) {
         .get()
 
       let position = (last?.position ?? -1) + 1
+      const uuids: string[] = []
 
       for (const entry of entries) {
         const inserted = tx
@@ -75,8 +83,16 @@ export function createSessions(db: Database) {
           .returning({id: sessionEntries.id})
           .get()
 
-        if (inserted) position += 1
+        if (!inserted) continue
+
+        position += 1
+
+        if (entry.uuid !== undefined) uuids.push(entry.uuid)
       }
+
+      if (key.subpath !== undefined) return
+
+      onAppended(provider, key.sessionId, uuids)
     })
   }
 

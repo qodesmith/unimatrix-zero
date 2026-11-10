@@ -37,7 +37,10 @@ it('fails partway when the Prompt asks it to', async () => {
   const driver = createFakeDriver({delayMs: 0})
 
   const events = await collect(
-    driver.startReply({...request, prompt: {text: 'Please /fail'}})
+    driver.startReply({
+      ...request,
+      prompt: {text: 'Please /fail', messageId: crypto.randomUUID()},
+    })
   )
 
   expect(textOf(events)).not.toBe('')
@@ -54,7 +57,7 @@ it('hangs partway when the Prompt asks it to, until stopped', async () => {
 
   const reply = driver.startReply({
     ...request,
-    prompt: {text: 'Please /hang'},
+    prompt: {text: 'Please /hang', messageId: crypto.randomUUID()},
   })
 
   const stream = reply[Symbol.asyncIterator]()
@@ -91,7 +94,7 @@ it('stops a hanging Reply that was stopped on its last word', async () => {
 
   for await (const event of driver.startReply({
     ...request,
-    prompt: {text: 'Please /hang'},
+    prompt: {text: 'Please /hang', messageId: crypto.randomUUID()},
   })) {
     events.push(event)
 
@@ -106,7 +109,7 @@ it('stops a hanging Reply that was stopped on its last word', async () => {
 
 it('records each Reply in the session it continues, or a new one', async () => {
   const driver = createFakeDriver({delayMs: 0})
-  const prompt = {text: 'Hi'}
+  const prompt = {text: 'Hi', messageId: crypto.randomUUID()}
 
   const first = await collect(driver.startReply({...request, prompt}))
   const recorded = first.find(event => event.type === 'REPLY_RECORDED')
@@ -136,7 +139,11 @@ it('records each Reply on the Model it was asked for', async () => {
   const driver = createFakeDriver({delayMs: 0})
 
   const events = await collect(
-    driver.startReply({...request, model: 'fake-pro', prompt: {text: 'Hi'}})
+    driver.startReply({
+      ...request,
+      model: 'fake-pro',
+      prompt: {text: 'Hi', messageId: crypto.randomUUID()},
+    })
   )
 
   expect(events).toContainEqual(

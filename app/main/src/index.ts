@@ -97,7 +97,10 @@ function openWindow(db: Database) {
     layout: layout.read(),
   }))
 
-  const sessions = createSessions(db)
+  const sessions = createSessions(db, (provider, sessionId, uuids) =>
+    turns.hostSessionAppended(provider, sessionId, uuids)
+  )
+
   const trees = createTrees(db)
   const treeRows = createTreeRows(trees, hub.publish)
 

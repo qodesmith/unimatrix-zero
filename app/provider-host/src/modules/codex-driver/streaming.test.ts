@@ -207,7 +207,7 @@ async function setUp(
       replyId,
       model,
       systemPrompt: 'You answer in as few words as you can.',
-      prompt: {text},
+      prompt: {text, messageId: crypto.randomUUID()},
       vendorProgram,
       session: session && {type: 'continue', ...session},
     })) {

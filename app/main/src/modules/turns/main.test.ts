@@ -24,6 +24,7 @@ let published: AppEvent[]
 let whenPublished: (event: AppEvent) => void
 let finished: FinishedReply[]
 let hostCommands: HostCommand[]
+let sentPromptIds: Map<string, string>
 let hostReady: boolean
 let clock: Date
 let hostReachable: boolean
@@ -36,6 +37,11 @@ const hosts: ReplyHosts = {
     if (!hostReachable) throw new Error('The claude host is not running.')
 
     hostCommands.push(command)
+
+    if (command.type === 'reply.start') {
+      const {replyId, prompt} = command.request
+      sentPromptIds.set(replyId, prompt.messageId)
+    }
   },
 }
 
@@ -61,6 +67,7 @@ beforeEach(() => {
   whenPublished = () => undefined
   finished = []
   hostCommands = []
+  sentPromptIds = new Map()
   hostReady = true
   clock = createdAt
   hostReachable = true
@@ -109,6 +116,17 @@ function recordPrompt(replyId: string, messageId: string, sessionId = 's1') {
   })
 }
 
+/** Main's copy of the session takes the Prompt, under the id main last sent. */
+function storePrompt(replyId: string, sessionId = 's1') {
+  const messageId = sentPromptIds.get(replyId)
+
+  if (!messageId) throw new Error('The Prompt was not sent')
+
+  turns.hostSessionAppended('claude', sessionId, [messageId])
+
+  return messageId
+}
+
 function finish(replyId: string) {
   fromHost(replyId, {type: 'RUN_FINISHED', status: 'complete'})
 }
@@ -119,6 +137,22 @@ function savedRoot() {
   finish(replyId)
 
   return replyId
+}
+
+/**
+ * A Retry under a saved root stored its Prompt, then the app quit and launched
+ * again.
+ */
+function quitAfterRetryStored() {
+  const retried = sendPrompt(savedRoot(), 'And then?')
+  recordPrompt(retried, 'p-first-attempt')
+  fail(retried)
+  turns.retry(treeId, retried)
+  const stored = storePrompt(retried)
+  turns.quitting()
+  turns = launch()
+
+  return {retried, stored}
 }
 
 function stopUnrecorded(replyId: string) {
@@ -207,7 +241,7 @@ describe('sending the root Prompt', () => {
           replyId: sent.reply.id,
           model: 'claude-opus-5',
           systemPrompt: '',
-          prompt: {text: 'Hello'},
+          prompt: {text: 'Hello', messageId: expect.any(String)},
           vendorProgram,
           session: null,
         },
@@ -571,7 +605,7 @@ describe('a Prompt answering a Reply', () => {
           replyId: sent?.reply.id,
           model: 'fake',
           systemPrompt: '',
-          prompt: {text: 'And then?'},
+          prompt: {text: 'And then?', messageId: expect.any(String)},
           vendorProgram,
           session: {
             sessionId: 's1',
@@ -854,7 +888,7 @@ describe('retrying a Reply', () => {
           replyId,
           model: 'fake',
           systemPrompt: '',
-          prompt: {text: 'Hi'},
+          prompt: {text: 'Hi', messageId: expect.any(String)},
           vendorProgram,
           session: null,
         },
@@ -935,10 +969,28 @@ describe('retrying a Reply', () => {
     ])
   })
 
-  it('leaves out a recorded Prompt that went into another session', () => {
+  it('cuts after the Prompt a Retry stored before the app quit, not the one of the attempt before', () => {
+    const {retried, stored} = quitAfterRetryStored()
+    const failed = sendPrompt(retried, 'Go on')
+    recordPrompt(failed, 'p-failed')
+    fail(failed)
+
+    turns.retry(treeId, failed)
+
+    expect(sessionsStarted()).toEqual([
+      {
+        sessionId: 's1',
+        messageId: 'm1',
+        type: 'cut',
+        keepThrough: stored,
+        dropFrom: 'p-failed',
+      },
+    ])
+  })
+
+  it('cuts after the Reply before, when the interrupted Reply’s Prompt never reached the session', () => {
     const replyId = savedRoot()
     const interrupted = sendPrompt(replyId, 'And then?')
-    recordPrompt(interrupted, 'p-interrupted', 's-other')
     turns.quitting()
     turns = launch()
     const failed = sendPrompt(interrupted, 'Go on')
@@ -952,7 +1004,32 @@ describe('retrying a Reply', () => {
         sessionId: 's1',
         messageId: 'm1',
         type: 'cut',
-        keepThrough: null,
+        keepThrough: 'm1',
+        dropFrom: 'p-failed',
+      },
+    ])
+  })
+
+  it('cuts after the Reply before, when the Reply answered forked into a session it left once its sibling was deleted', () => {
+    const replyId = savedRoot()
+    const sibling = sendPrompt(replyId, 'One way')
+    stopUnrecorded(sibling)
+    const forked = sendPrompt(replyId, 'Another way')
+    recordPrompt(forked, 'p-forked', 's-fork')
+    stopUnrecorded(forked)
+    turns.deletePrompt(treeId, promptOf(sibling))
+    const failed = sendPrompt(forked, 'Go on')
+    recordPrompt(failed, 'p-failed')
+    fail(failed)
+
+    turns.retry(treeId, failed)
+
+    expect(sessionsStarted()).toEqual([
+      {
+        sessionId: 's1',
+        messageId: 'm1',
+        type: 'cut',
+        keepThrough: 'm1',
         dropFrom: 'p-failed',
       },
     ])
@@ -1406,6 +1483,27 @@ describe('deleting a Prompt', () => {
       },
     ])
   })
+
+  it('cuts after the Prompt a Retry stored before the app quit, when the Turns below it are deleted', () => {
+    const {retried, stored} = quitAfterRetryStored()
+    const below = sendPrompt(retried, 'Go on')
+    recordPrompt(below, 'p-below')
+    finish(below)
+
+    turns.deletePrompt(treeId, promptOf(below))
+
+    expect(cutsAsked()).toMatchObject([
+      {
+        replyId: retried,
+        session: {
+          sessionId: 's1',
+          messageId: 'm1',
+          keepThrough: stored,
+          dropFrom: 'p-below',
+        },
+      },
+    ])
+  })
 })
 
 /** An exchange its Provider saved, Prompt and Reply, before it failed. */
@@ -1460,6 +1558,43 @@ describe('sending a Prompt where one failed', () => {
     expect(savedReplyIds()).toEqual([first, sent.reply.id].toSorted())
     expect(sessionsStarted()).toEqual([
       {sessionId: 's1', messageId: 'm1', type: 'rewind'},
+    ])
+  })
+
+  it('cuts after the Prompt a Retry stored before the app quit, as a Retry of the failed one would', () => {
+    const {retried, stored} = quitAfterRetryStored()
+    failedAt(retried)
+
+    sendInstead(retried)
+
+    expect(sessionsStarted()).toEqual([
+      {
+        sessionId: 's1',
+        messageId: 'm1',
+        type: 'cut',
+        keepThrough: stored,
+        dropFrom: 'p-failed',
+      },
+    ])
+  })
+
+  it('cuts after the Reply before, when the interrupted Reply above never reached the session', () => {
+    const first = savedRoot()
+    const interrupted = sendPrompt(first, 'And then?')
+    turns.quitting()
+    turns = launch()
+    failedAt(interrupted)
+
+    sendInstead(interrupted)
+
+    expect(sessionsStarted()).toEqual([
+      {
+        sessionId: 's1',
+        messageId: 'm1',
+        type: 'cut',
+        keepThrough: 'm1',
+        dropFrom: 'p-failed',
+      },
     ])
   })
 
