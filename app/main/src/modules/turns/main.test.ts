@@ -139,6 +139,22 @@ function savedRoot() {
   return replyId
 }
 
+/**
+ * A Retry under a saved root stored its Prompt, then the app quit and launched
+ * again.
+ */
+function quitAfterRetryStored() {
+  const retried = sendPrompt(savedRoot(), 'And then?')
+  recordPrompt(retried, 'p-first-attempt')
+  fail(retried)
+  turns.retry(treeId, retried)
+  const stored = storePrompt(retried)
+  turns.quitting()
+  turns = launch()
+
+  return {retried, stored}
+}
+
 function stopUnrecorded(replyId: string) {
   fromHost(replyId, {type: 'RUN_FINISHED', status: 'stopped'})
 }
@@ -954,14 +970,7 @@ describe('retrying a Reply', () => {
   })
 
   it('cuts after the Prompt a Retry stored before the app quit, not the one of the attempt before', () => {
-    const replyId = savedRoot()
-    const retried = sendPrompt(replyId, 'And then?')
-    recordPrompt(retried, 'p-first-attempt')
-    fail(retried)
-    turns.retry(treeId, retried)
-    const stored = storePrompt(retried)
-    turns.quitting()
-    turns = launch()
+    const {retried, stored} = quitAfterRetryStored()
     const failed = sendPrompt(retried, 'Go on')
     recordPrompt(failed, 'p-failed')
     fail(failed)
@@ -1476,14 +1485,7 @@ describe('deleting a Prompt', () => {
   })
 
   it('cuts after the Prompt a Retry stored before the app quit, when the Turns below it are deleted', () => {
-    const first = savedRoot()
-    const retried = sendPrompt(first, 'And then?')
-    recordPrompt(retried, 'p-first-attempt')
-    fail(retried)
-    turns.retry(treeId, retried)
-    const stored = storePrompt(retried)
-    turns.quitting()
-    turns = launch()
+    const {retried, stored} = quitAfterRetryStored()
     const below = sendPrompt(retried, 'Go on')
     recordPrompt(below, 'p-below')
     finish(below)
@@ -1560,14 +1562,7 @@ describe('sending a Prompt where one failed', () => {
   })
 
   it('cuts after the Prompt a Retry stored before the app quit, as a Retry of the failed one would', () => {
-    const first = savedRoot()
-    const retried = sendPrompt(first, 'And then?')
-    recordPrompt(retried, 'p-first-attempt')
-    fail(retried)
-    turns.retry(treeId, retried)
-    const stored = storePrompt(retried)
-    turns.quitting()
-    turns = launch()
+    const {retried, stored} = quitAfterRetryStored()
     failedAt(retried)
 
     sendInstead(retried)
