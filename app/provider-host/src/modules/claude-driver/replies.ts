@@ -37,6 +37,7 @@ export function createReplyMapper(ids: ReplyIds) {
   let mirrorFailed = false
   let lastMessage: {uuid: string; model: string} | null = null
   let limitLifts: number | undefined
+  let limitRejected = false
 
   function replace(text: string): ContentEvent[] {
     if (text === shown) return []
@@ -153,7 +154,8 @@ export function createReplyMapper(ids: ReplyIds) {
 
       if (message.type === 'rate_limit_event') {
         const {status, resetsAt} = message.rate_limit_info
-        limitLifts = status === 'rejected' ? resetsAt : undefined
+        limitRejected = status === 'rejected'
+        limitLifts = limitRejected ? resetsAt : undefined
       }
 
       // The only sign a compaction went through: one blocked or failed sends none.
@@ -211,6 +213,7 @@ export function createReplyMapper(ids: ReplyIds) {
         status: 'failed',
         failure: failureOf(message || 'Claude couldn’t finish this Reply.', {
           resetsAt: limitLifts,
+          limitRejected,
           terminalReason: result.terminal_reason,
         }),
       }

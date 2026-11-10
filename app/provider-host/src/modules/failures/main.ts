@@ -46,6 +46,8 @@ export class RequestRefused extends Error {
 export interface FailureSignals {
   /** In seconds since the epoch; it wins over the message's time. */
   resetsAt?: number | undefined
+  /** Claude rejected the turn for a usage limit, with or without a reset time. */
+  limitRejected?: boolean | undefined
   refusal?: Refusal | undefined
   codexErrorInfo?: unknown
   /** Claude's `terminal_reason`. */
@@ -107,12 +109,14 @@ export function failureOf(
 
   if (tooLong) return tooLong
 
-  const {resetsAt, terminalReason} = signals
+  const {resetsAt, limitRejected, terminalReason} = signals
 
   // A limit that failed the Compaction leaves the turn blocked as well, and
   // the limit is what the user can wait out.
   if (terminalReason === 'blocking_limit') {
-    return resetsAt !== undefined || LIMIT_REACHED.test(message)
+    return limitRejected ||
+      resetsAt !== undefined ||
+      LIMIT_REACHED.test(message)
       ? limitReached(message, resetsAt)
       : {code: 'too-long', message}
   }

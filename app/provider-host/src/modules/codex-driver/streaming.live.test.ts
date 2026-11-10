@@ -900,5 +900,5 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
     } finally {
       fs.rmSync(home, {recursive: true, force: true})
     }
-  }, 60_000)
+  })
 })

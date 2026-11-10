@@ -220,7 +220,7 @@ it('says how far a Prompt ran over the Provider’s cap, and offers no Retry', a
   expect(screen.getByRole('button', {name: 'Retry'}).query()).toBeNull()
 })
 
-it('says a Reply was too long for the Context window, and offers no Retry', async () => {
+it('says the Prompt was too long for the Context window, and offers no Retry', async () => {
   const screen = await renderSaved(
     failed({code: 'too-long', message: 'Prompt is too long'})
   )

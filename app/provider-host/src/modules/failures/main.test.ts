@@ -94,7 +94,7 @@ it.each([
     {terminalReason: 'blocking_limit'},
   ],
 ])(
-  'names a Reply as too long when %s, however the message reads',
+  'names a Prompt as too long when %s, however the message reads',
   (_, signals) => {
     expect(failureOf('Reworded by the vendor', signals)).toEqual({
       code: 'too-long',
@@ -135,4 +135,10 @@ it('keeps a usage limit a reached limit when `claude` blocks the turn for it', (
     message: 'Prompt is too long',
     resetsAt: '2026-11-06T13:00:00.000Z',
   })
+  expect(
+    failureOf('Prompt is too long', {
+      terminalReason: 'blocking_limit',
+      limitRejected: true,
+    })
+  ).toEqual({code: 'limit-reached', message: 'Prompt is too long'})
 })
