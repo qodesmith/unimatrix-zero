@@ -27,8 +27,8 @@ const UNIX_SECONDS = /^\d{10}$/
  */
 export const RefusalSchema = z.looseObject({
   input_error_code: z.string().optional(),
-  max_chars: z.number().int().nonnegative().optional(),
-  actual_chars: z.number().int().nonnegative().optional(),
+  max_chars: z.number().int().nonnegative().optional().catch(undefined),
+  actual_chars: z.number().int().nonnegative().optional().catch(undefined),
 })
 
 type Refusal = z.infer<typeof RefusalSchema>
