@@ -480,7 +480,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 300_000)
 
-  it('reaches a Reply before a Compaction for a Branch, a Retry and a send after Deleting Turns, each in a new session that goes on without the Turns dropped', async () => {
+  it('reaches a Reply before a Compaction for a Branch, a Retry and a send after deleting Turns, each in a new session that goes on without the Turns dropped', async () => {
     const live = liveDriver([])
     const {first} = await compactedThread(live)
     const target = first.recorded.session

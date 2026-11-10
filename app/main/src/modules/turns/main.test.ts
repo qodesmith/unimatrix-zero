@@ -678,7 +678,7 @@ describe('a Reply before a Compaction in its Claude session', () => {
     expect(sessionsStarted()).toEqual([forkedBeforeCompaction])
   })
 
-  it('takes the next Prompt after Deleting Turns in such a fork, with no cut, which spends the cut', () => {
+  it('takes the next Prompt after deleting Turns in such a fork, with no cut, which spends the cut', () => {
     const {first, second} = compactedThread()
     turns.deletePrompt(treeId, promptOf(second))
     hostCommands = []
@@ -770,7 +770,7 @@ describe('a stopped Reply its Provider never saved, whose Turn compacted the ses
 })
 
 describe('a Reply after a Compaction in its Claude session', () => {
-  it('still rewinds for a Retry, cuts after Deleting Turns and forks the whole session for a Branch', () => {
+  it('still rewinds for a Retry, cuts after deleting Turns and forks the whole session for a Branch', () => {
     const first = savedRoot()
     const second = savedAt(first, 'm2', 's1', 'b1')
     const third = savedAt(second, 'm3')
@@ -1437,7 +1437,6 @@ describe('retrying a Reply', () => {
   })
 })
 
-/** `boundaryId` has the session compact inside the Reply. */
 function savedAt(
   parentReplyId: string,
   messageId: string,
