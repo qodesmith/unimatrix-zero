@@ -71,12 +71,19 @@ it('names a Prompt over Codex’s text cap as too long, with both counts from th
     promptChars: 1_240_000,
     maxPromptChars: 1_048_576,
   })
+})
+
+it('leaves a request Codex refused for another reason a provider error', () => {
   expect(
     failureOf('Invalid request', {refusal: {input_error_code: 'empty_input'}})
   ).toEqual({code: 'provider-error', message: 'Invalid request'})
 })
 
 it.each([
+  [
+    'Codex refuses a Prompt over its cap without the counts',
+    {refusal: {input_error_code: 'input_too_large'}},
+  ],
   [
     'Codex reports the Context window exceeded',
     {codexErrorInfo: 'contextWindowExceeded'},
@@ -111,14 +118,12 @@ it.each([
 })
 
 it('keeps a usage limit a reached limit when `claude` blocks the turn for it', () => {
-  expect(
-    failureOf('You’ve hit your limit · resets 2026-10-24T15:00:00Z', {
-      terminalReason: 'blocking_limit',
-    })
-  ).toEqual({
+  const message =
+    'Prompt is too long · automatic compaction failed: You’ve hit your limit'
+
+  expect(failureOf(message, {terminalReason: 'blocking_limit'})).toEqual({
     code: 'limit-reached',
-    message: 'You’ve hit your limit · resets 2026-10-24T15:00:00Z',
-    resetsAt: '2026-10-24T15:00:00.000Z',
+    message,
   })
   expect(
     failureOf('Prompt is too long', {

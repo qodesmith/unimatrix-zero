@@ -68,7 +68,7 @@ const resetTime = new Intl.DateTimeFormat(undefined, {
   minute: '2-digit',
 })
 
-const count = new Intl.NumberFormat()
+const wholeNumber = new Intl.NumberFormat()
 
 const FAILURE_LINES: Record<
   RunFailure['code'],
@@ -88,7 +88,7 @@ const FAILURE_LINES: Record<
   'too-long': ({promptChars, maxPromptChars}) =>
     promptChars === undefined || maxPromptChars === undefined
       ? 'Too long for the Context window'
-      : `Prompt too long · ${count.format(promptChars)} characters, limit ${count.format(maxPromptChars)}`,
+      : `Prompt too long · ${wholeNumber.format(promptChars)} characters, limit ${wholeNumber.format(maxPromptChars)}`,
   'needs-app-update': () => 'Needs an app update',
   'fake-failure': ({message}) => message,
 }

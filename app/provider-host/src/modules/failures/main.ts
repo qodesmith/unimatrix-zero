@@ -33,7 +33,6 @@ export const RefusalSchema = z.looseObject({
 
 type Refusal = z.infer<typeof RefusalSchema>
 
-/** A request the vendor program refused. */
 export class RequestRefused extends Error {
   readonly data: Refusal | undefined
 
@@ -48,9 +47,8 @@ export interface FailureSignals {
   /** In seconds since the epoch; it wins over the message's time. */
   resetsAt?: number | undefined
   refusal?: Refusal | undefined
-  /** `codexErrorInfo` of a failed Codex turn. */
   codexErrorInfo?: unknown
-  /** `terminal_reason` of a Claude result. */
+  /** Claude's `terminal_reason`. */
   terminalReason?: string | undefined
 }
 
@@ -68,8 +66,10 @@ function refusedAsTooLong(
   message: string,
   {refusal, codexErrorInfo, terminalReason}: FailureSignals
 ): RunFailure | null {
+  const overCap = refusal?.input_error_code === 'input_too_large'
+
   if (
-    refusal?.input_error_code === 'input_too_large' &&
+    overCap &&
     refusal.actual_chars !== undefined &&
     refusal.max_chars !== undefined
   ) {
@@ -81,7 +81,8 @@ function refusedAsTooLong(
     }
   }
 
-  return codexErrorInfo === 'contextWindowExceeded' ||
+  return overCap ||
+    codexErrorInfo === 'contextWindowExceeded' ||
     terminalReason === 'prompt_too_long'
     ? {code: 'too-long', message}
     : null
@@ -108,7 +109,7 @@ export function failureOf(
 
   const {resetsAt, terminalReason} = signals
 
-  // A limit that failed the compaction leaves the turn blocked as well, and
+  // A limit that failed the Compaction leaves the turn blocked as well, and
   // the limit is what the user can wait out.
   if (terminalReason === 'blocking_limit') {
     return resetsAt !== undefined || LIMIT_REACHED.test(message)
