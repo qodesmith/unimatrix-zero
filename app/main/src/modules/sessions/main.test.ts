@@ -86,9 +86,14 @@ it('keeps a Subagent’s transcript apart and lists it under the session', () =>
 it('tells which entries a session’s own transcript took, and nothing of a Subagent’s', () => {
   append([{type: 'user', uuid: 'a'}, {type: 'mode'}])
   append([{type: 'user', uuid: 'b'}], 'subagents/agent-1')
+  append([
+    {type: 'user', uuid: 'a'},
+    {type: 'assistant', uuid: 'c'},
+  ])
 
   expect(appended).toEqual([
     {provider: 'claude', sessionId: 'session', uuids: ['a']},
+    {provider: 'claude', sessionId: 'session', uuids: ['c']},
   ])
 })
 

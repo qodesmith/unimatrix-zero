@@ -65,6 +65,7 @@ export function createSessions(
         .get()
 
       let position = (last?.position ?? -1) + 1
+      const uuids: string[] = []
 
       for (const entry of entries) {
         const inserted = tx
@@ -82,16 +83,16 @@ export function createSessions(
           .returning({id: sessionEntries.id})
           .get()
 
-        if (inserted) position += 1
+        if (!inserted) continue
+
+        position += 1
+
+        if (entry.uuid !== undefined) uuids.push(entry.uuid)
       }
 
       if (key.subpath !== undefined) return
 
-      onAppended(
-        provider,
-        key.sessionId,
-        entries.flatMap(({uuid}) => (uuid === undefined ? [] : [uuid]))
-      )
+      onAppended(provider, key.sessionId, uuids)
     })
   }
 

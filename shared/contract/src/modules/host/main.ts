@@ -191,9 +191,10 @@ export interface ProviderDriver {
   readUsage(): Promise<Usage>
   /**
    * Ends with `RUN_FINISHED`, including after `stop`. `PROMPT_DROPPED` comes
-   * once a Retry's cut drops `dropFrom`, `PROMPT_RECORDED` once the session
-   * holds the Prompt, and `REPLY_RECORDED`, before the end, once the Provider
-   * saved it.
+   * once a Retry's cut drops `dropFrom`, `PROMPT_RECORDED`, from a driver that
+   * names the Prompt itself, once the session holds it, and `REPLY_RECORDED`,
+   * before the end, once the Provider saved it. Main records a Prompt stored
+   * under `prompt.messageId` as it stores the entry.
    */
   startReply(request: ReplyRequest): AsyncIterable<StartReplyEvent>
   stop(replyId: string): Promise<void>
