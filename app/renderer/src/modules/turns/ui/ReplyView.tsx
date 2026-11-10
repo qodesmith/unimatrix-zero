@@ -83,7 +83,7 @@ function CompactionMarker() {
       className="text-xs before:min-w-6 after:min-w-6"
     >
       <MarkerContent className="text-balance group-data-[variant=separator]/marker:flex-initial">
-        Compacted here. The AI remembers the Turns above from a summary.
+        Compacted here. The AI remembers earlier Turns from a summary.
       </MarkerContent>
     </Marker>
   )

@@ -2148,7 +2148,7 @@ function endingIn(status: Reply['status'], text = 'Reply two'): Saved {
 }
 
 const COMPACTED =
-  'Compacted here. The AI remembers the Turns above from a summary.'
+  'Compacted here. The AI remembers earlier Turns from a summary.'
 
 /** Top to bottom, the Compaction markers among the Turns' texts. */
 function downThrough(surface: Locator, ...texts: string[]) {

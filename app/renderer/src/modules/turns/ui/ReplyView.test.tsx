@@ -361,7 +361,7 @@ it('offers no Retry on a Reply the app quit on: it goes on like a stopped one', 
 })
 
 const COMPACTED =
-  'Compacted here. The AI remembers the Turns above from a summary.'
+  'Compacted here. The AI remembers earlier Turns from a summary.'
 
 it('marks a streaming Reply once its Compaction arrives, and keeps the mark when it finishes', async () => {
   const screen = await replay(before('TOOL_CALL_START'))
