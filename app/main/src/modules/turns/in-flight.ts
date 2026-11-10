@@ -85,10 +85,11 @@ export function createInFlight(
   }
 
   /** A Subagent compacts its own transcript, not the session's: no record. */
-  function recordCompaction(entry: Entry, event: ReplyEvent) {
-    if (event.type !== 'CONTEXT_COMPACTED' || event.subagentId !== undefined) {
-      return
-    }
+  function recordCompaction(
+    entry: Entry,
+    event: Extract<ReplyEvent, {type: 'CONTEXT_COMPACTED'}>
+  ) {
+    if (event.subagentId !== undefined) return
 
     const {sessionId, boundaryId, replyId} = event
     db.insert(compactions)
@@ -99,7 +100,8 @@ export function createInFlight(
   function advance(entry: Entry, event: ReplyEvent) {
     const before = entry.reply
     entry.reply = foldReplyEvent(before, event)
-    recordCompaction(entry, event)
+
+    if (event.type === 'CONTEXT_COMPACTED') recordCompaction(entry, event)
 
     if (event.type === 'RUN_FINISHED') {
       entries.delete(event.replyId)

@@ -92,8 +92,8 @@ export const replies = sqliteTable(
 )
 
 /**
- * Kept against the Provider session, which holds the Compaction until it is
- * cut, even after the Reply it happened in is deleted or retried.
+ * Kept against the Provider session, which can still hold the Compaction after
+ * the Reply it happened in is deleted or retried.
  */
 export const compactions = sqliteTable('compactions', {
   id: id(),

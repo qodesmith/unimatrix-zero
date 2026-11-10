@@ -79,7 +79,6 @@ export const ReplyProgressSchema = z.strictObject({
   contextSize: z.number().int().nonnegative().nullable(),
   contextWindow: z.number().int().positive().nullable(),
   failure: RunFailureSchema.nullable(),
-  /** A Compaction happened while this Reply was written. */
   compacted: z.boolean(),
 })
 
@@ -228,7 +227,6 @@ export const TokensEvent = z.strictObject({
 export const ContextCompactedEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('CONTEXT_COMPACTED'),
-  /** The Provider session that compacted. */
   sessionId: z.string(),
   /** Claude's boundary entry in that session; Codex reports none. */
   boundaryId: z.string().nullable(),
