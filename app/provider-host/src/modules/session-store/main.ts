@@ -41,8 +41,11 @@ export function createSessionStoreClient(post: (message: HostMessage) => void) {
       )
     },
 
-    async load(key: SessionKey) {
-      return SESSION_STORE_RESULTS.load.parse(await ask({op: 'load', key}))
+    /** `through` ends the transcript at that entry, without the unnamed ones. */
+    async load(key: SessionKey, through?: string) {
+      return SESSION_STORE_RESULTS.load.parse(
+        await ask({op: 'load', key, through})
+      )
     },
 
     async listSubkeys(folder: SessionFolder) {

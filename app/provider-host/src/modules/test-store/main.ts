@@ -52,6 +52,18 @@ export function fakeStore(refuses: Refusals = {}) {
     })
   }
 
+  function load(key: SessionKey, through?: string) {
+    const kept = entries.get(keyText(key)) ?? null
+
+    if (!kept || through === undefined) return kept
+
+    const end = kept.findIndex(entry => entry.uuid === through)
+
+    if (end === -1) throw new Error(`No entry ${through} in the session.`)
+
+    return kept.slice(0, end + 1).filter(entry => entry.uuid !== undefined)
+  }
+
   function answer(request: SessionStoreRequest): SessionStoreValue {
     switch (request.op) {
       case 'append':
@@ -59,7 +71,7 @@ export function fakeStore(refuses: Refusals = {}) {
 
         return null
       case 'load':
-        return entries.get(keyText(request.key)) ?? null
+        return load(request.key, request.through)
       case 'list-subkeys':
         return subkeys(request.projectKey, request.sessionId)
       case 'load-files':
@@ -77,6 +89,16 @@ export function fakeStore(refuses: Refusals = {}) {
     }
   }
 
+  function outcome(request: SessionStoreRequest, refused: string | undefined) {
+    if (refused !== undefined) return {ok: false as const, message: refused}
+
+    try {
+      return {ok: true as const, value: answer(request)}
+    } catch (error) {
+      return {ok: false as const, message: String(error)}
+    }
+  }
+
   const client = createSessionStoreClient(message => {
     if (message.type !== 'SESSION_STORE') return
 
@@ -84,12 +106,7 @@ export function fakeStore(refuses: Refusals = {}) {
     const refused = refuses[message.request.op]
 
     setTimeout(() => {
-      client.settle(
-        message.requestId,
-        refused === undefined
-          ? {ok: true, value: answer(message.request)}
-          : {ok: false, message: refused}
-      )
+      client.settle(message.requestId, outcome(message.request, refused))
     }, 0)
   })
 

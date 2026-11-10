@@ -368,6 +368,48 @@ it('forks the session through a mid-Thread Reply into a new session, leaving the
   ])
 })
 
+const REACHING = {
+  sessionId: SESSION_ID,
+  messageId: FIRST_MESSAGE,
+  type: 'fork',
+  servedThrough: FIRST_MESSAGE,
+} as const
+
+it('forks from the app’s copy of the session served only through a Reply', async () => {
+  const claude = await setUp(['warm.ndjson', 'forked.ndjson'])
+  await warmThread(claude)
+
+  const forked = await claude.reply(FORK_PROMPT, REACHING)
+  const [, fork] = claude.reports()
+
+  expect(textOf(forked)).toBe('TEAL')
+  expect(fork?.configDir).not.toBe(claude.configDir)
+  expect(fork?.resumedFrom.at(-1)).toBe(FIRST_MESSAGE)
+  expect(fork?.resumedFrom).not.toContain(SECOND_MESSAGE)
+
+  await claude.allClosed()
+})
+
+it('writes the transcript back only through that Reply when forking from the store fails', async () => {
+  const claude = await setUp(
+    ['warm.ndjson', 'forked.ndjson', 'forked.ndjson'],
+    {FAKE_CLAUDE_REFUSE_STORE: 'yes'}
+  )
+
+  await warmThread(claude)
+
+  const forked = await claude.reply(FORK_PROMPT, REACHING)
+  const [, refused, fallback] = claude.reports()
+
+  expect(textOf(forked)).toBe('TEAL')
+  expect(refused?.ended).toBe('refused')
+  expect(fallback?.configDir).toBe(claude.configDir)
+  expect(fallback?.resumedFrom.at(-1)).toBe(FIRST_MESSAGE)
+  expect(fallback?.resumedFrom).not.toContain(SECOND_MESSAGE)
+
+  await claude.allClosed()
+})
+
 it('resumes from the app’s copy when the warm session’s `claude` exited while idle', async () => {
   const claude = await setUp(['warm.ndjson', 'resumed.ndjson'], {
     FAKE_CLAUDE_EXIT_AFTER: '2',

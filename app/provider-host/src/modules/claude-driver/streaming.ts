@@ -66,6 +66,11 @@ function cutAt(session: ReplySession) {
   }
 }
 
+/** Where the session served to `claude` ends, when it isn't served whole. */
+function servedThrough(session: ReplyRequest['session']) {
+  return session?.type === 'fork' ? session.servedThrough : undefined
+}
+
 function resumption(session: ReplyRequest['session'], restore: Restore) {
   if (!session || restore === 'none') {
     return {resume: null, fork: false, upTo: null}
@@ -95,8 +100,6 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     resolveModel: deps.resolveModel,
   })
 
-  const sessionStore = appSessionStore(deps.store)
-
   /** Waits for a closing `claude` in the session, which may still write to it. */
   async function open(request: ReplyRequest, restore: Restore): Promise<Live> {
     const {program, configDir} = request.vendorProgram
@@ -114,6 +117,11 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     if (resume) {
       files = await deps.store.loadFiles({projectKey, sessionId: resume})
     }
+
+    const sessionStore = appSessionStore(
+      deps.store,
+      servedThrough(request.session)
+    )
 
     // The fallback resumes from the transcript written back, not the store.
     const store =
@@ -279,11 +287,15 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     warm.drop(session)
 
-    const writtenBack = await writeTranscriptBack(deps.store, {
-      configDir: request.vendorProgram.configDir,
-      projectKey: session.projectKey,
-      sessionId: request.session.sessionId,
-    })
+    const writtenBack = await writeTranscriptBack(
+      deps.store,
+      {
+        configDir: request.vendorProgram.configDir,
+        projectKey: session.projectKey,
+        sessionId: request.session.sessionId,
+      },
+      servedThrough(request.session)
+    )
 
     if (!writtenBack) return {session, outcome}
 

@@ -5,7 +5,9 @@ import type {HostCommand} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {openDatabase, schema} from '#modules/database/main'
+import {createSessions} from '#modules/sessions/main'
 import {createTrees} from '#modules/trees/main'
+import {eq} from 'drizzle-orm'
 import path from 'node:path'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 
@@ -628,6 +630,156 @@ describe('a Compaction', () => {
 
     expect(compactionsRecorded()).toEqual([
       {provider: 'claude', sessionId: 's1', boundaryId: 'b1', replyId: null},
+    ])
+  })
+})
+
+/** Main's copy of the session's own transcript, one entry for each `uuid`. */
+function storeEntries(uuids: (string | null)[], sessionId = 's1') {
+  createSessions(db, () => undefined).handle('claude', {
+    op: 'append',
+    key: {projectKey: 'project', sessionId},
+    entries: uuids.map(uuid =>
+      uuid === null ? {type: 'mode'} : {type: 'entry', uuid}
+    ),
+  })
+}
+
+/** Three Turns in `s1`, which compacted inside the third. */
+function compactedThread() {
+  const first = savedRoot()
+  const second = savedAt(first, 'm2')
+  const third = savedAt(second, 'm3', 's1', 'b1')
+  storeEntries(['p-m1', 'm1', 'p-m2', 'm2', 'p-m3', 'b1', 'm3'])
+  hostCommands = []
+
+  return {first, second, third}
+}
+
+const forkedBeforeCompaction = {
+  type: 'fork',
+  sessionId: 's1',
+  messageId: 'm1',
+  servedThrough: 'm1',
+}
+
+function pendingCut(replyId: string) {
+  return db
+    .select({dropFrom: schema.replies.sessionDropFrom})
+    .from(schema.replies)
+    .where(eq(schema.replies.id, replyId))
+    .get()?.dropFrom
+}
+
+describe('a Reply before a Compaction in its Claude session', () => {
+  it('starts a Branch in a fork of the session served only through it', () => {
+    const {first} = compactedThread()
+
+    sendInstead(first)
+
+    expect(sessionsStarted()).toEqual([forkedBeforeCompaction])
+  })
+
+  it('takes the next Prompt after Deleting Turns in such a fork, with no cut, which spends the cut', () => {
+    const {first, second} = compactedThread()
+    turns.deletePrompt(treeId, promptOf(second))
+    hostCommands = []
+
+    const sent = sendInstead(first)
+
+    expect(sessionsStarted()).toEqual([forkedBeforeCompaction])
+    expect(pendingCut(first)).toBe('p-m2')
+
+    storePrompt(sent.reply.id, 's2')
+
+    expect(pendingCut(first)).toBeNull()
+  })
+
+  it('goes on forking from it once the Turn the fork added is deleted too', () => {
+    const {first, second} = compactedThread()
+    turns.deletePrompt(treeId, promptOf(second))
+    const added = savedAt(first, 'm4', 's2')
+    turns.deletePrompt(treeId, promptOf(added))
+    hostCommands = []
+
+    sendInstead(first)
+
+    expect(sessionsStarted()).toEqual([forkedBeforeCompaction])
+  })
+
+  it('retries a Prompt that failed after it in such a fork, without rewinding, as does a Prompt sent in the failed one’s place', () => {
+    const first = savedRoot()
+    const failed = sendPrompt(first, 'Far too long')
+    const promptId = storePrompt(failed)
+    compact(failed, 'b1')
+    storeEntries(['m1', promptId, 'b1'])
+    fail(failed)
+
+    turns.retry(treeId, failed)
+
+    expect(sessionsStarted()).toEqual([forkedBeforeCompaction])
+
+    fail(failed)
+    hostCommands = []
+    sendInstead(first)
+
+    expect(sessionsStarted()).toEqual([forkedBeforeCompaction])
+  })
+
+  it('forks after a stopped Reply’s own Prompt when its Provider never saved it', () => {
+    const first = savedRoot()
+    const cutShort = sendPrompt(first, 'And then?')
+    recordPrompt(cutShort, 'p-cut-short')
+    stopUnrecorded(cutShort)
+    const below = savedAt(cutShort, 'm3', 's1', 'b1')
+    storeEntries(['m1', 'p-cut-short', 'p-m3', 'b1', 'm3'])
+    turns.deletePrompt(treeId, promptOf(below))
+    hostCommands = []
+
+    sendInstead(cutShort)
+
+    expect(sessionsStarted()).toEqual([
+      {
+        type: 'fork',
+        sessionId: 's1',
+        messageId: 'p-cut-short',
+        servedThrough: 'p-cut-short',
+      },
+    ])
+  })
+})
+
+describe('a Reply after a Compaction in its Claude session', () => {
+  it('still rewinds for a Retry, cuts after Deleting Turns and forks the whole session for a Branch', () => {
+    const first = savedRoot()
+    const second = savedAt(first, 'm2', 's1', 'b1')
+    const third = savedAt(second, 'm3')
+    const failed = sendPrompt(third, 'And then?')
+    const failedPrompt = storePrompt(failed)
+    storeEntries(['m1', 'p-m2', 'b1', 'm2', 'p-m3', 'm3', failedPrompt])
+    fail(failed)
+
+    turns.retry(treeId, failed)
+
+    expect(sessionsStarted()).toEqual([
+      {type: 'rewind', sessionId: 's1', messageId: 'm3'},
+    ])
+
+    fail(failed)
+    turns.deletePrompt(treeId, promptOf(third))
+    hostCommands = []
+    sendInstead(second)
+    sendInstead(second)
+
+    expect(sessionsStarted()).toEqual([
+      {
+        type: 'cut',
+        sessionId: 's1',
+        messageId: 'm2',
+        keepThrough: 'm2',
+        dropFrom: 'p-m3',
+      },
+      {type: 'fork', sessionId: 's1', messageId: 'm2'},
     ])
   })
 })
@@ -1265,9 +1417,18 @@ describe('retrying a Reply', () => {
   })
 })
 
-function savedAt(parentReplyId: string, messageId: string, sessionId = 's1') {
+/** `boundaryId` has the session compact inside the Reply. */
+function savedAt(
+  parentReplyId: string,
+  messageId: string,
+  sessionId = 's1',
+  boundaryId?: string
+) {
   const replyId = sendPrompt(parentReplyId, `Prompt ${messageId}`)
   recordPrompt(replyId, `p-${messageId}`, sessionId)
+
+  if (boundaryId !== undefined) compact(replyId, boundaryId)
+
   turns.hostRecorded('claude', {
     type: 'REPLY_RECORDED',
     treeId,

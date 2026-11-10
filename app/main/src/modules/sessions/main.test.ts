@@ -56,6 +56,28 @@ it('keeps an entry appended twice once, and entries with no uuid every time', ()
   ])
 })
 
+it('gives back a session through one entry, without the entries that have no uuid', () => {
+  append([{type: 'user', uuid: 'a'}, {type: 'last-prompt'}])
+  append([{type: 'assistant', uuid: 'b'}, {type: 'mode'}])
+  append([
+    {type: 'system', uuid: 'c'},
+    {type: 'user', uuid: 'd'},
+  ])
+
+  expect(sessions.handle('claude', {op: 'load', key, through: 'b'})).toEqual([
+    {type: 'user', uuid: 'a'},
+    {type: 'assistant', uuid: 'b'},
+  ])
+})
+
+it('refuses to give back a session through an entry it doesn’t hold', () => {
+  append([{type: 'user', uuid: 'a'}])
+
+  expect(() =>
+    sessions.handle('claude', {op: 'load', key, through: 'missing'})
+  ).toThrow('no entry to end at')
+})
+
 it('loads nothing for a session it never kept', () => {
   append([{type: 'user', uuid: 'a'}])
 

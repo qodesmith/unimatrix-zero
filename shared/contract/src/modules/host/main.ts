@@ -60,7 +60,14 @@ export type DeletionCut = z.infer<typeof DeletionCutSchema>
 export const ReplySessionSchema = z.discriminatedUnion('type', [
   SessionRefSchema.extend({type: z.literal('continue')}),
   /** The Reply already has a Prompt after it; forking spares that Branch. */
-  SessionRefSchema.extend({type: z.literal('fork')}),
+  SessionRefSchema.extend({
+    type: z.literal('fork'),
+    /**
+     * The entry the Provider is served the session through, when the session
+     * compacted after `messageId`: served whole, it no longer reaches it.
+     */
+    servedThrough: z.string().min(1).optional(),
+  }),
   /** The session may run past `messageId` with a failed turn, dropped first. */
   SessionRefSchema.extend({type: z.literal('rewind')}),
   SessionCutSchema,

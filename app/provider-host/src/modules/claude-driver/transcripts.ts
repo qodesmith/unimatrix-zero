@@ -40,11 +40,18 @@ function keyOf({projectKey, sessionId, subpath}: SessionKey) {
     : {projectKey, sessionId, subpath}
 }
 
-/** The SDK's session store over the app's copy, which outlives `claude`'s own. */
-export function appSessionStore(store: SessionStoreClient): SessionStore {
+/**
+ * The SDK's session store over the app's copy, which outlives `claude`'s own.
+ * `through` ends the session's own transcript at that entry.
+ */
+export function appSessionStore(
+  store: SessionStoreClient,
+  through?: string
+): SessionStore {
   return {
     append: async (key, entries) => store.append(keyOf(key), entries),
-    load: async key => store.load(keyOf(key)),
+    load: async key =>
+      store.load(keyOf(key), key.subpath === undefined ? through : undefined),
     listSubkeys: async ({projectKey, sessionId}) =>
       store.listSubkeys({projectKey, sessionId}),
   }
@@ -92,16 +99,18 @@ function writeSubagent(stem: string, entries: SessionEntry[]) {
 
 /**
  * The fallback restore (ADR 0004): a plain write, so the files are new and no
- * cleanup sweep takes them.
+ * cleanup sweep takes them. `through` ends the session's own transcript at
+ * that entry.
  */
 export async function writeTranscriptBack(
   store: SessionStoreClient,
-  place: SessionPlace
+  place: SessionPlace,
+  through?: string
 ) {
   const {projectKey, sessionId} = place
 
   const [own, subpaths] = await Promise.all([
-    store.load({projectKey, sessionId}),
+    store.load({projectKey, sessionId}, through),
     store.listSubkeys({projectKey, sessionId}),
   ])
 

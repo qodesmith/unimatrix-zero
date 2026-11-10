@@ -178,7 +178,9 @@ function clearCut(db: Database, replyId: string) {
 
 /**
  * The session holds the Prompt right after the Reply it answers, so any cut
- * there is made. A Prompt that went into a fork leaves the session as it was.
+ * there is made. A Prompt that went into a fork leaves the session as it was,
+ * unless the fork was served only through that Reply: it holds nothing after
+ * it, and so does every later one.
  */
 export function clearCutOnPrompt(
   db: Database,
@@ -195,7 +197,12 @@ export function clearCutOnPrompt(
     prompt.promptId
   )
 
-  if (continued?.session?.sessionId === session.sessionId) {
+  const planned = continued?.session
+
+  if (
+    planned?.sessionId === session.sessionId ||
+    (planned?.type === 'fork' && planned.servedThrough !== undefined)
+  ) {
     clearCut(db, prompt.parentReplyId)
   }
 }

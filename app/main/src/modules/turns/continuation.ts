@@ -11,6 +11,8 @@ import type {Reply} from '@uz/contract/turns'
 import {schema} from '#modules/database/main'
 import {and, eq, ne} from 'drizzle-orm'
 
+import {reaching} from './reach'
+
 const {prompts, replies, systemPrompts} = schema
 
 /** A Reply ended early with its text kept; its Provider may not have saved it. */
@@ -83,7 +85,7 @@ function resumed(
   const before =
     parentReplyId === null
       ? null
-      : continuation(db, treeId, parentReplyId, row.promptId)
+      : planned(db, treeId, parentReplyId, row.promptId)
 
   const session = before?.session ?? null
 
@@ -112,12 +114,7 @@ function cutBack(
   return {type: 'cut', ...sessionRef(session), keepThrough, dropFrom}
 }
 
-/**
- * Forks when the Reply already has a Prompt after it other than `except`, the
- * one being run again. A Reply its Provider never saved continues from the
- * Reply its Prompt answers, and a session still holding deleted Turns is cut.
- */
-export function continuation(
+function planned(
   db: Database,
   treeId: string,
   replyId: string,
@@ -145,6 +142,28 @@ export function continuation(
         ? cutBack(row, session, dropFrom)
         : session,
   }
+}
+
+/**
+ * Forks when the Reply already has a Prompt after it other than `except`, the
+ * one being run again. A Reply its Provider never saved continues from the
+ * Reply its Prompt answers, and a session still holding deleted Turns is cut.
+ * A session that compacted after the Reply is forked from the part before.
+ */
+export function continuation(
+  db: Database,
+  treeId: string,
+  replyId: string,
+  except?: string
+): Continuation | null {
+  const plan = planned(db, treeId, replyId, except)
+
+  return (
+    plan && {
+      provider: plan.provider,
+      session: plan.session && reaching(db, plan.session),
+    }
+  )
 }
 
 /**
