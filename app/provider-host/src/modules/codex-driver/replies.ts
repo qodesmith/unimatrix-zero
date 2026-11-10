@@ -175,7 +175,7 @@ export function createReplyMapper(ids: ReplyIds) {
         status: 'failed',
         failure: failureOf(
           turn.error?.message ?? 'ChatGPT couldn’t finish this Reply.',
-          resetsAt
+          {resetsAt, codexErrorInfo: turn.error?.codexErrorInfo}
         ),
       }
     },

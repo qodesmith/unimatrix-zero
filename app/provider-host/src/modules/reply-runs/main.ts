@@ -8,7 +8,7 @@ import type {
 } from '@uz/contract/host'
 import type {ReplyEvent, RunFailure} from '@uz/contract/turns'
 
-import {failureOf} from '#modules/failures/main'
+import {RequestRefused, failureOf} from '#modules/failures/main'
 
 type RunFinished = Extract<ReplyEvent, {type: 'RUN_FINISHED'}>
 
@@ -100,7 +100,10 @@ export function createReplyRuns(
       const failure: RunFailure =
         error instanceof ProgramCrashed
           ? {code: 'program-crashed', message}
-          : failureOf(message, limitLifts())
+          : failureOf(message, {
+              resetsAt: limitLifts(),
+              refusal: error instanceof RequestRefused ? error.data : undefined,
+            })
 
       return {
         finished: {

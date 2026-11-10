@@ -209,10 +209,10 @@ export function createReplyMapper(ids: ReplyIds) {
         ...windowField,
         type: 'RUN_FINISHED',
         status: 'failed',
-        failure: failureOf(
-          message || 'Claude couldn’t finish this Reply.',
-          limitLifts
-        ),
+        failure: failureOf(message || 'Claude couldn’t finish this Reply.', {
+          resetsAt: limitLifts,
+          terminalReason: result.terminal_reason,
+        }),
       }
     },
 

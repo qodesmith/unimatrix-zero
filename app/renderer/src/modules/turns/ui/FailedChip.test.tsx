@@ -204,6 +204,33 @@ it('says only that the limit was reached when the Provider gave no reset time', 
   await expect.element(screen.getByText('Limit reached')).toBeVisible()
 })
 
+it('says how far a Prompt ran over the Provider’s cap, and offers no Retry', async () => {
+  const screen = await renderSaved(
+    failed({
+      code: 'too-long',
+      message: 'Input exceeds the maximum length of 1048576 characters.',
+      promptChars: 1_240_000,
+      maxPromptChars: 1_048_576,
+    })
+  )
+
+  await expect
+    .element(screen.getByText(/^Prompt too long · /))
+    .toMatchTextContent(/· 1\D240\D000 characters, limit 1\D048\D576$/u)
+  expect(screen.getByRole('button', {name: 'Retry'}).query()).toBeNull()
+})
+
+it('says a Reply was too long for the Context window, and offers no Retry', async () => {
+  const screen = await renderSaved(
+    failed({code: 'too-long', message: 'Prompt is too long'})
+  )
+
+  await expect
+    .element(screen.getByText('Too long for the Context window'))
+    .toBeVisible()
+  expect(screen.getByRole('button', {name: 'Retry'}).query()).toBeNull()
+})
+
 const lost: RunFailure = {code: 'connection-lost', message: 'ECONNRESET'}
 
 it('retries a failed Reply in place, and gives way once main runs it again', async () => {

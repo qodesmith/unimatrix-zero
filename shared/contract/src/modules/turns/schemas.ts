@@ -62,12 +62,19 @@ export const RunFailureSchema = z.strictObject({
     'host-unreachable',
     'driver-error',
     'provider-error',
+    'too-long',
     'needs-app-update',
     'fake-failure',
   ]),
   message: z.string(),
   /** When the limit lifts, for `limit-reached`, when the Provider said. */
   resetsAt: z.iso.datetime().optional(),
+  /**
+   * For `too-long`, when the Provider caps one Prompt's text: the characters
+   * it counted and its cap. Neither is set when the Context window was full.
+   */
+  promptChars: z.number().int().nonnegative().optional(),
+  maxPromptChars: z.number().int().nonnegative().optional(),
 })
 
 export type RunFailure = z.infer<typeof RunFailureSchema>

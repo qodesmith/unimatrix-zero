@@ -643,6 +643,63 @@ it('fails the Reply with Claude’s reason, without recording it', async () => {
   await claude.allClosed()
 })
 
+function endedAs(
+  terminalReason: string,
+  rateLimit?: {status: string; resetsAt: number}
+) {
+  return edited('warm.ndjson', lines =>
+    lines.map(line => {
+      if (line.kind !== 'out') return line
+
+      if (rateLimit && line.message.type === 'rate_limit_event') {
+        return {...line, message: {...line.message, rate_limit_info: rateLimit}}
+      }
+
+      return line.message.type === 'result'
+        ? {
+            ...line,
+            message: {
+              ...line.message,
+              is_error: true,
+              result: 'Prompt is too long',
+              terminal_reason: terminalReason,
+            },
+          }
+        : line
+    })
+  )
+}
+
+it.each(['prompt_too_long', 'blocking_limit'])(
+  'fails the Reply as too long when Claude’s result ends as %s',
+  async terminalReason => {
+    const claude = await setUp([endedAs(terminalReason)])
+
+    const events = await claude.reply(FIRST_PROMPT)
+
+    expect(events.map(event => event.type)).not.toContain('REPLY_RECORDED')
+    expect(events.at(-1)).toMatchObject({
+      status: 'failed',
+      failure: {code: 'too-long', message: 'Prompt is too long'},
+    })
+    await claude.allClosed()
+  }
+)
+
+it('keeps a limit Claude blocked the turn for a reached limit', async () => {
+  const claude = await setUp([
+    endedAs('blocking_limit', {status: 'rejected', resetsAt: 1793970000}),
+  ])
+
+  const events = await claude.reply(FIRST_PROMPT)
+
+  expect(events.at(-1)).toMatchObject({
+    status: 'failed',
+    failure: {code: 'limit-reached', resetsAt: '2026-11-06T13:00:00.000Z'},
+  })
+  await claude.allClosed()
+})
+
 it('names a limit Claude ran into, with when it lifts', async () => {
   const limited = edited('warm.ndjson', lines =>
     lines.map(line =>
