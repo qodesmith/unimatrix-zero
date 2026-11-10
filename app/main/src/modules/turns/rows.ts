@@ -14,7 +14,7 @@ import {removeTurns} from './deletion'
 
 const {compactions, prompts, replies, systemPrompts} = schema
 
-const {compacted: _, ...NEW_ROW} = NEW_REPLY
+const {compacted: _, ...NEW_REPLY_ROW} = NEW_REPLY
 
 const ContentSchema = z.array(ReplyPartSchema)
 
@@ -164,7 +164,7 @@ export function insertExchange(
         promptId: prompt.id,
         provider: next.provider,
         model: next.model,
-        ...NEW_ROW,
+        ...NEW_REPLY_ROW,
         systemPromptId,
         createdAt: next.now,
       })
@@ -189,7 +189,7 @@ export function resetReply(db: Database, replyId: string): void {
 
     const row = tx
       .update(replies)
-      .set({...NEW_ROW, sessionMessageId: null})
+      .set({...NEW_REPLY_ROW, sessionMessageId: null})
       .where(eq(replies.id, replyId))
       .returning()
       .get()
