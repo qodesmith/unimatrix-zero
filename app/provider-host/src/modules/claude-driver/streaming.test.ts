@@ -393,11 +393,17 @@ it('writes the transcript back when resuming from the store fails', async () => 
   )
 
   const session = await warmThread(claude)
+  const messageId = crypto.randomUUID()
 
-  const third = await claude.reply(THIRD_PROMPT, session)
+  const third = await claude.reply(THIRD_PROMPT, session, {messageId})
 
   expect(textOf(third)).toBe('TEAL OTTER')
   expect(third.at(-1)).toMatchObject({status: 'complete'})
+  expect(
+    claude.store
+      .entriesOf(claude.projectKey, SESSION_ID)
+      .map(entry => entry.uuid)
+  ).toContain(messageId)
 
   await claude.allClosed()
   const [, refused, fallback] = claude.reports()
