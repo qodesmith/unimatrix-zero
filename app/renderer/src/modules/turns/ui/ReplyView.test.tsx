@@ -34,6 +34,7 @@ const reply: Reply = {
   contextSize: null,
   contextWindow: null,
   failure: null,
+  compacted: false,
   createdAt: '2026-10-19T12:00:00.000Z',
 }
 
@@ -357,4 +358,30 @@ it('offers no Retry on a Reply the app quit on: it goes on like a stopped one', 
     .element(screen.getByText('Interrupted when the app quit'))
     .toBeVisible()
   expect(screen.getByRole('button', {name: 'Retry'}).query()).toBeNull()
+})
+
+const COMPACTED =
+  'Compacted here. The AI remembers the Turns above from a summary.'
+
+it('marks a streaming Reply once its Compaction arrives, and keeps the mark when it finishes', async () => {
+  const screen = await replay(before('TOOL_CALL_START'))
+  const marker = screen.getByText(COMPACTED)
+
+  await expect.element(screen.getByText('Writing…')).toBeVisible()
+  expect(marker.query()).toBeNull()
+
+  main.publish({
+    treeId,
+    replyId,
+    type: 'CONTEXT_COMPACTED',
+    sessionId: 'session-1',
+    boundaryId: null,
+  })
+
+  await expect.element(marker).toBeVisible()
+
+  stream(before('TOOL_CALL_START'), events.length)
+
+  await expect.element(screen.getByText('Writing…')).not.toBeInTheDocument()
+  await expect.element(marker).toBeVisible()
 })

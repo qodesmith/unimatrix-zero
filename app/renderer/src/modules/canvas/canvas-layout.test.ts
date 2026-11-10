@@ -29,6 +29,7 @@ function reply(id: string, promptId: string): Reply {
     contextSize: null,
     contextWindow: null,
     failure: null,
+    compacted: false,
     createdAt: at(++clock),
   }
 }

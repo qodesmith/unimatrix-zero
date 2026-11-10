@@ -121,6 +121,7 @@ it('opens Settings in a Sheet over the Tree, and closing it with the X shows the
         contextSize: null,
         contextWindow: null,
         failure: null,
+        compacted: false,
         createdAt: receivedAt,
       },
     ],
@@ -279,6 +280,7 @@ it('shows a streaming Reply where it was after a reload, and keeps going', async
     contextSize: null,
     contextWindow: null,
     failure: null,
+    compacted: false,
     createdAt: receivedAt,
   }
 
@@ -296,6 +298,7 @@ it('shows a streaming Reply where it was after a reload, and keeps going', async
         contextSize: null,
         contextWindow: null,
         failure: null,
+        compacted: false,
       },
     ],
   })

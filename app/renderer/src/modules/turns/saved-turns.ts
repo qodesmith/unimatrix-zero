@@ -10,9 +10,24 @@ export function turnsKey(treeId: string) {
 
 export function withProgress(
   reply: Reply,
-  {status, content, contextSize, contextWindow, failure}: ReplyProgress
+  {
+    status,
+    content,
+    contextSize,
+    contextWindow,
+    failure,
+    compacted,
+  }: ReplyProgress
 ): Reply {
-  return {...reply, status, content, contextSize, contextWindow, failure}
+  return {
+    ...reply,
+    status,
+    content,
+    contextSize,
+    contextWindow,
+    failure,
+    compacted,
+  }
 }
 
 /** Leaves the Turns alone when they aren't loaded or hold no such Reply. */
