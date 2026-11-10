@@ -2,6 +2,7 @@ import type {Database} from '#modules/database/main'
 import type {Removal} from './deletion'
 import type {ModelChoice, ProviderId} from '@uz/contract/providers'
 import type {Prompt, Reply} from '@uz/contract/turns'
+import type {SQL} from 'drizzle-orm'
 
 import {schema} from '#modules/database/main'
 import {NEW_REPLY, ReplyPartSchema, RunFailureSchema} from '@uz/contract/turns'
@@ -11,7 +12,9 @@ import {z} from 'zod'
 
 import {removeTurns} from './deletion'
 
-const {prompts, replies, systemPrompts} = schema
+const {compactions, prompts, replies, systemPrompts} = schema
+
+const {compacted: _, ...NEW_ROW} = NEW_REPLY
 
 const ContentSchema = z.array(ReplyPartSchema)
 
@@ -31,7 +34,7 @@ function toPrompt(row: PromptRow): Prompt {
   }
 }
 
-function toReply(row: ReplyRow): Reply {
+function toReply(row: ReplyRow, compacted: boolean): Reply {
   return {
     id: row.id,
     treeId: row.treeId,
@@ -43,8 +46,30 @@ function toReply(row: ReplyRow): Reply {
     contextSize: row.contextSize,
     contextWindow: row.contextWindow,
     failure: FailureSchema.parse(row.failure ?? null),
+    compacted,
     createdAt: row.createdAt.toISOString(),
   }
+}
+
+/** A Reply is compacted exactly when a Compaction links to it. */
+function repliesWhere(db: Database, matches: SQL): Reply[] {
+  const compacted = new Set(
+    db
+      .selectDistinct({replyId: compactions.replyId})
+      .from(compactions)
+      .innerJoin(replies, eq(replies.id, compactions.replyId))
+      .where(matches)
+      .all()
+      .map(row => row.replyId)
+  )
+
+  return db
+    .select()
+    .from(replies)
+    .where(matches)
+    .orderBy(asc(replies.createdAt), asc(replies.id))
+    .all()
+    .map(row => toReply(row, compacted.has(row.id)))
 }
 
 export function listTurns(db: Database, treeId: string) {
@@ -56,13 +81,7 @@ export function listTurns(db: Database, treeId: string) {
       .orderBy(asc(prompts.createdAt), asc(prompts.id))
       .all()
       .map(toPrompt),
-    replies: db
-      .select()
-      .from(replies)
-      .where(eq(replies.treeId, treeId))
-      .orderBy(asc(replies.createdAt), asc(replies.id))
-      .all()
-      .map(toReply),
+    replies: repliesWhere(db, eq(replies.treeId, treeId)),
   }
 }
 
@@ -78,11 +97,11 @@ export function lastModel(db: Database): ModelChoice | null {
 }
 
 export function savedReply(db: Database, replyId: string): Reply {
-  const row = db.select().from(replies).where(eq(replies.id, replyId)).get()
+  const [reply] = repliesWhere(db, eq(replies.id, replyId))
 
-  if (!row) throw new Error('That Reply was not saved.')
+  if (!reply) throw new Error('That Reply was not saved.')
 
-  return toReply(row)
+  return reply
 }
 
 function saveSystemPrompt(db: Database, text: string) {
@@ -145,28 +164,36 @@ export function insertExchange(
         promptId: prompt.id,
         provider: next.provider,
         model: next.model,
-        ...NEW_REPLY,
+        ...NEW_ROW,
         systemPromptId,
         createdAt: next.now,
       })
       .returning()
       .get()
 
-    return {prompt: toPrompt(prompt), reply: toReply(reply)}
+    return {prompt: toPrompt(prompt), reply: toReply(reply, false)}
   })
 }
 
 /**
  * Back to streaming from nothing. Its Prompt stays recorded until the Provider
- * drops it, since a Retry that fails first still has to cut there.
+ * drops it, since a Retry that fails first still has to cut there. Its
+ * Compactions stay recorded too, but against the session alone.
  */
 export function resetReply(db: Database, replyId: string): void {
-  const row = db
-    .update(replies)
-    .set({...NEW_REPLY, sessionMessageId: null})
-    .where(eq(replies.id, replyId))
-    .returning()
-    .get()
+  db.transaction(tx => {
+    tx.update(compactions)
+      .set({replyId: null})
+      .where(eq(compactions.replyId, replyId))
+      .run()
 
-  if (!row) throw new Error('That Reply was not saved.')
+    const row = tx
+      .update(replies)
+      .set({...NEW_ROW, sessionMessageId: null})
+      .where(eq(replies.id, replyId))
+      .returning()
+      .get()
+
+    if (!row) throw new Error('That Reply was not saved.')
+  })
 }

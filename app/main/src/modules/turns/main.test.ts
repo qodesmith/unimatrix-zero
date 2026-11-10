@@ -4,7 +4,7 @@ import type {AppEvent} from '@uz/contract/events'
 import type {HostCommand} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
-import {openDatabase} from '#modules/database/main'
+import {openDatabase, schema} from '#modules/database/main'
 import {createTrees} from '#modules/trees/main'
 import path from 'node:path'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
@@ -430,6 +430,7 @@ describe('a streaming Reply', () => {
   it('keeps what it shows for a window that connects mid-stream', () => {
     fromHost(replyId, {type: 'TEXT_DELTA', delta: 'Half a '})
     fromHost(replyId, {type: 'TEXT_DELTA', delta: 'sentence'})
+    compact(replyId, 'b1')
 
     expect(turns.streaming()).toEqual([
       {
@@ -440,6 +441,7 @@ describe('a streaming Reply', () => {
         contextSize: null,
         contextWindow: null,
         failure: null,
+        compacted: true,
       },
     ])
   })
@@ -515,6 +517,117 @@ describe('a streaming Reply', () => {
         model: 'claude-haiku-5-5',
         failure,
       },
+    ])
+  })
+})
+
+function compact(replyId: string, boundaryId: string) {
+  fromHost(replyId, {
+    type: 'CONTEXT_COMPACTED',
+    sessionId: 's1',
+    boundaryId,
+  })
+}
+
+function compactionsRecorded() {
+  const {provider, sessionId, boundaryId, replyId} = schema.compactions
+
+  return db
+    .select({provider, sessionId, boundaryId, replyId})
+    .from(schema.compactions)
+    .all()
+}
+
+describe('a Compaction', () => {
+  it('is recorded against the Provider session with Claude’s boundary before it is published, and marks only the Reply it happened in', () => {
+    const first = savedRoot()
+    const replyId = sendPrompt(first)
+    const recordedWhenPublished: number[] = []
+    whenPublished = () => {
+      recordedWhenPublished.push(compactionsRecorded().length)
+    }
+
+    compact(replyId, 'b1')
+
+    expect(compactionsRecorded()).toEqual([
+      {provider: 'claude', sessionId: 's1', boundaryId: 'b1', replyId},
+    ])
+    expect(recordedWhenPublished).toEqual([1])
+    expect(published).toMatchObject([{type: 'CONTEXT_COMPACTED', replyId}])
+    expect(saved(replyId).compacted).toBe(true)
+    expect(saved(first).compacted).toBe(false)
+  })
+
+  it('is recorded each time the session compacts during one Reply', () => {
+    const replyId = sendPrompt(null)
+
+    compact(replyId, 'b1')
+    compact(replyId, 'b2')
+
+    expect(compactionsRecorded()).toEqual([
+      {provider: 'claude', sessionId: 's1', boundaryId: 'b1', replyId},
+      {provider: 'claude', sessionId: 's1', boundaryId: 'b2', replyId},
+    ])
+  })
+
+  it('is not recorded from a host that is not writing the Reply, or for another Tree', () => {
+    const replyId = sendPrompt(null)
+
+    const event = {
+      type: 'CONTEXT_COMPACTED',
+      replyId,
+      sessionId: 's1',
+      boundaryId: 'b1',
+    } as const
+
+    turns.hostEvent('chatgpt', {...event, treeId})
+
+    expect(compactionsRecorded()).toEqual([])
+
+    turns.hostEvent('claude', {...event, treeId: crypto.randomUUID()})
+
+    expect(compactionsRecorded()).toEqual([])
+    expect(saved(replyId).compacted).toBe(false)
+  })
+
+  it('of a Subagent is not recorded, and leaves the Reply unmarked', () => {
+    const replyId = sendPrompt(null)
+
+    fromHost(replyId, {
+      type: 'CONTEXT_COMPACTED',
+      subagentId: 'sub-1',
+      sessionId: 's1',
+      boundaryId: 'b1',
+    })
+
+    expect(compactionsRecorded()).toEqual([])
+    expect(saved(replyId).compacted).toBe(false)
+    expect(turns.streaming()).toMatchObject([{replyId, compacted: false}])
+  })
+
+  it('stops marking a Reply that is retried, and stays recorded against the session', () => {
+    const replyId = sendPrompt(null)
+    compact(replyId, 'b1')
+    fail(replyId)
+
+    const retried = turns.retry(treeId, replyId)
+
+    expect(retried?.compacted).toBe(false)
+    expect(saved(replyId).compacted).toBe(false)
+    expect(compactionsRecorded()).toEqual([
+      {provider: 'claude', sessionId: 's1', boundaryId: 'b1', replyId: null},
+    ])
+  })
+
+  it('stays recorded against the session when its Reply is deleted', () => {
+    const replyId = sendPrompt(savedRoot())
+    compact(replyId, 'b1')
+    finish(replyId)
+
+    turns.deletePrompt(treeId, saved(replyId).promptId)
+
+    expect(compactionsRecorded()).toEqual([
+      {provider: 'claude', sessionId: 's1', boundaryId: 'b1', replyId: null},
     ])
   })
 })
