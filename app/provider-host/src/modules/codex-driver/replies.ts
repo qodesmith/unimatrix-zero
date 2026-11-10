@@ -5,7 +5,7 @@ import type {ReplyEvent} from '@uz/contract/turns'
 
 import {failureOf} from '#modules/failures/main'
 
-import {AgentMessageItemSchema} from './wire'
+import {AgentMessageItemSchema, CONTEXT_COMPACTION} from './wire'
 
 type ReplyIds = Pick<ReplyRequest, 'treeId' | 'replyId'>
 
@@ -115,6 +115,17 @@ export function createReplyMapper(ids: ReplyIds) {
       }
 
       if (method === 'item/completed') {
+        if (params.item.type === CONTEXT_COMPACTION) {
+          return [
+            {
+              ...ids,
+              type: 'CONTEXT_COMPACTED',
+              sessionId: params.threadId,
+              boundaryId: null,
+            },
+          ]
+        }
+
         const message = AgentMessageItemSchema.safeParse(params.item)
 
         return message.success

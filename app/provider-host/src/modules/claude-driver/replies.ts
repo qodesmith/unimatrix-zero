@@ -156,6 +156,18 @@ export function createReplyMapper(ids: ReplyIds) {
         limitLifts = status === 'rejected' ? resetsAt : undefined
       }
 
+      // The only sign a compaction went through: one blocked or failed sends none.
+      if (message.type === 'system' && message.subtype === 'compact_boundary') {
+        return [
+          {
+            ...ids,
+            type: 'CONTEXT_COMPACTED',
+            sessionId: message.session_id,
+            boundaryId: message.uuid,
+          },
+        ]
+      }
+
       if (!('parent_tool_use_id' in message)) return []
 
       if (message.parent_tool_use_id !== null) return []

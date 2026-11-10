@@ -8,6 +8,7 @@ import type {Model as CodexModel} from './protocol/v2/Model'
 import type {ModelListResponse} from './protocol/v2/ModelListResponse'
 import type {RateLimitWindow} from './protocol/v2/RateLimitWindow'
 import type {Thread} from './protocol/v2/Thread'
+import type {ThreadItem} from './protocol/v2/ThreadItem'
 import type {ThreadTokenUsage} from './protocol/v2/ThreadTokenUsage'
 import type {ThreadTurnsListResponse} from './protocol/v2/ThreadTurnsListResponse'
 import type {TokenUsageBreakdown} from './protocol/v2/TokenUsageBreakdown'
@@ -125,6 +126,13 @@ export const AgentMessageItemSchema = z.looseObject({
   id: z.string(),
   text: z.string(),
 })
+
+/**
+ * Codex sends this item's `item/completed` only once the compaction is in
+ * place.
+ */
+export const CONTEXT_COMPACTION =
+  'contextCompaction' satisfies ThreadItem['type']
 
 const RateLimitWindowSchema = z.looseObject({
   usedPercent: z.number(),

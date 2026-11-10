@@ -741,4 +741,100 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       fs.rmSync(home, {recursive: true, force: true})
     }
   }, 600_000)
+
+  it('reports a compaction Codex makes on its own inside a turn, with the thread it compacted', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const treeId = crypto.randomUUID()
+    const recording = process.env.UZ_RECORD === 'yes'
+
+    const recorder = createRecorder([path.join(RECORDINGS, 'compacted.ndjson')])
+
+    const idle = heldIdle()
+    const exits: Promise<unknown>[] = []
+    const start = recording ? recorder.spawn : spawnCodex
+
+    const driver = createCodexDriver({
+      store: fakeStore().client,
+      spawn: (command, options) => {
+        const child = start(command, options)
+        exits.push(once(child, 'exit').catch(() => undefined))
+
+        return child
+      },
+      // Codex checks the limit as a turn starts, so the padded turn compacts in the next.
+      commandFor: program => ({
+        command: program,
+        args: ['-c', 'model_auto_compact_token_limit=16000'],
+      }),
+      whenIdle: idle.whenIdle,
+    })
+
+    async function reply(text: string, session: SessionRef | null) {
+      const events = await Array.fromAsync(
+        driver.startReply({
+          treeId,
+          replyId: crypto.randomUUID(),
+          model: MODEL,
+          systemPrompt: 'You answer in as few words as you can.',
+          prompt: {text, messageId: crypto.randomUUID()},
+          vendorProgram: {
+            program: {
+              path: folder ?? '',
+              build: {
+                url: 'https://example.com/codex.tar.gz',
+                sha256: '0'.repeat(64),
+                size: 1,
+                archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+              },
+            },
+            configDir: home,
+          },
+          session: session && {...session, type: 'continue'},
+        })
+      )
+
+      expectComplete(events)
+
+      const recorded = events.find(
+        (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+      )
+
+      if (!recorded) throw new Error('The Reply was not recorded')
+
+      return {events, session: recorded.session}
+    }
+
+    const padding = 'The harbor log lists no ships today. '.repeat(400)
+
+    try {
+      const padded = await reply(
+        `Reply with the single word TEAL. Ignore the rest of this message. ${padding}`,
+        null
+      )
+
+      const next = await reply(
+        'Reply with the single word OTTER.',
+        padded.session
+      )
+
+      expect(
+        padded.events.filter(event => event.type === 'CONTEXT_COMPACTED')
+      ).toEqual([])
+      expect(
+        next.events.filter(event => event.type === 'CONTEXT_COMPACTED')
+      ).toEqual([
+        expect.objectContaining({
+          sessionId: padded.session.sessionId,
+          boundaryId: null,
+        }),
+      ])
+
+      idle.pass()
+      await Promise.all(exits)
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 300_000)
 })
