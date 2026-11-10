@@ -11,7 +11,7 @@ import type {Reply} from '@uz/contract/turns'
 import {schema} from '#modules/database/main'
 import {and, eq, ne} from 'drizzle-orm'
 
-import {reaching} from './reach'
+import {reaching, targetOf} from './reach'
 
 const {prompts, replies, systemPrompts} = schema
 
@@ -100,18 +100,29 @@ function sessionRef({sessionId, messageId}: SessionRef) {
   return {sessionId, messageId}
 }
 
-/** Keeps the Reply, or only its Prompt when its Provider never saved it. */
+/** The Reply, or only its Prompt when its Provider never saved it. */
+function lastKept(row: ReplyRow, session: SessionRef) {
+  return row.sessionMessageId === null
+    ? (promptIn(session, row) ?? session.messageId)
+    : session.messageId
+}
+
 function cutBack(
   row: ReplyRow,
   session: SessionRef,
   dropFrom: string
 ): DeletionCut {
-  const keepThrough =
-    row.sessionMessageId === null
-      ? (promptIn(session, row) ?? session.messageId)
-      : session.messageId
+  return {
+    type: 'cut',
+    ...sessionRef(session),
+    keepThrough: lastKept(row, session),
+    dropFrom,
+  }
+}
 
-  return {type: 'cut', ...sessionRef(session), keepThrough, dropFrom}
+interface Plan extends Continuation {
+  /** The last entry a `continue` keeps of its session. */
+  lastKept: string | null
 }
 
 function planned(
@@ -119,7 +130,7 @@ function planned(
   treeId: string,
   replyId: string,
   except?: string
-): Continuation | null {
+): Plan | null {
   const row = db
     .select()
     .from(replies)
@@ -137,6 +148,7 @@ function planned(
 
   return {
     provider: row.provider,
+    lastKept: session && lastKept(row, session),
     session:
       session?.type === 'continue' && dropFrom !== null
         ? cutBack(row, session, dropFrom)
@@ -158,12 +170,20 @@ export function continuation(
 ): Continuation | null {
   const plan = planned(db, treeId, replyId, except)
 
-  return (
-    plan && {
-      provider: plan.provider,
-      session: plan.session && reaching(db, plan.session),
-    }
-  )
+  if (!plan) return null
+
+  const {provider, session} = plan
+
+  return {
+    provider,
+    session:
+      session &&
+      reaching(
+        db,
+        session,
+        session.type === 'continue' ? plan.lastKept : targetOf(session)
+      ),
+  }
 }
 
 /**

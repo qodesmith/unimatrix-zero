@@ -634,7 +634,6 @@ describe('a Compaction', () => {
   })
 })
 
-/** Main's copy of the session's own transcript, one entry for each `uuid`. */
 function storeEntries(uuids: (string | null)[], sessionId = 's1') {
   createSessions(db, () => undefined).handle('claude', {
     op: 'append',
@@ -645,7 +644,6 @@ function storeEntries(uuids: (string | null)[], sessionId = 's1') {
   })
 }
 
-/** Three Turns in `s1`, which compacted inside the third. */
 function compactedThread() {
   const first = savedRoot()
   const second = savedAt(first, 'm2')
@@ -735,6 +733,28 @@ describe('a Reply before a Compaction in its Claude session', () => {
     storeEntries(['m1', 'p-cut-short', 'p-m3', 'b1', 'm3'])
     turns.deletePrompt(treeId, promptOf(below))
     hostCommands = []
+
+    sendInstead(cutShort)
+
+    expect(sessionsStarted()).toEqual([
+      {
+        type: 'fork',
+        sessionId: 's1',
+        messageId: 'p-cut-short',
+        servedThrough: 'p-cut-short',
+      },
+    ])
+  })
+})
+
+describe('a stopped Reply its Provider never saved, whose Turn compacted the session', () => {
+  it('takes the next Prompt in a fork served through its own Prompt, which the AI still remembers', () => {
+    const first = savedRoot()
+    const cutShort = sendPrompt(first, 'And then?')
+    recordPrompt(cutShort, 'p-cut-short')
+    compact(cutShort, 'b1')
+    stopUnrecorded(cutShort)
+    storeEntries(['m1', 'p-cut-short', 'b1'])
 
     sendInstead(cutShort)
 

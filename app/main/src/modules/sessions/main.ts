@@ -96,8 +96,7 @@ export function createSessions(
     })
   }
 
-  /** The place `through` ends a transcript at, told by its `uuid` alone. */
-  function endOf(provider: ProviderId, key: SessionKey, through: string) {
+  function upTo(provider: ProviderId, key: SessionKey, through: string) {
     const last = db
       .select({position: sessionEntries.position})
       .from(sessionEntries)
@@ -127,7 +126,7 @@ export function createSessions(
       .where(
         and(
           whereKey(provider, key),
-          through === undefined ? undefined : endOf(provider, key, through)
+          through === undefined ? undefined : upTo(provider, key, through)
         )
       )
       .orderBy(asc(sessionEntries.position))

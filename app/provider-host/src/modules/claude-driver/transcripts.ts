@@ -42,7 +42,7 @@ function keyOf({projectKey, sessionId, subpath}: SessionKey) {
 
 /**
  * The SDK's session store over the app's copy, which outlives `claude`'s own.
- * `through` ends the session's own transcript at that entry.
+ * `through` applies to the session's own transcript, not a Subagent's.
  */
 export function appSessionStore(
   store: SessionStoreClient,
@@ -99,8 +99,7 @@ function writeSubagent(stem: string, entries: SessionEntry[]) {
 
 /**
  * The fallback restore (ADR 0004): a plain write, so the files are new and no
- * cleanup sweep takes them. `through` ends the session's own transcript at
- * that entry.
+ * cleanup sweep takes them.
  */
 export async function writeTranscriptBack(
   store: SessionStoreClient,

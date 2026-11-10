@@ -47,8 +47,8 @@ function compactedAfter(db: Database, sessionId: string, uuid: string) {
   return later !== undefined
 }
 
-/** The last entry the send keeps of its session. */
-function targetOf(session: ReplySession) {
+/** The last entry a fork, a rewind or a cut keeps of its session. */
+export function targetOf(session: Exclude<ReplySession, {type: 'continue'}>) {
   return session.type === 'cut'
     ? (session.keepThrough ?? session.messageId)
     : session.messageId
@@ -56,17 +56,14 @@ function targetOf(session: ReplySession) {
 
 /**
  * Claude no longer finds an entry from before a Compaction in the whole
- * session, so a send that targets one forks from the session served only
- * through it. The fork holds nothing after the target: it stands in for a
- * rewind or a cut too, and the session it leaves is never added to after
- * being served in part.
+ * session, so a send whose `target` is one forks from the part through it. The
+ * fork stands in for a rewind or a cut too (ADR 0004).
  */
 export function reaching<Session extends ReplySession>(
   db: Database,
-  session: Session
+  session: Session,
+  target: string | null
 ): Session | Extract<ReplySession, {type: 'fork'}> {
-  const target = targetOf(session)
-
   if (target === null || !compactedAfter(db, session.sessionId, target)) {
     return session
   }

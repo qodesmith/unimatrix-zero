@@ -197,11 +197,11 @@ export function clearCutOnPrompt(
     prompt.promptId
   )
 
-  const planned = continued?.session
+  const next = continued?.session
 
   if (
-    planned?.sessionId === session.sessionId ||
-    (planned?.type === 'fork' && planned.servedThrough !== undefined)
+    next?.sessionId === session.sessionId ||
+    (next?.type === 'fork' && next.servedThrough !== undefined)
   ) {
     clearCut(db, prompt.parentReplyId)
   }

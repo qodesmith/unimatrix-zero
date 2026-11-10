@@ -154,7 +154,7 @@ function continuing(session: SessionRef, fork = false): ReplySession {
   return {...session, type: fork ? 'fork' : 'continue'}
 }
 
-/** Served only through the Reply, which sits before a compaction. */
+/** Served only through the Reply, which sits before a Compaction. */
 function reaching(session: ReplyRecorded['session']): ReplySession {
   return {...session, type: 'fork', servedThrough: session.messageId}
 }
@@ -480,7 +480,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 300_000)
 
-  it('reaches a Reply before a compaction for a Branch, a Retry and a send after Deleting Turns, each in a new session that goes on without the Turns dropped', async () => {
+  it('reaches a Reply before a Compaction for a Branch, a Retry and a send after Deleting Turns, each in a new session that goes on without the Turns dropped', async () => {
     const live = liveDriver([])
     const {first} = await compactedThread(live)
     const target = first.recorded.session
@@ -534,7 +534,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 600_000)
 
-  it('reaches a Reply before a compaction in a session an earlier Retry rewound', async () => {
+  it('reaches a Reply before a Compaction in a session an earlier Retry rewound', async () => {
     const live = liveDriver([])
     const first = await live.reply('My code word is TEAL.', null)
 
@@ -616,7 +616,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 600_000)
 
-  it('still serves the whole session to reach a Reply after its compaction', async () => {
+  it('still serves the whole session to reach a Reply after its Compaction', async () => {
     const live = liveDriver([])
     const {third} = await compactedThread(live)
 
