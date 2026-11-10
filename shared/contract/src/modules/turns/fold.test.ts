@@ -73,7 +73,18 @@ it('takes the Context size the Provider reports and the final status', () => {
     contextSize: 15,
     contextWindow: null,
     failure: null,
+    compacted: false,
   })
+})
+
+it('marks the Reply a Compaction happened in', () => {
+  expect(
+    fold(
+      {type: 'TEXT_DELTA', delta: 'Hi'},
+      {type: 'CONTEXT_COMPACTED', sessionId: 's1', boundaryId: null},
+      {type: 'RUN_FINISHED', status: 'complete'}
+    ).compacted
+  ).toBe(true)
 })
 
 it('keeps the Context window from whichever event reports it', () => {

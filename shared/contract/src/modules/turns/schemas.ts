@@ -79,6 +79,7 @@ export const ReplyProgressSchema = z.strictObject({
   contextSize: z.number().int().nonnegative().nullable(),
   contextWindow: z.number().int().positive().nullable(),
   failure: RunFailureSchema.nullable(),
+  compacted: z.boolean(),
 })
 
 export type ReplyProgress = z.infer<typeof ReplyProgressSchema>
@@ -226,6 +227,9 @@ export const TokensEvent = z.strictObject({
 export const ContextCompactedEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('CONTEXT_COMPACTED'),
+  sessionId: z.string(),
+  /** Claude's boundary entry in that session; Codex reports none. */
+  boundaryId: z.string().nullable(),
 })
 
 /** Ends the whole Reply; a Subagent ends with SUBAGENT_FINISHED. */

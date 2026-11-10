@@ -22,6 +22,10 @@ _Avoid_: Engine, bot, assistant
 The Provider's own record of one Thread, which it uses to continue the conversation. It is a disposable copy: the Tree is the truth, and a Provider session can be rebuilt from its Thread.
 _Avoid_: Thread (Codex's word for it), conversation
 
+**Compaction**:
+A Provider replacing the early part of a Provider session with a summary, on its own once the Context size nears the Context window, or when asked. The Thread still shows every Turn in full, but the AI now remembers the Turns before the Compaction only from that summary. The Thread marks the Reply a Compaction happened in. A Compaction that was blocked or failed changed nothing and isn't one.
+_Avoid_: Compression, summarization, Summary (that is prose made for the user)
+
 **System prompt**:
 The standing instructions the AI follows in a Tree. Each Tree has one, filled in from a global default and changeable at any time. A change applies to Replies generated afterward, and each Reply records the System prompt it ran under. A _preset_ is a read-only System prompt that ships with the app; presets and the user's own System prompts make up the _library_. A Tree holds its own copy, so editing a library entry never changes an existing Tree.
 _Avoid_: Instructions, persona, custom instructions

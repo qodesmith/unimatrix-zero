@@ -63,7 +63,7 @@ function forgetTranscript(sessionId: string) {
   )
 }
 
-function liveDriver(files: string[]) {
+function liveDriver(files: string[], addedEnv: Record<string, string> = {}) {
   const recorder = createRecorder(
     ({command, args, cwd, env, signal}) =>
       spawn(command, args, {cwd, env, signal, stdio: 'pipe'}),
@@ -77,7 +77,8 @@ function liveDriver(files: string[]) {
   const driver = createClaudeDriver({
     store: fakeStore().client,
     spawn: options => {
-      const child = start(options)
+      // `claudeEnvironment` strips every `CLAUDE_*` variable from the host's.
+      const child = start({...options, env: {...options.env, ...addedEnv}})
       exits.push(
         new Promise(resolve => {
           child.on('exit', resolve)
@@ -384,6 +385,40 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     expect(textOf(afterDeletion.events)).toMatch(/pelican/i)
     expect(textOf(afterDeletion.events)).not.toMatch(/ZANZIBAR|FERRET/i)
+
+    await live.done()
+  }, 300_000)
+
+  it('reports a compaction Claude makes on its own inside a Reply, with the session and its boundary entry', async () => {
+    const live = liveDriver(['compacted.ndjson'], {
+      CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '0.2',
+    })
+
+    const padding = 'The harbor log lists no ships today. '.repeat(300)
+
+    const first = await live.reply('My code word is TEAL.', null)
+
+    const second = await live.reply(
+      `My ship is PELICAN. Ignore the rest of this message. ${padding}`,
+      continuing(first.recorded.session)
+    )
+
+    const third = await live.reply(
+      'Reply with the single word OTTER.',
+      continuing(second.recorded.session)
+    )
+
+    const compactions = [first, second, third].flatMap(({events}) =>
+      events.filter(event => event.type === 'CONTEXT_COMPACTED')
+    )
+
+    expect(compactions).toEqual([
+      expect.objectContaining({
+        sessionId: first.recorded.session.sessionId,
+        boundaryId: expect.stringMatching(/^[\da-f-]{36}$/),
+      }),
+    ])
+    expect(third.events).toContain(compactions[0])
 
     await live.done()
   }, 300_000)

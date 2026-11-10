@@ -63,6 +63,7 @@ function reply(n: number, promptN: number, text: string): Reply {
     contextSize: null,
     contextWindow: null,
     failure: null,
+    compacted: false,
     createdAt: at(++clock),
   }
 }
@@ -2145,6 +2146,61 @@ function endingIn(status: Reply['status'], text = 'Reply two'): Saved {
     ],
   }
 }
+
+const COMPACTED =
+  'Compacted here. The AI remembers earlier Turns from a summary.'
+
+/** Top to bottom, the Compaction markers among the Turns' texts. */
+function downThrough(surface: Locator, ...texts: string[]) {
+  return [...texts, COMPACTED]
+    .flatMap(text =>
+      surface
+        .getByText(text)
+        .elements()
+        .map(element => ({text, top: element.getBoundingClientRect().top}))
+    )
+    .toSorted((a, b) => a.top - b.top)
+    .map(({text}) => (text === COMPACTED ? 'marker' : text))
+}
+
+it('marks the Reply a Compaction happened in between its Prompt and what it says, in both orientations and in the slideout, and no other Reply', async () => {
+  const saved = endingIn('complete')
+
+  saved.replies = saved.replies.map(one =>
+    one.id === uuid(12) ? {...one, compacted: true} : one
+  )
+  await renderCanvas(saved)
+  await expect.element(page.getByText('Reply two')).toBeVisible()
+
+  await expect.element(nodeOf('Reply two').getByText(COMPACTED)).toBeVisible()
+  expect(
+    downThrough(canvas(), 'Prompt one', 'Reply one', 'Prompt two', 'Reply two')
+  ).toEqual(['Prompt one', 'Reply one', 'Prompt two', 'marker', 'Reply two'])
+
+  await page.getByRole('button', {name: 'Horizontal'}).click()
+  await expect
+    .poll(() => document.querySelectorAll('.react-flow__node-exchange').length)
+    .toBe(2)
+  await expect.element(nodeOf('Reply two').getByText(COMPACTED)).toBeVisible()
+  expect(downThrough(nodeOf('Reply two'), 'Prompt two', 'Reply two')).toEqual([
+    'Prompt two',
+    'marker',
+    'Reply two',
+  ])
+  expect(canvas().getByText(COMPACTED).elements()).toHaveLength(1)
+
+  await openChatAt('Reply two')
+  await expect.element(slideout().getByText(COMPACTED)).toBeVisible()
+  expect(
+    downThrough(
+      slideout(),
+      'Prompt one',
+      'Reply one',
+      'Prompt two',
+      'Reply two'
+    )
+  ).toEqual(['Prompt one', 'Reply one', 'Prompt two', 'marker', 'Reply two'])
+})
 
 it('gives a stopped Reply an Input and shows a failed one only as a Failed chip with Retry, with no Input, on the canvas and in the slideout', async () => {
   clock = 0

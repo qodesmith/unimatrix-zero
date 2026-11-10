@@ -10,6 +10,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '#shadcn/ui/collapsible'
+import {Marker, MarkerContent} from '#shadcn/ui/marker'
 import {
   Trace,
   TraceCollapsible,
@@ -30,7 +31,7 @@ type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 /** A Reply's content, live while it streams; the caller owns its box. */
 export function ReplyView({reply}: {reply: Reply}) {
   const blocks = useThinking(reply.id)
-  const {status, content} = useReply(reply)
+  const {status, content, compacted} = useReply(reply)
   const streaming = status === 'streaming'
 
   function thinkingBefore(part: number) {
@@ -50,6 +51,7 @@ export function ReplyView({reply}: {reply: Reply}) {
       aria-busy={streaming}
       className="flex flex-col gap-2 text-sm"
     >
+      {compacted && <CompactionMarker />}
       <WrittenBy reply={reply} />
       {content.map((part, index) => (
         // oxlint-disable-next-line react/no-array-index-key -- parts only ever append, so positions are stable
@@ -71,6 +73,19 @@ export function ReplyView({reply}: {reply: Reply}) {
       )}
       <StatusLine status={status} />
     </article>
+  )
+}
+
+function CompactionMarker() {
+  return (
+    <Marker
+      variant="separator"
+      className="text-xs before:min-w-6 after:min-w-6"
+    >
+      <MarkerContent className="text-balance group-data-[variant=separator]/marker:flex-initial">
+        Compacted here. The AI remembers earlier Turns from a summary.
+      </MarkerContent>
+    </Marker>
   )
 }
 

@@ -6,6 +6,7 @@ export const NEW_REPLY: ReplyProgress = {
   contextSize: null,
   contextWindow: null,
   failure: null,
+  compacted: false,
 }
 
 function withLastText(
@@ -111,6 +112,8 @@ export function foldReplyEvent<T extends ReplyProgress>(
       contextWindow: event.contextWindow ?? reply.contextWindow,
     }
   }
+
+  if (event.type === 'CONTEXT_COMPACTED') return {...reply, compacted: true}
 
   if (!changesContent(event)) return reply
 

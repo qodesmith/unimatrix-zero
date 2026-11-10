@@ -67,6 +67,7 @@ function attachedReply(provider: ProviderId, modelId: string): Reply {
     contextSize: null,
     contextWindow: null,
     failure: null,
+    compacted: false,
     createdAt,
   }
 }

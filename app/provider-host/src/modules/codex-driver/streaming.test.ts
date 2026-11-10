@@ -56,6 +56,9 @@ const THANKS_TURN = '01a1893a-4f0d-71a0-9828-93cd3ea3291e'
 const RECONNECTED_THREAD_ID = '01a1c264-7cf0-7403-a69a-cdef675814f6'
 const RECONNECTED_TURN = '01a1c264-7f60-77f1-8637-990e960884d7'
 
+/** As `compacted.ndjson` recorded it. */
+const COMPACTED_THREAD_ID = '01a1c55f-23dd-7593-a186-df8b3a434f75'
+
 type Streamed = StartReplyEvent
 
 interface Report {
@@ -505,6 +508,59 @@ it('shows only the message Codex starts over after a dropped connection', async 
     sessionId: RECONNECTED_THREAD_ID,
     messageId: RECONNECTED_TURN,
   })
+})
+
+function compactionsIn(events: Streamed[]) {
+  return events.filter(event => event.type === 'CONTEXT_COMPACTED')
+}
+
+/**
+ * In `compacted.ndjson` the first turn fills the thread and the second starts
+ * by compacting it.
+ */
+async function compactingThread(recording: string) {
+  const codex = await setUp([recording])
+  const filled = await codex.reply('Reply with the single word TEAL.')
+
+  const compacting = await codex.reply(
+    'Reply with the single word OTTER.',
+    recordedIn(filled)
+  )
+
+  await codex.allClosed()
+
+  return {filled, compacting}
+}
+
+it('reports a compaction Codex made inside a turn, with the thread it compacted', async () => {
+  const {filled, compacting} = await compactingThread('compacted.ndjson')
+
+  expect(compactionsIn(compacting)).toEqual([
+    expect.objectContaining({
+      sessionId: COMPACTED_THREAD_ID,
+      boundaryId: null,
+    }),
+  ])
+  expect(textOf(compacting)).toBe('OTTER')
+  expect(compactionsIn(filled)).toEqual([])
+})
+
+it('reports no compaction for one Codex started and never finished, as when it fails', async () => {
+  const unfinished = edited('compacted.ndjson', text =>
+    text
+      .split('\n')
+      .filter(
+        line =>
+          !line.includes('"method":"item/completed"') ||
+          !line.includes('"type":"contextCompaction"')
+      )
+      .join('\n')
+  )
+
+  const {compacting} = await compactingThread(unfinished)
+
+  expect(compactionsIn(compacting)).toEqual([])
+  expect(textOf(compacting)).toBe('OTTER')
 })
 
 it('stops a Reply where it is, records it, and continues the Provider session after it', async () => {

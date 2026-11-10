@@ -43,6 +43,10 @@ const OTTER_MESSAGE = '52786f10-3dd8-4f5b-995f-c5f9c5a27a0e'
 const REWOUND_MESSAGE = '18fb8495-3399-43a8-bc37-573286cfc9ed'
 const MODEL = 'claude-haiku-5-5'
 
+/** As `compacted.ndjson` recorded them. */
+const COMPACTED_SESSION_ID = '471b5fd5-abf7-498b-9216-26c3ae547643'
+const BOUNDARY_ENTRY = '42429c6a-0cbe-4ef9-aaa6-afcc496c9bed'
+
 /** An entry `warmThrice()` repeats, under its new uuid. */
 function again(uuid: string) {
   return `cccccccc${uuid.slice(8)}`
@@ -547,6 +551,65 @@ it('shows thinking as it streams, and never as part of the Reply', async () => {
 
   await claude.reply(SECOND_PROMPT, recordedIn(events))
   await claude.allClosed()
+})
+
+function compactionsIn(events: Streamed[]) {
+  return events.filter(event => event.type === 'CONTEXT_COMPACTED')
+}
+
+/**
+ * In `compacted.ndjson` the second Reply's compaction fails and the third's
+ * goes through.
+ */
+async function compactingThread(recording: string) {
+  const claude = await setUp([recording])
+  const first = await claude.reply('My code word is TEAL.')
+  const second = await claude.reply('My ship is PELICAN.', recordedIn(first))
+  const replyId = crypto.randomUUID()
+
+  const third = await claude.reply(
+    'Reply with the single word OTTER.',
+    recordedIn(second),
+    {replyId}
+  )
+
+  await claude.allClosed()
+
+  return {first, second, third, replyId}
+}
+
+it('reports a compaction Claude made inside a Reply, with the session and its boundary entry, and none for one that failed', async () => {
+  const {first, second, third, replyId} =
+    await compactingThread('compacted.ndjson')
+
+  expect(compactionsIn(third)).toEqual([
+    expect.objectContaining({
+      replyId,
+      sessionId: COMPACTED_SESSION_ID,
+      boundaryId: BOUNDARY_ENTRY,
+    }),
+  ])
+  expect(textOf(third)).toBe('OTTER')
+  expect(compactionsIn([...first, ...second])).toEqual([])
+})
+
+it('reports no compaction when a hook blocked it, which ends the compacting with no boundary entry', async () => {
+  const blocked = edited('compacted.ndjson', lines =>
+    lines.flatMap(line => {
+      if (line.kind !== 'out' || line.message.type !== 'system') return [line]
+
+      if (line.message.subtype === 'compact_boundary') return []
+
+      const {compact_result: _, ...status} = line.message
+
+      return [{...line, message: status}]
+    })
+  )
+
+  const {third} = await compactingThread(blocked)
+
+  expect(compactionsIn(third)).toEqual([])
+  expect(textOf(third)).toBe('OTTER')
 })
 
 it('fails the Reply with Claude’s reason, without recording it', async () => {

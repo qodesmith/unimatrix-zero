@@ -91,6 +91,23 @@ export const replies = sqliteTable(
   table => [uniqueIndex('replies_prompt_id').on(table.promptId)]
 )
 
+/**
+ * Kept against the Provider session, which can still hold the Compaction after
+ * the Reply it happened in is deleted or retried.
+ */
+export const compactions = sqliteTable('compactions', {
+  id: id(),
+  provider: text('provider', {enum: ['claude', 'chatgpt']}).notNull(),
+  sessionId: text('session_id').notNull(),
+  /** Claude's boundary entry in the session; Codex reports none. */
+  boundaryId: text('boundary_id'),
+  /** The Reply the Thread marks; null once that Reply is deleted or retried. */
+  replyId: text('reply_id').references(() => replies.id, {
+    onDelete: 'set null',
+  }),
+  createdAt: createdAt(),
+})
+
 function sessionKey() {
   return {
     provider: text('provider', {enum: ['claude', 'chatgpt']}).notNull(),

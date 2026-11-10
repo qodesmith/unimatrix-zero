@@ -20,7 +20,7 @@ import {and, eq} from 'drizzle-orm'
 
 export const PARTIAL_SAVE_MS = 1000
 
-const {replies} = schema
+const {compactions, replies} = schema
 
 /** Parts before the last are done; the last is done once a tool answers it. */
 function finishedParts({content}: ReplyProgress) {
@@ -84,9 +84,24 @@ export function createInFlight(
     entry.saveTimer ??= setTimeout(() => save(entry), PARTIAL_SAVE_MS)
   }
 
+  /** A Subagent compacts its own transcript, not the session's: no record. */
+  function recordCompaction(
+    entry: Entry,
+    event: Extract<ReplyEvent, {type: 'CONTEXT_COMPACTED'}>
+  ) {
+    if (event.subagentId !== undefined) return
+
+    const {sessionId, boundaryId, replyId} = event
+    db.insert(compactions)
+      .values({provider: entry.provider, sessionId, boundaryId, replyId})
+      .run()
+  }
+
   function advance(entry: Entry, event: ReplyEvent) {
     const before = entry.reply
     entry.reply = foldReplyEvent(before, event)
+
+    if (event.type === 'CONTEXT_COMPACTED') recordCompaction(entry, event)
 
     if (event.type === 'RUN_FINISHED') {
       entries.delete(event.replyId)
