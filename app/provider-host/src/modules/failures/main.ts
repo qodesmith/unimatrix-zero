@@ -1,3 +1,4 @@
+import type {TerminalReason} from '@anthropic-ai/claude-agent-sdk'
 import type {RunFailure} from '@uz/contract/turns'
 
 import {z} from 'zod'
@@ -51,7 +52,7 @@ export interface FailureSignals {
   refusal?: Refusal | undefined
   codexErrorInfo?: unknown
   /** Claude's `terminal_reason`. */
-  terminalReason?: string | undefined
+  terminalReason?: TerminalReason | undefined
 }
 
 function resetsAtIn(message: string): string | undefined {
@@ -111,13 +112,19 @@ export function failureOf(
 
   const {resetsAt, limitRejected, terminalReason} = signals
 
-  // A limit that failed the Compaction leaves the turn blocked as well, and
-  // the limit is what the user can wait out.
+  // A limit or a lost connection that failed the Compaction leaves the turn
+  // blocked as well, and it is what the user can wait out or Retry.
   if (terminalReason === 'blocking_limit') {
-    return limitRejected ||
+    if (
+      limitRejected ||
       resetsAt !== undefined ||
       LIMIT_REACHED.test(message)
-      ? limitReached(message, resetsAt)
+    ) {
+      return limitReached(message, resetsAt)
+    }
+
+    return CONNECTION_LOST.test(message)
+      ? {code: 'connection-lost', message}
       : {code: 'too-long', message}
   }
 

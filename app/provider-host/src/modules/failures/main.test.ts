@@ -1,3 +1,5 @@
+import type {FailureSignals} from './main'
+
 import {expect, it} from 'vitest'
 
 import {failureOf} from './main'
@@ -79,7 +81,7 @@ it('leaves a request Codex refused for another reason a provider error', () => {
   ).toEqual({code: 'provider-error', message: 'Invalid request'})
 })
 
-it.each([
+it.each<[string, FailureSignals]>([
   [
     'Codex refuses a Prompt over its cap without the counts',
     {refusal: {input_error_code: 'input_too_large'}},
@@ -103,7 +105,7 @@ it.each([
   }
 )
 
-it.each([
+it.each<[string, FailureSignals]>([
   ['another Codex error', {codexErrorInfo: 'serverOverloaded'}],
   [
     'a Codex error with details',
@@ -141,4 +143,14 @@ it('keeps a usage limit a reached limit when `claude` blocks the turn for it', (
       limitRejected: true,
     })
   ).toEqual({code: 'limit-reached', message: 'Prompt is too long'})
+})
+
+it('keeps a lost connection a lost connection when it fails the Compaction of a blocked turn', () => {
+  const message =
+    'Prompt is too long · automatic compaction failed: fetch failed'
+
+  expect(failureOf(message, {terminalReason: 'blocking_limit'})).toEqual({
+    code: 'connection-lost',
+    message,
+  })
 })
