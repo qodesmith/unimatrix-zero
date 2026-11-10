@@ -89,7 +89,7 @@ Running a failed Reply's Prompt again in the same place, from its Failed chip: t
 _Avoid_: Regenerate, resend, re-run
 
 **Failed chip**:
-All the Thread shows of a failed Reply, which is an Exchange that didn't happen: the AI never remembers it, so the chip holds only "Failed", what went wrong, and Retry, while its Prompt goes back to the Input it was sent from. The next Prompt sent from that Input takes the failed Exchange's place.
+All the Thread shows of a failed Reply, which is an Exchange that didn't happen: the AI never remembers it, so the chip holds only "Failed", what went wrong, and Retry, while its Prompt goes back to the Input it was sent from. A failure that a Retry would only repeat, such as a Prompt too long for the Provider, offers no Retry. The next Prompt sent from that Input takes the failed Exchange's place.
 _Avoid_: Error card, failed box, error state
 
 **Thinking block**:

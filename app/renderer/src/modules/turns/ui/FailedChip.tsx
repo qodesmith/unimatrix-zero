@@ -68,6 +68,8 @@ const resetTime = new Intl.DateTimeFormat(undefined, {
   minute: '2-digit',
 })
 
+const wholeNumber = new Intl.NumberFormat()
+
 const FAILURE_LINES: Record<
   RunFailure['code'],
   (failure: RunFailure, name: string) => string
@@ -83,6 +85,10 @@ const FAILURE_LINES: Record<
   'host-unreachable': (_, name) => `${name} could not be reached`,
   'driver-error': ({message}) => message,
   'provider-error': ({message}) => message,
+  'too-long': ({promptChars, maxPromptChars}) =>
+    promptChars === undefined || maxPromptChars === undefined
+      ? 'Too long for the Context window'
+      : `Prompt too long · ${wholeNumber.format(promptChars)} characters, limit ${wholeNumber.format(maxPromptChars)}`,
   'needs-app-update': () => 'Needs an app update',
   'fake-failure': ({message}) => message,
 }
@@ -110,7 +116,7 @@ export function FailedChip({reply}: {reply: Reply}) {
           {describeFailure(failure, reply.provider)}
         </span>
       )}
-      <RetryControls reply={reply} />
+      {failure?.code !== 'too-long' && <RetryControls reply={reply} />}
     </div>
   )
 }

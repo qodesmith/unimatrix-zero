@@ -15,6 +15,7 @@ import type {TokenUsageBreakdown} from './protocol/v2/TokenUsageBreakdown'
 import type {Turn} from './protocol/v2/Turn'
 import type {TurnError} from './protocol/v2/TurnError'
 
+import {RefusalSchema} from '#modules/failures/main'
 import {z} from 'zod'
 
 // Each schema `satisfies` the generated type it reads from, so a Codex bump
@@ -28,7 +29,13 @@ const ThreadSchema = z.looseObject({
 
 const TurnErrorSchema = z.looseObject({
   message: z.string(),
-}) satisfies z.ZodType<Pick<TurnError, 'message'>>
+  codexErrorInfo: z
+    .union([z.string(), z.looseObject({})])
+    .nullable()
+    .optional(),
+}) satisfies z.ZodType<
+  Pick<TurnError, 'message'> & Partial<Pick<TurnError, 'codexErrorInfo'>>
+>
 
 const TurnSchema = z.looseObject({
   id: z.string(),
@@ -212,5 +219,10 @@ export const ServerRequestSchema = z.looseObject({
 export const AnswerSchema = z.looseObject({
   id: z.number(),
   result: z.unknown().optional(),
-  error: z.looseObject({message: z.string()}).optional(),
+  error: z
+    .looseObject({
+      message: z.string(),
+      data: RefusalSchema.optional().catch(undefined),
+    })
+    .optional(),
 })

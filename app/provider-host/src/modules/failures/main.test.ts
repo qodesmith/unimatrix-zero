@@ -1,3 +1,5 @@
+import type {FailureSignals} from './main'
+
 import {expect, it} from 'vitest'
 
 import {failureOf} from './main'
@@ -43,13 +45,112 @@ it('keeps when a limit lifts, when the Provider said', () => {
 it('takes when a limit lifts from the Provider over the message', () => {
   const message = 'You’ve hit your limit · resets 2026-10-24T15:00:00Z'
 
-  expect(failureOf(message, 1793970000)).toEqual({
+  expect(failureOf(message, {resetsAt: 1793970000})).toEqual({
     code: 'limit-reached',
     message,
     resetsAt: '2026-11-06T13:00:00.000Z',
   })
-  expect(failureOf('fetch failed', 1793970000)).toEqual({
+  expect(failureOf('fetch failed', {resetsAt: 1793970000})).toEqual({
     code: 'connection-lost',
     message: 'fetch failed',
+  })
+})
+
+it('names a Prompt over Codex’s text cap as too long, with both counts from the refusal', () => {
+  const message = 'Input exceeds the maximum length of 1048576 characters.'
+
+  expect(
+    failureOf(message, {
+      refusal: {
+        input_error_code: 'input_too_large',
+        max_chars: 1_048_576,
+        actual_chars: 1_240_000,
+      },
+    })
+  ).toEqual({
+    code: 'too-long',
+    message,
+    promptChars: 1_240_000,
+    maxPromptChars: 1_048_576,
+  })
+})
+
+it('leaves a request Codex refused for another reason a provider error', () => {
+  expect(
+    failureOf('Invalid request', {refusal: {input_error_code: 'empty_input'}})
+  ).toEqual({code: 'provider-error', message: 'Invalid request'})
+})
+
+it.each<[string, FailureSignals]>([
+  [
+    'Codex refuses a Prompt over its cap without the counts',
+    {refusal: {input_error_code: 'input_too_large'}},
+  ],
+  [
+    'Codex reports the Context window exceeded',
+    {codexErrorInfo: 'contextWindowExceeded'},
+  ],
+  ['the Claude API refuses the Prompt', {terminalReason: 'prompt_too_long'}],
+  [
+    '`claude` refuses before calling the API',
+    {terminalReason: 'blocking_limit'},
+  ],
+])(
+  'names a Prompt as too long when %s, however the message reads',
+  (_, signals) => {
+    expect(failureOf('Reworded by the vendor', signals)).toEqual({
+      code: 'too-long',
+      message: 'Reworded by the vendor',
+    })
+  }
+)
+
+it.each<[string, FailureSignals]>([
+  ['another Codex error', {codexErrorInfo: 'serverOverloaded'}],
+  [
+    'a Codex error with details',
+    {codexErrorInfo: {httpConnectionFailed: {httpStatusCode: 500}}},
+  ],
+  ['another way a Claude turn ends', {terminalReason: 'model_error'}],
+])('leaves %s a provider error', (_, signals) => {
+  expect(failureOf('Prompt is too long', signals)).toEqual({
+    code: 'provider-error',
+    message: 'Prompt is too long',
+  })
+})
+
+it('keeps a usage limit a reached limit when `claude` blocks the turn for it', () => {
+  const message =
+    'Prompt is too long · automatic compaction failed: You’ve hit your limit'
+
+  expect(failureOf(message, {terminalReason: 'blocking_limit'})).toEqual({
+    code: 'limit-reached',
+    message,
+  })
+  expect(
+    failureOf('Prompt is too long', {
+      terminalReason: 'blocking_limit',
+      resetsAt: 1793970000,
+    })
+  ).toEqual({
+    code: 'limit-reached',
+    message: 'Prompt is too long',
+    resetsAt: '2026-11-06T13:00:00.000Z',
+  })
+  expect(
+    failureOf('Prompt is too long', {
+      terminalReason: 'blocking_limit',
+      limitRejected: true,
+    })
+  ).toEqual({code: 'limit-reached', message: 'Prompt is too long'})
+})
+
+it('keeps a lost connection a lost connection when it fails the Compaction of a blocked turn', () => {
+  const message =
+    'Prompt is too long · automatic compaction failed: fetch failed'
+
+  expect(failureOf(message, {terminalReason: 'blocking_limit'})).toEqual({
+    code: 'connection-lost',
+    message,
   })
 })

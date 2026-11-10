@@ -4,6 +4,7 @@ import type {EventEmitter} from 'node:events'
 import type {Readable, Writable} from 'node:stream'
 import type {z} from 'zod'
 
+import {RequestRefused} from '#modules/failures/main'
 import {ProgramCrashed} from '#modules/reply-runs/main'
 import {once} from 'node:events'
 import {createInterface} from 'node:readline'
@@ -135,7 +136,7 @@ export async function startAppServer(
       const waiting = pending.get(id)
       pending.delete(id)
 
-      if (error) waiting?.reject(new Error(error.message))
+      if (error) waiting?.reject(new RequestRefused(error.message, error.data))
       else waiting?.resolve(answer.data)
 
       return

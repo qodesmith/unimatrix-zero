@@ -189,6 +189,27 @@ it.each([
   })
 })
 
+it('ends a turn that overran the Context window as too long', () => {
+  // Hand-built from the pinned protocol: nobody has made Codex send one.
+  const turn = {
+    id: 'turn',
+    status: 'failed',
+    error: {
+      message: 'Codex ran out of room in the model’s context window.',
+      codexErrorInfo: 'contextWindowExceeded',
+      additionalDetails: null,
+    },
+  } as const
+
+  expect(createReplyMapper(ids).finished(turn)).toMatchObject({
+    status: 'failed',
+    failure: {
+      code: 'too-long',
+      message: 'Codex ran out of room in the model’s context window.',
+    },
+  })
+})
+
 it('names when a limit lifts as Codex reported it apart from the message', () => {
   const turn = {
     id: 'turn',

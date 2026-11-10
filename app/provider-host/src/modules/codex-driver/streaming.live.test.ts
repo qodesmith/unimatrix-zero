@@ -3,6 +3,8 @@
  * UZ_LIVE_CODEX_HOME=<userData>/providers/chatgpt\
  * bun run test:node app/provider-host/src/modules/codex-driver/streaming.live
  *
+ * With `UZ_LIVE_CODEX_PROGRAM` alone, only the tests that need no sign-in run.
+ *
  * `UZ_RECORD=yes` writes the `recordings/` the driver tests replay. Record one
  * test at a time with `-t`: the ids the driver tests pin change each time.
  */
@@ -837,4 +839,66 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       fs.rmSync(home, {recursive: true, force: true})
     }
   }, 300_000)
+})
+
+describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
+  it('fails a Prompt over Codex’s text cap as too long, with both counts', async () => {
+    if (!folder) return
+
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-codex-'))
+    const idle = heldIdle()
+    const exits: Promise<unknown>[] = []
+
+    const driver = createCodexDriver({
+      store: fakeStore().client,
+      spawn: (command, options) => {
+        const child = spawnCodex(command, options)
+        exits.push(once(child, 'exit').catch(() => undefined))
+
+        return child
+      },
+      whenIdle: idle.whenIdle,
+    })
+
+    try {
+      const events = await Array.fromAsync(
+        driver.startReply({
+          treeId: crypto.randomUUID(),
+          replyId: crypto.randomUUID(),
+          model: MODEL,
+          systemPrompt: '',
+          // Two UTF-16 units each: Codex counts code points, not `length`.
+          prompt: {
+            text: '😀'.repeat(1_100_000),
+            messageId: crypto.randomUUID(),
+          },
+          vendorProgram: {
+            program: {
+              path: folder,
+              build: {
+                url: 'https://example.com/codex.tar.gz',
+                sha256: '0'.repeat(64),
+                size: 1,
+                archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+              },
+            },
+            configDir: home,
+          },
+          session: null,
+        })
+      )
+
+      const last = events.at(-1)
+      const failure = last?.type === 'RUN_FINISHED' ? last.failure : undefined
+
+      expect(failure).toMatchObject({code: 'too-long', promptChars: 1_100_000})
+      expect(failure?.maxPromptChars).toBeLessThan(1_100_000)
+      expect(events.some(event => event.type === 'PROMPT_RECORDED')).toBe(false)
+
+      idle.pass()
+      await Promise.all(exits)
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  })
 })

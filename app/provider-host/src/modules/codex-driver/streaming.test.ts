@@ -963,6 +963,72 @@ it('fails the Reply when the app has no copy of the Provider session', async () 
   expect(events.some(event => event.type === 'REPLY_RECORDED')).toBe(false)
 })
 
+const REFUSED = 'Input exceeds the maximum length of 1048576 characters.'
+
+/** `started.ndjson` with the turn refused as over the text cap. */
+function refusedOverCap(counts: {max_chars: unknown; actual_chars: unknown}) {
+  return edited('started.ndjson', text => {
+    const lines = text.split('\n')
+    const answered = lines.findIndex(line => line.includes('"id":3,"result"'))
+
+    return [
+      ...lines.slice(0, answered),
+      JSON.stringify({
+        kind: 'out',
+        message: {
+          id: 3,
+          error: {
+            code: -32_602,
+            data: {input_error_code: 'input_too_large', ...counts},
+            message: REFUSED,
+          },
+        },
+      }),
+      JSON.stringify({kind: 'end'}),
+    ].join('\n')
+  })
+}
+
+it('fails the Reply as too long, with both counts, when Codex refuses a Prompt over its text cap', async () => {
+  // The refusal as `codex` 0.163.0 answered a 1,048,577-character Prompt.
+  const codex = await setUp([
+    refusedOverCap({max_chars: 1_048_576, actual_chars: 1_048_577}),
+  ])
+
+  const events = await codex.reply(FIRST_PROMPT)
+
+  expect(events.map(event => event.type)).toEqual([
+    'RUN_STARTED',
+    'RUN_FINISHED',
+  ])
+  expect(events.at(-1)).toMatchObject({
+    status: 'failed',
+    failure: {
+      code: 'too-long',
+      message: REFUSED,
+      promptChars: 1_048_577,
+      maxPromptChars: 1_048_576,
+    },
+  })
+  await codex.allClosed()
+})
+
+it('fails the Reply as too long, without counts, when Codex refuses a Prompt over its text cap with a malformed count', async () => {
+  const codex = await setUp([
+    refusedOverCap({max_chars: '1048576', actual_chars: 1_048_577}),
+  ])
+
+  const events = await codex.reply(FIRST_PROMPT)
+
+  expect(events.at(-1)).toEqual(
+    expect.objectContaining({
+      status: 'failed',
+      failure: {code: 'too-long', message: REFUSED},
+    })
+  )
+  await codex.allClosed()
+})
+
 it('fails the Reply when a new Codex also stops before answering', async () => {
   const codex = await setUp(['started.ndjson', 'started.ndjson'], {
     env: {FAKE_CODEX_EXIT_AT: 'turn/start'},
