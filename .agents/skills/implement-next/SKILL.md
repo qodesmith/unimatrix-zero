@@ -34,13 +34,24 @@ Work one ticket from the **frontier**: the open `ready-for-agent` issues with no
 
    Every later step runs inside the worktree, so the checkout you started in stays untouched. If the branch or folder already exists, stop and say so.
 
-4. **Implement.** Read issue #<n> with the **Read an issue** command in `docs/agents/issue-tracker.md`, which prints the body and every comment. Together they are the spec: an agent brief comment is the contract, and a later comment overrides the body where the two disagree. When a comment points at another issue's findings, read that issue with the same command. Then read `.agents/skills/implement/SKILL.md` and follow it with that spec, handing legwork to subagents as **Subagents** below describes. Build only what the ticket's acceptance criteria name. Anything the PR adds that nothing in the same PR reads or calls is anticipating a later ticket; it belongs to the ticket that needs it, even when the PRD mentions it. A ticket asks for two things: criteria to meet and (potentially) questions to answer. Those answers, and answers to questions that come up while building, go in one comment on the issue so they outlive the session.
+4. **Implement.** Read issue #<n>, body and every comment, with this command:
+
+   ```sh
+   gh issue view <n> --json number,title,state,labels,body,comments \
+     --jq '"# #\(.number) \(.title)\nstate: \(.state)\nlabels: \([.labels[].name] | join(", "))\n\n\(.body)", (.comments[] | "\n--- comment by \(.author.login) at \(.createdAt) ---\n\(.body)")'
+   ```
+
+   Use this JSON form because the text form splits the issue when its output is piped, as it is in your shell: `gh issue view <n>` prints the body and a comment count, and `gh issue view <n> --comments` prints the comments alone.
+
+   The body and the comments together are the spec: an agent brief comment is the contract, and a later comment overrides the body where the two disagree. When a comment points at another issue's findings, read that issue with the same command.
+
+   Then read `.agents/skills/implement/SKILL.md` and follow it with that spec, handing legwork to subagents as **Subagents** below describes. Build only what the ticket's acceptance criteria name. Anything the PR adds that nothing in the same PR reads or calls is anticipating a later ticket; it belongs to the ticket that needs it, even when the PRD mentions it. A ticket asks for two things: criteria to meet and (potentially) questions to answer. Those answers, and answers to questions that come up while building, go in one comment on the issue so they outlive the session.
 
 5. **Open the PR.** Push the branch (`git push -u origin <n>-<slug>`) and open the PR with the `pr` skill's template, first line `Closes #<n>`. Merging it closes the issue and unblocks the tickets behind it.
 
 ## Subagents
 
-Keep the session's context for decisions: the contract, integration, review fixes. Legwork whose result fits in a paragraph goes to a subagent that returns the paragraph. Brief each one with context pointers (issue #<n>, an ADR, a PRD section, file paths) rather than pasted content, plus the worktree path written as the literal `<root>/<n>-<slug>`; the subagent starts every command with `cd <root>/<n>-<slug> &&`. A subagent sent to an issue reads it with the same **Read an issue** command, so name that command in its brief.
+Keep the session's context for decisions: the contract, integration, review fixes. Legwork whose result fits in a paragraph goes to a subagent that returns the paragraph. Brief each one with context pointers (issue #<n>, an ADR, a PRD section, file paths) rather than pasted content, plus the worktree path written as the literal `<root>/<n>-<slug>`; the subagent starts every command with `cd <root>/<n>-<slug> &&`. A subagent sent to an issue reads it with step 4's command, so write that command into its brief.
 
 - **Probes.** Each open question is a probe: what a dependency or SDK does, what a PRD section or prototype settles, what the running app shows on a screen. One subagent per question, returning the answer with its evidence. Run independent probes in parallel while you read the code you'll change. Their answers are the material for the issue comment in step 4.
 - **Slices.** When the ticket spans several packages, write the shared pieces yourself first (contract types, new dependencies, `bun install`) and commit them. Each package is then a slice: one subagent per package, all running in parallel, each calling the Skill tool with `tdd` to build its package's part of the criteria, editing only inside that package, and checking with that package's typecheck and tests. When every slice reports, read the diff, integrate, and run `fmt`, `lint` and the full test suite yourself. A ticket inside one package is one slice: build it yourself.
