@@ -128,8 +128,9 @@ export const AgentMessageItemSchema = z.looseObject({
 })
 
 /**
- * Codex sends this item's `item/completed` only once the compaction is in
- * place.
+ * Codex sends no `item/completed` for a compaction that fails or that a hook
+ * stops. The item is `{id}` only, so one that installed nothing can't be told
+ * apart.
  */
 export const CONTEXT_COMPACTION =
   'contextCompaction' satisfies ThreadItem['type']
