@@ -173,8 +173,8 @@ async function failedOn(live: Live, request: ReplyRequest) {
 }
 
 /**
- * Three Turns, compacted inside the third. The threshold is lowered only for
- * them: every later `claude` starts without it.
+ * Three Exchanges, compacted inside the third. The threshold is lowered only
+ * for them: every later `claude` starts without it.
  */
 async function compactedThread(live: Live) {
   live.setEnv({CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '0.2'})

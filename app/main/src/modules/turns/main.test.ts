@@ -693,7 +693,7 @@ describe('a Reply before a Compaction in its Claude session', () => {
     expect(pendingCut(first)).toBeNull()
   })
 
-  it('goes on forking from it once the Turn the fork added is deleted too', () => {
+  it('goes on forking from it once the Exchange the fork added is deleted too', () => {
     const {first, second} = compactedThread()
     turns.deletePrompt(treeId, promptOf(second))
     const added = savedAt(first, 'm4', 's2')

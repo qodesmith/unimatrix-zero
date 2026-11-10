@@ -53,15 +53,16 @@ export function fakeStore(refuses: Refusals = {}) {
   }
 
   function load(key: SessionKey, through?: string) {
-    const kept = entries.get(keyText(key)) ?? null
+    const kept = entries.get(keyText(key))
 
-    if (!kept || through === undefined) return kept
+    if (through === undefined) return kept ?? null
 
-    const end = kept.findIndex(entry => entry.uuid === through)
+    const held = kept ?? []
+    const end = held.findIndex(entry => entry.uuid === through)
 
     if (end === -1) throw new Error(`No entry ${through} in the session.`)
 
-    return kept.slice(0, end + 1).filter(entry => entry.uuid !== undefined)
+    return held.slice(0, end + 1).filter(entry => entry.uuid !== undefined)
   }
 
   function answer(request: SessionStoreRequest): SessionStoreValue {
