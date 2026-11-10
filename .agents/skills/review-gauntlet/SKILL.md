@@ -13,7 +13,7 @@ The gauntlet is **quiet**. Between setup and the final report, the only thing yo
 
 ## 1. Set up
 
-1. Parse `$ARGUMENTS`: the PR number (strip a leading `#`), then N, the number of rounds (default 3).
+1. Parse `$ARGUMENTS`: the PR number (strip a leading `#`), then N, the number of rounds (default 6).
 2. `gh pr view <PR> --json number,title,body,baseRefName,headRefName,closingIssuesReferences`.
 3. The current branch must be `headRefName`, and `git status --porcelain` must be empty, since the implementer commits whatever is in the tree. If either fails, stop and tell the user.
 4. `git fetch origin <baseRefName>`. The fixed point for the whole gauntlet is `origin/<baseRefName>`, and the diff is `git diff origin/<baseRefName>...HEAD`. `START=$(git rev-parse HEAD)` marks where the gauntlet began.
