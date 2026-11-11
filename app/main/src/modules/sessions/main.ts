@@ -43,6 +43,26 @@ function whereKey(provider: ProviderId, key: SessionKey) {
 }
 
 /**
+ * Where the entry `uuid` sits in the session's own transcript, counting up, or
+ * null when the app's copy doesn't hold it.
+ */
+export function positionOf(db: Database, sessionId: string, uuid: string) {
+  const entry = db
+    .select({position: sessionEntries.position})
+    .from(sessionEntries)
+    .where(
+      and(
+        eq(sessionEntries.sessionId, sessionId),
+        eq(sessionEntries.subpath, ''),
+        eq(sessionEntries.uuid, uuid)
+      )
+    )
+    .get()
+
+  return entry?.position ?? null
+}
+
+/**
  * The app's own copy of every Provider session, so any can be restored exactly.
  * `onAppended` hears the entries appended to a session's own transcript, in the
  * step that stores them: if it throws, they aren't stored.

@@ -745,6 +745,21 @@ describe('a Reply before a Compaction in its Claude session', () => {
       },
     ])
   })
+
+  it('takes the next Prompt after a Reply stopped in such a fork in the fork’s own session, which holds its Prompt', () => {
+    const {first} = compactedThread()
+    const cutShort = sendInstead(first).reply.id
+    recordPrompt(cutShort, 'p-cut-short', 's2')
+    stopUnrecorded(cutShort)
+    storeEntries(['m1', 'p-cut-short'], 's2')
+    hostCommands = []
+
+    sendInstead(cutShort)
+
+    expect(sessionsStarted()).toEqual([
+      {type: 'continue', sessionId: 's2', messageId: 'p-cut-short'},
+    ])
+  })
 })
 
 describe('a stopped Reply its Provider never saved, whose Turn compacted the session', () => {
@@ -1048,6 +1063,40 @@ describe('continuing from a Reply its Provider never saved', () => {
     expect(sessionsStarted()).toEqual([
       {sessionId: 's1', messageId: 'm1', type: 'continue'},
       {sessionId: 's1', messageId: 'm1', type: 'fork'},
+    ])
+  })
+
+  it('starts a Branch from a stopped Reply after its own Prompt, when the app’s copy of the session holds it', () => {
+    const first = savedRoot()
+    const cutShort = sendPrompt(first, 'And then?')
+    recordPrompt(cutShort, 'p-cut-short')
+    stopUnrecorded(cutShort)
+    savedAt(cutShort, 'm3')
+    storeEntries(['m1', 'p-cut-short', 'p-m3', 'm3'])
+    hostCommands = []
+
+    sendInstead(cutShort)
+
+    expect(sessionsStarted()).toEqual([
+      {type: 'fork', sessionId: 's1', messageId: 'p-cut-short'},
+    ])
+  })
+
+  it('goes on in the session a stopped Reply forked into, which alone holds its Prompt, and forks that session for a Branch', () => {
+    const first = savedRoot()
+    savedAt(first, 'm2')
+    const cutShort = sendPrompt(first, 'Another way')
+    recordPrompt(cutShort, 'p-cut-short', 's2')
+    stopUnrecorded(cutShort)
+    storeEntries(['m1', 'p-cut-short'], 's2')
+    hostCommands = []
+
+    sendInstead(cutShort)
+    sendInstead(cutShort)
+
+    expect(sessionsStarted()).toEqual([
+      {type: 'continue', sessionId: 's2', messageId: 'p-cut-short'},
+      {type: 'fork', sessionId: 's2', messageId: 'p-cut-short'},
     ])
   })
 })
