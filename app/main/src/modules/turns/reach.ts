@@ -2,49 +2,31 @@ import type {Database} from '#modules/database/main'
 import type {ReplySession} from '@uz/contract/host'
 
 import {schema} from '#modules/database/main'
-import {and, eq, gt} from 'drizzle-orm'
-import {alias} from 'drizzle-orm/sqlite-core'
+import {positionOf} from '#modules/sessions/main'
+import {eq} from 'drizzle-orm'
 
-const {compactions, sessionEntries} = schema
-
-const boundaries = alias(sessionEntries, 'boundaries')
+const {compactions} = schema
 
 /**
  * Whether the session's own transcript compacted after the entry `uuid`. Only
  * Claude reports a Compaction's boundary entry, so only its sessions match.
  */
 function compactedAfter(db: Database, sessionId: string, uuid: string) {
-  const later = db
-    .select({id: compactions.id})
-    .from(sessionEntries)
-    .innerJoin(
-      compactions,
-      and(
-        eq(compactions.provider, sessionEntries.provider),
-        eq(compactions.sessionId, sessionEntries.sessionId)
-      )
-    )
-    .innerJoin(
-      boundaries,
-      and(
-        eq(boundaries.provider, sessionEntries.provider),
-        eq(boundaries.projectKey, sessionEntries.projectKey),
-        eq(boundaries.sessionId, sessionEntries.sessionId),
-        eq(boundaries.subpath, sessionEntries.subpath),
-        eq(boundaries.uuid, compactions.boundaryId),
-        gt(boundaries.position, sessionEntries.position)
-      )
-    )
-    .where(
-      and(
-        eq(sessionEntries.sessionId, sessionId),
-        eq(sessionEntries.subpath, ''),
-        eq(sessionEntries.uuid, uuid)
-      )
-    )
-    .get()
+  const at = positionOf(db, sessionId, uuid)
 
-  return later !== undefined
+  if (at === null) return false
+
+  return db
+    .select({boundaryId: compactions.boundaryId})
+    .from(compactions)
+    .where(eq(compactions.sessionId, sessionId))
+    .all()
+    .some(({boundaryId}) => {
+      const boundary =
+        boundaryId === null ? null : positionOf(db, sessionId, boundaryId)
+
+      return boundary !== null && boundary > at
+    })
 }
 
 /** The last entry a fork, a rewind or a cut keeps of its session. */
