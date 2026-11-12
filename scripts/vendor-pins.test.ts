@@ -36,7 +36,7 @@ const PINNED: PinVersions = {
   sdk: '0.3.307',
 }
 
-function repo(head: PinVersions) {
+function apiAt(head: PinVersions) {
   const refs = new Map([
     ['fork-point', PINNED],
     ['head', head],
@@ -65,7 +65,7 @@ describe('a bump PR', () => {
   it('is one that moves a vendor program’s version from where it branched', async () => {
     const head = {...PINNED, claude: '2.1.322', codex: '0.170.0'}
 
-    await expect(bumpOf(repo(head), 'o/r', pr)).resolves.toEqual([
+    await expect(bumpOf(apiAt(head), 'o/r', pr)).resolves.toEqual([
       'claude 2.1.307 → 2.1.322',
       'codex 0.163.0 → 0.170.0',
     ])
@@ -74,7 +74,7 @@ describe('a bump PR', () => {
   it('is one that moves the Agent SDK', async () => {
     const head = {...PINNED, sdk: '0.3.322', other: '^4.1.0'}
 
-    await expect(bumpOf(repo(head), 'o/r', pr)).resolves.toEqual([
+    await expect(bumpOf(apiAt(head), 'o/r', pr)).resolves.toEqual([
       '@anthropic-ai/claude-agent-sdk 0.3.307 → 0.3.322',
     ])
   })
@@ -82,6 +82,6 @@ describe('a bump PR', () => {
   it('isn’t one that edits the pin files without moving a pin', async () => {
     const head = {...PINNED, other: '^4.1.0'}
 
-    await expect(bumpOf(repo(head), 'o/r', pr)).resolves.toEqual([])
+    await expect(bumpOf(apiAt(head), 'o/r', pr)).resolves.toEqual([])
   })
 })

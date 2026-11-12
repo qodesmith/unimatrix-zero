@@ -24,7 +24,7 @@ Entries describe behavior, never line numbers: the most specific pointer is a mo
 | Changed by     | `upgrade`, or `upgrade + drift` when the vendor's servers or the Model can change it without a release |
 | Check          | `` `[dep:<id>]` `` and where its live check is, or `none: <reason>`                                    |
 
-A live check is a test whose name starts with `[dep:<id>]`, in a `*.live.test.ts` that runs a real, signed-in vendor program. For a W entry, the check asserts the Provider still shows the problem the workaround exists for, so it fails once the workaround is no longer needed. `none: <reason>` is for a check that isn't possible or isn't cheap.
+A live check is a test whose name carries `[dep:<id>]` (one test can carry several), in a `*.live.test.ts` that runs a real, signed-in vendor program. For a W entry, the check asserts the Provider still shows the problem the workaround exists for, so it fails once the workaround is no longer needed. `none: <reason>` is for a check that isn't possible or isn't cheap.
 
 ## Checking the list: `bun run provider-checks`
 
