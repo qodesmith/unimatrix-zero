@@ -6,6 +6,7 @@
 import type {CheckStatus, Review} from './provider-checks-result.ts'
 import type {Entry} from './provider-dependencies.ts'
 import type {Builds} from './provider-review.ts'
+import type {Pins} from './vendor-pins.ts'
 
 import {$} from 'bun'
 import fs from 'node:fs'
@@ -18,7 +19,7 @@ import {devUserData} from './dev-data.ts'
 import {passed, renderResult} from './provider-checks-result.ts'
 import {LIST, entriesOf, liveCheckOf, tagsIn} from './provider-dependencies.ts'
 import {review} from './provider-review.ts'
-import {HOST_PACKAGE, MANIFEST, bumpOf, pinsOf} from './vendor-pins.ts'
+import {HOST_PACKAGE, MANIFEST, SDK, bumpOf, pinsOf} from './vendor-pins.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const GATE_JOB = 'Provider checks on a vendor bump'
@@ -50,6 +51,8 @@ const Runs = z.looseObject({
   ),
 })
 
+const InstalledPackage = z.looseObject({version: z.string()})
+
 const Jobs = z.looseObject({
   jobs: z.array(z.looseObject({id: z.number(), name: z.string()})),
 })
@@ -69,12 +72,33 @@ async function api(call: string) {
   return $`gh api ${call}`.text()
 }
 
+/** `node_modules` isn't in git, so a checkout can leave an older SDK installed. */
+function installedSdkIsPinned(pins: Pins) {
+  const installed = path.join(
+    path.dirname(HOST_PACKAGE),
+    'node_modules',
+    SDK,
+    'package.json'
+  )
+
+  const version = fs.existsSync(path.join(root, installed))
+    ? InstalledPackage.parse(JSON.parse(readText(installed))).version
+    : 'not installed'
+
+  if (version !== pins.get(SDK)) {
+    fail(
+      `The Agent SDK in ${installed} is ${version}, not the pinned ${pins.get(SDK)}: run \`bun install\`, then run this again.`
+    )
+  }
+}
+
 /**
  * The pinned builds and sign-ins in this checkout's own dev data, which
  * `bun run dev` downloads and the app's connect flow fills.
  */
 function liveBuilds() {
   const pins = pinsOf(readText(MANIFEST), readText(HOST_PACKAGE))
+  installedSdkIsPinned(pins)
   const userData = devUserData(root)
 
   const env = {

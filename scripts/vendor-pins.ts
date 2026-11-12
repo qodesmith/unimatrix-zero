@@ -6,7 +6,7 @@ import {z} from 'zod'
 
 export const MANIFEST = 'app/main/src/modules/vendor-programs/dev-manifest.json'
 export const HOST_PACKAGE = 'app/provider-host/package.json'
-const SDK = '@anthropic-ai/claude-agent-sdk'
+export const SDK = '@anthropic-ai/claude-agent-sdk'
 
 const Manifest = z.looseObject({
   vendorPrograms: z.record(z.string(), z.looseObject({version: z.string()})),
@@ -28,7 +28,7 @@ export function pinsOf(manifest: string, hostPackage: string) {
   ])
 }
 
-type Pins = ReturnType<typeof pinsOf>
+export type Pins = ReturnType<typeof pinsOf>
 
 /** Each pin `head` moves, as `<name> <from> → <to>`. */
 function pinChanges(base: Pins, head: Pins) {
