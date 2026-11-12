@@ -74,6 +74,8 @@ export async function runClaudeOneShot(
       mcpServers: {},
       persistSession: false,
       maxTurns: 1,
+      // Else an `@path` quoted from a Prompt or Reply is read in as a file.
+      verbatimPrompts: true,
       model,
     },
   })

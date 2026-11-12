@@ -117,6 +117,17 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Changed by:** upgrade
 - **Check:** `[dep:prompt-stored-under-app-uuid]` in `claude-driver`: the app's copy holds a user entry under the Prompt's id.
 
+### Prompts delivered as written
+
+- **Id:** `verbatim-prompts`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** `claude` honors the SDK's `verbatimPrompts` option, which sends each user message marked `client_composed`: `claude` delivers its text as written, with no slash-command dispatch and no `@path` file-mention expansion. Without the mark, a Prompt such as `/compact` is run as a command, and its turn ends with no assistant message. The mark also skips the turn-start attachment pass: nested `CLAUDE.md` and rules files, skill and tool listings, and per-turn reminders arrive only after the turn's first tool call. With no settings and no tools, that pass held nothing over two warm turns on one day; what it holds on a cold resume, or after a date change between turns, is unchecked.
+- **App side:** `claude-driver` turns the option on for every Reply and every one-shot, so each Prompt reaches the AI as text, and each Reply ends at a message the app can record. With no tools, a turn makes no tool call, so nothing the pass skips arrives later.
+- **User would see:** a Prompt such as `/compact` run instead of answered: a Reply with no text, marked complete, whose Input says it can't be continued. An `@path` in a Prompt would show the AI that file.
+- **Changed by:** upgrade
+- **Check:** `[dep:verbatim-prompts]` in `claude-driver`: `/compact` sent as a Prompt gets an answer and no Compaction, and the next Prompt goes on from it. `@path`, and one-shots, have no check.
+
 ### A refused resume sends no `init`
 
 - **Id:** `refused-resume-no-init`

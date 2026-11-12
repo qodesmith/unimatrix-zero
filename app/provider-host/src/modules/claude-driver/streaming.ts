@@ -137,6 +137,8 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       tools: [],
       strictMcpConfig: true,
       mcpServers: {},
+      // Else a Prompt such as `/compact` is run as a `claude` command.
+      verbatimPrompts: true,
       includePartialMessages: true,
       thinking: {type: 'adaptive', display: 'summarized'},
       systemPrompt: request.systemPrompt,

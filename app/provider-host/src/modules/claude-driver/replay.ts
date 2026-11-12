@@ -54,6 +54,8 @@ export const FakeClaudeRunSchema = z.strictObject({
   /** The runs, by n, still going when this one started. */
   runningAtStart: z.array(z.number()),
   prompts: z.array(z.string()),
+  /** Per Prompt, whether it came marked to be delivered as written. */
+  clientComposed: z.array(z.boolean()),
   /** The entry uuids of the transcript it resumed. */
   resumedFrom: z.array(z.string()),
   toolResults: z.array(z.string()),
@@ -89,7 +91,7 @@ function stillRunning(file) {
 const runningAtStart = fs.readdirSync(reports).filter(stillRunning).map(file => Number.parseInt(file, 10))
 const args = process.argv.slice(2)
 const configDir = process.env.CLAUDE_CONFIG_DIR
-const report = {args, configDir, runningAtStart, prompts: [], resumedFrom: [], toolResults: [], inputClosed: false, ended: null}
+const report = {args, configDir, runningAtStart, prompts: [], clientComposed: [], resumedFrom: [], toolResults: [], inputClosed: false, ended: null}
 save()
 const recording = options.recordings[run]
 const lines = fs.readFileSync(recording, 'utf8')
@@ -195,6 +197,7 @@ process.stdin.on('data', chunk => {
     if (message.type === 'control_request') requestIds.set(step.message.request_id, message.request_id)
     if (message.type === 'user') {
       report.prompts.push(message.message.content)
+      report.clientComposed.push(message.client_composed === true)
       promptUuid = message.uuid ?? null
     }
     save()

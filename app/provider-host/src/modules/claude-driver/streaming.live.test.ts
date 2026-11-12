@@ -234,6 +234,8 @@ async function failedOn(live: Live, request: ReplyRequest) {
   return events
 }
 
+const PADDING = 'The harbor log lists no ships today. '.repeat(300)
+
 /**
  * Three Exchanges, compacted inside the third. The threshold is lowered only
  * for them: every later `claude` starts without it.
@@ -241,11 +243,10 @@ async function failedOn(live: Live, request: ReplyRequest) {
 async function compactedThread(live: Live) {
   live.setEnv({CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '0.2'})
 
-  const padding = 'The harbor log lists no ships today. '.repeat(300)
   const first = await live.reply('My code word is TEAL.', null)
 
   const second = await live.reply(
-    `My ship is PELICAN. Ignore the rest of this message. ${padding}`,
+    `My ship is PELICAN. Ignore the rest of this message. ${PADDING}`,
     continuing(first.recorded.session)
   )
 
@@ -525,12 +526,10 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '0.2',
     })
 
-    const padding = 'The harbor log lists no ships today. '.repeat(300)
-
     const first = await live.reply('My code word is TEAL.', null)
 
     const second = await live.reply(
-      `My ship is PELICAN. Ignore the rest of this message. ${padding}`,
+      `My ship is PELICAN. Ignore the rest of this message. ${PADDING}`,
       continuing(first.recorded.session)
     )
 
@@ -628,17 +627,25 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       continuing(retried.recorded.session)
     )
 
-    const compacting = await Array.fromAsync(
-      live.driver.startReply(
-        live.request('/compact', continuing(third.recorded.session))
-      )
+    await live.closed()
+    live.setEnv({CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '0.2'})
+
+    const padded = await live.reply(
+      `Ignore this message. ${PADDING}`,
+      continuing(third.recorded.session)
     )
 
-    expect(compacting).toContainEqual(
+    const compacting = await live.reply(
+      'Reply with the single word OK.',
+      continuing(padded.recorded.session)
+    )
+
+    expect(compacting.events).toContainEqual(
       expect.objectContaining({type: 'CONTEXT_COMPACTED'})
     )
 
     await live.closed()
+    live.setEnv({})
 
     const reached = await live.reply(RECALL, reaching(retried.recorded.session))
 
@@ -706,6 +713,32 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     await live.done()
   }, 600_000)
+
+  it('[dep:verbatim-prompts] delivers a Prompt that starts with a claude command to the AI as written, with no Compaction, and goes on from its Reply', async () => {
+    const live = liveDriver([])
+    const first = await live.reply('My code word is TEAL.', null)
+
+    const answered = await live.reply(
+      '/compact',
+      continuing(first.recorded.session)
+    )
+
+    expect(answered.events).not.toContainEqual(
+      expect.objectContaining({type: 'CONTEXT_COMPACTED'})
+    )
+    expect(textOf(answered.events)).not.toBe('')
+
+    await live.closed()
+
+    const next = await live.reply(
+      'What is my code word? Just the word.',
+      continuing(answered.recorded.session)
+    )
+
+    expect(textOf(next.events)).toMatch(/TEAL/)
+
+    await live.done()
+  }, 300_000)
 
   it('[dep:synthetic-model-name] marks the message it makes up for a failed Reply by the Model name <synthetic>, with no isSynthetic flag', async () => {
     const live = liveDriver([])

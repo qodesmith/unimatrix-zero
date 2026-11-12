@@ -858,6 +858,17 @@ it('stores the Prompt in the app’s copy of the session under the id main gave 
   ).toEqual([messageId])
 })
 
+it('sends a Prompt that starts with a claude command marked to be delivered as written', async () => {
+  const claude = await setUp(['warm.ndjson'])
+
+  await claude.reply('/compact')
+
+  expect(claude.reports()[0]).toMatchObject({
+    prompts: ['/compact'],
+    clientComposed: [true],
+  })
+})
+
 it('passes on a stop asked before claude has the Prompt', async () => {
   const claude = await setUp(['stopped.ndjson'])
 
