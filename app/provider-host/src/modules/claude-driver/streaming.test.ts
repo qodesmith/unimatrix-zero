@@ -33,7 +33,6 @@ import {projectKeyOf} from './transcripts'
 const DEFAULT_COMPACTION: CompactionSettings = {auto: true, threshold: null}
 
 /** As `warm.ndjson`, `resumed.ndjson` and `forked.ndjson` recorded them. */
-
 const SESSION_ID = '6b3fb527-e561-4b5c-810d-0ef9ac53978c'
 const FIRST_MESSAGE = '62e0dab1-d770-4979-863e-4df4e2be3150'
 const SECOND_MESSAGE = '7e7158ab-59c9-4e14-9828-54466ba8084e'

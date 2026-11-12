@@ -335,18 +335,18 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **App side:** `claude-driver` starts `claude` with the Compaction Settings, and with neither key for a default. It closes a warm `claude` started with other Compaction Settings, so the next Reply resumes the session in a new one. The Setting's range is the one `claude` takes.
 - **User would see:** a threshold that changes nothing, or a Thread that compacts with Compaction off. If `claude` narrowed the range, values outside it would be ignored without a word.
 - **Changed by:** upgrade
-- **Check:** `[dep:claude-compaction-settings]` in `claude-driver`: a Thread under a lowered threshold doesn't compact, past it with Compaction off doesn't, and with Compaction on again it does, each from the next Reply. Whether `applyFlagSettings` still ignores a new window, which would make closing the warm `claude` unnecessary, has no check.
+- **Check:** `[dep:claude-compaction-settings]` in `claude-driver`: a Thread under a lowered threshold doesn't compact, past it with Compaction off doesn't, and with Compaction on again it does, each from the next Reply. Whether `applyFlagSettings` still ignores a new window, which would make closing the warm `claude` unnecessary, has no check: `claude-driver` never calls it, so the check would drive `claude` on its own and fill a session past the new window.
 
 ### Codex's Compaction limit
 
 - **Id:** `codex-compaction-limit`
-- **Kind:** D
+- **Kind:** D/W
 - **Provider:** ChatGPT
 - **Relies on:** Codex takes `model_auto_compact_token_limit`, an integer, in `config` on `thread/start`, `thread/resume` and `thread/fork`, and accepts a misspelled key without an error. It checks the limit as a turn starts, and clamps it to 90% of the Model's raw Context window. On `thread/resume` it ignores `config` for a thread that a client is subscribed to, and takes it after `thread/unsubscribe`. A resume that brings no `config` keeps the old limit.
 - **App side:** `codex-driver` sends the threshold in `config` on every thread it starts, resumes or forks, and for the default sends no `config` on a start and an empty one on a resume or fork. When the threshold for a loaded thread changes, it unsubscribes and resumes the thread.
 - **User would see:** a threshold that changes nothing, or that reaches a Thread only once the app-server restarts.
 - **Changed by:** upgrade
-- **Check:** `[dep:codex-compaction-limit]` in `codex-driver`: a thread under the threshold doesn't compact, and compacts on the next Reply once the threshold drops below its size while it's loaded. The clamp has no check: a full Context window costs about 450,000 tokens.
+- **Check:** `[dep:codex-compaction-limit]` in `codex-driver`: a thread under the threshold doesn't compact, and compacts on the next Reply once the threshold drops below its size while it's loaded. The clamp has no check: a full Context window costs about 450,000 tokens. Whether a subscribed resume still ignores `config`, and a resume with none still keeps the old limit, which would make unsubscribing and the empty `config` unnecessary, has no check: `codex-driver` does neither, so the check would drive the app-server on its own and fill a thread past a limit for each.
 
 ### The largest Codex Context window
 
