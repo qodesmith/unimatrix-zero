@@ -13,6 +13,7 @@ import path from 'node:path'
 import {parseArgs} from 'node:util'
 import {z} from 'zod'
 
+import {devUserData} from './dev-data.ts'
 import {passed, renderResult} from './provider-checks-result.ts'
 import {LIST, entriesOf, liveCheckOf, tagsIn} from './provider-dependencies.ts'
 import {review} from './provider-review.ts'
@@ -21,13 +22,6 @@ import {HOST_PACKAGE, MANIFEST, bumpOf, pinsOf} from './vendor-pins.ts'
 const root = path.resolve(import.meta.dirname, '..')
 const GATE_JOB = 'Provider checks on a vendor bump'
 const REVIEWERS = 4
-
-const LiveEnv = z.object({
-  UZ_LIVE_CLAUDE_PROGRAM: z.string().min(1),
-  UZ_LIVE_CLAUDE_CONFIG: z.string().min(1),
-  UZ_LIVE_CODEX_PROGRAM: z.string().min(1),
-  UZ_LIVE_CODEX_HOME: z.string().min(1),
-})
 
 const Pulls = z.array(
   z.looseObject({
@@ -72,31 +66,56 @@ async function api(call: string) {
   return $`gh api ${call}`.text()
 }
 
-function liveBuilds(): Builds {
-  const env = LiveEnv.safeParse(process.env)
-
-  if (!env.success) {
-    fail(
-      `Set ${Object.keys(LiveEnv.shape).join(', ')}, as the live tests' headers describe.`
-    )
-  }
-
+/**
+ * The pinned builds and sign-ins in this checkout's own dev data, which
+ * `bun run dev` downloads and the app's connect flow fills.
+ */
+function liveBuilds() {
   const pins = pinsOf(readText(MANIFEST), readText(HOST_PACKAGE))
+  const userData = devUserData(root)
 
-  const claudeProgram = env.data.UZ_LIVE_CLAUDE_PROGRAM
-  const codexFolder = env.data.UZ_LIVE_CODEX_PROGRAM
+  const env = {
+    UZ_LIVE_CLAUDE_PROGRAM: path.join(
+      userData,
+      'vendor',
+      'claude',
+      pins.get('claude') ?? '',
+      'claude'
+    ),
+    UZ_LIVE_CLAUDE_CONFIG: path.join(userData, 'providers', 'claude'),
+    UZ_LIVE_CODEX_PROGRAM: path.join(
+      userData,
+      'vendor',
+      'chatgpt',
+      pins.get('codex') ?? ''
+    ),
+    UZ_LIVE_CODEX_HOME: path.join(userData, 'providers', 'chatgpt'),
+  }
 
-  if (!claudeProgram.split(path.sep).includes(pins.get('claude') ?? '')) {
+  const needed = [
+    ...Object.values(env),
+    path.join(env.UZ_LIVE_CODEX_HOME, 'auth.json'),
+  ]
+
+  const missing = needed.filter(file => !fs.existsSync(file))
+
+  if (missing.length > 0) {
     fail(
-      `UZ_LIVE_CLAUDE_PROGRAM isn't the pinned claude ${pins.get('claude')}.`
+      [
+        "This checkout's dev data lacks the pinned builds or a sign-in:",
+        ...missing.map(file => `  ${file}`),
+        'Run `bun run dev` here, connect Claude and ChatGPT, then run this again.',
+      ].join('\n')
     )
   }
 
-  if (path.basename(codexFolder) !== pins.get('codex')) {
-    fail(`UZ_LIVE_CODEX_PROGRAM isn't the pinned Codex ${pins.get('codex')}.`)
+  const builds: Builds = {
+    pins,
+    claudeProgram: env.UZ_LIVE_CLAUDE_PROGRAM,
+    codexFolder: env.UZ_LIVE_CODEX_PROGRAM,
   }
 
-  return {pins, claudeProgram, codexFolder}
+  return {builds, env}
 }
 
 function readText(file: string) {
@@ -147,7 +166,7 @@ async function checkedOut(bump: Bump) {
   }
 }
 
-async function runLiveChecks(ids: string[]) {
+async function runLiveChecks(ids: string[], env: Record<string, string>) {
   const report = path.join(os.tmpdir(), `uz-provider-checks-${Date.now()}.json`)
 
   await Bun.spawn(
@@ -164,7 +183,11 @@ async function runLiveChecks(ids: string[]) {
       '--reporter=json',
       `--outputFile.json=${report}`,
     ],
-    {cwd: root, stdio: ['inherit', 'inherit', 'inherit']}
+    {
+      cwd: root,
+      env: {...process.env, ...env},
+      stdio: ['inherit', 'inherit', 'inherit'],
+    }
   ).exited
 
   const outcomes = new Map<string, string[]>()
@@ -244,7 +267,7 @@ async function rerunGate(repo: string, bump: Bump) {
 }
 
 const {values} = parseArgs({options: {pr: {type: 'string'}}})
-const builds = liveBuilds()
+const {builds, env} = liveBuilds()
 
 const repo = (
   await $`gh repo view --json nameWithOwner --jq .nameWithOwner`.text()
@@ -261,7 +284,7 @@ const live = entriesOf(readText(LIST)).flatMap(entry =>
 const result = {
   head: bump?.head ?? null,
   pinChanges: bump?.changes ?? [],
-  checks: await runLiveChecks(live),
+  checks: await runLiveChecks(live, env),
   reviews: await reviewAll(builds),
 }
 

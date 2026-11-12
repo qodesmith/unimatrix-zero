@@ -28,7 +28,7 @@ A live check is a test whose name starts with `[dep:<id>]`, in a `*.live.test.ts
 
 ## Checking the list: `bun run provider-checks`
 
-Live checks need the maintainer's signed-in account, so they never run in CI. On the maintainer's machine, with the `UZ_LIVE_*` variables the live tests' headers describe pointing at the pinned builds, `bun run provider-checks`:
+Live checks need the maintainer's signed-in account, so they never run in CI. They use the checkout's own dev data: run `bun run dev` in the checkout to be checked and connect Claude and ChatGPT, so it holds the pinned builds and both sign-ins. Then, on the maintainer's machine, `bun run provider-checks`:
 
 1. Runs every `[dep:]` live check.
 2. Has an agent on the maintainer's own `claude` login read each entry against the current code and the pinned builds, and report the ones that no longer hold on either side.
