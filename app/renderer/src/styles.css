@@ -79,6 +79,7 @@
   }
 }
 
+/* React Flow reads these variables. */
 .react-flow {
   --xy-background-color: var(--canvas-background);
   --xy-background-pattern-color: var(--canvas-dots);
@@ -95,19 +96,21 @@
   --xy-minimap-node-stroke-color: transparent;
 }
 
-/* Flow marks the highlighted Thread's edges `on-thread`. */
+/* React Flow's edge markup; Flow marks the highlighted Thread's edges
+   `on-thread`. */
 .react-flow__edge.on-thread .react-flow__edge-path {
   stroke: var(--thread-highlight);
   stroke-width: 2.5;
 }
 
+/* React Flow's node markup: a hovered Turn sits above its neighbors. */
 .react-flow__node:hover,
 .react-flow__node:focus-within {
   z-index: 1000 !important;
 }
 
-/* While orientation switches, the edges, which jump, stay hidden until the
-   Turns arrive. */
+/* React Flow's node and edge markup: while orientation switches, the edges,
+   which jump, stay hidden until the Turns arrive. */
 @media (prefers-reduced-motion: no-preference) {
   .canvas-switching .react-flow__node {
     transition: transform var(--transition-duration-slide) var(--ease-slide);
@@ -121,8 +124,8 @@
   transition: none;
 }
 
-/* Opacity, not visibility: React Flow marks each measured node visible, which
-   overrides a hidden parent. */
+/* React Flow's viewport markup. Opacity, not visibility: React Flow marks each
+   measured node visible, which overrides a hidden parent. */
 .canvas-fitting .react-flow__viewport {
   opacity: 0;
 }

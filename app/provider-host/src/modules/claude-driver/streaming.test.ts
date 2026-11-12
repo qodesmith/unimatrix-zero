@@ -284,6 +284,7 @@ async function warmThread(claude: Awaited<ReturnType<typeof setUp>>) {
   const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
   await claude.allClosed()
 
+  // Gone from `claude`'s own folder, so only the app's copy can bring it back.
   fs.rmSync(path.join(claude.configDir, 'projects'), {
     recursive: true,
     force: true,

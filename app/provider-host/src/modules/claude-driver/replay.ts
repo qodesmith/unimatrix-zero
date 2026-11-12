@@ -128,6 +128,7 @@ const renamed = new Map()
 let promptUuid = null
 let at = 0
 
+/** A Prompt sent with a \`uuid\` is stored under it, as \`claude\` does. */
 function rename(entry) {
   if (promptUuid && entry.type === 'user' && entry.uuid) {
     renamed.set(entry.uuid, promptUuid)

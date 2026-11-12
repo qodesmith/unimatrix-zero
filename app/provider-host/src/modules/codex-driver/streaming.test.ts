@@ -77,7 +77,13 @@ interface Report {
   forkedThrough: string | null
   interrupted: string | null
   reverted: string | null
-  ended: string | null
+  ended:
+    | 'input-closed'
+    | 'killed'
+    | 'refused'
+    | 'exited'
+    | `unexpected-${string}`
+    | null
 }
 
 const cleanUps: (() => Promise<void>)[] = []
