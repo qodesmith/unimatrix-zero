@@ -8,6 +8,7 @@ import type {
   StartReplyEvent,
 } from '@uz/contract/host'
 import type {Model} from '@uz/contract/providers'
+import type {Compaction} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -30,6 +31,8 @@ import {
 import {projectKeyOf} from './transcripts'
 
 /** As `warm.ndjson`, `resumed.ndjson` and `forked.ndjson` recorded them. */
+const DEFAULT_COMPACTION: Compaction = {auto: true, threshold: null}
+
 const SESSION_ID = '6b3fb527-e561-4b5c-810d-0ef9ac53978c'
 const FIRST_MESSAGE = '62e0dab1-d770-4979-863e-4df4e2be3150'
 const SECOND_MESSAGE = '7e7158ab-59c9-4e14-9828-54466ba8084e'
@@ -136,6 +139,7 @@ async function setUp(
     replyId?: string
     model?: string
     messageId?: ReplyRequest['prompt']['messageId']
+    compaction?: Compaction
   }
 
   const vendorProgram = {
@@ -154,6 +158,7 @@ async function setUp(
       replyId = crypto.randomUUID(),
       model = 'haiku',
       messageId = crypto.randomUUID(),
+      compaction = DEFAULT_COMPACTION,
     }: ReplyOptions = {}
   ) {
     const events: Streamed[] = []
@@ -167,6 +172,7 @@ async function setUp(
       prompt: {text, messageId},
       vendorProgram,
       session: session && {type: 'continue', ...session},
+      compaction,
     })) {
       events.push(event)
 

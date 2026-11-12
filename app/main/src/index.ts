@@ -30,6 +30,7 @@ import {
   openLink,
   setAppMenu,
 } from '#modules/window/main'
+import {compactionFor} from '@uz/contract/settings'
 import {app, dialog, ipcMain, protocol, session} from 'electron'
 import path from 'node:path'
 
@@ -147,6 +148,7 @@ function openWindow(db: Database) {
     publish: hub.publish,
     hosts,
     vendorProgramFor: provider => signInRequestFor(provider, machine),
+    compactionFor: provider => compactionFor(settings.read(), provider),
     now: () => new Date(),
     onTurnsChanged: treeRows.turnsChanged,
     onReplyFinished: finished => {

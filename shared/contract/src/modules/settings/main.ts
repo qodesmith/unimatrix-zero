@@ -1,3 +1,5 @@
+import type {ProviderId} from '#modules/providers/main'
+
 import {z} from 'zod'
 
 export const CanvasOrientationSchema = z.enum(['vertical', 'horizontal'])
@@ -17,7 +19,26 @@ export const SendKeySchema = z.enum(['enter', 'mod-enter'])
 /** In pixels. */
 export const FONT_SIZE = {min: 12, max: 24, step: 2}
 
-/** Global, never per Tree; a Setting changes nothing about what the AI does. */
+/**
+ * The Context sizes, in tokens, a Provider takes as the point to compact at.
+ * Claude refuses values outside its range. Codex compacts at 90% of the
+ * Context window at most, so `max` is 90% of its largest Model's window at
+ * the pinned version.
+ */
+export const COMPACTION_THRESHOLD = {
+  claude: {min: 100_000, max: 1_000_000},
+  chatgpt: {min: 20_000, max: 243_000},
+} satisfies Record<ProviderId, {min: number; max: number}>
+
+/** Null leaves it to the Provider: the Model's own limit. */
+function thresholdSchema({min, max}: {min: number; max: number}) {
+  return z.int().min(min).max(max).nullable()
+}
+
+/**
+ * Global, never per Tree. Only the Compaction Settings change what the AI
+ * does, in every Thread from its next Reply.
+ */
 export const SettingsSchema = z.strictObject({
   themeMode: ThemeModeSchema,
   canvasOrientation: CanvasOrientationSchema,
@@ -32,6 +53,10 @@ export const SettingsSchema = z.strictObject({
   /** The note above the Input before a step that re-reads the Thread cold. */
   reReadNote: z.boolean(),
   escStopsReply: z.boolean(),
+  /** Automatic Compaction; a Prompt of `/compact` still compacts. */
+  claudeAutoCompaction: z.boolean(),
+  claudeCompactionThreshold: thresholdSchema(COMPACTION_THRESHOLD.claude),
+  chatgptCompactionThreshold: thresholdSchema(COMPACTION_THRESHOLD.chatgpt),
 })
 
 export type Settings = z.infer<typeof SettingsSchema>
@@ -45,8 +70,37 @@ export const DEFAULT_SETTINGS: Settings = {
   sendKey: 'enter',
   reReadNote: true,
   escStopsReply: true,
+  claudeAutoCompaction: true,
+  claudeCompactionThreshold: null,
+  chatgptCompactionThreshold: null,
 }
 
 export const SettingsUpdateSchema = SettingsSchema.partial()
 
 export type SettingsUpdate = z.infer<typeof SettingsUpdateSchema>
+
+/** When a Provider compacts a Thread, as each Reply is sent with it. */
+export const CompactionSchema = z.strictObject({
+  /** False only for a Provider that can turn automatic Compaction off. */
+  auto: z.boolean(),
+  threshold: z.int().positive().nullable(),
+})
+
+export type Compaction = z.infer<typeof CompactionSchema>
+
+export function compactionFor(
+  settings: Settings,
+  provider: ProviderId
+): Compaction {
+  switch (provider) {
+    case 'claude':
+      return {
+        auto: settings.claudeAutoCompaction,
+        threshold: settings.claudeCompactionThreshold,
+      }
+    case 'chatgpt':
+      return {auto: true, threshold: settings.chatgptCompactionThreshold}
+    default:
+      throw new Error('Unknown Provider.')
+  }
+}

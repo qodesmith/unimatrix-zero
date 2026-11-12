@@ -9,6 +9,7 @@ import type {ApprovalAnswer, ReplyEvent} from '#modules/turns/main'
 
 import {VendorBuildSchema} from '#modules/manifest/main'
 import {ModelSchema, SignInUpdateSchema} from '#modules/providers/main'
+import {CompactionSchema} from '#modules/settings/main'
 import {ReplyEventSchema, ReplyPartSchema} from '#modules/turns/main'
 import {z} from 'zod'
 
@@ -101,6 +102,7 @@ export const ReplyRequestSchema = z.strictObject({
   vendorProgram: SignInRequestSchema,
   /** Null starts a session. */
   session: ReplySessionSchema.nullable(),
+  compaction: CompactionSchema,
 })
 
 export type ReplyRequest = z.infer<typeof ReplyRequestSchema>

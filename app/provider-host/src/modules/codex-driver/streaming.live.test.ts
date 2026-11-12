@@ -14,6 +14,7 @@ import type {
   SignInRequest,
   StartReplyEvent,
 } from '@uz/contract/host'
+import type {Compaction} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -43,6 +44,8 @@ const signedIn = process.env.UZ_LIVE_CODEX_HOME
 
 /** The Model ChatGPT's `model/list` marked as its default when recorded. */
 const MODEL = 'gpt-6.1-sol'
+
+const DEFAULT_COMPACTION: Compaction = {auto: true, threshold: null}
 
 function homeFrom(source: string) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-codex-'))
@@ -243,6 +246,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             configDir: home,
           },
           session: session && {...session, type: fork ? 'fork' : 'continue'},
+          compaction: DEFAULT_COMPACTION,
         })
       )
 
@@ -400,6 +404,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           ...session,
           type: rewind ? 'rewind' : 'continue',
         },
+        compaction: DEFAULT_COMPACTION,
       })) {
         events.push(event)
 
@@ -556,6 +561,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           prompt: {text, messageId: crypto.randomUUID()},
           vendorProgram: vendorProgram(home),
           session: session && {...session, type: 'continue'},
+          compaction: DEFAULT_COMPACTION,
         })
       )
 
@@ -677,6 +683,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             configDir: home,
           },
           session,
+          compaction: DEFAULT_COMPACTION,
         })
       )
     }
@@ -822,6 +829,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           configDir: home,
         },
         session: null,
+        compaction: DEFAULT_COMPACTION,
       })) {
         events.push(event)
 
@@ -908,6 +916,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             configDir: home,
           },
           session: session && {...session, type: 'continue'},
+          compaction: DEFAULT_COMPACTION,
         })
       )
 
@@ -998,6 +1007,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             configDir: home,
           },
           session: null,
+          compaction: DEFAULT_COMPACTION,
         })
       )
 
@@ -1068,6 +1078,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
             configDir: home,
           },
           session: null,
+          compaction: DEFAULT_COMPACTION,
         })
       )
 

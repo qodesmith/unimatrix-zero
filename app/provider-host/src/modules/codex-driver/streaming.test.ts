@@ -7,6 +7,7 @@ import type {
   SignInRequest,
   StartReplyEvent,
 } from '@uz/contract/host'
+import type {Compaction} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -35,6 +36,8 @@ const RESUMED_TURN = '01a168e8-7ae7-71d3-b6fa-169bec1fd887'
 const FORKED_THREAD_ID = '01a168e8-9d25-7df2-b2f4-208bfb1bbd5e'
 const FORKED_TURN = '01a168e8-9d50-7fb1-a539-2fd85f3c4b2b'
 const MODEL = 'gpt-6.1-sol'
+
+const DEFAULT_COMPACTION: Compaction = {auto: true, threshold: null}
 const ROLLOUT = `sessions/2026/10/23/rollout-2026-10-23T09-16-57-${THREAD_ID}.jsonl`
 const FORKED_ROLLOUT = `sessions/2026/10/23/rollout-2026-10-23T09-17-17-${FORKED_THREAD_ID}.jsonl`
 
@@ -182,7 +185,8 @@ async function setUp(
     {
       stopAfter = Infinity,
       model = MODEL,
-    }: {stopAfter?: number; model?: string} = {}
+      compaction = DEFAULT_COMPACTION,
+    }: {stopAfter?: number; model?: string; compaction?: Compaction} = {}
   ) {
     const replyId = crypto.randomUUID()
     const events: Streamed[] = []
@@ -196,6 +200,7 @@ async function setUp(
       prompt: {text, messageId: crypto.randomUUID()},
       vendorProgram,
       session: session && {type: 'continue', ...session},
+      compaction,
     })) {
       events.push(event)
 

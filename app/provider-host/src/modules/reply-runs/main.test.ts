@@ -17,6 +17,7 @@ const request: ReplyRequest = {
   prompt: {text: 'Hello', messageId: crypto.randomUUID()},
   vendorProgram: {program: null, configDir: '/config'},
   session: null,
+  compaction: {auto: true, threshold: null},
 }
 
 const delta: ContentEvent = {...ids, type: 'TEXT_DELTA', delta: 'Hi'}

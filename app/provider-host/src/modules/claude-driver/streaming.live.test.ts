@@ -16,6 +16,7 @@ import type {
   SessionRef,
   StartReplyEvent,
 } from '@uz/contract/host'
+import type {Compaction} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -98,6 +99,7 @@ function liveDriver(
   refuses: Parameters<typeof fakeStore>[0] = {}
 ) {
   let addedEnv = firstEnv
+  let compaction: Compaction = {auto: true, threshold: null}
   const store = fakeStore(refuses)
   const printed: string[] = []
 
@@ -155,6 +157,7 @@ function liveDriver(
         configDir,
       },
       session,
+      compaction,
     }
   }
 
@@ -176,6 +179,10 @@ function liveDriver(
     /** For each `claude` started from here on. */
     setEnv(env: Record<string, string>) {
       addedEnv = env
+    },
+    /** For each Reply from here on, as main reads it from Settings. */
+    setCompaction(next: Compaction) {
+      compaction = next
     },
     printed,
     entriesOf: (sessionId: string) =>
