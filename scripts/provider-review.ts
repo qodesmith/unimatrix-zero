@@ -40,6 +40,8 @@ const Output = z.looseObject({
 
 const TOOLS = ['Read', 'Grep', 'Glob', 'Bash(strings:*)', 'Bash(grep:*)']
 
+const TIME_LIMIT_MS = 10 * 60 * 1000
+
 function promptFor(entry: Entry, builds: Builds) {
   const fields = Object.entries(entry.fields).map(
     ([name, value]) => `- **${name}:** ${value}`
@@ -59,7 +61,7 @@ Decide whether it still holds, on both sides:
   ]
     .map(([name, version]) => `${name} ${version}`)
     .join(', ')}. The builds:
-  - claude: the binary ${builds.claudeProgram} (search it with strings or grep -a)
+  - claude: the binary ${builds.claudeProgram} (search it with \`strings <binary> | grep -F <text>\`; a regex over the binary itself runs for hours)
   - the Agent SDK: app/provider-host/node_modules/@anthropic-ai/claude-agent-sdk
   - the Codex app-server: the folder ${builds.codexFolder}, with the types generated from it in app/provider-host/src/modules/codex-driver/protocol/
 - App side: the code in this repo still does what "App side" says, so the entry still describes something.
@@ -114,14 +116,30 @@ export async function review(
       stdin: new Blob([promptFor(entry, builds)]),
       stdout: 'pipe',
       stderr: 'pipe',
+      detached: true,
     }
   )
+
+  // The whole group, so a search the reviewer started dies with it.
+  const limit = setTimeout(() => {
+    process.kill(-child.pid, 'SIGKILL')
+  }, TIME_LIMIT_MS)
 
   const [stdout, stderr] = await Promise.all([
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
     child.exited,
   ])
+
+  clearTimeout(limit)
+
+  if (child.signalCode === 'SIGKILL') {
+    return {
+      id: entry.id,
+      verdict: 'not reviewed',
+      reason: `ran past ${TIME_LIMIT_MS / 60_000} minutes`,
+    }
+  }
 
   const output = outputOf(stdout)
   const answer = output?.structured_output
