@@ -22,20 +22,11 @@ const VERDICTS = [
   'stale on both sides',
 ] as const
 
-const SCHEMA = {
-  type: 'object',
-  properties: {
-    verdict: {enum: VERDICTS},
-    evidence: {type: 'string'},
-  },
-  required: ['verdict', 'evidence'],
-}
+const Answer = z.object({verdict: z.enum(VERDICTS), evidence: z.string()})
 
 const Output = z.looseObject({
   subtype: z.string(),
-  structured_output: z
-    .object({verdict: z.enum(VERDICTS), evidence: z.string()})
-    .optional(),
+  structured_output: Answer.optional(),
 })
 
 const TOOLS = ['Read', 'Grep', 'Glob', 'Bash(strings:*)', 'Bash(grep:*)']
@@ -47,7 +38,7 @@ function promptFor(entry: Entry, builds: Builds) {
     ([name, value]) => `- **${name}:** ${value}`
   )
 
-  return `You are checking one entry of ${LIST}, the list of places where this app relies on what a vendor program or a Model happens to do. Read the top of that file for what each field means.
+  return `You are checking one entry of ${LIST}, the list of places where this app relies on what a vendor program (\`claude\`, Codex's app-server), the Agent SDK or a Model happens to do. Read the top of that file for what each field means.
 
 The entry:
 
@@ -98,7 +89,7 @@ export async function review(
       '--output-format',
       'json',
       '--json-schema',
-      JSON.stringify(SCHEMA),
+      JSON.stringify(z.toJSONSchema(Answer)),
       '--tools',
       'Read,Grep,Glob,Bash',
       '--allowedTools',

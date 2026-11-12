@@ -1,6 +1,6 @@
 # Provider dependencies
 
-The places where the app relies on what a vendor program (`claude`, the Agent SDK, Codex's app-server) or a Model happens to do, where an upgrade could change it without a type or a test noticing. The list started from the audit in [#203](https://github.com/qodesmith/unimatrix-zero/issues/203#issuecomment-6781652892).
+The places where the app relies on what a vendor program (`claude`, Codex's app-server), the Agent SDK or a Model happens to do, where an upgrade could change it without a type or a test noticing. The list started from the audit in [#203](https://github.com/qodesmith/unimatrix-zero/issues/203#issuecomment-6781652892).
 
 An entry goes stale from either side:
 

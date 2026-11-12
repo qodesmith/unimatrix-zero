@@ -2,25 +2,25 @@ import {describe, expect, it} from 'vitest'
 
 import {HOST_PACKAGE, MANIFEST, bumpOf} from './vendor-pins.ts'
 
-interface Tree {
+interface PinVersions {
   claude: string
   codex: string
   sdk: string
   other?: string
 }
 
-function files(tree: Tree) {
+function files(pins: PinVersions) {
   const manifest = {
     vendorPrograms: {
-      claude: {version: tree.claude, builds: {}},
-      codex: {version: tree.codex, builds: {}},
+      claude: {version: pins.claude, builds: {}},
+      codex: {version: pins.codex, builds: {}},
     },
   }
 
   const hostPackage = {
     dependencies: {
-      '@anthropic-ai/claude-agent-sdk': tree.sdk,
-      zod: tree.other ?? '^4.0.0',
+      '@anthropic-ai/claude-agent-sdk': pins.sdk,
+      zod: pins.other ?? '^4.0.0',
     },
   }
 
@@ -30,10 +30,14 @@ function files(tree: Tree) {
   ])
 }
 
-const PINNED: Tree = {claude: '2.1.307', codex: '0.163.0', sdk: '0.3.307'}
+const PINNED: PinVersions = {
+  claude: '2.1.307',
+  codex: '0.163.0',
+  sdk: '0.3.307',
+}
 
-function repo(head: Tree) {
-  const trees = new Map([
+function repo(head: PinVersions) {
+  const refs = new Map([
     ['fork-point', PINNED],
     ['head', head],
   ])
@@ -46,8 +50,8 @@ function repo(head: Tree) {
     const [, file = '', ref = ''] =
       /^repos\/o\/r\/contents\/(.+)\?ref=(.+)$/.exec(call) ?? []
 
-    const tree = trees.get(ref)
-    const content = tree && files(tree).get(file)
+    const pins = refs.get(ref)
+    const content = pins && files(pins).get(file)
 
     if (content === undefined) throw new Error(`Unexpected call: ${call}`)
 

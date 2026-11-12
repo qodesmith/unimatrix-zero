@@ -23,12 +23,14 @@ const root = path.resolve(import.meta.dirname, '..')
 const GATE_JOB = 'Provider checks on a vendor bump'
 const REVIEWERS = 4
 
-const Pulls = z.array(
-  z.looseObject({
-    number: z.number(),
-    base: z.looseObject({sha: z.string()}),
-    head: z.looseObject({sha: z.string()}),
-  })
+const PullPages = z.array(
+  z.array(
+    z.looseObject({
+      number: z.number(),
+      base: z.looseObject({sha: z.string()}),
+      head: z.looseObject({sha: z.string()}),
+    })
+  )
 )
 
 const VitestReport = z.looseObject({
@@ -123,9 +125,9 @@ function readText(file: string) {
 }
 
 async function findBump(repo: string, wanted: number | null) {
-  const open = Pulls.parse(
-    JSON.parse(await api(`repos/${repo}/pulls?state=open&per_page=100`))
-  )
+  const call = `repos/${repo}/pulls?state=open&per_page=100`
+  const pages = await $`gh api --paginate --slurp ${call}`.text()
+  const open = PullPages.parse(JSON.parse(pages)).flat()
 
   const bumps: Bump[] = []
 
@@ -175,6 +177,7 @@ async function runLiveChecks(ids: string[], env: Record<string, string>) {
       'run',
       'scripts/vitest.ts',
       'run',
+      '.live.test.ts',
       '--project',
       'node',
       '-t',
