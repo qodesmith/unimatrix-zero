@@ -203,7 +203,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **App side:** each driver's environment sets the switch. `vendor-program` re-hashes `claude` on every check, so a self-updated `claude` is downloaded again; for Codex it checks only the entrypoint and its note.
 - **User would see:** a vendor program that updates itself off the pin: `claude` downloaded again every time, and a Codex update that goes unnoticed.
 - **Changed by:** upgrade
-- **Check:** `[dep:self-updates-off]` in `claude-driver` and `codex-driver`: each pinned program still holds the switch's name. Whether it's honored has no check: testing it could update the program.
+- **Check:** `[dep:self-updates-off]` in `claude-driver` and `codex-driver`: each pinned program still holds the name of every switch its driver sets, this one included, so it also catches a renamed `cli_auth_credentials_store`. Whether it's honored has no check: testing it could update the program.
 
 ### A cut with no target resumes at the newest entry
 
