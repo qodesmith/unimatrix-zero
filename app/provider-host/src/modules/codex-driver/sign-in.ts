@@ -13,10 +13,10 @@ import {SIGN_IN_CANCELED, signInFailed} from '@uz/contract/providers'
 export const SIGN_IN_TIMEOUT_MS = 15 * 60 * 1000
 
 /** Starting a sign-in while another holds this port makes Codex cancel that one. */
-const SIGN_IN_PORT = 1455
+export const SIGN_IN_PORT = 1455
 
 /** Codex's message when OpenAI's page answers `missing_codex_entitlement`. */
-const NOT_ENTITLED = 'Codex is not enabled for your workspace'
+export const NOT_ENTITLED = 'Codex is not enabled for your workspace'
 
 const PLAN_NAMES = new Map([
   ['free', 'Free'],

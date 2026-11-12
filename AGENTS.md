@@ -19,3 +19,7 @@ US English (color, behavior, labeled, organize) everywhere you write: code, docs
 ### Code style
 
 Read [CODE_STYLE.md](./CODE_STYLE.md) before writing or reviewing code, a test or a doc: it names the skill and the topic file for each task.
+
+### Provider dependencies
+
+Read [docs/provider-dependencies.md](./docs/provider-dependencies.md) before changing code that relies on what `claude`, the Agent SDK, Codex or a Model does. A PR that adds a Provider dependency or workaround adds its entry there, with a live check or a reason; a PR that removes one removes its entry.
