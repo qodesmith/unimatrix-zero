@@ -35,8 +35,8 @@ export interface FakeClaudeOptions {
 const OPTIONS_VARIABLE = 'FAKE_CLAUDE_OPTIONS'
 
 /**
- * The nth `claude` started replays the nth of `recordings` and writes its
- * report to `<reports>/<n>.json`.
+ * The nth `claude` started replays the nth of `recordings` and records its
+ * run in `<reports>/<n>.json`.
  */
 export function fakeClaudeEnv(
   recordings: string[],
@@ -48,7 +48,7 @@ export function fakeClaudeEnv(
   }
 }
 
-export const FakeClaudeReportSchema = z.strictObject({
+export const FakeClaudeRunSchema = z.strictObject({
   args: z.array(z.string()),
   configDir: z.string(),
   /** The runs, by n, still going when this one started. */

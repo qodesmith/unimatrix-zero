@@ -21,7 +21,7 @@ import {afterEach, expect, it} from 'vitest'
 
 import {createClaudeDriver, spawnClaude} from './main'
 import {
-  FakeClaudeReportSchema,
+  FakeClaudeRunSchema,
   RECORDINGS,
   RecordedLineSchema,
   fakeClaudeEnv,
@@ -186,7 +186,7 @@ async function setUp(
       .readdirSync(reports)
       .toSorted((a, b) => Number.parseInt(a, 10) - Number.parseInt(b, 10))
       .map(file =>
-        FakeClaudeReportSchema.parse(
+        FakeClaudeRunSchema.parse(
           JSON.parse(fs.readFileSync(path.join(reports, file), 'utf8'))
         )
       )
