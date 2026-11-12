@@ -54,7 +54,7 @@ const answered: OneShotMessage[] = [
   {type: 'result', subtype: 'success', is_error: false, result: 'Otters'},
 ]
 
-it('asks claude once, with no tools, settings or saved session, and answers with the result', async () => {
+it('asks claude once, with no tools, settings or saved session and the prompt delivered as written, and answers with the result', async () => {
   const claude = fakeClaude(answered)
 
   const text = await runClaudeOneShot(
@@ -81,6 +81,7 @@ it('asks claude once, with no tools, settings or saved session, and answers with
         mcpServers: {},
         persistSession: false,
         maxTurns: 1,
+        verbatimPrompts: true,
         model: 'haiku',
       },
     },
