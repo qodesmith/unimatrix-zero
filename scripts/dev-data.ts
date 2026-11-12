@@ -42,10 +42,9 @@ export function devUserData(root: string) {
 }
 
 /**
- * The Keychain item `claude` keeps the sign-in of a dev folder's Claude config
- * folder under: `claude` hashes a config folder other than its default into
- * the name. `resume-config-swap-keychain` in `docs/provider-dependencies.md`.
- * The Keychain is macOS-only, so the path is joined POSIX-style everywhere.
+ * `claude` hashes a non-default config folder into its Keychain item's name
+ * (`resume-config-swap-keychain`). The Keychain is macOS-only, so the path is
+ * joined POSIX-style on every platform.
  */
 function claudeKeychainOf(appDataPath: string, folder: string) {
   const configDir = path.posix.join(appDataPath, folder, 'providers', 'claude')

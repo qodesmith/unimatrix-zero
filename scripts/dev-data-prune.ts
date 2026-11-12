@@ -1,8 +1,3 @@
-/**
- * `bun run dev-data:prune [--yes]`, by hand: lists, and with `--yes` deletes,
- * the dev data folders of checkouts `git worktree list` no longer names, with
- * the Claude Keychain entry of each.
- */
 import {$} from 'bun'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -17,14 +12,14 @@ import {
 
 const root = path.resolve(import.meta.dirname, '..')
 const {values} = parseArgs({options: {yes: {type: 'boolean', default: false}}})
-const folder = appData()
+const appDataPath = appData()
 
 const plan = planPrune({
-  appDataPath: folder,
+  appDataPath,
   checkouts: worktreesIn(
     await $`git -C ${root} worktree list --porcelain`.text()
-  ),
-  appDataEntries: fs.readdirSync(folder),
+  ).map(checkout => path.resolve(checkout)),
+  appDataEntries: fs.readdirSync(appDataPath),
   keychainServices:
     process.platform === 'darwin'
       ? keychainServicesIn(await $`security dump-keychain`.text())
@@ -41,10 +36,10 @@ if (plan.folders.length === 0) {
 
     if (!values.yes) continue
 
-    fs.rmSync(path.join(folder, name), {recursive: true, force: true})
-
     if (keychain)
       await $`security delete-generic-password -s ${keychain}`.quiet()
+
+    fs.rmSync(path.join(appDataPath, name), {recursive: true, force: true})
   }
 }
 
