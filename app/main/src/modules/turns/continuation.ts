@@ -9,7 +9,10 @@ import type {ProviderId} from '@uz/contract/providers'
 import type {Reply} from '@uz/contract/turns'
 
 import {schema} from '#modules/database/main'
+import {positionOf} from '#modules/sessions/main'
 import {and, eq, ne} from 'drizzle-orm'
+
+import {reaching, targetOf} from './reach'
 
 const {prompts, replies, systemPrompts} = schema
 
@@ -83,46 +86,85 @@ function resumed(
   const before =
     parentReplyId === null
       ? null
-      : continuation(db, treeId, parentReplyId, row.promptId)
+      : planned(db, treeId, parentReplyId, row.promptId)
 
   const session = before?.session ?? null
 
-  if (session?.type === 'fork' || !answered(db, row.id, except)) {
-    return session
+  return (
+    session && keepingPrompt(db, row, session, answered(db, row.id, except))
+  )
+}
+
+/**
+ * `session` is where the Reply above goes on; `forks` when `row` has a Prompt
+ * after it.
+ */
+function keepingPrompt(
+  db: Database,
+  row: ReplyRow,
+  session: ContinuedSession,
+  forks: boolean
+): ContinuedSession {
+  const own = ownPrompt(db, row)
+
+  if (own && own.sessionId !== session.sessionId) {
+    return {type: forks ? 'fork' : 'continue', ...own}
   }
 
-  return session && {type: 'fork', ...sessionRef(session)}
+  if (session.type !== 'fork' && !forks) return session
+
+  return {type: 'fork', ...sessionRef(session), ...own}
 }
 
 function sessionRef({sessionId, messageId}: SessionRef) {
   return {sessionId, messageId}
 }
 
-/** Keeps the Reply, or only its Prompt when its Provider never saved it. */
+/**
+ * The Reply's session at its Prompt, when the app's copy holds that Prompt. A
+ * Reply that began a fork has it in a session the Reply above was never in.
+ */
+function ownPrompt(db: Database, row: ReplyRow): SessionRef | null {
+  const {sessionId, sessionPromptId: messageId} = row
+
+  if (sessionId === null || messageId === null) return null
+
+  return positionOf(db, sessionId, messageId) === null
+    ? null
+    : {sessionId, messageId}
+}
+
+/** The Reply, or only its Prompt when its Provider never saved it. */
+function lastKept(row: ReplyRow, session: SessionRef) {
+  return row.sessionMessageId === null
+    ? (promptIn(session, row) ?? session.messageId)
+    : session.messageId
+}
+
 function cutBack(
   row: ReplyRow,
   session: SessionRef,
   dropFrom: string
 ): DeletionCut {
-  const keepThrough =
-    row.sessionMessageId === null
-      ? (promptIn(session, row) ?? session.messageId)
-      : session.messageId
-
-  return {type: 'cut', ...sessionRef(session), keepThrough, dropFrom}
+  return {
+    type: 'cut',
+    ...sessionRef(session),
+    keepThrough: lastKept(row, session),
+    dropFrom,
+  }
 }
 
-/**
- * Forks when the Reply already has a Prompt after it other than `except`, the
- * one being run again. A Reply its Provider never saved continues from the
- * Reply its Prompt answers, and a session still holding deleted Turns is cut.
- */
-export function continuation(
+interface Plan extends Continuation {
+  /** The last entry a `continue` keeps of its session. */
+  lastKept: string | null
+}
+
+function planned(
   db: Database,
   treeId: string,
   replyId: string,
   except?: string
-): Continuation | null {
+): Plan | null {
   const row = db
     .select()
     .from(replies)
@@ -140,10 +182,42 @@ export function continuation(
 
   return {
     provider: row.provider,
+    lastKept: session && lastKept(row, session),
     session:
       session?.type === 'continue' && dropFrom !== null
         ? cutBack(row, session, dropFrom)
         : session,
+  }
+}
+
+/**
+ * Forks when the Reply already has a Prompt after it other than `except`, the
+ * one being run again. A Reply its Provider never saved continues from the
+ * Reply its Prompt answers, or from its own Prompt in a fork it began, and a
+ * session still holding deleted Turns is cut. A session that compacted after
+ * the Reply is forked from the part before.
+ */
+export function continuation(
+  db: Database,
+  treeId: string,
+  replyId: string,
+  except?: string
+): Continuation | null {
+  const plan = planned(db, treeId, replyId, except)
+
+  if (!plan) return null
+
+  const {provider, session} = plan
+
+  return {
+    provider,
+    session:
+      session &&
+      reaching(
+        db,
+        session,
+        session.type === 'continue' ? plan.lastKept : targetOf(session)
+      ),
   }
 }
 

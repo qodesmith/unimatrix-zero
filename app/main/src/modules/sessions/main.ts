@@ -11,7 +11,7 @@ import type {ProviderId} from '@uz/contract/providers'
 
 import {schema} from '#modules/database/main'
 import {SessionEntrySchema} from '@uz/contract/host'
-import {and, asc, eq, max} from 'drizzle-orm'
+import {and, asc, eq, isNotNull, lte, max} from 'drizzle-orm'
 
 const {sessionEntries, sessionFiles} = schema
 
@@ -40,6 +40,26 @@ function whereKey(provider: ProviderId, key: SessionKey) {
     inFolder(sessionEntries, provider, key),
     eq(sessionEntries.subpath, key.subpath ?? '')
   )
+}
+
+/**
+ * Where the entry `uuid` sits in the session's own transcript, counting up, or
+ * null when the app's copy doesn't hold it.
+ */
+export function positionOf(db: Database, sessionId: string, uuid: string) {
+  const entry = db
+    .select({position: sessionEntries.position})
+    .from(sessionEntries)
+    .where(
+      and(
+        eq(sessionEntries.sessionId, sessionId),
+        eq(sessionEntries.subpath, ''),
+        eq(sessionEntries.uuid, uuid)
+      )
+    )
+    .get()
+
+  return entry?.position ?? null
 }
 
 /**
@@ -96,11 +116,39 @@ export function createSessions(
     })
   }
 
-  function load(provider: ProviderId, key: SessionKey): SessionEntry[] | null {
+  function upTo(provider: ProviderId, key: SessionKey, through: string) {
+    const last = db
+      .select({position: sessionEntries.position})
+      .from(sessionEntries)
+      .where(and(whereKey(provider, key), eq(sessionEntries.uuid, through)))
+      .get()
+
+    if (!last) throw new Error('The session holds no entry to end at.')
+
+    return and(
+      lte(sessionEntries.position, last.position),
+      isNotNull(sessionEntries.uuid)
+    )
+  }
+
+  /**
+   * `through` gives the session as it was at that entry. Entries with no
+   * `uuid` are left out of it: one can point Claude at a later entry.
+   */
+  function load(
+    provider: ProviderId,
+    key: SessionKey,
+    through?: string
+  ): SessionEntry[] | null {
     const rows = db
       .select({entry: sessionEntries.entry})
       .from(sessionEntries)
-      .where(whereKey(provider, key))
+      .where(
+        and(
+          whereKey(provider, key),
+          through === undefined ? undefined : upTo(provider, key, through)
+        )
+      )
       .orderBy(asc(sessionEntries.position))
       .all()
 
@@ -174,7 +222,7 @@ export function createSessions(
 
         return null
       case 'load':
-        return load(provider, request.key)
+        return load(provider, request.key, request.through)
       case 'list-subkeys':
         return listSubkeys(provider, request.projectKey, request.sessionId)
       case 'save-files':

@@ -63,7 +63,10 @@ function forgetTranscript(sessionId: string) {
   )
 }
 
-function liveDriver(files: string[], addedEnv: Record<string, string> = {}) {
+function liveDriver(files: string[], firstEnv: Record<string, string> = {}) {
+  let addedEnv = firstEnv
+  const store = fakeStore()
+
   const recorder = createRecorder(
     ({command, args, cwd, env, signal}) =>
       spawn(command, args, {cwd, env, signal, stdio: 'pipe'}),
@@ -75,7 +78,7 @@ function liveDriver(files: string[], addedEnv: Record<string, string> = {}) {
   const start = recording ? recorder.spawn : spawnClaude
 
   const driver = createClaudeDriver({
-    store: fakeStore().client,
+    store: store.client,
     spawn: options => {
       // `claudeEnvironment` strips every `CLAUDE_*` variable from the host's.
       const child = start({...options, env: {...options.env, ...addedEnv}})
@@ -133,6 +136,12 @@ function liveDriver(files: string[], addedEnv: Record<string, string> = {}) {
     request,
     reply,
     closed,
+    /** For each `claude` started from here on. */
+    setEnv(env: Record<string, string>) {
+      addedEnv = env
+    },
+    entryCount: (sessionId: string) =>
+      store.entriesOf(projectKeyOf(configDir), sessionId).length,
     async done() {
       await closed()
 
@@ -143,6 +152,54 @@ function liveDriver(files: string[], addedEnv: Record<string, string> = {}) {
 
 function continuing(session: SessionRef, fork = false): ReplySession {
   return {...session, type: fork ? 'fork' : 'continue'}
+}
+
+/** Served only through the Reply, which sits before a Compaction. */
+function reaching(session: ReplyRecorded['session']): ReplySession {
+  return {...session, type: 'fork', servedThrough: session.messageId}
+}
+
+type Live = ReturnType<typeof liveDriver>
+
+const RECALL =
+  'Name my code word, my ship, my color, my pet and my bird, in that order. Write NONE for each one I never told you.'
+
+async function failedOn(live: Live, request: ReplyRequest) {
+  const events = await Array.fromAsync(live.driver.startReply(request))
+
+  expect(events.at(-1)).toMatchObject({type: 'RUN_FINISHED', status: 'failed'})
+
+  return events
+}
+
+/**
+ * Three Exchanges, compacted inside the third. The threshold is lowered only
+ * for them: every later `claude` starts without it.
+ */
+async function compactedThread(live: Live) {
+  live.setEnv({CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '0.2'})
+
+  const padding = 'The harbor log lists no ships today. '.repeat(300)
+  const first = await live.reply('My code word is TEAL.', null)
+
+  const second = await live.reply(
+    `My ship is PELICAN. Ignore the rest of this message. ${padding}`,
+    continuing(first.recorded.session)
+  )
+
+  const third = await live.reply(
+    'My color is CRIMSON.',
+    continuing(second.recorded.session)
+  )
+
+  expect(third.events).toContainEqual(
+    expect.objectContaining({type: 'CONTEXT_COMPACTED'})
+  )
+
+  await live.closed()
+  live.setEnv({})
+
+  return {first, third}
 }
 
 describe.skipIf(!program || !configDir)('a live Claude', () => {
@@ -422,4 +479,157 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     await live.done()
   }, 300_000)
+
+  it('reaches a Reply before a Compaction for a Branch, a Retry and a send after deleting Turns, each in a new session that goes on without the Turns dropped', async () => {
+    const live = liveDriver([])
+    const {first} = await compactedThread(live)
+    const target = first.recorded.session
+    const kept = live.entryCount(target.sessionId)
+
+    const branch = await live.reply(RECALL, reaching(target))
+
+    expect(branch.recorded.session.sessionId).not.toBe(target.sessionId)
+    expect(textOf(branch.events)).toMatch(/TEAL/)
+    expect(textOf(branch.events)).not.toMatch(/PELICAN|CRIMSON/i)
+
+    await failedOn(live, {
+      ...live.request('My pet is FERRET.', reaching(target)),
+      model: 'claude-made-up-0',
+    })
+
+    const retried = await live.reply('My bird is OSPREY.', reaching(target))
+
+    expect(retried.recorded.session.sessionId).not.toBe(target.sessionId)
+
+    await live.closed()
+
+    const afterRetry = await live.reply(
+      RECALL,
+      continuing(retried.recorded.session)
+    )
+
+    expect(afterRetry.recorded.session.sessionId).toBe(
+      retried.recorded.session.sessionId
+    )
+    expect(textOf(afterRetry.events)).toMatch(/TEAL/)
+    expect(textOf(afterRetry.events)).toMatch(/OSPREY/)
+    expect(textOf(afterRetry.events)).not.toMatch(/PELICAN|CRIMSON|FERRET/i)
+
+    const sent = await live.reply('My pet is WOMBAT.', reaching(target))
+
+    expect(sent.recorded.session.sessionId).not.toBe(target.sessionId)
+
+    await live.closed()
+
+    const afterDeletion = await live.reply(
+      RECALL,
+      continuing(sent.recorded.session)
+    )
+
+    expect(textOf(afterDeletion.events)).toMatch(/TEAL/)
+    expect(textOf(afterDeletion.events)).toMatch(/WOMBAT/)
+    expect(textOf(afterDeletion.events)).not.toMatch(/PELICAN|CRIMSON|OSPREY/i)
+    expect(live.entryCount(target.sessionId)).toBe(kept)
+
+    await live.done()
+  }, 600_000)
+
+  it('reaches a Reply before a Compaction in a session an earlier Retry rewound', async () => {
+    const live = liveDriver([])
+    const first = await live.reply('My code word is TEAL.', null)
+
+    await failedOn(live, {
+      ...live.request('My pet is FERRET.', continuing(first.recorded.session)),
+      model: 'claude-made-up-0',
+    })
+    await live.closed()
+
+    const retried = await live.reply('My bird is OSPREY.', {
+      ...first.recorded.session,
+      type: 'rewind',
+    })
+
+    const third = await live.reply(
+      'My color is CRIMSON.',
+      continuing(retried.recorded.session)
+    )
+
+    const compacting = await Array.fromAsync(
+      live.driver.startReply(
+        live.request('/compact', continuing(third.recorded.session))
+      )
+    )
+
+    expect(compacting).toContainEqual(
+      expect.objectContaining({type: 'CONTEXT_COMPACTED'})
+    )
+
+    await live.closed()
+
+    const reached = await live.reply(RECALL, reaching(retried.recorded.session))
+
+    expect(textOf(reached.events)).toMatch(/TEAL/)
+    expect(textOf(reached.events)).toMatch(/OSPREY/)
+    expect(textOf(reached.events)).not.toMatch(/CRIMSON|FERRET/i)
+
+    await live.done()
+  }, 600_000)
+
+  it('gets a Reply to the next message after a Prompt too long for the Model, from the last Reply before it', async () => {
+    const live = liveDriver([])
+    const first = await live.reply('My code word is TEAL.', null)
+
+    const filler = 'The quick brown fox jumps over the lazy dog. '.repeat(
+      60_000
+    )
+
+    const tooLong = await failedOn(
+      live,
+      live.request(
+        `${filler}My ship is PELICAN.`,
+        continuing(first.recorded.session)
+      )
+    )
+
+    expect(tooLong.at(-1)).toMatchObject({failure: {code: 'too-long'}})
+    expect(tooLong).toContainEqual(
+      expect.objectContaining({
+        type: 'CONTEXT_COMPACTED',
+        sessionId: first.recorded.session.sessionId,
+        boundaryId: expect.stringMatching(/^[\da-f-]{36}$/),
+      })
+    )
+
+    const next = await live.reply(
+      'My bird is OSPREY.',
+      reaching(first.recorded.session)
+    )
+
+    await live.closed()
+
+    const after = await live.reply(RECALL, continuing(next.recorded.session))
+
+    expect(textOf(after.events)).toMatch(/TEAL/)
+    expect(textOf(after.events)).toMatch(/OSPREY/)
+    expect(textOf(after.events)).not.toMatch(/PELICAN/i)
+
+    await live.done()
+  }, 600_000)
+
+  it('still serves the whole session to reach a Reply after its Compaction', async () => {
+    const live = liveDriver([])
+    const {third} = await compactedThread(live)
+
+    const branch = await live.reply(
+      RECALL,
+      continuing(third.recorded.session, true)
+    )
+
+    expect(branch.recorded.session.sessionId).not.toBe(
+      third.recorded.session.sessionId
+    )
+    expect(textOf(branch.events)).toMatch(/CRIMSON/)
+
+    await live.done()
+  }, 600_000)
 })
