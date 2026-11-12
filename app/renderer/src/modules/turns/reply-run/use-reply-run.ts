@@ -10,7 +10,6 @@ import {useReplyStore} from '../use-live-reply'
 import {askToRetry, askToStop} from './actions'
 import {initialReplyRun, replyRunTransition} from './machine'
 
-/** True when the event moved the Reply's run. */
 function sendRun(store: ReplyStore, replyId: string, event: ReplyRunEvent) {
   const before = store.state.runs[replyId] ?? initialReplyRun
   const after = replyRunTransition(before, event)

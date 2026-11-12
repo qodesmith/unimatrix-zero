@@ -14,7 +14,7 @@ export type ThemeMode = z.infer<typeof ThemeModeSchema>
  */
 export const SendKeySchema = z.enum(['enter', 'mod-enter'])
 
-/** The font size's floor, ceiling and step, in pixels. */
+/** In pixels. */
 export const FONT_SIZE = {min: 12, max: 24, step: 2}
 
 /** Global, never per Tree; a Setting changes nothing about what the AI does. */

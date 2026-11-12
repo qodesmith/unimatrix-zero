@@ -1,3 +1,4 @@
+import type {FakeCodexOptions} from './replay'
 import type {
   PromptRecorded,
   ReplyRecorded,
@@ -18,7 +19,12 @@ import path from 'node:path'
 import {afterEach, expect, it, vi} from 'vitest'
 
 import {createCodexDriver, spawnCodex} from './main'
-import {replayCodex} from './replay'
+import {
+  FakeCodexRunSchema,
+  RECORDINGS,
+  fakeCodexEnv,
+  replayCodex,
+} from './replay'
 import {folderOf} from './rollouts'
 
 /** As `started.ndjson`, `resumed.ndjson` and `forked.ndjson` recorded them. */
@@ -60,27 +66,6 @@ const RECONNECTED_TURN = '01a1c264-7f60-77f1-8637-990e960884d7'
 const COMPACTED_THREAD_ID = '01a1c55f-23dd-7593-a186-df8b3a434f75'
 
 type Streamed = StartReplyEvent
-
-interface Report {
-  args: string[]
-  home: string
-  cwd: string
-  vendorVariables: string[]
-  methods: string[]
-  prompts: string[]
-  /** At each `thread/start`, `thread/fork` and `thread/resume`. */
-  threadModels: (string | null)[]
-  turnModels: (string | null)[]
-  modelLists: object[]
-  resumedFrom: {type: string; id: string}[]
-  /** At each `turn/start`, the ids of what the thread held. */
-  contexts: string[][]
-  forkedThrough: string | null
-  interrupted: string | null
-  reverted: string | null
-  /** `input-closed`, `killed`, `refused`, `exited`, or what it didn't expect. */
-  ended: string | null
-}
 
 const cleanUps: (() => Promise<void>)[] = []
 
@@ -138,8 +123,8 @@ async function setUp(
   recordings: string[],
   {
     store = fakeStore(),
-    env = {},
-  }: {store?: ReturnType<typeof fakeStore>; env?: Record<string, string>} = {}
+    ...behavior
+  }: {store?: ReturnType<typeof fakeStore>} & FakeCodexOptions = {}
 ) {
   const fake = await replayCodex()
   cleanUps.push(fake.cleanUp)
@@ -164,15 +149,13 @@ async function setUp(
       ELECTRON_RUN_AS_NODE: '1',
       OPENAI_API_KEY: 'sk-outranks-the-plan',
       CODEX_HOME: '/Users/sam/.codex',
-      FAKE_CODEX_RECORDINGS: recordings
-        .map(name =>
-          path.isAbsolute(name)
-            ? name
-            : path.join(import.meta.dirname, 'recordings', name)
-        )
-        .join(path.delimiter),
-      FAKE_CODEX_REPORTS: reports,
-      ...env,
+      ...fakeCodexEnv(
+        recordings.map(name =>
+          path.isAbsolute(name) ? name : path.join(RECORDINGS, name)
+        ),
+        reports,
+        behavior
+      ),
     },
     whenIdle: idle.whenIdle,
   })
@@ -224,12 +207,14 @@ async function setUp(
     return events
   }
 
-  function reportsSoFar(): Report[] {
+  function reportsSoFar() {
     return fs
       .readdirSync(reports)
       .toSorted((a, b) => Number.parseInt(a, 10) - Number.parseInt(b, 10))
       .map(file =>
-        JSON.parse(fs.readFileSync(path.join(reports, file), 'utf8'))
+        FakeCodexRunSchema.parse(
+          JSON.parse(fs.readFileSync(path.join(reports, file), 'utf8'))
+        )
       )
   }
 
@@ -514,10 +499,6 @@ function compactionsIn(events: Streamed[]) {
   return events.filter(event => event.type === 'CONTEXT_COMPACTED')
 }
 
-/**
- * In `compacted.ndjson` the first turn fills the thread and the second starts
- * by compacting it.
- */
 async function compactingThread(recording: string) {
   const codex = await setUp([recording])
   const filled = await codex.reply('Reply with the single word TEAL.')
@@ -810,7 +791,8 @@ it('doesn’t cut again when Codex stops after the cut and a new app-server take
 
   const codex = await setUp([resumedThenReverted(), 'resumed.ndjson'], {
     store: opened.store,
-    env: {FAKE_CODEX_EXIT_AT: 'turn/start', FAKE_CODEX_EXITS: '1'},
+    exitAt: 'turn/start',
+    exits: 1,
   })
 
   extendSavedRollout(opened.store, codex.configDir, 'interrupted', 'failed')
@@ -965,7 +947,6 @@ it('fails the Reply when the app has no copy of the Provider session', async () 
 
 const REFUSED = 'Input exceeds the maximum length of 1048576 characters.'
 
-/** `started.ndjson` with the turn refused as over the text cap. */
 function refusedOverCap(counts: {max_chars: unknown; actual_chars: unknown}) {
   return edited('started.ndjson', text => {
     const lines = text.split('\n')
@@ -1031,7 +1012,7 @@ it('fails the Reply as too long, without counts, when Codex refuses a Prompt ove
 
 it('fails the Reply when a new Codex also stops before answering', async () => {
   const codex = await setUp(['started.ndjson', 'started.ndjson'], {
-    env: {FAKE_CODEX_EXIT_AT: 'turn/start'},
+    exitAt: 'turn/start',
   })
 
   const events = await codex.reply(FIRST_PROMPT)
@@ -1053,7 +1034,7 @@ it('fails the Reply when a new Codex also stops before answering', async () => {
 
 it('fails the Reply as a crash, keeping its text, when Codex stops mid-stream', async () => {
   const codex = await setUp(['started.ndjson'], {
-    env: {FAKE_CODEX_EXIT_AT: 'thread/tokenUsage/updated'},
+    exitAt: 'thread/tokenUsage/updated',
   })
 
   const events = await codex.reply(FIRST_PROMPT)
@@ -1155,7 +1136,8 @@ it('names when a limit lifts by a full window a later update leaves out', async 
 
 it('takes the Prompt to a new app-server when the last one stopped unheard', async () => {
   const codex = await setUp(['started.ndjson', 'started.ndjson'], {
-    env: {FAKE_CODEX_EXIT_AT: 'turn/start', FAKE_CODEX_EXITS: '1'},
+    exitAt: 'turn/start',
+    exits: 1,
   })
 
   const events = await codex.reply(FIRST_PROMPT)
@@ -1170,7 +1152,8 @@ it('takes the Prompt to a new app-server when the last one stopped unheard', asy
 
 it('fails the Reply rather than send the Prompt again when Codex stops after accepting it', async () => {
   const codex = await setUp(['started.ndjson', 'started.ndjson'], {
-    env: {FAKE_CODEX_EXIT_AT: 'turn/started', FAKE_CODEX_EXITS: '1'},
+    exitAt: 'turn/started',
+    exits: 1,
   })
 
   const events = await codex.reply(FIRST_PROMPT)

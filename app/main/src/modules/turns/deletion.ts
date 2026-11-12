@@ -18,7 +18,6 @@ export interface Removal {
   cut: ReturnType<typeof cutBelow>
 }
 
-/** Sets the cut on the Reply above in the same step. */
 export function removeTurns(tx: Writer, {promptIds, cut}: Removal) {
   if (cut) {
     tx.update(replies)

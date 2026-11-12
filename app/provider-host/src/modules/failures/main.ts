@@ -47,11 +47,9 @@ export class RequestRefused extends Error {
 export interface FailureSignals {
   /** In seconds since the epoch; it wins over the message's time. */
   resetsAt?: number | undefined
-  /** Claude rejected the turn for a usage limit, with or without a reset time. */
   limitRejected?: boolean | undefined
   refusal?: Refusal | undefined
   codexErrorInfo?: unknown
-  /** Claude's `terminal_reason`. */
   terminalReason?: TerminalReason | undefined
 }
 

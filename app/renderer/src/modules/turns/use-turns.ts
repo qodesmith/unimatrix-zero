@@ -6,7 +6,6 @@ import {useQuery, useQueryClient} from '@tanstack/react-query'
 
 import {addSent, removeDeleted, turnsKey} from './saved-turns'
 
-/** A Tree's saved Prompts and Replies. */
 export function useTurns(treeId: string) {
   return useQuery({
     queryKey: turnsKey(treeId),

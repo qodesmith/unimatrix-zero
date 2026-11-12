@@ -3,7 +3,6 @@ import {useEffect, useLayoutEffect, useRef} from 'react'
 import {fontSizeFor} from '../font-size'
 import {useSettings, useUpdateSettings} from '../use-settings'
 
-/** Sets the root font size, which every `rem` of text follows. */
 export function FollowFontSize() {
   const {fontSize} = useSettings()
   const update = useUpdateSettings()

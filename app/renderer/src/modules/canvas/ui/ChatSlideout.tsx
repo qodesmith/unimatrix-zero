@@ -83,7 +83,6 @@ export function ChatSlideout({
     return elsewhere ? false : (opener.current ?? false)
   }
 
-  // Opening at a Turn, or following a send to its Reply, scrolls there and puts the user in the Input.
   useLayoutEffect(() => {
     const turn = scroller?.querySelector(`[data-chat-turn="${scrollToTurnId}"]`)
 
@@ -110,7 +109,6 @@ export function ChatSlideout({
     input.current?.focus({preventScroll: true})
   }, [open, scrollToTurnId, scroller])
 
-  // The Thread stays on the newest text until the user scrolls up.
   useEffect(() => {
     const inner = content.current
 

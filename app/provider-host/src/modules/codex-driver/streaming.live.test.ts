@@ -3,10 +3,8 @@
  * UZ_LIVE_CODEX_HOME=<userData>/providers/chatgpt\
  * bun run test:node app/provider-host/src/modules/codex-driver/streaming.live
  *
- * With `UZ_LIVE_CODEX_PROGRAM` alone, only the tests that need no sign-in run.
- *
- * `UZ_RECORD=yes` writes the `recordings/` the driver tests replay. Record one
- * test at a time with `-t`: the ids the driver tests pin change each time.
+ * `UZ_RECORD=yes` rewrites `recordings/`. Record one test at a time with `-t`:
+ * the ids the driver tests pin change each time.
  */
 import type {
   PromptRecorded,

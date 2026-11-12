@@ -43,8 +43,7 @@ interface FollowOptions {
 
 /**
  * Keeps a streaming Reply's bottom, its Input included, on the canvas while it
- * grows. Panning that bottom away lets the Reply go; panning back follows it
- * again.
+ * grows; panning that bottom away lets it go, panning back follows it again.
  */
 export function useFollow({
   index,

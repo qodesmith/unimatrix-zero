@@ -4,7 +4,6 @@ import {PROVIDER_NAMES} from '@uz/contract/providers'
 
 import {ABOUT} from '../about'
 
-/** The Provider's icon, named for screen readers. */
 export function ProviderMark({provider}: {provider: ProviderId}) {
   return (
     <span

@@ -22,7 +22,6 @@ function dialogView(state: TreeDeleteState) {
   }
 }
 
-/** Deleting a Tree after asking. */
 export function useTreeDelete(treeId: string) {
   const [state, send] = useStateMachine({
     transition: treeDeleteTransition,

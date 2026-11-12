@@ -644,7 +644,6 @@ async function chipDrawn() {
     .toBeVisible()
 }
 
-/** Text the canvas shows as a Turn, not as a draft in an Input. */
 function shownOnCanvas(text: string) {
   return canvas()
     .getByText(text, {exact: true})
@@ -2150,7 +2149,6 @@ function endingIn(status: Reply['status'], text = 'Reply two'): Saved {
 const COMPACTED =
   'Compacted here. The AI remembers earlier Turns from a summary.'
 
-/** Top to bottom, the Compaction markers among the Turns' texts. */
 function downThrough(surface: Locator, ...texts: string[]) {
   return [...texts, COMPACTED]
     .flatMap(text =>

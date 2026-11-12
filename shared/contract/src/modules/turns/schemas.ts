@@ -4,7 +4,6 @@ import {z} from 'zod'
 export const PromptSchema = z.strictObject({
   id: z.uuid(),
   treeId: z.uuid(),
-  /** Null for the root Prompt. */
   parentReplyId: z.uuid().nullable(),
   text: z.string(),
   createdAt: z.iso.datetime(),
@@ -119,7 +118,6 @@ const replyIds = {
 
 const replyEvent = {
   ...replyIds,
-  /** Set when a Subagent of the Reply did it. */
   subagentId: z.string().optional(),
 }
 

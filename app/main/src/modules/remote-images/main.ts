@@ -28,10 +28,6 @@ function redirectTarget(from: URL, response: Response) {
     : null
 }
 
-/**
- * A redirect may change host, but never leave the web, nor drop to http when
- * the chip was https.
- */
 function refusedHop(requested: URL, next: URL) {
   if (next.protocol === 'https:') return null
 

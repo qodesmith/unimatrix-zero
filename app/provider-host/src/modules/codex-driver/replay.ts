@@ -20,24 +20,69 @@ const RecordedLineSchema = z.discriminatedUnion('kind', [
 
 export type RecordedLine = z.infer<typeof RecordedLineSchema>
 
+export interface FakeCodexOptions {
+  /** Exits, as a crash would, when it reads or would write this method. */
+  exitAt?: string
+  /** Only this many runs, from the first, exit at `exitAt`. */
+  exits?: number
+}
+
+const OPTIONS_VARIABLE = 'FAKE_CODEX_OPTIONS'
+
 /**
- * The nth `codex app-server` started replays the nth of
- * `FAKE_CODEX_RECORDINGS`, matching each message by method. Like `codex`, it
- * resumes or forks only a thread whose rollout is in place under `sessions/`,
- * and a revert writes the thread a new rollout that points into the old one
- * just before the reverted turn.
+ * The nth `codex app-server` started replays the nth of `recordings` and
+ * records its run in `<reports>/<n>.json`.
+ */
+export function fakeCodexEnv(
+  recordings: string[],
+  reports: string,
+  options: FakeCodexOptions = {}
+) {
+  return {
+    [OPTIONS_VARIABLE]: JSON.stringify({recordings, reports, ...options}),
+  }
+}
+
+const NullableStringSchema = z.string().nullable()
+
+export const FakeCodexRunSchema = z.strictObject({
+  args: z.array(z.string()),
+  home: z.string(),
+  cwd: z.string(),
+  vendorVariables: z.array(z.string()),
+  methods: z.array(z.string()),
+  prompts: z.array(z.string()),
+  threadModels: z.array(NullableStringSchema),
+  turnModels: z.array(NullableStringSchema),
+  modelLists: z.array(z.looseObject({})),
+  resumedFrom: z.array(z.looseObject({type: z.string(), id: z.string()})),
+  /** At each `turn/start`, the ids of what the thread held. */
+  contexts: z.array(z.array(z.string())),
+  forkedThrough: NullableStringSchema,
+  interrupted: NullableStringSchema,
+  reverted: NullableStringSchema,
+  ended: z
+    .union([
+      z.enum(['input-closed', 'killed', 'refused', 'exited']),
+      z.templateLiteral(['unexpected-', z.string()]),
+    ])
+    .nullable(),
+})
+
+/**
+ * Matches each message by method. Like `codex`, it resumes or forks only a
+ * thread whose rollout is in place under `sessions/`, and a revert writes the
+ * thread a new rollout that points into the old one just before the reverted
+ * turn.
  */
 const SCRIPT = `
 import fs from 'node:fs'
 import path from 'node:path'
 
-const reports = process.env.FAKE_CODEX_REPORTS
+const options = JSON.parse(process.env.${OPTIONS_VARIABLE})
+const reports = options.reports
 const run = fs.readdirSync(reports).length
 const reportFile = path.join(reports, run + '.json')
-fs.writeFileSync(reportFile, '{}')
-const recording = process.env.FAKE_CODEX_RECORDINGS.split(path.delimiter)[run]
-const [, ...steps] = fs.readFileSync(recording, 'utf8')
-  .split('\\n').filter(Boolean).map(line => JSON.parse(line))
 const home = process.env.CODEX_HOME
 const standIn = ${JSON.stringify(CODEX_HOME_STAND_IN)}
 const vendorVariables = Object.keys(process.env).filter(name => /^(OPENAI|CODEX|ANTHROPIC|CLAUDE)_/i.test(name))
@@ -47,6 +92,9 @@ function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
 }
 save()
+const recording = options.recordings[run]
+const [, ...steps] = fs.readFileSync(recording, 'utf8')
+  .split('\\n').filter(Boolean).map(line => JSON.parse(line))
 
 function rollouts() {
   const sessions = path.join(home, 'sessions')
@@ -90,7 +138,7 @@ const ids = new Map()
 let at = 0
 
 function exitsHere(method) {
-  return method !== undefined && method === process.env.FAKE_CODEX_EXIT_AT && run < Number(process.env.FAKE_CODEX_EXITS ?? Infinity)
+  return method !== undefined && method === options.exitAt && run < (options.exits ?? Infinity)
 }
 
 function write(message) {
