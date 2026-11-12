@@ -92,7 +92,8 @@ export async function review(
       '--output-format',
       'json',
       '--json-schema',
-      JSON.stringify(z.toJSONSchema(Answer)),
+      // claude rejects Zod's default $schema, draft 2020-12.
+      JSON.stringify(z.toJSONSchema(Answer, {target: 'draft-07'})),
       '--tools',
       'Read,Grep,Glob,Bash',
       '--allowedTools',
