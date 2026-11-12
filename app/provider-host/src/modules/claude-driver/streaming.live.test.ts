@@ -19,11 +19,18 @@ import type {
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
+import {isReplyEvent} from '@uz/contract/host'
+import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {spawn} from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
+import {createInterface} from 'node:readline'
 import {describe, expect, it} from 'vitest'
+import {z} from 'zod'
 
+import {planOf, readAccount} from './account'
+import {claudeEnvironment} from './environment'
 import {createClaudeDriver, spawnClaude} from './main'
 import {createRecorder} from './recording'
 import {RECORDINGS} from './replay'
@@ -41,6 +48,27 @@ function textOf(events: Streamed[]) {
     .join('')
 }
 
+function shownText(events: Streamed[]) {
+  return events
+    .filter(isReplyEvent)
+    .reduce(foldReplyEvent, NEW_REPLY)
+    .content.flatMap(part => (part.type === 'text' ? [part.text] : []))
+    .join('')
+}
+
+const OutLine = z.looseObject({
+  type: z.string(),
+  subtype: z.string().optional(),
+  terminal_reason: z.string().optional(),
+  is_error: z.boolean().optional(),
+  errors: z.array(z.string()).optional(),
+  message: z.looseObject({model: z.string().optional()}).optional(),
+})
+
+function linesOf(printed: string[]) {
+  return printed.map(line => OutLine.parse(JSON.parse(line)))
+}
+
 function recordedIn(events: Streamed[]) {
   const recorded = events.find(
     (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
@@ -51,21 +79,27 @@ function recordedIn(events: Streamed[]) {
   return recorded
 }
 
-function forgetTranscript(sessionId: string) {
-  fs.rmSync(
-    path.join(
-      configDir,
-      'projects',
-      projectKeyOf(configDir),
-      `${sessionId}.jsonl`
-    ),
-    {force: true}
+function transcriptOf(sessionId: string) {
+  return path.join(
+    configDir,
+    'projects',
+    projectKeyOf(configDir),
+    `${sessionId}.jsonl`
   )
 }
 
-function liveDriver(files: string[], firstEnv: Record<string, string> = {}) {
+function forgetTranscript(sessionId: string) {
+  fs.rmSync(transcriptOf(sessionId), {force: true})
+}
+
+function liveDriver(
+  files: string[],
+  firstEnv: Record<string, string> = {},
+  refuses: Parameters<typeof fakeStore>[0] = {}
+) {
   let addedEnv = firstEnv
-  const store = fakeStore()
+  const store = fakeStore(refuses)
+  const printed: string[] = []
 
   const recorder = createRecorder(
     ({command, args, cwd, env, signal}) =>
@@ -82,6 +116,9 @@ function liveDriver(files: string[], firstEnv: Record<string, string> = {}) {
     spawn: options => {
       // `claudeEnvironment` strips every `CLAUDE_*` variable from the host's.
       const child = start({...options, env: {...options.env, ...addedEnv}})
+      createInterface({input: child.stdout}).on('line', line =>
+        printed.push(line)
+      )
       exits.push(
         new Promise(resolve => {
           child.on('exit', resolve)
@@ -140,6 +177,9 @@ function liveDriver(files: string[], firstEnv: Record<string, string> = {}) {
     setEnv(env: Record<string, string>) {
       addedEnv = env
     },
+    printed,
+    entriesOf: (sessionId: string) =>
+      store.entriesOf(projectKeyOf(configDir), sessionId),
     entryCount: (sessionId: string) =>
       store.entriesOf(projectKeyOf(configDir), sessionId).length,
     async done() {
@@ -160,6 +200,28 @@ function reaching(session: ReplyRecorded['session']): ReplySession {
 }
 
 type Live = ReturnType<typeof liveDriver>
+
+/**
+ * Runs the real `claude` and writes to `ended` whether it exited by itself or
+ * was killed. The SDK runs a `.mjs` with the `node` on PATH.
+ */
+function exitWatcher(ended: string) {
+  return `
+import {spawn} from 'node:child_process'
+import fs from 'node:fs'
+const ended = how => fs.writeFileSync(${JSON.stringify(ended)}, how)
+const child = spawn(${JSON.stringify(program)}, process.argv.slice(2), {stdio: 'inherit'})
+process.on('SIGTERM', () => {
+  ended('killed')
+  child.kill('SIGKILL')
+  process.exit(143)
+})
+child.on('exit', code => {
+  ended('exited')
+  process.exit(code ?? 1)
+})
+`
+}
 
 const RECALL =
   'Name my code word, my ship, my color, my pet and my bird, in that order. Write NONE for each one I never told you.'
@@ -203,7 +265,7 @@ async function compactedThread(live: Live) {
 }
 
 describe.skipIf(!program || !configDir)('a live Claude', () => {
-  it('streams, continues warm, resumes from the app’s copy alone, then forks mid-Thread', async () => {
+  it('[dep:project-key-copy] [dep:resume-config-swap-keychain] streams into the project folder the app computes, continues warm, resumes signed in from the app’s copy alone, then forks mid-Thread', async () => {
     const live = liveDriver(['warm.ndjson', 'resumed.ndjson', 'forked.ndjson'])
 
     const first = await live.reply('Reply with the single word TEAL.', null)
@@ -218,6 +280,12 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     )
 
     await live.closed()
+
+    expect(fs.existsSync(transcriptOf(first.recorded.session.sessionId))).toBe(
+      true
+    )
+    expect(live.entryCount(first.recorded.session.sessionId)).toBeGreaterThan(0)
+
     forgetTranscript(first.recorded.session.sessionId)
 
     const third = await live.reply(
@@ -242,7 +310,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 180_000)
 
-  it('stops a Reply mid-stream and continues warm from it, then rewinds a session to an earlier Reply', async () => {
+  it('[dep:cut-short-replies] [dep:stop-terminal-reason] stops a Reply mid-stream, which claude ends as aborted yet still marks an error, noting the stop in the session, and continues warm from it, then rewinds a session to an earlier Reply', async () => {
     const live = liveDriver([
       'stopped.ndjson',
       'rewound-warm.ndjson',
@@ -267,6 +335,9 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     expect(textOf(events).length).toBeGreaterThan(0)
     expect(events.at(-1)).toMatchObject({status: 'stopped'})
+    expect(
+      linesOf(live.printed).find(line => line.type === 'result')
+    ).toMatchObject({terminal_reason: 'aborted_streaming', is_error: true})
     const stopped = recordedIn(events)
 
     const asked = await live.reply(
@@ -275,6 +346,9 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     )
 
     expect(asked.recorded.session.sessionId).toBe(stopped.session.sessionId)
+    expect(JSON.stringify(live.entriesOf(stopped.session.sessionId))).toContain(
+      '[Request interrupted by user]'
+    )
 
     const first = await live.reply('Reply with the single word TEAL.', null)
 
@@ -632,4 +706,142 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     await live.done()
   }, 600_000)
+
+  it('[dep:synthetic-model-name] marks the message it makes up for a failed Reply by the Model name <synthetic>, with no isSynthetic flag', async () => {
+    const live = liveDriver([])
+
+    await failedOn(live, {
+      ...live.request('Reply with the single word TEAL.', null),
+      model: 'claude-made-up-0',
+    })
+
+    const madeUp = linesOf(live.printed).filter(
+      line => line.type === 'assistant' && line.message?.model === '<synthetic>'
+    )
+
+    expect(madeUp.length).toBeGreaterThan(0)
+    expect(madeUp.filter(line => 'isSynthetic' in line)).toEqual([])
+
+    await live.done()
+  }, 180_000)
+
+  it('[dep:stream-event-order] [dep:prompt-stored-under-app-uuid] shows a Reply’s text once, and stores the Prompt under the id the app gave it', async () => {
+    const live = liveDriver([])
+    const request = live.request('Reply with the single word TEAL.', null)
+    const events = await Array.fromAsync(live.driver.startReply(request))
+
+    expect(events.at(-1)).toMatchObject({status: 'complete'})
+    expect(shownText(events).trim()).toMatch(/^TEAL\.?$/)
+
+    const {sessionId} = recordedIn(events).session
+
+    expect(live.entriesOf(sessionId)).toContainEqual(
+      expect.objectContaining({type: 'user', uuid: request.prompt.messageId})
+    )
+
+    await live.done()
+  }, 180_000)
+
+  it('[dep:refused-resume-no-init] refuses to resume a session it doesn’t have without ever sending init', async () => {
+    const live = liveDriver([])
+
+    await failedOn(
+      live,
+      live.request('Reply with the single word TEAL.', {
+        type: 'continue',
+        sessionId: crypto.randomUUID(),
+        messageId: crypto.randomUUID(),
+      })
+    )
+
+    const lines = linesOf(live.printed)
+
+    expect(lines).toContainEqual(
+      expect.objectContaining({
+        type: 'result',
+        errors: [
+          expect.stringMatching(/^No conversation found with session ID/),
+        ],
+      })
+    )
+    expect(
+      lines.filter(line => line.type === 'system' && line.subtype === 'init')
+    ).toEqual([])
+
+    await live.done()
+  }, 180_000)
+
+  it('[dep:sdk-session-store-alpha] leaves a Reply unrecorded when the app’s copy refuses every entry', async () => {
+    const live = liveDriver([], {}, {append: 'The store is full.'})
+
+    const events = await Array.fromAsync(
+      live.driver.startReply(
+        live.request('Reply with the single word TEAL.', null)
+      )
+    )
+
+    expect(events.at(-1)).toMatchObject({status: 'complete'})
+    expect(events.filter(event => event.type === 'REPLY_RECORDED')).toEqual([])
+
+    await live.done()
+  }, 180_000)
+
+  it('[dep:cut-with-no-target-resumes-at-newest] still resumes at the newest entry, failed attempt and all, for a cut that names nothing to keep', async () => {
+    const live = liveDriver([])
+    const first = await live.reply('Reply with the single word TEAL.', null)
+
+    await failedOn(live, {
+      ...live.request(
+        'Remember the codeword ZANZIBAR and reply with it.',
+        continuing(first.recorded.session)
+      ),
+      model: 'claude-made-up-0',
+    })
+    await live.closed()
+
+    const after = await live.reply(
+      'Quote every message I sent you before this one, word for word.',
+      {
+        ...first.recorded.session,
+        type: 'cut',
+        keepThrough: null,
+        dropFrom: null,
+      }
+    )
+
+    expect(textOf(after.events)).toMatch(/ZANZIBAR/i)
+
+    await live.done()
+  }, 180_000)
+
+  it('[dep:plan-from-subscription-type] [dep:claude-exits-on-input-end] names the account’s plan, and exits by itself once its input ends', async () => {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-exit-'))
+    const watcher = path.join(folder, 'claude.mjs')
+    const ended = path.join(folder, 'ended')
+    fs.writeFileSync(watcher, exitWatcher(ended))
+
+    try {
+      const {account} = await readAccount({
+        program: watcher,
+        env: claudeEnvironment(process.env, configDir),
+        cwd: configDir,
+      })
+
+      expect(fs.readFileSync(ended, 'utf8')).toBe('exited')
+      expect(planOf(account.subscriptionType ?? '')).not.toBeNull()
+    } finally {
+      fs.rmSync(folder, {recursive: true, force: true})
+    }
+  }, 120_000)
+
+  it('[dep:self-updates-off] holds every switch the app sets beside its config folder', () => {
+    const binary = fs.readFileSync(program)
+
+    const switches = Object.keys(claudeEnvironment({}, configDir)).filter(
+      name => !name.startsWith('CLAUDE_')
+    )
+
+    expect(switches.length).toBeGreaterThan(0)
+    expect(switches.filter(name => !binary.includes(name))).toEqual([])
+  })
 })

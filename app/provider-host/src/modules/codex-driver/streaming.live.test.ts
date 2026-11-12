@@ -17,8 +17,10 @@ import type {
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
+import {programOf} from '#modules/vendor-program/main'
 import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
+import {spawnSync} from 'node:child_process'
 import {once} from 'node:events'
 import fs from 'node:fs'
 import http from 'node:http'
@@ -28,9 +30,13 @@ import path from 'node:path'
 import {describe, expect, it} from 'vitest'
 import {z} from 'zod'
 
+import {startAppServer} from './app-server'
+import {CODEX_ARGS, codexEnvironment} from './environment'
 import {createCodexDriver, spawnCodex} from './main'
+import {portFree} from './port'
 import {createRecorder} from './recording'
 import {RECORDINGS} from './replay'
+import {NOT_ENTITLED, SIGN_IN_PORT} from './sign-in'
 
 const folder = process.env.UZ_LIVE_CODEX_PROGRAM
 const signedIn = process.env.UZ_LIVE_CODEX_HOME
@@ -86,6 +92,81 @@ async function startProxy() {
   }
 }
 
+const WireLine = z.looseObject({
+  id: z.union([z.number(), z.string()]).optional(),
+  method: z.string().optional(),
+  params: z
+    .looseObject({
+      itemId: z.string().optional(),
+      item: z.looseObject({id: z.string(), type: z.string()}).optional(),
+    })
+    .optional(),
+})
+
+function wireLinesIn(output: Buffer[]) {
+  return Buffer.concat(output)
+    .toString('utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map(line => WireLine.parse(JSON.parse(line)))
+}
+
+function agentMessagesIn(output: Buffer[]) {
+  const lines = wireLinesIn(output)
+
+  const streamed = [
+    ...new Set(
+      lines.flatMap(({method, params}) =>
+        method === 'item/agentMessage/delta' && params?.itemId
+          ? [params.itemId]
+          : []
+      )
+    ),
+  ]
+
+  const finished = lines.flatMap(({method, params}) =>
+    method === 'item/completed' && params?.item?.type === 'agentMessage'
+      ? [params.item.id]
+      : []
+  )
+
+  return {streamed, finished}
+}
+
+const MANIFEST = path.resolve(
+  import.meta.dirname,
+  '../../../../main/src/modules/vendor-programs/dev-manifest.json'
+)
+
+const PROTOCOL = path.join(import.meta.dirname, 'protocol')
+
+const PinnedManifest = z.looseObject({
+  vendorPrograms: z.looseObject({
+    codex: z.looseObject({version: z.string()}),
+  }),
+})
+
+function programIn(pinned: string) {
+  return programOf({
+    path: pinned,
+    build: {
+      url: 'https://example.com/codex.tar.gz',
+      sha256: '0'.repeat(64),
+      size: 1,
+      archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+    },
+  })
+}
+
+function filesIn(root: string) {
+  return new Map(
+    fs
+      .readdirSync(root, {recursive: true, encoding: 'utf8'})
+      .filter(name => fs.statSync(path.join(root, name)).isFile())
+      .map(name => [name, fs.readFileSync(path.join(root, name), 'utf8')])
+  )
+}
+
 function expectComplete(events: Streamed[]) {
   const last = events.at(-1)
 
@@ -94,7 +175,7 @@ function expectComplete(events: Streamed[]) {
 }
 
 describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
-  it('streams, continues the loaded thread, resumes from the app’s copy alone, then forks mid-Thread', async () => {
+  it('[dep:codex-rollout-files] streams, continues the loaded thread, appending to one rollout under sessions/, resumes from the app’s copy alone, then forks mid-Thread', async () => {
     if (!folder || !signedIn) return
 
     const store = fakeStore()
@@ -129,6 +210,10 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     async function closed() {
       idle.pass()
       await Promise.all(exits)
+    }
+
+    function savedRollouts(session: SessionRef) {
+      return [...store.filesOf('codex', session.sessionId).values()]
     }
 
     async function reply(
@@ -181,6 +266,11 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         true
       )
 
+      const [rollout, ...others] = savedRollouts(opened.recorded.session)
+
+      expect(others).toEqual([])
+      expect(rollout?.path).toMatch(/^sessions\/.+\/rollout-[^/]+\.jsonl$/)
+
       const continued = await reply(
         first,
         home,
@@ -191,6 +281,14 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       expect(continued.recorded.session.sessionId).toBe(
         opened.recorded.session.sessionId
       )
+
+      const [appended] = savedRollouts(continued.recorded.session)
+      const before = Buffer.from(rollout?.base64 ?? '', 'base64')
+      const after = Buffer.from(appended?.base64 ?? '', 'base64')
+
+      expect(appended?.path).toBe(rollout?.path)
+      expect(after.length).toBeGreaterThan(before.length)
+      expect(after.subarray(0, before.length).equals(before)).toBe(true)
 
       await closed()
 
@@ -232,7 +330,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 180_000)
 
-  it('stops a Reply mid-stream and continues after it, then rewinds the loaded thread for a Retry', async () => {
+  it('[dep:codex-thread-revert] stops a Reply mid-stream and continues after it, then rewinds the loaded thread for a Retry', async () => {
     if (!folder || !signedIn) return
 
     const store = fakeStore()
@@ -391,7 +489,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 180_000)
 
-  it('cuts an unloaded thread from a mid-Thread Prompt, dropping every Turn after it, then resumes from the app’s copy alone', async () => {
+  it('[dep:codex-thread-revert] cuts an unloaded thread from a mid-Thread Prompt, dropping every Turn after it, then resumes from the app’s copy alone', async () => {
     if (!folder || !signedIn) return
 
     const store = fakeStore()
@@ -534,7 +632,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 180_000)
 
-  it('forgets a failed Prompt once the next is sent from the Reply above it, for two failures in one thread', async () => {
+  it('[dep:codex-history-databases] forgets a failed Prompt once the next is sent from the Reply above it, for two failures in one thread, the second from a rollout written over the one Codex’s databases saw', async () => {
     if (!folder || !signedIn) return
 
     const home = homeFrom(signedIn)
@@ -641,6 +739,15 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         second.recorded.session
       )
 
+      idle.pass()
+      await Promise.all(exits)
+
+      expect(
+        fs
+          .readdirSync(home, {recursive: true, encoding: 'utf8'})
+          .some(file => file.endsWith('.sqlite'))
+      ).toBe(true)
+
       const third = await reply(recall, {
         ...second.recorded.session,
         type: 'rewind',
@@ -659,7 +766,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 180_000)
 
-  it('shows only the message Codex starts over after its connection drops mid-Reply', async () => {
+  it('[dep:codex-reconnect-new-message] shows only the message Codex starts over, as a new item that leaves the first unfinished, after its connection drops mid-Reply', async () => {
     if (!folder || !signedIn) return
 
     const proxy = await startProxy()
@@ -674,11 +781,14 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     const exits: Promise<unknown>[] = []
     const start = recording ? recorder.spawn : spawnCodex
 
+    const output: Buffer[] = []
+
     const driver = createCodexDriver({
       store: fakeStore().client,
       spawn: (command, options) => {
         const child = start(command, options)
         exits.push(once(child, 'exit').catch(() => undefined))
+        child.stdout.on('data', (chunk: Buffer) => output.push(chunk))
 
         return child
       },
@@ -733,6 +843,12 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       expect(lines.slice(1)).toEqual(
         Array.from({length: 50}, (_, index) => String(index + 1))
       )
+
+      const {streamed, finished} = agentMessagesIn(output)
+
+      expect(streamed.length).toBeGreaterThanOrEqual(2)
+      expect(finished).not.toContain(streamed[0])
+      expect(finished).toContain(streamed.at(-1))
 
       idle.pass()
       await Promise.all(exits)
@@ -837,6 +953,75 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       fs.rmSync(home, {recursive: true, force: true})
     }
   }, 300_000)
+
+  it('[dep:codex-server-requests-refused] runs a shell command for the AI without sending the app one server request', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const idle = heldIdle()
+    const exits: Promise<unknown>[] = []
+    const output: Buffer[] = []
+
+    const driver = createCodexDriver({
+      store: fakeStore().client,
+      spawn: (command, options) => {
+        const child = spawnCodex(command, options)
+        exits.push(once(child, 'exit').catch(() => undefined))
+        child.stdout.on('data', (chunk: Buffer) => output.push(chunk))
+
+        return child
+      },
+      whenIdle: idle.whenIdle,
+    })
+
+    try {
+      const events = await Array.fromAsync(
+        driver.startReply({
+          treeId: crypto.randomUUID(),
+          replyId: crypto.randomUUID(),
+          model: MODEL,
+          systemPrompt: 'You answer in as few words as you can.',
+          prompt: {
+            text: 'Run `pwd` in your shell, then reply with only what it printed.',
+            messageId: crypto.randomUUID(),
+          },
+          vendorProgram: {
+            program: {
+              path: folder,
+              build: {
+                url: 'https://example.com/codex.tar.gz',
+                sha256: '0'.repeat(64),
+                size: 1,
+                archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+              },
+            },
+            configDir: home,
+          },
+          session: null,
+        })
+      )
+
+      expectComplete(events)
+
+      const lines = wireLinesIn(output)
+
+      expect(
+        lines.some(
+          ({method, params}) =>
+            method === 'item/completed' &&
+            params?.item?.type === 'commandExecution'
+        )
+      ).toBe(true)
+      expect(
+        lines.filter(line => line.id !== undefined && line.method !== undefined)
+      ).toEqual([])
+
+      idle.pass()
+      await Promise.all(exits)
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 180_000)
 })
 
 describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
@@ -896,6 +1081,92 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
       idle.pass()
       await Promise.all(exits)
     } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  })
+
+  it('[dep:codex-protocol-types] generates the protocol/ types committed for it', () => {
+    if (!folder) return
+
+    const {version} = PinnedManifest.parse(
+      JSON.parse(fs.readFileSync(MANIFEST, 'utf8'))
+    ).vendorPrograms.codex
+
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-protocol-'))
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-codex-'))
+
+    try {
+      // The standalone app-server has no generator: the full `codex` does.
+      const generated = spawnSync(
+        'bunx',
+        [`@openai/codex@${version}`, 'app-server', 'generate-ts', '--out', out],
+        {encoding: 'utf8', env: {...process.env, CODEX_HOME: home}}
+      )
+
+      expect({
+        status: generated.status,
+        stderr: generated.stderr,
+      }).toMatchObject({
+        status: 0,
+      })
+
+      const committed = filesIn(PROTOCOL)
+      const fresh = filesIn(out)
+      const names = new Set([...committed.keys(), ...fresh.keys()])
+
+      expect(
+        [...names].filter(name => committed.get(name) !== fresh.get(name))
+      ).toEqual([])
+    } finally {
+      fs.rmSync(out, {recursive: true, force: true})
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:self-updates-off] holds every setting the app passes it', () => {
+    if (!folder) return
+
+    const program = programIn(folder)
+
+    const binary = fs.readFileSync(program)
+
+    const settings = CODEX_ARGS.filter(arg => arg !== '-c').map(
+      arg => arg.split('=')[0] ?? ''
+    )
+
+    expect(settings.length).toBeGreaterThan(0)
+    expect(settings.filter(name => !binary.includes(name))).toEqual([])
+  })
+
+  it('[dep:codex-sign-in-port-and-refusal] holds the refused-workspace wording the app matches, and takes the sign-in port for a sign-in', async () => {
+    if (!folder) return
+
+    const program = programIn(folder)
+
+    expect(fs.readFileSync(program).includes(NOT_ENTITLED)).toBe(true)
+
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-codex-'))
+
+    const server = await startAppServer(
+      spawnCodex,
+      {command: program, args: CODEX_ARGS},
+      {cwd: home, env: codexEnvironment(process.env, home)}
+    )
+
+    try {
+      expect(
+        await portFree(SIGN_IN_PORT),
+        'another sign-in holds the port: close it and run again'
+      ).toBe(true)
+
+      const login = await server.request('account/login/start', {
+        type: 'chatgpt',
+      })
+
+      await expect.poll(async () => portFree(SIGN_IN_PORT)).toBe(false)
+      await server.request('account/login/cancel', {loginId: login.loginId})
+    } finally {
+      await server.close()
       fs.rmSync(home, {recursive: true, force: true})
     }
   })

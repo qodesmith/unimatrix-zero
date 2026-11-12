@@ -59,13 +59,35 @@ jobs:
       - if: matrix.renderer
         run: bun run test:renderer
 
+  provider-checks:
+    name: Provider checks on a vendor bump
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - run: bun install --frozen-lockfile
+      # Re-run this job once `bun run provider-checks` has posted its result.
+      - run: bun run scripts/provider-checks-gate.ts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
   ci:
     name: CI
     if: always()
-    needs: [checks, unit]
+    needs: [checks, unit, provider-checks]
     runs-on: ubuntu-latest
     steps:
       - run: |
           echo "checks: ${{ needs.checks.result }}"
           echo "unit: ${{ needs.unit.result }}"
-          test "${{ needs.checks.result }}" = success && test "${{ needs.unit.result }}" = success
+          echo "provider-checks: ${{ needs.provider-checks.result }}"
+          test "${{ needs.checks.result }}" = success && test "${{ needs.unit.result }}" = success && test "${{ needs.provider-checks.result }}" = success

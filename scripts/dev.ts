@@ -1,14 +1,15 @@
 import type {RolldownWatcher} from 'rolldown'
 
-import {createHash, randomBytes} from 'node:crypto'
+import {randomBytes} from 'node:crypto'
 import path from 'node:path'
 import {build, createServer} from 'vite'
 
+import {checkoutHash, devDataFolderName} from './dev-data'
 import {electronPath} from './electron-as-node'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-const worktree = createHash('sha256').update(root).digest('hex').slice(0, 8)
+const worktree = checkoutHash(root)
 
 // fetch refuses the Fetch spec's "bad ports", so main can't proxy to Vite on
 // one. These are the ones inside the ranges below.
@@ -29,7 +30,7 @@ const debugPort = worktreePort(9222, 1000)
 const fakeProvider = process.argv.includes('--fake')
 
 // A fake connection saved in the real data would pass for a real one.
-const dataFolder = `unimatrix-zero-dev-${worktree}${fakeProvider ? '-fake' : ''}`
+const dataFolder = devDataFolderName(root, fakeProvider)
 
 const scriptNonce = randomBytes(16).toString('base64')
 
