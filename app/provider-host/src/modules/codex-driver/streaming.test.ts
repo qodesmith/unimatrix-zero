@@ -7,7 +7,7 @@ import type {
   SignInRequest,
   StartReplyEvent,
 } from '@uz/contract/host'
-import type {Compaction} from '@uz/contract/settings'
+import type {CompactionSettings} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -37,7 +37,7 @@ const FORKED_THREAD_ID = '01a168e8-9d25-7df2-b2f4-208bfb1bbd5e'
 const FORKED_TURN = '01a168e8-9d50-7fb1-a539-2fd85f3c4b2b'
 const MODEL = 'gpt-6.1-sol'
 
-const DEFAULT_COMPACTION: Compaction = {auto: true, threshold: null}
+const DEFAULT_COMPACTION: CompactionSettings = {auto: true, threshold: null}
 const ROLLOUT = `sessions/2026/10/23/rollout-2026-10-23T09-16-57-${THREAD_ID}.jsonl`
 const FORKED_ROLLOUT = `sessions/2026/10/23/rollout-2026-10-23T09-17-17-${FORKED_THREAD_ID}.jsonl`
 
@@ -186,7 +186,11 @@ async function setUp(
       stopAfter = Infinity,
       model = MODEL,
       compaction = DEFAULT_COMPACTION,
-    }: {stopAfter?: number; model?: string; compaction?: Compaction} = {}
+    }: {
+      stopAfter?: number
+      model?: string
+      compaction?: CompactionSettings
+    } = {}
   ) {
     const replyId = crypto.randomUUID()
     const events: Streamed[] = []
@@ -359,7 +363,7 @@ it('continues the Provider session in the app-server that has it loaded, then cl
   expect(reports[0]?.ended).toBe('input-closed')
 })
 
-it('resumes the Provider session from the app’s copy alone, written back under its own name', async () => {
+it('resumes the Provider session from the app’s copy alone, written back under its own name, with an empty config for the default Compaction threshold', async () => {
   const opened = await setUp(['started.ndjson'])
   const first = await opened.reply(FIRST_PROMPT)
   const second = await opened.reply(SECOND_PROMPT, recordedIn(first))
@@ -380,6 +384,7 @@ it('resumes the Provider session from the app’s copy alone, written back under
   const [report] = codex.reports()
 
   expect(report?.methods).toContain('thread/resume')
+  expect(report?.threadConfigs).toEqual([{}])
   expect(report?.resumedFrom.map(line => line.id)).toEqual([
     THREAD_ID,
     FIRST_TURN,

@@ -155,6 +155,10 @@ _Avoid_: Folder, project, group
 The single place for the user's global preferences: how the app looks and behaves, and the defaults new Trees start from. Settings never changes an existing Tree, except the Compaction Settings, which apply to every Thread from its next Reply; anything else that shapes what the AI does in one Tree belongs to that Tree.
 _Avoid_: Preferences, options, config
 
+**Compaction Settings**:
+The global Settings that decide when a Provider makes a Compaction on its own: a threshold for each Provider, the Context size it compacts at, and for Claude a switch that turns automatic Compaction off. They reach every Thread from its next Reply; an unset threshold leaves it to the Model.
+_Avoid_: Compaction (that is the event), auto-compact settings
+
 **Font size**:
 The base size of all text in the app, a Setting. Text grows with it, and so do the widths that cap a line of it; spacing and the canvas's Zoom stay as they are.
 _Avoid_: Text size, zoom

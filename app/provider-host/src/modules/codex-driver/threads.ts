@@ -8,9 +8,25 @@ export interface LoadedThread {
   path: string | null
 }
 
-/** Codex's own default, with nothing in `config`, for a null threshold. */
 export function configOf(threshold: number | null) {
-  return threshold === null
-    ? {}
-    : {config: {model_auto_compact_token_limit: threshold}}
+  return threshold === null ? {} : {model_auto_compact_token_limit: threshold}
+}
+
+export function loadThread(
+  threads: Map<string, LoadedThread>,
+  opened: {thread: {id: string; path: string | null}; model: string},
+  turns: string[],
+  threshold: number | null
+): LoadedThread {
+  const thread = {
+    id: opened.thread.id,
+    model: opened.model,
+    threshold,
+    turns,
+    path: opened.thread.path,
+  }
+
+  threads.set(thread.id, thread)
+
+  return thread
 }

@@ -25,7 +25,7 @@ import {limitLifts} from './rate-limits'
 import {createReplyMapper, turnOf} from './replies'
 import {requestRevert} from './revert'
 import {folderOf, readRollouts, rolloutAt, writeRolloutsBack} from './rollouts'
-import {configOf} from './threads'
+import {configOf, loadThread} from './threads'
 
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
 
@@ -151,25 +151,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     if (next !== undefined) await revert(running, thread, next, configDir)
   }
 
-  function load(
-    running: Running,
-    opened: {thread: {id: string; path: string | null}; model: string},
-    turns: string[],
-    threshold: number | null
-  ): LoadedThread {
-    const thread = {
-      id: opened.thread.id,
-      model: opened.model,
-      threshold,
-      turns,
-      path: opened.thread.path,
-    }
-
-    running.threads.set(thread.id, thread)
-
-    return thread
-  }
-
   async function threadFor(
     running: Running,
     request: ReplyRequest,
@@ -184,13 +165,18 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       approvalPolicy: 'never',
       model: request.model,
       developerInstructions: request.systemPrompt || null,
-      ...configOf(threshold),
     } satisfies ParamsOf<'thread/start'>
 
+    // A resume or fork that brings no `config` keeps the thread's old limit.
+    const config = configOf(threshold)
+
     if (!request.session) {
-      const thread = load(
-        running,
-        await running.server.request('thread/start', settings),
+      const thread = loadThread(
+        running.threads,
+        await running.server.request(
+          'thread/start',
+          threshold === null ? settings : {...settings, config}
+        ),
         [],
         threshold
       )
@@ -234,12 +220,13 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     }
 
     if (fork) {
-      const thread = load(
-        running,
+      const thread = loadThread(
+        running.threads,
         await running.server.request('thread/fork', {
           threadId: id,
           lastTurnId: messageId,
           ...settings,
+          config,
           excludeTurns: true,
         }),
         openedAt,
@@ -249,11 +236,12 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       return {thread, dropped: false}
     }
 
-    const resumed = load(
-      running,
+    const resumed = loadThread(
+      running.threads,
       await running.server.request('thread/resume', {
         threadId: id,
         ...settings,
+        config,
         excludeTurns: true,
       }),
       openedAt,
@@ -264,10 +252,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     return cut(resumed)
   }
 
-  /**
-   * Codex ignores `config` on resuming a thread a client is subscribed to, and
-   * keeps the old one when a resume brings none, so `{}` asks for its default.
-   */
+  /** Codex ignores `config` on resuming a thread a client is subscribed to. */
   async function reload(
     running: Running,
     thread: LoadedThread,
@@ -279,11 +264,11 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     const opened = await running.server.request('thread/resume', {
       threadId: thread.id,
       ...settings,
-      config: configOf(threshold).config ?? {},
+      config: configOf(threshold),
       excludeTurns: true,
     })
 
-    return load(running, opened, thread.turns, threshold)
+    return loadThread(running.threads, opened, thread.turns, threshold)
   }
 
   async function resume(
@@ -302,10 +287,16 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       cwd: configDir,
       sandbox: 'read-only',
       approvalPolicy: 'never',
+      config: {},
       excludeTurns: true,
     })
 
-    return load(running, opened, messageId === null ? [] : [messageId], null)
+    return loadThread(
+      running.threads,
+      opened,
+      messageId === null ? [] : [messageId],
+      null
+    )
   }
 
   /** Saves the reverted rollout, so a later resume lacks what it dropped. */

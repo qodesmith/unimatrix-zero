@@ -10,7 +10,7 @@ import type {
   SpawnedProcess,
 } from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRequest, ReplySession, SessionFile} from '@uz/contract/host'
-import type {Compaction} from '@uz/contract/settings'
+import type {CompactionSettings} from '@uz/contract/settings'
 import type {RunFailure} from '@uz/contract/turns'
 
 import {failureOf} from '#modules/failures/main'
@@ -43,7 +43,7 @@ type Restore = 'none' | 'store' | 'file'
 
 interface Live extends ClaudeSession {
   model: string
-  compaction: Compaction
+  compaction: CompactionSettings
   restore: Restore
   projectKey: string
   /** The SDK swaps in its own configuration folder on a restore. */
@@ -85,7 +85,7 @@ function resumption(session: ReplyRequest['session'], restore: Restore) {
 }
 
 /** Nothing for a default, so `claude` compacts where it would on its own. */
-function compactionSettings({auto, threshold}: Compaction) {
+function compactionSettings({auto, threshold}: CompactionSettings) {
   return {
     ...(auto ? {} : {autoCompactEnabled: false}),
     ...(threshold === null ? {} : {autoCompactWindow: threshold}),

@@ -53,7 +53,6 @@ export const FakeCodexRunSchema = z.strictObject({
   methods: z.array(z.string()),
   prompts: z.array(z.string()),
   threadModels: z.array(NullableStringSchema),
-  /** The `config` each thread was started, resumed or forked with. */
   threadConfigs: z.array(z.looseObject({}).nullable()),
   turnModels: z.array(NullableStringSchema),
   modelLists: z.array(z.looseObject({})),

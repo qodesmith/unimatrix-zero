@@ -15,7 +15,6 @@ import {SignIn} from './ProviderCard'
 
 interface ProviderTabsProps {
   connections: ConnectionsControls
-  /** Shown in each Provider's tab, under its account. */
   providerSettings: ComponentType<{provider: ProviderId}>
 }
 
@@ -95,7 +94,7 @@ function Account({
   return (
     <div className="flex items-center justify-between gap-4 rounded-lg bg-muted/50 px-4 py-3">
       <div className="flex min-w-0 flex-col">
-        <span className="font-medium">Signed in</span>
+        <span className="font-medium">Account</span>
         <span className="truncate text-muted-foreground">
           {card.account.email} · {PROVIDER_NAMES[provider]} {card.account.plan}
         </span>

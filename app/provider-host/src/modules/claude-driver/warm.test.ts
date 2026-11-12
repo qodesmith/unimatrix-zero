@@ -1,11 +1,11 @@
-import type {Compaction} from '@uz/contract/settings'
+import type {CompactionSettings} from '@uz/contract/settings'
 
 import {idleFor} from '#modules/idle/main'
 import {afterEach, beforeEach, expect, it, vi} from 'vitest'
 
 import {createWarmSessions} from './warm'
 
-const DEFAULTS: Compaction = {auto: true, threshold: null}
+const DEFAULTS: CompactionSettings = {auto: true, threshold: null}
 
 function session(
   sessionId: string,

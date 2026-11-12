@@ -2,7 +2,7 @@ import type {Database} from '#modules/database/main'
 import type {FinishedReply, ReplyHosts} from './main'
 import type {AppEvent} from '@uz/contract/events'
 import type {HostCommand} from '@uz/contract/host'
-import type {Compaction} from '@uz/contract/settings'
+import type {CompactionSettings} from '@uz/contract/settings'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {openDatabase, schema} from '#modules/database/main'
@@ -29,7 +29,7 @@ let finished: FinishedReply[]
 let hostCommands: HostCommand[]
 let sentPromptIds: Map<string, string>
 let hostReady: boolean
-let compaction: Compaction
+let compaction: CompactionSettings
 let clock: Date
 let hostReachable: boolean
 let turns: ReturnType<typeof createTurns>
@@ -544,15 +544,35 @@ describe('the Compaction Settings', () => {
     const first = savedRoot()
 
     compaction = {auto: false, threshold: 150_000}
-    const failed = sendPrompt(first)
-    fail(failed)
 
-    compaction = {auto: true, threshold: 120_000}
-    turns.retry(treeId, failed)
+    const sent = turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: first,
+      text: 'Hi',
+    })
+
+    if (!sent) throw new Error('The Reply it answers is gone')
 
     expect(hostCommands).toEqual([
       expect.objectContaining({
-        request: expect.objectContaining({compaction}),
+        request: expect.objectContaining({
+          compaction: {auto: false, threshold: 150_000},
+        }),
+      }),
+    ])
+
+    hostCommands = []
+    fail(sent.reply.id)
+
+    compaction = {auto: true, threshold: 120_000}
+    turns.retry(treeId, sent.reply.id)
+
+    expect(hostCommands).toEqual([
+      expect.objectContaining({
+        request: expect.objectContaining({
+          compaction: {auto: true, threshold: 120_000},
+        }),
       }),
     ])
   })

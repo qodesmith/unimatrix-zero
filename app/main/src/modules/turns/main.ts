@@ -13,7 +13,7 @@ import type {
   SignInRequest,
 } from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
-import type {Compaction} from '@uz/contract/settings'
+import type {CompactionSettings} from '@uz/contract/settings'
 import type {Reply, ReplyEvent} from '@uz/contract/turns'
 
 import {schema} from '#modules/database/main'
@@ -54,7 +54,7 @@ export interface TurnsDeps {
   hosts: ReplyHosts
   vendorProgramFor: (provider: ProviderId) => SignInRequest
   /** Read as each Reply starts, so a change applies from the next one. */
-  compactionFor: (provider: ProviderId) => Compaction
+  compactionFor: (provider: ProviderId) => CompactionSettings
   now: () => Date
   onTurnsChanged: (treeId: string) => void
   /** Every way a Reply ends, a failure to reach its host included. */

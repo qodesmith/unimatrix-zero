@@ -1,6 +1,6 @@
 import type {WhenIdle} from '#modules/idle/main'
 import type {SessionRef} from '@uz/contract/host'
-import type {Compaction} from '@uz/contract/settings'
+import type {CompactionSettings} from '@uz/contract/settings'
 
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
 
@@ -12,7 +12,7 @@ export interface WarmSession {
   /** The Model `claude` started on, which it keeps. */
   readonly model: string
   /** Fixed as `claude` starts: it applies no later change to the threshold. */
-  readonly compaction: Compaction
+  readonly compaction: CompactionSettings
   close(): Promise<void>
 }
 
@@ -84,7 +84,7 @@ export function createWarmSessions<Session extends WarmSession>({
      */
     claim(
       ref: SessionRef,
-      {model, compaction}: {model: string; compaction: Compaction}
+      {model, compaction}: {model: string; compaction: CompactionSettings}
     ): Session | null {
       const wanted = resolveModel(model)
 

@@ -14,7 +14,7 @@ import type {
   SignInRequest,
   StartReplyEvent,
 } from '@uz/contract/host'
-import type {Compaction} from '@uz/contract/settings'
+import type {CompactionSettings} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -45,7 +45,7 @@ const signedIn = process.env.UZ_LIVE_CODEX_HOME
 /** The Model ChatGPT's `model/list` marked as its default when recorded. */
 const MODEL = 'gpt-6.1-sol'
 
-const DEFAULT_COMPACTION: Compaction = {auto: true, threshold: null}
+const DEFAULT_COMPACTION: CompactionSettings = {auto: true, threshold: null}
 
 function homeFrom(source: string) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-codex-'))

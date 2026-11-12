@@ -78,18 +78,18 @@ export const SettingsUpdateSchema = SettingsSchema.partial()
 export type SettingsUpdate = z.infer<typeof SettingsUpdateSchema>
 
 /** When a Provider compacts a Thread, as each Reply is sent with it. */
-export const CompactionSchema = z.strictObject({
+export const CompactionSettingsSchema = z.strictObject({
   /** False only for a Provider that can turn automatic Compaction off. */
   auto: z.boolean(),
   threshold: z.int().positive().nullable(),
 })
 
-export type Compaction = z.infer<typeof CompactionSchema>
+export type CompactionSettings = z.infer<typeof CompactionSettingsSchema>
 
 export function compactionFor(
   settings: Settings,
   provider: ProviderId
-): Compaction {
+): CompactionSettings {
   switch (provider) {
     case 'claude':
       return {

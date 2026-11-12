@@ -8,7 +8,7 @@ import type {
   StartReplyEvent,
 } from '@uz/contract/host'
 import type {Model} from '@uz/contract/providers'
-import type {Compaction} from '@uz/contract/settings'
+import type {CompactionSettings} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -30,7 +30,7 @@ import {
 } from './replay'
 import {projectKeyOf} from './transcripts'
 
-const DEFAULT_COMPACTION: Compaction = {auto: true, threshold: null}
+const DEFAULT_COMPACTION: CompactionSettings = {auto: true, threshold: null}
 
 /** As `warm.ndjson`, `resumed.ndjson` and `forked.ndjson` recorded them. */
 
@@ -140,7 +140,7 @@ async function setUp(
     replyId?: string
     model?: string
     messageId?: ReplyRequest['prompt']['messageId']
-    compaction?: Compaction
+    compaction?: CompactionSettings
   }
 
   const vendorProgram = {
