@@ -24,8 +24,8 @@ const plan = planPrune({
   checkouts: worktreesIn(
     await $`git -C ${root} worktree list --porcelain`.text()
   ),
-  folders: fs.readdirSync(folder),
-  keychain:
+  appDataEntries: fs.readdirSync(folder),
+  keychainServices:
     process.platform === 'darwin'
       ? keychainServicesIn(await $`security dump-keychain`.text())
       : [],

@@ -4,9 +4,6 @@ import {keychainServicesIn, planPrune, worktreesIn} from './dev-data.ts'
 
 const appDataPath = '/Users/sam/Library/Application Support'
 
-// The checkout at /Users/sam/repos/uz, and one at /Users/sam/repos/uz/gone
-// that was removed. The Keychain names are what `claude` saves a sign-in under
-// for each folder's `providers/claude`.
 const KEPT = 'unimatrix-zero-dev-5ec60a61'
 const KEPT_KEYCHAIN = 'Claude Code-credentials-26a01dfa'
 const GONE = 'unimatrix-zero-dev-69af198d'
@@ -18,7 +15,7 @@ describe('planPrune', () => {
     const plan = planPrune({
       appDataPath,
       checkouts: ['/Users/sam/repos/uz'],
-      folders: [
+      appDataEntries: [
         KEPT,
         `${KEPT}-fake`,
         GONE,
@@ -26,7 +23,7 @@ describe('planPrune', () => {
         'unimatrix-zero',
         'Code',
       ],
-      keychain: [],
+      keychainServices: [],
     })
 
     expect(plan.folders.map(folder => folder.name)).toEqual([GONE, GONE_FAKE])
@@ -36,8 +33,8 @@ describe('planPrune', () => {
     const plan = planPrune({
       appDataPath,
       checkouts: [],
-      folders: [GONE, GONE_FAKE],
-      keychain: [GONE_KEYCHAIN],
+      appDataEntries: [GONE, GONE_FAKE],
+      keychainServices: [GONE_KEYCHAIN],
     })
 
     expect(plan.folders).toEqual([
@@ -50,8 +47,8 @@ describe('planPrune', () => {
     const plan = planPrune({
       appDataPath,
       checkouts: ['/Users/sam/repos/uz'],
-      folders: [KEPT, GONE],
-      keychain: [
+      appDataEntries: [KEPT, GONE],
+      keychainServices: [
         'Claude Code-credentials',
         KEPT_KEYCHAIN,
         GONE_KEYCHAIN,

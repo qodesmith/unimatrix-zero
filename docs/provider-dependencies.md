@@ -145,10 +145,10 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Kind:** D
 - **Provider:** Claude
 - **Relies on:** SDK internals: on a resume from the app's copy, the SDK copies the session into a temporary `claude-resume-*` folder and points `CLAUDE_CONFIG_DIR` at it, and on a Mac `claude` finds its sign-in through a Keychain name hashed from `CLAUDE_SECURESTORAGE_CONFIG_DIR`, or `CLAUDE_CONFIG_DIR` when that's unset.
-- **App side:** `claude-driver`'s environment sets `CLAUDE_SECURESTORAGE_CONFIG_DIR` to the real config folder so the sign-in stays findable, and reads the swapped `CLAUDE_CONFIG_DIR` to put tool results back. `bun run dev-data:prune` (`scripts/dev-data-prune.ts`) finds a removed worktree's Claude sign-in by the same hashed Keychain name.
+- **App side:** `claude-driver`'s environment sets `CLAUDE_SECURESTORAGE_CONFIG_DIR` to the real config folder so the sign-in stays findable, and reads the swapped `CLAUDE_CONFIG_DIR` to put tool results back. `bun run dev-data:prune` finds a removed worktree's Claude sign-in by that Keychain name, computed the way `claude` hashes it: the first 8 hex of the config folder's SHA-256.
 - **User would see:** Replies resumed from the app's copy fail signed out, or lose their tool results. The maintainer would see `dev-data:prune` leave removed worktrees' sign-ins behind, listed as unmatched.
 - **Changed by:** upgrade
-- **Check:** `[dep:resume-config-swap-keychain]` in `claude-driver`: a Reply resumed from the app's copy alone, with the transcript gone, completes signed in.
+- **Check:** `[dep:resume-config-swap-keychain]` in `claude-driver`: a Reply resumed from the app's copy alone, with the transcript gone, completes signed in. The Keychain name's hash has no check: a change shows as `dev-data:prune` listing every dev sign-in as unmatched.
 
 ### The SDK's alpha session store
 

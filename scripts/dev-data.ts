@@ -1,12 +1,13 @@
 /**
- * The data folder `bun run dev` gives this checkout, so each worktree keeps
- * its own sign-ins and vendor programs.
+ * The data folder `bun run dev` gives each checkout, so each worktree keeps
+ * its own sign-ins and vendor programs, and which of those folders, with
+ * their Claude Keychain entries, `bun run dev-data:prune` deletes.
  */
 import {createHash} from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
 
-const PREFIX = 'unimatrix-zero-dev-'
+const DEV_FOLDER_PREFIX = 'unimatrix-zero-dev-'
 const CLAUDE_KEYCHAIN = 'Claude Code-credentials'
 
 function shortHash(text: string) {
@@ -19,7 +20,7 @@ export function checkoutHash(root: string) {
 }
 
 export function devDataFolderName(root: string, fake: boolean) {
-  return `${PREFIX}${checkoutHash(root)}${fake ? '-fake' : ''}`
+  return `${DEV_FOLDER_PREFIX}${checkoutHash(root)}${fake ? '-fake' : ''}`
 }
 
 /** Electron's `appData`, where the shell puts the dev data folder. */
@@ -54,10 +55,8 @@ function claudeKeychainOf(appDataPath: string, folder: string) {
 interface PruneInput {
   appDataPath: string
   checkouts: string[]
-  /** The names in `appDataPath`. */
-  folders: string[]
-  /** The service of every Keychain item. */
-  keychain: string[]
+  appDataEntries: string[]
+  keychainServices: string[]
 }
 
 /**
@@ -67,8 +66,8 @@ interface PruneInput {
 export function planPrune({
   appDataPath,
   checkouts,
-  folders,
-  keychain,
+  appDataEntries,
+  keychainServices,
 }: PruneInput) {
   const kept = new Set(
     checkouts.flatMap(root => [
@@ -77,24 +76,25 @@ export function planPrune({
     ])
   )
 
-  const devFolders = folders.filter(name => name.startsWith(PREFIX))
+  const devFolders = appDataEntries
+    .filter(name => name.startsWith(DEV_FOLDER_PREFIX))
+    .map(name => ({name, entry: claudeKeychainOf(appDataPath, name)}))
 
   const claudeEntries = new Set(
-    keychain.filter(service => service.startsWith(`${CLAUDE_KEYCHAIN}-`))
+    keychainServices.filter(service =>
+      service.startsWith(`${CLAUDE_KEYCHAIN}-`)
+    )
   )
 
-  const owned = new Set(
-    devFolders.map(name => claudeKeychainOf(appDataPath, name))
-  )
+  const owned = new Set(devFolders.map(folder => folder.entry))
 
   return {
     folders: devFolders
-      .filter(name => !kept.has(name))
-      .map(name => {
-        const entry = claudeKeychainOf(appDataPath, name)
-
-        return {name, keychain: claudeEntries.has(entry) ? entry : null}
-      }),
+      .filter(folder => !kept.has(folder.name))
+      .map(({name, entry}) => ({
+        name,
+        keychain: claudeEntries.has(entry) ? entry : null,
+      })),
     unmatched: [...claudeEntries].filter(service => !owned.has(service)),
   }
 }
