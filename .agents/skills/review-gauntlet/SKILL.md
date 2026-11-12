@@ -18,7 +18,14 @@ The gauntlet is **quiet**. Between setup and the final report, the only thing yo
 3. The current branch must be `headRefName`, and `git status --porcelain` must be empty, since the implementer commits whatever is in the tree. If either fails, stop and tell the user.
 4. `git fetch origin <baseRefName>`. The fixed point for the whole gauntlet is `origin/<baseRefName>`, and the diff is `git diff origin/<baseRefName>...HEAD`. `START=$(git rev-parse HEAD)` marks where the gauntlet began.
 5. `GAUNTLET=$(mktemp -d)`. Every report goes in this directory, outside the repo, so nothing in it gets committed.
-6. Write `$GAUNTLET/spec.md`: the PR title and body, then `gh issue view <n> --comments` for each closing issue. If there's no spec beyond an empty PR body, ask the user for one now. This is the only question the gauntlet asks, so the rounds can run unattended.
+6. Write `$GAUNTLET/spec.md`: the PR title and body, then each closing issue, body and every comment, from this command:
+
+   ```sh
+   gh issue view <n> --json number,title,state,labels,body,comments \
+     --jq '"# #\(.number) \(.title)\nstate: \(.state)\nlabels: \([.labels[].name] | join(", "))\n\n\(.body)", (.comments[] | "\n--- comment by \(.author.login) at \(.createdAt) ---\n\(.body)")'
+   ```
+
+   Use this JSON form because the text form splits the issue when its output is piped: `gh issue view <n> --comments` prints the comments alone. If there's no spec beyond an empty PR body, ask the user for one now. This is the only question the gauntlet asks, so the rounds can run unattended.
 7. Create `$GAUNTLET/change-log.md` and `$GAUNTLET/open-calls.md`, both empty.
 
 ## 2. Run each round
