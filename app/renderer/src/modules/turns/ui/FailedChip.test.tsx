@@ -105,7 +105,6 @@ function Providers({children}: {children: ReactNode}) {
   )
 }
 
-/** The chip for each failed Reply, as the canvas and the slideout draw it. */
 function FailedReplies() {
   const turns = useTurns(treeId)
 

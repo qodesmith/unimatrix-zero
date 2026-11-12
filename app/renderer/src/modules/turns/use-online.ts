@@ -14,7 +14,6 @@ function isOnline() {
   return navigator.onLine
 }
 
-/** Whether the browser believes it has a network connection. */
 export function useOnline() {
   return useSyncExternalStore(subscribe, isOnline)
 }

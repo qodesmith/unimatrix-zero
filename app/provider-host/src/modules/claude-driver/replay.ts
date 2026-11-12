@@ -22,15 +22,11 @@ export const RecordedLineSchema = z.discriminatedUnion('kind', [
 export type RecordedLine = z.infer<typeof RecordedLineSchema>
 
 /**
- * The nth `claude` started replays the nth of `FAKE_CLAUDE_RECORDINGS` and
- * reports to `FAKE_CLAUDE_REPORTS/<n>.json`; each line the SDK writes must be
- * the next one recorded. `FAKE_CLAUDE_TOOL_RESULT` names a tool result file to
- * write, `FAKE_CLAUDE_REFUSE_STORE=yes` refuses the SDK's temporary folder,
- * and `FAKE_CLAUDE_EXIT_AFTER=<n>` exits after the nth Prompt. A Prompt sent
- * with a `uuid` is stored under it, as `claude` does.
+ * The nth `claude` started replays the nth of `FAKE_CLAUDE_RECORDINGS`, and
+ * exits on any line the SDK writes that isn't the next one recorded.
+ * `FAKE_CLAUDE_REFUSE_STORE=yes` refuses the SDK's temporary folder, and
  * `FAKE_CLAUDE_HOLD_EXIT=<file>` keeps it going once its input closes, until
- * that file exists. Its report names each `claude` still running as it
- * started, and the entries it resumed with, up to `--resume-session-at`.
+ * that file exists.
  */
 const SCRIPT = `
 import fs from 'node:fs'

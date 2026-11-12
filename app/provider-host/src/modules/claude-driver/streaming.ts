@@ -66,7 +66,6 @@ function cutAt(session: ReplySession) {
   }
 }
 
-/** Where the session served to `claude` ends, when it isn't served whole. */
 function servedThrough(session: ReplyRequest['session']) {
   return session?.type === 'fork' ? session.servedThrough : undefined
 }

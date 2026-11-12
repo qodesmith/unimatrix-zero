@@ -40,7 +40,6 @@ function titlePrompt(prompt: string, reply: string) {
   ].join('\n\n')
 }
 
-/** The answer's first line without quotes or markdown; '' when none is left. */
 function cleanTitle(answer: string) {
   const line = answer
     .split('\n')

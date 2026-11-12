@@ -62,7 +62,6 @@ export const TreeTurnsResult = z.strictObject({
 export const PromptSendCommand = z.strictObject({
   type: z.literal('prompt.send'),
   treeId: z.uuid(),
-  /** Null for the root Prompt. */
   parentReplyId: z.uuid().nullable(),
   text: z.string().trim().min(1),
   /** As the Input's picker shows it; main never swaps it for another. */

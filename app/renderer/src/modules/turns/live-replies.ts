@@ -15,7 +15,6 @@ export interface ThinkingBlock {
   /** The count of content parts before this thinking began. */
   beforePart: number
   startedAt: number
-  /** Null while the Model still thinks. */
   endedAt: number | null
 }
 

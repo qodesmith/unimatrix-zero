@@ -95,10 +95,7 @@ function resumed(
   )
 }
 
-/**
- * `session` is where the Reply above goes on; `forks` when `row` has a Prompt
- * after it.
- */
+/** `session` is where the Reply above goes on. */
 function keepingPrompt(
   db: Database,
   row: ReplyRow,

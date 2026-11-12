@@ -100,7 +100,6 @@ export function createTrees(db: Database) {
       )
     },
 
-    /** The automatic title, unless the Tree already has one; null if not. */
     nameAutomatically(id: string, title: string): Tree | null {
       return updated(
         db

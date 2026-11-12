@@ -211,7 +211,6 @@ describe('a collapsed Fork', () => {
   })
 })
 
-/** Two Branches of the root Reply, with the second one started at `second`. */
 function twoBranches(second: string) {
   clock = 0
   const root = prompt('P1', null)

@@ -1,6 +1,6 @@
 /**
- * Live: drives a real `claude` on a real Claude plan, so it runs only when
- * asked, on a machine where Claude was connected in the app:
+ * Runs a real `claude` on a real plan, only on a machine where Claude was
+ * connected in the app:
  *
  * UZ_LIVE_CLAUDE_PROGRAM=<userData>/vendor/claude/<version>/claude\
  * UZ_LIVE_CLAUDE_CONFIG=<userData>/providers/claude\

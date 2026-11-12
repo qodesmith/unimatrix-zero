@@ -118,7 +118,6 @@ function recordPrompt(replyId: string, messageId: string, sessionId = 's1') {
   })
 }
 
-/** Main's copy of the session takes the Prompt, under the id main last sent. */
 function storePrompt(replyId: string, sessionId = 's1') {
   const messageId = sentPromptIds.get(replyId)
 
@@ -141,10 +140,6 @@ function savedRoot() {
   return replyId
 }
 
-/**
- * A Retry under a saved root stored its Prompt, then the app quit and launched
- * again.
- */
 function quitAfterRetryStored() {
   const retried = sendPrompt(savedRoot(), 'And then?')
   recordPrompt(retried, 'p-first-attempt')
@@ -183,7 +178,6 @@ function sessionsStarted() {
   )
 }
 
-/** A root exchange in another Tree, recorded by its Provider and then failed. */
 function inAnotherTree() {
   const sent = turns.sendPrompt({
     model: picked,
@@ -1848,7 +1842,6 @@ describe('deleting a Prompt', () => {
   })
 })
 
-/** An exchange its Provider saved, Prompt and Reply, before it failed. */
 function failedAt(parentReplyId: string | null, sessionId = 's1') {
   const replyId = sendPrompt(parentReplyId, 'Failing')
   recordPrompt(replyId, 'p-failed', sessionId)

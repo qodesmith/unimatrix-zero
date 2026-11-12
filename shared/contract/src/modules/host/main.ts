@@ -129,7 +129,6 @@ export const PromptRecordedMessage = z.strictObject({
 
 export type PromptRecorded = z.infer<typeof PromptRecordedMessage>
 
-/** A Retry's cut dropped the Prompt recorded for this Reply. */
 export const PromptDroppedMessage = z.strictObject({
   type: z.literal('PROMPT_DROPPED'),
   treeId: z.uuid(),

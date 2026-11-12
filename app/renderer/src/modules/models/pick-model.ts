@@ -15,7 +15,6 @@ export type WantedModel = ModelChoice & {entry: string | null}
 
 export interface ModelPickInput {
   wanted: WantedModel | null
-  /** The Provider of the Reply a continuing Thread's Input is attached to. */
   lockedTo: ProviderId | null
   statuses: ProviderStatus[]
   models: Record<ProviderId, Model[]>
@@ -105,10 +104,6 @@ function startOnFirstConnected({statuses, models}: ModelPickInput): Selection {
     : {selected: null, heldBecause: 'Connect a Provider to send'}
 }
 
-/**
- * The picked entry while it still names the Model picked on it, else the entry
- * listed under that Model.
- */
 function entryOf(listed: Model[], wanted: WantedModel) {
   const picked = listed.find(
     model => model.id === wanted.entry && concreteOf(model) === wanted.model

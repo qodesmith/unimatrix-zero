@@ -160,7 +160,6 @@ interface JumpButtonProps {
   dotClass: string
 }
 
-/** Each click pans to the next Reply in the list, round and round. */
 function JumpButton({label, title, ids, onJump, dotClass}: JumpButtonProps) {
   const last = useRef<string | null>(null)
 
