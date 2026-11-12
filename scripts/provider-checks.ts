@@ -4,6 +4,7 @@
  * list, and posts both on the open bump PR for CI's gate.
  */
 import type {CheckStatus, Review} from './provider-checks-result.ts'
+import type {Entry} from './provider-dependencies.ts'
 import type {Builds} from './provider-review.ts'
 
 import {$} from 'bun'
@@ -218,8 +219,7 @@ function statusOf(outcomes: string[]): CheckStatus {
     : 'not run'
 }
 
-async function reviewAll(builds: Builds) {
-  const entries = entriesOf(readText(LIST))
+async function reviewAll(entries: Entry[], builds: Builds) {
   const reviews: Review[] = []
   let next = 0
 
@@ -280,7 +280,9 @@ const bump = await findBump(repo, values.pr ? Number(values.pr) : null)
 
 if (bump) await checkedOut(bump)
 
-const live = entriesOf(readText(LIST)).flatMap(entry =>
+const entries = entriesOf(readText(LIST))
+
+const live = entries.flatMap(entry =>
   liveCheckOf(entry) === entry.id ? [entry.id] : []
 )
 
@@ -288,7 +290,7 @@ const result = {
   head: bump?.head ?? null,
   pinChanges: bump?.changes ?? [],
   checks: await runLiveChecks(live, env),
-  reviews: await reviewAll(builds),
+  reviews: await reviewAll(entries, builds),
 }
 
 const body = renderResult(result)

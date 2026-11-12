@@ -5,6 +5,7 @@
 import type {Review} from './provider-checks-result.ts'
 import type {Entry} from './provider-dependencies.ts'
 
+import path from 'node:path'
 import {z} from 'zod'
 
 import {LIST} from './provider-dependencies.ts'
@@ -98,7 +99,7 @@ export async function review(
       'dontAsk',
       '--no-session-persistence',
       '--add-dir',
-      builds.claudeProgram.replace(/\/[^/]+$/, ''),
+      path.dirname(builds.claudeProgram),
       builds.codexFolder,
     ],
     {

@@ -23,12 +23,13 @@ import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {spawn} from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import {createInterface} from 'node:readline'
 import {describe, expect, it} from 'vitest'
 import {z} from 'zod'
 
-import {EXIT_TIMEOUT_MS, planOf, readAccount} from './account'
+import {planOf, readAccount} from './account'
 import {claudeEnvironment} from './environment'
 import {createClaudeDriver, spawnClaude} from './main'
 import {createRecorder} from './recording'
@@ -199,6 +200,28 @@ function reaching(session: ReplyRecorded['session']): ReplySession {
 }
 
 type Live = ReturnType<typeof liveDriver>
+
+/**
+ * Runs the real `claude` and writes to `ended` whether it exited by itself or
+ * was killed. The SDK runs a `.mjs` with the `node` on PATH.
+ */
+function exitWatcher(ended: string) {
+  return `
+import {spawn} from 'node:child_process'
+import fs from 'node:fs'
+const ended = how => fs.writeFileSync(${JSON.stringify(ended)}, how)
+const child = spawn(${JSON.stringify(program)}, process.argv.slice(2), {stdio: 'inherit'})
+process.on('SIGTERM', () => {
+  ended('killed')
+  child.kill('SIGKILL')
+  process.exit(143)
+})
+child.on('exit', code => {
+  ended('exited')
+  process.exit(code ?? 1)
+})
+`
+}
 
 const RECALL =
   'Name my code word, my ship, my color, my pet and my bird, in that order. Write NONE for each one I never told you.'
@@ -792,16 +815,23 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
   }, 180_000)
 
   it('[dep:plan-from-subscription-type] [dep:claude-exits-on-input-end] names the account’s plan, and exits by itself once its input ends', async () => {
-    const started = performance.now()
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-exit-'))
+    const watcher = path.join(folder, 'claude.mjs')
+    const ended = path.join(folder, 'ended')
+    fs.writeFileSync(watcher, exitWatcher(ended))
 
-    const {account} = await readAccount({
-      program,
-      env: claudeEnvironment(process.env, configDir),
-      cwd: configDir,
-    })
+    try {
+      const {account} = await readAccount({
+        program: watcher,
+        env: claudeEnvironment(process.env, configDir),
+        cwd: configDir,
+      })
 
-    expect(performance.now() - started).toBeLessThan(EXIT_TIMEOUT_MS)
-    expect(planOf(account.subscriptionType ?? '')).not.toBeNull()
+      expect(fs.readFileSync(ended, 'utf8')).toBe('exited')
+      expect(planOf(account.subscriptionType ?? '')).not.toBeNull()
+    } finally {
+      fs.rmSync(folder, {recursive: true, force: true})
+    }
   }, 120_000)
 
   it('[dep:self-updates-off] holds every switch the app sets beside its config folder', () => {

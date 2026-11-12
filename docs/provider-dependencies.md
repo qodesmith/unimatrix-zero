@@ -192,7 +192,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **App side:** `claude-driver` closes its sessions, one-shots and account reads by ending input and waiting for `claude` to exit, and closes through the SDK only after a timeout.
 - **User would see:** a lost token refresh and a later sign-out, or every close taking the full timeout.
 - **Changed by:** upgrade
-- **Check:** `[dep:claude-exits-on-input-end]` in `claude-driver`: an account read ends before the timeout. Whether a refreshed token gets saved has no check.
+- **Check:** `[dep:claude-exits-on-input-end]` in `claude-driver`: an account read's `claude` exits by itself, not killed. Whether a refreshed token gets saved has no check.
 
 ### Self-updates turned off
 

@@ -10,7 +10,7 @@ import {once} from 'node:events'
 import {setTimeout as delay} from 'node:timers/promises'
 
 /** Far longer than a token refresh; a `claude` still running then is stuck. */
-export const EXIT_TIMEOUT_MS = 30_000
+const EXIT_TIMEOUT_MS = 30_000
 
 const PREFIX = 'Claude '
 
