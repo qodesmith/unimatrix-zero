@@ -1,4 +1,6 @@
 import type {ConnectionsControls} from '../use-connections'
+import type {ProviderId} from '@uz/contract/providers'
+import type {ComponentType} from 'react'
 
 import {Button} from '#shadcn/ui/button'
 import {ProviderIdSchema} from '@uz/contract/providers'
@@ -11,9 +13,15 @@ interface ConnectionsProps {
   connections: ConnectionsControls
   /** First launch only: the introduction, and "Start chatting" once ready. */
   onStart?: () => void
+  /** Shown under each Provider's card. */
+  providerSettings?: ComponentType<{provider: ProviderId}>
 }
 
-export function Connections({connections, onStart}: ConnectionsProps) {
+export function Connections({
+  connections,
+  onStart,
+  providerSettings: ProviderSettings,
+}: ConnectionsProps) {
   const {state} = connections
   const connecting = state.signIn?.provider ?? null
 
@@ -45,18 +53,22 @@ export function Connections({connections, onStart}: ConnectionsProps) {
         )}
       >
         {ProviderIdSchema.options.map(provider => (
-          <ProviderCard
-            key={provider}
-            provider={provider}
-            card={cardOf(state, provider)}
-            waitingFor={
-              connecting !== null && connecting !== provider ? connecting : null
-            }
-            connect={() => void connections.connect(provider)}
-            cancel={() => void connections.cancel(provider)}
-            openPage={() => void connections.openPage(provider)}
-            submitCode={code => void connections.submitCode(provider, code)}
-          />
+          <div key={provider} className="flex w-80 flex-col gap-6">
+            <ProviderCard
+              provider={provider}
+              card={cardOf(state, provider)}
+              waitingFor={
+                connecting !== null && connecting !== provider
+                  ? connecting
+                  : null
+              }
+              connect={() => void connections.connect(provider)}
+              cancel={() => void connections.cancel(provider)}
+              openPage={() => void connections.openPage(provider)}
+              submitCode={code => void connections.submitCode(provider, code)}
+            />
+            {ProviderSettings && <ProviderSettings provider={provider} />}
+          </div>
         ))}
       </div>
       {onStart && (

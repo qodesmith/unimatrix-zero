@@ -102,9 +102,16 @@ interface ToggleProps {
   description: ReactNode
   checked: boolean
   onChange: (checked: boolean) => void
+  disabled?: boolean
 }
 
-export function Toggle({label, description, checked, onChange}: ToggleProps) {
+export function Toggle({
+  label,
+  description,
+  checked,
+  onChange,
+  disabled = false,
+}: ToggleProps) {
   const id = useId()
 
   return (
@@ -113,6 +120,7 @@ export function Toggle({label, description, checked, onChange}: ToggleProps) {
         id={id}
         className="mt-0.5"
         checked={checked}
+        disabled={disabled}
         onCheckedChange={onChange}
       />
       <FieldContent className="gap-0.5">

@@ -7,6 +7,7 @@ import type {
 } from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
+import type {LoadedThread} from './threads'
 import type {Notification, ParamsOf, RateLimits} from './wire'
 import type {
   DeletionCut,
@@ -20,34 +21,13 @@ import {createInbox} from '#modules/inbox/main'
 import {ProgramCrashed, createReplyRuns} from '#modules/reply-runs/main'
 
 import {readModels} from './models'
+import {limitLifts} from './rate-limits'
 import {createReplyMapper, turnOf} from './replies'
 import {requestRevert} from './revert'
 import {folderOf, readRollouts, rolloutAt, writeRolloutsBack} from './rollouts'
+import {configOf} from './threads'
 
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
-
-/** Codex's own default, with nothing in `config`, for a null threshold. */
-function configOf(threshold: number | null) {
-  return threshold === null
-    ? {}
-    : {config: {model_auto_compact_token_limit: threshold}}
-}
-
-/** When all full windows lift, in seconds since the epoch; else undefined. */
-function limitLifts({primary, secondary}: RateLimits) {
-  const now = Date.now() / 1000
-
-  const lifts = [primary, secondary].flatMap(window =>
-    window !== null &&
-    window.usedPercent >= 100 &&
-    window.resetsAt !== null &&
-    window.resetsAt > now
-      ? [window.resetsAt]
-      : []
-  )
-
-  return lifts.length === 0 ? undefined : Math.max(...lifts)
-}
 
 export interface CodexRepliesDeps {
   store: SessionStoreClient
@@ -62,16 +42,6 @@ interface Running {
   threads: Map<string, LoadedThread>
   writing: number
   wake: (() => void) | undefined
-}
-
-interface LoadedThread {
-  id: string
-  model: string
-  /** The Compaction threshold Codex loaded it with, which it keeps. */
-  threshold: number | null
-  /** Oldest first: the turn it was opened at, then each one started here. */
-  turns: string[]
-  path: string | null
 }
 
 /** ChatGPT's Replies through one `codex app-server` that every Thread shares. */

@@ -553,7 +553,7 @@ it('loads a thread again with a changed Compaction threshold, which Codex takes 
     {model_auto_compact_token_limit: 20_000},
   ])
   expect(
-    report?.methods.filter(method => method?.startsWith('thread/'))
+    report?.methods.filter(method => method.startsWith('thread/'))
   ).toEqual([
     'thread/start',
     'thread/read',

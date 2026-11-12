@@ -272,6 +272,22 @@ async function compactedThread(live: Live) {
   return {first, third}
 }
 
+/** About 12 tokens a sentence, measured. */
+function padding(tokens: number) {
+  return 'The harbor log lists no ships today. '.repeat(Math.round(tokens / 12))
+}
+
+function contextOf(events: Streamed[]) {
+  return (
+    events.filter(isReplyEvent).reduce(foldReplyEvent, NEW_REPLY).contextSize ??
+    0
+  )
+}
+
+function compacted(events: Streamed[]) {
+  return events.some(event => event.type === 'CONTEXT_COMPACTED')
+}
+
 describe.skipIf(!program || !configDir)('a live Claude', () => {
   it('[dep:project-key-copy] [dep:resume-config-swap-keychain] streams into the project folder the app computes, continues warm, resumes signed in from the app’s copy alone, then forks mid-Thread', async () => {
     const live = liveDriver(['warm.ndjson', 'resumed.ndjson', 'forked.ndjson'])
@@ -563,35 +579,28 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
   it('[dep:claude-compaction-settings] compacts a Thread at the threshold set, not at all with automatic Compaction off, each from the next Reply', async () => {
     const live = liveDriver([])
     const lowered = {auto: true, threshold: 100_000}
-    // About 12 tokens each, measured.
-    const pad = (tokens: number) =>
-      'The harbor log lists no ships today. '.repeat(Math.round(tokens / 12))
-
-    const contextOf = (events: Streamed[]) =>
-      events.filter(isReplyEvent).reduce(foldReplyEvent, NEW_REPLY)
-        .contextSize ?? 0
-
-    const compacted = (events: Streamed[]) =>
-      events.some(event => event.type === 'CONTEXT_COMPACTED')
 
     const first = await live.reply(
-      `My code word is TEAL. Ignore the rest of this message. ${pad(30_000)}`,
+      `My code word is TEAL. Ignore the rest of this message. ${padding(30_000)}`,
       null
     )
 
     live.setCompaction(lowered)
+
     const under = await live.reply(
-      `My ship is PELICAN. Ignore the rest of this message. ${pad(25_000)}`,
+      `My ship is PELICAN. Ignore the rest of this message. ${padding(25_000)}`,
       continuing(first.recorded.session)
     )
 
     live.setCompaction({...lowered, auto: false})
+
     const off = await live.reply(
-      `My color is CRIMSON. Ignore the rest of this message. ${pad(20_000)}`,
+      `My color is CRIMSON. Ignore the rest of this message. ${padding(20_000)}`,
       continuing(under.recorded.session)
     )
 
     live.setCompaction(lowered)
+
     const on = await live.reply(
       'Reply with the single word OTTER.',
       continuing(off.recorded.session)

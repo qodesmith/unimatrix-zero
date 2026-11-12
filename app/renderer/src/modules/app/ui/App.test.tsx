@@ -164,6 +164,24 @@ it('opens and closes Settings without sliding or fading when the OS asks for red
   ).toEqual([])
 })
 
+it('shows each Provider’s Compaction Settings in the Connections section of Settings', async () => {
+  globalThis.window.uz = fakeMain()
+  await renderApp()
+
+  await openSettings()
+  await settingsSheet()
+    .getByRole('navigation', {name: 'Settings sections'})
+    .getByRole('button', {name: 'Connections'})
+    .click()
+
+  await expect
+    .element(settingsSheet().getByRole('group', {name: 'Claude Compaction'}))
+    .toBeVisible()
+  await expect
+    .element(settingsSheet().getByRole('group', {name: 'ChatGPT Compaction'}))
+    .toBeVisible()
+})
+
 it('closes only Settings on Esc over a streaming Reply and the slideout: the Reply is not stopped, and the slideout shows the text that came meanwhile', async () => {
   const main = fakeMain()
   globalThis.window.uz = main
@@ -650,6 +668,9 @@ describe('connecting a Provider', () => {
       .toBeDisabled()
     await expect
       .element(page.getByRole('region', {name: 'Trees'}))
+      .not.toBeInTheDocument()
+    await expect
+      .element(page.getByRole('group', {name: /Compaction/}))
       .not.toBeInTheDocument()
   })
 

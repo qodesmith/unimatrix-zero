@@ -10,7 +10,11 @@ import {
   LayoutSidebar,
   SidebarToggle,
 } from '#modules/layout/main'
-import {FollowFontSize, SettingsProvider} from '#modules/settings/main'
+import {
+  CompactionSettings,
+  FollowFontSize,
+  SettingsProvider,
+} from '#modules/settings/main'
 import {NoTreeOpen, TreeTitle, useTrees} from '#modules/trees/main'
 import {LiveReplies} from '#modules/turns/main'
 import {SidebarInset} from '#shadcn/ui/sidebar'
@@ -74,7 +78,12 @@ function AppLayout() {
       sidebar={
         <AppSidebar
           trees={trees}
-          connections={<Connections connections={connections} />}
+          connections={
+            <Connections
+              connections={connections}
+              providerSettings={CompactionSettings}
+            />
+          }
         />
       }
     >
