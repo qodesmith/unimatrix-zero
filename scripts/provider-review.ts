@@ -4,14 +4,16 @@
  */
 import type {Review} from './provider-checks-result.ts'
 import type {Entry} from './provider-dependencies.ts'
+import type {Pins} from './vendor-pins.ts'
 
 import path from 'node:path'
 import {z} from 'zod'
 
 import {LIST} from './provider-dependencies.ts'
+import {INSTALLED_SDK} from './vendor-pins.ts'
 
 export interface Builds {
-  pins: Map<string, string>
+  pins: Pins
   claudeProgram: string
   codexFolder: string
 }
@@ -54,7 +56,7 @@ Decide whether it still holds, on both sides:
     .map(([name, version]) => `${name} ${version}`)
     .join(', ')}. The builds:
   - claude: the binary ${builds.claudeProgram} (search it with \`strings <binary> | grep -F <text>\`; a regex over the binary itself runs for hours)
-  - the Agent SDK: app/provider-host/node_modules/@anthropic-ai/claude-agent-sdk
+  - the Agent SDK: ${INSTALLED_SDK}
   - the Codex app-server: the folder ${builds.codexFolder}, with the types generated from it in app/provider-host/src/modules/codex-driver/protocol/
 - App side: the code in this repo still does what "App side" says, so the entry still describes something.
 

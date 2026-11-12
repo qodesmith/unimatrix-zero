@@ -1154,7 +1154,10 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
     )
 
     try {
-      expect(await portFree(SIGN_IN_PORT)).toBe(true)
+      expect(
+        await portFree(SIGN_IN_PORT),
+        'another sign-in holds the port: close it and run again'
+      ).toBe(true)
 
       const login = await server.request('account/login/start', {
         type: 'chatgpt',

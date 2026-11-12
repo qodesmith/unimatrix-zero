@@ -2,11 +2,18 @@
  * The vendor pins, and whether a PR changes them. A bump PR is known by what it
  * changes, never by its branch or labels, which a fork can copy.
  */
+import path from 'node:path'
 import {z} from 'zod'
 
 export const MANIFEST = 'app/main/src/modules/vendor-programs/dev-manifest.json'
 export const HOST_PACKAGE = 'app/provider-host/package.json'
 export const SDK = '@anthropic-ai/claude-agent-sdk'
+
+export const INSTALLED_SDK = path.join(
+  path.dirname(HOST_PACKAGE),
+  'node_modules',
+  SDK
+)
 
 const Manifest = z.looseObject({
   vendorPrograms: z.record(z.string(), z.looseObject({version: z.string()})),

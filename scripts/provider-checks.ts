@@ -19,7 +19,14 @@ import {devUserData} from './dev-data.ts'
 import {passed, renderResult} from './provider-checks-result.ts'
 import {LIST, entriesOf, liveCheckOf, tagsIn} from './provider-dependencies.ts'
 import {review} from './provider-review.ts'
-import {HOST_PACKAGE, MANIFEST, SDK, bumpOf, pinsOf} from './vendor-pins.ts'
+import {
+  HOST_PACKAGE,
+  INSTALLED_SDK,
+  MANIFEST,
+  SDK,
+  bumpOf,
+  pinsOf,
+} from './vendor-pins.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const GATE_JOB = 'Provider checks on a vendor bump'
@@ -73,13 +80,8 @@ async function api(call: string) {
 }
 
 /** `node_modules` isn't in git, so a checkout can leave an older SDK installed. */
-function installedSdkIsPinned(pins: Pins) {
-  const installed = path.join(
-    path.dirname(HOST_PACKAGE),
-    'node_modules',
-    SDK,
-    'package.json'
-  )
+function requirePinnedSdk(pins: Pins) {
+  const installed = path.join(INSTALLED_SDK, 'package.json')
 
   const version = fs.existsSync(path.join(root, installed))
     ? InstalledPackage.parse(JSON.parse(readText(installed))).version
@@ -98,7 +100,7 @@ function installedSdkIsPinned(pins: Pins) {
  */
 function liveBuilds() {
   const pins = pinsOf(readText(MANIFEST), readText(HOST_PACKAGE))
-  installedSdkIsPinned(pins)
+  requirePinnedSdk(pins)
   const userData = devUserData(root)
 
   const env = {
@@ -182,7 +184,7 @@ async function findBump(repo: string, wanted: number | null) {
   return bumps[0] ?? null
 }
 
-async function checkedOut(bump: Bump) {
+async function requireBumpHead(bump: Bump) {
   const head = (await $`git rev-parse HEAD`.cwd(root).text()).trim()
   const dirty = (await $`git status --porcelain`.cwd(root).text()).trim()
 
@@ -302,7 +304,7 @@ const repo = (
 
 const bump = await findBump(repo, values.pr ? Number(values.pr) : null)
 
-if (bump) await checkedOut(bump)
+if (bump) await requireBumpHead(bump)
 
 const entries = entriesOf(readText(LIST))
 
