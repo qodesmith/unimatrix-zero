@@ -23,7 +23,7 @@ The Provider's own record of one Thread, which it uses to continue the conversat
 _Avoid_: Thread (Codex's word for it), conversation
 
 **Compaction**:
-A Provider replacing the early part of a Provider session with a summary, on its own once the Context size nears the Context window, or when asked. The Thread still shows every Turn in full, but the AI now remembers the Turns before the Compaction only from that summary. The Thread marks the Reply a Compaction happened in. A Compaction that was blocked or failed changed nothing and isn't one.
+A Provider replacing the early part of a Provider session with a summary, on its own once the Context size nears the Context window or the threshold set in Settings, or when asked. The Thread still shows every Turn in full, but the AI now remembers the Turns before the Compaction only from that summary. The Thread marks the Reply a Compaction happened in. A Compaction that was blocked or failed changed nothing and isn't one.
 _Avoid_: Compression, summarization, Summary (that is prose made for the user)
 
 **System prompt**:
@@ -152,7 +152,7 @@ A named group of Trees in the sidebar, made by the user. A Tree is in at most on
 _Avoid_: Folder, project, group
 
 **Settings**:
-The single place for the user's global preferences: how the app looks and behaves, and the defaults new Trees start from. Settings never changes an existing Tree; anything that shapes what the AI does in one Tree belongs to that Tree.
+The single place for the user's global preferences: how the app looks and behaves, and the defaults new Trees start from. Settings never changes an existing Tree, except the Compaction Settings, which apply to every Thread from its next Reply; anything else that shapes what the AI does in one Tree belongs to that Tree.
 _Avoid_: Preferences, options, config
 
 **Font size**:

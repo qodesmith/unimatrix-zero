@@ -1311,3 +1311,24 @@ it('learns nothing from a `claude` whose Models can’t be read, and writes the 
 
   expect(changes[0]?.[0]).toMatchObject({resolvesTo: 'claude-fable-5-1'})
 })
+
+it('starts claude with the Compaction Settings, and with nothing for the defaults', async () => {
+  const claude = await setUp(['warm.ndjson', 'resumed.ndjson'])
+  const first = await claude.reply(FIRST_PROMPT)
+  const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
+
+  const third = await claude.reply(THIRD_PROMPT, recordedIn(second), {
+    compaction: {auto: false, threshold: 150_000},
+  })
+
+  expect(textOf(third)).toBe('TEAL OTTER')
+
+  await claude.allClosed()
+  const [warm, changed] = claude.reports()
+
+  expect(warm?.prompts).toEqual([FIRST_PROMPT, SECOND_PROMPT])
+  expect(warm?.args.join(' ')).not.toMatch(/autoCompact/)
+  expect(changed?.args).toContain(`--resume=${SESSION_ID}`)
+  expect(changed?.args.join(' ')).toMatch(/"autoCompactEnabled":false/)
+  expect(changed?.args.join(' ')).toMatch(/"autoCompactWindow":150000/)
+})

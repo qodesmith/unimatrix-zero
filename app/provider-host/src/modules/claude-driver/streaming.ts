@@ -10,6 +10,7 @@ import type {
   SpawnedProcess,
 } from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRequest, ReplySession, SessionFile} from '@uz/contract/host'
+import type {Compaction} from '@uz/contract/settings'
 import type {RunFailure} from '@uz/contract/turns'
 
 import {failureOf} from '#modules/failures/main'
@@ -42,6 +43,7 @@ type Restore = 'none' | 'store' | 'file'
 
 interface Live extends ClaudeSession {
   model: string
+  compaction: Compaction
   restore: Restore
   projectKey: string
   /** The SDK swaps in its own configuration folder on a restore. */
@@ -79,6 +81,14 @@ function resumption(session: ReplyRequest['session'], restore: Restore) {
     resume: session.sessionId,
     fork: session.type === 'fork',
     upTo: cutAt(session),
+  }
+}
+
+/** Nothing for a default, so `claude` compacts where it would on its own. */
+function compactionSettings({auto, threshold}: Compaction) {
+  return {
+    ...(auto ? {} : {autoCompactEnabled: false}),
+    ...(threshold === null ? {} : {autoCompactWindow: threshold}),
   }
 }
 
@@ -133,7 +143,10 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       env: claudeEnvironment(deps.env, configDir),
       cwd,
       settingSources: [],
-      settings: {autoMemoryEnabled: false},
+      settings: {
+        autoMemoryEnabled: false,
+        ...compactionSettings(request.compaction),
+      },
       tools: [],
       strictMcpConfig: true,
       mcpServers: {},
@@ -173,6 +186,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     return Object.assign(session, {
       model: request.model,
+      compaction: request.compaction,
       restore,
       projectKey,
       activeConfigDir: () => activeConfigDir,
@@ -247,7 +261,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     if (!session || session.type === 'fork') return null
 
-    const claimed = warm.claim(session, request.model)
+    const claimed = warm.claim(session, request)
 
     if (claimed && cutAt(session) !== null) {
       warm.drop(claimed)
