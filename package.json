@@ -35,6 +35,7 @@
     "electron-runtime": "bun run scripts/electron-runtime.ts",
     "codex-protocol": "bun run scripts/codex-protocol.ts",
     "provider-checks": "bun run scripts/provider-checks.ts",
+    "dev-data:prune": "bun run scripts/dev-data-prune.ts",
     "record-fake-reply": "bun run scripts/record-fake-reply.ts",
     "skills:install": "bun run scripts/install-skills.ts",
     "skills:update": "bunx skills update --project -y",
