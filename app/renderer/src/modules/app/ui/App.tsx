@@ -2,6 +2,7 @@ import {Canvas} from '#modules/canvas/main'
 import {
   Connections,
   ConnectionsProvider,
+  ProviderTabs,
   anyConnected,
   useConnections,
 } from '#modules/connections/main'
@@ -79,7 +80,7 @@ function AppLayout() {
         <AppSidebar
           trees={trees}
           connections={
-            <Connections
+            <ProviderTabs
               connections={connections}
               providerSettings={CompactionSettings}
             />

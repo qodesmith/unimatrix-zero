@@ -83,6 +83,17 @@ async function openSettings() {
     .toBeVisible()
 }
 
+async function openConnections() {
+  await settingsSheet()
+    .getByRole('navigation', {name: 'Settings sections'})
+    .getByRole('button', {name: 'Connections'})
+    .click()
+}
+
+function providerTab(name: string) {
+  return settingsSheet().getByRole('tabpanel', {name})
+}
+
 async function startStreaming(main: FakeMain) {
   await sidebarNewTree().click()
   await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
@@ -164,21 +175,28 @@ it('opens and closes Settings without sliding or fading when the OS asks for red
   ).toEqual([])
 })
 
-it('shows each Provider’s Compaction Settings in the Connections section of Settings', async () => {
+it('shows each Provider’s Compaction Settings in its own tab in the Connections section of Settings', async () => {
   globalThis.window.uz = fakeMain()
   await renderApp()
 
   await openSettings()
-  await settingsSheet()
-    .getByRole('navigation', {name: 'Settings sections'})
-    .getByRole('button', {name: 'Connections'})
-    .click()
+  await openConnections()
 
   await expect
-    .element(settingsSheet().getByRole('group', {name: 'Claude Compaction'}))
+    .element(
+      providerTab('Claude').getByRole('group', {name: 'Claude Compaction'})
+    )
     .toBeVisible()
   await expect
     .element(settingsSheet().getByRole('group', {name: 'ChatGPT Compaction'}))
+    .not.toBeInTheDocument()
+
+  await settingsSheet().getByRole('tab', {name: 'ChatGPT'}).click()
+
+  await expect
+    .element(
+      providerTab('ChatGPT').getByRole('group', {name: 'ChatGPT Compaction'})
+    )
     .toBeVisible()
 })
 
@@ -939,30 +957,28 @@ describe('connecting a Provider', () => {
       .toHaveTextContent('ChatGPT can’t be connected in this version yet.')
   })
 
-  it('shows the same cards under Settings once connected', async () => {
-    globalThis.window.uz = fakeMain()
+  it('shows each Provider’s account in its own tab under Settings, without the cards, and connects from there', async () => {
+    const main = fakeMain()
+    globalThis.window.uz = main
     await renderApp()
 
-    await page.getByRole('button', {name: 'Settings'}).click()
-    await page
-      .getByRole('navigation', {name: 'Settings sections'})
-      .getByRole('button', {name: 'Connections'})
+    await openSettings()
+    await openConnections()
+
+    await expect
+      .element(providerTab('Claude').getByText('sam@example.com · Claude Max'))
+      .toBeVisible()
+    await expect
+      .element(settingsSheet().getByRole('region', {name: 'Claude'}))
+      .not.toBeInTheDocument()
+
+    await settingsSheet().getByRole('tab', {name: 'ChatGPT'}).click()
+    await providerTab('ChatGPT')
+      .getByRole('button', {name: 'Connect ChatGPT'})
       .click()
 
-    const connections = page.getByRole('region', {name: 'Connections'})
-
     await expect
-      .element(connections.getByRole('heading', {name: 'Connections'}))
-      .toBeVisible()
-    await expect
-      .element(
-        connections
-          .getByRole('region', {name: 'Claude'})
-          .getByText('sam@example.com')
-      )
-      .toBeVisible()
-    await expect
-      .element(connections.getByRole('button', {name: 'Connect ChatGPT'}))
-      .toBeEnabled()
+      .poll(() => main.sent)
+      .toContainEqual({type: 'provider.connect', provider: 'chatgpt'})
   })
 })
