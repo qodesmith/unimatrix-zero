@@ -17,7 +17,7 @@ Entries describe behavior, never line numbers: the most specific pointer is a mo
 | -------------- | ------------------------------------------------------------------------------------------------------ |
 | Id             | A stable kebab-case name that links the entry to its check                                             |
 | Kind           | D (an upgrade could quietly break it), W (an upgrade could make it unnecessary), or D/W                |
-| Provider       | Claude, Codex or both                                                                                  |
+| Provider       | Claude, ChatGPT or both                                                                                |
 | Relies on      | The Provider's behavior, in the Provider's terms                                                       |
 | App side       | What the app does that depends on it, by concept, naming a module at most                              |
 | User would see | What breaks if the behavior changes                                                                    |
@@ -55,7 +55,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 
 - **Id:** `codex-history-databases`
 - **Kind:** D
-- **Provider:** Codex
+- **Provider:** ChatGPT
 - **Relies on:** Codex resumes a thread from the rollout file under `CODEX_HOME`, even though it also keeps the thread's history in its own databases (`thread_history_1.sqlite`, `state_5.sqlite`). A rollout written over with an earlier copy wins over what the databases saw.
 - **App side:** `codex-driver` saves only the rollout files Codex names, and rewinds an unloaded thread by writing the app's copy over its rollout before resuming it. Nothing in the app reads or writes the databases.
 - **User would see:** after a Retry or a deletion, the AI still remembers the failed or deleted Turns.
@@ -231,7 +231,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 
 - **Id:** `codex-rollout-files`
 - **Kind:** D
-- **Provider:** Codex
+- **Provider:** ChatGPT
 - **Relies on:** `thread/read` names each thread's rollout file (`Thread.path`, marked `[UNSTABLE]`) and its fork parent, inside `CODEX_HOME` under `sessions/`. Codex only appends to a rollout it resumes, writes a compressed `.jsonl.zst` it resumes back out as plain `.jsonl`, and resumes a thread by id from files written back under their original names.
 - **App side:** after each Reply, `codex-driver` saves the files Codex names, following fork parents. Before a resume or fork it writes them back, leaving alone a file on disk that starts with the saved bytes, so a Reply cut short stays in the thread.
 - **User would see:** a moved or renamed rollout isn't saved and nothing says so; the next cold resume fails with "no rollout found for thread id". A rollout rewritten in place fails the prefix test, so the app's copy overwrites it and loses a Reply cut short.
@@ -242,7 +242,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 
 - **Id:** `codex-thread-revert`
 - **Kind:** D
-- **Provider:** Codex
+- **Provider:** ChatGPT
 - **Relies on:** `thread/revert` writes a new rollout that refers back into the old one and leaves the old file untouched. Once a turn is reverted, `thread/turns/list` no longer lists it, so an error from reverting a turn that list lacks means it's already gone.
 - **App side:** for a Retry's rewind or a deletion's cut, `codex-driver` reverts, saves the old rollout beside the new one, and treats a refused revert of an unlisted turn as done.
 - **User would see:** resumes from the app's copy fail, or deleted Turns come back into what the AI remembers. If reverted turns stayed listed, every Retry after a failed attempt would fail.
@@ -253,7 +253,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 
 - **Id:** `codex-reconnect-new-message`
 - **Kind:** W
-- **Provider:** Codex
+- **Provider:** ChatGPT
 - **Relies on:** when Codex's connection drops mid-Reply, it streams the answer again as a new `agentMessage` item and never finishes the old one, at times without any notification that it retried.
 - **App side:** the Reply mapper in `codex-driver` drops a message that never finished as soon as a new one starts, replacing the text shown so far (#213).
 - **User would see:** nothing while Codex keeps doing this. If Codex starts finishing or resuming the old item, the workaround is no longer needed; if it starts a real follow-on message while the first is unfinished, the app drops text that should stay.
@@ -264,7 +264,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 
 - **Id:** `codex-resend-unanswered-prompt`
 - **Kind:** D
-- **Provider:** Codex
+- **Provider:** ChatGPT
 - **Relies on:** an app-server that exits before answering `turn/start` (or the `thread/start` or `thread/resume` before it) hasn't saved the Prompt to the rollout.
 - **App side:** when nothing was heard back and the app-server has exited, `codex-driver` tries once more on a new app-server, loading the thread from the app's copy.
 - **User would see:** the Prompt twice in the thread, so the AI sees it twice.
@@ -275,7 +275,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 
 - **Id:** `codex-server-requests-refused`
 - **Kind:** D
-- **Provider:** Codex
+- **Provider:** ChatGPT
 - **Relies on:** with `approvalPolicy: 'never'`, a read-only sandbox and no client capabilities, Codex sends none of its server requests (approvals, user input, tool calls, token refreshes) during a Reply.
 - **App side:** the app-server client in `codex-driver` refuses every server request at once.
 - **User would see:** a Reply that stalls or fails in Codex's wording, for example when an upgrade adds a request type or a connector asks the user for input.
@@ -286,7 +286,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 
 - **Id:** `codex-protocol-types`
 - **Kind:** D
-- **Provider:** Codex
+- **Provider:** ChatGPT
 - **Relies on:** Codex keeps the method names and shapes of the notifications and answers the app reads, as `codex app-server generate-ts` produced them for the pinned version.
 - **App side:** `codex-driver` parses notifications against a closed list and drops anything else or anything that fails to parse. Its schemas match the committed types in `protocol/`, so only a regenerated `protocol/` turns a changed shape into a typecheck error, and `bun run codex-protocol` isn't run when the pin moves.
 - **User would see:** a Reply that streams until Codex exits, text that appears all at once at the end, or wrong token counts and missing limit-reset times.
@@ -297,7 +297,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 
 - **Id:** `codex-sign-in-port-and-refusal`
 - **Kind:** D
-- **Provider:** Codex
+- **Provider:** ChatGPT
 - **Relies on:** `account/login/start` runs Codex's local callback server on port 1455, and a second sign-in started while one holds it cancels the first. When OpenAI's page answers `missing_codex_entitlement`, `account/login/completed` carries the English error "Codex is not enabled for your workspace".
 - **App side:** `codex-driver` reports "Another ChatGPT or Codex sign-in is open" when port 1455 is taken, and marks a sign-in plan-refused only when the error holds that phrase.
 - **User would see:** a false "another sign-in is open", or a sign-in elsewhere silently canceled. A refused workspace shown as a page that never answered instead of the plan-refused explanation.

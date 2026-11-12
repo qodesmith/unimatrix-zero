@@ -20,7 +20,7 @@ type Field = (typeof FIELDS)[number]
 const ALLOWED: Partial<Record<Field, RegExp>> = {
   Id: /^`[a-z\d]+(-[a-z\d]+)*`$/,
   Kind: /^(D|W|D\/W)$/,
-  Provider: /^(Claude|Codex|both)$/,
+  Provider: /^(Claude|ChatGPT|both)$/,
   'Changed by': /^(upgrade|upgrade \+ drift)(\.|$)/,
 }
 
