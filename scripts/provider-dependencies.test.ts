@@ -29,7 +29,7 @@ function list(...entries: string[]) {
   )
 }
 
-function test(...ids: string[]) {
+function testFile(...ids: string[]) {
   return {
     file: 'app/x.live.test.ts',
     source: ids.map(id => `it('[dep:${id}] holds', () => {})`).join('\n'),
@@ -43,7 +43,7 @@ describe('the Provider dependencies lint', () => {
       entry('reasoned', {Check: 'none: needs a sign-in'})
     )
 
-    expect(problemsOf(doc, [test('checked')])).toEqual([])
+    expect(problemsOf(doc, [testFile('checked')])).toEqual([])
   })
 
   it('fails an entry with neither a live check nor a reason', () => {
@@ -66,9 +66,9 @@ describe('the Provider dependencies lint', () => {
   })
 
   it('fails a check that names an id the list lacks', () => {
-    expect(problemsOf(list(entry('kept')), [test('kept', 'gone')])).toEqual([
-      "app/x.live.test.ts: [dep:gone] isn't in docs/provider-dependencies.md",
-    ])
+    expect(problemsOf(list(entry('kept')), [testFile('kept', 'gone')])).toEqual(
+      ["app/x.live.test.ts: [dep:gone] isn't in docs/provider-dependencies.md"]
+    )
   })
 
   it('fails an entry whose live check no test names', () => {
@@ -83,7 +83,7 @@ describe('the Provider dependencies lint', () => {
       entry('two', {Check: '`[dep:one]` in `claude-driver`'})
     )
 
-    expect(problemsOf(doc, [test('one')])).toEqual([
+    expect(problemsOf(doc, [testFile('one')])).toEqual([
       'two: Check names [dep:one], not [dep:two]',
     ])
   })
@@ -91,7 +91,7 @@ describe('the Provider dependencies lint', () => {
   it('fails an entry that gives a reason while a test checks it', () => {
     const doc = list(entry('both', {Check: 'none: too slow'}))
 
-    expect(problemsOf(doc, [test('both')])).toEqual([
+    expect(problemsOf(doc, [testFile('both')])).toEqual([
       'both: Check gives a reason, but app/x.live.test.ts has [dep:both]',
     ])
   })
@@ -107,7 +107,7 @@ describe('the Provider dependencies lint', () => {
       })
     )
 
-    expect(problemsOf(doc, [test('twice')])).toEqual([
+    expect(problemsOf(doc, [testFile('twice')])).toEqual([
       'twice title: **Kind:** can\'t be "X"',
       'twice title: **Provider:** can\'t be "Gemini"',
       'twice title: **Changed by:** can\'t be "drift"',
