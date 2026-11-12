@@ -518,7 +518,7 @@ async function compactingThread(recording: string) {
   return {filled, compacting}
 }
 
-it('starts a thread with the Compaction threshold, and with no config for the default', async () => {
+it('starts a thread with no config for the default Compaction threshold', async () => {
   const codex = await setUp(['started.ndjson'])
   await codex.reply('Reply with the single word TEAL.')
   await codex.allClosed()

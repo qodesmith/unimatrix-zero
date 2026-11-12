@@ -20,10 +20,8 @@ export const SendKeySchema = z.enum(['enter', 'mod-enter'])
 export const FONT_SIZE = {min: 12, max: 24, step: 2}
 
 /**
- * The Context sizes, in tokens, a Provider takes as the point to compact at.
- * Claude refuses values outside its range. Codex compacts at 90% of the
- * Context window at most, so `max` is 90% of its largest Model's window at
- * the pinned version.
+ * In tokens, the range each Provider takes. Codex's `max` is 90% of its
+ * largest Model's raw Context window, past which it clamps.
  */
 export const COMPACTION_THRESHOLD = {
   claude: {min: 100_000, max: 1_000_000},

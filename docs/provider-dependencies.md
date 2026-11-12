@@ -332,7 +332,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Kind:** D/W
 - **Provider:** Claude
 - **Relies on:** `claude` takes `autoCompactWindow` and `autoCompactEnabled` in the SDK's `settings`. It compacts on its own at the window minus 13,000, and minus up to 20,000 more for output, and never past the Model's own limit. It takes only integers from 100,000 to 1,000,000 and drops any other value without an error. `autoCompactEnabled: false` stops automatic Compaction past any threshold. `claude` fixes the window as it starts: `applyFlagSettings` stores a new one and doesn't apply it, though it does apply `autoCompactEnabled`.
-- **App side:** `claude-driver` starts `claude` with the Compaction Settings, and with neither key for a default. It closes a warm `claude` started with other Compaction Settings, so the next Reply resumes the session in a new one. The contract's `COMPACTION_THRESHOLD` keeps the Setting inside the range `claude` takes.
+- **App side:** `claude-driver` starts `claude` with the Compaction Settings, and with neither key for a default. It closes a warm `claude` started with other Compaction Settings, so the next Reply resumes the session in a new one. The Setting's range is the one `claude` takes.
 - **User would see:** a threshold that changes nothing, or a Thread that compacts with Compaction off. If `claude` narrowed the range, values outside it would be ignored without a word.
 - **Changed by:** upgrade
 - **Check:** `[dep:claude-compaction-settings]` in `claude-driver`: a Thread under a lowered threshold doesn't compact, past it with Compaction off doesn't, and with Compaction on again it does, each from the next Reply. Whether `applyFlagSettings` still ignores a new window, which would make closing the warm `claude` unnecessary, has no check.
@@ -343,7 +343,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Kind:** D
 - **Provider:** ChatGPT
 - **Relies on:** Codex takes `model_auto_compact_token_limit`, an integer, in `config` on `thread/start`, `thread/resume` and `thread/fork`, and accepts a misspelled key without an error. It checks the limit as a turn starts, and clamps it to 90% of the Model's raw Context window. On `thread/resume` it ignores `config` for a thread that a client is subscribed to, and takes it after `thread/unsubscribe`. A resume that brings no `config` keeps the old limit.
-- **App side:** `codex-driver` sends the threshold in `config` on every thread it starts, resumes or forks, and nothing for the default. When the threshold for a loaded thread changes, it unsubscribes and resumes the thread, with an empty `config` to go back to the default.
+- **App side:** `codex-driver` sends the threshold in `config` on every thread it starts, resumes or forks for a Reply, and nothing for the default. When the threshold for a loaded thread changes, it unsubscribes and resumes the thread, with an empty `config` to go back to the default.
 - **User would see:** a threshold that changes nothing, or that reaches a Thread only once the app-server restarts.
 - **Changed by:** upgrade
 - **Check:** `[dep:codex-compaction-limit]` in `codex-driver`: a thread under the threshold doesn't compact, and compacts on the next Reply once the threshold drops below its size while it's loaded. The clamp has no check: a full Context window costs about 450,000 tokens.
@@ -354,7 +354,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Kind:** D
 - **Provider:** ChatGPT
 - **Relies on:** the largest raw Context window among Codex's Models is 500,000 tokens (`gpt-6.1-sol` and `gpt-6.1-terra`; Codex reports 95% of it as `modelContextWindow`). Codex fetches its Model catalog from OpenAI's servers, so the list can change without a release.
-- **App side:** the contract's `COMPACTION_THRESHOLD.chatgpt.max` is 450,000, 90% of that window, which is where the Setting's "Default" sits.
+- **App side:** the top of ChatGPT's Compaction threshold Setting is 450,000, 90% of that window, and stands for Codex's default.
 - **User would see:** with a larger Model, a slider that can't reach that Model's own default; with a smaller largest Model, a top stretch of the slider that acts as the default.
 - **Changed by:** upgrade + drift
 - **Check:** none: a Model's raw window shows only in Codex's catalog cache, and a check would take a Reply on every Model.

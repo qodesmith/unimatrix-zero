@@ -109,6 +109,21 @@ it('closes one started with other Compaction Settings instead of giving it back'
   expect(warm.size).toBe(0)
 })
 
+it('closes one started with automatic Compaction on when the Reply has it off', () => {
+  const warm = warmSessions(6)
+  const one = session('s1', 'm1')
+  warm.add(one)
+  warm.release(one)
+
+  expect(
+    warm.claim(
+      {sessionId: 's1', messageId: 'm1'},
+      {model: 'haiku', compaction: {auto: false, threshold: null}}
+    )
+  ).toBeNull()
+  expect(one.closed).toBe(true)
+})
+
 it('starts the idle wait over after each Reply', () => {
   const warm = warmSessions(6)
   const one = session('s1', 'm1')
