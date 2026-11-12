@@ -16,7 +16,7 @@ import {z} from 'zod'
 import {passed, renderResult} from './provider-checks-result.ts'
 import {LIST, entriesOf, liveCheckOf, tagsIn} from './provider-dependencies.ts'
 import {review} from './provider-review.ts'
-import {bumpOf, pinsOf} from './vendor-pins.ts'
+import {HOST_PACKAGE, MANIFEST, bumpOf, pinsOf} from './vendor-pins.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const GATE_JOB = 'Provider checks on a vendor bump'
@@ -81,10 +81,7 @@ function liveBuilds(): Builds {
     )
   }
 
-  const pins = pinsOf(
-    readText('app/main/src/modules/vendor-programs/dev-manifest.json'),
-    readText('app/provider-host/package.json')
-  )
+  const pins = pinsOf(readText(MANIFEST), readText(HOST_PACKAGE))
 
   const claudeProgram = env.data.UZ_LIVE_CLAUDE_PROGRAM
   const codexFolder = env.data.UZ_LIVE_CODEX_PROGRAM

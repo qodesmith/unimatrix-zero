@@ -208,7 +208,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 ### A cut with no target resumes at the newest entry
 
 - **Id:** `cut-with-no-target-resumes-at-newest`
-- **Kind:** W
+- **Kind:** D
 - **Provider:** Claude
 - **Relies on:** a resume with no `resumeSessionAt` loads the session up to its newest entry, a failed attempt's Prompt and error entry included. `claude` can drop entries only by resuming at an earlier one.
 - **App side:** `claude-driver` turns a cut that names nothing to keep into a plain resume, which is why `turns` always names what a Retry's cut keeps (#214).

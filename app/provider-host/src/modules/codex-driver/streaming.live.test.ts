@@ -111,7 +111,6 @@ function wireLinesIn(output: Buffer[]) {
     .map(line => WireLine.parse(JSON.parse(line)))
 }
 
-/** The `agentMessage` items Codex streamed text into, and those it finished. */
 function agentMessagesIn(output: Buffer[]) {
   const lines = wireLinesIn(output)
 
@@ -147,7 +146,18 @@ const PinnedManifest = z.looseObject({
   }),
 })
 
-/** Each file under `root`, by its path there, with its text. */
+function programIn(pinned: string) {
+  return programOf({
+    path: pinned,
+    build: {
+      url: 'https://example.com/codex.tar.gz',
+      sha256: '0'.repeat(64),
+      size: 1,
+      archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+    },
+  })
+}
+
 function filesIn(root: string) {
   return new Map(
     fs
@@ -1113,41 +1123,25 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
     }
   }, 300_000)
 
-  it('[dep:self-updates-off] holds the setting the app turns its update check off with', () => {
+  it('[dep:self-updates-off] holds every setting the app passes it', () => {
     if (!folder) return
 
-    const program = programOf({
-      path: folder,
-      build: {
-        url: 'https://example.com/codex.tar.gz',
-        sha256: '0'.repeat(64),
-        size: 1,
-        archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
-      },
-    })
+    const program = programIn(folder)
+
+    const binary = fs.readFileSync(program)
 
     const settings = CODEX_ARGS.filter(arg => arg !== '-c').map(
       arg => arg.split('=')[0] ?? ''
     )
 
-    expect(settings).toContain('check_for_update_on_startup')
-    expect(
-      fs.readFileSync(program).includes('check_for_update_on_startup')
-    ).toBe(true)
+    expect(settings.length).toBeGreaterThan(0)
+    expect(settings.filter(name => !binary.includes(name))).toEqual([])
   })
 
   it('[dep:codex-sign-in-port-and-refusal] holds the refused-workspace wording the app matches, and takes the sign-in port for a sign-in', async () => {
     if (!folder) return
 
-    const program = programOf({
-      path: folder,
-      build: {
-        url: 'https://example.com/codex.tar.gz',
-        sha256: '0'.repeat(64),
-        size: 1,
-        archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
-      },
-    })
+    const program = programIn(folder)
 
     expect(fs.readFileSync(program).includes(NOT_ENTITLED)).toBe(true)
 

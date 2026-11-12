@@ -4,8 +4,8 @@
  */
 import {z} from 'zod'
 
-const MANIFEST = 'app/main/src/modules/vendor-programs/dev-manifest.json'
-const HOST_PACKAGE = 'app/provider-host/package.json'
+export const MANIFEST = 'app/main/src/modules/vendor-programs/dev-manifest.json'
+export const HOST_PACKAGE = 'app/provider-host/package.json'
 const SDK = '@anthropic-ai/claude-agent-sdk'
 
 const Manifest = z.looseObject({
@@ -49,7 +49,6 @@ export type GitHubApi = (path: string) => Promise<string>
 
 const Compare = z.looseObject({
   merge_base_commit: z.looseObject({sha: z.string()}),
-  files: z.array(z.looseObject({filename: z.string()})).default([]),
 })
 
 const Contents = z.looseObject({content: z.string()})
@@ -69,8 +68,8 @@ async function pinsAt(api: GitHubApi, repo: string, sha: string) {
 }
 
 /**
- * The pins a PR moves from where it branched off `base`; empty when it moves
- * none.
+ * The pins a PR moves from where it branched off `base`. Read whole, since
+ * GitHub's list of a PR's changed files stops at 300.
  */
 export async function bumpOf(
   api: GitHubApi,
@@ -80,12 +79,6 @@ export async function bumpOf(
   const compared = Compare.parse(
     JSON.parse(await api(`repos/${repo}/compare/${pr.base}...${pr.head}`))
   )
-
-  const touched = compared.files.some(({filename}) =>
-    [MANIFEST, HOST_PACKAGE].includes(filename)
-  )
-
-  if (!touched) return []
 
   const [base, head] = await Promise.all([
     pinsAt(api, repo, compared.merge_base_commit.sha),

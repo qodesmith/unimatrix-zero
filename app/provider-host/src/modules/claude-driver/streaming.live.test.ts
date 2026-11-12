@@ -64,8 +64,8 @@ const OutLine = z.looseObject({
   message: z.looseObject({model: z.string().optional()}).optional(),
 })
 
-function linesOf(out: string[]) {
-  return out.map(line => OutLine.parse(JSON.parse(line)))
+function linesOf(printed: string[]) {
+  return printed.map(line => OutLine.parse(JSON.parse(line)))
 }
 
 function recordedIn(events: Streamed[]) {
@@ -78,7 +78,6 @@ function recordedIn(events: Streamed[]) {
   return recorded
 }
 
-/** Where `claude` keeps a session, under the key the app computes. */
 function transcriptOf(sessionId: string) {
   return path.join(
     configDir,
@@ -99,8 +98,7 @@ function liveDriver(
 ) {
   let addedEnv = firstEnv
   const store = fakeStore(refuses)
-  /** Every line each `claude` printed, in order. */
-  const out: string[] = []
+  const printed: string[] = []
 
   const recorder = createRecorder(
     ({command, args, cwd, env, signal}) =>
@@ -117,7 +115,9 @@ function liveDriver(
     spawn: options => {
       // `claudeEnvironment` strips every `CLAUDE_*` variable from the host's.
       const child = start({...options, env: {...options.env, ...addedEnv}})
-      createInterface({input: child.stdout}).on('line', line => out.push(line))
+      createInterface({input: child.stdout}).on('line', line =>
+        printed.push(line)
+      )
       exits.push(
         new Promise(resolve => {
           child.on('exit', resolve)
@@ -176,7 +176,7 @@ function liveDriver(
     setEnv(env: Record<string, string>) {
       addedEnv = env
     },
-    out,
+    printed,
     entriesOf: (sessionId: string) =>
       store.entriesOf(projectKeyOf(configDir), sessionId),
     entryCount: (sessionId: string) =>
@@ -313,7 +313,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     expect(textOf(events).length).toBeGreaterThan(0)
     expect(events.at(-1)).toMatchObject({status: 'stopped'})
     expect(
-      linesOf(live.out).find(line => line.type === 'result')
+      linesOf(live.printed).find(line => line.type === 'result')
     ).toMatchObject({terminal_reason: 'aborted_streaming', is_error: true})
     const stopped = recordedIn(events)
 
@@ -692,14 +692,9 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       model: 'claude-made-up-0',
     })
 
-    const madeUp = live.out.flatMap(line => {
-      const parsed = OutLine.parse(JSON.parse(line))
-
-      return parsed.type === 'assistant' &&
-        parsed.message?.model === '<synthetic>'
-        ? [parsed]
-        : []
-    })
+    const madeUp = linesOf(live.printed).filter(
+      line => line.type === 'assistant' && line.message?.model === '<synthetic>'
+    )
 
     expect(madeUp.length).toBeGreaterThan(0)
     expect(madeUp.filter(line => 'isSynthetic' in line)).toEqual([])
@@ -736,7 +731,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       })
     )
 
-    const lines = linesOf(live.out)
+    const lines = linesOf(live.printed)
 
     expect(lines).toContainEqual(
       expect.objectContaining({
@@ -809,7 +804,14 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     expect(planOf(account.subscriptionType ?? '')).not.toBeNull()
   }, 120_000)
 
-  it('[dep:self-updates-off] holds the switch that turns its self-updates off', () => {
-    expect(fs.readFileSync(program).includes('DISABLE_UPDATES')).toBe(true)
+  it('[dep:self-updates-off] holds every switch the app sets beside its config folder', () => {
+    const binary = fs.readFileSync(program)
+
+    const switches = Object.keys(claudeEnvironment({}, configDir)).filter(
+      name => !name.startsWith('CLAUDE_')
+    )
+
+    expect(switches.length).toBeGreaterThan(0)
+    expect(switches.filter(name => !binary.includes(name))).toEqual([])
   })
 })

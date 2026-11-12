@@ -1,9 +1,6 @@
 import {describe, expect, it} from 'vitest'
 
-import {bumpOf} from './vendor-pins.ts'
-
-const MANIFEST = 'app/main/src/modules/vendor-programs/dev-manifest.json'
-const HOST_PACKAGE = 'app/provider-host/package.json'
+import {HOST_PACKAGE, MANIFEST, bumpOf} from './vendor-pins.ts'
 
 interface Tree {
   claude: string
@@ -35,8 +32,7 @@ function files(tree: Tree) {
 
 const PINNED: Tree = {claude: '2.1.307', codex: '0.163.0', sdk: '0.3.307'}
 
-/** A repo where `head` branched off `fork-point` and changed `changed`. */
-function repo(head: Tree, changed: string[]) {
+function repo(head: Tree) {
   const trees = new Map([
     ['fork-point', PINNED],
     ['head', head],
@@ -44,10 +40,7 @@ function repo(head: Tree, changed: string[]) {
 
   return async (call: string) => {
     if (call === 'repos/o/r/compare/main-tip...head') {
-      return JSON.stringify({
-        merge_base_commit: {sha: 'fork-point'},
-        files: changed.map(filename => ({filename})),
-      })
+      return JSON.stringify({merge_base_commit: {sha: 'fork-point'}})
     }
 
     const [, file = '', ref = ''] =
@@ -68,33 +61,23 @@ describe('a bump PR', () => {
   it('is one that moves a vendor program’s version from where it branched', async () => {
     const head = {...PINNED, claude: '2.1.322', codex: '0.170.0'}
 
-    await expect(bumpOf(repo(head, [MANIFEST]), 'o/r', pr)).resolves.toEqual([
+    await expect(bumpOf(repo(head), 'o/r', pr)).resolves.toEqual([
       'claude 2.1.307 → 2.1.322',
       'codex 0.163.0 → 0.170.0',
     ])
   })
 
-  it('is one that moves the Agent SDK, even inside other changes', async () => {
+  it('is one that moves the Agent SDK', async () => {
     const head = {...PINNED, sdk: '0.3.322', other: '^4.1.0'}
 
-    await expect(
-      bumpOf(repo(head, ['README.md', HOST_PACKAGE]), 'o/r', pr)
-    ).resolves.toEqual(['@anthropic-ai/claude-agent-sdk 0.3.307 → 0.3.322'])
+    await expect(bumpOf(repo(head), 'o/r', pr)).resolves.toEqual([
+      '@anthropic-ai/claude-agent-sdk 0.3.307 → 0.3.322',
+    ])
   })
 
   it('isn’t one that edits the pin files without moving a pin', async () => {
     const head = {...PINNED, other: '^4.1.0'}
 
-    await expect(
-      bumpOf(repo(head, [MANIFEST, HOST_PACKAGE]), 'o/r', pr)
-    ).resolves.toEqual([])
-  })
-
-  it('isn’t one that leaves the pin files alone, without reading them', async () => {
-    const head = {...PINNED, claude: 'unread'}
-
-    await expect(bumpOf(repo(head, ['README.md']), 'o/r', pr)).resolves.toEqual(
-      []
-    )
+    await expect(bumpOf(repo(head), 'o/r', pr)).resolves.toEqual([])
   })
 })

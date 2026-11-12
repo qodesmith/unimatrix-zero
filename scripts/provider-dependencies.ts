@@ -64,7 +64,7 @@ export function tagsIn(source: string) {
   return [...source.matchAll(TAG)].map(([, id = '']) => id)
 }
 
-/** The live check an entry's Check field names, or null for a reason. */
+/** The id an entry's Check names, null for a reason, or '' for neither. */
 export function liveCheckOf(entry: Entry) {
   const check = entry.fields.Check ?? ''
 
