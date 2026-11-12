@@ -34,10 +34,6 @@ import path from 'node:path'
 const reports = process.env.FAKE_CODEX_REPORTS
 const run = fs.readdirSync(reports).length
 const reportFile = path.join(reports, run + '.json')
-fs.writeFileSync(reportFile, '{}')
-const recording = process.env.FAKE_CODEX_RECORDINGS.split(path.delimiter)[run]
-const [, ...steps] = fs.readFileSync(recording, 'utf8')
-  .split('\\n').filter(Boolean).map(line => JSON.parse(line))
 const home = process.env.CODEX_HOME
 const standIn = ${JSON.stringify(CODEX_HOME_STAND_IN)}
 const vendorVariables = Object.keys(process.env).filter(name => /^(OPENAI|CODEX|ANTHROPIC|CLAUDE)_/i.test(name))
@@ -47,6 +43,9 @@ function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
 }
 save()
+const recording = process.env.FAKE_CODEX_RECORDINGS.split(path.delimiter)[run]
+const [, ...steps] = fs.readFileSync(recording, 'utf8')
+  .split('\\n').filter(Boolean).map(line => JSON.parse(line))
 
 function rollouts() {
   const sessions = path.join(home, 'sessions')
