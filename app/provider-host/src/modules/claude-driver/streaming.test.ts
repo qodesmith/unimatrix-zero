@@ -858,7 +858,7 @@ it('stores the Prompt in the app’s copy of the session under the id main gave 
   ).toEqual([messageId])
 })
 
-it('sends a Prompt that starts with a claude command marked to be delivered as written, not run', async () => {
+it('sends a Prompt that starts with a claude command marked to be delivered as written', async () => {
   const claude = await setUp(['warm.ndjson'])
 
   await claude.reply('/compact')

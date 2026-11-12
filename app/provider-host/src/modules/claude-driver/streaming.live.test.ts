@@ -234,12 +234,12 @@ async function failedOn(live: Live, request: ReplyRequest) {
   return events
 }
 
+const PADDING = 'The harbor log lists no ships today. '.repeat(300)
+
 /**
  * Three Exchanges, compacted inside the third. The threshold is lowered only
  * for them: every later `claude` starts without it.
  */
-const PADDING = 'The harbor log lists no ships today. '.repeat(300)
-
 async function compactedThread(live: Live) {
   live.setEnv({CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '0.2'})
 
@@ -718,21 +718,21 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     const live = liveDriver([])
     const first = await live.reply('My code word is TEAL.', null)
 
-    const command = await live.reply(
+    const answered = await live.reply(
       '/compact',
       continuing(first.recorded.session)
     )
 
-    expect(command.events).not.toContainEqual(
+    expect(answered.events).not.toContainEqual(
       expect.objectContaining({type: 'CONTEXT_COMPACTED'})
     )
-    expect(textOf(command.events)).not.toBe('')
+    expect(textOf(answered.events)).not.toBe('')
 
     await live.closed()
 
     const next = await live.reply(
       'What is my code word? Just the word.',
-      continuing(command.recorded.session)
+      continuing(answered.recorded.session)
     )
 
     expect(textOf(next.events)).toMatch(/TEAL/)
