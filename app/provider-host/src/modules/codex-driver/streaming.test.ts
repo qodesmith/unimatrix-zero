@@ -21,6 +21,7 @@ import {createCodexDriver, spawnCodex} from './main'
 import {replayCodex} from './replay'
 import {folderOf} from './rollouts'
 
+/** As `started.ndjson`, `resumed.ndjson` and `forked.ndjson` recorded them. */
 const THREAD_ID = '01a168e8-439c-71f2-bbd1-52697c97d40d'
 const FIRST_TURN = '01a168e8-4e8e-7312-b51e-dcc3f2d051eb'
 const SECOND_TURN = '01a168e8-60f5-71c3-81f4-a35411c1913a'
@@ -31,11 +32,13 @@ const MODEL = 'gpt-6.1-sol'
 const ROLLOUT = `sessions/2026/10/23/rollout-2026-10-23T09-16-57-${THREAD_ID}.jsonl`
 const FORKED_ROLLOUT = `sessions/2026/10/23/rollout-2026-10-23T09-17-17-${FORKED_THREAD_ID}.jsonl`
 
+/** As `stopped.ndjson` recorded them. */
 const STOPPED_THREAD_ID = '01a170a9-cc05-7142-8908-96e20ff7d881'
 const STOPPED_TURN = '01a170a9-ce9a-7972-abbb-60582c32b871'
 const AFTER_STOP_TURN = '01a170a9-de52-7e32-98fa-57fc6eeb8640'
 const STOPPED_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-39-${STOPPED_THREAD_ID}.jsonl`
 
+/** As `reverted.ndjson` recorded them. */
 const REWOUND_THREAD_ID = '01a170a9-f825-72a1-bba2-c0fac2f606fd'
 const HI_TURN = '01a170a9-fa94-7543-b644-2fe7cf5a34fc'
 const BYE_TURN = '01a170aa-0e03-7b72-8de6-8e269c1f5388'
@@ -43,14 +46,17 @@ const RETRIED_TURN = '01a170aa-1476-75b0-892c-bd4587e4d57b'
 const REWOUND_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-50-${REWOUND_THREAD_ID}.jsonl`
 const REVERTED_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-56-${REWOUND_THREAD_ID}_01a170aa-145c-7992-b8a7-bcfb762e8621.jsonl`
 
+/** As `thanked.ndjson`, `cut.ndjson` and `cut-resumed.ndjson` recorded them. */
 const THANKED_THREAD_ID = '01a1893a-31f8-76f2-8050-38ee9d75c720'
 const HELLO_TURN = '01a1893a-3439-7c23-9c2d-69d52b12a8b4'
 const GOODBYE_TURN = '01a1893a-4532-7b33-804e-21ff70011737'
 const THANKS_TURN = '01a1893a-4f0d-71a0-9828-93cd3ea3291e'
 
+/** As `reconnected.ndjson` recorded them. */
 const RECONNECTED_THREAD_ID = '01a1c264-7cf0-7403-a69a-cdef675814f6'
 const RECONNECTED_TURN = '01a1c264-7f60-77f1-8637-990e960884d7'
 
+/** As `compacted.ndjson` recorded it. */
 const COMPACTED_THREAD_ID = '01a1c55f-23dd-7593-a186-df8b3a434f75'
 
 type Streamed = StartReplyEvent
@@ -977,6 +983,7 @@ function refusedOverCap(counts: {max_chars: unknown; actual_chars: unknown}) {
 }
 
 it('fails the Reply as too long, with both counts, when Codex refuses a Prompt over its text cap', async () => {
+  // The refusal as `codex` 0.163.0 answered a 1,048,577-character Prompt.
   const codex = await setUp([
     refusedOverCap({max_chars: 1_048_576, actual_chars: 1_048_577}),
   ])

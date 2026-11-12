@@ -35,6 +35,7 @@ import {RECORDINGS} from './replay'
 const folder = process.env.UZ_LIVE_CODEX_PROGRAM
 const signedIn = process.env.UZ_LIVE_CODEX_HOME
 
+/** The Model ChatGPT's `model/list` marked as its default when recorded. */
 const MODEL = 'gpt-6.1-sol'
 
 function homeFrom(source: string) {

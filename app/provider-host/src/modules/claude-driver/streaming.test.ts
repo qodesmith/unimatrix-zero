@@ -1,4 +1,4 @@
-import type {RecordedLine} from './replay'
+import type {FakeClaudeOptions, RecordedLine} from './replay'
 import type {SDKPartialAssistantMessage} from '@anthropic-ai/claude-agent-sdk'
 import type {
   ReplyRecorded,
@@ -20,9 +20,16 @@ import path from 'node:path'
 import {afterEach, expect, it} from 'vitest'
 
 import {createClaudeDriver, spawnClaude} from './main'
-import {RECORDINGS, RecordedLineSchema, replayClaude} from './replay'
+import {
+  FakeClaudeReportSchema,
+  RECORDINGS,
+  RecordedLineSchema,
+  fakeClaudeEnv,
+  replayClaude,
+} from './replay'
 import {projectKeyOf} from './transcripts'
 
+/** As `warm.ndjson`, `resumed.ndjson` and `forked.ndjson` recorded them. */
 const SESSION_ID = '6b3fb527-e561-4b5c-810d-0ef9ac53978c'
 const FIRST_MESSAGE = '62e0dab1-d770-4979-863e-4df4e2be3150'
 const SECOND_MESSAGE = '7e7158ab-59c9-4e14-9828-54466ba8084e'
@@ -30,16 +37,19 @@ const RESUMED_MESSAGE = '54a838e7-618e-41c6-a747-d57b47a7908e'
 const FORKED_SESSION_ID = '830530ec-a381-4e19-98a4-d7383b717af5'
 const FORKED_MESSAGE = '1f72cfd4-d1f2-4d35-aa13-f8df39b2bdb1'
 
+/** As `stopped.ndjson` recorded them. */
 const STOPPED_SESSION_ID = '3a5d1c74-2159-4d23-a6a3-fd192b046074'
 const STOPPED_MESSAGE = '8ce30d53-0856-4a14-a476-50e3b6184868'
 const ASKED_MESSAGE = '2f4dc5fc-2bbc-434b-a571-f92d02cbda82'
 
+/** As `rewound-warm.ndjson` and `rewound.ndjson` recorded them. */
 const REWOUND_SESSION_ID = '0dcd3d7c-ebce-4799-8da8-bdf836d1cbf3'
 const TEAL_MESSAGE = '90b7a04e-36fa-4aa1-84e8-66380ab18fe0'
 const OTTER_MESSAGE = '52786f10-3dd8-4f5b-995f-c5f9c5a27a0e'
 const REWOUND_MESSAGE = '18fb8495-3399-43a8-bc37-573286cfc9ed'
 const MODEL = 'claude-haiku-5-5'
 
+/** As `compacted.ndjson` recorded them. */
 const COMPACTED_SESSION_ID = '471b5fd5-abf7-498b-9216-26c3ae547643'
 const BOUNDARY_ENTRY = '42429c6a-0cbe-4ef9-aaa6-afcc496c9bed'
 
@@ -51,23 +61,6 @@ function again(uuid: string) {
 const THIRD_MESSAGE = again(SECOND_MESSAGE)
 
 type Streamed = StartReplyEvent
-
-interface Report {
-  args: string[]
-  configDir: string
-  runningAtStart: number[]
-  prompts: string[]
-  resumedFrom: string[]
-  toolResults: string[]
-  inputClosed: boolean
-  ended:
-    | 'input-closed'
-    | 'killed'
-    | 'refused'
-    | 'exited'
-    | `unexpected-${string}`
-    | null
-}
 
 const cleanUps: (() => Promise<void>)[] = []
 
@@ -104,7 +97,7 @@ function edited(name: string, edit: (lines: RecordedLine[]) => RecordedLine[]) {
 
 async function setUp(
   recordings: string[],
-  env: Record<string, string> = {},
+  behavior: FakeClaudeOptions = {},
   store = fakeStore()
 ) {
   const fake = await replayClaude()
@@ -124,13 +117,13 @@ async function setUp(
     },
     env: {
       PATH: process.env.PATH ?? '',
-      FAKE_CLAUDE_RECORDINGS: recordings
-        .map(name =>
+      ...fakeClaudeEnv(
+        recordings.map(name =>
           path.isAbsolute(name) ? name : path.join(RECORDINGS, name)
-        )
-        .join(path.delimiter),
-      FAKE_CLAUDE_REPORTS: reports,
-      ...env,
+        ),
+        reports,
+        behavior
+      ),
     },
     whenIdle: idle.whenIdle,
   })
@@ -188,12 +181,14 @@ async function setUp(
     return events
   }
 
-  function reportsSoFar(): Report[] {
+  function reportsSoFar() {
     return fs
       .readdirSync(reports)
       .toSorted((a, b) => Number.parseInt(a, 10) - Number.parseInt(b, 10))
       .map(file =>
-        JSON.parse(fs.readFileSync(path.join(reports, file), 'utf8'))
+        FakeClaudeReportSchema.parse(
+          JSON.parse(fs.readFileSync(path.join(reports, file), 'utf8'))
+        )
       )
   }
 
@@ -388,7 +383,7 @@ it('forks from the app’s copy of the session served only through a Reply', asy
 it('writes the transcript back only through that Reply when forking from the store fails', async () => {
   const claude = await setUp(
     ['warm.ndjson', 'forked.ndjson', 'forked.ndjson'],
-    {FAKE_CLAUDE_REFUSE_STORE: 'yes'}
+    {refuseStore: true}
   )
 
   await warmThread(claude)
@@ -407,7 +402,7 @@ it('writes the transcript back only through that Reply when forking from the sto
 
 it('resumes from the app’s copy when the warm session’s `claude` exited while idle', async () => {
   const claude = await setUp(['warm.ndjson', 'resumed.ndjson'], {
-    FAKE_CLAUDE_EXIT_AFTER: '2',
+    exitAfter: 2,
   })
 
   const first = await claude.reply(FIRST_PROMPT)
@@ -430,7 +425,7 @@ it('resumes from the app’s copy when the warm session’s `claude` exited whil
 it('writes the transcript back when resuming from the store fails', async () => {
   const claude = await setUp(
     ['warm.ndjson', 'resumed.ndjson', 'resumed.ndjson'],
-    {FAKE_CLAUDE_REFUSE_STORE: 'yes'}
+    {refuseStore: true}
   )
 
   const session = await warmThread(claude)
@@ -458,7 +453,7 @@ it('writes the transcript back when resuming from the store fails', async () => 
 
 it('keeps the files beside a session and puts them back when it resumes', async () => {
   const claude = await setUp(['warm.ndjson', 'resumed.ndjson'], {
-    FAKE_CLAUDE_TOOL_RESULT: 'toolu_1.txt',
+    toolResult: 'toolu_1.txt',
   })
 
   const session = await warmThread(claude)
@@ -476,7 +471,7 @@ it('keeps the files beside a session and puts them back when it resumes', async 
 it('fails the Reply when the app can’t save its files, and closes its `claude`', async () => {
   const claude = await setUp(
     ['warm.ndjson'],
-    {FAKE_CLAUDE_TOOL_RESULT: 'toolu_1.txt'},
+    {toolResult: 'toolu_1.txt'},
     fakeStore({'save-files': 'database or disk is full'})
   )
 
@@ -597,33 +592,38 @@ function compactionsIn(events: Streamed[]) {
 async function compactingThread(recording: string) {
   const claude = await setUp([recording])
   const first = await claude.reply('My code word is TEAL.')
-  const second = await claude.reply('My ship is PELICAN.', recordedIn(first))
+
+  const failedCompacting = await claude.reply(
+    'My ship is PELICAN.',
+    recordedIn(first)
+  )
+
   const replyId = crypto.randomUUID()
 
-  const third = await claude.reply(
+  const compacting = await claude.reply(
     'Reply with the single word OTTER.',
-    recordedIn(second),
+    recordedIn(failedCompacting),
     {replyId}
   )
 
   await claude.allClosed()
 
-  return {first, second, third, replyId}
+  return {first, failedCompacting, compacting, replyId}
 }
 
 it('reports a compaction Claude made inside a Reply, with the session and its boundary entry, and none for one that failed', async () => {
-  const {first, second, third, replyId} =
+  const {first, failedCompacting, compacting, replyId} =
     await compactingThread('compacted.ndjson')
 
-  expect(compactionsIn(third)).toEqual([
+  expect(compactionsIn(compacting)).toEqual([
     expect.objectContaining({
       replyId,
       sessionId: COMPACTED_SESSION_ID,
       boundaryId: BOUNDARY_ENTRY,
     }),
   ])
-  expect(textOf(third)).toBe('OTTER')
-  expect(compactionsIn([...first, ...second])).toEqual([])
+  expect(textOf(compacting)).toBe('OTTER')
+  expect(compactionsIn([...first, ...failedCompacting])).toEqual([])
 })
 
 it('reports no compaction when a hook blocked it, which ends the compacting with no boundary entry', async () => {
@@ -639,10 +639,10 @@ it('reports no compaction when a hook blocked it, which ends the compacting with
     })
   )
 
-  const {third} = await compactingThread(blocked)
+  const {compacting} = await compactingThread(blocked)
 
-  expect(compactionsIn(third)).toEqual([])
-  expect(textOf(third)).toBe('OTTER')
+  expect(compactionsIn(compacting)).toEqual([])
+  expect(textOf(compacting)).toBe('OTTER')
 })
 
 it('fails the Reply with Claude’s reason, without recording it', async () => {
@@ -803,7 +803,7 @@ it('fails the Reply as a crash when `claude` exits before its result, keeping th
     return lines.toSpliced(result, 1)
   })
 
-  const claude = await setUp([crashing], {FAKE_CLAUDE_EXIT_AFTER: '1'})
+  const claude = await setUp([crashing], {exitAfter: 1})
 
   const messageId = crypto.randomUUID()
 
@@ -1079,7 +1079,7 @@ it('waits for the warm `claude` it closes to end before resuming that session at
   const hold = path.join(folder('uz-claude-hold-'), 'go')
 
   const claude = await setUp([warmThrice(), 'resumed.ndjson'], {
-    FAKE_CLAUDE_HOLD_EXIT: hold,
+    holdExit: hold,
   })
 
   cleanUps.push(async () => fs.writeFileSync(hold, ''))

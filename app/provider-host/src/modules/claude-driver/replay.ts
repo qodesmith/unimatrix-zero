@@ -21,18 +21,62 @@ export const RecordedLineSchema = z.discriminatedUnion('kind', [
 
 export type RecordedLine = z.infer<typeof RecordedLineSchema>
 
+export interface FakeClaudeOptions {
+  /** Exits, as a crash would, once it has taken this many Prompts. */
+  exitAfter?: number
+  /** Writes a tool result file of this name beside the session it answers. */
+  toolResult?: string
+  /** Refuses to resume from the SDK's temporary folder. */
+  refuseStore?: boolean
+  /** Keeps it going once its input closes, until this file exists. */
+  holdExit?: string
+}
+
+const OPTIONS_VARIABLE = 'FAKE_CLAUDE_OPTIONS'
+
 /**
- * The nth `claude` started replays the nth of `FAKE_CLAUDE_RECORDINGS`, and
- * exits on any line the SDK writes that isn't the next one recorded.
- * `FAKE_CLAUDE_REFUSE_STORE=yes` refuses the SDK's temporary folder, and
- * `FAKE_CLAUDE_HOLD_EXIT=<file>` keeps it going once its input closes, until
- * that file exists.
+ * The nth `claude` started replays the nth of `recordings` and writes its
+ * report to `<reports>/<n>.json`.
  */
+export function fakeClaudeEnv(
+  recordings: string[],
+  reports: string,
+  options: FakeClaudeOptions = {}
+) {
+  return {
+    [OPTIONS_VARIABLE]: JSON.stringify({recordings, reports, ...options}),
+  }
+}
+
+export const FakeClaudeReportSchema = z.strictObject({
+  args: z.array(z.string()),
+  configDir: z.string(),
+  /** The runs, by n, still going when this one started. */
+  runningAtStart: z.array(z.number()),
+  prompts: z.array(z.string()),
+  /** The entry uuids of the transcript it resumed. */
+  resumedFrom: z.array(z.string()),
+  toolResults: z.array(z.string()),
+  inputClosed: z.boolean(),
+  ended: z
+    .enum([
+      'input-closed',
+      'killed',
+      'refused',
+      'exited',
+      'unexpected-in',
+      'unexpected-end',
+    ])
+    .nullable(),
+})
+
+/** Exits on any line the SDK writes that isn't the next one recorded. */
 const SCRIPT = `
 import fs from 'node:fs'
 import path from 'node:path'
 
-const reports = process.env.FAKE_CLAUDE_REPORTS
+const options = JSON.parse(process.env.${OPTIONS_VARIABLE})
+const reports = options.reports
 const run = fs.readdirSync(reports).length
 const reportFile = path.join(reports, run + '.json')
 function stillRunning(file) {
@@ -43,19 +87,18 @@ function stillRunning(file) {
   }
 }
 const runningAtStart = fs.readdirSync(reports).filter(stillRunning).map(file => Number.parseInt(file, 10))
-fs.writeFileSync(reportFile, '{}')
-const recording = process.env.FAKE_CLAUDE_RECORDINGS.split(path.delimiter)[run]
+const args = process.argv.slice(2)
+const configDir = process.env.CLAUDE_CONFIG_DIR
+const report = {args, configDir, runningAtStart, prompts: [], resumedFrom: [], toolResults: [], inputClosed: false, ended: null}
+save()
+const recording = options.recordings[run]
 const lines = fs.readFileSync(recording, 'utf8')
   .split('\\n').filter(Boolean).map(line => JSON.parse(line))
 const [start, ...steps] = lines
-const configDir = process.env.CLAUDE_CONFIG_DIR
 const projectKey = fs.realpathSync(process.cwd()).replace(/[^a-zA-Z0-9]/g, '-')
 const projects = path.join(configDir, 'projects', projectKey)
 const recordedProjects = path.join(start.configDir, 'projects', start.projectKey)
-const args = process.argv.slice(2)
 const resume = args.find(arg => arg.startsWith('--resume='))?.slice('--resume='.length)
-const report = {args, configDir, runningAtStart, prompts: [], resumedFrom: [], toolResults: [], inputClosed: false, ended: null}
-
 function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
 }
@@ -72,7 +115,7 @@ function refuse(sessionId) {
 if (resume) {
   const transcript = path.join(projects, resume + '.jsonl')
   const temporary = configDir !== process.env.CLAUDE_SECURESTORAGE_CONFIG_DIR
-  if (!fs.existsSync(transcript) || (temporary && process.env.FAKE_CLAUDE_REFUSE_STORE === 'yes')) refuse(resume)
+  if (!fs.existsSync(transcript) || (temporary && options.refuseStore)) refuse(resume)
   report.resumedFrom = fs.readFileSync(transcript, 'utf8').split('\\n').filter(Boolean)
     .map(line => JSON.parse(line).uuid).filter(Boolean)
   const toolResults = path.join(projects, resume, 'tool-results')
@@ -108,10 +151,10 @@ function write(message) {
     fs.appendFileSync(filePath, entries.map(entry => JSON.stringify(entry) + '\\n').join(''))
     message = {...message, filePath, entries}
   }
-  if (message.type === 'result' && process.env.FAKE_CLAUDE_TOOL_RESULT) {
+  if (message.type === 'result' && options.toolResult) {
     const folder = path.join(projects, message.session_id, 'tool-results')
     fs.mkdirSync(folder, {recursive: true})
-    fs.writeFileSync(path.join(folder, process.env.FAKE_CLAUDE_TOOL_RESULT), 'A large tool result')
+    fs.writeFileSync(path.join(folder, options.toolResult), 'A large tool result')
   }
   process.stdout.write(JSON.stringify(message) + '\\n')
 }
@@ -155,7 +198,7 @@ process.stdin.on('data', chunk => {
     }
     save()
     answer()
-    if (message.type === 'user' && report.prompts.length === Number(process.env.FAKE_CLAUDE_EXIT_AFTER)) {
+    if (message.type === 'user' && report.prompts.length === options.exitAfter) {
       process.stdout.write('', () => {
         report.ended = 'exited'
         save()
@@ -175,7 +218,7 @@ function closeInput() {
 process.stdin.on('end', () => {
   report.inputClosed = true
   save()
-  const hold = process.env.FAKE_CLAUDE_HOLD_EXIT
+  const hold = options.holdExit
   if (!hold) closeInput()
   else {
     const waiting = setInterval(() => {
