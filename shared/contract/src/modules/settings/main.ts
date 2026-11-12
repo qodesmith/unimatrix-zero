@@ -27,7 +27,7 @@ export const FONT_SIZE = {min: 12, max: 24, step: 2}
  */
 export const COMPACTION_THRESHOLD = {
   claude: {min: 100_000, max: 1_000_000},
-  chatgpt: {min: 20_000, max: 243_000},
+  chatgpt: {min: 20_000, max: 450_000},
 } satisfies Record<ProviderId, {min: number; max: number}>
 
 /** Null leaves it to the Provider: the Model's own limit. */

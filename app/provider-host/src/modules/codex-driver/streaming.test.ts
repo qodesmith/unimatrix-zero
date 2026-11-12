@@ -518,6 +518,80 @@ async function compactingThread(recording: string) {
   return {filled, compacting}
 }
 
+it('starts a thread with the Compaction threshold, and with no config for the default', async () => {
+  const codex = await setUp(['started.ndjson'])
+  await codex.reply('Reply with the single word TEAL.')
+  await codex.allClosed()
+
+  expect(codex.reports()[0]?.threadConfigs).toEqual([null])
+})
+
+it('loads a thread again with a changed Compaction threshold, which Codex takes only from a thread no client is subscribed to', async () => {
+  const codex = await setUp(['compaction-settings.ndjson'])
+
+  const padded = await codex.reply('Reply with the single word TEAL.', null, {
+    compaction: {auto: true, threshold: 30_000},
+  })
+
+  const under = await codex.reply(
+    'Reply with the single word OTTER.',
+    recordedIn(padded),
+    {compaction: {auto: true, threshold: 30_000}}
+  )
+
+  const lowered = await codex.reply(
+    'Reply with the single word HERON.',
+    recordedIn(under),
+    {compaction: {auto: true, threshold: 20_000}}
+  )
+
+  await codex.allClosed()
+  const [report] = codex.reports()
+
+  expect(report?.threadConfigs).toEqual([
+    {model_auto_compact_token_limit: 30_000},
+    {model_auto_compact_token_limit: 20_000},
+  ])
+  expect(
+    report?.methods.filter(method => method?.startsWith('thread/'))
+  ).toEqual([
+    'thread/start',
+    'thread/read',
+    'thread/read',
+    'thread/unsubscribe',
+    'thread/resume',
+    'thread/read',
+  ])
+  expect(compactionsIn([...padded, ...under])).toEqual([])
+  expect(compactionsIn(lowered)).toHaveLength(1)
+  expect(textOf(lowered)).toBe('HERON')
+})
+
+it('loads a thread again with an empty config to go back to Codex’s default, which a resume with none would leave as it was', async () => {
+  const codex = await setUp(['compaction-settings.ndjson'])
+  const lowered = {compaction: {auto: true, threshold: 30_000}}
+
+  const padded = await codex.reply(
+    'Reply with the single word TEAL.',
+    null,
+    lowered
+  )
+
+  const under = await codex.reply(
+    'Reply with the single word OTTER.',
+    recordedIn(padded),
+    lowered
+  )
+
+  await codex.reply('Reply with the single word HERON.', recordedIn(under))
+  await codex.allClosed()
+
+  expect(codex.reports()[0]?.threadConfigs).toEqual([
+    {model_auto_compact_token_limit: 30_000},
+    {},
+  ])
+})
+
 it('reports a compaction Codex made inside a turn, with the thread it compacted', async () => {
   const {filled, compacting} = await compactingThread('compacted.ndjson')
 

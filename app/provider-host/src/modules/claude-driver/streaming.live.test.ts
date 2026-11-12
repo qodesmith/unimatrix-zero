@@ -560,6 +560,55 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 300_000)
 
+  it('[dep:claude-compaction-settings] compacts a Thread at the threshold set, not at all with automatic Compaction off, each from the next Reply', async () => {
+    const live = liveDriver([])
+    const lowered = {auto: true, threshold: 100_000}
+    // About 12 tokens each, measured.
+    const pad = (tokens: number) =>
+      'The harbor log lists no ships today. '.repeat(Math.round(tokens / 12))
+
+    const contextOf = (events: Streamed[]) =>
+      events.filter(isReplyEvent).reduce(foldReplyEvent, NEW_REPLY)
+        .contextSize ?? 0
+
+    const compacted = (events: Streamed[]) =>
+      events.some(event => event.type === 'CONTEXT_COMPACTED')
+
+    const first = await live.reply(
+      `My code word is TEAL. Ignore the rest of this message. ${pad(30_000)}`,
+      null
+    )
+
+    live.setCompaction(lowered)
+    const under = await live.reply(
+      `My ship is PELICAN. Ignore the rest of this message. ${pad(25_000)}`,
+      continuing(first.recorded.session)
+    )
+
+    live.setCompaction({...lowered, auto: false})
+    const off = await live.reply(
+      `My color is CRIMSON. Ignore the rest of this message. ${pad(20_000)}`,
+      continuing(under.recorded.session)
+    )
+
+    live.setCompaction(lowered)
+    const on = await live.reply(
+      'Reply with the single word OTTER.',
+      continuing(off.recorded.session)
+    )
+
+    // claude compacts 33,000 below the threshold: 13,000, and 20,000 for output.
+    expect(contextOf(under.events)).toBeLessThan(67_000)
+    expect(contextOf(off.events)).toBeGreaterThan(67_000)
+    expect([first, under, off].some(({events}) => compacted(events))).toBe(
+      false
+    )
+    expect(compacted(on.events)).toBe(true)
+    expect(contextOf(on.events)).toBeLessThan(contextOf(off.events) / 2)
+
+    await live.done()
+  }, 600_000)
+
   it('reaches a Reply before a Compaction for a Branch, a Retry and a send after deleting Turns, each in a new session that goes on without the Turns dropped', async () => {
     const live = liveDriver([])
     const {first} = await compactedThread(live)

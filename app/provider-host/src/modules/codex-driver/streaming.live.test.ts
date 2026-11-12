@@ -963,6 +963,115 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 300_000)
 
+  it('[dep:codex-compaction-limit] compacts a thread past the threshold set, from the next Reply on a thread already loaded', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const treeId = crypto.randomUUID()
+    const recording = process.env.UZ_RECORD === 'yes'
+
+    const recorder = createRecorder([
+      path.join(RECORDINGS, 'compaction-settings.ndjson'),
+    ])
+
+    const idle = heldIdle()
+    const exits: Promise<unknown>[] = []
+    const start = recording ? recorder.spawn : spawnCodex
+
+    const driver = createCodexDriver({
+      store: fakeStore().client,
+      spawn: (command, options) => {
+        const child = start(command, options)
+        exits.push(once(child, 'exit').catch(() => undefined))
+
+        return child
+      },
+      whenIdle: idle.whenIdle,
+    })
+
+    async function reply(
+      text: string,
+      session: SessionRef | null,
+      threshold: number
+    ) {
+      const events = await Array.fromAsync(
+        driver.startReply({
+          treeId,
+          replyId: crypto.randomUUID(),
+          model: MODEL,
+          systemPrompt: 'You answer in as few words as you can.',
+          prompt: {text, messageId: crypto.randomUUID()},
+          vendorProgram: {
+            program: {
+              path: folder ?? '',
+              build: {
+                url: 'https://example.com/codex.tar.gz',
+                sha256: '0'.repeat(64),
+                size: 1,
+                archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+              },
+            },
+            configDir: home,
+          },
+          session: session && {...session, type: 'continue'},
+          compaction: {auto: true, threshold},
+        })
+      )
+
+      expectComplete(events)
+
+      const recorded = events.find(
+        (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+      )
+
+      if (!recorded) throw new Error('The Reply was not recorded')
+
+      return {
+        compacted: events.some(event => event.type === 'CONTEXT_COMPACTED'),
+        contextSize:
+          events.filter(isReplyEvent).reduce(foldReplyEvent, NEW_REPLY)
+            .contextSize ?? 0,
+        session: recorded.session,
+      }
+    }
+
+    const padding = 'The harbor log lists no ships today. '.repeat(800)
+
+    try {
+      // Codex checks the limit as a turn starts, so the padded turn can't compact.
+      const padded = await reply(
+        `Reply with the single word TEAL. Ignore the rest of this message. ${padding}`,
+        null,
+        30_000
+      )
+
+      const under = await reply(
+        'Reply with the single word OTTER.',
+        padded.session,
+        30_000
+      )
+
+      const lowered = await reply(
+        'Reply with the single word HERON.',
+        under.session,
+        20_000
+      )
+
+      expect(under.contextSize).toBeGreaterThan(20_000)
+      expect(under.contextSize).toBeLessThan(30_000)
+      expect([padded.compacted, under.compacted, lowered.compacted]).toEqual([
+        false,
+        false,
+        true,
+      ])
+
+      idle.pass()
+      await Promise.all(exits)
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 300_000)
+
   it('[dep:codex-server-requests-refused] runs a shell command for the AI without sending the app one server request', async () => {
     if (!folder || !signedIn) return
 

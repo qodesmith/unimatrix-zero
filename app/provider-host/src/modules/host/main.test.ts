@@ -15,6 +15,7 @@ const request = {
   prompt: {text: 'Hi', messageId: crypto.randomUUID()},
   vendorProgram: {program: null, configDir: '/claude'},
   session: null,
+  compaction: {auto: true, threshold: null},
 }
 
 function fakeMain() {

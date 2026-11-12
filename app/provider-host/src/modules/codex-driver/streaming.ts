@@ -26,6 +26,13 @@ import {folderOf, readRollouts, rolloutAt, writeRolloutsBack} from './rollouts'
 
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
 
+/** Codex's own default, with nothing in `config`, for a null threshold. */
+function configOf(threshold: number | null) {
+  return threshold === null
+    ? {}
+    : {config: {model_auto_compact_token_limit: threshold}}
+}
+
 /** When all full windows lift, in seconds since the epoch; else undefined. */
 function limitLifts({primary, secondary}: RateLimits) {
   const now = Date.now() / 1000
@@ -60,6 +67,8 @@ interface Running {
 interface LoadedThread {
   id: string
   model: string
+  /** The Compaction threshold Codex loaded it with, which it keeps. */
+  threshold: number | null
   /** Oldest first: the turn it was opened at, then each one started here. */
   turns: string[]
   path: string | null
@@ -175,11 +184,13 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   function load(
     running: Running,
     opened: {thread: {id: string; path: string | null}; model: string},
-    turns: string[]
+    turns: string[],
+    threshold: number | null
   ): LoadedThread {
     const thread = {
       id: opened.thread.id,
       model: opened.model,
+      threshold,
       turns,
       path: opened.thread.path,
     }
@@ -195,6 +206,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     dropFrom: string | null
   ): Promise<{thread: LoadedThread; dropped: boolean}> {
     const {configDir} = request.vendorProgram
+    const {threshold} = request.compaction
 
     const settings = {
       cwd: configDir,
@@ -202,13 +214,15 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       approvalPolicy: 'never',
       model: request.model,
       developerInstructions: request.systemPrompt || null,
+      ...configOf(threshold),
     } satisfies ParamsOf<'thread/start'>
 
     if (!request.session) {
       const thread = load(
         running,
         await running.server.request('thread/start', settings),
-        []
+        [],
+        threshold
       )
 
       return {thread, dropped: false}
@@ -229,11 +243,16 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     }
 
     if (loaded && !fork) {
-      if (!rewind) return cut(loaded)
+      const thread =
+        loaded.threshold === threshold
+          ? loaded
+          : await reload(running, loaded, settings, threshold)
 
-      await dropAfter(running, loaded, messageId, configDir)
+      if (!rewind) return cut(thread)
 
-      return {thread: loaded, dropped: false}
+      await dropAfter(running, thread, messageId, configDir)
+
+      return {thread, dropped: false}
     }
 
     // Codex forks and resumes from the rollout on disk, which only a loaded
@@ -253,7 +272,8 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
           ...settings,
           excludeTurns: true,
         }),
-        openedAt
+        openedAt,
+        threshold
       )
 
       return {thread, dropped: false}
@@ -266,11 +286,34 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
         ...settings,
         excludeTurns: true,
       }),
-      openedAt
+      openedAt,
+      threshold
     )
 
     // The rollout on disk was kept: it holds the Reply cut short.
     return cut(resumed)
+  }
+
+  /**
+   * Codex ignores `config` on resuming a thread a client is subscribed to, and
+   * keeps the old one when a resume brings none, so `{}` asks for its default.
+   */
+  async function reload(
+    running: Running,
+    thread: LoadedThread,
+    settings: ParamsOf<'thread/start'>,
+    threshold: number | null
+  ) {
+    await running.server.request('thread/unsubscribe', {threadId: thread.id})
+
+    const opened = await running.server.request('thread/resume', {
+      threadId: thread.id,
+      ...settings,
+      config: configOf(threshold).config ?? {},
+      excludeTurns: true,
+    })
+
+    return load(running, opened, thread.turns, threshold)
   }
 
   async function resume(
@@ -292,7 +335,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       excludeTurns: true,
     })
 
-    return load(running, opened, messageId === null ? [] : [messageId])
+    return load(running, opened, messageId === null ? [] : [messageId], null)
   }
 
   /** Saves the reverted rollout, so a later resume lacks what it dropped. */
