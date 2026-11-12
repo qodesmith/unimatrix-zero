@@ -184,15 +184,11 @@ async function findBump(repo: string, wanted: number | null) {
   return bumps[0] ?? null
 }
 
-async function requireBumpHead(bump: Bump) {
-  const head = (await $`git rev-parse HEAD`.cwd(root).text()).trim()
+async function isCleanAt(head: string) {
+  const current = (await $`git rev-parse HEAD`.cwd(root).text()).trim()
   const dirty = (await $`git status --porcelain`.cwd(root).text()).trim()
 
-  if (head !== bump.head || dirty) {
-    fail(
-      `The result is tied to #${bump.number}'s head ${bump.head}: run on a clean checkout of it (gh pr checkout ${bump.number}).`
-    )
-  }
+  return current === head && !dirty
 }
 
 async function runLiveChecks(ids: string[], env: Record<string, string>) {
@@ -303,8 +299,7 @@ const repo = (
 ).trim()
 
 const bump = await findBump(repo, values.pr ? Number(values.pr) : null)
-
-if (bump) await requireBumpHead(bump)
+const postTo = bump && (await isCleanAt(bump.head)) ? bump : null
 
 const entries = entriesOf(readText(LIST))
 
@@ -313,8 +308,8 @@ const live = entries.flatMap(entry =>
 )
 
 const result = {
-  head: bump?.head ?? null,
-  pinChanges: bump?.changes ?? [],
+  head: postTo?.head ?? null,
+  pinChanges: postTo?.changes ?? [],
   checks: await runLiveChecks(live, env),
   reviews: await reviewAll(entries, builds),
 }
@@ -323,11 +318,15 @@ const body = renderResult(result)
 
 console.log(`\n${body}`)
 
-if (bump) {
-  await $`gh pr comment ${bump.number} --body-file - < ${new Response(body)}`.cwd(
+if (postTo) {
+  await $`gh pr comment ${postTo.number} --body-file - < ${new Response(body)}`.cwd(
     root
   )
-  await rerunGate(repo, bump)
+  await rerunGate(repo, postTo)
+} else if (bump) {
+  console.warn(
+    `Nothing was posted: a result for #${bump.number} must come from a clean checkout of its head ${bump.head} (gh pr checkout ${bump.number}).`
+  )
 } else {
   console.warn('No bump PR is open: there was nothing to comment on.')
 }
