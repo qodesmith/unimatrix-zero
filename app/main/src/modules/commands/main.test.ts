@@ -64,6 +64,7 @@ beforeEach(() => {
         send: sendToHost,
       },
       vendorProgramFor: () => ({program: null, configDir: '/claude'}),
+      compactionSettingsFor: () => ({auto: true, threshold: null}),
       now,
       onTurnsChanged: rows.turnsChanged,
       onReplyFinished: rows.replyFinished,

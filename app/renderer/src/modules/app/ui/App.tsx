@@ -2,6 +2,7 @@ import {Canvas} from '#modules/canvas/main'
 import {
   Connections,
   ConnectionsProvider,
+  ProviderTabs,
   anyConnected,
   useConnections,
 } from '#modules/connections/main'
@@ -10,7 +11,11 @@ import {
   LayoutSidebar,
   SidebarToggle,
 } from '#modules/layout/main'
-import {FollowFontSize, SettingsProvider} from '#modules/settings/main'
+import {
+  CompactionSettings,
+  FollowFontSize,
+  SettingsProvider,
+} from '#modules/settings/main'
 import {NoTreeOpen, TreeTitle, useTrees} from '#modules/trees/main'
 import {LiveReplies} from '#modules/turns/main'
 import {SidebarInset} from '#shadcn/ui/sidebar'
@@ -74,7 +79,12 @@ function AppLayout() {
       sidebar={
         <AppSidebar
           trees={trees}
-          connections={<Connections connections={connections} />}
+          connections={
+            <ProviderTabs
+              connections={connections}
+              providerSettings={CompactionSettings}
+            />
+          }
         />
       }
     >

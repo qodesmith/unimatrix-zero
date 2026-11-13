@@ -8,6 +8,7 @@ import type {
   StartReplyEvent,
 } from '@uz/contract/host'
 import type {Model} from '@uz/contract/providers'
+import type {CompactionSettings} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -28,6 +29,11 @@ import {
   replayClaude,
 } from './replay'
 import {projectKeyOf} from './transcripts'
+
+const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
+  auto: true,
+  threshold: null,
+}
 
 /** As `warm.ndjson`, `resumed.ndjson` and `forked.ndjson` recorded them. */
 const SESSION_ID = '6b3fb527-e561-4b5c-810d-0ef9ac53978c'
@@ -136,6 +142,7 @@ async function setUp(
     replyId?: string
     model?: string
     messageId?: ReplyRequest['prompt']['messageId']
+    compactionSettings?: CompactionSettings
   }
 
   const vendorProgram = {
@@ -154,6 +161,7 @@ async function setUp(
       replyId = crypto.randomUUID(),
       model = 'haiku',
       messageId = crypto.randomUUID(),
+      compactionSettings = DEFAULT_COMPACTION_SETTINGS,
     }: ReplyOptions = {}
   ) {
     const events: Streamed[] = []
@@ -167,6 +175,7 @@ async function setUp(
       prompt: {text, messageId},
       vendorProgram,
       session: session && {type: 'continue', ...session},
+      compactionSettings,
     })) {
       events.push(event)
 
@@ -1304,4 +1313,25 @@ it('learns nothing from a `claude` whose Models can’t be read, and writes the 
   await expect.poll(() => changes.length).toBe(1)
 
   expect(changes[0]?.[0]).toMatchObject({resolvesTo: 'claude-fable-5-1'})
+})
+
+it('starts claude with the Compaction Settings, and with nothing for the defaults', async () => {
+  const claude = await setUp(['warm.ndjson', 'resumed.ndjson'])
+  const first = await claude.reply(FIRST_PROMPT)
+  const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
+
+  const third = await claude.reply(THIRD_PROMPT, recordedIn(second), {
+    compactionSettings: {auto: false, threshold: 150_000},
+  })
+
+  expect(textOf(third)).toBe('TEAL OTTER')
+
+  await claude.allClosed()
+  const [warm, changed] = claude.reports()
+
+  expect(warm?.prompts).toEqual([FIRST_PROMPT, SECOND_PROMPT])
+  expect(warm?.args.join(' ')).not.toMatch(/autoCompact/)
+  expect(changed?.args).toContain(`--resume=${SESSION_ID}`)
+  expect(changed?.args.join(' ')).toMatch(/"autoCompactEnabled":false/)
+  expect(changed?.args.join(' ')).toMatch(/"autoCompactWindow":150000/)
 })

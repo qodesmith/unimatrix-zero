@@ -1,5 +1,6 @@
 import type {WhenIdle} from '#modules/idle/main'
-import type {SessionRef} from '@uz/contract/host'
+import type {ReplyRequest, SessionRef} from '@uz/contract/host'
+import type {CompactionSettings} from '@uz/contract/settings'
 
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
 
@@ -10,6 +11,8 @@ export interface WarmSession {
   readonly messageId: string | null
   /** The Model `claude` started on, which it keeps. */
   readonly model: string
+  /** Fixed as `claude` starts: it applies no later change to the threshold. */
+  readonly compactionSettings: CompactionSettings
   close(): Promise<void>
 }
 
@@ -75,10 +78,17 @@ export function createWarmSessions<Session extends WarmSession>({
 
   return {
     /**
-     * Closes it at any other point or on another Model, so `claude` never runs
-     * a session twice. Another name for its Model keeps it.
+     * Closes it at any other point, on another Model or with other Compaction
+     * Settings, so `claude` never runs a session twice. Another name for its
+     * Model keeps it.
      */
-    claim(ref: SessionRef, model: string): Session | null {
+    claim(
+      ref: SessionRef,
+      {
+        model,
+        compactionSettings,
+      }: Pick<ReplyRequest, 'model' | 'compactionSettings'>
+    ): Session | null {
       const wanted = resolveModel(model)
 
       for (const session of idle.keys()) {
@@ -86,7 +96,9 @@ export function createWarmSessions<Session extends WarmSession>({
 
         if (
           session.messageId === ref.messageId &&
-          resolveModel(session.model) === wanted
+          resolveModel(session.model) === wanted &&
+          session.compactionSettings.auto === compactionSettings.auto &&
+          session.compactionSettings.threshold === compactionSettings.threshold
         ) {
           wake(session)
 

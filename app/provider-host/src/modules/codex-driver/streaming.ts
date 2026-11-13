@@ -7,6 +7,7 @@ import type {
 } from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
+import type {LoadedThread} from './threads'
 import type {Notification, ParamsOf, RateLimits} from './wire'
 import type {
   DeletionCut,
@@ -15,32 +16,19 @@ import type {
   ReplyRequest,
   SignInRequest,
 } from '@uz/contract/host'
+import type {CompactionSettings} from '@uz/contract/settings'
 
 import {createInbox} from '#modules/inbox/main'
 import {ProgramCrashed, createReplyRuns} from '#modules/reply-runs/main'
 
 import {readModels} from './models'
+import {limitLifts} from './rate-limits'
 import {createReplyMapper, turnOf} from './replies'
 import {requestRevert} from './revert'
 import {folderOf, readRollouts, rolloutAt, writeRolloutsBack} from './rollouts'
+import {configOf, loadThread} from './threads'
 
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
-
-/** When all full windows lift, in seconds since the epoch; else undefined. */
-function limitLifts({primary, secondary}: RateLimits) {
-  const now = Date.now() / 1000
-
-  const lifts = [primary, secondary].flatMap(window =>
-    window !== null &&
-    window.usedPercent >= 100 &&
-    window.resetsAt !== null &&
-    window.resetsAt > now
-      ? [window.resetsAt]
-      : []
-  )
-
-  return lifts.length === 0 ? undefined : Math.max(...lifts)
-}
 
 export interface CodexRepliesDeps {
   store: SessionStoreClient
@@ -55,14 +43,6 @@ interface Running {
   threads: Map<string, LoadedThread>
   writing: number
   wake: (() => void) | undefined
-}
-
-interface LoadedThread {
-  id: string
-  model: string
-  /** Oldest first: the turn it was opened at, then each one started here. */
-  turns: string[]
-  path: string | null
 }
 
 /** ChatGPT's Replies through one `codex app-server` that every Thread shares. */
@@ -172,29 +152,13 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     if (next !== undefined) await revert(running, thread, next, configDir)
   }
 
-  function load(
-    running: Running,
-    opened: {thread: {id: string; path: string | null}; model: string},
-    turns: string[]
-  ): LoadedThread {
-    const thread = {
-      id: opened.thread.id,
-      model: opened.model,
-      turns,
-      path: opened.thread.path,
-    }
-
-    running.threads.set(thread.id, thread)
-
-    return thread
-  }
-
   async function threadFor(
     running: Running,
     request: ReplyRequest,
     dropFrom: string | null
   ): Promise<{thread: LoadedThread; dropped: boolean}> {
     const {configDir} = request.vendorProgram
+    const {threshold} = request.compactionSettings
 
     const settings = {
       cwd: configDir,
@@ -204,11 +168,18 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       developerInstructions: request.systemPrompt || null,
     } satisfies ParamsOf<'thread/start'>
 
+    // A resume or fork that brings no `config` keeps the thread's old limit.
+    const config = configOf(threshold)
+
     if (!request.session) {
-      const thread = load(
-        running,
-        await running.server.request('thread/start', settings),
-        []
+      const thread = loadThread(
+        running.threads,
+        await running.server.request(
+          'thread/start',
+          threshold === null ? settings : {...settings, config}
+        ),
+        [],
+        threshold
       )
 
       return {thread, dropped: false}
@@ -229,11 +200,16 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     }
 
     if (loaded && !fork) {
-      if (!rewind) return cut(loaded)
+      const thread =
+        loaded.threshold === threshold
+          ? loaded
+          : await reload(running, loaded, settings, threshold)
 
-      await dropAfter(running, loaded, messageId, configDir)
+      if (!rewind) return cut(thread)
 
-      return {thread: loaded, dropped: false}
+      await dropAfter(running, thread, messageId, configDir)
+
+      return {thread, dropped: false}
     }
 
     // Codex forks and resumes from the rollout on disk, which only a loaded
@@ -245,32 +221,55 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     }
 
     if (fork) {
-      const thread = load(
-        running,
+      const thread = loadThread(
+        running.threads,
         await running.server.request('thread/fork', {
           threadId: id,
           lastTurnId: messageId,
           ...settings,
+          config,
           excludeTurns: true,
         }),
-        openedAt
+        openedAt,
+        threshold
       )
 
       return {thread, dropped: false}
     }
 
-    const resumed = load(
-      running,
+    const resumed = loadThread(
+      running.threads,
       await running.server.request('thread/resume', {
         threadId: id,
         ...settings,
+        config,
         excludeTurns: true,
       }),
-      openedAt
+      openedAt,
+      threshold
     )
 
     // The rollout on disk was kept: it holds the Reply cut short.
     return cut(resumed)
+  }
+
+  /** Codex ignores `config` on resuming a thread a client is subscribed to. */
+  async function reload(
+    running: Running,
+    thread: LoadedThread,
+    settings: ParamsOf<'thread/start'>,
+    threshold: CompactionSettings['threshold']
+  ) {
+    await running.server.request('thread/unsubscribe', {threadId: thread.id})
+
+    const opened = await running.server.request('thread/resume', {
+      threadId: thread.id,
+      ...settings,
+      config: configOf(threshold),
+      excludeTurns: true,
+    })
+
+    return loadThread(running.threads, opened, thread.turns, threshold)
   }
 
   async function resume(
@@ -289,10 +288,16 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       cwd: configDir,
       sandbox: 'read-only',
       approvalPolicy: 'never',
+      config: {},
       excludeTurns: true,
     })
 
-    return load(running, opened, messageId === null ? [] : [messageId])
+    return loadThread(
+      running.threads,
+      opened,
+      messageId === null ? [] : [messageId],
+      null
+    )
   }
 
   /** Saves the reverted rollout, so a later resume lacks what it dropped. */

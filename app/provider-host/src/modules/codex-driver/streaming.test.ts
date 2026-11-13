@@ -7,6 +7,7 @@ import type {
   SignInRequest,
   StartReplyEvent,
 } from '@uz/contract/host'
+import type {CompactionSettings} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -35,6 +36,12 @@ const RESUMED_TURN = '01a168e8-7ae7-71d3-b6fa-169bec1fd887'
 const FORKED_THREAD_ID = '01a168e8-9d25-7df2-b2f4-208bfb1bbd5e'
 const FORKED_TURN = '01a168e8-9d50-7fb1-a539-2fd85f3c4b2b'
 const MODEL = 'gpt-6.1-sol'
+
+const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
+  auto: true,
+  threshold: null,
+}
+
 const ROLLOUT = `sessions/2026/10/23/rollout-2026-10-23T09-16-57-${THREAD_ID}.jsonl`
 const FORKED_ROLLOUT = `sessions/2026/10/23/rollout-2026-10-23T09-17-17-${FORKED_THREAD_ID}.jsonl`
 
@@ -182,7 +189,12 @@ async function setUp(
     {
       stopAfter = Infinity,
       model = MODEL,
-    }: {stopAfter?: number; model?: string} = {}
+      compactionSettings = DEFAULT_COMPACTION_SETTINGS,
+    }: {
+      stopAfter?: number
+      model?: string
+      compactionSettings?: CompactionSettings
+    } = {}
   ) {
     const replyId = crypto.randomUUID()
     const events: Streamed[] = []
@@ -196,6 +208,7 @@ async function setUp(
       prompt: {text, messageId: crypto.randomUUID()},
       vendorProgram,
       session: session && {type: 'continue', ...session},
+      compactionSettings,
     })) {
       events.push(event)
 
@@ -354,7 +367,7 @@ it('continues the Provider session in the app-server that has it loaded, then cl
   expect(reports[0]?.ended).toBe('input-closed')
 })
 
-it('resumes the Provider session from the app’s copy alone, written back under its own name', async () => {
+it('resumes the Provider session from the app’s copy alone, written back under its own name, with an empty config for the default Compaction threshold', async () => {
   const opened = await setUp(['started.ndjson'])
   const first = await opened.reply(FIRST_PROMPT)
   const second = await opened.reply(SECOND_PROMPT, recordedIn(first))
@@ -375,6 +388,7 @@ it('resumes the Provider session from the app’s copy alone, written back under
   const [report] = codex.reports()
 
   expect(report?.methods).toContain('thread/resume')
+  expect(report?.threadConfigs).toEqual([{}])
   expect(report?.resumedFrom.map(line => line.id)).toEqual([
     THREAD_ID,
     FIRST_TURN,
@@ -432,7 +446,7 @@ it('resumes from Codex’s rollout when it carries the app’s copy further, as 
   ])
 })
 
-it('forks the Provider session through a mid-Thread Reply into a new thread, from the app’s copy alone', async () => {
+it('forks the Provider session through a mid-Thread Reply into a new thread with the Compaction threshold, from the app’s copy alone', async () => {
   const opened = await setUp(['started.ndjson'])
   const first = await opened.reply(FIRST_PROMPT)
   await opened.reply(SECOND_PROMPT, recordedIn(first))
@@ -440,10 +454,11 @@ it('forks the Provider session through a mid-Thread Reply into a new thread, fro
 
   const codex = await setUp(['forked.ndjson'], {store: opened.store})
 
-  const forked = await codex.reply(FORK_PROMPT, {
-    ...recordedIn(first),
-    type: 'fork',
-  })
+  const forked = await codex.reply(
+    FORK_PROMPT,
+    {...recordedIn(first), type: 'fork'},
+    {compactionSettings: {auto: true, threshold: 30_000}}
+  )
 
   expect(textOf(forked)).toBe('You asked: “Say hi in three words.”')
   expect(recordedIn(forked)).toEqual({
@@ -455,6 +470,9 @@ it('forks the Provider session through a mid-Thread Reply into a new thread, fro
 
   expect(report?.methods).not.toContain('thread/resume')
   expect(report?.forkedThrough).toBe(FIRST_TURN)
+  expect(report?.threadConfigs).toEqual([
+    {model_auto_compact_token_limit: 30_000},
+  ])
   // Written back whole for Codex to fork; the fork is Codex's to cut.
   expect(report?.resumedFrom.map(line => line.id)).toEqual([
     THREAD_ID,
@@ -512,6 +530,79 @@ async function compactingThread(recording: string) {
 
   return {filled, compacting}
 }
+
+it('starts a thread with no config for the default Compaction threshold', async () => {
+  const codex = await setUp(['started.ndjson'])
+  await codex.reply('Reply with the single word TEAL.')
+  await codex.allClosed()
+
+  expect(codex.reports()[0]?.threadConfigs).toEqual([null])
+})
+
+it('unsubscribes a loaded thread and resumes it with a changed Compaction threshold', async () => {
+  const codex = await setUp(['compaction-settings.ndjson'])
+
+  const padded = await codex.reply('Reply with the single word TEAL.', null, {
+    compactionSettings: {auto: true, threshold: 30_000},
+  })
+
+  const under = await codex.reply(
+    'Reply with the single word OTTER.',
+    recordedIn(padded),
+    {compactionSettings: {auto: true, threshold: 30_000}}
+  )
+
+  const lowered = await codex.reply(
+    'Reply with the single word HERON.',
+    recordedIn(under),
+    {compactionSettings: {auto: true, threshold: 20_000}}
+  )
+
+  await codex.allClosed()
+  const [report] = codex.reports()
+
+  expect(report?.threadConfigs).toEqual([
+    {model_auto_compact_token_limit: 30_000},
+    {model_auto_compact_token_limit: 20_000},
+  ])
+  expect(
+    report?.methods.filter(method => method.startsWith('thread/'))
+  ).toEqual([
+    'thread/start',
+    'thread/read',
+    'thread/read',
+    'thread/unsubscribe',
+    'thread/resume',
+    'thread/read',
+  ])
+  expect(compactionsIn(lowered)).toHaveLength(1)
+  expect(textOf(lowered)).toBe('HERON')
+})
+
+it('loads a thread again with an empty config to go back to Codex’s default', async () => {
+  const codex = await setUp(['compaction-settings.ndjson'])
+  const lowered = {compactionSettings: {auto: true, threshold: 30_000}}
+
+  const padded = await codex.reply(
+    'Reply with the single word TEAL.',
+    null,
+    lowered
+  )
+
+  const under = await codex.reply(
+    'Reply with the single word OTTER.',
+    recordedIn(padded),
+    lowered
+  )
+
+  await codex.reply('Reply with the single word HERON.', recordedIn(under))
+  await codex.allClosed()
+
+  expect(codex.reports()[0]?.threadConfigs).toEqual([
+    {model_auto_compact_token_limit: 30_000},
+    {},
+  ])
+})
 
 it('reports a compaction Codex made inside a turn, with the thread it compacted', async () => {
   const {filled, compacting} = await compactingThread('compacted.ndjson')

@@ -74,6 +74,7 @@ export const RESPONSES = {
   'thread/resume': OpenedThreadSchema,
   'thread/fork': OpenedThreadSchema,
   'thread/read': z.looseObject({thread: ThreadSchema}),
+  'thread/unsubscribe': z.looseObject({}),
   'thread/revert': z.looseObject({thread: ThreadSchema}),
   'thread/turns/list': z.looseObject({
     data: z.array(z.looseObject({id: z.string()})),

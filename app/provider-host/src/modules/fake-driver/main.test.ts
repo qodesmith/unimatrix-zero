@@ -13,6 +13,7 @@ const request = {
   systemPrompt: '',
   vendorProgram: {program: null, configDir: '/claude'},
   session: null,
+  compactionSettings: {auto: true, threshold: null},
 }
 
 type Streamed = StartReplyEvent

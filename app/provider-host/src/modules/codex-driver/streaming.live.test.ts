@@ -6,6 +6,7 @@
  * `UZ_RECORD=yes` rewrites `recordings/`. Record one test at a time with `-t`:
  * the ids the driver tests pin change each time.
  */
+import type {SpawnCodex} from './app-server'
 import type {
   PromptRecorded,
   ReplyRecorded,
@@ -14,6 +15,7 @@ import type {
   SignInRequest,
   StartReplyEvent,
 } from '@uz/contract/host'
+import type {CompactionSettings} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -43,6 +45,11 @@ const signedIn = process.env.UZ_LIVE_CODEX_HOME
 
 /** The Model ChatGPT's `model/list` marked as its default when recorded. */
 const MODEL = 'gpt-6.1-sol'
+
+const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
+  auto: true,
+  threshold: null,
+}
 
 function homeFrom(source: string) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-codex-'))
@@ -174,6 +181,77 @@ function expectComplete(events: Streamed[]) {
   expect(last).toMatchObject({status: 'complete'})
 }
 
+/** A Thread's Replies, each at the Compaction threshold given. */
+function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
+  const treeId = crypto.randomUUID()
+  const idle = heldIdle()
+  const exits: Promise<unknown>[] = []
+
+  const driver = createCodexDriver({
+    store: fakeStore().client,
+    spawn: (command, options) => {
+      const child = spawn(command, options)
+      exits.push(once(child, 'exit').catch(() => undefined))
+
+      return child
+    },
+    whenIdle: idle.whenIdle,
+  })
+
+  async function reply(
+    text: string,
+    session: SessionRef | null,
+    threshold: CompactionSettings['threshold']
+  ) {
+    const events = await Array.fromAsync(
+      driver.startReply({
+        treeId,
+        replyId: crypto.randomUUID(),
+        model: MODEL,
+        systemPrompt: 'You answer in as few words as you can.',
+        prompt: {text, messageId: crypto.randomUUID()},
+        vendorProgram: {
+          program: {
+            path: program,
+            build: {
+              url: 'https://example.com/codex.tar.gz',
+              sha256: '0'.repeat(64),
+              size: 1,
+              archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+            },
+          },
+          configDir: home,
+        },
+        session: session && {...session, type: 'continue'},
+        compactionSettings: {auto: true, threshold},
+      })
+    )
+
+    expectComplete(events)
+
+    const recorded = events.find(
+      (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+    )
+
+    if (!recorded) throw new Error('The Reply was not recorded')
+
+    return {
+      compacted: events.some(event => event.type === 'CONTEXT_COMPACTED'),
+      contextSize:
+        events.filter(isReplyEvent).reduce(foldReplyEvent, NEW_REPLY)
+          .contextSize ?? 0,
+      session: recorded.session,
+    }
+  }
+
+  async function closed() {
+    idle.pass()
+    await Promise.all(exits)
+  }
+
+  return {reply, closed}
+}
+
 describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
   it('[dep:codex-rollout-files] streams, continues the loaded thread, appending to one rollout under sessions/, resumes from the app’s copy alone, then forks mid-Thread', async () => {
     if (!folder || !signedIn) return
@@ -243,6 +321,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             configDir: home,
           },
           session: session && {...session, type: fork ? 'fork' : 'continue'},
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
 
@@ -400,6 +479,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           ...session,
           type: rewind ? 'rewind' : 'continue',
         },
+        compactionSettings: DEFAULT_COMPACTION_SETTINGS,
       })) {
         events.push(event)
 
@@ -556,6 +636,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           prompt: {text, messageId: crypto.randomUUID()},
           vendorProgram: vendorProgram(home),
           session: session && {...session, type: 'continue'},
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
 
@@ -677,6 +758,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             configDir: home,
           },
           session,
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
     }
@@ -822,6 +904,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           configDir: home,
         },
         session: null,
+        compactionSettings: DEFAULT_COMPACTION_SETTINGS,
       })) {
         events.push(event)
 
@@ -908,6 +991,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             configDir: home,
           },
           session: session && {...session, type: 'continue'},
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
 
@@ -949,6 +1033,87 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
 
       idle.pass()
       await Promise.all(exits)
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:codex-compaction-limit] compacts a thread past the threshold set, from the next Reply on a thread already loaded', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const recording = process.env.UZ_RECORD === 'yes'
+
+    const recorder = createRecorder([
+      path.join(RECORDINGS, 'compaction-settings.ndjson'),
+    ])
+
+    const {reply, closed} = compactionReplies(
+      folder,
+      home,
+      recording ? recorder.spawn : spawnCodex
+    )
+
+    const padding = 'The harbor log lists no ships today. '.repeat(800)
+
+    try {
+      // Codex checks the limit as a turn starts, so the padded turn can't compact.
+      const padded = await reply(
+        `Reply with the single word TEAL. Ignore the rest of this message. ${padding}`,
+        null,
+        30_000
+      )
+
+      const under = await reply(
+        'Reply with the single word OTTER.',
+        padded.session,
+        30_000
+      )
+
+      const lowered = await reply(
+        'Reply with the single word HERON.',
+        under.session,
+        20_000
+      )
+
+      expect(under.contextSize).toBeGreaterThan(20_000)
+      expect(under.contextSize).toBeLessThan(30_000)
+      expect([padded.compacted, under.compacted, lowered.compacted]).toEqual([
+        false,
+        false,
+        true,
+      ])
+
+      await closed()
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:codex-compaction-limit] drops a lowered limit from the next Reply on a thread already loaded, once the threshold goes back to the default', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const {reply, closed} = compactionReplies(folder, home, spawnCodex)
+    const padding = 'The harbor log lists no ships today. '.repeat(1000)
+
+    try {
+      const padded = await reply(
+        `Reply with the single word TEAL. Ignore the rest of this message. ${padding}`,
+        null,
+        20_000
+      )
+
+      const restored = await reply(
+        'Reply with the single word OTTER.',
+        padded.session,
+        null
+      )
+
+      expect(padded.contextSize).toBeGreaterThan(20_000)
+      expect([padded.compacted, restored.compacted]).toEqual([false, false])
+
+      await closed()
     } finally {
       fs.rmSync(home, {recursive: true, force: true})
     }
@@ -998,6 +1163,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             configDir: home,
           },
           session: null,
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
 
@@ -1068,6 +1234,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
             configDir: home,
           },
           session: null,
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
 

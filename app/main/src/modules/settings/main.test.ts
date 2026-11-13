@@ -24,6 +24,9 @@ it('keeps a change across reopening and leaves the other Settings alone', () => 
     sendKey: 'mod-enter',
     reReadNote: false,
     escStopsReply: false,
+    claudeAutoCompaction: false,
+    claudeCompactionThreshold: 150_000,
+    chatgptCompactionThreshold: 50_000,
   } as const
 
   createSettings(db).update(others)
@@ -72,4 +75,15 @@ it('reads a saved value that no longer fits as the default', () => {
     .run()
 
   expect(createSettings(db).read().canvasOrientation).toBe('vertical')
+})
+
+it('keeps a Compaction threshold, and clears it back to the Provider’s default', () => {
+  const settings = createSettings(db)
+  settings.update({claudeCompactionThreshold: 150_000})
+
+  expect(createSettings(db).read().claudeCompactionThreshold).toBe(150_000)
+
+  settings.update({claudeCompactionThreshold: null})
+
+  expect(createSettings(db).read().claudeCompactionThreshold).toBeNull()
 })

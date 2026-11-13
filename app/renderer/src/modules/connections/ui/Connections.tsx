@@ -4,7 +4,7 @@ import {Button} from '#shadcn/ui/button'
 import {ProviderIdSchema} from '@uz/contract/providers'
 import {cn} from 'cn'
 
-import {anyConnected, cardOf} from '../cards'
+import {anyConnected, cardOf, waitingFor} from '../cards'
 import {ProviderCard} from './ProviderCard'
 
 interface ConnectionsProps {
@@ -15,7 +15,6 @@ interface ConnectionsProps {
 
 export function Connections({connections, onStart}: ConnectionsProps) {
   const {state} = connections
-  const connecting = state.signIn?.provider ?? null
 
   return (
     <div
@@ -49,9 +48,7 @@ export function Connections({connections, onStart}: ConnectionsProps) {
             key={provider}
             provider={provider}
             card={cardOf(state, provider)}
-            waitingFor={
-              connecting !== null && connecting !== provider ? connecting : null
-            }
+            waitingFor={waitingFor(state, provider)}
             connect={() => void connections.connect(provider)}
             cancel={() => void connections.cancel(provider)}
             openPage={() => void connections.openPage(provider)}

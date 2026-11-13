@@ -23,7 +23,7 @@ The Provider's own record of one Thread, which it uses to continue the conversat
 _Avoid_: Thread (Codex's word for it), conversation
 
 **Compaction**:
-A Provider replacing the early part of a Provider session with a summary, on its own once the Context size nears the Context window, or when asked. The Thread still shows every Turn in full, but the AI now remembers the Turns before the Compaction only from that summary. The Thread marks the Reply a Compaction happened in. A Compaction that was blocked or failed changed nothing and isn't one.
+A Provider replacing the early part of a Provider session with a summary, on its own once the Context size nears the Context window or the threshold set in Settings, or when asked. The Thread still shows every Turn in full, but the AI now remembers the Turns before the Compaction only from that summary. The Thread marks the Reply a Compaction happened in. A Compaction that was blocked or failed changed nothing and isn't one.
 _Avoid_: Compression, summarization, Summary (that is prose made for the user)
 
 **System prompt**:
@@ -152,8 +152,12 @@ A named group of Trees in the sidebar, made by the user. A Tree is in at most on
 _Avoid_: Folder, project, group
 
 **Settings**:
-The single place for the user's global preferences: how the app looks and behaves, and the defaults new Trees start from. Settings never changes an existing Tree; anything that shapes what the AI does in one Tree belongs to that Tree.
+The single place for the user's global preferences: how the app looks and behaves, and the defaults new Trees start from. Settings never changes an existing Tree, except the Compaction Settings, which apply to every Thread from its next Reply; anything else that shapes what the AI does in one Tree belongs to that Tree.
 _Avoid_: Preferences, options, config
+
+**Compaction Settings**:
+The global Settings, one set for each Provider, that decide when it makes a Compaction on its own: a threshold, the Context size it compacts at, and for Claude a switch that turns automatic Compaction off. They reach every Thread from its next Reply; an unset threshold leaves it to the Provider's default.
+_Avoid_: Compaction (that is the event), auto-compact settings
 
 **Font size**:
 The base size of all text in the app, a Setting. Text grows with it, and so do the widths that cap a line of it; spacing and the canvas's Zoom stay as they are.

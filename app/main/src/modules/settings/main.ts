@@ -3,6 +3,7 @@ import type {Settings, SettingsUpdate} from '@uz/contract/settings'
 
 import {schema} from '#modules/database/main'
 import {DEFAULT_SETTINGS, SettingsSchema} from '@uz/contract/settings'
+import {eq} from 'drizzle-orm'
 
 type SettingKey = keyof Settings
 
@@ -14,7 +15,10 @@ const KEYS = Object.keys(SettingsSchema.shape).filter(isSettingKey)
 
 export type SettingsStore = ReturnType<typeof createSettings>
 
-/** One row per key; a value that no longer fits its schema reads as the default. */
+/**
+ * One row per key, none for a key set to null; a missing row, or a value that
+ * no longer fits its schema, reads as the default.
+ */
 export function createSettings(
   db: Database,
   onSaved?: (saved: Settings) => void
@@ -47,6 +51,11 @@ export function createSettings(
           const value = changes[key]
 
           if (value === undefined) continue
+
+          if (value === null) {
+            tx.delete(settings).where(eq(settings.key, key)).run()
+            continue
+          }
 
           tx.insert(settings)
             .values({key, value})
