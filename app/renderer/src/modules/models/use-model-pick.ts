@@ -32,7 +32,6 @@ export function useModelPick(
 
   return pickModel({
     wanted: picked ?? (recorded && recordedOf(recorded)),
-    lockedTo: attachedTo?.provider ?? null,
     statuses: state.statuses,
     models: state.models,
   })

@@ -58,7 +58,6 @@ function only(
 it('starts from the first connected Provider’s default when nothing is wanted', () => {
   const pick = pickModel({
     wanted: null,
-    lockedTo: null,
     statuses: only('claude', 'not-connected', false),
     models,
   })
@@ -71,7 +70,6 @@ it('starts from the first connected Provider’s default when nothing is wanted'
 it('starts on the Model the Provider’s default resolves to, named as the default', () => {
   const pick = pickModel({
     wanted: null,
-    lockedTo: null,
     statuses: connected,
     models,
   })
@@ -83,7 +81,6 @@ it('starts on the Model the Provider’s default resolves to, named as the defau
 it('passes over a signed-out Provider when nothing is wanted', () => {
   const pick = pickModel({
     wanted: null,
-    lockedTo: null,
     statuses: only('claude', 'signed-out'),
     models,
   })
@@ -94,7 +91,6 @@ it('passes over a signed-out Provider when nothing is wanted', () => {
 it('keeps the wanted Model while its Provider lists it', () => {
   const pick = pickModel({
     wanted: recorded('claude', 'haiku'),
-    lockedTo: 'claude',
     statuses: connected,
     models,
   })
@@ -112,7 +108,6 @@ it('keeps the wanted Model while its Provider lists it', () => {
 it('keeps a Reply’s Model by the id it recorded, named by the entry that resolves to it', () => {
   const pick = pickModel({
     wanted: recorded('claude', 'opus-4-7'),
-    lockedTo: 'claude',
     statuses: connected,
     models,
   })
@@ -124,7 +119,6 @@ it('keeps a Reply’s Model by the id it recorded, named by the entry that resol
 it('prefers a Model’s own id over another’s resolved id', () => {
   const pick = pickModel({
     wanted: recorded('claude', 'haiku'),
-    lockedTo: null,
     statuses: connected,
     models: {
       ...models,
@@ -138,7 +132,6 @@ it('prefers a Model’s own id over another’s resolved id', () => {
 it('names a Reply’s Model by its own entry over the default that resolves to it too', () => {
   const pick = pickModel({
     wanted: recorded('claude', 'opus-4-7'),
-    lockedTo: 'claude',
     statuses: connected,
     models: {
       ...models,
@@ -157,7 +150,6 @@ const opus47 = model('opus-4-7', {name: 'Opus 4.7'})
 it('shows the picked entry while it still resolves to the Model picked on it', () => {
   const pick = pickModel({
     wanted: {provider: 'claude', model: 'opus-4-7', entry: 'default'},
-    lockedTo: null,
     statuses: connected,
     models: {
       ...models,
@@ -184,7 +176,6 @@ it('shows the picked entry while it still resolves to the Model picked on it', (
 it('stays on the Model an alias resolved to when picked, after the alias moves', () => {
   const pick = pickModel({
     wanted: {provider: 'claude', model: 'opus-4-7', entry: 'opus'},
-    lockedTo: null,
     statuses: connected,
     models: {
       ...models,
@@ -203,7 +194,6 @@ it('stays on the Model an alias resolved to when picked, after the alias moves',
 it('resolves a recorded alias to the Model it names, never sending the alias', () => {
   const pick = pickModel({
     wanted: recorded('claude', 'default'),
-    lockedTo: 'claude',
     statuses: connected,
     models: {
       ...models,
@@ -217,7 +207,6 @@ it('resolves a recorded alias to the Model it names, never sending the alias', (
 it('holds Send, saying so, when the wanted Model needs an app update', () => {
   const pick = pickModel({
     wanted: recorded('claude', 'haiku'),
-    lockedTo: 'claude',
     statuses: connected,
     models: {
       ...models,
@@ -236,7 +225,6 @@ it('holds Send, saying so, when the wanted Model needs an app update', () => {
 it('holds Send, saying which Model is gone, when the wanted Model is no longer offered', () => {
   const pick = pickModel({
     wanted: recorded('claude', 'sonnet-3'),
-    lockedTo: 'claude',
     statuses: connected,
     models,
   })
@@ -249,7 +237,6 @@ it('holds Send, saying which Model is gone, when the wanted Model is no longer o
 it('takes the first usable Model as the default when the marked one needs an app update', () => {
   const pick = pickModel({
     wanted: null,
-    lockedTo: null,
     statuses: connected,
     models: {
       ...models,
@@ -268,7 +255,6 @@ it('offers every connected Provider’s Models at the root, a gated one included
 
   const pick = pickModel({
     wanted: null,
-    lockedTo: null,
     statuses: connected,
     models: {...models, chatgpt: [...chatgptModels, gated]},
   })
@@ -282,7 +268,6 @@ it('offers every connected Provider’s Models at the root, a gated one included
 it('offers no Models of a Provider that isn’t connected', () => {
   const pick = pickModel({
     wanted: null,
-    lockedTo: null,
     statuses: only('chatgpt', 'not-connected', false),
     models,
   })
@@ -293,7 +278,6 @@ it('offers no Models of a Provider that isn’t connected', () => {
 it('offers no group for a connected Provider that hasn’t listed any Models', () => {
   const pick = pickModel({
     wanted: null,
-    lockedTo: null,
     statuses: connected,
     models: {...models, claude: []},
   })
@@ -301,21 +285,9 @@ it('offers no group for a connected Provider that hasn’t listed any Models', (
   expect(pick.groups).toEqual([{provider: 'chatgpt', models: chatgptModels}])
 })
 
-it('offers only the locked Provider’s Models in a continuing Thread', () => {
-  const pick = pickModel({
-    wanted: recorded('chatgpt', 'gpt-5'),
-    lockedTo: 'chatgpt',
-    statuses: connected,
-    models,
-  })
-
-  expect(pick.groups.map(group => group.provider)).toEqual(['chatgpt'])
-})
-
 it('keeps a signed-out Provider’s Model, offering to sign in again and holding Send', () => {
   const pick = pickModel({
     wanted: recorded('claude', 'haiku'),
-    lockedTo: 'claude',
     statuses: only('claude', 'signed-out'),
     models,
   })
@@ -334,7 +306,6 @@ it('keeps a signed-out Provider’s Model, offering to sign in again and holding
 it('keeps the picked default named as the default while its Provider is signed out', () => {
   const pick = pickModel({
     wanted: {provider: 'claude', model: 'opus-4-7', entry: 'default'},
-    lockedTo: null,
     statuses: only('claude', 'signed-out'),
     models: {
       ...models,
@@ -360,7 +331,6 @@ it('keeps the picked default named as the default while its Provider is signed o
 it('keeps a signed-out Provider’s Model by its id when the list doesn’t know it', () => {
   const pick = pickModel({
     wanted: recorded('claude', 'opus-4-7'),
-    lockedTo: 'claude',
     statuses: only('claude', 'signed-out'),
     models: {...models, claude: []},
   })
@@ -373,10 +343,9 @@ it('keeps a signed-out Provider’s Model by its id when the list doesn’t know
   })
 })
 
-it('starts a new Tree on another connected Provider, saying so, when the last-used one was removed', () => {
+it('goes on, in a Thread or a new Tree, on another connected Provider, saying so, when the wanted one was removed', () => {
   const pick = pickModel({
     wanted: recorded('claude', 'opus-4-7'),
-    lockedTo: null,
     statuses: only('claude', 'not-connected', false),
     models,
   })
@@ -389,7 +358,6 @@ it('starts a new Tree on another connected Provider, saying so, when the last-us
 it('holds Send at the root, saying why, when no Provider is connected', () => {
   const pick = pickModel({
     wanted: recorded('claude', 'opus-4-7'),
-    lockedTo: null,
     statuses: [
       {provider: 'claude', status: 'not-connected', account: null},
       {provider: 'chatgpt', status: 'not-connected', account: null},
@@ -402,23 +370,9 @@ it('holds Send at the root, saying why, when no Provider is connected', () => {
   expect(pick.heldBecause).toBe('Connect a Provider to send')
 })
 
-it('selects nothing in a continuing Thread whose Provider was removed, and holds Send', () => {
-  const pick = pickModel({
-    wanted: recorded('claude', 'opus-4-7'),
-    lockedTo: 'claude',
-    statuses: only('claude', 'not-connected', false),
-    models,
-  })
-
-  expect(pick.selected).toBeNull()
-  expect(pick.groups).toEqual([])
-  expect(pick.heldBecause).toBe('Connect Claude to continue this Thread')
-})
-
 it('holds Send while the wanted Model’s Provider hasn’t listed any Models', () => {
   const pick = pickModel({
     wanted: recorded('claude', 'opus-4-7'),
-    lockedTo: 'claude',
     statuses: connected,
     models: {...models, claude: []},
   })
@@ -430,7 +384,6 @@ it('holds Send while the wanted Model’s Provider hasn’t listed any Models', 
 it('holds Send while the first connected Provider hasn’t listed any Models', () => {
   const pick = pickModel({
     wanted: null,
-    lockedTo: null,
     statuses: connected,
     models: {...models, claude: []},
   })
@@ -442,7 +395,6 @@ it('holds Send while the first connected Provider hasn’t listed any Models', (
 it('holds Send, saying so, when every Model of the Provider needs an app update', () => {
   const pick = pickModel({
     wanted: null,
-    lockedTo: null,
     statuses: only('chatgpt', 'not-connected', false),
     models: {...models, claude: [model('opus', {needsAppUpdate: true})]},
   })

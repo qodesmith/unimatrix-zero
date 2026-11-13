@@ -15,7 +15,6 @@ export type WantedModel = ModelChoice & {entry: string | null}
 
 export interface ModelPickInput {
   wanted: WantedModel | null
-  lockedTo: ProviderId | null
   statuses: ProviderStatus[]
   models: Record<ProviderId, Model[]>
 }
@@ -146,14 +145,6 @@ function fromWanted(
 
   if (status && isConnected(status)) return fromList(wanted, input.models)
 
-  if (input.lockedTo !== null) {
-    return {
-      selected: null,
-      notice: null,
-      heldBecause: `Connect ${name} to continue this Thread`,
-    }
-  }
-
   const started = startOnFirstConnected(input)
   const notice = `${name} isn’t connected`
 
@@ -167,14 +158,10 @@ function fromWanted(
 
 /** What an Input's Model picker offers and shows, and whether it may send. */
 export function pickModel(input: ModelPickInput): ModelPick {
-  const {wanted, lockedTo, statuses, models} = input
+  const {wanted, statuses, models} = input
 
   const groups = statuses
-    .filter(
-      status =>
-        status.account !== null &&
-        (lockedTo === null || status.provider === lockedTo)
-    )
+    .filter(status => status.account !== null)
     .map(({provider}) => ({provider, models: models[provider]}))
     .filter(group => group.models.length > 0)
 

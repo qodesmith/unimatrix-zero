@@ -78,6 +78,7 @@ interface Setup {
   providers?: ProviderStatus[]
   models?: Record<ProviderId, Model[]>
   sendKey?: Settings['sendKey']
+  reReadNote?: Settings['reReadNote']
 }
 
 interface Sends {
@@ -91,6 +92,7 @@ function fakeMain({
   providers = READY,
   models = MODELS,
   sendKey = DEFAULT_SETTINGS.sendKey,
+  reReadNote = DEFAULT_SETTINGS.reReadNote,
 }: Setup) {
   const sent: Command[] = []
   const listeners: ((event: AppEvent) => void)[] = []
@@ -147,7 +149,7 @@ function fakeMain({
         models,
         lastModel,
         signIn: null,
-        settings: {...DEFAULT_SETTINGS, sendKey},
+        settings: {...DEFAULT_SETTINGS, sendKey, reReadNote},
         layout: DEFAULT_LAYOUT,
       })
 
@@ -282,12 +284,54 @@ it('sends the Model the default resolved to when picked, still showing the defau
   expect(sentModels(main)).toEqual([{provider: 'claude', model: 'opus-4-7'}])
 })
 
-it('lists only the Thread’s own Provider in a continuing Thread', async () => {
-  await renderInput({attachedTo: attachedReply('claude', 'opus-4-7')})
+it('lists every connected Provider in a continuing Thread, and sends the Thread on to the other one picked', async () => {
+  const main = await renderInput({
+    attachedTo: attachedReply('claude', 'opus-4-7'),
+  })
 
   await picker().click()
   await expect.element(page.getByRole('option', {name: 'Haiku'})).toBeVisible()
-  expect(page.getByRole('option', {name: 'GPT-5'}).query()).toBeNull()
+  await page.getByRole('option', {name: 'GPT-5'}).click()
+  await expectPicked('ChatGPT', 'GPT-5')
+
+  await send(main)
+  expect(sentModels(main)).toEqual([{provider: 'chatgpt', model: 'gpt-5'}])
+})
+
+function sized(contextSize: number) {
+  return {...attachedReply('claude', 'opus-4-7'), contextSize}
+}
+
+const SWITCH_NOTE =
+  'Switching to ChatGPT will re-read ~63k tokens of this conversation (uses more of your limit).'
+
+it('says above the Input how much of a long Thread another Provider will re-read, once it’s picked', async () => {
+  await renderInput({attachedTo: sized(48_000)})
+
+  expect(page.getByRole('note').query()).toBeNull()
+
+  await picker().click()
+  await page.getByRole('option', {name: 'GPT-5'}).click()
+
+  await expect.element(page.getByRole('note')).toHaveTextContent(SWITCH_NOTE)
+})
+
+it('says nothing when the Thread is short', async () => {
+  await renderInput({attachedTo: sized(1000)})
+  await picker().click()
+  await page.getByRole('option', {name: 'GPT-5'}).click()
+  await expectPicked('ChatGPT', 'GPT-5')
+
+  expect(page.getByRole('note').query()).toBeNull()
+})
+
+it('says nothing when the Setting hides the note', async () => {
+  await renderInput({attachedTo: sized(48_000), reReadNote: false})
+  await picker().click()
+  await page.getByRole('option', {name: 'GPT-5'}).click()
+  await expectPicked('ChatGPT', 'GPT-5')
+
+  expect(page.getByRole('note').query()).toBeNull()
 })
 
 it('lists a Model the app is too old for, disabled as needing an app update', async () => {

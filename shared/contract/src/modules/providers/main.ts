@@ -37,6 +37,16 @@ export const ModelSchema = z.strictObject({
 export type Model = z.infer<typeof ModelSchema>
 
 /**
+ * About how many tokens a new session's first turn carries before the Thread:
+ * the vendor program's own instructions, as the app starts it. Measured from
+ * a recorded first Reply to a one-line Prompt, rounded up.
+ */
+export const SETUP_TOKENS: Record<ProviderId, number> = {
+  claude: 1000,
+  chatgpt: 15_000,
+}
+
+/**
  * A Reply records the id it was written on, which may be a `resolvesTo`; the
  * default resolves to another entry's Model too, which names it better.
  */

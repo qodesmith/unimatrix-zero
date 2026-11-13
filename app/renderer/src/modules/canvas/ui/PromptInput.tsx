@@ -10,11 +10,12 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from '#shadcn/ui/input-group'
-import {useEffect, useRef, useState} from 'react'
+import {use, useEffect, useRef, useState} from 'react'
 
-import {useAttachedReply} from '../canvas-context'
+import {CanvasContext, useAttachedReply} from '../canvas-context'
 import {EMPTY_DRAFT} from '../drafts'
 import {usePromptSend} from '../prompt-send/use-prompt-send'
+import {contextSizeAt, reReadNote} from '../re-read'
 import {StopButton} from './StopButton'
 
 interface PromptInputProps {
@@ -52,14 +53,25 @@ export function PromptInput({
   ref,
 }: PromptInputProps) {
   const promptSend = usePromptSend(treeId, parentReplyId)
-  const {sendKey} = useSettings()
+  const {sendKey, reReadNote: showsReReadNote} = useSettings()
+  const canvas = use(CanvasContext)
   const form = useRef<HTMLFormElement>(null)
   const [ownDraft, setOwnDraft] = useState(EMPTY_DRAFT)
   const current = kept ?? ownDraft
   const {text: draft, model: picked} = current
   const latest = useRef(current)
-  const pick = useModelPick(picked, useAttachedReply(parentReplyId))
+  const attachedTo = useAttachedReply(parentReplyId)
+  const pick = useModelPick(picked, attachedTo)
   const {selected} = pick
+
+  const note =
+    showsReReadNote && canvas
+      ? reReadNote({
+          attachedTo,
+          contextSize: contextSizeAt(canvas.index, attachedTo),
+          to: selected,
+        })
+      : null
   const sending = promptSend.state.status === 'sending'
   const held = !canSend || sending || pick.heldBecause !== null
 
@@ -111,6 +123,11 @@ export function PromptInput({
         send()
       }}
     >
+      {note && (
+        <p role="note" className="mb-1 px-1 text-xs text-muted-foreground">
+          {note}
+        </p>
+      )}
       <InputGroup className="bg-background">
         <InputGroupTextarea
           ref={ref}
