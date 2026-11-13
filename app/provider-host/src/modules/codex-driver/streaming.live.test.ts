@@ -201,7 +201,7 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
   async function reply(
     text: string,
     session: SessionRef | null,
-    threshold: number | null
+    threshold: CompactionSettings['threshold']
   ) {
     const events = await Array.fromAsync(
       driver.startReply({
