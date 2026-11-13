@@ -31,7 +31,8 @@ export function settingsOf(request: ReplyRequest) {
     sandbox: 'read-only',
     approvalPolicy: 'never',
     model: request.model,
-    developerInstructions: request.systemPrompt || null,
+    developerInstructions:
+      explainingLabels(request.systemPrompt, request.thread) || null,
   } satisfies ParamsOf<'thread/start'>
 }
 
@@ -96,11 +97,7 @@ async function newThread(
 ): Promise<Opened> {
   const {threshold} = request.compactionSettings
 
-  const settings = {
-    ...settingsOf(request),
-    developerInstructions:
-      explainingLabels(request.systemPrompt, request.thread) || null,
-  }
+  const settings = settingsOf(request)
 
   async function open() {
     return loadThread(

@@ -127,17 +127,6 @@ function textOf({session, thread, prompt}: ReplyRequest) {
     : prompt.text
 }
 
-/** The request as a new session, told the whole Thread, takes it. */
-function rebuilding(request: ReplyRequest): ReplyRequest {
-  const {systemPrompt, thread} = request
-
-  return {
-    ...request,
-    session: null,
-    systemPrompt: explainingLabels(systemPrompt, thread),
-  }
-}
-
 /** Replies from a warm `claude`, or a new one that resumes, forks or starts. */
 export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   const warm = createWarmSessions<Live>({
@@ -191,7 +180,8 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       verbatimPrompts: true,
       includePartialMessages: true,
       thinking: {type: 'adaptive', display: 'summarized'},
-      systemPrompt: request.systemPrompt,
+      // On every open: `claude` keeps no System prompt with the session.
+      systemPrompt: explainingLabels(request.systemPrompt, request.thread),
       model: request.model,
       ...(resume ? {resume} : {}),
       ...(fork ? {forkSession: true} : {}),
@@ -380,7 +370,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     if (!request.session) {
       if (thread.length > 0) yield rebuilt
 
-      return yield* fromCopy(rebuilding(request), mapper, run)
+      return yield* fromCopy(request, mapper, run)
     }
 
     const restored = yield* fromCopy(request, mapper, run)
@@ -390,7 +380,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     warm.drop(restored.session)
     yield rebuilt
 
-    return yield* fromCopy(rebuilding(request), mapper, run)
+    return yield* fromCopy({...request, session: null}, mapper, run)
   }
 
   /** A refused save of the tool results fails the Reply. */

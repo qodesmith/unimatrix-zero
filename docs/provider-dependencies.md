@@ -401,4 +401,4 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **App side:** the re-read note's estimate adds that overhead, rounded up, to the Context size before a Prompt goes to another Provider (`canvas`).
 - **User would see:** an estimate off by the difference, and a note shown or left out near its 20k mark.
 - **Changed by:** upgrade + drift. The program's own instructions change with releases, and Codex's with its server-side Model catalog.
-- **Check:** none: a few thousand tokens either way barely moves an estimate the note gives in thousands; the recorded first Replies (`warm.ndjson`, `started.ndjson`) show the numbers when they are re-recorded.
+- **Check:** none: a few thousand tokens either way barely moves an estimate the note gives in thousands; the recorded first Replies in `claude-driver` and `codex-driver` show the numbers when they are re-recorded.

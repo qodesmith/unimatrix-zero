@@ -12,6 +12,7 @@ import type {CompactionSettings} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
+import {explainingLabels} from '#modules/thread-replay/main'
 import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {once} from 'node:events'
@@ -127,6 +128,8 @@ function extendSavedRollout(
   return file
 }
 
+const SYSTEM_PROMPT = 'You answer in as few words as you can.'
+
 async function setUp(
   recordings: string[],
   {
@@ -207,7 +210,7 @@ async function setUp(
       treeId,
       replyId,
       model,
-      systemPrompt: 'You answer in as few words as you can.',
+      systemPrompt: SYSTEM_PROMPT,
       prompt: {text, messageId: crypto.randomUUID()},
       vendorProgram,
       session: session && {type: 'continue', ...session},
@@ -1753,6 +1756,39 @@ it('takes over a Thread Claude wrote: a new thread holding each Turn as a messag
       role: 'user',
       content: [{type: 'input_text', text: 'Still there?'}],
     },
+  ])
+
+  await codex.allClosed()
+})
+
+it('keeps the line that explains the labels when a rebuilt thread resumes in a new codex', async () => {
+  const opened = await setUp([injecting()])
+  const first = await opened.reply(FIRST_PROMPT, null, {thread: HANDED_OVER})
+  await opened.allClosed()
+
+  const thread: Thread = [
+    ...HANDED_OVER,
+    {
+      prompt: FIRST_PROMPT,
+      reply: [{type: 'text', text: 'Hi there, friend!'}],
+      label: null,
+    },
+  ]
+
+  const codex = await setUp(['resumed.ndjson'], {store: opened.store})
+  const events = await codex.reply(THIRD_PROMPT, recordedIn(first), {thread})
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+  const [rebuilt] = opened.reports()
+  const [resumed] = codex.reports()
+
+  expect(rebuilt?.threadInstructions).toEqual([
+    explainingLabels(SYSTEM_PROMPT, HANDED_OVER),
+  ])
+  expect(resumed?.methods).toContain('thread/resume')
+  expect(resumed?.threadInstructions).toEqual([
+    explainingLabels(SYSTEM_PROMPT, thread),
   ])
 
   await codex.allClosed()

@@ -1409,6 +1409,27 @@ it('takes over a Thread ChatGPT wrote: a new session, told the whole Thread and 
   await claude.allClosed()
 })
 
+it('keeps the line that explains the labels when a rebuilt session resumes in a new claude', async () => {
+  const claude = await setUp(['warm.ndjson', 'resumed.ndjson'])
+  const first = await claude.reply(FIRST_PROMPT, null, {thread: HANDED_OVER})
+  await claude.allClosed()
+
+  const thread: Thread = [
+    ...HANDED_OVER,
+    {prompt: FIRST_PROMPT, reply: [{type: 'text', text: 'TEAL'}], label: null},
+  ]
+
+  const events = await claude.reply(THIRD_PROMPT, recordedIn(first), {thread})
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+  await claude.allClosed()
+  const [, resumed] = claude.reports()
+
+  expect(resumed?.args).toContain(`--resume=${SESSION_ID}`)
+  expect(resumed?.systemPrompt.join('')).toBe(explainingLabels('', thread))
+})
+
 it('sends a Tree’s first Prompt as written, with no Thread to tell', async () => {
   const claude = await setUp(['warm.ndjson'])
 

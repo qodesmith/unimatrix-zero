@@ -3,6 +3,7 @@ import type {Thread} from '@uz/contract/host'
 import type {Model, ModelChoice, ProviderId} from '@uz/contract/providers'
 
 import {schema} from '#modules/database/main'
+import {replyLabel} from '@uz/contract/host'
 import {concreteId, modelName} from '@uz/contract/providers'
 import {ReplyPartSchema} from '@uz/contract/turns'
 import {and, eq} from 'drizzle-orm'
@@ -15,7 +16,7 @@ const ContentSchema = z.array(ReplyPartSchema)
 export type ListedModels = (provider: ProviderId) => Model[]
 
 function labelFor({provider, model}: ModelChoice, listed: ListedModels) {
-  return `[Reply written by ${modelName(listed(provider), model)}]`
+  return replyLabel(modelName(listed(provider), model))
 }
 
 /**

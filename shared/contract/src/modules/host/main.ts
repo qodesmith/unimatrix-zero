@@ -94,6 +94,11 @@ export const ThreadSchema = z.array(
 
 export type Thread = z.infer<typeof ThreadSchema>
 
+/** The label a Thread gives a Reply the Model named `name` wrote. */
+export function replyLabel(name: string) {
+  return `[Reply written by ${name}]`
+}
+
 /** The shape `node:crypto` types a UUID as, which the Claude SDK asks for. */
 const UuidPartsSchema = z.templateLiteral([
   z.string(),
