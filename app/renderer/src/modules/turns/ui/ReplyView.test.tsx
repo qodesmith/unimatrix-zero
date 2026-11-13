@@ -35,6 +35,7 @@ const reply: Reply = {
   contextWindow: null,
   failure: null,
   compacted: false,
+  rebuilt: false,
   createdAt: '2026-10-19T12:00:00.000Z',
 }
 
@@ -384,4 +385,15 @@ it('marks a streaming Reply once its Compaction arrives, and keeps the mark when
 
   await expect.element(screen.getByText('Writing…')).not.toBeInTheDocument()
   await expect.element(marker).toBeVisible()
+})
+
+it('says a Reply re-read the whole conversation, and says nothing on another', async () => {
+  const screen = await renderSaved({rebuilt: true}, {rebuilt: false})
+
+  await expect
+    .element(screen.getByText('Re-read the whole conversation to go on'))
+    .toBeVisible()
+  expect(
+    screen.getByText('Re-read the whole conversation to go on').all()
+  ).toHaveLength(1)
 })

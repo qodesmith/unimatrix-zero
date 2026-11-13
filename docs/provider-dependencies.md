@@ -391,3 +391,14 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **User would see:** a Claude that comments on the replay as a document, or answers as if the earlier Turns never happened.
 - **Changed by:** upgrade + drift. The Model decides how it reads the replay.
 - **Check:** `[dep:thread-replay-as-conversation]` in `claude-driver`: a new session told a ChatGPT-written Thread recalls it, and the next Prompt goes on from it warm.
+
+### A new session's setup tokens
+
+- **Id:** `setup-tokens`
+- **Kind:** D
+- **Provider:** both
+- **Relies on:** how many tokens the vendor program puts before the Thread in a new session's first turn, as the app starts it: about 600 for `claude` with no tools or settings, and about 14,500 for Codex.
+- **App side:** the re-read note's estimate adds that overhead, rounded up, to the Context size before a Prompt goes to another Provider (`canvas`).
+- **User would see:** an estimate off by the difference, and a note shown or left out near its 20k mark.
+- **Changed by:** upgrade + drift. The program's own instructions change with releases, and Codex's with its server-side Model catalog.
+- **Check:** none: a few thousand tokens either way barely moves an estimate the note gives in thousands; the recorded first Replies (`warm.ndjson`, `started.ndjson`) show the numbers when they are re-recorded.

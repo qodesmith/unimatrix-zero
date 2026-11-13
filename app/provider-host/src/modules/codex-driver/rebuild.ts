@@ -5,21 +5,25 @@ import type {ParamsOf} from './wire'
 import type {ReplyRequest, Thread} from '@uz/contract/host'
 
 import {RequestRefused} from '#modules/failures/main'
-import {replyText} from '#modules/thread-replay/main'
+import {explainingLabels, replyText} from '#modules/thread-replay/main'
 
 import {configOf, loadThread} from './threads'
 
 /** How Codex refuses to resume or fork a thread whose rollout it can't find. */
 const SESSION_LOST = /no rollout found for thread id/
 
-/** `replay`: the thread holds nothing of the Thread, so the Prompt tells it. */
+/**
+ * `replay`: the thread holds nothing of the Thread, so the Prompt tells it.
+ * `rebuilt`: the thread was started and given the Thread.
+ */
 interface Opened {
   thread: LoadedThread
   dropped: boolean
   replay: boolean
+  rebuilt: boolean
 }
 
-export type Restored = Omit<Opened, 'replay'>
+export type Restored = Omit<Opened, 'replay' | 'rebuilt'>
 
 export function settingsOf(request: ReplyRequest) {
   return {
@@ -91,7 +95,12 @@ async function newThread(
   request: ReplyRequest
 ): Promise<Opened> {
   const {threshold} = request.compactionSettings
-  const settings = settingsOf(request)
+
+  const settings = {
+    ...settingsOf(request),
+    developerInstructions:
+      explainingLabels(request.systemPrompt, request.thread) || null,
+  }
 
   async function open() {
     return loadThread(
@@ -108,15 +117,18 @@ async function newThread(
   }
 
   const thread = await open()
-  const told = {thread, dropped: false, replay: false}
 
-  if (request.thread.length === 0) return told
+  if (request.thread.length === 0) {
+    return {thread, dropped: false, replay: false, rebuilt: false}
+  }
 
-  if (await injectThread(server, thread.id, request.thread)) return told
+  if (await injectThread(server, thread.id, request.thread)) {
+    return {thread, dropped: false, replay: false, rebuilt: true}
+  }
 
   threads.delete(thread.id)
 
-  return {thread: await open(), dropped: false, replay: true}
+  return {thread: await open(), dropped: false, replay: true, rebuilt: true}
 }
 
 /**
@@ -133,7 +145,7 @@ export async function openThread(
   if (!restore) return newThread(server, threads, request)
 
   try {
-    return {...(await restore()), replay: false}
+    return {...(await restore()), replay: false, rebuilt: false}
   } catch (error) {
     const lost =
       error instanceof RequestRefused && SESSION_LOST.test(error.message)

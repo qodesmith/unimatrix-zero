@@ -127,7 +127,6 @@ export function failedToReplace(
   return {
     promptIds: removed.flatMap(turns => turns.promptIds),
     replyIds: removedReplies.map(reply => reply.id),
-    /** The first failed Prompt, and the Provider `session` is a session of. */
     promptId: first.promptId,
     provider: recovered?.provider ?? null,
     session: recovered?.session ?? null,

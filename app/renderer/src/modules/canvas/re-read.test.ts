@@ -1,9 +1,13 @@
 import type {Prompt, Reply} from '@uz/contract/turns'
 
-import {SETUP_TOKENS} from '@uz/contract/providers'
 import {expect, it} from 'vitest'
 
-import {RE_READ_NOTE_FROM, contextSizeAt, reReadNote} from './re-read'
+import {
+  RE_READ_NOTE_FROM,
+  SETUP_TOKENS,
+  contextSizeAt,
+  reReadNote,
+} from './re-read'
 import {indexTurns} from './tree'
 
 const treeId = '01a16096-00ad-7d3b-8205-6b76ddc26ce0'
@@ -40,6 +44,7 @@ function exchange(
       contextWindow: null,
       failure: null,
       compacted: false,
+      rebuilt: false,
       createdAt,
     },
   }

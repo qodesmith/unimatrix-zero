@@ -73,9 +73,11 @@ export function createInFlight(
     if (entry.saveTimer) clearTimeout(entry.saveTimer)
     entry.saveTimer = null
 
-    const {status, content, contextSize, contextWindow, failure} = entry.reply
+    const {status, content, contextSize, contextWindow, failure, rebuilt} =
+      entry.reply
+
     db.update(replies)
-      .set({status, content, contextSize, contextWindow, failure})
+      .set({status, content, contextSize, contextWindow, failure, rebuilt})
       .where(eq(replies.id, entry.reply.replyId))
       .run()
   }

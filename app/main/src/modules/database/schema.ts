@@ -86,6 +86,8 @@ export const replies = sqliteTable(
     sessionDropFrom: text('session_drop_from'),
     contextSize: integer('context_size'),
     contextWindow: integer('context_window'),
+    /** Its Provider session was rebuilt from the Thread for it. */
+    rebuilt: integer('rebuilt', {mode: 'boolean'}).notNull().default(false),
     createdAt: createdAt(),
   },
   table => [uniqueIndex('replies_prompt_id').on(table.promptId)]

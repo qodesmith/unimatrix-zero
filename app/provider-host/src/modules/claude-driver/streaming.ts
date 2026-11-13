@@ -15,7 +15,7 @@ import type {RunFailure} from '@uz/contract/turns'
 
 import {failureOf} from '#modules/failures/main'
 import {createReplyRuns} from '#modules/reply-runs/main'
-import {replayed} from '#modules/thread-replay/main'
+import {explainingLabels, replayed} from '#modules/thread-replay/main'
 
 import {claudeEnvironment} from './environment'
 import {createReplyMapper} from './replies'
@@ -125,6 +125,17 @@ function textOf({session, thread, prompt}: ReplyRequest) {
   return session === null && thread.length > 0
     ? replayed(thread, prompt.text)
     : prompt.text
+}
+
+/** The request as a new session, told the whole Thread, takes it. */
+function rebuilding(request: ReplyRequest): ReplyRequest {
+  const {systemPrompt, thread} = request
+
+  return {
+    ...request,
+    session: null,
+    systemPrompt: explainingLabels(systemPrompt, thread),
+  }
 }
 
 /** Replies from a warm `claude`, or a new one that resumes, forks or starts. */
@@ -363,19 +374,23 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     mapper: Mapper,
     run: ReplyRun
   ): AsyncGenerator<ContentEvent, {session: Live; outcome: Outcome}> {
-    const restored = yield* fromCopy(request, mapper, run)
+    const {treeId, replyId, thread} = request
+    const rebuilt = {treeId, replyId, type: 'SESSION_REBUILT'} as const
 
-    if (
-      !request.session ||
-      request.thread.length === 0 ||
-      !sessionLost(restored.outcome)
-    ) {
-      return restored
+    if (!request.session) {
+      if (thread.length > 0) yield rebuilt
+
+      return yield* fromCopy(rebuilding(request), mapper, run)
     }
 
-    warm.drop(restored.session)
+    const restored = yield* fromCopy(request, mapper, run)
 
-    return yield* fromCopy({...request, session: null}, mapper, run)
+    if (thread.length === 0 || !sessionLost(restored.outcome)) return restored
+
+    warm.drop(restored.session)
+    yield rebuilt
+
+    return yield* fromCopy(rebuilding(request), mapper, run)
   }
 
   /** A refused save of the tool results fails the Reply. */

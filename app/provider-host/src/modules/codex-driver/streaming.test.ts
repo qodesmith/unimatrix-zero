@@ -1717,6 +1717,9 @@ it('takes over a Thread Claude wrote: a new thread holding each Turn as a messag
 
   expect(run?.methods).not.toContain('thread/resume')
   expect(run?.prompts).toEqual([FIRST_PROMPT])
+  expect(events.filter(event => event.type === 'SESSION_REBUILT')).toHaveLength(
+    1
+  )
   expect(run?.injected).toEqual([
     {
       type: 'message',
@@ -1758,9 +1761,10 @@ it('takes over a Thread Claude wrote: a new thread holding each Turn as a messag
 it('injects nothing for a Tree’s first Prompt', async () => {
   const codex = await setUp(['started.ndjson'])
 
-  await codex.reply(FIRST_PROMPT)
+  const events = await codex.reply(FIRST_PROMPT)
 
   expect(codex.reports()[0]?.methods).not.toContain('thread/inject_items')
+  expect(events.some(event => event.type === 'SESSION_REBUILT')).toBe(false)
 
   await codex.allClosed()
 })
@@ -1807,6 +1811,9 @@ it('rebuilds a thread the app has no copy of from the Thread', async () => {
   ).toEqual(['thread/resume', 'thread/start', 'thread/inject_items'])
   expect(run?.injected).toHaveLength(5)
   expect(run?.prompts).toEqual([FIRST_PROMPT])
+  expect(events.filter(event => event.type === 'SESSION_REBUILT')).toHaveLength(
+    1
+  )
 
   await codex.allClosed()
 })

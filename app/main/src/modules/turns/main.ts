@@ -38,7 +38,7 @@ import {
   resetReply,
   savedReply,
 } from './rows'
-import {explainingLabels, threadTo} from './thread'
+import {threadTo} from './thread'
 
 export {PARTIAL_SAVE_MS} from './in-flight'
 
@@ -189,7 +189,7 @@ export function createTurns({
         treeId,
         replyId: reply.id,
         model,
-        systemPrompt: explainingLabels(systemPrompt, thread),
+        systemPrompt,
         prompt: {text, messageId: randomUUID()},
         vendorProgram: vendorProgramFor(provider),
         session,
@@ -236,7 +236,7 @@ export function createTurns({
         treeId,
         replyId,
         model,
-        systemPrompt: explainingLabels(systemPrompt, thread),
+        systemPrompt,
         prompt: {text, messageId: randomUUID()},
         vendorProgram: vendorProgramFor(provider),
         session,

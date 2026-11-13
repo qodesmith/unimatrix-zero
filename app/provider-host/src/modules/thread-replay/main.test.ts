@@ -2,7 +2,7 @@ import type {Thread} from '@uz/contract/host'
 
 import {expect, it} from 'vitest'
 
-import {replayed, replyText} from './main'
+import {explainingLabels, replayed, replyText} from './main'
 
 const searched: Thread[number] = {
   prompt: 'Which river is longest?',
@@ -91,4 +91,21 @@ it('replays the whole Thread in order before the Prompt, without a Reply that sh
       'List both.',
     ].join('\n')
   )
+})
+
+it('adds one line explaining the labels after the user’s System prompt, only when a Reply has one', () => {
+  const labeled: Thread = [
+    {prompt: 'Hi', reply: [], label: '[Reply written by GPT-6 Sol]'},
+    {prompt: 'Again', reply: [], label: '[Reply written by GPT-6 Sol]'},
+  ]
+
+  const unlabeled: Thread = [{prompt: 'Hi', reply: [], label: null}]
+  const explained = explainingLabels('Be brief.', labeled)
+  const [own, line, ...rest] = explained.split('\n\n')
+
+  expect(own).toBe('Be brief.')
+  expect(line).toContain('[Reply written by')
+  expect(rest).toEqual([])
+  expect(explainingLabels('', labeled)).toBe(line)
+  expect(explainingLabels('Be brief.', unlabeled)).toBe('Be brief.')
 })

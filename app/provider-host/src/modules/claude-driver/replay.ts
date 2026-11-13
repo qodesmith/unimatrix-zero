@@ -58,6 +58,8 @@ export const FakeClaudeRunSchema = z.strictObject({
   prompts: z.array(z.string()),
   /** Per Prompt, whether it came marked to be delivered as written. */
   clientComposed: z.array(z.boolean()),
+  /** The System prompt the SDK started it with. */
+  systemPrompt: z.array(z.string()),
   /** The entry uuids of the transcript it resumed. */
   resumedFrom: z.array(z.string()),
   toolResults: z.array(z.string()),
@@ -93,7 +95,7 @@ function stillRunning(file) {
 const runningAtStart = fs.readdirSync(reports).filter(stillRunning).map(file => Number.parseInt(file, 10))
 const args = process.argv.slice(2)
 const configDir = process.env.CLAUDE_CONFIG_DIR
-const report = {args, configDir, runningAtStart, prompts: [], clientComposed: [], resumedFrom: [], toolResults: [], inputClosed: false, ended: null}
+const report = {args, configDir, runningAtStart, prompts: [], clientComposed: [], systemPrompt: [], resumedFrom: [], toolResults: [], inputClosed: false, ended: null}
 save()
 const recording = options.recordings[run]
 const lines = fs.readFileSync(recording, 'utf8')
@@ -198,6 +200,10 @@ process.stdin.on('data', chunk => {
       recorded.type === message.type &&
       (message.type !== 'control_request' || recorded.request.subtype === message.request.subtype))
     if (message.type === 'control_request') requestIds.set(step.message.request_id, message.request_id)
+    if (message.type === 'control_request' && message.request.subtype === 'initialize') {
+      const prompt = message.request.systemPrompt
+      report.systemPrompt = Array.isArray(prompt) ? prompt : prompt == null ? [] : [prompt]
+    }
     if (message.type === 'user') {
       report.prompts.push(message.message.content)
       report.clientComposed.push(message.client_composed === true)

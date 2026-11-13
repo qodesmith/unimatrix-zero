@@ -68,6 +68,7 @@ function attachedReply(provider: ProviderId, modelId: string): Reply {
     contextWindow: null,
     failure: null,
     compacted: false,
+    rebuilt: false,
     createdAt,
   }
 }

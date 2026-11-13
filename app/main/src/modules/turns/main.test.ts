@@ -453,6 +453,7 @@ describe('a streaming Reply', () => {
         contextWindow: null,
         failure: null,
         compacted: true,
+        rebuilt: false,
       },
     ])
   })
@@ -1161,24 +1162,6 @@ describe('a Prompt sent on another Provider', () => {
     })
   })
 
-  it('explains the labels in the System prompt the Provider gets, which the Reply doesn’t record', () => {
-    const {second, request} = switched()
-
-    expect(request?.systemPrompt).toContain('[Reply written by')
-
-    const [recorded] = db
-      .select({text: schema.systemPrompts.text})
-      .from(schema.replies)
-      .innerJoin(
-        schema.systemPrompts,
-        eq(schema.systemPrompts.id, schema.replies.systemPromptId)
-      )
-      .where(eq(schema.replies.id, second))
-      .all()
-
-    expect(recorded?.text).toBe('')
-  })
-
   it('is refused while the new Provider isn’t ready, adding nothing to the Tree', () => {
     const replyId = savedRoot()
     const before = turns.list(treeId)
@@ -1239,19 +1222,6 @@ describe('a Prompt sent on another Provider', () => {
     ])
   })
 
-  it('adds no line to the System prompt while one Model wrote the whole Thread', () => {
-    const replyId = savedRoot()
-
-    turns.sendPrompt({
-      model: {provider: 'claude', model: 'haiku'},
-      treeId,
-      parentReplyId: replyId,
-      text: 'More',
-    })
-
-    expect(requests()).toMatchObject([{systemPrompt: ''}])
-  })
-
   it('retries a failed hand-over with the whole Thread and no session again', () => {
     const replyId = savedRoot()
 
@@ -1284,7 +1254,6 @@ describe('a Prompt sent on another Provider', () => {
     expect(requests()).toMatchObject([
       {
         session: null,
-        systemPrompt: expect.stringContaining('[Reply written by'),
         thread: [{prompt: 'Hi', label: '[Reply written by Haiku 5.5]'}],
       },
     ])

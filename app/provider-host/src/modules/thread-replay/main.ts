@@ -47,3 +47,17 @@ export function replayed(thread: Thread, prompt: string) {
     prompt,
   ].join('\n\n')
 }
+
+/** Goes in the System prompt of a session told a Thread with a label. */
+const LABELS_LINE =
+  'Some Replies in this conversation begin with a label such as "[Reply written by GPT-5]". The app adds it to each Reply that another AI model wrote: those words are that model’s, not yours, so judge them as you would anyone else’s and disagree where they are wrong. Never write such a label yourself, and don’t mention the labels.'
+
+/**
+ * The System prompt a session told the Thread gets. The Reply records only
+ * the user's own, which the line is no part of.
+ */
+export function explainingLabels(systemPrompt: string, thread: Thread) {
+  if (thread.every(exchange => exchange.label === null)) return systemPrompt
+
+  return systemPrompt === '' ? LABELS_LINE : `${systemPrompt}\n\n${LABELS_LINE}`
+}

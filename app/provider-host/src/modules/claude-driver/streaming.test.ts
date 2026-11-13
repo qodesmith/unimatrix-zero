@@ -13,6 +13,7 @@ import type {CompactionSettings} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
+import {explainingLabels} from '#modules/thread-replay/main'
 import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {once} from 'node:events'
@@ -1390,6 +1391,10 @@ it('takes over a Thread ChatGPT wrote: a new session, told the whole Thread and 
   const [started] = claude.reports()
 
   expect(started?.args.join(' ')).not.toMatch(/--resume/)
+  expect(started?.systemPrompt.join('')).toBe(explainingLabels('', HANDED_OVER))
+  expect(events.filter(event => event.type === 'SESSION_REBUILT')).toHaveLength(
+    1
+  )
   expect(started?.prompts).toHaveLength(1)
   expect(started?.prompts[0]).toContain(HANDED_OVER_TURNS)
   expect(started?.prompts[0]?.endsWith(`</thread>\n\n${FIRST_PROMPT}`)).toBe(
@@ -1414,6 +1419,20 @@ it('sends a Tree’s first Prompt as written, with no Thread to tell', async () 
   await claude.allClosed()
 })
 
+it('says nothing of a rebuild for a session it restores', async () => {
+  const claude = await setUp(['warm.ndjson', 'resumed.ndjson'])
+  const session = await warmThread(claude)
+
+  const events = await claude.reply(THIRD_PROMPT, session, {
+    thread: HANDED_OVER,
+  })
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(events.some(event => event.type === 'SESSION_REBUILT')).toBe(false)
+
+  await claude.allClosed()
+})
+
 it('rebuilds a session the app has no copy of from the Thread, in a new session', async () => {
   const claude = await setUp(['resumed.ndjson', 'warm.ndjson'])
 
@@ -1433,6 +1452,9 @@ it('rebuilds a session the app has no copy of from the Thread, in a new session'
   expect(refused?.ended).toBe('refused')
   expect(rebuilt?.args.join(' ')).not.toMatch(/--resume/)
   expect(rebuilt?.prompts[0]).toContain(HANDED_OVER_TURNS)
+  expect(events.filter(event => event.type === 'SESSION_REBUILT')).toHaveLength(
+    1
+  )
 })
 
 it('rebuilds from the Thread when claude can’t find the entry to resume at, after the exact restore fails both ways', async () => {

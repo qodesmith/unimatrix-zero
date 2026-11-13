@@ -3,7 +3,7 @@ import type {ModelChoice, ProviderId} from '@uz/contract/providers'
 import type {Reply} from '@uz/contract/turns'
 
 import {useConnections} from '#modules/connections/main'
-import {findModel} from '@uz/contract/providers'
+import {modelName} from '@uz/contract/providers'
 
 import {pickModel} from './pick-model'
 
@@ -40,5 +40,5 @@ export function useModelPick(
 export function useModelName(provider: ProviderId, id: string) {
   const {state} = useConnections()
 
-  return findModel(state.models[provider], id)?.name ?? id
+  return modelName(state.models[provider], id)
 }

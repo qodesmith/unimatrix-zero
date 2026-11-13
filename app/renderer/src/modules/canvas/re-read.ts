@@ -1,11 +1,21 @@
 import type {TreeIndex} from './tree'
-import type {ModelChoice} from '@uz/contract/providers'
+import type {ModelChoice, ProviderId} from '@uz/contract/providers'
 import type {Reply} from '@uz/contract/turns'
 
-import {PROVIDER_NAMES, SETUP_TOKENS} from '@uz/contract/providers'
+import {PROVIDER_NAMES} from '@uz/contract/providers'
 
 /** Below this, re-reading a Thread cold costs too little to mention. */
 export const RE_READ_NOTE_FROM = 20_000
+
+/**
+ * About how many tokens a new session's first turn carries before the Thread:
+ * the vendor program's own instructions, as the app starts it. Measured from
+ * a recorded first Reply to a one-line Prompt, rounded up.
+ */
+export const SETUP_TOKENS: Record<ProviderId, number> = {
+  claude: 1000,
+  chatgpt: 15_000,
+}
 
 /**
  * The Context size the Thread ending at `reply` carries: its own, or that of

@@ -26,10 +26,7 @@ type ContinuedSession = Extract<
 
 type ReplyRow = typeof replies.$inferSelect
 
-/**
- * A null session means the Provider has nothing of the Thread: it starts one,
- * and rebuilds it from the Thread (ADR 0001).
- */
+/** A null session means the Provider has nothing of the Thread. */
 export interface Continuation {
   provider: ProviderId
   session: ContinuedSession | null
@@ -40,7 +37,6 @@ export interface Recovery {
   model: string
   systemPrompt: string
   text: string
-  /** The Reply the failed Prompt answers. */
   parentReplyId: string | null
   session: ReplyRequest['session']
 }

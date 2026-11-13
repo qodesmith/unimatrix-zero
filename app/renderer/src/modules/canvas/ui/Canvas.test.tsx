@@ -64,6 +64,7 @@ function reply(n: number, promptN: number, text: string): Reply {
     contextWindow: null,
     failure: null,
     compacted: false,
+    rebuilt: false,
     createdAt: at(++clock),
   }
 }

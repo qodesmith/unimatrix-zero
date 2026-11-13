@@ -437,7 +437,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     request: ReplyRequest,
     run: ReplyRun
   ): AsyncGenerator<WriteReplyEvent, Ending> {
-    const {session} = request
+    const {session, treeId, replyId} = request
     let dropFrom = session?.type === 'cut' ? session.dropFrom : null
 
     if (session) await cuts.get(session.sessionId)
@@ -454,13 +454,11 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
           session && (async () => restore(running, request, session, dropFrom))
         )
 
+        if (opened.rebuilt) yield {type: 'SESSION_REBUILT', treeId, replyId}
+
         if (opened.dropped) {
           dropFrom = null
-          yield {
-            type: 'PROMPT_DROPPED',
-            treeId: request.treeId,
-            replyId: request.replyId,
-          }
+          yield {type: 'PROMPT_DROPPED', treeId, replyId}
         }
 
         const sent = send(running, request, opened, run)
