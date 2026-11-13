@@ -31,7 +31,7 @@ The layout, and why only `@uz/contract` crosses between processes, are in [READM
 - `machine()` builds the transition function from a table keyed by `status`. The renderer imports it from `#modules/state-machine/main`; main, a Provider host and a script import it from `@uz/contract/state-machine`. Write the table with `satisfies Transitions<State, Event>`, or give it inline (`machine<State, Event>({...})`). In both forms the typecheck refuses a missing status.
 - An event that a state does not list, and a result shallow-equal to its input, return the input object, so React bails out of the update.
 - In React, `useStateMachine({transition, initial})` runs the machine and returns `[state, send]`. Call it rather than `useReducer` for a machine.
-- Outside React, the runner keeps the state in one variable and has one `send` that replaces it and then runs the effects the new state calls for. An ignored event returns the same object, so `send` runs nothing for it. `provider-hosts/main.ts` in main and `scripts/dev.ts` are the examples.
+- Outside React, the runner keeps the state in one variable and has one `send` that replaces it. An ignored event returns the same object, so nothing runs for it. Where the effects follow from the new state alone, `send` runs them (`scripts/dev.ts`). Where they depend on the event, `send` reports whether the state took it and the caller runs them (`provider-hosts/main.ts` in main).
 - A reader that branches on two or more states uses an exhaustive `switch` on `status`. A check for one state may use `status ===`.
 
 ## Pick the runner for the machine
