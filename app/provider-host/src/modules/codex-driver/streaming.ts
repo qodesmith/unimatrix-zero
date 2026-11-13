@@ -7,6 +7,7 @@ import type {
 } from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
+import type {Restored} from './rebuild'
 import type {LoadedThread} from './threads'
 import type {Notification, ParamsOf, RateLimits} from './wire'
 import type {
@@ -25,7 +26,7 @@ import {replayed} from '#modules/thread-replay/main'
 
 import {readModels} from './models'
 import {limitLifts} from './rate-limits'
-import {injectThread, sessionLost} from './rebuild'
+import {openThread, settingsOf} from './rebuild'
 import {createReplyMapper, turnOf} from './replies'
 import {requestRevert} from './revert'
 import {folderOf, readRollouts, rolloutAt, writeRolloutsBack} from './rollouts'
@@ -40,25 +41,6 @@ export interface CodexRepliesDeps {
 }
 
 type CutRequest = Parameters<ProviderDriver['cutSession']>[0]
-
-/** `replay`: the thread holds nothing of the Thread, so the Prompt tells it. */
-interface Opened {
-  thread: LoadedThread
-  dropped: boolean
-  replay: boolean
-}
-
-type Restored = Omit<Opened, 'replay'>
-
-function settingsOf(request: ReplyRequest) {
-  return {
-    cwd: request.vendorProgram.configDir,
-    sandbox: 'read-only',
-    approvalPolicy: 'never',
-    model: request.model,
-    developerInstructions: request.systemPrompt || null,
-  } satisfies ParamsOf<'thread/start'>
-}
 
 interface Running {
   server: AppServer
@@ -172,69 +154,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     const next = at === -1 ? undefined : thread.turns[at + 1]
 
     if (next !== undefined) await revert(running, thread, next, configDir)
-  }
-
-  /**
-   * A new thread given the whole Thread: as history when Codex takes the
-   * items, else in a thread of its own, with the Prompt.
-   */
-  async function started(
-    running: Running,
-    request: ReplyRequest
-  ): Promise<Opened> {
-    const {threshold} = request.compactionSettings
-    const settings = settingsOf(request)
-
-    async function start() {
-      return loadThread(
-        running.threads,
-        await running.server.request(
-          'thread/start',
-          threshold === null
-            ? settings
-            : {...settings, config: configOf(threshold)}
-        ),
-        [],
-        threshold
-      )
-    }
-
-    const thread = await start()
-    const told = {thread, dropped: false, replay: false}
-
-    if (request.thread.length === 0) return told
-
-    if (await injectThread(running.server, thread.id, request.thread)) {
-      return told
-    }
-
-    running.threads.delete(thread.id)
-
-    return {thread: await start(), dropped: false, replay: true}
-  }
-
-  /**
-   * The one way a session is rebuilt from its Thread (ADR 0001): the exact
-   * restore first, then, for a thread Codex no longer has, a new one.
-   */
-  async function threadFor(
-    running: Running,
-    request: ReplyRequest,
-    dropFrom: string | null
-  ): Promise<Opened> {
-    const {session} = request
-
-    if (!session) return started(running, request)
-
-    try {
-      const restored = await restore(running, request, session, dropFrom)
-
-      return {...restored, replay: false}
-    } catch (error) {
-      if (request.thread.length === 0 || !sessionLost(error)) throw error
-
-      return started(running, request)
-    }
   }
 
   async function restore(
@@ -422,7 +341,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   async function* send(
     running: Running,
     request: ReplyRequest,
-    {thread, replay}: Opened,
+    {thread, replay}: Awaited<ReturnType<typeof openThread>>,
     run: ReplyRun
   ): AsyncGenerator<ContentEvent | PromptRecorded, Ending> {
     const ids = {treeId: request.treeId, replyId: request.replyId}
@@ -528,7 +447,12 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       let heard = false
 
       try {
-        const opened = await threadFor(running, request, dropFrom)
+        const opened = await openThread(
+          running.server,
+          running.threads,
+          request,
+          session && (async () => restore(running, request, session, dropFrom))
+        )
 
         if (opened.dropped) {
           dropFrom = null

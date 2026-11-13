@@ -14,6 +14,7 @@ import type {
   SessionRef,
   SignInRequest,
   StartReplyEvent,
+  Thread,
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 
@@ -251,6 +252,100 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
   }
 
   return {reply, closed}
+}
+
+/** A Thread Claude wrote, as main hands it over. */
+const FROM_CLAUDE: Thread = [
+  {
+    prompt: 'Pick a color for the boat, one word.',
+    reply: [{type: 'text', text: 'Teal.'}],
+    label: '[Reply written by Haiku 5.5]',
+  },
+  {
+    prompt: 'And an animal to paint on it, one word.',
+    reply: [{type: 'text', text: 'Otter.'}],
+    label: '[Reply written by Haiku 5.5]',
+  },
+]
+
+/** Replies that each hand the driver the Thread they continue. */
+function threadReplies(program: string, home: string) {
+  const treeId = crypto.randomUUID()
+  const idle = heldIdle()
+  const exits: Promise<unknown>[] = []
+  const output: Buffer[] = []
+
+  const driver = createCodexDriver({
+    store: fakeStore().client,
+    spawn: (command, options) => {
+      const child = spawnCodex(command, options)
+      exits.push(once(child, 'exit').catch(() => undefined))
+      child.stdout.on('data', (chunk: Buffer) => output.push(chunk))
+
+      return child
+    },
+    whenIdle: idle.whenIdle,
+  })
+
+  async function reply(
+    text: string,
+    session: ReplySession | null,
+    thread: Thread
+  ) {
+    const events = await Array.fromAsync(
+      driver.startReply({
+        treeId,
+        replyId: crypto.randomUUID(),
+        model: MODEL,
+        systemPrompt: 'You answer in as few words as you can.',
+        prompt: {text, messageId: crypto.randomUUID()},
+        vendorProgram: {
+          program: {
+            path: program,
+            build: {
+              url: 'https://example.com/codex.tar.gz',
+              sha256: '0'.repeat(64),
+              size: 1,
+              archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+            },
+          },
+          configDir: home,
+        },
+        session,
+        thread,
+        compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+      })
+    )
+
+    expectComplete(events)
+
+    const recorded = events.find(
+      (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+    )
+
+    if (!recorded) throw new Error('The Reply was not recorded')
+
+    const shown = events
+      .filter(isReplyEvent)
+      .reduce(foldReplyEvent, NEW_REPLY)
+      .content.flatMap(part => (part.type === 'text' ? [part.text] : []))
+      .join('')
+
+    return {text: shown, session: recorded.session}
+  }
+
+  async function closed() {
+    idle.pass()
+    await Promise.all(exits)
+  }
+
+  /** A text replay opens a second thread for a Reply; injected items don't. */
+  function threadsStarted() {
+    return wireLinesIn(output).filter(line => line.method === 'thread/started')
+      .length
+  }
+
+  return {reply, closed, threadsStarted}
 }
 
 describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
@@ -1260,6 +1355,39 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
       fs.rmSync(home, {recursive: true, force: true})
     }
   })
+
+  it('[dep:codex-inject-items] [dep:lost-session-refusals] takes over a Thread Claude wrote as its own history, and rebuilds a thread it has no rollout of', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const {reply, closed, threadsStarted} = threadReplies(folder, home)
+    const asked = 'What color and what animal did we pick? Just the two words.'
+
+    try {
+      const taken = await reply(asked, null, FROM_CLAUDE)
+
+      expect(taken.text).toMatch(/teal/i)
+      expect(taken.text).toMatch(/otter/i)
+      expect(threadsStarted()).toBe(1)
+
+      const lost = crypto.randomUUID()
+
+      const rebuilt = await reply(
+        asked,
+        {type: 'continue', sessionId: lost, messageId: crypto.randomUUID()},
+        FROM_CLAUDE
+      )
+
+      expect(rebuilt.text).toMatch(/teal/i)
+      expect(rebuilt.text).toMatch(/otter/i)
+      expect(rebuilt.session.sessionId).not.toBe(lost)
+      expect(threadsStarted()).toBe(2)
+
+      await closed()
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 300_000)
 
   it('[dep:codex-protocol-types] generates the protocol/ types committed for it', () => {
     if (!folder) return

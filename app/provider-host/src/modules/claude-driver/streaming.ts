@@ -306,7 +306,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
    * A warm `claude` that exited while idle is replaced; a store restore that
    * `claude` refuses falls back to the transcript written back.
    */
-  async function* restore(
+  async function* fromCopy(
     request: ReplyRequest,
     mapper: Mapper,
     run: ReplyRun
@@ -363,7 +363,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     mapper: Mapper,
     run: ReplyRun
   ): AsyncGenerator<ContentEvent, {session: Live; outcome: Outcome}> {
-    const restored = yield* restore(request, mapper, run)
+    const restored = yield* fromCopy(request, mapper, run)
 
     if (
       !request.session ||
@@ -375,7 +375,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     warm.drop(restored.session)
 
-    return yield* restore({...request, session: null}, mapper, run)
+    return yield* fromCopy({...request, session: null}, mapper, run)
   }
 
   /** A refused save of the tool results fails the Reply. */

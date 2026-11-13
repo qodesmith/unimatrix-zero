@@ -1653,9 +1653,10 @@ const HANDED_OVER: Thread = [
  * `started.ndjson`, with Codex answering `thread/inject_items` after
  * `thread/start`.
  */
-function injecting(answer: object) {
+function injecting() {
   return edited('started.ndjson', text => {
     const lines = text.split('\n')
+
     const started = lines.findIndex(line =>
       line.startsWith('{"kind":"out","message":{"id":2,"result"')
     )
@@ -1666,7 +1667,7 @@ function injecting(answer: object) {
         kind: 'in',
         message: {id: 90, method: 'thread/inject_items', params: {}},
       }),
-      JSON.stringify({kind: 'out', message: {id: 90, ...answer}}),
+      JSON.stringify({kind: 'out', message: {id: 90, result: {}}}),
       ...lines.slice(started + 1),
     ].join('\n')
   })
@@ -1676,9 +1677,11 @@ function injecting(answer: object) {
 function injectRefused() {
   return edited('started.ndjson', text => {
     const lines = text.split('\n')
+
     const asked = lines.findIndex(line =>
       line.includes('"method":"thread/start"')
     )
+
     const answered = lines.findIndex(line =>
       line.startsWith('{"kind":"out","message":{"id":2,"result"')
     )
@@ -1700,7 +1703,7 @@ function injectRefused() {
 }
 
 it('takes over a Thread Claude wrote: a new thread holding each Turn as a message, then the Prompt as written', async () => {
-  const codex = await setUp([injecting({result: {}})])
+  const codex = await setUp([injecting()])
 
   const events = await codex.reply(FIRST_PROMPT, null, {thread: HANDED_OVER})
 
@@ -1784,7 +1787,7 @@ it('replays the Thread as text in a new thread, before the Prompt, when Codex re
 })
 
 it('rebuilds a thread the app has no copy of from the Thread', async () => {
-  const codex = await setUp([injecting({result: {}})], {
+  const codex = await setUp([injecting()], {
     keepRunningOnRefusal: true,
   })
 

@@ -1076,12 +1076,18 @@ describe('a Prompt answering a Reply', () => {
   })
 })
 
+function listed(id: string, name: string, resolvesTo: string | null = null) {
+  return {id, name, isDefault: false, resolvesTo, needsAppUpdate: false}
+}
+
+function requests() {
+  return hostCommands.flatMap(command =>
+    command.type === 'reply.start' ? [command.request] : []
+  )
+}
+
 describe('a Prompt sent on another Provider', () => {
   const GPT = {provider: 'chatgpt', model: 'gpt-6-sol'} as const
-
-  function listed(id: string, name: string, resolvesTo: string | null = null) {
-    return {id, name, isDefault: false, resolvesTo, needsAppUpdate: false}
-  }
 
   beforeEach(() => {
     chatgptConnected = true
@@ -1094,12 +1100,6 @@ describe('a Prompt sent on another Provider', () => {
       chatgpt: [listed('gpt-6-sol', 'GPT-6 Sol')],
     }
   })
-
-  function requests() {
-    return hostCommands.flatMap(command =>
-      command.type === 'reply.start' ? [command.request] : []
-    )
-  }
 
   /** A Claude Reply saved in s1, then a ChatGPT Reply saved in a thread. */
   function switched() {
