@@ -442,7 +442,7 @@ it('resumes from Codex’s rollout when it carries the app’s copy further, as 
   ])
 })
 
-it('forks the Provider session through a mid-Thread Reply into a new thread, from the app’s copy alone', async () => {
+it('forks the Provider session through a mid-Thread Reply into a new thread with the Compaction threshold, from the app’s copy alone', async () => {
   const opened = await setUp(['started.ndjson'])
   const first = await opened.reply(FIRST_PROMPT)
   await opened.reply(SECOND_PROMPT, recordedIn(first))
@@ -450,10 +450,11 @@ it('forks the Provider session through a mid-Thread Reply into a new thread, fro
 
   const codex = await setUp(['forked.ndjson'], {store: opened.store})
 
-  const forked = await codex.reply(FORK_PROMPT, {
-    ...recordedIn(first),
-    type: 'fork',
-  })
+  const forked = await codex.reply(
+    FORK_PROMPT,
+    {...recordedIn(first), type: 'fork'},
+    {compaction: {auto: true, threshold: 30_000}}
+  )
 
   expect(textOf(forked)).toBe('You asked: “Say hi in three words.”')
   expect(recordedIn(forked)).toEqual({
@@ -465,6 +466,9 @@ it('forks the Provider session through a mid-Thread Reply into a new thread, fro
 
   expect(report?.methods).not.toContain('thread/resume')
   expect(report?.forkedThrough).toBe(FIRST_TURN)
+  expect(report?.threadConfigs).toEqual([
+    {model_auto_compact_token_limit: 30_000},
+  ])
   // Written back whole for Codex to fork; the fork is Codex's to cut.
   expect(report?.resumedFrom.map(line => line.id)).toEqual([
     THREAD_ID,
