@@ -116,8 +116,16 @@ function startElectron() {
         UZ_DEV_FAKE: fakeProvider ? '1' : '0',
       },
       onExit: (_proc, code) => {
-        if (state.status === 'running' || state.status === 'settling') {
-          console.log(`Electron exited (${code}); stopping dev.`)
+        switch (state.status) {
+          case 'running':
+          case 'settling':
+            console.log(`Electron exited (${code}); stopping dev.`)
+            break
+          case 'restarting':
+          case 'stopping':
+            break
+          default:
+            throw new Error('Unknown dev Electron state.')
         }
 
         send({type: 'exited'})
