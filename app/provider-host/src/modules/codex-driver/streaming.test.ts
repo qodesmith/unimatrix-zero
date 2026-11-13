@@ -531,7 +531,7 @@ it('starts a thread with no config for the default Compaction threshold', async 
   expect(codex.reports()[0]?.threadConfigs).toEqual([null])
 })
 
-it('loads a thread again with a changed Compaction threshold, which Codex takes only from a thread no client is subscribed to', async () => {
+it('unsubscribes a loaded thread and resumes it with a changed Compaction threshold', async () => {
   const codex = await setUp(['compaction-settings.ndjson'])
 
   const padded = await codex.reply('Reply with the single word TEAL.', null, {
@@ -572,7 +572,7 @@ it('loads a thread again with a changed Compaction threshold, which Codex takes 
   expect(textOf(lowered)).toBe('HERON')
 })
 
-it('loads a thread again with an empty config to go back to Codex’s default, which a resume with none would leave as it was', async () => {
+it('loads a thread again with an empty config to go back to Codex’s default', async () => {
   const codex = await setUp(['compaction-settings.ndjson'])
   const lowered = {compaction: {auto: true, threshold: 30_000}}
 

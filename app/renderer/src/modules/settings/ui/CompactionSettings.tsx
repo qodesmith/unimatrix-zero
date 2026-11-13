@@ -120,6 +120,9 @@ function Threshold({range, saved, disabled, onCommit}: ThresholdProps) {
           largeStep={10 * STEP}
           value={[shown]}
           disabled={disabled}
+          getAriaValueText={(_, value) =>
+            value === range.max ? 'Default' : `${tokens.format(value)} tokens`
+          }
           onValueChange={value => setDragged(thumbOf(value))}
           onValueCommitted={value => {
             setDragged(null)

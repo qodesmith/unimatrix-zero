@@ -98,6 +98,7 @@ it('shows the slider’s maximum as Default, and saves moving there as unset', a
       {type: 'settings.update', changes: {claudeCompactionThreshold: null}},
     ])
   await expect.element(threshold()).toHaveValue('Default')
+  await expect.element(slider()).toHaveAttribute('aria-valuetext', 'Default')
 })
 
 it('clamps a typed threshold to the Provider’s range, the top of it saving as unset', async () => {

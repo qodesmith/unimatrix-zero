@@ -6,6 +6,7 @@
  * `UZ_RECORD=yes` rewrites `recordings/`. Record one test at a time with `-t`:
  * the ids the driver tests pin change each time.
  */
+import type {SpawnCodex} from './app-server'
 import type {
   PromptRecorded,
   ReplyRecorded,
@@ -175,6 +176,77 @@ function expectComplete(events: Streamed[]) {
 
   expect(last?.type === 'RUN_FINISHED' && last.failure).toBeFalsy()
   expect(last).toMatchObject({status: 'complete'})
+}
+
+/** A Thread's Replies, each at the Compaction threshold given. */
+function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
+  const treeId = crypto.randomUUID()
+  const idle = heldIdle()
+  const exits: Promise<unknown>[] = []
+
+  const driver = createCodexDriver({
+    store: fakeStore().client,
+    spawn: (command, options) => {
+      const child = spawn(command, options)
+      exits.push(once(child, 'exit').catch(() => undefined))
+
+      return child
+    },
+    whenIdle: idle.whenIdle,
+  })
+
+  async function reply(
+    text: string,
+    session: SessionRef | null,
+    threshold: number | null
+  ) {
+    const events = await Array.fromAsync(
+      driver.startReply({
+        treeId,
+        replyId: crypto.randomUUID(),
+        model: MODEL,
+        systemPrompt: 'You answer in as few words as you can.',
+        prompt: {text, messageId: crypto.randomUUID()},
+        vendorProgram: {
+          program: {
+            path: program,
+            build: {
+              url: 'https://example.com/codex.tar.gz',
+              sha256: '0'.repeat(64),
+              size: 1,
+              archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+            },
+          },
+          configDir: home,
+        },
+        session: session && {...session, type: 'continue'},
+        compaction: {auto: true, threshold},
+      })
+    )
+
+    expectComplete(events)
+
+    const recorded = events.find(
+      (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+    )
+
+    if (!recorded) throw new Error('The Reply was not recorded')
+
+    return {
+      compacted: events.some(event => event.type === 'CONTEXT_COMPACTED'),
+      contextSize:
+        events.filter(isReplyEvent).reduce(foldReplyEvent, NEW_REPLY)
+          .contextSize ?? 0,
+      session: recorded.session,
+    }
+  }
+
+  async function closed() {
+    idle.pass()
+    await Promise.all(exits)
+  }
+
+  return {reply, closed}
 }
 
 describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
@@ -967,73 +1039,17 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     if (!folder || !signedIn) return
 
     const home = homeFrom(signedIn)
-    const treeId = crypto.randomUUID()
     const recording = process.env.UZ_RECORD === 'yes'
 
     const recorder = createRecorder([
       path.join(RECORDINGS, 'compaction-settings.ndjson'),
     ])
 
-    const idle = heldIdle()
-    const exits: Promise<unknown>[] = []
-    const start = recording ? recorder.spawn : spawnCodex
-
-    const driver = createCodexDriver({
-      store: fakeStore().client,
-      spawn: (command, options) => {
-        const child = start(command, options)
-        exits.push(once(child, 'exit').catch(() => undefined))
-
-        return child
-      },
-      whenIdle: idle.whenIdle,
-    })
-
-    async function reply(
-      text: string,
-      session: SessionRef | null,
-      threshold: number
-    ) {
-      const events = await Array.fromAsync(
-        driver.startReply({
-          treeId,
-          replyId: crypto.randomUUID(),
-          model: MODEL,
-          systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text, messageId: crypto.randomUUID()},
-          vendorProgram: {
-            program: {
-              path: folder ?? '',
-              build: {
-                url: 'https://example.com/codex.tar.gz',
-                sha256: '0'.repeat(64),
-                size: 1,
-                archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
-              },
-            },
-            configDir: home,
-          },
-          session: session && {...session, type: 'continue'},
-          compaction: {auto: true, threshold},
-        })
-      )
-
-      expectComplete(events)
-
-      const recorded = events.find(
-        (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
-      )
-
-      if (!recorded) throw new Error('The Reply was not recorded')
-
-      return {
-        compacted: events.some(event => event.type === 'CONTEXT_COMPACTED'),
-        contextSize:
-          events.filter(isReplyEvent).reduce(foldReplyEvent, NEW_REPLY)
-            .contextSize ?? 0,
-        session: recorded.session,
-      }
-    }
+    const {reply, closed} = compactionReplies(
+      folder,
+      home,
+      recording ? recorder.spawn : spawnCodex
+    )
 
     const padding = 'The harbor log lists no ships today. '.repeat(800)
 
@@ -1065,8 +1081,36 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         true,
       ])
 
-      idle.pass()
-      await Promise.all(exits)
+      await closed()
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:codex-compaction-limit] drops a lowered limit from the next Reply on a thread already loaded, once the threshold goes back to the default', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const {reply, closed} = compactionReplies(folder, home, spawnCodex)
+    const padding = 'The harbor log lists no ships today. '.repeat(1000)
+
+    try {
+      const padded = await reply(
+        `Reply with the single word TEAL. Ignore the rest of this message. ${padding}`,
+        null,
+        20_000
+      )
+
+      const restored = await reply(
+        'Reply with the single word OTTER.',
+        padded.session,
+        null
+      )
+
+      expect(padded.contextSize).toBeGreaterThan(20_000)
+      expect([padded.compacted, restored.compacted]).toEqual([false, false])
+
+      await closed()
     } finally {
       fs.rmSync(home, {recursive: true, force: true})
     }
