@@ -9,10 +9,15 @@ import {indexTurns} from './tree'
 const treeId = '01a16096-00ad-7d3b-8205-6b76ddc26ce0'
 const createdAt = '2026-10-19T12:00:00.000Z'
 
+interface Exchange {
+  prompt: Prompt
+  reply: Reply
+}
+
 function exchange(
   parentReplyId: string | null,
   contextSize: number | null
-): {prompt: Prompt; reply: Reply} {
+): Exchange {
   const prompt: Prompt = {
     id: crypto.randomUUID(),
     treeId,
@@ -95,6 +100,7 @@ it('takes the Context size of the nearest Reply above that has one', () => {
   const root = exchange(null, 30_000)
   const middle = exchange(root.reply.id, 45_000)
   const stopped = exchange(middle.reply.id, null)
+
   const index = indexTurns({
     prompts: [root.prompt, middle.prompt, stopped.prompt],
     replies: [root.reply, middle.reply, stopped.reply],
