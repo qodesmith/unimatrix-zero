@@ -7,6 +7,7 @@ export const NEW_REPLY: ReplyProgress = {
   contextWindow: null,
   failure: null,
   compacted: false,
+  rebuilt: false,
 }
 
 function withLastText(
@@ -102,6 +103,8 @@ export function foldReplyEvent<T extends ReplyProgress>(
       failure: event.failure ?? null,
     }
   }
+
+  if (event.type === 'SESSION_REBUILT') return {...reply, rebuilt: true}
 
   if (event.subagentId !== undefined) return reply
 

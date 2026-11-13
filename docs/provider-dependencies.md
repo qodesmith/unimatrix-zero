@@ -358,3 +358,58 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **User would see:** with a larger Model, a slider that can't reach that Model's own default; with a smaller largest Model, a top stretch of the slider that acts as the default.
 - **Changed by:** upgrade + drift
 - **Check:** none: a Model's raw window shows only in Codex's catalog cache, and a check would take a Reply on every Model.
+
+### A lost session, told by the refusal's text
+
+- **Id:** `lost-session-refusals`
+- **Kind:** D
+- **Provider:** both
+- **Relies on:** the text a vendor program refuses a session it can't continue with, which no failure kind marks: `claude`'s "No conversation found with session ID" for a session it has no transcript of, and "No message found with message.uuid of" for a `resumeSessionAt` entry off the session's newest chain; Codex's "no rollout found for thread id" for a thread whose rollout it can't find. Neither writes anything to the session when it refuses.
+- **App side:** `claude-driver` and `codex-driver` rebuild the session from the Thread, in a new session, only after a refusal that matches, and only once the exact restore from the app's copy has failed.
+- **User would see:** if the text changed, a Reply that fails with the vendor's text where it would have gone on in a rebuilt session.
+- **Changed by:** upgrade
+- **Check:** `[dep:lost-session-refusals]` in `claude-driver`, for a session it doesn't have and a resume at an entry off its newest chain, and in `codex-driver`, for a thread with no rollout: each goes on in a rebuilt session.
+
+### Codex takes another Provider's Thread as history
+
+- **Id:** `codex-inject-items`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** `thread/inject_items` appends user and assistant `message` items to a new thread's history without starting a turn, and the Model takes the assistant items as its own earlier Replies.
+- **App side:** `codex-driver` gives a new thread the whole Thread this way, each Turn a message of its own, when a Thread comes from Claude or its thread is lost; it falls back to a text replay only when Codex refuses the items.
+- **User would see:** if Codex refused the items, every hand-over would go by text replay, which the AI may read as a quoted document; if it took them but the Model ignored them, ChatGPT would not remember the Thread.
+- **Changed by:** upgrade + drift. The Model decides how it reads injected history.
+- **Check:** `[dep:codex-inject-items]` in `codex-driver`: a new thread given a Claude-written Thread opens one thread, not a second for a replay, and its Reply recalls the Thread.
+
+### Claude takes a replayed Thread as its conversation
+
+- **Id:** `thread-replay-as-conversation`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** the Model takes a Thread replayed as text inside one user message, between `<thread>` tags with a line that says what it is, as the conversation it has had, and answers the Prompt after it.
+- **App side:** `claude-driver` gives a new session the whole Thread this way with its first Prompt, when a Thread comes from ChatGPT or its session is lost. The SDK takes only user messages, and a hand-made transcript in the session store's private format was ruled out, since any `claude` update can break that format and the app never writes a Provider's own format (ADR 0004, #10).
+- **User would see:** a Claude that comments on the replay as a document, or answers as if the earlier Turns never happened.
+- **Changed by:** upgrade + drift. The Model decides how it reads the replay.
+- **Check:** `[dep:thread-replay-as-conversation]` in `claude-driver`: a new session told a ChatGPT-written Thread recalls it, and the next Prompt goes on from it warm.
+
+### A new session's setup tokens
+
+- **Id:** `setup-tokens`
+- **Kind:** D
+- **Provider:** both
+- **Relies on:** how many tokens the vendor program puts before the Thread in a new session's first turn, as the app starts it: about 600 for `claude` with no tools or settings, and about 14,500 for Codex.
+- **App side:** a Reply's Context size includes its own Provider's overhead, so the re-read note's estimate swaps that overhead for the new Provider's, each rounded up, before a Prompt goes to another Provider (`canvas`).
+- **User would see:** an estimate off by the difference, and a note shown or left out near its 20k mark.
+- **Changed by:** upgrade + drift. The program's own instructions change with releases, and Codex's with its server-side Model catalog.
+- **Check:** none: a few thousand tokens either way barely moves an estimate the note gives in thousands; the recorded first Replies in `claude-driver` and `codex-driver` show the numbers when they are re-recorded.
+
+### The Model writes no Reply label
+
+- **Id:** `reply-labels-unwritten`
+- **Kind:** D
+- **Provider:** both
+- **Relies on:** the Model follows a System prompt line telling it never to write a label such as `[Reply written by GPT-6.1 Sol]` and never to mention the labels, even though every Reply another Model wrote begins with one in the history it reads.
+- **App side:** `turns` labels each Reply another Model wrote, a rebuilt session reads the labels with the Thread, and `thread-replay` adds that line to the System prompt each time a session for a labeled Thread opens. Nothing removes a label from a Reply the Model writes.
+- **User would see:** a Reply that begins with a label of its own, or talks about the labels.
+- **Changed by:** upgrade + drift. The Model decides whether it copies the labels it reads.
+- **Check:** `[dep:reply-labels-unwritten]` in `claude-driver` and `codex-driver`: a Reply to a Thread another Provider wrote holds no label.

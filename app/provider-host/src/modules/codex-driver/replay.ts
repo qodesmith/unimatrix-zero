@@ -25,6 +25,11 @@ export interface FakeCodexOptions {
   exitAt?: string
   /** Only this many runs, from the first, exit at `exitAt`. */
   exits?: number
+  /**
+   * Answers a resume or fork of a thread it can't find with the error alone
+   * and goes on, as `codex` does; the recording leaves that request out.
+   */
+  keepRunningOnRefusal?: boolean
 }
 
 const OPTIONS_VARIABLE = 'FAKE_CODEX_OPTIONS'
@@ -54,11 +59,15 @@ export const FakeCodexRunSchema = z.strictObject({
   prompts: z.array(z.string()),
   threadModels: z.array(NullableStringSchema),
   threadConfigs: z.array(z.looseObject({}).nullable()),
+  /** At each `thread/start`, `thread/fork` or `thread/resume`. */
+  threadInstructions: z.array(NullableStringSchema),
   turnModels: z.array(NullableStringSchema),
   modelLists: z.array(z.looseObject({})),
   resumedFrom: z.array(z.looseObject({type: z.string(), id: z.string()})),
   /** At each `turn/start`, the ids of what the thread held. */
   contexts: z.array(z.array(z.string())),
+  /** Every item `thread/inject_items` gave a thread, in order. */
+  injected: z.array(z.looseObject({})),
   forkedThrough: NullableStringSchema,
   interrupted: NullableStringSchema,
   reverted: NullableStringSchema,
@@ -87,7 +96,7 @@ const reportFile = path.join(reports, run + '.json')
 const home = process.env.CODEX_HOME
 const standIn = ${JSON.stringify(CODEX_HOME_STAND_IN)}
 const vendorVariables = Object.keys(process.env).filter(name => /^(OPENAI|CODEX|ANTHROPIC|CLAUDE)_/i.test(name))
-const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], threadModels: [], threadConfigs: [], turnModels: [], modelLists: [], resumedFrom: [], contexts: [], forkedThrough: null, interrupted: null, reverted: null, ended: null}
+const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], threadModels: [], threadConfigs: [], threadInstructions: [], turnModels: [], modelLists: [], resumedFrom: [], contexts: [], injected: [], forkedThrough: null, interrupted: null, reverted: null, ended: null}
 
 function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
@@ -201,13 +210,16 @@ process.stdin.on('data', chunk => {
       }
       if (refusal) {
         process.stdout.write(JSON.stringify({id: message.id, error: {code: -32600, message: refusal}}) + '\\n')
-        end('refused', 1)
+        if (!options.keepRunningOnRefusal) end('refused', 1)
+        save()
+        continue
       }
       if (message.method === 'thread/fork') report.forkedThrough = message.params.lastTurnId
     }
     if (message.method === 'thread/start' || message.method === 'thread/fork' || message.method === 'thread/resume') {
       report.threadModels.push(message.params.model ?? null)
       report.threadConfigs.push(message.params.config ?? null)
+      report.threadInstructions.push(message.params.developerInstructions ?? null)
     }
     if (message.method === 'turn/start') {
       report.prompts.push(message.params.input[0].text)
@@ -216,6 +228,7 @@ process.stdin.on('data', chunk => {
       report.contexts.push(rollout ? historyOf(rollout).map(line => line.id) : [])
     }
     if (message.method === 'model/list') report.modelLists.push(message.params)
+    if (message.method === 'thread/inject_items') report.injected.push(...message.params.items)
     if (message.method === 'turn/interrupt') report.interrupted = message.params.turnId
     if (message.method === 'thread/revert') {
       report.reverted = message.params.beforeTurnId

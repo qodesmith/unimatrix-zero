@@ -17,6 +17,7 @@ export function withProgress(
     contextWindow,
     failure,
     compacted,
+    rebuilt,
   }: ReplyProgress
 ): Reply {
   return {
@@ -27,6 +28,7 @@ export function withProgress(
     contextWindow,
     failure,
     compacted,
+    rebuilt,
   }
 }
 

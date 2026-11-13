@@ -15,6 +15,7 @@ import {useEffect, useRef, useState} from 'react'
 import {useAttachedReply} from '../canvas-context'
 import {EMPTY_DRAFT} from '../drafts'
 import {usePromptSend} from '../prompt-send/use-prompt-send'
+import {useReReadNote} from '../use-re-read-note'
 import {StopButton} from './StopButton'
 
 interface PromptInputProps {
@@ -58,8 +59,12 @@ export function PromptInput({
   const current = kept ?? ownDraft
   const {text: draft, model: picked} = current
   const latest = useRef(current)
-  const pick = useModelPick(picked, useAttachedReply(parentReplyId))
+  const attachedTo = useAttachedReply(parentReplyId)
+  const pick = useModelPick(picked, attachedTo)
   const {selected} = pick
+
+  const note = useReReadNote(attachedTo, selected)
+
   const sending = promptSend.state.status === 'sending'
   const held = !canSend || sending || pick.heldBecause !== null
 
@@ -111,6 +116,11 @@ export function PromptInput({
         send()
       }}
     >
+      {note && (
+        <p role="note" className="mb-1 px-1 text-xs text-muted-foreground">
+          {note}
+        </p>
+      )}
       <InputGroup className="bg-background">
         <InputGroupTextarea
           ref={ref}

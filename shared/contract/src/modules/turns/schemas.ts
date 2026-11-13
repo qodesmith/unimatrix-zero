@@ -86,6 +86,11 @@ export const ReplyProgressSchema = z.strictObject({
   contextWindow: z.number().int().positive().nullable(),
   failure: RunFailureSchema.nullable(),
   compacted: z.boolean(),
+  /**
+   * Its Provider session was rebuilt from the Thread for it, so the AI re-read
+   * the whole Thread cold.
+   */
+  rebuilt: z.boolean(),
 })
 
 export type ReplyProgress = z.infer<typeof ReplyProgressSchema>
@@ -237,6 +242,15 @@ export const ContextCompactedEvent = z.strictObject({
   boundaryId: z.string().nullable(),
 })
 
+/**
+ * The Provider started a session for the Reply and gave it the whole Thread,
+ * having none it could restore.
+ */
+export const SessionRebuiltEvent = z.strictObject({
+  ...replyIds,
+  type: z.literal('SESSION_REBUILT'),
+})
+
 /** Ends the whole Reply; a Subagent ends with SUBAGENT_FINISHED. */
 export const RunFinishedEvent = z.strictObject({
   ...replyIds,
@@ -263,6 +277,7 @@ export const ReplyEventSchema = z.discriminatedUnion('type', [
   FilesChangedEvent,
   TokensEvent,
   ContextCompactedEvent,
+  SessionRebuiltEvent,
   RunFinishedEvent,
 ])
 

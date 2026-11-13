@@ -31,7 +31,7 @@ type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 /** A Reply's content, live while it streams; the caller owns its box. */
 export function ReplyView({reply}: {reply: Reply}) {
   const blocks = useThinking(reply.id)
-  const {status, content, compacted} = useReply(reply)
+  const {status, content, compacted, rebuilt} = useReply(reply)
   const streaming = status === 'streaming'
 
   function thinkingBefore(part: number) {
@@ -53,6 +53,11 @@ export function ReplyView({reply}: {reply: Reply}) {
     >
       {compacted && <CompactionMarker />}
       <WrittenBy reply={reply} />
+      {rebuilt && (
+        <span className="text-xs text-muted-foreground">
+          Re-read the whole conversation to go on
+        </span>
+      )}
       {content.map((part, index) => (
         // oxlint-disable-next-line react/no-array-index-key -- parts only ever append, so positions are stable
         <Fragment key={index}>

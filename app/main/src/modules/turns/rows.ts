@@ -47,6 +47,7 @@ function toReply(row: ReplyRow, compacted: boolean): Reply {
     contextWindow: row.contextWindow,
     failure: FailureSchema.parse(row.failure ?? null),
     compacted,
+    rebuilt: row.rebuilt,
     createdAt: row.createdAt.toISOString(),
   }
 }

@@ -76,6 +76,7 @@ export const RESPONSES = {
   'thread/read': z.looseObject({thread: ThreadSchema}),
   'thread/unsubscribe': z.looseObject({}),
   'thread/revert': z.looseObject({thread: ThreadSchema}),
+  'thread/inject_items': z.looseObject({}),
   'thread/turns/list': z.looseObject({
     data: z.array(z.looseObject({id: z.string()})),
     nextCursor: z.string().nullable(),

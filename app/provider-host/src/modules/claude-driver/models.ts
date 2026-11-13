@@ -2,6 +2,7 @@ import type {ModelInfo} from '@anthropic-ai/claude-agent-sdk'
 import type {SignInRequest} from '@uz/contract/host'
 import type {Model} from '@uz/contract/providers'
 
+import {concreteId} from '@uz/contract/providers'
 import {isDeepStrictEqual} from 'node:util'
 import {z} from 'zod'
 
@@ -57,7 +58,7 @@ export function createModelList(read: ReadModels) {
 
   /** The Model a listed name stands for, and any other name as it is. */
   function resolve(id: string) {
-    return kept?.find(model => model.id === id)?.resolvesTo ?? id
+    return concreteId(kept ?? [], id)
   }
 
   async function readList(vendorProgram: SignInRequest) {

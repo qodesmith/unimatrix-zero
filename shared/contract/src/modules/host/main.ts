@@ -76,6 +76,29 @@ export const ReplySessionSchema = z.discriminatedUnion('type', [
 
 export type ReplySession = z.infer<typeof ReplySessionSchema>
 
+/**
+ * The Turns a Prompt continues, oldest first: what a Provider session is
+ * rebuilt from. The whole Thread, never cut or summarized.
+ */
+export const ThreadSchema = z.array(
+  z.strictObject({
+    prompt: z.string(),
+    reply: z.array(ReplyPartSchema),
+    /**
+     * Goes before the Reply's text for the AI alone, when another Model than
+     * the one the Prompt goes to wrote it. The System prompt explains it.
+     */
+    label: z.string().min(1).nullable(),
+  })
+)
+
+export type Thread = z.infer<typeof ThreadSchema>
+
+/** The label a Thread gives a Reply the Model named `name` wrote. */
+export function replyLabel(name: string) {
+  return `[Reply written by ${name}]`
+}
+
 /** The shape `node:crypto` types a UUID as, which the Claude SDK asks for. */
 const UuidPartsSchema = z.templateLiteral([
   z.string(),
@@ -102,6 +125,11 @@ export const ReplyRequestSchema = z.strictObject({
   vendorProgram: SignInRequestSchema,
   /** Null starts a session. */
   session: ReplySessionSchema.nullable(),
+  /**
+   * The driver rebuilds the session from it when `session` is null, or names
+   * one its Provider no longer has. Empty for a Tree's first Prompt.
+   */
+  thread: ThreadSchema,
   compactionSettings: CompactionSettingsSchema,
 })
 
@@ -148,12 +176,6 @@ export const SessionCutMessage = z.strictObject({
 })
 
 export type SessionCutReport = z.infer<typeof SessionCutMessage>
-
-export const ThreadSchema = z.array(
-  z.strictObject({prompt: z.string(), reply: z.array(ReplyPartSchema)})
-)
-
-export type Thread = z.infer<typeof ThreadSchema>
 
 export type StartReplyEvent =
   | ReplyEvent
@@ -211,7 +233,6 @@ export interface ProviderDriver {
     session: SessionRef
     atMessageId: string
   }): Promise<SessionRef>
-  rebuildSession(input: {thread: Thread}): Promise<SessionRef>
   /**
    * Drops Turns the Tree deleted. True once the session no longer holds
    * `dropFrom`; false when the cut waits for the next Reply in the session.

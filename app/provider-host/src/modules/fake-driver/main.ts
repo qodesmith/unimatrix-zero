@@ -248,7 +248,6 @@ export function createFakeDriver({
     ...createReplyRuns(write),
     answerApproval: async () => undefined,
     forkSession: async () => ({sessionId: randomUUID(), messageId: null}),
-    rebuildSession: async () => ({sessionId: randomUUID(), messageId: null}),
     cutSession: async () => true,
     runOneShot: async () => 'A fake one-shot answer.',
     mcpSignIn: async () => undefined,

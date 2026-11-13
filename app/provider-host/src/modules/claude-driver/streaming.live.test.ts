@@ -15,6 +15,7 @@ import type {
   ReplySession,
   SessionRef,
   StartReplyEvent,
+  Thread,
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 
@@ -157,6 +158,7 @@ function liveDriver(
         configDir,
       },
       session,
+      thread: [],
       compactionSettings,
     }
   }
@@ -839,6 +841,104 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     await live.done()
   }, 180_000)
+
+  it('[dep:thread-replay-as-conversation] [dep:reply-labels-unwritten] takes over a Thread ChatGPT wrote, told in one user message, writes no label, and goes on from it warm', async () => {
+    const live = liveDriver([])
+
+    const fromChatgpt: Thread = [
+      {
+        prompt: 'Pick a color for the boat, one word.',
+        reply: [{type: 'text', text: 'Teal.'}],
+        label: '[Reply written by GPT-6.1 Sol]',
+      },
+      {
+        prompt: 'And an animal to paint on it, one word.',
+        reply: [{type: 'text', text: 'Otter.'}],
+        label: '[Reply written by GPT-6.1 Sol]',
+      },
+    ]
+
+    const taken = await Array.fromAsync(
+      live.driver.startReply({
+        ...live.request(
+          'What color and what animal did we pick? Just the two words.',
+          null
+        ),
+        thread: fromChatgpt,
+      })
+    )
+
+    expect(taken.at(-1)).toMatchObject({status: 'complete'})
+    expect(textOf(taken)).toMatch(/teal/i)
+    expect(textOf(taken)).toMatch(/otter/i)
+    expect(textOf(taken)).not.toMatch(/\[Reply written by/)
+
+    const after = await live.reply(
+      'Which animal was it? Just the word.',
+      continuing(recordedIn(taken).session)
+    )
+
+    expect(textOf(after.events)).toMatch(/otter/i)
+    expect(textOf(after.events)).not.toMatch(/\[Reply written by/)
+
+    await live.done()
+  }, 180_000)
+
+  it('[dep:lost-session-refusals] rebuilds from the Thread a session it has no copy of, and one resumed at an entry off its newest chain', async () => {
+    const live = liveDriver([])
+    const teal = 'Reply with the single word TEAL.'
+    const otter = 'Now reply with the single word OTTER.'
+    const asked = 'Which words have you replied with so far? Just the words.'
+
+    const first = await live.reply(teal, null)
+    const second = await live.reply(otter, continuing(first.recorded.session))
+
+    // A rewind to the first Reply leaves the second off the newest chain.
+    await live.reply('Now reply with the single word HERON.', {
+      ...first.recorded.session,
+      type: 'rewind',
+    })
+    await live.closed()
+
+    const thread: Thread = [
+      {prompt: teal, reply: [{type: 'text', text: 'TEAL'}], label: null},
+      {prompt: otter, reply: [{type: 'text', text: 'OTTER'}], label: null},
+    ]
+
+    const offChain = await Array.fromAsync(
+      live.driver.startReply({
+        ...live.request(asked, {...second.recorded.session, type: 'rewind'}),
+        thread,
+      })
+    )
+
+    expect(offChain.at(-1)).toMatchObject({status: 'complete'})
+    expect(textOf(offChain)).toMatch(/TEAL/i)
+    expect(textOf(offChain)).toMatch(/OTTER/i)
+    expect(textOf(offChain)).not.toMatch(/HERON/i)
+    expect(recordedIn(offChain).session.sessionId).not.toBe(
+      first.recorded.session.sessionId
+    )
+
+    const unknown = crypto.randomUUID()
+
+    const lost = await Array.fromAsync(
+      live.driver.startReply({
+        ...live.request(asked, {
+          type: 'continue',
+          sessionId: unknown,
+          messageId: crypto.randomUUID(),
+        }),
+        thread,
+      })
+    )
+
+    expect(lost.at(-1)).toMatchObject({status: 'complete'})
+    expect(textOf(lost)).toMatch(/OTTER/i)
+    expect(recordedIn(lost).session.sessionId).not.toBe(unknown)
+
+    await live.done()
+  }, 300_000)
 
   it('[dep:refused-resume-no-init] refuses to resume a session it doesn’t have without ever sending init', async () => {
     const live = liveDriver([])

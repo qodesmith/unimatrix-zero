@@ -159,6 +159,7 @@ export function fakeMain(saved: Saved = {}) {
         contextWindow: null,
         failure: null,
         compacted: false,
+        rebuilt: false,
         createdAt: receivedAt,
       }
 

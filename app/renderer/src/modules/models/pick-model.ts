@@ -5,7 +5,7 @@ import type {
   ProviderStatus,
 } from '@uz/contract/providers'
 
-import {PROVIDER_NAMES} from '@uz/contract/providers'
+import {PROVIDER_NAMES, concreteOf, findModel} from '@uz/contract/providers'
 
 /**
  * The Model an Input wants: `entry` is the listed entry the user picked it by,
@@ -15,7 +15,6 @@ export type WantedModel = ModelChoice & {entry: string | null}
 
 export interface ModelPickInput {
   wanted: WantedModel | null
-  lockedTo: ProviderId | null
   statuses: ProviderStatus[]
   models: Record<ProviderId, Model[]>
 }
@@ -38,28 +37,9 @@ export interface ModelPick {
 
 const LOADING = 'Loading Models…'
 
-function concreteOf(model: Model) {
-  return model.resolvesTo ?? model.id
-}
-
 /** Resolved now, so a later move of the alias or default leaves it be. */
 export function pickedFrom(provider: ProviderId, model: Model): WantedModel {
   return {provider, model: concreteOf(model), entry: model.id}
-}
-
-/**
- * A Reply records the id it was written on, which may be a `resolvesTo`; the
- * default resolves to another entry's Model too, which names it better.
- */
-export function findModel(models: Model[], id: string) {
-  const resolved = models.filter(model => model.resolvesTo === id)
-
-  return (
-    models.find(model => model.id === id) ??
-    resolved.find(model => !model.isDefault) ??
-    resolved[0] ??
-    null
-  )
 }
 
 function isConnected(status: ProviderStatus) {
@@ -161,14 +141,6 @@ function fromWanted(
 
   if (status && isConnected(status)) return fromList(wanted, input.models)
 
-  if (input.lockedTo !== null) {
-    return {
-      selected: null,
-      notice: null,
-      heldBecause: `Connect ${name} to continue this Thread`,
-    }
-  }
-
   const started = startOnFirstConnected(input)
   const notice = `${name} isn’t connected`
 
@@ -182,14 +154,10 @@ function fromWanted(
 
 /** What an Input's Model picker offers and shows, and whether it may send. */
 export function pickModel(input: ModelPickInput): ModelPick {
-  const {wanted, lockedTo, statuses, models} = input
+  const {wanted, statuses, models} = input
 
   const groups = statuses
-    .filter(
-      status =>
-        status.account !== null &&
-        (lockedTo === null || status.provider === lockedTo)
-    )
+    .filter(status => status.account !== null)
     .map(({provider}) => ({provider, models: models[provider]}))
     .filter(group => group.models.length > 0)
 

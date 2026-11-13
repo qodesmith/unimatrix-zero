@@ -17,6 +17,7 @@ const request: ReplyRequest = {
   prompt: {text: 'Hello', messageId: crypto.randomUUID()},
   vendorProgram: {program: null, configDir: '/config'},
   session: null,
+  thread: [],
   compactionSettings: {auto: true, threshold: null},
 }
 

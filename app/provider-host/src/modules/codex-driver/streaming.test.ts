@@ -6,11 +6,13 @@ import type {
   SessionRef,
   SignInRequest,
   StartReplyEvent,
+  Thread,
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
+import {explainingLabels} from '#modules/thread-replay/main'
 import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {once} from 'node:events'
@@ -126,6 +128,8 @@ function extendSavedRollout(
   return file
 }
 
+const SYSTEM_PROMPT = 'You answer in as few words as you can.'
+
 async function setUp(
   recordings: string[],
   {
@@ -190,10 +194,12 @@ async function setUp(
       stopAfter = Infinity,
       model = MODEL,
       compactionSettings = DEFAULT_COMPACTION_SETTINGS,
+      thread = [],
     }: {
       stopAfter?: number
       model?: string
       compactionSettings?: CompactionSettings
+      thread?: Thread
     } = {}
   ) {
     const replyId = crypto.randomUUID()
@@ -204,10 +210,11 @@ async function setUp(
       treeId,
       replyId,
       model,
-      systemPrompt: 'You answer in as few words as you can.',
+      systemPrompt: SYSTEM_PROMPT,
       prompt: {text, messageId: crypto.randomUUID()},
       vendorProgram,
       session: session && {type: 'continue', ...session},
+      thread,
       compactionSettings,
     })) {
       events.push(event)
@@ -1619,4 +1626,229 @@ it('lists the Models on the app-server a Reply already started', async () => {
     LISTED
   )
   expect(codex.reports()).toHaveLength(1)
+})
+
+/** A Thread Claude wrote, as main hands it over. */
+const HANDED_OVER: Thread = [
+  {
+    prompt: 'Name a color.',
+    reply: [{type: 'text', text: 'Teal.'}],
+    label: '[Reply written by Haiku 5.5]',
+  },
+  {
+    prompt: 'And an animal?',
+    reply: [
+      {
+        type: 'tool-call',
+        toolCallId: 'toolu_1',
+        toolName: 'WebSearch',
+        args: '{"query":"animals"}',
+        result: {content: 'Otters are animals.', isError: false},
+      },
+      {type: 'text', text: 'Otter.'},
+    ],
+    label: '[Reply written by Haiku 5.5]',
+  },
+  {prompt: 'Still there?', reply: [], label: null},
+]
+
+/**
+ * `started.ndjson`, with Codex answering `thread/inject_items` after
+ * `thread/start`.
+ */
+function injecting() {
+  return edited('started.ndjson', text => {
+    const lines = text.split('\n')
+
+    const started = lines.findIndex(line =>
+      line.startsWith('{"kind":"out","message":{"id":2,"result"')
+    )
+
+    return [
+      ...lines.slice(0, started + 1),
+      JSON.stringify({
+        kind: 'in',
+        message: {id: 90, method: 'thread/inject_items', params: {}},
+      }),
+      JSON.stringify({kind: 'out', message: {id: 90, result: {}}}),
+      ...lines.slice(started + 1),
+    ].join('\n')
+  })
+}
+
+/** A second `thread/start`, as the text replay opens after a refused inject. */
+function injectRefused() {
+  return edited('started.ndjson', text => {
+    const lines = text.split('\n')
+
+    const asked = lines.findIndex(line =>
+      line.includes('"method":"thread/start"')
+    )
+
+    const answered = lines.findIndex(line =>
+      line.startsWith('{"kind":"out","message":{"id":2,"result"')
+    )
+
+    return [
+      ...lines.slice(0, answered + 1),
+      JSON.stringify({
+        kind: 'in',
+        message: {id: 90, method: 'thread/inject_items', params: {}},
+      }),
+      JSON.stringify({
+        kind: 'out',
+        message: {id: 90, error: {code: -32600, message: 'invalid item'}},
+      }),
+      ...lines.slice(asked),
+    ].join('\n')
+  })
+}
+
+it('takes over a Thread Claude wrote: a new thread holding each Turn as a message, then the Prompt as written', async () => {
+  const codex = await setUp([injecting()])
+
+  const events = await codex.reply(FIRST_PROMPT, null, {thread: HANDED_OVER})
+
+  expect(textOf(events)).toBe('Hi there, friend!')
+  expect(recordedIn(events)).toEqual({
+    sessionId: THREAD_ID,
+    messageId: FIRST_TURN,
+  })
+
+  const [run] = codex.reports()
+
+  expect(run?.methods).not.toContain('thread/resume')
+  expect(run?.prompts).toEqual([FIRST_PROMPT])
+  expect(events.filter(event => event.type === 'SESSION_REBUILT')).toHaveLength(
+    1
+  )
+  expect(run?.injected).toEqual([
+    {
+      type: 'message',
+      role: 'user',
+      content: [{type: 'input_text', text: 'Name a color.'}],
+    },
+    {
+      type: 'message',
+      role: 'assistant',
+      content: [
+        {type: 'output_text', text: '[Reply written by Haiku 5.5]\n\nTeal.'},
+      ],
+    },
+    {
+      type: 'message',
+      role: 'user',
+      content: [{type: 'input_text', text: 'And an animal?'}],
+    },
+    {
+      type: 'message',
+      role: 'assistant',
+      content: [
+        {
+          type: 'output_text',
+          text: '[Reply written by Haiku 5.5]\n\n[Tool call: WebSearch]\n{"query":"animals"}\n[Tool result]\nOtters are animals.\n\nOtter.',
+        },
+      ],
+    },
+    {
+      type: 'message',
+      role: 'user',
+      content: [{type: 'input_text', text: 'Still there?'}],
+    },
+  ])
+
+  await codex.allClosed()
+})
+
+it('keeps the line that explains the labels when a rebuilt thread resumes in a new codex', async () => {
+  const opened = await setUp([injecting()])
+  const first = await opened.reply(FIRST_PROMPT, null, {thread: HANDED_OVER})
+  await opened.allClosed()
+
+  const thread: Thread = [
+    ...HANDED_OVER,
+    {
+      prompt: FIRST_PROMPT,
+      reply: [{type: 'text', text: 'Hi there, friend!'}],
+      label: null,
+    },
+  ]
+
+  const codex = await setUp(['resumed.ndjson'], {store: opened.store})
+  const events = await codex.reply(THIRD_PROMPT, recordedIn(first), {thread})
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+  const [rebuilt] = opened.reports()
+  const [resumed] = codex.reports()
+
+  expect(rebuilt?.threadInstructions).toEqual([
+    explainingLabels(SYSTEM_PROMPT, HANDED_OVER),
+  ])
+  expect(resumed?.methods).toContain('thread/resume')
+  expect(resumed?.threadInstructions).toEqual([
+    explainingLabels(SYSTEM_PROMPT, thread),
+  ])
+
+  await codex.allClosed()
+})
+
+it('injects nothing for a Tree’s first Prompt', async () => {
+  const codex = await setUp(['started.ndjson'])
+
+  const events = await codex.reply(FIRST_PROMPT)
+
+  expect(codex.reports()[0]?.methods).not.toContain('thread/inject_items')
+  expect(events.some(event => event.type === 'SESSION_REBUILT')).toBe(false)
+
+  await codex.allClosed()
+})
+
+it('replays the Thread as text in a new thread, before the Prompt, when Codex refuses the items', async () => {
+  const codex = await setUp([injectRefused()])
+
+  const events = await codex.reply(FIRST_PROMPT, null, {thread: HANDED_OVER})
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+  const [run] = codex.reports()
+  const [prompt] = run?.prompts ?? []
+
+  expect(run?.methods.filter(method => method === 'thread/start')).toHaveLength(
+    2
+  )
+  expect(prompt).toContain(
+    '<reply>\n[Reply written by Haiku 5.5]\n\nTeal.\n</reply>'
+  )
+  expect(prompt?.endsWith(`</thread>\n\n${FIRST_PROMPT}`)).toBe(true)
+
+  await codex.allClosed()
+})
+
+it('rebuilds a thread the app has no copy of from the Thread', async () => {
+  const codex = await setUp([injecting()], {
+    keepRunningOnRefusal: true,
+  })
+
+  const events = await codex.reply(
+    FIRST_PROMPT,
+    {sessionId: crypto.randomUUID(), messageId: crypto.randomUUID()},
+    {thread: HANDED_OVER}
+  )
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(recordedIn(events).sessionId).toBe(THREAD_ID)
+
+  const [run] = codex.reports()
+
+  expect(
+    run?.methods.filter(method => method.startsWith('thread/')).slice(0, 3)
+  ).toEqual(['thread/resume', 'thread/start', 'thread/inject_items'])
+  expect(run?.injected).toHaveLength(5)
+  expect(run?.prompts).toEqual([FIRST_PROMPT])
+  expect(events.filter(event => event.type === 'SESSION_REBUILT')).toHaveLength(
+    1
+  )
+
+  await codex.allClosed()
 })

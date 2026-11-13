@@ -7,6 +7,7 @@ import type {
 } from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
+import type {Opened, Restored} from './rebuild'
 import type {LoadedThread} from './threads'
 import type {Notification, ParamsOf, RateLimits} from './wire'
 import type {
@@ -14,15 +15,18 @@ import type {
   PromptRecorded,
   ProviderDriver,
   ReplyRequest,
+  ReplySession,
   SignInRequest,
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 
 import {createInbox} from '#modules/inbox/main'
 import {ProgramCrashed, createReplyRuns} from '#modules/reply-runs/main'
+import {replayed} from '#modules/thread-replay/main'
 
 import {readModels} from './models'
 import {limitLifts} from './rate-limits'
+import {openThread, settingsOf} from './rebuild'
 import {createReplyMapper, turnOf} from './replies'
 import {requestRevert} from './revert'
 import {folderOf, readRollouts, rolloutAt, writeRolloutsBack} from './rollouts'
@@ -152,40 +156,20 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     if (next !== undefined) await revert(running, thread, next, configDir)
   }
 
-  async function threadFor(
+  async function restore(
     running: Running,
     request: ReplyRequest,
+    session: ReplySession,
     dropFrom: string | null
-  ): Promise<{thread: LoadedThread; dropped: boolean}> {
+  ): Promise<Restored> {
     const {configDir} = request.vendorProgram
     const {threshold} = request.compactionSettings
-
-    const settings = {
-      cwd: configDir,
-      sandbox: 'read-only',
-      approvalPolicy: 'never',
-      model: request.model,
-      developerInstructions: request.systemPrompt || null,
-    } satisfies ParamsOf<'thread/start'>
+    const settings = settingsOf(request)
 
     // A resume or fork that brings no `config` keeps the thread's old limit.
     const config = configOf(threshold)
 
-    if (!request.session) {
-      const thread = loadThread(
-        running.threads,
-        await running.server.request(
-          'thread/start',
-          threshold === null ? settings : {...settings, config}
-        ),
-        [],
-        threshold
-      )
-
-      return {thread, dropped: false}
-    }
-
-    const {sessionId: id, messageId, type} = request.session
+    const {sessionId: id, messageId, type} = session
     const fork = type === 'fork'
     const rewind = type === 'rewind'
     const loaded = running.threads.get(id)
@@ -357,7 +341,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   async function* send(
     running: Running,
     request: ReplyRequest,
-    thread: LoadedThread,
+    {thread, replay}: Opened,
     run: ReplyRun
   ): AsyncGenerator<ContentEvent | PromptRecorded, Ending> {
     const ids = {treeId: request.treeId, replyId: request.replyId}
@@ -373,7 +357,15 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       // A thread loaded on another Model switches to this one from here on.
       const started = await server.request('turn/start', {
         threadId: thread.id,
-        input: [{type: 'text', text: request.prompt.text, text_elements: []}],
+        input: [
+          {
+            type: 'text',
+            text: replay
+              ? replayed(request.thread, request.prompt.text)
+              : request.prompt.text,
+            text_elements: [],
+          },
+        ],
         model: request.model,
       })
 
@@ -445,7 +437,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     request: ReplyRequest,
     run: ReplyRun
   ): AsyncGenerator<WriteReplyEvent, Ending> {
-    const {session} = request
+    const {session, treeId, replyId} = request
     let dropFrom = session?.type === 'cut' ? session.dropFrom : null
 
     if (session) await cuts.get(session.sessionId)
@@ -455,18 +447,21 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       let heard = false
 
       try {
-        const {thread, dropped} = await threadFor(running, request, dropFrom)
+        const opened = await openThread(
+          running.server,
+          running.threads,
+          request,
+          session && (async () => restore(running, request, session, dropFrom))
+        )
 
-        if (dropped) {
+        if (opened.rebuilt) yield {type: 'SESSION_REBUILT', treeId, replyId}
+
+        if (opened.dropped) {
           dropFrom = null
-          yield {
-            type: 'PROMPT_DROPPED',
-            treeId: request.treeId,
-            replyId: request.replyId,
-          }
+          yield {type: 'PROMPT_DROPPED', treeId, replyId}
         }
 
-        const sent = send(running, request, thread, run)
+        const sent = send(running, request, opened, run)
 
         for (;;) {
           const step = await sent.next()

@@ -1,0 +1,1 @@
+ALTER TABLE `replies` ADD `rebuilt` integer DEFAULT false NOT NULL;

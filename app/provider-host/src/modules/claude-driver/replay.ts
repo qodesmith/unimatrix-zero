@@ -28,6 +28,8 @@ export interface FakeClaudeOptions {
   toolResult?: string
   /** Refuses to resume from the SDK's temporary folder. */
   refuseStore?: boolean
+  /** Refuses to resume at an entry, as for one off the newest chain. */
+  refuseResumeAt?: boolean
   /** Keeps it going once its input closes, until this file exists. */
   holdExit?: string
 }
@@ -56,6 +58,7 @@ export const FakeClaudeRunSchema = z.strictObject({
   prompts: z.array(z.string()),
   /** Per Prompt, whether it came marked to be delivered as written. */
   clientComposed: z.array(z.boolean()),
+  systemPrompt: z.array(z.string()),
   /** The entry uuids of the transcript it resumed. */
   resumedFrom: z.array(z.string()),
   toolResults: z.array(z.string()),
@@ -91,7 +94,7 @@ function stillRunning(file) {
 const runningAtStart = fs.readdirSync(reports).filter(stillRunning).map(file => Number.parseInt(file, 10))
 const args = process.argv.slice(2)
 const configDir = process.env.CLAUDE_CONFIG_DIR
-const report = {args, configDir, runningAtStart, prompts: [], clientComposed: [], resumedFrom: [], toolResults: [], inputClosed: false, ended: null}
+const report = {args, configDir, runningAtStart, prompts: [], clientComposed: [], systemPrompt: [], resumedFrom: [], toolResults: [], inputClosed: false, ended: null}
 save()
 const recording = options.recordings[run]
 const lines = fs.readFileSync(recording, 'utf8')
@@ -105,10 +108,9 @@ function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
 }
 
-function refuse(sessionId) {
+function refuse(sessionId, error = 'No conversation found with session ID: ' + sessionId) {
   report.ended = 'refused'
   save()
-  const error = 'No conversation found with session ID: ' + sessionId
   process.stderr.write(error + '\\n')
   process.stdout.write(JSON.stringify({type: 'result', subtype: 'error_during_execution', is_error: true, errors: [error], session_id: sessionId, duration_ms: 0, duration_api_ms: 0, num_turns: 0, stop_reason: null, total_cost_usd: 0, usage: {input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0}, modelUsage: {}, permission_denials: [], uuid: '00000000-0000-4000-8000-000000000000'}) + '\\n')
   process.exit(1)
@@ -118,6 +120,8 @@ if (resume) {
   const transcript = path.join(projects, resume + '.jsonl')
   const temporary = configDir !== process.env.CLAUDE_SECURESTORAGE_CONFIG_DIR
   if (!fs.existsSync(transcript) || (temporary && options.refuseStore)) refuse(resume)
+  const resumeAt = args.find(arg => arg.startsWith('--resume-session-at='))?.slice('--resume-session-at='.length)
+  if (resumeAt && options.refuseResumeAt) refuse(resume, 'No message found with message.uuid of: ' + resumeAt)
   report.resumedFrom = fs.readFileSync(transcript, 'utf8').split('\\n').filter(Boolean)
     .map(line => JSON.parse(line).uuid).filter(Boolean)
   const toolResults = path.join(projects, resume, 'tool-results')
@@ -195,6 +199,10 @@ process.stdin.on('data', chunk => {
       recorded.type === message.type &&
       (message.type !== 'control_request' || recorded.request.subtype === message.request.subtype))
     if (message.type === 'control_request') requestIds.set(step.message.request_id, message.request_id)
+    if (message.type === 'control_request' && message.request.subtype === 'initialize') {
+      const prompt = message.request.systemPrompt
+      report.systemPrompt = Array.isArray(prompt) ? prompt : prompt == null ? [] : [prompt]
+    }
     if (message.type === 'user') {
       report.prompts.push(message.message.content)
       report.clientComposed.push(message.client_composed === true)

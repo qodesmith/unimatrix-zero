@@ -3,8 +3,9 @@ import type {ModelChoice, ProviderId} from '@uz/contract/providers'
 import type {Reply} from '@uz/contract/turns'
 
 import {useConnections} from '#modules/connections/main'
+import {modelName} from '@uz/contract/providers'
 
-import {findModel, pickModel} from './pick-model'
+import {pickModel} from './pick-model'
 
 const NOT_LOADED: ModelPick = {
   groups: [],
@@ -31,7 +32,6 @@ export function useModelPick(
 
   return pickModel({
     wanted: picked ?? (recorded && recordedOf(recorded)),
-    lockedTo: attachedTo?.provider ?? null,
     statuses: state.statuses,
     models: state.models,
   })
@@ -40,5 +40,5 @@ export function useModelPick(
 export function useModelName(provider: ProviderId, id: string) {
   const {state} = useConnections()
 
-  return findModel(state.models[provider], id)?.name ?? id
+  return modelName(state.models[provider], id)
 }

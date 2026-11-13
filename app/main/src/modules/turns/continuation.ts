@@ -26,7 +26,7 @@ type ContinuedSession = Extract<
 
 type ReplyRow = typeof replies.$inferSelect
 
-/** A null session means the Provider has nothing of the Thread and starts one. */
+/** A null session means the Provider has nothing of the Thread. */
 export interface Continuation {
   provider: ProviderId
   session: ContinuedSession | null
@@ -37,6 +37,7 @@ export interface Recovery {
   model: string
   systemPrompt: string
   text: string
+  parentReplyId: string | null
   session: ReplyRequest['session']
 }
 
@@ -69,11 +70,7 @@ function resumed(
     }
   }
 
-  if (!CUT_SHORT.has(row.status)) {
-    throw new Error(
-      'This Reply can’t be continued: its Provider never saved it.'
-    )
-  }
+  if (!CUT_SHORT.has(row.status)) return null
 
   const prompt = db
     .select({parentReplyId: prompts.parentReplyId})
@@ -88,7 +85,9 @@ function resumed(
       ? null
       : planned(db, treeId, parentReplyId, row.promptId)
 
-  const session = before?.session ?? null
+  // The Reply above went on in its own Provider's session, which another's
+  // Reply was never in.
+  const session = before?.provider === row.provider ? before.session : null
 
   return (
     session && keepingPrompt(db, row, session, answered(db, row.id, except))
@@ -192,7 +191,8 @@ function planned(
  * one being run again. A Reply its Provider never saved continues from the
  * Reply its Prompt answers, or from its own Prompt in a fork it began, and a
  * session still holding deleted Turns is cut. A session that compacted after
- * the Reply is forked from the part before.
+ * the Reply is forked from the part before. The session is the Reply's own
+ * Provider's: a Prompt sent to another has none.
  */
 export function continuation(
   db: Database,
@@ -311,9 +311,11 @@ export function recovery(
     model: row.model,
     systemPrompt: systemPrompt.text,
     text: prompt.text,
-    session: continued?.session
-      ? rewound(continued.session, parent, row)
-      : null,
+    parentReplyId: prompt.parentReplyId,
+    session:
+      continued?.session && continued.provider === row.provider
+        ? rewound(continued.session, parent, row)
+        : null,
   }
 }
 

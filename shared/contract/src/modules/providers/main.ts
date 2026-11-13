@@ -37,6 +37,37 @@ export const ModelSchema = z.strictObject({
 export type Model = z.infer<typeof ModelSchema>
 
 /**
+ * A Reply records the id it was written on, which may be a `resolvesTo`; the
+ * default resolves to another entry's Model too, which names it better.
+ */
+export function findModel(models: Model[], id: string) {
+  const resolved = models.filter(model => model.resolvesTo === id)
+
+  return (
+    models.find(model => model.id === id) ??
+    resolved.find(model => !model.isDefault) ??
+    resolved[0] ??
+    null
+  )
+}
+
+/** As the Provider lists it; its id when the list doesn't know it. */
+export function modelName(models: Model[], id: string) {
+  return findModel(models, id)?.name ?? id
+}
+
+export function concreteOf(model: Model) {
+  return model.resolvesTo ?? model.id
+}
+
+/** The Model a listed alias or default stands for now; any other id as is. */
+export function concreteId(models: Model[], id: string) {
+  const listed = models.find(model => model.id === id)
+
+  return listed ? concreteOf(listed) : id
+}
+
+/**
  * A Prompt's `model` is always concrete, but a Retry resends the failed Reply's
  * recorded one, which an older row may hold as an alias or `default`.
  */

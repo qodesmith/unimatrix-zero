@@ -74,6 +74,7 @@ it('takes the Context size the Provider reports and the final status', () => {
     contextWindow: null,
     failure: null,
     compacted: false,
+    rebuilt: false,
   })
 })
 
@@ -84,6 +85,17 @@ it('marks the Reply a Compaction happened in', () => {
       {type: 'CONTEXT_COMPACTED', sessionId: 's1', boundaryId: null},
       {type: 'RUN_FINISHED', status: 'complete'}
     ).compacted
+  ).toBe(true)
+})
+
+it('marks the Reply its Provider session was rebuilt for', () => {
+  expect(fold({type: 'TEXT_DELTA', delta: 'Hi'}).rebuilt).toBe(false)
+  expect(
+    fold(
+      {type: 'SESSION_REBUILT'},
+      {type: 'TEXT_DELTA', delta: 'Hi'},
+      {type: 'RUN_FINISHED', status: 'complete'}
+    ).rebuilt
   ).toBe(true)
 })
 
