@@ -1,5 +1,8 @@
 import type {ProviderId} from '@uz/contract/providers'
-import type {SettingsUpdate} from '@uz/contract/settings'
+import type {
+  CompactionThresholdRange,
+  SettingsUpdate,
+} from '@uz/contract/settings'
 
 import {Field, FieldDescription, FieldLabel} from '#shadcn/ui/field'
 import {Input} from '#shadcn/ui/input'
@@ -76,7 +79,7 @@ function thumbOf(value: number | readonly number[]) {
 }
 
 interface ThresholdProps {
-  range: {min: number; max: number}
+  range: CompactionThresholdRange
   /** Null is the Provider's default, which the slider's maximum stands for. */
   saved: number | null
   disabled: boolean

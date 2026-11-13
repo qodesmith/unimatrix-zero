@@ -134,6 +134,16 @@ export function cardOf(state: ConnectionsState, provider: ProviderId): Card {
   return failure ? {kind: 'failed', failure} : {kind: 'idle'}
 }
 
+/** Only one Provider connects at a time: the one this one waits for. */
+export function waitingFor(
+  state: ConnectionsState,
+  provider: ProviderId
+): ProviderId | null {
+  const connecting = state.signIn?.provider ?? null
+
+  return connecting === provider ? null : connecting
+}
+
 export function anyConnected(state: ConnectionsState) {
   return state.statuses.some(status => status.account !== null)
 }

@@ -19,6 +19,11 @@ export const SendKeySchema = z.enum(['enter', 'mod-enter'])
 /** In pixels. */
 export const FONT_SIZE = {min: 12, max: 24, step: 2}
 
+export interface CompactionThresholdRange {
+  min: number
+  max: number
+}
+
 /**
  * In tokens, the range each Provider takes. Codex's `max` is 90% of its
  * largest Model's raw Context window, past which it clamps.
@@ -26,10 +31,10 @@ export const FONT_SIZE = {min: 12, max: 24, step: 2}
 export const COMPACTION_THRESHOLD = {
   claude: {min: 100_000, max: 1_000_000},
   chatgpt: {min: 20_000, max: 450_000},
-} satisfies Record<ProviderId, {min: number; max: number}>
+} satisfies Record<ProviderId, CompactionThresholdRange>
 
-/** Null leaves it to the Provider: the Model's own limit. */
-function thresholdSchema({min, max}: {min: number; max: number}) {
+/** Null leaves it to the Provider's default. */
+function thresholdSchema({min, max}: CompactionThresholdRange) {
   return z.int().min(min).max(max).nullable()
 }
 

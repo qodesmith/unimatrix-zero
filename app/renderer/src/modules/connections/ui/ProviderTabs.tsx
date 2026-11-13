@@ -10,7 +10,7 @@ import {PROVIDER_NAMES, ProviderIdSchema} from '@uz/contract/providers'
 import {cn} from 'cn'
 
 import {ABOUT} from '../about'
-import {cardOf} from '../cards'
+import {cardOf, waitingFor} from '../cards'
 import {SignIn} from './ProviderCard'
 
 interface ProviderTabsProps {
@@ -24,7 +24,6 @@ export function ProviderTabs({
   providerSettings: ProviderSettings,
 }: ProviderTabsProps) {
   const {state} = connections
-  const connecting = state.signIn?.provider ?? null
 
   return (
     <Tabs defaultValue={ProviderIdSchema.options[0]} className="gap-6">
@@ -64,11 +63,7 @@ export function ProviderTabs({
               <SignIn
                 provider={provider}
                 card={card}
-                waitingFor={
-                  connecting !== null && connecting !== provider
-                    ? connecting
-                    : null
-                }
+                waitingFor={waitingFor(state, provider)}
                 connect={() => void connections.connect(provider)}
                 cancel={() => void connections.cancel(provider)}
                 openPage={() => void connections.openPage(provider)}

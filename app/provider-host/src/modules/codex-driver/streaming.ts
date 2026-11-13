@@ -16,6 +16,7 @@ import type {
   ReplyRequest,
   SignInRequest,
 } from '@uz/contract/host'
+import type {CompactionSettings} from '@uz/contract/settings'
 
 import {createInbox} from '#modules/inbox/main'
 import {ProgramCrashed, createReplyRuns} from '#modules/reply-runs/main'
@@ -257,7 +258,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     running: Running,
     thread: LoadedThread,
     settings: ParamsOf<'thread/start'>,
-    threshold: number | null
+    threshold: CompactionSettings['threshold']
   ) {
     await running.server.request('thread/unsubscribe', {threadId: thread.id})
 

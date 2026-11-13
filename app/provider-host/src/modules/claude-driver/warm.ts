@@ -1,5 +1,5 @@
 import type {WhenIdle} from '#modules/idle/main'
-import type {SessionRef} from '@uz/contract/host'
+import type {ReplyRequest, SessionRef} from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
@@ -87,7 +87,7 @@ export function createWarmSessions<Session extends WarmSession>({
       {
         model,
         compactionSettings,
-      }: {model: string; compactionSettings: CompactionSettings}
+      }: Pick<ReplyRequest, 'model' | 'compactionSettings'>
     ): Session | null {
       const wanted = resolveModel(model)
 

@@ -331,7 +331,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Id:** `claude-compaction-settings`
 - **Kind:** D/W
 - **Provider:** Claude
-- **Relies on:** `claude` takes `autoCompactWindow` and `autoCompactEnabled` in the SDK's `settings`. It compacts on its own at the window minus 13,000, and minus up to 20,000 more for output, and never past the Model's own limit. It takes only integers from 100,000 to 1,000,000 and drops any other value without an error. `autoCompactEnabled: false` stops automatic Compaction past any threshold. `claude` fixes the window as it starts: `applyFlagSettings` stores a new one and doesn't apply it, though it does apply `autoCompactEnabled`.
+- **Relies on:** `claude` takes `autoCompactWindow` and `autoCompactEnabled` in the SDK's `settings`. It compacts on its own at the window minus 13,000, and minus up to 20,000 more for output, and never past the Model's Context window. It takes only integers from 100,000 to 1,000,000 and drops any other value without an error. `autoCompactEnabled: false` stops automatic Compaction past any threshold. `claude` fixes the window as it starts: `applyFlagSettings` stores a new one and doesn't apply it, though it does apply `autoCompactEnabled`.
 - **App side:** `claude-driver` starts `claude` with the Compaction Settings, and with neither key for a default. It closes a warm `claude` started with other Compaction Settings, so the next Reply resumes the session in a new one. The Setting's range is the one `claude` takes.
 - **User would see:** a threshold that changes nothing, or a Thread that compacts with Compaction off. If `claude` narrowed the range, values outside it would be ignored without a word.
 - **Changed by:** upgrade
