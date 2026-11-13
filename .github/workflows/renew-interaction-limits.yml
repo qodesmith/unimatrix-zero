@@ -1,0 +1,54 @@
+name: Renew interaction limits
+
+on:
+  schedule:
+    - cron: '17 9 * * 1'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+
+jobs:
+  renew:
+    name: Keep the repo collaborators-only
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # This job holds a token with admin access to the repo, so it checks out
+    # nothing and runs no `bun install`: no repo or dependency code runs beside it.
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.INTERACTION_LIMITS_CLIENT_ID }}
+          private-key: ${{ secrets.INTERACTION_LIMITS_PRIVATE_KEY }}
+      - name: Renew the limit when under 150 days remain
+        # 150 days is about five months of the six a renewal buys, so a weekly
+        # run renews about once a month and months of failed runs pass before
+        # the limit lapses.
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          api="repos/$GITHUB_REPOSITORY/interaction-limits"
+
+          current=$(gh api "$api")
+          limit=$(jq -r '.limit // ""' <<<"$current")
+          expires=$(jq -r '.expires_at // ""' <<<"$current")
+          renew_after=$(date -u -d '+150 days' +%s)
+
+          if [[ $limit == collaborators_only && -n $expires ]] &&
+            (($(date -u -d "$expires" +%s) > renew_after)); then
+            echo "Collaborators only until $expires, nothing to renew." >>"$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          gh api -X PUT "$api" -f limit=collaborators_only -f expiry=six_months >/dev/null
+
+          renewed=$(gh api "$api")
+          if [[ $(jq -r '.limit // ""' <<<"$renewed") != collaborators_only ]]; then
+            echo "::error::The limit reads back as $renewed after renewing."
+            exit 1
+          fi
+          echo "Renewed: collaborators only until $(jq -r .expires_at <<<"$renewed") (was: ${limit:-no limit}${expires:+ until $expires}).">>"$GITHUB_STEP_SUMMARY"
