@@ -1624,3 +1624,186 @@ it('lists the Models on the app-server a Reply already started', async () => {
   )
   expect(codex.reports()).toHaveLength(1)
 })
+
+/** A Thread Claude wrote, as main hands it over. */
+const HANDED_OVER: Thread = [
+  {
+    prompt: 'Name a color.',
+    reply: [{type: 'text', text: 'Teal.'}],
+    label: '[Reply written by Haiku 5.5]',
+  },
+  {
+    prompt: 'And an animal?',
+    reply: [
+      {
+        type: 'tool-call',
+        toolCallId: 'toolu_1',
+        toolName: 'WebSearch',
+        args: '{"query":"animals"}',
+        result: {content: 'Otters are animals.', isError: false},
+      },
+      {type: 'text', text: 'Otter.'},
+    ],
+    label: '[Reply written by Haiku 5.5]',
+  },
+  {prompt: 'Still there?', reply: [], label: null},
+]
+
+/**
+ * `started.ndjson`, with Codex answering `thread/inject_items` after
+ * `thread/start`.
+ */
+function injecting(answer: object) {
+  return edited('started.ndjson', text => {
+    const lines = text.split('\n')
+    const started = lines.findIndex(line =>
+      line.startsWith('{"kind":"out","message":{"id":2,"result"')
+    )
+
+    return [
+      ...lines.slice(0, started + 1),
+      JSON.stringify({
+        kind: 'in',
+        message: {id: 90, method: 'thread/inject_items', params: {}},
+      }),
+      JSON.stringify({kind: 'out', message: {id: 90, ...answer}}),
+      ...lines.slice(started + 1),
+    ].join('\n')
+  })
+}
+
+/** A second `thread/start`, as the text replay opens after a refused inject. */
+function injectRefused() {
+  return edited('started.ndjson', text => {
+    const lines = text.split('\n')
+    const asked = lines.findIndex(line =>
+      line.includes('"method":"thread/start"')
+    )
+    const answered = lines.findIndex(line =>
+      line.startsWith('{"kind":"out","message":{"id":2,"result"')
+    )
+
+    return [
+      ...lines.slice(0, answered + 1),
+      JSON.stringify({
+        kind: 'in',
+        message: {id: 90, method: 'thread/inject_items', params: {}},
+      }),
+      JSON.stringify({
+        kind: 'out',
+        message: {id: 90, error: {code: -32600, message: 'invalid item'}},
+      }),
+      ...lines.slice(asked, answered + 1),
+      ...lines.slice(answered + 1),
+    ].join('\n')
+  })
+}
+
+it('takes over a Thread Claude wrote: a new thread holding each Turn as a message, then the Prompt as written', async () => {
+  const codex = await setUp([injecting({result: {}})])
+
+  const events = await codex.reply(FIRST_PROMPT, null, {thread: HANDED_OVER})
+
+  expect(textOf(events)).toBe('Hi there, friend!')
+  expect(recordedIn(events)).toEqual({
+    sessionId: THREAD_ID,
+    messageId: FIRST_TURN,
+  })
+
+  const [run] = codex.reports()
+
+  expect(run?.methods).not.toContain('thread/resume')
+  expect(run?.prompts).toEqual([FIRST_PROMPT])
+  expect(run?.injected).toEqual([
+    {
+      type: 'message',
+      role: 'user',
+      content: [{type: 'input_text', text: 'Name a color.'}],
+    },
+    {
+      type: 'message',
+      role: 'assistant',
+      content: [
+        {type: 'output_text', text: '[Reply written by Haiku 5.5]\n\nTeal.'},
+      ],
+    },
+    {
+      type: 'message',
+      role: 'user',
+      content: [{type: 'input_text', text: 'And an animal?'}],
+    },
+    {
+      type: 'message',
+      role: 'assistant',
+      content: [
+        {
+          type: 'output_text',
+          text: '[Reply written by Haiku 5.5]\n\n[Tool call: WebSearch]\n{"query":"animals"}\n[Tool result]\nOtters are animals.\n\nOtter.',
+        },
+      ],
+    },
+    {
+      type: 'message',
+      role: 'user',
+      content: [{type: 'input_text', text: 'Still there?'}],
+    },
+  ])
+
+  await codex.allClosed()
+})
+
+it('injects nothing for a Tree’s first Prompt', async () => {
+  const codex = await setUp(['started.ndjson'])
+
+  await codex.reply(FIRST_PROMPT)
+
+  expect(codex.reports()[0]?.methods).not.toContain('thread/inject_items')
+
+  await codex.allClosed()
+})
+
+it('replays the Thread as text in a new thread, before the Prompt, when Codex refuses the items', async () => {
+  const codex = await setUp([injectRefused()])
+
+  const events = await codex.reply(FIRST_PROMPT, null, {thread: HANDED_OVER})
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+  const [run] = codex.reports()
+  const [prompt] = run?.prompts ?? []
+
+  expect(run?.methods.filter(method => method === 'thread/start')).toHaveLength(
+    2
+  )
+  expect(prompt).toContain(
+    '<reply>\n[Reply written by Haiku 5.5]\n\nTeal.\n</reply>'
+  )
+  expect(prompt?.endsWith(`</thread>\n\n${FIRST_PROMPT}`)).toBe(true)
+
+  await codex.allClosed()
+})
+
+it('rebuilds a thread the app has no copy of from the Thread', async () => {
+  const codex = await setUp([injecting({result: {}})], {
+    keepRunningOnRefusal: true,
+  })
+
+  const events = await codex.reply(
+    FIRST_PROMPT,
+    {sessionId: crypto.randomUUID(), messageId: crypto.randomUUID()},
+    {thread: HANDED_OVER}
+  )
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(recordedIn(events).sessionId).toBe(THREAD_ID)
+
+  const [run] = codex.reports()
+
+  expect(
+    run?.methods.filter(method => method.startsWith('thread/')).slice(0, 3)
+  ).toEqual(['thread/resume', 'thread/start', 'thread/inject_items'])
+  expect(run?.injected).toHaveLength(5)
+  expect(run?.prompts).toEqual([FIRST_PROMPT])
+
+  await codex.allClosed()
+})

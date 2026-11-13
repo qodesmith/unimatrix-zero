@@ -28,6 +28,8 @@ export interface FakeClaudeOptions {
   toolResult?: string
   /** Refuses to resume from the SDK's temporary folder. */
   refuseStore?: boolean
+  /** Refuses to resume at an entry, as for one off the newest chain. */
+  refuseResumeAt?: boolean
   /** Keeps it going once its input closes, until this file exists. */
   holdExit?: string
 }
@@ -105,10 +107,9 @@ function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
 }
 
-function refuse(sessionId) {
+function refuse(sessionId, error = 'No conversation found with session ID: ' + sessionId) {
   report.ended = 'refused'
   save()
-  const error = 'No conversation found with session ID: ' + sessionId
   process.stderr.write(error + '\\n')
   process.stdout.write(JSON.stringify({type: 'result', subtype: 'error_during_execution', is_error: true, errors: [error], session_id: sessionId, duration_ms: 0, duration_api_ms: 0, num_turns: 0, stop_reason: null, total_cost_usd: 0, usage: {input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0}, modelUsage: {}, permission_denials: [], uuid: '00000000-0000-4000-8000-000000000000'}) + '\\n')
   process.exit(1)
@@ -118,6 +119,8 @@ if (resume) {
   const transcript = path.join(projects, resume + '.jsonl')
   const temporary = configDir !== process.env.CLAUDE_SECURESTORAGE_CONFIG_DIR
   if (!fs.existsSync(transcript) || (temporary && options.refuseStore)) refuse(resume)
+  const resumeAt = args.find(arg => arg.startsWith('--resume-session-at='))?.slice('--resume-session-at='.length)
+  if (resumeAt && options.refuseResumeAt) refuse(resume, 'No message found with message.uuid of: ' + resumeAt)
   report.resumedFrom = fs.readFileSync(transcript, 'utf8').split('\\n').filter(Boolean)
     .map(line => JSON.parse(line).uuid).filter(Boolean)
   const toolResults = path.join(projects, resume, 'tool-results')

@@ -1339,3 +1339,168 @@ it('starts claude with the Compaction Settings, and with nothing for the default
   expect(changed?.args.join(' ')).toMatch(/"autoCompactEnabled":false/)
   expect(changed?.args.join(' ')).toMatch(/"autoCompactWindow":150000/)
 })
+
+/** A Thread ChatGPT wrote, as main hands it over. */
+const HANDED_OVER: Thread = [
+  {
+    prompt: 'Name a color.',
+    reply: [{type: 'text', text: 'Teal.'}],
+    label: '[Reply written by GPT-6 Sol]',
+  },
+  {
+    prompt: 'And an animal?',
+    reply: [
+      {
+        type: 'tool-call',
+        toolCallId: 'call-1',
+        toolName: 'search',
+        args: '{"query":"animals"}',
+        result: {content: 'Otters are animals.', isError: false},
+      },
+      {type: 'text', text: 'Otter.'},
+    ],
+    label: '[Reply written by GPT-6 Sol]',
+  },
+]
+
+const HANDED_OVER_TURNS = [
+  '<thread>',
+  '<prompt>\nName a color.\n</prompt>',
+  '<reply>\n[Reply written by GPT-6 Sol]\n\nTeal.\n</reply>',
+  '<prompt>\nAnd an animal?\n</prompt>',
+  '<reply>\n[Reply written by GPT-6 Sol]\n\n[Tool call: search]\n{"query":"animals"}\n[Tool result]\nOtters are animals.\n\nOtter.\n</reply>',
+  '</thread>',
+].join('\n')
+
+it('takes over a Thread ChatGPT wrote: a new session, told the whole Thread and the Prompt in one user message', async () => {
+  const claude = await setUp(['warm.ndjson'])
+  const messageId = crypto.randomUUID()
+
+  const events = await claude.reply(FIRST_PROMPT, null, {
+    thread: HANDED_OVER,
+    messageId,
+  })
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(recordedIn(events)).toEqual({
+    sessionId: SESSION_ID,
+    messageId: FIRST_MESSAGE,
+  })
+
+  const [started] = claude.reports()
+
+  expect(started?.args.join(' ')).not.toMatch(/--resume/)
+  expect(started?.prompts).toHaveLength(1)
+  expect(started?.prompts[0]).toContain(HANDED_OVER_TURNS)
+  expect(started?.prompts[0]?.endsWith(`</thread>\n\n${FIRST_PROMPT}`)).toBe(
+    true
+  )
+  expect(
+    claude.store
+      .entriesOf(claude.projectKey, SESSION_ID)
+      .map(entry => entry.uuid)
+  ).toContain(messageId)
+
+  await claude.allClosed()
+})
+
+it('sends a Tree’s first Prompt as written, with no Thread to tell', async () => {
+  const claude = await setUp(['warm.ndjson'])
+
+  await claude.reply(FIRST_PROMPT)
+
+  expect(claude.reports()[0]?.prompts).toEqual([FIRST_PROMPT])
+
+  await claude.allClosed()
+})
+
+it('rebuilds a session the app has no copy of from the Thread, in a new session', async () => {
+  const claude = await setUp(['resumed.ndjson', 'warm.ndjson'])
+
+  const events = await claude.reply(
+    FIRST_PROMPT,
+    {sessionId: crypto.randomUUID(), messageId: crypto.randomUUID()},
+    {thread: HANDED_OVER}
+  )
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(textOf(events)).toBe('TEAL')
+  expect(recordedIn(events).sessionId).toBe(SESSION_ID)
+
+  await claude.allClosed()
+  const [refused, rebuilt] = claude.reports()
+
+  expect(refused?.ended).toBe('refused')
+  expect(rebuilt?.args.join(' ')).not.toMatch(/--resume/)
+  expect(rebuilt?.prompts[0]).toContain(HANDED_OVER_TURNS)
+})
+
+it('rebuilds from the Thread when claude can’t find the entry to resume at, after the exact restore fails both ways', async () => {
+  const claude = await setUp(
+    ['warm.ndjson', 'rewound.ndjson', 'rewound.ndjson', 'warm.ndjson'],
+    {refuseResumeAt: true}
+  )
+
+  const session = await warmThread(claude)
+
+  const events = await claude.reply(
+    THIRD_PROMPT,
+    {...session, type: 'rewind'},
+    {thread: HANDED_OVER}
+  )
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+  await claude.allClosed()
+  const [, fromStore, fromFile, rebuilt] = claude.reports()
+
+  expect(fromStore?.ended).toBe('refused')
+  expect(fromFile?.ended).toBe('refused')
+  expect(fromFile?.configDir).toBe(claude.configDir)
+  expect(rebuilt?.args.join(' ')).not.toMatch(/--resume/)
+  expect(rebuilt?.prompts[0]).toContain(HANDED_OVER_TURNS)
+})
+
+it('fails the Reply, rebuilding nothing, when claude refuses the session for a Prompt that came with no Thread', async () => {
+  const claude = await setUp(['resumed.ndjson', 'warm.ndjson'])
+
+  const events = await claude.reply(FIRST_PROMPT, {
+    sessionId: crypto.randomUUID(),
+    messageId: crypto.randomUUID(),
+  })
+
+  expect(events.at(-1)).toMatchObject({
+    status: 'failed',
+    failure: {
+      message: expect.stringMatching(/^No conversation found with session ID/),
+    },
+  })
+  expect(claude.reports()).toHaveLength(1)
+})
+
+it('rebuilds nothing for a failure that isn’t a lost session', async () => {
+  const failing = edited('resumed.ndjson', lines =>
+    lines.map(line =>
+      line.kind === 'out' && line.message.type === 'result'
+        ? {
+            ...line,
+            message: {...line.message, is_error: true, result: 'Overloaded'},
+          }
+        : line
+    )
+  )
+
+  const claude = await setUp(['warm.ndjson', failing, 'warm.ndjson'])
+  const first = await claude.reply(FIRST_PROMPT)
+  await claude.allClosed()
+
+  const events = await claude.reply(SECOND_PROMPT, recordedIn(first), {
+    thread: HANDED_OVER,
+  })
+
+  expect(events.at(-1)).toMatchObject({
+    status: 'failed',
+    failure: {message: 'Overloaded'},
+  })
+  expect(claude.reports()).toHaveLength(2)
+})
