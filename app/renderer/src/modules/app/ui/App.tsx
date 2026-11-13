@@ -3,7 +3,6 @@ import {
   Connections,
   ConnectionsProvider,
   ProviderTabs,
-  anyConnected,
   useConnections,
 } from '#modules/connections/main'
 import {
@@ -16,7 +15,6 @@ import {
   FollowFontSize,
   SettingsProvider,
 } from '#modules/settings/main'
-import {useStateMachine} from '#modules/state-machine/main'
 import {NoTreeOpen, TreeTitle, useTrees} from '#modules/trees/main'
 import {LiveReplies} from '#modules/turns/main'
 import {SidebarInset} from '#shadcn/ui/sidebar'
@@ -24,11 +22,7 @@ import {TooltipProvider} from '#shadcn/ui/tooltip'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {useState} from 'react'
 
-import {startChatting} from '../first-launch/actions'
-import {
-  firstLaunchTransition,
-  initialFirstLaunch,
-} from '../first-launch/machine'
+import {useFirstLaunch} from '../first-launch/use-first-launch'
 import {AppSidebar} from './AppSidebar'
 
 export function App() {
@@ -58,25 +52,7 @@ function AppLayout() {
   const trees = useTrees()
   const {hasTrees, openTree, create} = trees
 
-  const [firstLaunch, send] = useStateMachine({
-    transition: firstLaunchTransition,
-    initial: initialFirstLaunch,
-  })
-
-  if (firstLaunch.status === 'loading' && connections.state.loaded) {
-    send({type: 'loaded', anyConnected: anyConnected(connections.state)})
-  }
-
-  function start() {
-    if (
-      firstLaunchTransition(firstLaunch, {type: 'startAsked'}) === firstLaunch
-    ) {
-      return
-    }
-
-    send({type: 'startAsked'})
-    void startChatting({createTree: create, send})
-  }
+  const firstLaunch = useFirstLaunch(connections.state, create)
 
   switch (firstLaunch.status) {
     case 'loading':
@@ -85,7 +61,7 @@ function AppLayout() {
     case 'starting':
       return (
         <main className="h-full overflow-y-auto">
-          <Connections connections={connections} onStart={start} />
+          <Connections connections={connections} onStart={firstLaunch.start} />
         </main>
       )
     case 'ready':

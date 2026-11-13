@@ -81,10 +81,8 @@ interface Setup {
 }
 
 interface Sends {
-  /** Each `prompt.send` waits here until the test lets it through. */
   waiting: (() => void)[]
   hold: boolean
-  /** The message main refuses the next `prompt.send` with. */
   refusal: string | null
 }
 

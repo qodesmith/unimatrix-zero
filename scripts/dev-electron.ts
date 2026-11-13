@@ -8,7 +8,15 @@ import {machine} from '@uz/contract/state-machine'
  */
 export type DevElectronState =
   | {status: 'running'}
-  | {status: 'settling'; bundle: string; since: number}
+  | {
+      status: 'settling'
+      bundle: string
+      /**
+       * Makes each rebuild a new state, so the runner re-arms the settle timer
+       * for the same bundle too.
+       */
+      since: number
+    }
   | {status: 'restarting'}
   | {status: 'stopping'}
 

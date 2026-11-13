@@ -1,3 +1,5 @@
+export type {ConnectionsState} from './cards'
+
 export {Connections} from './ui/Connections'
 
 export {ConnectionsProvider} from './ui/ConnectionsProvider'

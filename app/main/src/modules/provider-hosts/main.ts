@@ -197,20 +197,30 @@ export function createProviderHosts({
     })
   }
 
-  /** Main may have stopped the host while handling the crash. */
   function afterCrash(provider: ProviderId, host: Host) {
     const {state} = host
 
-    if (state.status === 'failed') onStatus(provider, 'failed')
+    switch (state.status) {
+      case 'failed':
+        onStatus(provider, 'failed')
+        break
+      case 'restarting':
+        onStatus(provider, 'restarting')
+        later(host, state.delayMs, () => {
+          const child = spawn(provider)
 
-    if (state.status !== 'restarting') return
-
-    onStatus(provider, 'restarting')
-    later(host, state.delayMs, () => {
-      const child = spawn(provider)
-
-      if (send(host, {type: 'spawned', child})) watch(provider, host, child)
-    })
+          if (send(host, {type: 'spawned', child})) watch(provider, host, child)
+        })
+        break
+      case 'starting':
+      case 'ready':
+        break
+      // Main may have stopped the host while handling the crash.
+      case 'stopped':
+        break
+      default:
+        throw new Error('Unknown host state.')
+    }
   }
 
   /** Stops the Provider's host on purpose, so it doesn't count as a crash. */

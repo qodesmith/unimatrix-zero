@@ -9,7 +9,6 @@ import {initialPromptSend, promptSendTransition} from './machine'
 interface Submission {
   text: string
   model: ModelChoice
-  /** The Reply main started for the sent Prompt. */
   onSent: (replyId: string) => void
 }
 

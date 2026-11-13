@@ -79,7 +79,7 @@ describe('the host lifecycle machine', () => {
       ).toEqual({status: 'ready', child, restarts: 1, smallestModel: 'tiny'})
     })
 
-    it('waits longer before each restart, then stays down', () => {
+    it('waits the next delay before each restart, then stays down', () => {
       expect(
         RESTART_DELAYS_MS.map((_, crashes) => crashAfter(crashes))
       ).toEqual(

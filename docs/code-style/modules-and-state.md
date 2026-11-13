@@ -50,8 +50,9 @@ The layout, and why only `@uz/contract` crosses between processes, are in [READM
 
 ## Give each machine a folder in its module
 
-- Each machine is a folder in its module, one folder for each machine. A script's machine is one file beside the script, such as `scripts/dev-electron.ts`:
+- Each machine is a folder in its module, one folder for each machine:
   - `machine.ts`: the state union, the event union, the initial state and the transition function.
   - `actions.ts`: only when an operation has effects.
   - The runner hook, when the runner is not the one component that reads the state. A runner component is `.tsx`, so it lives under the module's `ui/`.
+- A script's machine is one file beside the script, such as `scripts/dev-electron.ts`.
 - Testing a machine is in [testing](testing.md).
