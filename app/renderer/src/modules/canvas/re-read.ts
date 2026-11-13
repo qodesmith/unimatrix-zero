@@ -17,15 +17,26 @@ export const SETUP_TOKENS: Record<ProviderId, number> = {
   chatgpt: 15_000,
 }
 
+/** A Context size, and the Provider whose setup it includes. */
+export interface MeasuredContext {
+  provider: ProviderId
+  size: number
+}
+
 /**
  * The Context size the Thread ending at `reply` carries: its own, or that of
  * the nearest Reply above it that has one. Null when none does.
  */
-export function contextSizeAt(index: TreeIndex, reply: Reply | null) {
+export function contextSizeAt(
+  index: TreeIndex,
+  reply: Reply | null
+): MeasuredContext | null {
   let current = reply
 
   while (current) {
-    if (current.contextSize !== null) return current.contextSize
+    if (current.contextSize !== null) {
+      return {provider: current.provider, size: current.contextSize}
+    }
 
     const parentReplyId = index.promptById.get(current.promptId)?.parentReplyId
 
@@ -41,7 +52,7 @@ export function contextSizeAt(index: TreeIndex, reply: Reply | null) {
 interface ReReadInput {
   /** The Reply the Input is attached to; null at the root. */
   attachedTo: Reply | null
-  contextSize: number | null
+  context: MeasuredContext | null
   /** The Model the Input would send on. */
   to: ModelChoice | null
 }
@@ -50,12 +61,13 @@ interface ReReadInput {
  * What the Input says before a Prompt that re-reads the Thread cold, or null:
  * a Thread going to another Provider rebuilds its session from the Thread.
  */
-export function reReadNote({attachedTo, contextSize, to}: ReReadInput) {
-  if (!attachedTo || !to || contextSize === null) return null
+export function reReadNote({attachedTo, context, to}: ReReadInput) {
+  if (!attachedTo || !to || !context) return null
 
   if (to.provider === attachedTo.provider) return null
 
-  const tokens = contextSize + SETUP_TOKENS[to.provider]
+  const tokens =
+    context.size - SETUP_TOKENS[context.provider] + SETUP_TOKENS[to.provider]
 
   if (tokens < RE_READ_NOTE_FROM) return null
 

@@ -19,7 +19,7 @@ export function useReReadNote(
 
   return reReadNote({
     attachedTo,
-    contextSize: contextSizeAt(canvas.index, attachedTo),
+    context: contextSizeAt(canvas.index, attachedTo),
     to,
   })
 }

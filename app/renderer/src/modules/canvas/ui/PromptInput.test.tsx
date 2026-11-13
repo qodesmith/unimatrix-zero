@@ -307,7 +307,7 @@ const SWITCH_NOTE =
   'Switching to ChatGPT will re-read ~63k tokens of this conversation (uses more of your limit).'
 
 it('says above the Input how much of a long Thread another Provider will re-read, once it’s picked', async () => {
-  await renderInput({attachedTo: sized(48_000)})
+  await renderInput({attachedTo: sized(49_000)})
 
   expect(page.getByRole('note').query()).toBeNull()
 
@@ -327,7 +327,7 @@ it('says nothing when the Thread is short', async () => {
 })
 
 it('says nothing when the Setting hides the note', async () => {
-  await renderInput({attachedTo: sized(48_000), reReadNote: false})
+  await renderInput({attachedTo: sized(49_000), reReadNote: false})
   await picker().click()
   await page.getByRole('option', {name: 'GPT-5'}).click()
   await expectPicked('ChatGPT', 'GPT-5')

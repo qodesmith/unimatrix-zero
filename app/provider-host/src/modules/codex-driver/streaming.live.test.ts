@@ -1356,7 +1356,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
     }
   })
 
-  it('[dep:codex-inject-items] [dep:lost-session-refusals] takes over a Thread Claude wrote as its own history, and rebuilds a thread it has no rollout of', async () => {
+  it('[dep:codex-inject-items] [dep:lost-session-refusals] [dep:reply-labels-unwritten] takes over a Thread Claude wrote as its own history, writes no label, and rebuilds a thread it has no rollout of', async () => {
     if (!folder || !signedIn) return
 
     const home = homeFrom(signedIn)
@@ -1368,6 +1368,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
 
       expect(taken.text).toMatch(/teal/i)
       expect(taken.text).toMatch(/otter/i)
+      expect(taken.text).not.toMatch(/\[Reply written by/)
       expect(threadsStarted()).toBe(1)
 
       const lost = crypto.randomUUID()
@@ -1380,6 +1381,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
 
       expect(rebuilt.text).toMatch(/teal/i)
       expect(rebuilt.text).toMatch(/otter/i)
+      expect(rebuilt.text).not.toMatch(/\[Reply written by/)
       expect(rebuilt.session.sessionId).not.toBe(lost)
       expect(threadsStarted()).toBe(2)
 

@@ -842,7 +842,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 180_000)
 
-  it('[dep:thread-replay-as-conversation] takes over a Thread ChatGPT wrote, told in one user message, and goes on from it warm', async () => {
+  it('[dep:thread-replay-as-conversation] [dep:reply-labels-unwritten] takes over a Thread ChatGPT wrote, told in one user message, writes no label, and goes on from it warm', async () => {
     const live = liveDriver([])
 
     const fromChatgpt: Thread = [
@@ -871,6 +871,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     expect(taken.at(-1)).toMatchObject({status: 'complete'})
     expect(textOf(taken)).toMatch(/teal/i)
     expect(textOf(taken)).toMatch(/otter/i)
+    expect(textOf(taken)).not.toMatch(/\[Reply written by/)
 
     const after = await live.reply(
       'Which animal was it? Just the word.',
@@ -878,6 +879,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     )
 
     expect(textOf(after.events)).toMatch(/otter/i)
+    expect(textOf(after.events)).not.toMatch(/\[Reply written by/)
 
     await live.done()
   }, 180_000)

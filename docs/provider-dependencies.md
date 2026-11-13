@@ -398,7 +398,18 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Kind:** D
 - **Provider:** both
 - **Relies on:** how many tokens the vendor program puts before the Thread in a new session's first turn, as the app starts it: about 600 for `claude` with no tools or settings, and about 14,500 for Codex.
-- **App side:** the re-read note's estimate adds that overhead, rounded up, to the Context size before a Prompt goes to another Provider (`canvas`).
+- **App side:** a Reply's Context size includes its own Provider's overhead, so the re-read note's estimate swaps that overhead for the new Provider's, each rounded up, before a Prompt goes to another Provider (`canvas`).
 - **User would see:** an estimate off by the difference, and a note shown or left out near its 20k mark.
 - **Changed by:** upgrade + drift. The program's own instructions change with releases, and Codex's with its server-side Model catalog.
 - **Check:** none: a few thousand tokens either way barely moves an estimate the note gives in thousands; the recorded first Replies in `claude-driver` and `codex-driver` show the numbers when they are re-recorded.
+
+### The Model writes no Reply label
+
+- **Id:** `reply-labels-unwritten`
+- **Kind:** D
+- **Provider:** both
+- **Relies on:** the Model follows a System prompt line telling it never to write a label such as `[Reply written by GPT-6.1 Sol]` and never to mention the labels, even though every Reply another Model wrote begins with one in the history it reads.
+- **App side:** `turns` labels each Reply another Model wrote, a rebuilt session reads the labels with the Thread, and `thread-replay` adds that line to the System prompt each time a session for a labeled Thread opens. Nothing removes a label from a Reply the Model writes.
+- **User would see:** a Reply that begins with a label of its own, or talks about the labels.
+- **Changed by:** upgrade + drift. The Model decides whether it copies the labels it reads.
+- **Check:** `[dep:reply-labels-unwritten]` in `claude-driver` and `codex-driver`: a Reply to a Thread another Provider wrote holds no label.

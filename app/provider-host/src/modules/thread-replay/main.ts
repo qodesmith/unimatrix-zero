@@ -50,7 +50,7 @@ export function replayed(thread: Thread, prompt: string) {
   ].join('\n\n')
 }
 
-const LABELS_LINE = `Some Replies in this conversation begin with a label such as "${replyLabel('GPT-5')}". The app adds it to each Reply that another AI model wrote: those words are that model’s, not yours, so judge them as you would anyone else’s and disagree where they are wrong. Never write such a label yourself, and don’t mention the labels.`
+const LABELS_LINE = `A Reply in this conversation may begin with a label such as "${replyLabel('GPT-5')}". The app adds it to each Reply that another AI model wrote: those words are that model’s, not yours, so judge them as you would anyone else’s and disagree where they are wrong. Never write such a label yourself, and don’t mention the labels.`
 
 /**
  * The System prompt a session for the Thread gets each time it opens. The
