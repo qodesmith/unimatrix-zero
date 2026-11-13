@@ -37,7 +37,11 @@ const FORKED_THREAD_ID = '01a168e8-9d25-7df2-b2f4-208bfb1bbd5e'
 const FORKED_TURN = '01a168e8-9d50-7fb1-a539-2fd85f3c4b2b'
 const MODEL = 'gpt-6.1-sol'
 
-const DEFAULT_COMPACTION: CompactionSettings = {auto: true, threshold: null}
+const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
+  auto: true,
+  threshold: null,
+}
+
 const ROLLOUT = `sessions/2026/10/23/rollout-2026-10-23T09-16-57-${THREAD_ID}.jsonl`
 const FORKED_ROLLOUT = `sessions/2026/10/23/rollout-2026-10-23T09-17-17-${FORKED_THREAD_ID}.jsonl`
 
@@ -185,11 +189,11 @@ async function setUp(
     {
       stopAfter = Infinity,
       model = MODEL,
-      compaction = DEFAULT_COMPACTION,
+      compactionSettings = DEFAULT_COMPACTION_SETTINGS,
     }: {
       stopAfter?: number
       model?: string
-      compaction?: CompactionSettings
+      compactionSettings?: CompactionSettings
     } = {}
   ) {
     const replyId = crypto.randomUUID()
@@ -204,7 +208,7 @@ async function setUp(
       prompt: {text, messageId: crypto.randomUUID()},
       vendorProgram,
       session: session && {type: 'continue', ...session},
-      compaction,
+      compactionSettings,
     })) {
       events.push(event)
 
@@ -453,7 +457,7 @@ it('forks the Provider session through a mid-Thread Reply into a new thread with
   const forked = await codex.reply(
     FORK_PROMPT,
     {...recordedIn(first), type: 'fork'},
-    {compaction: {auto: true, threshold: 30_000}}
+    {compactionSettings: {auto: true, threshold: 30_000}}
   )
 
   expect(textOf(forked)).toBe('You asked: “Say hi in three words.”')
@@ -539,19 +543,19 @@ it('unsubscribes a loaded thread and resumes it with a changed Compaction thresh
   const codex = await setUp(['compaction-settings.ndjson'])
 
   const padded = await codex.reply('Reply with the single word TEAL.', null, {
-    compaction: {auto: true, threshold: 30_000},
+    compactionSettings: {auto: true, threshold: 30_000},
   })
 
   const under = await codex.reply(
     'Reply with the single word OTTER.',
     recordedIn(padded),
-    {compaction: {auto: true, threshold: 30_000}}
+    {compactionSettings: {auto: true, threshold: 30_000}}
   )
 
   const lowered = await codex.reply(
     'Reply with the single word HERON.',
     recordedIn(under),
-    {compaction: {auto: true, threshold: 20_000}}
+    {compactionSettings: {auto: true, threshold: 20_000}}
   )
 
   await codex.allClosed()
@@ -578,7 +582,7 @@ it('unsubscribes a loaded thread and resumes it with a changed Compaction thresh
 
 it('loads a thread again with an empty config to go back to Codex’s default', async () => {
   const codex = await setUp(['compaction-settings.ndjson'])
-  const lowered = {compaction: {auto: true, threshold: 30_000}}
+  const lowered = {compactionSettings: {auto: true, threshold: 30_000}}
 
   const padded = await codex.reply(
     'Reply with the single word TEAL.',

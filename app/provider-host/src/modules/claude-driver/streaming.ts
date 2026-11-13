@@ -43,7 +43,7 @@ type Restore = 'none' | 'store' | 'file'
 
 interface Live extends ClaudeSession {
   model: string
-  compaction: CompactionSettings
+  compactionSettings: CompactionSettings
   restore: Restore
   projectKey: string
   /** The SDK swaps in its own configuration folder on a restore. */
@@ -85,7 +85,7 @@ function resumption(session: ReplyRequest['session'], restore: Restore) {
 }
 
 /** Nothing for a default, so `claude` compacts where it would on its own. */
-function compactionSettings({auto, threshold}: CompactionSettings) {
+function claudeSettingsOf({auto, threshold}: CompactionSettings) {
   return {
     ...(auto ? {} : {autoCompactEnabled: false}),
     ...(threshold === null ? {} : {autoCompactWindow: threshold}),
@@ -145,7 +145,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       settingSources: [],
       settings: {
         autoMemoryEnabled: false,
-        ...compactionSettings(request.compaction),
+        ...claudeSettingsOf(request.compactionSettings),
       },
       tools: [],
       strictMcpConfig: true,
@@ -186,7 +186,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     return Object.assign(session, {
       model: request.model,
-      compaction: request.compaction,
+      compactionSettings: request.compactionSettings,
       restore,
       projectKey,
       activeConfigDir: () => activeConfigDir,

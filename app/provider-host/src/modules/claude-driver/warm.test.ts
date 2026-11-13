@@ -11,13 +11,13 @@ function session(
   sessionId: string,
   messageId: string,
   model = 'haiku',
-  compaction = DEFAULTS
+  compactionSettings = DEFAULTS
 ) {
   return {
     sessionId,
     messageId,
     model,
-    compaction,
+    compactionSettings,
     closed: false,
     async close() {
       this.closed = true
@@ -50,13 +50,13 @@ it('gives back the idle session standing at that Reply', () => {
   expect(
     warm.claim(
       {sessionId: 's1', messageId: 'm1'},
-      {model: 'haiku', compaction: DEFAULTS}
+      {model: 'haiku', compactionSettings: DEFAULTS}
     )
   ).toBe(one)
   expect(
     warm.claim(
       {sessionId: 's1', messageId: 'm1'},
-      {model: 'haiku', compaction: DEFAULTS}
+      {model: 'haiku', compactionSettings: DEFAULTS}
     )
   ).toBeNull()
 })
@@ -70,7 +70,7 @@ it('closes one standing elsewhere in the session instead of giving it back', () 
   expect(
     warm.claim(
       {sessionId: 's1', messageId: 'm1'},
-      {model: 'haiku', compaction: DEFAULTS}
+      {model: 'haiku', compactionSettings: DEFAULTS}
     )
   ).toBeNull()
   expect(one.closed).toBe(true)
@@ -86,7 +86,7 @@ it('closes one on another Model instead of giving it back', () => {
   expect(
     warm.claim(
       {sessionId: 's1', messageId: 'm1'},
-      {model: 'sonnet', compaction: DEFAULTS}
+      {model: 'sonnet', compactionSettings: DEFAULTS}
     )
   ).toBeNull()
   expect(one.closed).toBe(true)
@@ -102,7 +102,7 @@ it('closes one started with other Compaction Settings instead of giving it back'
   expect(
     warm.claim(
       {sessionId: 's1', messageId: 'm1'},
-      {model: 'haiku', compaction: {auto: true, threshold: 150_000}}
+      {model: 'haiku', compactionSettings: {auto: true, threshold: 150_000}}
     )
   ).toBeNull()
   expect(one.closed).toBe(true)
@@ -118,7 +118,7 @@ it('closes one started with automatic Compaction on when the Reply has it off', 
   expect(
     warm.claim(
       {sessionId: 's1', messageId: 'm1'},
-      {model: 'haiku', compaction: {auto: false, threshold: null}}
+      {model: 'haiku', compactionSettings: {auto: false, threshold: null}}
     )
   ).toBeNull()
   expect(one.closed).toBe(true)
@@ -133,7 +133,7 @@ it('starts the idle wait over after each Reply', () => {
 
   warm.claim(
     {sessionId: 's1', messageId: 'm1'},
-    {model: 'haiku', compaction: DEFAULTS}
+    {model: 'haiku', compactionSettings: DEFAULTS}
   )
   vi.advanceTimersByTime(5000)
   expect(one.closed).toBe(false)
@@ -153,7 +153,7 @@ it('never closes a session claimed after being released twice', () => {
 
   warm.claim(
     {sessionId: 's1', messageId: 'm1'},
-    {model: 'haiku', compaction: DEFAULTS}
+    {model: 'haiku', compactionSettings: DEFAULTS}
   )
   vi.advanceTimersByTime(5000)
 
@@ -187,7 +187,7 @@ it('says when every `claude` it closed in a session has ended', async () => {
   warm.release(one)
   warm.claim(
     {sessionId: 's1', messageId: 'm1'},
-    {model: 'haiku', compaction: DEFAULTS}
+    {model: 'haiku', compactionSettings: DEFAULTS}
   )
   const closed = warm.closed('s1')
 

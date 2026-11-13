@@ -86,7 +86,7 @@ export const CompactionSettingsSchema = z.strictObject({
 
 export type CompactionSettings = z.infer<typeof CompactionSettingsSchema>
 
-export function compactionFor(
+export function compactionSettingsFor(
   settings: Settings,
   provider: ProviderId
 ): CompactionSettings {

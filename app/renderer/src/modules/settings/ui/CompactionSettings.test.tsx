@@ -1,7 +1,6 @@
 import type {ProviderId} from '@uz/contract/providers'
 import type {Settings} from '@uz/contract/settings'
 
-import {COMPACTION_THRESHOLD} from '@uz/contract/settings'
 import {expect, it} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {page, userEvent} from 'vitest/browser'
@@ -102,21 +101,18 @@ it('shows the slider’s maximum as Default, and saves moving there as unset', a
 })
 
 it('clamps a typed threshold to the Provider’s range, the top of it saving as unset', async () => {
-  const {min} = COMPACTION_THRESHOLD.chatgpt
   const main = await renderCompaction('chatgpt')
 
   await threshold().fill('5')
   await userEvent.keyboard('{Enter}')
-  await expect
-    .element(threshold())
-    .toHaveValue(new Intl.NumberFormat('en-US').format(min))
+  await expect.element(threshold()).toHaveValue('20,000')
 
   await threshold().fill('99,999,999')
   await userEvent.keyboard('{Enter}')
   await expect.element(threshold()).toHaveValue('Default')
 
   expect(main.sent).toEqual([
-    {type: 'settings.update', changes: {chatgptCompactionThreshold: min}},
+    {type: 'settings.update', changes: {chatgptCompactionThreshold: 20_000}},
     {type: 'settings.update', changes: {chatgptCompactionThreshold: null}},
   ])
 })

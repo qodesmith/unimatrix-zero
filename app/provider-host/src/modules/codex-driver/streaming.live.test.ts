@@ -46,7 +46,10 @@ const signedIn = process.env.UZ_LIVE_CODEX_HOME
 /** The Model ChatGPT's `model/list` marked as its default when recorded. */
 const MODEL = 'gpt-6.1-sol'
 
-const DEFAULT_COMPACTION: CompactionSettings = {auto: true, threshold: null}
+const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
+  auto: true,
+  threshold: null,
+}
 
 function homeFrom(source: string) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-codex-'))
@@ -220,7 +223,7 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
           configDir: home,
         },
         session: session && {...session, type: 'continue'},
-        compaction: {auto: true, threshold},
+        compactionSettings: {auto: true, threshold},
       })
     )
 
@@ -318,7 +321,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             configDir: home,
           },
           session: session && {...session, type: fork ? 'fork' : 'continue'},
-          compaction: DEFAULT_COMPACTION,
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
 
@@ -476,7 +479,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           ...session,
           type: rewind ? 'rewind' : 'continue',
         },
-        compaction: DEFAULT_COMPACTION,
+        compactionSettings: DEFAULT_COMPACTION_SETTINGS,
       })) {
         events.push(event)
 
@@ -633,7 +636,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           prompt: {text, messageId: crypto.randomUUID()},
           vendorProgram: vendorProgram(home),
           session: session && {...session, type: 'continue'},
-          compaction: DEFAULT_COMPACTION,
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
 
@@ -755,7 +758,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             configDir: home,
           },
           session,
-          compaction: DEFAULT_COMPACTION,
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
     }
@@ -901,7 +904,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           configDir: home,
         },
         session: null,
-        compaction: DEFAULT_COMPACTION,
+        compactionSettings: DEFAULT_COMPACTION_SETTINGS,
       })) {
         events.push(event)
 
@@ -988,7 +991,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             configDir: home,
           },
           session: session && {...session, type: 'continue'},
-          compaction: DEFAULT_COMPACTION,
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
 
@@ -1160,7 +1163,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             configDir: home,
           },
           session: null,
-          compaction: DEFAULT_COMPACTION,
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
 
@@ -1231,7 +1234,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
             configDir: home,
           },
           session: null,
-          compaction: DEFAULT_COMPACTION,
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
 

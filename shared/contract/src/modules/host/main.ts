@@ -102,7 +102,7 @@ export const ReplyRequestSchema = z.strictObject({
   vendorProgram: SignInRequestSchema,
   /** Null starts a session. */
   session: ReplySessionSchema.nullable(),
-  compaction: CompactionSettingsSchema,
+  compactionSettings: CompactionSettingsSchema,
 })
 
 export type ReplyRequest = z.infer<typeof ReplyRequestSchema>

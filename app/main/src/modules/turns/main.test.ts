@@ -29,7 +29,7 @@ let finished: FinishedReply[]
 let hostCommands: HostCommand[]
 let sentPromptIds: Map<string, string>
 let hostReady: boolean
-let compaction: CompactionSettings
+let compactionSettings: CompactionSettings
 let clock: Date
 let hostReachable: boolean
 let turns: ReturnType<typeof createTurns>
@@ -58,7 +58,7 @@ function launch() {
     },
     hosts,
     vendorProgramFor: () => vendorProgram,
-    compactionFor: () => compaction,
+    compactionSettingsFor: () => compactionSettings,
     now: () => clock,
     onTurnsChanged: () => undefined,
     onReplyFinished: reply => finished.push(reply),
@@ -74,7 +74,7 @@ beforeEach(() => {
   hostCommands = []
   sentPromptIds = new Map()
   hostReady = true
-  compaction = {auto: true, threshold: null}
+  compactionSettings = {auto: true, threshold: null}
   clock = createdAt
   hostReachable = true
   turns = launch()
@@ -244,7 +244,7 @@ describe('sending the root Prompt', () => {
           prompt: {text: 'Hello', messageId: expect.any(String)},
           vendorProgram,
           session: null,
-          compaction: {auto: true, threshold: null},
+          compactionSettings: {auto: true, threshold: null},
         },
       },
     ])
@@ -543,7 +543,7 @@ describe('the Compaction Settings', () => {
   it('go with each Reply as they are when it starts, a Retry’s too', () => {
     const first = savedRoot()
 
-    compaction = {auto: false, threshold: 150_000}
+    compactionSettings = {auto: false, threshold: 150_000}
 
     const sent = turns.sendPrompt({
       model: picked,
@@ -557,7 +557,7 @@ describe('the Compaction Settings', () => {
     expect(hostCommands).toEqual([
       expect.objectContaining({
         request: expect.objectContaining({
-          compaction: {auto: false, threshold: 150_000},
+          compactionSettings: {auto: false, threshold: 150_000},
         }),
       }),
     ])
@@ -565,13 +565,13 @@ describe('the Compaction Settings', () => {
     hostCommands = []
     fail(sent.reply.id)
 
-    compaction = {auto: true, threshold: 120_000}
+    compactionSettings = {auto: true, threshold: 120_000}
     turns.retry(treeId, sent.reply.id)
 
     expect(hostCommands).toEqual([
       expect.objectContaining({
         request: expect.objectContaining({
-          compaction: {auto: true, threshold: 120_000},
+          compactionSettings: {auto: true, threshold: 120_000},
         }),
       }),
     ])
@@ -950,7 +950,7 @@ describe('a Prompt answering a Reply', () => {
             messageId: 'm1',
             type: 'continue',
           },
-          compaction: {auto: true, threshold: null},
+          compactionSettings: {auto: true, threshold: null},
         },
       },
     ])
@@ -1264,7 +1264,7 @@ describe('retrying a Reply', () => {
           prompt: {text: 'Hi', messageId: expect.any(String)},
           vendorProgram,
           session: null,
-          compaction: {auto: true, threshold: null},
+          compactionSettings: {auto: true, threshold: null},
         },
       },
     ])

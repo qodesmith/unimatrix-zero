@@ -297,7 +297,7 @@ it('sends commands to the Provider’s host', () => {
       prompt: {text: 'Hi', messageId: crypto.randomUUID()},
       vendorProgram: {program: null, configDir: '/claude'},
       session: null,
-      compaction: {auto: true, threshold: null},
+      compactionSettings: {auto: true, threshold: null},
     },
   } as const
 

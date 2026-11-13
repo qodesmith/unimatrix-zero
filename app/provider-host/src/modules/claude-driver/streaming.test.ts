@@ -30,7 +30,10 @@ import {
 } from './replay'
 import {projectKeyOf} from './transcripts'
 
-const DEFAULT_COMPACTION: CompactionSettings = {auto: true, threshold: null}
+const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
+  auto: true,
+  threshold: null,
+}
 
 /** As `warm.ndjson`, `resumed.ndjson` and `forked.ndjson` recorded them. */
 const SESSION_ID = '6b3fb527-e561-4b5c-810d-0ef9ac53978c'
@@ -139,7 +142,7 @@ async function setUp(
     replyId?: string
     model?: string
     messageId?: ReplyRequest['prompt']['messageId']
-    compaction?: CompactionSettings
+    compactionSettings?: CompactionSettings
   }
 
   const vendorProgram = {
@@ -158,7 +161,7 @@ async function setUp(
       replyId = crypto.randomUUID(),
       model = 'haiku',
       messageId = crypto.randomUUID(),
-      compaction = DEFAULT_COMPACTION,
+      compactionSettings = DEFAULT_COMPACTION_SETTINGS,
     }: ReplyOptions = {}
   ) {
     const events: Streamed[] = []
@@ -172,7 +175,7 @@ async function setUp(
       prompt: {text, messageId},
       vendorProgram,
       session: session && {type: 'continue', ...session},
-      compaction,
+      compactionSettings,
     })) {
       events.push(event)
 
@@ -1318,7 +1321,7 @@ it('starts claude with the Compaction Settings, and with nothing for the default
   const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
 
   const third = await claude.reply(THIRD_PROMPT, recordedIn(second), {
-    compaction: {auto: false, threshold: 150_000},
+    compactionSettings: {auto: false, threshold: 150_000},
   })
 
   expect(textOf(third)).toBe('TEAL OTTER')

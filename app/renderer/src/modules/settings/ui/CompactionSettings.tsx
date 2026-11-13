@@ -5,7 +5,10 @@ import {Field, FieldDescription, FieldLabel} from '#shadcn/ui/field'
 import {Input} from '#shadcn/ui/input'
 import {Slider} from '#shadcn/ui/slider'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
-import {COMPACTION_THRESHOLD, compactionFor} from '@uz/contract/settings'
+import {
+  COMPACTION_THRESHOLD,
+  compactionSettingsFor,
+} from '@uz/contract/settings'
 import {cn} from 'cn'
 import {useId, useState} from 'react'
 
@@ -32,7 +35,7 @@ interface CompactionSettingsProps {
 
 export function CompactionSettings({provider}: CompactionSettingsProps) {
   const update = useUpdateSettings()
-  const {auto, threshold} = compactionFor(useSettings(), provider)
+  const {auto, threshold} = compactionSettingsFor(useSettings(), provider)
 
   return (
     <Group legend={`${PROVIDER_NAMES[provider]} Compaction`}>

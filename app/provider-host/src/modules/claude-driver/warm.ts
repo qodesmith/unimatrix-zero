@@ -12,7 +12,7 @@ export interface WarmSession {
   /** The Model `claude` started on, which it keeps. */
   readonly model: string
   /** Fixed as `claude` starts: it applies no later change to the threshold. */
-  readonly compaction: CompactionSettings
+  readonly compactionSettings: CompactionSettings
   close(): Promise<void>
 }
 
@@ -84,7 +84,10 @@ export function createWarmSessions<Session extends WarmSession>({
      */
     claim(
       ref: SessionRef,
-      {model, compaction}: {model: string; compaction: CompactionSettings}
+      {
+        model,
+        compactionSettings,
+      }: {model: string; compactionSettings: CompactionSettings}
     ): Session | null {
       const wanted = resolveModel(model)
 
@@ -94,8 +97,8 @@ export function createWarmSessions<Session extends WarmSession>({
         if (
           session.messageId === ref.messageId &&
           resolveModel(session.model) === wanted &&
-          session.compaction.auto === compaction.auto &&
-          session.compaction.threshold === compaction.threshold
+          session.compactionSettings.auto === compactionSettings.auto &&
+          session.compactionSettings.threshold === compactionSettings.threshold
         ) {
           wake(session)
 

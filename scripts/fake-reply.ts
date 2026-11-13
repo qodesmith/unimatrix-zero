@@ -42,7 +42,7 @@ export async function recordFakeReply(): Promise<ReplyEvent[]> {
     prompt: {text: 'Show me everything', messageId: crypto.randomUUID()},
     vendorProgram: {program: null, configDir: '/fake'},
     session: null,
-    compaction: {auto: true, threshold: null},
+    compactionSettings: {auto: true, threshold: null},
   })) {
     if (!isReplyEvent(event)) continue
 

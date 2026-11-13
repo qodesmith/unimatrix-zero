@@ -157,7 +157,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     dropFrom: string | null
   ): Promise<{thread: LoadedThread; dropped: boolean}> {
     const {configDir} = request.vendorProgram
-    const {threshold} = request.compaction
+    const {threshold} = request.compactionSettings
 
     const settings = {
       cwd: configDir,

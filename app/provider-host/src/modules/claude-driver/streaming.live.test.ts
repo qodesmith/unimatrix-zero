@@ -99,7 +99,7 @@ function liveDriver(
   refuses: Parameters<typeof fakeStore>[0] = {}
 ) {
   let addedEnv = firstEnv
-  let compaction: CompactionSettings = {auto: true, threshold: null}
+  let compactionSettings: CompactionSettings = {auto: true, threshold: null}
   const store = fakeStore(refuses)
   const printed: string[] = []
 
@@ -157,7 +157,7 @@ function liveDriver(
         configDir,
       },
       session,
-      compaction,
+      compactionSettings,
     }
   }
 
@@ -182,7 +182,7 @@ function liveDriver(
     },
     /** For each Reply from here on, as main reads it from Settings. */
     setCompaction(next: CompactionSettings) {
-      compaction = next
+      compactionSettings = next
     },
     printed,
     entriesOf: (sessionId: string) =>
