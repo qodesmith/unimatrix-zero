@@ -58,7 +58,6 @@ export const FakeClaudeRunSchema = z.strictObject({
   prompts: z.array(z.string()),
   /** Per Prompt, whether it came marked to be delivered as written. */
   clientComposed: z.array(z.boolean()),
-  /** The System prompt the SDK started it with. */
   systemPrompt: z.array(z.string()),
   /** The entry uuids of the transcript it resumed. */
   resumedFrom: z.array(z.string()),

@@ -304,10 +304,11 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   }
 
   /**
-   * A warm `claude` that exited while idle is replaced; a store restore that
-   * `claude` refuses falls back to the transcript written back.
+   * A null session starts a new one. A warm `claude` that exited while idle is
+   * replaced; a store restore that `claude` refuses falls back to the
+   * transcript written back.
    */
-  async function* fromCopy(
+  async function* replyOnce(
     request: ReplyRequest,
     mapper: Mapper,
     run: ReplyRun
@@ -370,17 +371,17 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     if (!request.session) {
       if (thread.length > 0) yield rebuilt
 
-      return yield* fromCopy(request, mapper, run)
+      return yield* replyOnce(request, mapper, run)
     }
 
-    const restored = yield* fromCopy(request, mapper, run)
+    const restored = yield* replyOnce(request, mapper, run)
 
     if (thread.length === 0 || !sessionLost(restored.outcome)) return restored
 
     warm.drop(restored.session)
     yield rebuilt
 
-    return yield* fromCopy({...request, session: null}, mapper, run)
+    return yield* replyOnce({...request, session: null}, mapper, run)
   }
 
   /** A refused save of the tool results fails the Reply. */

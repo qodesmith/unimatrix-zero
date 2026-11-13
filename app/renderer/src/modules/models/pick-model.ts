@@ -5,7 +5,7 @@ import type {
   ProviderStatus,
 } from '@uz/contract/providers'
 
-import {PROVIDER_NAMES, findModel} from '@uz/contract/providers'
+import {PROVIDER_NAMES, concreteOf, findModel} from '@uz/contract/providers'
 
 /**
  * The Model an Input wants: `entry` is the listed entry the user picked it by,
@@ -36,10 +36,6 @@ export interface ModelPick {
 }
 
 const LOADING = 'Loading Models…'
-
-function concreteOf(model: Model) {
-  return model.resolvesTo ?? model.id
-}
 
 /** Resolved now, so a later move of the alias or default leaves it be. */
 export function pickedFrom(provider: ProviderId, model: Model): WantedModel {
