@@ -80,14 +80,43 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
+  interaction-limits-renewal:
+    name: Interaction limits renewal is on
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    # GitHub turns off a public repo's scheduled workflows after 60 days with no
+    # activity, and a later push doesn't turn them back on.
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          workflow=renew-interaction-limits.yml
+
+          if ! state=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow" --jq .state 2>lookup-error); then
+            if grep -q 'HTTP 404' lookup-error; then
+              echo "::notice::$workflow isn't on main yet, so there is no schedule to check."
+              exit 0
+            fi
+            cat lookup-error >&2
+            exit 1
+          fi
+
+          if [[ $state != active ]]; then
+            echo "::error::$workflow is $state, so the interaction limit stops renewing. Turn it back on with: gh workflow enable $workflow"
+            exit 1
+          fi
+
   ci:
     name: CI
     if: always()
-    needs: [checks, unit, provider-checks]
+    needs: [checks, unit, provider-checks, interaction-limits-renewal]
     runs-on: ubuntu-latest
     steps:
       - run: |
           echo "checks: ${{ needs.checks.result }}"
           echo "unit: ${{ needs.unit.result }}"
           echo "provider-checks: ${{ needs.provider-checks.result }}"
-          test "${{ needs.checks.result }}" = success && test "${{ needs.unit.result }}" = success && test "${{ needs.provider-checks.result }}" = success
+          echo "interaction-limits-renewal: ${{ needs.interaction-limits-renewal.result }}"
+          test "${{ needs.checks.result }}" = success && test "${{ needs.unit.result }}" = success && test "${{ needs.provider-checks.result }}" = success && test "${{ needs.interaction-limits-renewal.result }}" = success
