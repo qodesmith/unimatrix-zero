@@ -68,7 +68,6 @@ export function CompactionSettings({provider}: CompactionSettingsProps) {
   )
 }
 
-/** The Slider takes a list of thumbs, and this one has one. */
 function thumbOf(value: number | readonly number[]) {
   return [value].flat()[0] ?? 0
 }
