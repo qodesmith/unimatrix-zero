@@ -78,7 +78,7 @@ export type ReplySession = z.infer<typeof ReplySessionSchema>
 
 /**
  * The Turns a Prompt continues, oldest first: what a Provider session is
- * rebuilt from (ADR 0001). The whole Thread, never cut or summarized.
+ * rebuilt from. The whole Thread, never cut or summarized.
  */
 export const ThreadSchema = z.array(
   z.strictObject({

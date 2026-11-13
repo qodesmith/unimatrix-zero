@@ -88,7 +88,7 @@ export const ReplyProgressSchema = z.strictObject({
   compacted: z.boolean(),
   /**
    * Its Provider session was rebuilt from the Thread for it, so the AI re-read
-   * the whole Thread cold (ADR 0001).
+   * the whole Thread cold.
    */
   rebuilt: z.boolean(),
 })

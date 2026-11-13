@@ -1699,8 +1699,7 @@ function injectRefused() {
         kind: 'out',
         message: {id: 90, error: {code: -32600, message: 'invalid item'}},
       }),
-      ...lines.slice(asked, answered + 1),
-      ...lines.slice(answered + 1),
+      ...lines.slice(asked),
     ].join('\n')
   })
 }

@@ -387,7 +387,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Kind:** D
 - **Provider:** Claude
 - **Relies on:** the Model takes a Thread replayed as text inside one user message, between `<thread>` tags with a line that says what it is, as the conversation it has had, and answers the Prompt after it.
-- **App side:** `claude-driver` gives a new session the whole Thread this way with its first Prompt, when a Thread comes from ChatGPT or its session is lost. The SDK takes only user messages, and a hand-made transcript in the session store's private format was ruled out (#10).
+- **App side:** `claude-driver` gives a new session the whole Thread this way with its first Prompt, when a Thread comes from ChatGPT or its session is lost. The SDK takes only user messages, and a hand-made transcript in the session store's private format was ruled out, since any `claude` update can break that format and the app never writes a Provider's own format (ADR 0004, #10).
 - **User would see:** a Claude that comments on the replay as a document, or answers as if the earlier Turns never happened.
 - **Changed by:** upgrade + drift. The Model decides how it reads the replay.
 - **Check:** `[dep:thread-replay-as-conversation]` in `claude-driver`: a new session told a ChatGPT-written Thread recalls it, and the next Prompt goes on from it warm.
