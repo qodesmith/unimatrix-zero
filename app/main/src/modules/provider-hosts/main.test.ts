@@ -148,6 +148,16 @@ it('is ready once the host says so', () => {
   expect(hosts.ready('claude')).toBe(true)
 })
 
+it('reports ready once when one host says so twice', () => {
+  const hosts = setUp()
+  hosts.connect('claude')
+
+  latest().say(hostReady)
+  latest().say(hostReady)
+
+  expect(statuses).toEqual(['starting', 'ready'])
+})
+
 it('passes on the Models a host lists', () => {
   const hosts = setUp()
   hosts.connect('claude')
