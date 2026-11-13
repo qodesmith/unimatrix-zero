@@ -13,6 +13,9 @@ const settling = {
 const restarting = {status: 'restarting'} satisfies DevElectronState
 const stopping = {status: 'stopping'} satisfies DevElectronState
 
+// @ts-expect-error only a settling Electron names a rebuilt bundle
+void ({...restarting, bundle: 'main'} satisfies DevElectronState)
+
 const ALL: DevElectronEvent[] = [
   {type: 'rebuilt', bundle: 'preload', at: 1200},
   {type: 'settled'},

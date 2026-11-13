@@ -47,7 +47,7 @@ const transitions = {
     exited: stopping,
     stopAsked: stopping,
   },
-  // The next Electron starts after this rebuild, so it loads the new bundle.
+  // Ignores `rebuilt`: the next Electron starts after it, so it loads the new bundle.
   restarting: {exited: () => initialDevElectron, stopAsked: stopping},
   stopping: {},
 } satisfies Transitions<DevElectronState, DevElectronEvent>
