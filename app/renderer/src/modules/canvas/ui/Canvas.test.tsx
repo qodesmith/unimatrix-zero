@@ -690,6 +690,22 @@ it('moves the Active Thread to a Reply that fails as it starts, and sends its Pr
     )
 })
 
+it('leaves the cursor alone when a Reply that failed as it started is retried', async () => {
+  const {main} = await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply three')).toBeVisible()
+  main.sends.failure = {code: 'host-unreachable', message: 'No host'}
+
+  await inputUnder('Reply three').fill('A thought')
+  await userEvent.keyboard('{Enter}')
+  await expect
+    .element(chip().getByText('Claude could not be reached'))
+    .toBeVisible()
+
+  await chip().getByRole('button', {name: 'Retry'}).click()
+  await expect.element(inputUnder('Writing…')).toBeVisible()
+  await expect.element(inputUnder('Writing…')).not.toHaveFocus()
+})
+
 function rect(turnText: string) {
   return page.getByText(turnText).element().getBoundingClientRect()
 }

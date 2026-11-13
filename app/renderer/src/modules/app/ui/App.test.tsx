@@ -801,6 +801,44 @@ describe('connecting a Provider', () => {
     expect(main.sent.map(command => command.type)).toContain('tree.create')
   })
 
+  it('creates one Tree however often Start chatting is clicked while main creates it', async () => {
+    const main = fakeMain({firstLaunch: true})
+    const created = Promise.withResolvers<undefined>()
+    let asked = 0
+
+    globalThis.window.uz = {
+      ...main,
+      send: (async (command: Command) => {
+        if (command.type === 'tree.create') {
+          asked += 1
+          await created.promise
+        }
+
+        return main.send(command)
+      }) as Bridge['send'],
+    }
+    await renderApp()
+
+    main.publish({
+      type: 'PROVIDER_STATUS',
+      provider: 'claude',
+      status: 'ready',
+      account,
+    })
+
+    const start = page.getByRole('button', {name: 'Start chatting →'})
+
+    await start.click()
+    await expect.poll(() => asked).toBe(1)
+    await start.click()
+
+    created.resolve(undefined)
+    await expect
+      .element(page.getByRole('textbox', {name: 'Prompt'}))
+      .toBeVisible()
+    expect(asked).toBe(1)
+  })
+
   it('waits for the new page after Claude refuses a code', async () => {
     const main = fakeMain({firstLaunch: true})
     globalThis.window.uz = main

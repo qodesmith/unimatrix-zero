@@ -1,19 +1,20 @@
+import type {ImageLoadState} from '../image-load/machine'
 import type {ExtraProps} from 'streamdown'
 
 import {bridge} from '#modules/bridge/main'
+import {useStateMachine} from '#modules/state-machine/main'
 import {Button} from '#shadcn/ui/button'
 import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
-import {useState} from 'react'
+
+import {loadImage} from '../image-load/actions'
+import {imageLoadTransition, initialImageLoad} from '../image-load/machine'
 
 type ImageProps = React.JSX.IntrinsicElements['img'] & ExtraProps
 
-type LoadState =
-  | {state: 'unloaded'}
-  | {state: 'loading'}
-  | {state: 'loaded'; dataUrl: string}
-  | {state: 'failed'; message: string}
-
-const BUTTON_LABELS: Record<Exclude<LoadState['state'], 'loaded'>, string> = {
+const BUTTON_LABELS: Record<
+  Exclude<ImageLoadState['status'], 'loaded'>,
+  string
+> = {
   unloaded: 'Load',
   loading: 'Loading…',
   failed: 'Try again',
@@ -51,9 +52,12 @@ function RemoteImageChip({
   alt: ImageProps['alt']
   title: ImageProps['title']
 }) {
-  const [load, setLoad] = useState<LoadState>({state: 'unloaded'})
+  const [load, send] = useStateMachine({
+    transition: imageLoadTransition,
+    initial: initialImageLoad,
+  })
 
-  if (load.state === 'loaded') {
+  if (load.status === 'loaded') {
     return (
       <img
         src={load.dataUrl}
@@ -64,15 +68,14 @@ function RemoteImageChip({
     )
   }
 
-  async function loadImage() {
-    setLoad({state: 'loading'})
-    const outcome = await bridge().send({type: 'image.load', url})
+  function ask() {
+    if (imageLoadTransition(load, {type: 'loadAsked'}) === load) return
 
-    setLoad(
-      outcome.ok
-        ? {state: 'loaded', dataUrl: outcome.value.dataUrl}
-        : {state: 'failed', message: outcome.error.message}
-    )
+    send({type: 'loadAsked'})
+    void loadImage({
+      runLoad: async () => bridge().send({type: 'image.load', url}),
+      send,
+    })
   }
 
   return (
@@ -84,16 +87,16 @@ function RemoteImageChip({
       >
         <span>Image from {hostOf(url)}</span>
         {alt && <span className="truncate italic">{alt}</span>}
-        {load.state === 'failed' && (
+        {load.status === 'failed' && (
           <span className="text-destructive">{load.message}</span>
         )}
         <Button
           variant="link"
-          disabled={load.state === 'loading'}
-          onClick={() => void loadImage()}
+          disabled={load.status === 'loading'}
+          onClick={ask}
           className="h-auto border-0 p-0 text-xs text-foreground underline-offset-2"
         >
-          {BUTTON_LABELS[load.state]}
+          {BUTTON_LABELS[load.status]}
         </Button>
       </TooltipTrigger>
       <TooltipContent>{url}</TooltipContent>

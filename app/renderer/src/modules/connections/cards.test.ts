@@ -4,7 +4,7 @@ import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import {expect, it} from 'vitest'
 
-import {NOT_LOADED, applyConnectionEvent, cardOf} from './cards'
+import {NOT_LOADED, applyConnectionEvent, cardOf, withFailure} from './cards'
 
 const url = 'https://claude.com/cai/oauth/authorize?code=true&state=s'
 
@@ -150,6 +150,26 @@ it('goes back to Connect when connecting is canceled', () => {
   ])
 
   expect(cardOf(state, 'claude')).toEqual({kind: 'idle'})
+})
+
+it('goes back to Connect when a connect is canceled after main refused a command during it', () => {
+  const connecting = fold([
+    snapshot,
+    {type: 'SIGN_IN_STEP', provider: 'claude', step: 'get-ready'},
+  ])
+
+  const refused = withFailure(connecting, 'claude', {
+    reason: 'failed',
+    message: 'You can connect Claude once Claude is done.',
+  })
+
+  const canceled = applyConnectionEvent(refused, {
+    type: 'SIGN_IN_FINISHED',
+    provider: 'claude',
+    outcome: 'canceled',
+  })
+
+  expect(cardOf(canceled, 'claude')).toEqual({kind: 'idle'})
 })
 
 it('picks up a connect in progress from the SNAPSHOT', () => {

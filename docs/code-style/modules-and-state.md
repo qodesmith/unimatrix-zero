@@ -28,9 +28,10 @@ The layout, and why only `@uz/contract` crosses between processes, are in [READM
 
 ## Write the transitions with `machine()`, and run them with `useStateMachine`
 
-- `machine()` from `#modules/state-machine/main` builds the transition function from a table keyed by `status`. Write the table with `satisfies Transitions<State, Event>`, or give it inline (`machine<State, Event>({...})`). In both forms the typecheck refuses a missing status.
+- `machine()` builds the transition function from a table keyed by `status`. The renderer imports it from `#modules/state-machine/main`; main, a Provider host and a script import it from `@uz/contract/state-machine`. Write the table with `satisfies Transitions<State, Event>`, or give it inline (`machine<State, Event>({...})`). In both forms the typecheck refuses a missing status.
 - An event that a state does not list, and a result shallow-equal to its input, return the input object, so React bails out of the update.
-- `useStateMachine({transition, initial})` runs the machine and returns `[state, send]`. Call it rather than `useReducer` for a machine.
+- In React, `useStateMachine({transition, initial})` runs the machine and returns `[state, send]`. Call it rather than `useReducer` for a machine.
+- Outside React, the runner keeps the state in one variable and has one `send` that replaces it. An ignored event returns the same object, so nothing runs for it. Where the effects follow from the new state alone, `send` runs them (`scripts/dev.ts`). Where they depend on the event, `send` reports whether the state took it and the caller runs them (`provider-hosts/main.ts` in main).
 - A reader that branches on two or more states uses an exhaustive `switch` on `status`. A check for one state may use `status ===`.
 
 ## Pick the runner for the machine
@@ -38,13 +39,14 @@ The layout, and why only `@uz/contract` crosses between processes, are in [READM
 - When one component reads the state and needs nothing more than `send`, that component calls `useStateMachine`.
 - When the runner also reads data beside the machine, or hands callbacks to other components, it is a hook beside the machine, `use-<machine>.ts`, returning its own object. `canvas/chat-slideout/use-chat-slideout.ts` is the example: it sends `arrived` once the Tree has the Reply it follows.
 - When a machine is kept per entity, and other components and main's events share its state, its states live in a store keyed by that entity, and its runner hook runs `machine()`'s transition on that store. `turns/reply-run/use-reply-run.ts` is the example.
-- In a compound, the provider runs the machine and types its context as `{state, actions, meta}`. The first compound adds that type to `state-machine/machine.ts` and exports it from the module's `main.ts`.
+- In a compound, the provider runs the machine and types its context as `{state, actions, meta}`. The first compound adds that type to the renderer's `state-machine/` module and exports it from the module's `main.ts`.
 
 ## Put effects in an actions file, and only when an operation has one
 
 - An actions file exists only when an operation has effects, such as a `bridge().send`, a timer or a write to Settings. A machine with no effects, such as `chat-slideout/`, has none.
 - Each action takes one `input` object. It never sets machine state, and changes the machine only through `send`.
 - The runner reads the effects from hooks and passes them in: `send`, the query client, a ref. They are not static imports.
+- A handler that starts an effect sends the event only when the state takes it: it checks `transition(state, event) === state` first and returns. `canvas/prompt-send/use-prompt-send.ts` is the example: a second submit while a Prompt is being sent does nothing.
 
 ## Give each machine a folder in its module
 
@@ -52,4 +54,5 @@ The layout, and why only `@uz/contract` crosses between processes, are in [READM
   - `machine.ts`: the state union, the event union, the initial state and the transition function.
   - `actions.ts`: only when an operation has effects.
   - The runner hook, when the runner is not the one component that reads the state. A runner component is `.tsx`, so it lives under the module's `ui/`.
+- A script's machine is one file beside the script, such as `scripts/dev-electron.ts`.
 - Testing a machine is in [testing](testing.md).

@@ -3,7 +3,6 @@ import type {KeyboardEvent, Ref} from 'react'
 
 import {ModelPicker, useModelPick} from '#modules/models/main'
 import {useSettings} from '#modules/settings/main'
-import {useSendPrompt} from '#modules/turns/main'
 import {FieldError} from '#shadcn/ui/field'
 import {
   InputGroup,
@@ -11,10 +10,11 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from '#shadcn/ui/input-group'
-import {useRef, useState} from 'react'
+import {useEffect, useRef, useState} from 'react'
 
 import {useAttachedReply} from '../canvas-context'
 import {EMPTY_DRAFT} from '../drafts'
+import {usePromptSend} from '../prompt-send/use-prompt-send'
 import {StopButton} from './StopButton'
 
 interface PromptInputProps {
@@ -35,6 +35,11 @@ interface PromptInputProps {
   ref?: Ref<HTMLTextAreaElement>
 }
 
+/** What was typed after `sent` while main took it: the Input keeps that. */
+function unsent(text: string, sent: string) {
+  return text.startsWith(sent) ? text.slice(sent.length) : text
+}
+
 export function PromptInput({
   treeId,
   parentReplyId,
@@ -46,42 +51,43 @@ export function PromptInput({
   stopReplyId,
   ref,
 }: PromptInputProps) {
-  const sendPrompt = useSendPrompt(treeId, parentReplyId)
+  const promptSend = usePromptSend(treeId, parentReplyId)
   const {sendKey} = useSettings()
   const form = useRef<HTMLFormElement>(null)
   const [ownDraft, setOwnDraft] = useState(EMPTY_DRAFT)
-  const {text: draft, model: picked} = kept ?? ownDraft
-  const [sending, setSending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const current = kept ?? ownDraft
+  const {text: draft, model: picked} = current
+  const latest = useRef(current)
   const pick = useModelPick(picked, useAttachedReply(parentReplyId))
   const {selected} = pick
+  const sending = promptSend.state.status === 'sending'
   const held = !canSend || sending || pick.heldBecause !== null
 
-  function updateDraft(changes: Partial<Draft>) {
-    const next = {...(kept ?? ownDraft), ...changes}
+  useEffect(() => {
+    latest.current = current
+  }, [current])
 
+  function updateDraft(changes: Partial<Draft>) {
+    const next = {...latest.current, ...changes}
+
+    latest.current = next
     setOwnDraft(next)
     onDraftChange?.(next)
   }
 
-  async function send() {
+  function send() {
     if (held || !selected || draft.trim() === '') return
 
     const {provider, model} = selected
 
-    setSending(true)
-    const outcome = await sendPrompt(draft, {provider, model})
-    setSending(false)
-
-    if (!outcome.ok) {
-      setError(outcome.error)
-
-      return
-    }
-
-    setError(null)
-    updateDraft({text: ''})
-    onSent?.(outcome.reply.id)
+    promptSend.submit({
+      text: draft,
+      model: {provider, model},
+      onSent: replyId => {
+        updateDraft({text: unsent(latest.current.text, draft)})
+        onSent?.(replyId)
+      },
+    })
   }
 
   function onKeyDown(event: KeyboardEvent) {
@@ -92,7 +98,7 @@ export function PromptInput({
 
     if (sends) {
       event.preventDefault()
-      void send()
+      send()
     }
   }
 
@@ -102,7 +108,7 @@ export function PromptInput({
       className="nowheel nopan w-full"
       onSubmit={event => {
         event.preventDefault()
-        void send()
+        send()
       }}
     >
       <InputGroup className="bg-background">
@@ -121,7 +127,11 @@ export function PromptInput({
           align="block-end"
           className="flex-wrap justify-between"
         >
-          <FieldError className="text-xs">{error}</FieldError>
+          <FieldError className="text-xs">
+            {promptSend.state.status === 'refused'
+              ? promptSend.state.error
+              : null}
+          </FieldError>
           <div className="ml-auto flex items-center gap-1">
             <ModelPicker pick={pick} onPick={model => updateDraft({model})} />
             {stopReplyId === undefined ? (

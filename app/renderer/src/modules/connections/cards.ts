@@ -108,7 +108,13 @@ export function applyConnectionEvent(
   }
 
   if (event.type === 'SIGN_IN_FINISHED') {
-    const finished = {...state, signIn: null, pasting: false}
+    // A command refused while connecting says nothing once the connect is over.
+    const finished = {
+      ...state,
+      signIn: null,
+      pasting: false,
+      failures: withoutFailure(state, event.provider),
+    }
 
     return event.outcome === 'failed'
       ? withFailure(finished, event.provider, event.failure)

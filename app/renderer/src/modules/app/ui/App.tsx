@@ -3,7 +3,6 @@ import {
   Connections,
   ConnectionsProvider,
   ProviderTabs,
-  anyConnected,
   useConnections,
 } from '#modules/connections/main'
 import {
@@ -23,6 +22,7 @@ import {TooltipProvider} from '#shadcn/ui/tooltip'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {useState} from 'react'
 
+import {useFirstLaunch} from '../first-launch/use-first-launch'
 import {AppSidebar} from './AppSidebar'
 
 export function App() {
@@ -52,26 +52,22 @@ function AppLayout() {
   const trees = useTrees()
   const {hasTrees, openTree, create} = trees
 
-  const [firstLaunch, setFirstLaunch] = useState<boolean | null>(null)
+  const firstLaunch = useFirstLaunch(connections.state, create)
 
-  if (firstLaunch === null && connections.state.loaded) {
-    setFirstLaunch(!anyConnected(connections.state))
-  }
-
-  async function startChatting() {
-    await create()
-    setFirstLaunch(false)
-  }
-
-  if (firstLaunch !== false) {
-    return firstLaunch ? (
-      <main className="h-full overflow-y-auto">
-        <Connections
-          connections={connections}
-          onStart={() => void startChatting()}
-        />
-      </main>
-    ) : null
+  switch (firstLaunch.status) {
+    case 'loading':
+      return null
+    case 'connecting':
+    case 'starting':
+      return (
+        <main className="h-full overflow-y-auto">
+          <Connections connections={connections} onStart={firstLaunch.start} />
+        </main>
+      )
+    case 'ready':
+      break
+    default:
+      throw new Error('Unknown first launch state.')
   }
 
   return (

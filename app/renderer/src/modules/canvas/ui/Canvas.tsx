@@ -375,6 +375,11 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
     .filter(reply => reply.status === 'failed')
     .map(reply => reply.id)
 
+  // A failed Reply has no Input to focus, and a Retry leaves the cursor alone.
+  if (inputToFocus !== null && failed.includes(inputToFocus)) {
+    setInputToFocus(null)
+  }
+
   return (
     <CanvasContext value={state}>
       <ReactFlowProvider>
