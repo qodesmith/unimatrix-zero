@@ -85,8 +85,8 @@ export function ProviderCard({
   )
 }
 
-/** A card's sign-in without the card around it, for Settings. */
-export function SignIn({
+/** A card's connect flow without the card around it, for Settings. */
+export function Connect({
   provider,
   card,
   waitingFor,

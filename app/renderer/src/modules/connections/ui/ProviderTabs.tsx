@@ -11,7 +11,7 @@ import {cn} from 'cn'
 
 import {ABOUT} from '../about'
 import {cardOf, waitingFor} from '../cards'
-import {SignIn} from './ProviderCard'
+import {Connect} from './ProviderCard'
 
 interface ProviderTabsProps {
   connections: ConnectionsControls
@@ -60,7 +60,7 @@ export function ProviderTabs({
             {card.kind === 'connected' ? (
               <Account provider={provider} card={card} />
             ) : (
-              <SignIn
+              <Connect
                 provider={provider}
                 card={card}
                 waitingFor={waitingFor(state, provider)}
