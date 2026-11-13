@@ -16,7 +16,7 @@ const SESSION_LOST = /no rollout found for thread id/
  * `replay`: the thread holds nothing of the Thread, so the Prompt tells it.
  * `rebuilt`: the thread was started and given the Thread.
  */
-interface Opened {
+export interface Opened {
   thread: LoadedThread
   dropped: boolean
   replay: boolean

@@ -77,9 +77,9 @@ it('says how much of the Thread another Provider will re-read, Context size and 
   )
 })
 
-/** The note for a ChatGPT Thread of `conversation` tokens going to Claude. */
-function chatgptToClaude(conversation: number) {
-  const size = conversation + SETUP_TOKENS.chatgpt
+/** The note for a ChatGPT Thread of `threadTokens` tokens going to Claude. */
+function chatgptToClaude(threadTokens: number) {
+  const size = threadTokens + SETUP_TOKENS.chatgpt
 
   return reReadNote({
     attachedTo: exchange(null, size, 'chatgpt').reply,

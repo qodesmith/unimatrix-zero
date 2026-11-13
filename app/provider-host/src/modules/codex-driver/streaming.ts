@@ -7,7 +7,7 @@ import type {
 } from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
-import type {Restored} from './rebuild'
+import type {Opened, Restored} from './rebuild'
 import type {LoadedThread} from './threads'
 import type {Notification, ParamsOf, RateLimits} from './wire'
 import type {
@@ -341,7 +341,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   async function* send(
     running: Running,
     request: ReplyRequest,
-    {thread, replay}: Awaited<ReturnType<typeof openThread>>,
+    {thread, replay}: Opened,
     run: ReplyRun
   ): AsyncGenerator<ContentEvent | PromptRecorded, Ending> {
     const ids = {treeId: request.treeId, replyId: request.replyId}
