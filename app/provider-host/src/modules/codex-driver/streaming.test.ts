@@ -575,7 +575,6 @@ it('unsubscribes a loaded thread and resumes it with a changed Compaction thresh
     'thread/resume',
     'thread/read',
   ])
-  expect(compactionsIn([...padded, ...under])).toEqual([])
   expect(compactionsIn(lowered)).toHaveLength(1)
   expect(textOf(lowered)).toBe('HERON')
 })

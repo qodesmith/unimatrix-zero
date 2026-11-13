@@ -24,9 +24,11 @@ const APPLIES = 'Applies to every Thread from its next Reply.'
 
 const tokens = new Intl.NumberFormat('en-US')
 
+type Threshold = ReturnType<typeof compactionSettingsFor>['threshold']
+
 const thresholdUpdate: Record<
   ProviderId,
-  (threshold: number | null) => SettingsUpdate
+  (threshold: Threshold) => SettingsUpdate
 > = {
   claude: claudeCompactionThreshold => ({claudeCompactionThreshold}),
   chatgpt: chatgptCompactionThreshold => ({chatgptCompactionThreshold}),
@@ -81,9 +83,9 @@ function thumbOf(value: number | readonly number[]) {
 interface ThresholdProps {
   range: CompactionThresholdRange
   /** Null is the Provider's default, which the slider's maximum stands for. */
-  saved: number | null
+  saved: Threshold
   disabled: boolean
-  onCommit: (threshold: number | null) => void
+  onCommit: (threshold: Threshold) => void
 }
 
 function Threshold({range, saved, disabled, onCommit}: ThresholdProps) {
