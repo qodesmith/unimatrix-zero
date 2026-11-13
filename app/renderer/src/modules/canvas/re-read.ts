@@ -4,6 +4,8 @@ import type {Reply} from '@uz/contract/turns'
 
 import {PROVIDER_NAMES} from '@uz/contract/providers'
 
+import {previousReply} from './tree'
+
 /** Below this, re-reading a Thread cold costs too little to mention. */
 export const RE_READ_NOTE_FROM = 20_000
 
@@ -38,12 +40,7 @@ export function contextSizeAt(
       return {provider: current.provider, size: current.contextSize}
     }
 
-    const parentReplyId = index.promptById.get(current.promptId)?.parentReplyId
-
-    current =
-      parentReplyId === undefined || parentReplyId === null
-        ? null
-        : (index.replyById.get(parentReplyId) ?? null)
+    current = previousReply(index, current)
   }
 
   return null
