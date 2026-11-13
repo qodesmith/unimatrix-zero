@@ -14,6 +14,7 @@
     "./manifest": "./src/modules/manifest/main.ts",
     "./providers": "./src/modules/providers/main.ts",
     "./settings": "./src/modules/settings/main.ts",
+    "./state-machine": "./src/modules/state-machine/main.ts",
     "./theme": "./src/modules/theme/main.ts",
     "./trees": "./src/modules/trees/main.ts",
     "./turns": "./src/modules/turns/main.ts"

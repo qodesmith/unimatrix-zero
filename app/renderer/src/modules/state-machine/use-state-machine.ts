@@ -1,4 +1,4 @@
-import type {MachineEvent, MachineState} from './machine'
+import type {MachineEvent, MachineState} from '@uz/contract/state-machine'
 
 import {useReducer} from 'react'
 

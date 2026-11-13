@@ -24,7 +24,7 @@ app/main/           the hub: SQLite, Provider hosts, the one window
 app/preload/        window.uz = { send, subscribe, registerDroppedFile }, one self-contained CJS file
 app/renderer/       React, Tailwind and shadcn, styled only by Theme tokens
 app/provider-host/  one utility process per Provider: claude and chatgpt entries
-shared/contract/    Zod schemas for commands and events; every type derives from them
+shared/contract/    Zod schemas for commands and events; every type derives from them. Also `machine()`, the state machine helper every process shares
 tooling/            the shared Vite build helper and the repo's own lint rules
 scripts/            dev loop, test runner, runtime pinning
 ```

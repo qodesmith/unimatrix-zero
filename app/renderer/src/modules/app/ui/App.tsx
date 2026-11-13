@@ -16,6 +16,7 @@ import {
   FollowFontSize,
   SettingsProvider,
 } from '#modules/settings/main'
+import {useStateMachine} from '#modules/state-machine/main'
 import {NoTreeOpen, TreeTitle, useTrees} from '#modules/trees/main'
 import {LiveReplies} from '#modules/turns/main'
 import {SidebarInset} from '#shadcn/ui/sidebar'
@@ -23,6 +24,11 @@ import {TooltipProvider} from '#shadcn/ui/tooltip'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {useState} from 'react'
 
+import {startChatting} from '../first-launch/actions'
+import {
+  firstLaunchTransition,
+  initialFirstLaunch,
+} from '../first-launch/machine'
 import {AppSidebar} from './AppSidebar'
 
 export function App() {
@@ -52,26 +58,40 @@ function AppLayout() {
   const trees = useTrees()
   const {hasTrees, openTree, create} = trees
 
-  const [firstLaunch, setFirstLaunch] = useState<boolean | null>(null)
+  const [firstLaunch, send] = useStateMachine({
+    transition: firstLaunchTransition,
+    initial: initialFirstLaunch,
+  })
 
-  if (firstLaunch === null && connections.state.loaded) {
-    setFirstLaunch(!anyConnected(connections.state))
+  if (firstLaunch.status === 'loading' && connections.state.loaded) {
+    send({type: 'loaded', anyConnected: anyConnected(connections.state)})
   }
 
-  async function startChatting() {
-    await create()
-    setFirstLaunch(false)
+  function start() {
+    if (
+      firstLaunchTransition(firstLaunch, {type: 'startAsked'}) === firstLaunch
+    ) {
+      return
+    }
+
+    send({type: 'startAsked'})
+    void startChatting({createTree: create, send})
   }
 
-  if (firstLaunch !== false) {
-    return firstLaunch ? (
-      <main className="h-full overflow-y-auto">
-        <Connections
-          connections={connections}
-          onStart={() => void startChatting()}
-        />
-      </main>
-    ) : null
+  switch (firstLaunch.status) {
+    case 'loading':
+      return null
+    case 'connecting':
+    case 'starting':
+      return (
+        <main className="h-full overflow-y-auto">
+          <Connections connections={connections} onStart={start} />
+        </main>
+      )
+    case 'ready':
+      break
+    default:
+      throw new Error('Unknown first launch state.')
   }
 
   return (

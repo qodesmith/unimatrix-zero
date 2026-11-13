@@ -1,6 +1,6 @@
 export type {Turns} from './saved-turns'
 
-export type {DeleteOutcome} from './use-turns'
+export type {DeleteOutcome, SendOutcome} from './use-turns'
 
 export {FailedChip} from './ui/FailedChip'
 

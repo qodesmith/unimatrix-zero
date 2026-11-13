@@ -80,6 +80,14 @@ interface Setup {
   sendKey?: Settings['sendKey']
 }
 
+interface Sends {
+  /** Each `prompt.send` waits here until the test lets it through. */
+  waiting: (() => void)[]
+  hold: boolean
+  /** The message main refuses the next `prompt.send` with. */
+  refusal: string | null
+}
+
 function fakeMain({
   lastModel = null,
   providers = READY,
@@ -88,12 +96,26 @@ function fakeMain({
 }: Setup) {
   const sent: Command[] = []
   const listeners: ((event: AppEvent) => void)[] = []
+  const sends: Sends = {waiting: [], hold: false, refusal: null}
 
   const bridge: Bridge = {
     send: (async (command: Command) => {
       sent.push(command)
 
       if (command.type !== 'prompt.send') return {ok: true, value: {}}
+
+      if (sends.hold) {
+        const {promise, resolve} = Promise.withResolvers<undefined>()
+        sends.waiting.push(() => resolve(undefined))
+        await promise
+      }
+
+      if (sends.refusal !== null) {
+        return {
+          ok: false,
+          error: {code: 'handler-failed', message: sends.refusal},
+        }
+      }
 
       const prompt: Prompt = {
         id: crypto.randomUUID(),
@@ -140,7 +162,7 @@ function fakeMain({
     for (const listener of listeners) listener(event)
   }
 
-  return {...bridge, sent, publish}
+  return {...bridge, sent, sends, publish}
 }
 
 async function renderInput(setup: Setup = {}) {
@@ -368,3 +390,55 @@ it.each(['Meta', 'Control'])(
     await expect.poll(() => sentTexts(main)).toEqual(['Hello?\nThere'])
   }
 )
+
+it('shows main’s refusal with the Prompt still in the Input, and drops it while the next send is on its way', async () => {
+  const main = await renderInput()
+  const input = page.getByRole('textbox', {name: 'Prompt'})
+
+  main.sends.refusal = 'The disk is full.'
+  await send(main)
+  await expect.element(page.getByText('The disk is full.')).toBeVisible()
+  await expect.element(input).toHaveValue('Hello?')
+
+  main.sends.refusal = null
+  main.sends.hold = true
+  await userEvent.keyboard('{Enter}')
+  await expect.poll(() => main.sends.waiting.length).toBe(1)
+  await expect
+    .element(page.getByText('The disk is full.'))
+    .not.toBeInTheDocument()
+
+  main.sends.waiting[0]?.()
+  await expect.element(input).toHaveValue('')
+})
+
+it('sends a Prompt once however often it is submitted while main takes it', async () => {
+  const main = await renderInput()
+
+  main.sends.hold = true
+  await send(main)
+  await expect.element(page.getByRole('button', {name: 'Send'})).toBeDisabled()
+  await userEvent.keyboard('{Enter}{Enter}')
+
+  main.sends.hold = false
+  main.sends.waiting[0]?.()
+  await expect
+    .element(page.getByRole('textbox', {name: 'Prompt'}))
+    .toHaveValue('')
+  expect(sentTexts(main)).toEqual(['Hello?'])
+})
+
+it('keeps what was typed, and the Model picked, while main took the Prompt', async () => {
+  const main = await renderInput()
+  const input = page.getByRole('textbox', {name: 'Prompt'})
+
+  main.sends.hold = true
+  await send(main)
+  await userEvent.keyboard('And another thing')
+  await picker().click()
+  await page.getByRole('option', {name: 'Haiku'}).click()
+
+  main.sends.waiting[0]?.()
+  await expect.element(input).toHaveValue('And another thing')
+  await expectPicked('Claude', 'Haiku')
+})

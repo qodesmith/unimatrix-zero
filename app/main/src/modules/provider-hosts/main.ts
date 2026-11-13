@@ -1,3 +1,5 @@
+import type {HostEvent, HostState} from './host-lifecycle/machine'
+import type {HostProcess} from './host-process'
 import type {
   HostCommand,
   OneShotFinished,
@@ -20,16 +22,11 @@ import type {ReplyEvent} from '@uz/contract/turns'
 import {HostMessageSchema} from '@uz/contract/host'
 import {randomUUID} from 'node:crypto'
 
-export interface HostProcess {
-  post(command: HostCommand): void
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the process boundary: HostMessageSchema parses it
-  onMessage(listener: (message: unknown) => void): void
-  onExit(listener: () => void): void
-  kill(): void
-}
+import {childOf, hostTransition, startingHost} from './host-lifecycle/machine'
 
-/** Waits before each restart after a crash; after the last, the host stays down. */
-export const RESTART_DELAYS_MS = [1000, 5000, 30_000]
+export type {HostProcess} from './host-process'
+
+export {RESTART_DELAYS_MS} from './host-lifecycle/machine'
 
 /** A host that stays up this long after reporting ready has recovered. */
 export const STABLE_AFTER_MS = 60_000
@@ -43,10 +40,7 @@ interface PendingOneShot {
 }
 
 interface Host {
-  process: HostProcess | null
-  ready: boolean
-  smallestModel: string | null
-  restarts: number
+  state: HostState
   timers: Set<ReturnType<typeof setTimeout>>
   oneShots: Map<string, PendingOneShot>
 }
@@ -139,26 +133,30 @@ export function createProviderHosts({
     host.oneShots.clear()
   }
 
-  function start(provider: ProviderId, host: Host) {
-    const child = spawn(provider)
-    host.process = child
-    host.ready = false
-    host.smallestModel = null
+  /** False when the host's state ignores the event. */
+  function send(host: Host, event: HostEvent) {
+    const before = host.state
+    host.state = hostTransition(before, event)
+
+    return host.state !== before
+  }
+
+  function watch(provider: ProviderId, host: Host, child: HostProcess) {
     onStatus(provider, 'starting')
 
     child.onMessage(raw => {
       const parsed = HostMessageSchema.safeParse(raw)
 
-      if (!parsed.success || host.process !== child) return
+      if (!parsed.success || childOf(host.state) !== child) return
 
       const message = parsed.data
 
       if (message.type === 'HOST_READY') {
-        host.ready = true
-        host.smallestModel = message.smallestModel
-        later(host, STABLE_AFTER_MS, () => {
-          host.restarts = 0
-        })
+        const {smallestModel} = message
+
+        if (!send(host, {type: 'becameReady', smallestModel})) return
+
+        later(host, STABLE_AFTER_MS, () => send(host, {type: 'stayedUp'}))
         onStatus(provider, 'ready')
       } else if (message.type === 'MODELS_CHANGED') {
         onModels(provider, message.models)
@@ -189,29 +187,29 @@ export function createProviderHosts({
     })
 
     child.onExit(() => {
-      if (host.process !== child) return
+      if (childOf(host.state) !== child) return
 
-      host.process = null
-      host.ready = false
-      host.smallestModel = null
+      send(host, {type: 'exited'})
       clearTimers(host)
       failOneShots(host, `The ${provider} host stopped unexpectedly.`)
       onCrash(provider)
+      afterCrash(provider, host)
+    })
+  }
 
-      // Main may have stopped it while handling the crash.
-      if (hosts.get(provider) !== host) return
+  /** Main may have stopped the host while handling the crash. */
+  function afterCrash(provider: ProviderId, host: Host) {
+    const {state} = host
 
-      const delay = RESTART_DELAYS_MS[host.restarts]
+    if (state.status === 'failed') onStatus(provider, 'failed')
 
-      if (delay === undefined) {
-        onStatus(provider, 'failed')
+    if (state.status !== 'restarting') return
 
-        return
-      }
+    onStatus(provider, 'restarting')
+    later(host, state.delayMs, () => {
+      const child = spawn(provider)
 
-      host.restarts += 1
-      onStatus(provider, 'restarting')
-      later(host, delay, () => start(provider, host))
+      if (send(host, {type: 'spawned', child})) watch(provider, host, child)
     })
   }
 
@@ -224,8 +222,8 @@ export function createProviderHosts({
     hosts.delete(provider)
     clearTimers(host)
     failOneShots(host, `The ${provider} host was stopped.`)
-    const child = host.process
-    host.process = null
+    const child = childOf(host.state)
+    send(host, {type: 'stopped'})
     child?.kill()
   }
 
@@ -233,25 +231,25 @@ export function createProviderHosts({
     connect(provider: ProviderId) {
       if (hosts.has(provider)) return
 
+      const child = spawn(provider)
+
       const host: Host = {
-        process: null,
-        ready: false,
-        smallestModel: null,
-        restarts: 0,
+        state: startingHost(child),
         timers: new Set(),
         oneShots: new Map(),
       }
 
       hosts.set(provider, host)
-      start(provider, host)
+      watch(provider, host, child)
     },
 
     ready(provider: ProviderId): boolean {
-      return hosts.get(provider)?.ready ?? false
+      return hosts.get(provider)?.state.status === 'ready'
     },
 
     send(provider: ProviderId, command: HostCommand) {
-      const child = hosts.get(provider)?.process
+      const host = hosts.get(provider)
+      const child = host ? childOf(host.state) : null
 
       if (!child) throw new Error(`The ${provider} host is not running.`)
 
@@ -267,12 +265,12 @@ export function createProviderHosts({
       request: Omit<OneShotRequest, 'model'>
     ): Promise<string> {
       const host = hosts.get(provider)
-      const child = host?.process
-      const model = host?.smallestModel
 
-      if (!host || !child || !host.ready || !model) {
+      if (host?.state.status !== 'ready' || !host.state.smallestModel) {
         throw new Error(`The ${provider} host can’t run a one-shot.`)
       }
+
+      const {child, smallestModel: model} = host.state
 
       const requestId = randomUUID()
 

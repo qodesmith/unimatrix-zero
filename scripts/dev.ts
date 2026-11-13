@@ -1,3 +1,4 @@
+import type {DevElectronEvent} from './dev-electron'
 import type {RolldownWatcher} from 'rolldown'
 
 import {randomBytes} from 'node:crypto'
@@ -5,6 +6,7 @@ import path from 'node:path'
 import {build, createServer} from 'vite'
 
 import {checkoutHash, devDataFolderName} from './dev-data'
+import {devElectronTransition, initialDevElectron} from './dev-electron'
 import {electronPath} from './electron-as-node'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -90,8 +92,11 @@ const bundles = {
 
 await Promise.all(firstBuilds)
 
+const SETTLE_MS = 300
+
+let state = initialDevElectron
 let electron: ReturnType<typeof Bun.spawn> | null = null
-let stopping = false
+let settleTimer: ReturnType<typeof setTimeout> | null = null
 
 function startElectron() {
   electron = Bun.spawn(
@@ -111,45 +116,17 @@ function startElectron() {
         UZ_DEV_FAKE: fakeProvider ? '1' : '0',
       },
       onExit: (_proc, code) => {
-        if (stopping || restarting) return
-        console.log(`Electron exited (${code}); stopping dev.`)
-        void shutdown()
+        if (state.status === 'running' || state.status === 'settling') {
+          console.log(`Electron exited (${code}); stopping dev.`)
+        }
+
+        send({type: 'exited'})
       },
     }
   )
 }
 
-let restarting = false
-
-async function restartElectron(reason: string) {
-  console.log(`${reason} rebuilt; restarting Electron.`)
-  restarting = true
-  electron?.kill()
-  await electron?.exited
-  restarting = false
-  startElectron()
-}
-
-let restartTimer: ReturnType<typeof setTimeout> | null = null
-
-function scheduleRestart(reason: string) {
-  if (restartTimer) clearTimeout(restartTimer)
-  restartTimer = setTimeout(() => {
-    restartTimer = null
-    void restartElectron(reason)
-  }, 300)
-}
-
-for (const [name, watcher] of Object.entries(bundles)) {
-  watcher.on('event', event => {
-    if (event.code !== 'BUNDLE_END') return
-
-    scheduleRestart(name)
-  })
-}
-
 async function shutdown() {
-  stopping = true
   electron?.kill()
   await Promise.all(
     Object.values(bundles).map(async watcher => watcher.close())
@@ -158,9 +135,49 @@ async function shutdown() {
   process.exit(0)
 }
 
-process.on('SIGINT', () => void shutdown())
+/** Runs what entering a state calls for; an ignored event runs nothing. */
+function send(event: DevElectronEvent) {
+  const before = state
+  state = devElectronTransition(before, event)
 
-process.on('SIGTERM', () => void shutdown())
+  if (state === before) return
+
+  if (settleTimer) clearTimeout(settleTimer)
+  settleTimer = null
+
+  switch (state.status) {
+    case 'settling':
+      settleTimer = setTimeout(() => send({type: 'settled'}), SETTLE_MS)
+      break
+    case 'restarting':
+      if (before.status === 'settling') {
+        console.log(`${before.bundle} rebuilt; restarting Electron.`)
+      }
+
+      electron?.kill()
+      break
+    case 'running':
+      startElectron()
+      break
+    case 'stopping':
+      void shutdown()
+      break
+    default:
+      throw new Error('Unknown dev Electron state.')
+  }
+}
+
+for (const [bundle, watcher] of Object.entries(bundles)) {
+  watcher.on('event', event => {
+    if (event.code !== 'BUNDLE_END') return
+
+    send({type: 'rebuilt', bundle, at: Date.now()})
+  })
+}
+
+process.on('SIGINT', () => send({type: 'stopAsked'}))
+
+process.on('SIGTERM', () => send({type: 'stopAsked'}))
 
 console.log(
   `Unimatrix Zero dev: renderer on app-dev:// (Vite :${vitePort}), CDP on :${debugPort}, data in ${dataFolder}${fakeProvider ? ', fake Provider' : ''}`
