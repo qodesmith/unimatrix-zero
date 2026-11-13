@@ -7,17 +7,12 @@ import {createWarmSessions} from './warm'
 
 const DEFAULTS: CompactionSettings = {auto: true, threshold: null}
 
-function session(
-  sessionId: string,
-  messageId: string,
-  model = 'haiku',
-  compactionSettings = DEFAULTS
-) {
+function session(sessionId: string, messageId: string, model = 'haiku') {
   return {
     sessionId,
     messageId,
     model,
-    compactionSettings,
+    compactionSettings: DEFAULTS,
     closed: false,
     async close() {
       this.closed = true
