@@ -6,6 +6,7 @@ import type {
   ReplySession,
   SessionRef,
   StartReplyEvent,
+  Thread,
 } from '@uz/contract/host'
 import type {Model} from '@uz/contract/providers'
 import type {CompactionSettings} from '@uz/contract/settings'
@@ -143,6 +144,7 @@ async function setUp(
     model?: string
     messageId?: ReplyRequest['prompt']['messageId']
     compactionSettings?: CompactionSettings
+    thread?: Thread
   }
 
   const vendorProgram = {
@@ -162,6 +164,7 @@ async function setUp(
       model = 'haiku',
       messageId = crypto.randomUUID(),
       compactionSettings = DEFAULT_COMPACTION_SETTINGS,
+      thread = [],
     }: ReplyOptions = {}
   ) {
     const events: Streamed[] = []
@@ -175,6 +178,7 @@ async function setUp(
       prompt: {text, messageId},
       vendorProgram,
       session: session && {type: 'continue', ...session},
+      thread,
       compactionSettings,
     })) {
       events.push(event)

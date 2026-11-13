@@ -157,6 +157,7 @@ function liveDriver(
         configDir,
       },
       session,
+      thread: [],
       compactionSettings,
     }
   }

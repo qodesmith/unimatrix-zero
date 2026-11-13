@@ -297,7 +297,7 @@ it('sends commands to the Provider’s host', () => {
   const hosts = setUp()
   hosts.connect('claude')
 
-  const command = {
+  const command: HostCommand = {
     type: 'reply.start',
     request: {
       treeId: textDelta.treeId,
@@ -307,9 +307,10 @@ it('sends commands to the Provider’s host', () => {
       prompt: {text: 'Hi', messageId: crypto.randomUUID()},
       vendorProgram: {program: null, configDir: '/claude'},
       session: null,
+      thread: [],
       compactionSettings: {auto: true, threshold: null},
     },
-  } as const
+  }
 
   hosts.send('claude', command)
 

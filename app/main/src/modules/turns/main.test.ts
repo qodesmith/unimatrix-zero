@@ -2,6 +2,7 @@ import type {Database} from '#modules/database/main'
 import type {FinishedReply, ReplyHosts} from './main'
 import type {AppEvent} from '@uz/contract/events'
 import type {HostCommand} from '@uz/contract/host'
+import type {Model, ProviderId} from '@uz/contract/providers'
 import type {CompactionSettings} from '@uz/contract/settings'
 import type {ReplyEvent} from '@uz/contract/turns'
 
@@ -22,6 +23,9 @@ const createdAt = new Date('2026-10-19T12:00:00.000Z')
 
 const picked = {provider: 'claude', model: 'fake'} as const
 
+/** The Model `record()` says wrote a Reply. */
+const HAIKU = {provider: 'claude', model: 'claude-haiku-5-5'} as const
+
 let db: Database
 let published: AppEvent[]
 let whenPublished: (event: AppEvent) => void
@@ -29,14 +33,16 @@ let finished: FinishedReply[]
 let hostCommands: HostCommand[]
 let sentPromptIds: Map<string, string>
 let hostReady: boolean
+let chatgptConnected: boolean
 let compactionSettings: CompactionSettings
 let clock: Date
 let hostReachable: boolean
+let listedModels: Record<ProviderId, Model[]>
 let turns: ReturnType<typeof createTurns>
 let treeId: string
 
 const hosts: ReplyHosts = {
-  ready: provider => hostReady && provider === 'claude',
+  ready: provider => hostReady && (provider === 'claude' || chatgptConnected),
   send: (_provider, command) => {
     if (!hostReachable) throw new Error('The claude host is not running.')
 
@@ -59,6 +65,7 @@ function launch() {
     hosts,
     vendorProgramFor: () => vendorProgram,
     compactionSettingsFor: () => compactionSettings,
+    listedModels: provider => listedModels[provider],
     now: () => clock,
     onTurnsChanged: () => undefined,
     onReplyFinished: reply => finished.push(reply),
@@ -74,9 +81,11 @@ beforeEach(() => {
   hostCommands = []
   sentPromptIds = new Map()
   hostReady = true
+  chatgptConnected = false
   compactionSettings = {auto: true, threshold: null}
   clock = createdAt
   hostReachable = true
+  listedModels = {claude: [], chatgpt: []}
   turns = launch()
   treeId = createTrees(db).create(createdAt).id
 })
@@ -244,6 +253,7 @@ describe('sending the root Prompt', () => {
           prompt: {text: 'Hello', messageId: expect.any(String)},
           vendorProgram,
           session: null,
+          thread: [],
           compactionSettings: {auto: true, threshold: null},
         },
       },
@@ -483,14 +493,15 @@ describe('a streaming Reply', () => {
 
     expect(saved(replyId).model).toBe('fake')
     expect(finished).toMatchObject([{replyId, model: 'fake'}])
-    expect(() =>
-      turns.sendPrompt({
-        model: picked,
-        treeId,
-        parentReplyId: replyId,
-        text: 'More',
-      })
-    ).toThrow('This Reply can’t be continued: its Provider never saved it.')
+
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: replyId,
+      text: 'More',
+    })
+
+    expect(sessionsStarted()).toEqual([null])
   })
 
   it('saves the Model its Provider reports', () => {
@@ -928,7 +939,7 @@ describe('a Prompt answering a Reply', () => {
     const replyId = savedRoot()
 
     const sent = turns.sendPrompt({
-      model: picked,
+      model: HAIKU,
       treeId,
       parentReplyId: replyId,
       text: 'And then?',
@@ -941,7 +952,7 @@ describe('a Prompt answering a Reply', () => {
         request: {
           treeId,
           replyId: sent?.reply.id,
-          model: 'fake',
+          model: 'claude-haiku-5-5',
           systemPrompt: '',
           prompt: {text: 'And then?', messageId: expect.any(String)},
           vendorProgram,
@@ -950,26 +961,16 @@ describe('a Prompt answering a Reply', () => {
             messageId: 'm1',
             type: 'continue',
           },
+          thread: [{prompt: 'Hi', reply: [], label: null}],
           compactionSettings: {auto: true, threshold: null},
         },
       },
     ])
   })
 
-  it.each([
-    [
-      'still streaming',
-      (replyId: string) => record(replyId),
-      'Wait for this Reply to finish before continuing.',
-    ],
-    [
-      'never saved by its Provider',
-      (replyId: string) => finish(replyId),
-      'This Reply can’t be continued: its Provider never saved it.',
-    ],
-  ])('is refused from a Reply %s', (_case, setUp, message) => {
+  it('is refused from a Reply still streaming', () => {
     const replyId = sendPrompt(null)
-    setUp(replyId)
+    record(replyId)
 
     expect(() =>
       turns.sendPrompt({
@@ -978,8 +979,36 @@ describe('a Prompt answering a Reply', () => {
         parentReplyId: replyId,
         text: 'More',
       })
-    ).toThrow(message)
+    ).toThrow('Wait for this Reply to finish before continuing.')
     expect(hostCommands).toEqual([])
+  })
+
+  it('starts a session, given the whole Thread, from a Reply its Provider never saved', () => {
+    const replyId = sendPrompt(null)
+    fromHost(replyId, {type: 'TEXT_DELTA', delta: 'Hello.'})
+    finish(replyId)
+
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: replyId,
+      text: 'More',
+    })
+
+    expect(hostCommands).toMatchObject([
+      {
+        request: {
+          session: null,
+          thread: [
+            {
+              prompt: 'Hi',
+              reply: [{type: 'text', text: 'Hello.'}],
+              label: null,
+            },
+          ],
+        },
+      },
+    ])
   })
 
   it('starts a Branch from a Reply that already has a Prompt after it, forking its session', () => {
@@ -1045,21 +1074,283 @@ describe('a Prompt answering a Reply', () => {
       })
     ).toThrow('Connect Claude to continue this Thread.')
   })
+})
 
-  it('is refused on another Provider’s Model, adding nothing to the Tree', () => {
+describe('a Prompt sent on another Provider', () => {
+  const GPT = {provider: 'chatgpt', model: 'gpt-6-sol'} as const
+
+  function listed(id: string, name: string, resolvesTo: string | null = null) {
+    return {id, name, isDefault: false, resolvesTo, needsAppUpdate: false}
+  }
+
+  beforeEach(() => {
+    chatgptConnected = true
+    listedModels = {
+      claude: [
+        listed('claude-haiku-5-5', 'Haiku 5.5'),
+        listed('haiku', 'Haiku', 'claude-haiku-5-5'),
+        listed('claude-opus-5-5', 'Opus 5.5'),
+      ],
+      chatgpt: [listed('gpt-6-sol', 'GPT-6 Sol')],
+    }
+  })
+
+  function requests() {
+    return hostCommands.flatMap(command =>
+      command.type === 'reply.start' ? [command.request] : []
+    )
+  }
+
+  /** A Claude Reply saved in s1, then a ChatGPT Reply saved in a thread. */
+  function switched() {
+    const first = sendPrompt(null, 'Name a color.')
+    fromHost(first, {type: 'TEXT_DELTA', delta: 'Teal.'})
+    record(first)
+    finish(first)
+
+    const sent = turns.sendPrompt({
+      model: GPT,
+      treeId,
+      parentReplyId: first,
+      text: 'And an animal?',
+    })
+
+    if (!sent) throw new Error('Nothing was sent')
+
+    const second = sent.reply.id
+    const [request] = requests()
+    turns.hostEvent('chatgpt', {
+      type: 'TEXT_DELTA',
+      treeId,
+      replyId: second,
+      delta: 'Otter.',
+    })
+    turns.hostRecorded('chatgpt', {
+      type: 'REPLY_RECORDED',
+      treeId,
+      replyId: second,
+      model: 'gpt-6-sol',
+      session: {sessionId: 'thread-1', messageId: 'turn-1'},
+    })
+    turns.hostEvent('chatgpt', {
+      type: 'RUN_FINISHED',
+      treeId,
+      replyId: second,
+      status: 'complete',
+    })
+    hostCommands = []
+
+    return {first, second, sent, request}
+  }
+
+  it('continues in the same Tree on the new Provider, which gets the whole Thread and no session', () => {
+    const {first, sent, request} = switched()
+
+    expect(sent.prompt).toMatchObject({treeId, parentReplyId: first})
+    expect(sent.reply).toMatchObject({provider: 'chatgpt', model: 'gpt-6-sol'})
+    expect(request).toMatchObject({
+      model: 'gpt-6-sol',
+      session: null,
+      thread: [
+        {
+          prompt: 'Name a color.',
+          reply: [{type: 'text', text: 'Teal.'}],
+          label: '[Reply written by Haiku 5.5]',
+        },
+      ],
+    })
+  })
+
+  it('explains the labels in the System prompt the Provider gets, which the Reply doesn’t record', () => {
+    const {second, request} = switched()
+
+    expect(request?.systemPrompt).toContain('[Reply written by')
+
+    const [recorded] = db
+      .select({text: schema.systemPrompts.text})
+      .from(schema.replies)
+      .innerJoin(
+        schema.systemPrompts,
+        eq(schema.systemPrompts.id, schema.replies.systemPromptId)
+      )
+      .where(eq(schema.replies.id, second))
+      .all()
+
+    expect(recorded?.text).toBe('')
+  })
+
+  it('is refused while the new Provider isn’t ready, adding nothing to the Tree', () => {
     const replyId = savedRoot()
     const before = turns.list(treeId)
+    chatgptConnected = false
 
     expect(() =>
       turns.sendPrompt({
-        model: {provider: 'chatgpt', model: 'gpt-5.5'},
+        model: GPT,
         treeId,
         parentReplyId: replyId,
         text: 'More',
       })
-    ).toThrow('Pick a Claude Model to continue this Thread.')
+    ).toThrow('Connect ChatGPT to continue this Thread.')
     expect(turns.list(treeId)).toEqual(before)
     expect(hostCommands).toEqual([])
+  })
+
+  it('rebuilds on the first Provider when the Thread comes back to it, labeling only the other Model’s Reply', () => {
+    const {second} = switched()
+
+    turns.sendPrompt({
+      model: {provider: 'claude', model: 'haiku'},
+      treeId,
+      parentReplyId: second,
+      text: 'List both.',
+    })
+
+    expect(requests()).toMatchObject([
+      {
+        session: null,
+        thread: [
+          {prompt: 'Name a color.', label: null},
+          {
+            prompt: 'And an animal?',
+            reply: [{type: 'text', text: 'Otter.'}],
+            label: '[Reply written by GPT-6 Sol]',
+          },
+        ],
+      },
+    ])
+  })
+
+  it('keeps the session on another Model of the same Provider, whose Reply is labeled all the same', () => {
+    const replyId = savedRoot()
+
+    turns.sendPrompt({
+      model: {provider: 'claude', model: 'claude-opus-5-5'},
+      treeId,
+      parentReplyId: replyId,
+      text: 'More',
+    })
+
+    expect(requests()).toMatchObject([
+      {
+        session: {type: 'continue', sessionId: 's1', messageId: 'm1'},
+        thread: [{prompt: 'Hi', label: '[Reply written by Haiku 5.5]'}],
+      },
+    ])
+  })
+
+  it('adds no line to the System prompt while one Model wrote the whole Thread', () => {
+    const replyId = savedRoot()
+
+    turns.sendPrompt({
+      model: {provider: 'claude', model: 'haiku'},
+      treeId,
+      parentReplyId: replyId,
+      text: 'More',
+    })
+
+    expect(requests()).toMatchObject([{systemPrompt: ''}])
+  })
+
+  it('retries a failed hand-over with the whole Thread and no session again', () => {
+    const replyId = savedRoot()
+
+    const sent = turns.sendPrompt({
+      model: GPT,
+      treeId,
+      parentReplyId: replyId,
+      text: 'More',
+    })
+
+    if (!sent) throw new Error('Nothing was sent')
+
+    turns.hostPromptRecorded('chatgpt', {
+      type: 'PROMPT_RECORDED',
+      treeId,
+      replyId: sent.reply.id,
+      session: {sessionId: 'thread-1', messageId: 'turn-1'},
+    })
+    turns.hostEvent('chatgpt', {
+      type: 'RUN_FINISHED',
+      treeId,
+      replyId: sent.reply.id,
+      status: 'failed',
+      failure: {code: 'provider-error', message: 'No.'},
+    })
+    hostCommands = []
+
+    turns.retry(treeId, sent.reply.id)
+
+    expect(requests()).toMatchObject([
+      {
+        session: null,
+        systemPrompt: expect.stringContaining('[Reply written by'),
+        thread: [{prompt: 'Hi', label: '[Reply written by Haiku 5.5]'}],
+      },
+    ])
+  })
+
+  it('goes on in the Reply’s own session when a Prompt on its Provider takes the place of a failed hand-over', () => {
+    const replyId = savedRoot()
+
+    const sent = turns.sendPrompt({
+      model: GPT,
+      treeId,
+      parentReplyId: replyId,
+      text: 'More',
+    })
+
+    if (!sent) throw new Error('Nothing was sent')
+
+    turns.hostEvent('chatgpt', {
+      type: 'RUN_FINISHED',
+      treeId,
+      replyId: sent.reply.id,
+      status: 'failed',
+      failure: {code: 'provider-error', message: 'No.'},
+    })
+    hostCommands = []
+
+    turns.sendPrompt({
+      model: HAIKU,
+      treeId,
+      parentReplyId: replyId,
+      text: 'More',
+    })
+
+    expect(sessionsStarted()).toEqual([
+      {type: 'continue', sessionId: 's1', messageId: 'm1'},
+    ])
+  })
+
+  it('starts a session from a Reply cut short on another Provider than the Reply above it', () => {
+    const replyId = savedRoot()
+
+    const sent = turns.sendPrompt({
+      model: GPT,
+      treeId,
+      parentReplyId: replyId,
+      text: 'More',
+    })
+
+    if (!sent) throw new Error('Nothing was sent')
+
+    turns.hostEvent('chatgpt', {
+      type: 'RUN_FINISHED',
+      treeId,
+      replyId: sent.reply.id,
+      status: 'stopped',
+    })
+    hostCommands = []
+
+    turns.sendPrompt({
+      model: GPT,
+      treeId,
+      parentReplyId: sent.reply.id,
+      text: 'Go on.',
+    })
+
+    expect(sessionsStarted()).toEqual([null])
   })
 })
 
@@ -1264,6 +1555,7 @@ describe('retrying a Reply', () => {
           prompt: {text: 'Hi', messageId: expect.any(String)},
           vendorProgram,
           session: null,
+          thread: [],
           compactionSettings: {auto: true, threshold: null},
         },
       },

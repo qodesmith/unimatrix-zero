@@ -1,6 +1,7 @@
 import type {Database} from '#modules/database/main'
 import type {Continuation} from './continuation'
 import type {FinishedReply} from './in-flight'
+import type {ListedModels} from './thread'
 import type {Command, CommandResult} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {
@@ -37,6 +38,7 @@ import {
   resetReply,
   savedReply,
 } from './rows'
+import {explainingLabels, threadTo} from './thread'
 
 export {PARTIAL_SAVE_MS} from './in-flight'
 
@@ -55,6 +57,8 @@ export interface TurnsDeps {
   vendorProgramFor: (provider: ProviderId) => SignInRequest
   /** Read as each Reply starts, so a change applies from the next one. */
   compactionSettingsFor: (provider: ProviderId) => CompactionSettings
+  /** For telling the AI which Replies another Model wrote, and its name. */
+  listedModels: ListedModels
   now: () => Date
   onTurnsChanged: (treeId: string) => void
   /** Every way a Reply ends, a failure to reach its host included. */
@@ -75,6 +79,7 @@ export function createTurns({
   hosts,
   vendorProgramFor,
   compactionSettingsFor,
+  listedModels,
   now,
   onTurnsChanged,
   onReplyFinished,
@@ -106,16 +111,30 @@ export function createTurns({
     clearCutOnPrompt(db, recorded)
   }
 
+  /**
+   * A failed attempt on the Prompt's Provider may have left its Prompt in the
+   * session, so the session is the one its Retry would resume. A Provider the
+   * Reply being answered isn't on has no session of the Thread.
+   */
+  function sessionOn(
+    provider: ProviderId,
+    {treeId, parentReplyId}: Pick<NewPrompt, 'treeId' | 'parentReplyId'>,
+    failed: ReturnType<typeof failedToReplace>
+  ) {
+    if (failed?.provider === provider) return failed.session
+
+    const continued =
+      parentReplyId === null
+        ? null
+        : continuation(db, treeId, parentReplyId, failed?.promptId)
+
+    return continued?.provider === provider ? continued.session : null
+  }
+
   function refuseUnsendable(
     continued: Continuation | null,
     provider: ProviderId
   ) {
-    if (continued && continued.provider !== provider) {
-      throw new Error(
-        `Pick a ${PROVIDER_NAMES[continued.provider]} Model to continue this Thread.`
-      )
-    }
-
     if (!hosts.ready(provider)) {
       throw new Error(
         continued
@@ -150,6 +169,10 @@ export function createTurns({
 
       const failed = failedToReplace(db, treeId, parentReplyId)
       const systemPrompt = ''
+      const thread = threadTo(db, treeId, parentReplyId, picked, listedModels)
+      // Before the Prompt is saved: once it is, the Reply it answers has a
+      // Prompt after it, and its session would fork.
+      const session = sessionOn(provider, {treeId, parentReplyId}, failed)
 
       const {prompt, reply} = insertExchange(db, {
         treeId,
@@ -166,10 +189,11 @@ export function createTurns({
         treeId,
         replyId: reply.id,
         model,
-        systemPrompt,
+        systemPrompt: explainingLabels(systemPrompt, thread),
         prompt: {text, messageId: randomUUID()},
         vendorProgram: vendorProgramFor(provider),
-        session: failed ? failed.session : (continued?.session ?? null),
+        session,
+        thread,
         compactionSettings: compactionSettingsFor(provider),
       })
 
@@ -198,16 +222,25 @@ export function createTurns({
         throw new Error(`Connect ${PROVIDER_NAMES[provider]} to retry.`)
       }
 
+      const thread = threadTo(
+        db,
+        treeId,
+        recovered.parentReplyId,
+        {provider, model},
+        listedModels
+      )
+
       resetReply(db, replyId)
 
       return startOnHost(provider, {
         treeId,
         replyId,
         model,
-        systemPrompt,
+        systemPrompt: explainingLabels(systemPrompt, thread),
         prompt: {text, messageId: randomUUID()},
         vendorProgram: vendorProgramFor(provider),
         session,
+        thread,
         compactionSettings: compactionSettingsFor(provider),
       })
     },

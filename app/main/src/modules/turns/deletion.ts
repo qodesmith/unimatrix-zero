@@ -122,11 +122,15 @@ export function failedToReplace(
 
   const removed = failed.map(row => below(db, row.promptId))
   const removedReplies = removed.flatMap(turns => turns.replies)
+  const recovered = recovery(db, treeId, first.replyId)
 
   return {
     promptIds: removed.flatMap(turns => turns.promptIds),
     replyIds: removedReplies.map(reply => reply.id),
-    session: recovery(db, treeId, first.replyId)?.session ?? null,
+    /** The first failed Prompt, and the Provider `session` is a session of. */
+    promptId: first.promptId,
+    provider: recovered?.provider ?? null,
+    session: recovered?.session ?? null,
     cut: cutBelow(
       db,
       treeId,

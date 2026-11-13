@@ -14,15 +14,18 @@ import type {
   PromptRecorded,
   ProviderDriver,
   ReplyRequest,
+  ReplySession,
   SignInRequest,
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 
 import {createInbox} from '#modules/inbox/main'
 import {ProgramCrashed, createReplyRuns} from '#modules/reply-runs/main'
+import {replayed} from '#modules/thread-replay/main'
 
 import {readModels} from './models'
 import {limitLifts} from './rate-limits'
+import {injectThread, sessionLost} from './rebuild'
 import {createReplyMapper, turnOf} from './replies'
 import {requestRevert} from './revert'
 import {folderOf, readRollouts, rolloutAt, writeRolloutsBack} from './rollouts'
@@ -37,6 +40,25 @@ export interface CodexRepliesDeps {
 }
 
 type CutRequest = Parameters<ProviderDriver['cutSession']>[0]
+
+/** `replay`: the thread holds nothing of the Thread, so the Prompt tells it. */
+interface Opened {
+  thread: LoadedThread
+  dropped: boolean
+  replay: boolean
+}
+
+type Restored = Omit<Opened, 'replay'>
+
+function settingsOf(request: ReplyRequest) {
+  return {
+    cwd: request.vendorProgram.configDir,
+    sandbox: 'read-only',
+    approvalPolicy: 'never',
+    model: request.model,
+    developerInstructions: request.systemPrompt || null,
+  } satisfies ParamsOf<'thread/start'>
+}
 
 interface Running {
   server: AppServer
@@ -152,40 +174,83 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     if (next !== undefined) await revert(running, thread, next, configDir)
   }
 
-  async function threadFor(
+  /**
+   * A new thread given the whole Thread: as history when Codex takes the
+   * items, else in a thread of its own, with the Prompt.
+   */
+  async function started(
     running: Running,
-    request: ReplyRequest,
-    dropFrom: string | null
-  ): Promise<{thread: LoadedThread; dropped: boolean}> {
-    const {configDir} = request.vendorProgram
+    request: ReplyRequest
+  ): Promise<Opened> {
     const {threshold} = request.compactionSettings
+    const settings = settingsOf(request)
 
-    const settings = {
-      cwd: configDir,
-      sandbox: 'read-only',
-      approvalPolicy: 'never',
-      model: request.model,
-      developerInstructions: request.systemPrompt || null,
-    } satisfies ParamsOf<'thread/start'>
-
-    // A resume or fork that brings no `config` keeps the thread's old limit.
-    const config = configOf(threshold)
-
-    if (!request.session) {
-      const thread = loadThread(
+    async function start() {
+      return loadThread(
         running.threads,
         await running.server.request(
           'thread/start',
-          threshold === null ? settings : {...settings, config}
+          threshold === null
+            ? settings
+            : {...settings, config: configOf(threshold)}
         ),
         [],
         threshold
       )
-
-      return {thread, dropped: false}
     }
 
-    const {sessionId: id, messageId, type} = request.session
+    const thread = await start()
+    const told = {thread, dropped: false, replay: false}
+
+    if (request.thread.length === 0) return told
+
+    if (await injectThread(running.server, thread.id, request.thread)) {
+      return told
+    }
+
+    running.threads.delete(thread.id)
+
+    return {thread: await start(), dropped: false, replay: true}
+  }
+
+  /**
+   * The one way a session is rebuilt from its Thread (ADR 0001): the exact
+   * restore first, then, for a thread Codex no longer has, a new one.
+   */
+  async function threadFor(
+    running: Running,
+    request: ReplyRequest,
+    dropFrom: string | null
+  ): Promise<Opened> {
+    const {session} = request
+
+    if (!session) return started(running, request)
+
+    try {
+      const restored = await restore(running, request, session, dropFrom)
+
+      return {...restored, replay: false}
+    } catch (error) {
+      if (request.thread.length === 0 || !sessionLost(error)) throw error
+
+      return started(running, request)
+    }
+  }
+
+  async function restore(
+    running: Running,
+    request: ReplyRequest,
+    session: ReplySession,
+    dropFrom: string | null
+  ): Promise<Restored> {
+    const {configDir} = request.vendorProgram
+    const {threshold} = request.compactionSettings
+    const settings = settingsOf(request)
+
+    // A resume or fork that brings no `config` keeps the thread's old limit.
+    const config = configOf(threshold)
+
+    const {sessionId: id, messageId, type} = session
     const fork = type === 'fork'
     const rewind = type === 'rewind'
     const loaded = running.threads.get(id)
@@ -357,7 +422,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   async function* send(
     running: Running,
     request: ReplyRequest,
-    thread: LoadedThread,
+    {thread, replay}: Opened,
     run: ReplyRun
   ): AsyncGenerator<ContentEvent | PromptRecorded, Ending> {
     const ids = {treeId: request.treeId, replyId: request.replyId}
@@ -373,7 +438,15 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       // A thread loaded on another Model switches to this one from here on.
       const started = await server.request('turn/start', {
         threadId: thread.id,
-        input: [{type: 'text', text: request.prompt.text, text_elements: []}],
+        input: [
+          {
+            type: 'text',
+            text: replay
+              ? replayed(request.thread, request.prompt.text)
+              : request.prompt.text,
+            text_elements: [],
+          },
+        ],
         model: request.model,
       })
 
@@ -455,9 +528,9 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       let heard = false
 
       try {
-        const {thread, dropped} = await threadFor(running, request, dropFrom)
+        const opened = await threadFor(running, request, dropFrom)
 
-        if (dropped) {
+        if (opened.dropped) {
           dropFrom = null
           yield {
             type: 'PROMPT_DROPPED',
@@ -466,7 +539,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
           }
         }
 
-        const sent = send(running, request, thread, run)
+        const sent = send(running, request, opened, run)
 
         for (;;) {
           const step = await sent.next()

@@ -15,6 +15,7 @@ import type {RunFailure} from '@uz/contract/turns'
 
 import {failureOf} from '#modules/failures/main'
 import {createReplyRuns} from '#modules/reply-runs/main'
+import {replayed} from '#modules/thread-replay/main'
 
 import {claudeEnvironment} from './environment'
 import {createReplyMapper} from './replies'
@@ -99,6 +100,31 @@ type Outcome =
 
 function crashed(message: string): RunFailure {
   return {code: 'program-crashed', message}
+}
+
+/**
+ * How `claude` refuses a session it has no transcript of, and a point to
+ * resume at that is off the session's newest chain. It writes nothing to the
+ * session either time.
+ */
+const SESSION_LOST =
+  /No conversation found with session ID|No message found with message\.uuid of/
+
+function sessionLost(outcome: Outcome) {
+  if ('failure' in outcome) return SESSION_LOST.test(outcome.failure.message)
+
+  const {result} = outcome
+
+  return (
+    result.subtype !== 'success' && SESSION_LOST.test(result.errors.join(' '))
+  )
+}
+
+/** A session started for a Thread is told all of it with its first Prompt. */
+function textOf({session, thread, prompt}: ReplyRequest) {
+  return session === null && thread.length > 0
+    ? replayed(thread, prompt.text)
+    : prompt.text
 }
 
 /** Replies from a warm `claude`, or a new one that resumes, forks or starts. */
@@ -202,14 +228,18 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   async function* reply(
     session: Live,
     mapper: Mapper,
-    {prompt}: ReplyRequest,
+    request: ReplyRequest,
     run: ReplyRun
   ): AsyncGenerator<ContentEvent, Outcome> {
+    const {prompt} = request
     let heard = false
     let unstoppable: (() => void) | null = null
 
     try {
-      for await (const message of session.send(prompt.text, prompt.messageId)) {
+      for await (const message of session.send(
+        textOf(request),
+        prompt.messageId
+      )) {
         unstoppable ??= run.stoppable(async () => session.interrupt())
         heard = true
 
@@ -276,7 +306,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
    * A warm `claude` that exited while idle is replaced; a store restore that
    * `claude` refuses falls back to the transcript written back.
    */
-  async function* answer(
+  async function* restore(
     request: ReplyRequest,
     mapper: Mapper,
     run: ReplyRun
@@ -321,6 +351,31 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       session: fallback,
       outcome: yield* reply(fallback, mapper, request, run),
     }
+  }
+
+  /**
+   * The one way a session is rebuilt from its Thread (ADR 0001): the exact
+   * restore first, then, for a session `claude` no longer has, a new one told
+   * the whole Thread.
+   */
+  async function* answer(
+    request: ReplyRequest,
+    mapper: Mapper,
+    run: ReplyRun
+  ): AsyncGenerator<ContentEvent, {session: Live; outcome: Outcome}> {
+    const restored = yield* restore(request, mapper, run)
+
+    if (
+      !request.session ||
+      request.thread.length === 0 ||
+      !sessionLost(restored.outcome)
+    ) {
+      return restored
+    }
+
+    warm.drop(restored.session)
+
+    return yield* restore({...request, session: null}, mapper, run)
   }
 
   /** A refused save of the tool results fails the Reply. */

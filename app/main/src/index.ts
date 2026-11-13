@@ -150,6 +150,7 @@ function openWindow(db: Database) {
     vendorProgramFor: provider => signInRequestFor(provider, machine),
     compactionSettingsFor: provider =>
       compactionSettingsFor(settings.read(), provider),
+    listedModels: provider => connections.models(provider),
     now: () => new Date(),
     onTurnsChanged: treeRows.turnsChanged,
     onReplyFinished: finished => {

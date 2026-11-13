@@ -3,8 +3,9 @@ import type {ModelChoice, ProviderId} from '@uz/contract/providers'
 import type {Reply} from '@uz/contract/turns'
 
 import {useConnections} from '#modules/connections/main'
+import {findModel} from '@uz/contract/providers'
 
-import {findModel, pickModel} from './pick-model'
+import {pickModel} from './pick-model'
 
 const NOT_LOADED: ModelPick = {
   groups: [],

@@ -102,7 +102,6 @@ export function createClaudeDriver({
     stop: replies.stop,
     answerApproval: notYet,
     forkSession: notYet,
-    rebuildSession: notYet,
     cutSession: replies.cutSession,
     runOneShot: async (request, signal) =>
       runClaudeOneShot({query: run, env}, request, signal),

@@ -65,6 +65,7 @@ beforeEach(() => {
       },
       vendorProgramFor: () => ({program: null, configDir: '/claude'}),
       compactionSettingsFor: () => ({auto: true, threshold: null}),
+      listedModels: () => [],
       now,
       onTurnsChanged: rows.turnsChanged,
       onReplyFinished: rows.replyFinished,

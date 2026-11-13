@@ -164,6 +164,9 @@ export function createConnections({
   }
 
   return {
+    /** As the Provider last listed them; none if it never has. */
+    models: modelsOf,
+
     snapshot() {
       const models: Record<ProviderId, Model[]> = {
         claude: modelsOf('claude'),

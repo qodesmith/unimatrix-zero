@@ -223,6 +223,7 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
           configDir: home,
         },
         session: session && {...session, type: 'continue'},
+        thread: [],
         compactionSettings: {auto: true, threshold},
       })
     )
@@ -321,6 +322,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             configDir: home,
           },
           session: session && {...session, type: fork ? 'fork' : 'continue'},
+          thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
@@ -479,6 +481,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           ...session,
           type: rewind ? 'rewind' : 'continue',
         },
+        thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
       })) {
         events.push(event)
@@ -636,6 +639,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           prompt: {text, messageId: crypto.randomUUID()},
           vendorProgram: vendorProgram(home),
           session: session && {...session, type: 'continue'},
+          thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
@@ -758,6 +762,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             configDir: home,
           },
           session,
+          thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
@@ -904,6 +909,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           configDir: home,
         },
         session: null,
+        thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
       })) {
         events.push(event)
@@ -991,6 +997,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             configDir: home,
           },
           session: session && {...session, type: 'continue'},
+          thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
@@ -1163,6 +1170,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             configDir: home,
           },
           session: null,
+          thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )
@@ -1234,6 +1242,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
             configDir: home,
           },
           session: null,
+          thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         })
       )

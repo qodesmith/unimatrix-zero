@@ -6,6 +6,7 @@ import type {
   SessionRef,
   SignInRequest,
   StartReplyEvent,
+  Thread,
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 
@@ -190,10 +191,12 @@ async function setUp(
       stopAfter = Infinity,
       model = MODEL,
       compactionSettings = DEFAULT_COMPACTION_SETTINGS,
+      thread = [],
     }: {
       stopAfter?: number
       model?: string
       compactionSettings?: CompactionSettings
+      thread?: Thread
     } = {}
   ) {
     const replyId = crypto.randomUUID()
@@ -208,6 +211,7 @@ async function setUp(
       prompt: {text, messageId: crypto.randomUUID()},
       vendorProgram,
       session: session && {type: 'continue', ...session},
+      thread,
       compactionSettings,
     })) {
       events.push(event)
