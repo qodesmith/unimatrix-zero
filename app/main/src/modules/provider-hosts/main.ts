@@ -133,7 +133,6 @@ export function createProviderHosts({
     host.oneShots.clear()
   }
 
-  /** False when the host's state ignores the event. */
   function send(host: Host, event: HostEvent) {
     const before = host.state
     host.state = hostTransition(before, event)

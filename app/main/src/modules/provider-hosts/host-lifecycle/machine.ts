@@ -6,7 +6,6 @@ import {machine} from '@uz/contract/state-machine'
 /** Waits before each restart after a crash; after the last, the host stays down. */
 export const RESTART_DELAYS_MS = [1000, 5000, 30_000]
 
-/** `restarts` counts the crashes since the host last stayed up. */
 export type HostState =
   | {status: 'starting'; child: HostProcess; restarts: number}
   | {
@@ -68,7 +67,6 @@ const transitions = {
 
 export const hostTransition = machine<HostState, HostEvent>(transitions)
 
-/** The running process, which only a starting or ready host has. */
 export function childOf(state: HostState): HostProcess | null {
   switch (state.status) {
     case 'starting':

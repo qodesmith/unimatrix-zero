@@ -2,10 +2,6 @@ import type {Transitions} from '@uz/contract/state-machine'
 
 import {machine} from '@uz/contract/state-machine'
 
-/**
- * Electron under the dev loop. `settling` waits for the bundles to stop
- * rebuilding; `restarting` waits for the killed Electron to exit.
- */
 export type DevElectronState =
   | {status: 'running'}
   | {

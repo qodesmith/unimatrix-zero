@@ -2,10 +2,6 @@ import type {Transitions} from '#modules/state-machine/main'
 
 import {machine} from '#modules/state-machine/main'
 
-/**
- * Which screen a launch shows: the Connections screen until a Provider is
- * connected.
- */
 export type FirstLaunchState =
   | {status: 'loading'}
   | {status: 'connecting'}

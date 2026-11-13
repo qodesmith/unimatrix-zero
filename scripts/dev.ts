@@ -143,7 +143,6 @@ async function shutdown() {
   process.exit(0)
 }
 
-/** Runs what entering a state calls for; an ignored event runs nothing. */
 function send(event: DevElectronEvent) {
   const before = state
   state = devElectronTransition(before, event)

@@ -58,7 +58,6 @@ function except(...types: HostEvent['type'][]) {
   return ALL.filter(event => !types.includes(event.type))
 }
 
-/** Crashes a starting host that has already crashed `restarts` times. */
 function crashAfter(restarts: number) {
   return hostTransition({...starting, restarts}, {type: 'exited'})
 }
