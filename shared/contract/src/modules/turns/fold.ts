@@ -106,6 +106,8 @@ export function foldReplyEvent<T extends ReplyProgress>(
 
   if (event.type === 'SESSION_REBUILT') return {...reply, rebuilt: true}
 
+  if (event.type === 'RECONNECTING') return reply
+
   if (event.subagentId !== undefined) return reply
 
   if (event.type === 'TOKENS') {

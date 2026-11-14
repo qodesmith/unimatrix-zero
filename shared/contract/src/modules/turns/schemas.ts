@@ -251,6 +251,15 @@ export const SessionRebuiltEvent = z.strictObject({
   type: z.literal('SESSION_REBUILT'),
 })
 
+/**
+ * Display only: the vendor program is retrying a lost connection. Its next
+ * content says the connection is back, since nothing else does.
+ */
+export const ReconnectingEvent = z.strictObject({
+  ...replyIds,
+  type: z.literal('RECONNECTING'),
+})
+
 /** Ends the whole Reply; a Subagent ends with SUBAGENT_FINISHED. */
 export const RunFinishedEvent = z.strictObject({
   ...replyIds,
@@ -278,6 +287,7 @@ export const ReplyEventSchema = z.discriminatedUnion('type', [
   TokensEvent,
   ContextCompactedEvent,
   SessionRebuiltEvent,
+  ReconnectingEvent,
   RunFinishedEvent,
 ])
 
