@@ -912,7 +912,7 @@ function failedAfter(
   added: RecordedLine[],
   result: Partial<
     Pick<SDKResultSuccess, 'terminal_reason' | 'api_error_status'>
-  > = {}
+  >
 ) {
   return edited('warm.ndjson', lines =>
     lines.flatMap(line =>
