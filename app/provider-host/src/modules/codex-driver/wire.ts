@@ -3,6 +3,7 @@ import type {ServerNotification} from './protocol/ServerNotification'
 import type {Account} from './protocol/v2/Account'
 import type {AccountLoginCompletedNotification} from './protocol/v2/AccountLoginCompletedNotification'
 import type {AgentMessageDeltaNotification} from './protocol/v2/AgentMessageDeltaNotification'
+import type {CodexErrorInfo} from './protocol/v2/CodexErrorInfo'
 import type {ErrorNotification} from './protocol/v2/ErrorNotification'
 import type {LoginAccountResponse} from './protocol/v2/LoginAccountResponse'
 import type {Model as CodexModel} from './protocol/v2/Model'
@@ -38,12 +39,25 @@ const TurnErrorSchema = z.looseObject({
   Pick<TurnError, 'message'> & Partial<Pick<TurnError, 'codexErrorInfo'>>
 >
 
+type HttpStatusVariant = Pick<
+  Extract<
+    CodexErrorInfo,
+    {responseStreamDisconnected: unknown}
+  >['responseStreamDisconnected'],
+  'httpStatusCode'
+>
+
 /**
  * The HTTP status Codex forwards on the `codexErrorInfo` variant it names,
  * null on a variant without one.
  */
 const HttpStatusSchema = z
-  .record(z.string(), z.looseObject({httpStatusCode: z.number().nullable()}))
+  .record(
+    z.string(),
+    z.looseObject({
+      httpStatusCode: z.number().nullable(),
+    }) satisfies z.ZodType<HttpStatusVariant>
+  )
   .transform(variant => Object.values(variant).at(0)?.httpStatusCode ?? null)
 
 const RetryErrorSchema = TurnErrorSchema.transform(error => ({
