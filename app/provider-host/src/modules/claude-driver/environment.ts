@@ -12,3 +12,15 @@ export function claudeEnvironment(base: NodeJS.ProcessEnv, configDir: string) {
     DISABLE_UPDATES: '1',
   }
 }
+
+/** `claude` reads a usage-limit wait of `0` as no cap, so the cap is 1 ms. */
+export function claudeReplyEnvironment(
+  base: NodeJS.ProcessEnv,
+  configDir: string
+) {
+  return {
+    ...claudeEnvironment(base, configDir),
+    CLAUDE_CODE_RETRY_WATCHDOG: '1',
+    CLAUDE_CODE_RETRY_WATCHDOG_MAX_USAGE_LIMIT_WAIT_MS: '1',
+  }
+}

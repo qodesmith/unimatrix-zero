@@ -20,11 +20,13 @@ import type {
 import type {CompactionSettings} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
+import {listenLocally, startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
 import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {spawn} from 'node:child_process'
 import fs from 'node:fs'
+import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import {createInterface} from 'node:readline'
@@ -32,7 +34,7 @@ import {describe, expect, it} from 'vitest'
 import {z} from 'zod'
 
 import {planOf, readAccount} from './account'
-import {claudeEnvironment} from './environment'
+import {claudeEnvironment, claudeReplyEnvironment} from './environment'
 import {createClaudeDriver, spawnClaude} from './main'
 import {createRecorder} from './recording'
 import {RECORDINGS} from './replay'
@@ -65,10 +67,38 @@ const OutLine = z.looseObject({
   is_error: z.boolean().optional(),
   errors: z.array(z.string()).optional(),
   message: z.looseObject({model: z.string().optional()}).optional(),
+  attempt: z.number().optional(),
+  max_retries: z.number().optional(),
+  event: z.looseObject({type: z.string()}).optional(),
+  abandoned_blocks: z.unknown().optional(),
+})
+
+const SavedEntry = z.looseObject({
+  type: z.string(),
+  message: z
+    .looseObject({
+      content: z.union([
+        z.string(),
+        z.array(z.looseObject({type: z.string(), text: z.string().optional()})),
+      ]),
+    })
+    .optional(),
 })
 
 function linesOf(printed: string[]) {
   return printed.map(line => OutLine.parse(JSON.parse(line)))
+}
+
+/**
+ * True once `claude` has sent `api_retry` twice for one attempt, which the
+ * watchdog does 30 s into an attempt's wait. Early attempts wait less.
+ */
+function waitsWithinAnAttempt(printed: string[]) {
+  const attempts = linesOf(printed).flatMap(line =>
+    line.subtype === 'api_retry' ? [line.attempt] : []
+  )
+
+  return new Set(attempts).size < attempts.length
 }
 
 function recordedIn(events: Streamed[]) {
@@ -100,6 +130,7 @@ function liveDriver(
   refuses: Parameters<typeof fakeStore>[0] = {}
 ) {
   let addedEnv = firstEnv
+  let droppedEnv: string[] = []
   let compactionSettings: CompactionSettings = {auto: true, threshold: null}
   const store = fakeStore(refuses)
   const printed: string[] = []
@@ -118,7 +149,13 @@ function liveDriver(
     store: store.client,
     spawn: options => {
       // `claudeEnvironment` strips every `CLAUDE_*` variable from the host's.
-      const child = start({...options, env: {...options.env, ...addedEnv}})
+      const env = Object.fromEntries(
+        Object.entries({...options.env, ...addedEnv}).filter(
+          ([name]) => !droppedEnv.includes(name)
+        )
+      )
+
+      const child = start({...options, env})
       createInterface({input: child.stdout}).on('line', line =>
         printed.push(line)
       )
@@ -181,6 +218,10 @@ function liveDriver(
     /** For each `claude` started from here on. */
     setEnv(env: Record<string, string>) {
       addedEnv = env
+    },
+    /** For each `claude` started from here on, even ones the driver sets. */
+    dropEnv(names: string[]) {
+      droppedEnv = names
     },
     /** For each Reply from here on, as main reads it from Settings. */
     setCompaction(next: CompactionSettings) {
@@ -272,6 +313,66 @@ async function compactedThread(live: Live) {
   live.setEnv({})
 
   return {first, third}
+}
+
+const HOUR_IN_SECONDS = 3600
+
+/**
+ * Stands in for the API at `ANTHROPIC_BASE_URL`: every Messages request is
+ * refused with a rejected five-hour limit, as the servers send it, and every
+ * other request goes on to the real API.
+ */
+async function startLimitedApi() {
+  // One reset for every request, so each failure names the same time.
+  const resets = String(Math.floor(Date.now() / 1000) + 2 * HOUR_IN_SECONDS)
+
+  const server = http.createServer((request, response) => {
+    const url = request.url ?? '/'
+
+    if (request.method === 'POST' && url.startsWith('/v1/messages')) {
+      request.resume()
+      response.writeHead(429, {
+        'content-type': 'application/json',
+        'retry-after': String(2 * HOUR_IN_SECONDS),
+        'anthropic-ratelimit-unified-status': 'rejected',
+        'anthropic-ratelimit-unified-reset': resets,
+        'anthropic-ratelimit-unified-representative-claim': 'five_hour',
+        'anthropic-ratelimit-unified-5h-status': 'rejected',
+        'anthropic-ratelimit-unified-5h-reset': resets,
+        'anthropic-ratelimit-unified-5h-utilization': '1.0',
+        'anthropic-ratelimit-unified-overage-status': 'rejected',
+      })
+      response.end(
+        JSON.stringify({
+          type: 'error',
+          error: {type: 'rate_limit_error', message: 'Rate limit exceeded'},
+        })
+      )
+
+      return
+    }
+
+    void (async () => {
+      const body = Buffer.concat(await Array.fromAsync(request))
+
+      const headers = Object.fromEntries(
+        Object.entries(request.headers).flatMap(([name, value]) =>
+          name === 'host' || value === undefined ? [] : [[name, String(value)]]
+        )
+      )
+
+      const upstream = await fetch(`https://api.anthropic.com${url}`, {
+        method: request.method,
+        headers,
+        ...(body.length > 0 ? {body} : {}),
+      })
+
+      response.writeHead(upstream.status, Object.fromEntries(upstream.headers))
+      response.end(Buffer.from(await upstream.arrayBuffer()))
+    })()
+  })
+
+  return {url: await listenLocally(server), close: () => server.close()}
 }
 
 /** About 12 tokens a sentence, measured. */
@@ -841,6 +942,164 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     await live.done()
   }, 180_000)
+
+  it('[dep:claude-retry-watchdog] [dep:claude-api-retry] [dep:stream-event-order] waits out connections refused mid-Reply for longer than claude’s default retries, saying it is reconnecting, then completes and shows the message it started over once, as the session holds it', async () => {
+    const proxy = await startProxy()
+    const live = liveDriver([], {HTTPS_PROXY: proxy.url})
+    const events: Streamed[] = []
+    let deltas = 0
+
+    try {
+      for await (const event of live.driver.startReply(
+        live.request(
+          'Make up a three-word ship name, put it on the first line, then write the numbers 1 to 1000, one per line.',
+          null
+        )
+      )) {
+        events.push(event)
+
+        // claude's default 10 retries give up after 3 to 5 minutes.
+        if (event.type === 'TEXT_DELTA' && ++deltas === 12) {
+          proxy.refuseFor(6 * 60_000)
+        }
+      }
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+      const lines = linesOf(live.printed)
+      const retries = lines.filter(line => line.subtype === 'api_retry')
+
+      expect(
+        Math.max(...retries.map(line => line.attempt ?? 0))
+      ).toBeGreaterThan(10)
+
+      const limits = retries.map(line => line.max_retries ?? 0)
+
+      expect(limits.length).toBeGreaterThan(0)
+      expect(Math.min(...limits)).toBeGreaterThanOrEqual(300)
+      expect(events.some(event => event.type === 'RECONNECTING')).toBe(true)
+      expect(
+        lines.filter(
+          line =>
+            line.event?.type === 'message_stop' &&
+            line.abandoned_blocks !== undefined
+        ).length
+      ).toBeGreaterThan(0)
+
+      const saved = live
+        .entriesOf(recordedIn(events).session.sessionId)
+        .map(entry => SavedEntry.parse(entry))
+        .flatMap(({type, message}) =>
+          type === 'assistant' && Array.isArray(message?.content)
+            ? message.content.flatMap(part => part.text ?? [])
+            : []
+        )
+        .join('')
+
+      expect(saved).not.toBe('')
+      expect(shownText(events)).toBe(saved)
+
+      await live.done()
+    } finally {
+      proxy.close()
+    }
+  }, 900_000)
+
+  it('[dep:claude-retry-watchdog] stops a Reply in claude’s wait within one attempt, while connections are still refused, then goes on from it once they are let through', async () => {
+    const proxy = await startProxy()
+    const live = liveDriver([], {HTTPS_PROXY: proxy.url})
+
+    try {
+      const first = await live.reply('My ship is PELICAN.', null)
+
+      const counting = live.request(
+        'Write the numbers 1 to 1000, one per line.',
+        continuing(first.recorded.session)
+      )
+
+      const events: Streamed[] = []
+      let deltas = 0
+      let stopping = false
+
+      for await (const event of live.driver.startReply(counting)) {
+        events.push(event)
+
+        // Longer than the test runs, so only Stop can end the wait.
+        if (event.type === 'TEXT_DELTA' && ++deltas === 12) {
+          proxy.refuseFor(30 * 60_000)
+        }
+
+        if (
+          event.type === 'RECONNECTING' &&
+          !stopping &&
+          waitsWithinAnAttempt(live.printed)
+        ) {
+          stopping = true
+          await live.driver.stop(counting.replyId)
+        }
+      }
+
+      expect(events.at(-1)).toMatchObject({
+        type: 'RUN_FINISHED',
+        status: 'stopped',
+      })
+
+      proxy.letThrough()
+
+      // As main continues a stopped Reply its Provider never saved: from the Reply above.
+      const above =
+        events.find(
+          (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+        )?.session ?? first.recorded.session
+
+      const asked = await live.reply(
+        'What is my ship called? Just the name.',
+        continuing(above)
+      )
+
+      expect(asked.recorded.session.sessionId).toBe(
+        first.recorded.session.sessionId
+      )
+      expect(textOf(asked.events)).toMatch(/PELICAN/)
+
+      await live.done()
+    } finally {
+      proxy.close()
+    }
+  }, 300_000)
+
+  it('[dep:claude-watchdog-usage-limit] fails a Reply at a usage limit at once, as it does without the watchdog', async () => {
+    const api = await startLimitedApi()
+    const live = liveDriver([], {ANTHROPIC_BASE_URL: api.url})
+
+    async function limited() {
+      const events = await failedOn(live, live.request('Say hi.', null))
+      await live.closed()
+
+      return events.filter(isReplyEvent).reduce(foldReplyEvent, NEW_REPLY)
+        .failure
+    }
+
+    try {
+      const watched = await limited()
+
+      expect(
+        linesOf(live.printed).filter(line => line.subtype === 'api_retry')
+      ).toEqual([])
+
+      live.dropEnv(
+        Object.keys(claudeReplyEnvironment({}, configDir)).filter(
+          name => !(name in claudeEnvironment({}, configDir))
+        )
+      )
+
+      expect(await limited()).toEqual(watched)
+
+      await live.done()
+    } finally {
+      api.close()
+    }
+  }, 120_000)
 
   it('[dep:thread-replay-as-conversation] [dep:reply-labels-unwritten] takes over a Thread ChatGPT wrote, told in one user message, writes no label, and goes on from it warm', async () => {
     const live = liveDriver([])

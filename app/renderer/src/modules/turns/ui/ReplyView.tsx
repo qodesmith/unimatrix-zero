@@ -24,7 +24,8 @@ import {cn} from 'cn'
 import {ChevronRightIcon} from 'lucide-react'
 import {Fragment} from 'react'
 
-import {useReply, useThinking} from '../use-live-reply'
+import {useReply, useThinking, useWaiting} from '../use-live-reply'
+import {useOnline} from '../use-online'
 
 type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 
@@ -73,9 +74,7 @@ export function ReplyView({reply}: {reply: Reply}) {
         </Fragment>
       ))}
       {thinkingBefore(content.length)}
-      {streaming && (
-        <span className="text-xs text-muted-foreground">Writing…</span>
-      )}
+      {streaming && <StreamingLine replyId={reply.id} />}
       <StatusLine status={status} />
     </article>
   )
@@ -105,6 +104,18 @@ function WrittenBy({reply}: {reply: Reply}) {
       </Badge>
     </div>
   )
+}
+
+function streamingLabel(online: boolean, waiting: boolean) {
+  if (!online) return 'Offline · waiting for the connection'
+
+  return waiting ? 'Reconnecting…' : 'Writing…'
+}
+
+function StreamingLine({replyId}: {replyId: string}) {
+  const label = streamingLabel(useOnline(), useWaiting(replyId))
+
+  return <span className="text-xs text-muted-foreground">{label}</span>
 }
 
 function StatusLine({status}: {status: ReplyStatus}) {

@@ -25,12 +25,22 @@ interface LiveState {
   thinking: Record<string, ThinkingBlock[]>
   /** By Reply id, from a Stop or Retry asked until the machine is idle again. */
   runs: Record<string, ReplyRunState>
+  /**
+   * By streaming Reply id, from a sign of a lost connection to its next
+   * content.
+   */
+  waiting: Record<string, true>
 }
 
 export type ReplyStore = Store<LiveState>
 
 export function createReplyStore(): ReplyStore {
-  return new Store<LiveState>({replies: {}, thinking: {}, runs: {}})
+  return new Store<LiveState>({
+    replies: {},
+    thinking: {},
+    runs: {},
+    waiting: {},
+  })
 }
 
 function without<T>(byReply: Record<string, T>, replyId: string) {
@@ -125,6 +135,39 @@ function runsAfter(runs: LiveState['runs'], event: ReplyEvent) {
   return after === before ? runs : withRun(runs, event.replyId, after)
 }
 
+const ENDS_WAIT: ReadonlySet<ReplyEvent['type']> = new Set([
+  'RUN_STARTED',
+  'TEXT_DELTA',
+  'TEXT_REPLACE',
+  'REASONING_DELTA',
+  'TOOL_CALL_START',
+  'TOOL_CALL_ARGS',
+  'TOOL_RESULT',
+  'RUN_FINISHED',
+])
+
+function waitingAfter(waiting: LiveState['waiting'], event: ReplyEvent) {
+  const {replyId} = event
+
+  if (event.type === 'RECONNECTING') {
+    return waiting[replyId] ? waiting : {...waiting, [replyId]: true as const}
+  }
+
+  return waiting[replyId] && ENDS_WAIT.has(event.type)
+    ? without(waiting, replyId)
+    : waiting
+}
+
+/** Neither vendor program says when the connection is back; content does. */
+export function markStreamingWaiting(store: ReplyStore) {
+  store.setState(state => ({
+    ...state,
+    waiting: Object.fromEntries(
+      Object.keys(state.replies).map(replyId => [replyId, true as const])
+    ),
+  }))
+}
+
 /**
  * A `SNAPSHOT` replaces the streaming Replies; at `RUN_FINISHED` the Reply
  * moves into the saved Turns, which main has just written the same way.
@@ -141,6 +184,11 @@ export function applyLiveEvent(
       replies: Object.fromEntries(
         event.replies.map(reply => [reply.replyId, reply])
       ),
+      waiting: Object.fromEntries(
+        event.replies.flatMap(({replyId}) =>
+          state.waiting[replyId] ? [[replyId, true as const]] : []
+        )
+      ),
     }))
     void queryClient.invalidateQueries({queryKey: ['turns']})
 
@@ -150,11 +198,12 @@ export function applyLiveEvent(
   if (!('replyId' in event)) return
 
   const {treeId, replyId} = event
-  const {replies, thinking, runs} = store.state
+  const {replies, thinking, runs, waiting} = store.state
   const current = replies[replyId] ?? {...NEW_REPLY, treeId, replyId}
   const next = foldReplyEvent(current, event)
   const nextThinking = thinkingAfter(thinking, event, current, now())
   const nextRuns = runsAfter(runs, event)
+  const nextWaiting = waitingAfter(waiting, event)
 
   if (event.type === 'RUN_FINISHED') {
     updateSavedReply(queryClient, event, saved => withProgress(saved, next))
@@ -162,6 +211,7 @@ export function applyLiveEvent(
       replies: without(replies, replyId),
       thinking: nextThinking,
       runs: nextRuns,
+      waiting: nextWaiting,
     }))
 
     return
@@ -169,11 +219,17 @@ export function applyLiveEvent(
 
   const changed = next !== current || !(replyId in replies)
 
-  if (changed || nextThinking !== thinking || nextRuns !== runs) {
+  if (
+    changed ||
+    nextThinking !== thinking ||
+    nextRuns !== runs ||
+    nextWaiting !== waiting
+  ) {
     store.setState(() => ({
       replies: changed ? {...replies, [replyId]: next} : replies,
       thinking: nextThinking,
       runs: nextRuns,
+      waiting: nextWaiting,
     }))
   }
 }

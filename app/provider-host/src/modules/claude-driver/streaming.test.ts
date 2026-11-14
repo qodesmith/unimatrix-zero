@@ -114,10 +114,12 @@ async function setUp(
   const reports = folder('uz-claude-reports-')
   const idle = heldIdle()
   const exits: Promise<unknown>[] = []
+  const environments: NodeJS.ProcessEnv[] = []
 
   const driver = createClaudeDriver({
     store: store.client,
     spawn: options => {
+      environments.push(options.env)
       const child = spawnClaude(options)
       exits.push(once(child, 'exit').catch(() => undefined))
 
@@ -227,6 +229,7 @@ async function setUp(
     store,
     reply,
     reports: reportsSoFar,
+    environments,
     allClosed,
   }
 }
@@ -554,6 +557,128 @@ function streamed(event: SDKPartialAssistantMessage['event']): RecordedLine {
     },
   }
 }
+
+/** Text blocks only. */
+function cutOff(texts: string[], fromBlock: number): RecordedLine[] {
+  const start = read('warm.ndjson').find(
+    line =>
+      line.kind === 'out' &&
+      JSON.stringify(line.message).includes('"message_start"')
+  )
+
+  if (!start) throw new Error('The recording has no message_start')
+
+  const blocks = texts.flatMap((text, index) => [
+    streamed({
+      type: 'content_block_start',
+      index,
+      content_block: {type: 'text', text: '', citations: null},
+    }),
+    streamed({
+      type: 'content_block_delta',
+      index,
+      delta: {type: 'text_delta', text},
+    }),
+    streamed({type: 'content_block_stop', index}),
+  ])
+
+  return [
+    start,
+    ...blocks,
+    {
+      kind: 'out',
+      message: {
+        type: 'stream_event',
+        event: {type: 'message_stop'},
+        abandoned_blocks: {
+          api_message_id: 'msg_cut',
+          from_block_index: fromBlock,
+        },
+        session_id: SESSION_ID,
+        parent_tool_use_id: null,
+        uuid: crypto.randomUUID(),
+      },
+    },
+    ...[1, 2].map((attempt): RecordedLine => ({
+      kind: 'out',
+      message: {
+        type: 'system',
+        subtype: 'api_retry',
+        attempt,
+        max_retries: 300,
+        retry_delay_ms: 523,
+        error_status: null,
+        error: 'unknown',
+        session_id: SESSION_ID,
+        uuid: crypto.randomUUID(),
+      },
+    })),
+  ]
+}
+
+function beforeFirstMessage(added: RecordedLine[]) {
+  return edited('warm.ndjson', lines => {
+    const start = lines.findIndex(
+      line =>
+        line.kind === 'out' &&
+        JSON.stringify(line.message).includes('"message_start"')
+    )
+
+    return [...lines.slice(0, start), ...added, ...lines.slice(start)]
+  })
+}
+
+function textAndReconnects(events: Streamed[]) {
+  return replyEvents(events).flatMap(event =>
+    ['TEXT_DELTA', 'TEXT_REPLACE', 'RECONNECTING'].includes(event.type)
+      ? [event]
+      : []
+  )
+}
+
+it('starts claude for a Reply with the retry watchdog on, and its wait at a usage limit capped', async () => {
+  const claude = await setUp(['warm.ndjson'])
+
+  await claude.reply(FIRST_PROMPT)
+
+  expect(claude.environments).toEqual([
+    expect.objectContaining({
+      CLAUDE_CODE_RETRY_WATCHDOG: '1',
+      CLAUDE_CODE_RETRY_WATCHDOG_MAX_USAGE_LIMIT_WAIT_MS: '1',
+    }),
+  ])
+
+  await claude.allClosed()
+})
+
+it('reports each retry, and shows once the message Claude starts over after cutting it off', async () => {
+  const claude = await setUp([beforeFirstMessage(cutOff(['TE'], 0))])
+
+  const events = await claude.reply(FIRST_PROMPT)
+
+  expect(textAndReconnects(events)).toEqual([
+    expect.objectContaining({type: 'TEXT_DELTA', delta: 'TE'}),
+    expect.objectContaining({type: 'RECONNECTING'}),
+    expect.objectContaining({type: 'RECONNECTING'}),
+    expect.objectContaining({type: 'TEXT_REPLACE', text: ''}),
+    expect.objectContaining({type: 'TEXT_DELTA', delta: 'TEAL'}),
+  ])
+  expect(textOf(events)).toBe('TEAL')
+
+  await claude.reply(SECOND_PROMPT, recordedIn(events))
+  await claude.allClosed()
+})
+
+it('keeps the blocks of a cut-off message that come before the first one Claude threw away', async () => {
+  const claude = await setUp([beforeFirstMessage(cutOff(['Kept. ', 'TE'], 1))])
+
+  const events = await claude.reply(FIRST_PROMPT)
+
+  expect(textOf(events)).toBe('Kept. TEAL')
+
+  await claude.reply(SECOND_PROMPT, recordedIn(events))
+  await claude.allClosed()
+})
 
 it('shows thinking as it streams, and never as part of the Reply', async () => {
   const thinking = edited('warm.ndjson', lines => {

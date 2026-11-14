@@ -88,6 +88,22 @@ it('adds a message that never streamed, and leaves one that matches', () => {
   expect(mapper.map(message('a', 'Hi'))).toEqual([])
 })
 
+function retryNotice(willRetry: boolean): Notification {
+  return {
+    method: 'error',
+    params: {...inTurn, willRetry},
+  }
+}
+
+it('reports a wait while Codex retries, and nothing for an error it gives up on', () => {
+  const mapper = createReplyMapper(ids)
+
+  expect(mapper.map(retryNotice(true))).toEqual([
+    {...ids, type: 'RECONNECTING'},
+  ])
+  expect(mapper.map(retryNotice(false))).toEqual([])
+})
+
 it('passes reasoning on and reads each request’s own token count', () => {
   const mapper = createReplyMapper(ids)
 

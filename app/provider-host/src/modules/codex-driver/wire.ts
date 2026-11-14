@@ -3,6 +3,7 @@ import type {ServerNotification} from './protocol/ServerNotification'
 import type {Account} from './protocol/v2/Account'
 import type {AccountLoginCompletedNotification} from './protocol/v2/AccountLoginCompletedNotification'
 import type {AgentMessageDeltaNotification} from './protocol/v2/AgentMessageDeltaNotification'
+import type {ErrorNotification} from './protocol/v2/ErrorNotification'
 import type {LoginAccountResponse} from './protocol/v2/LoginAccountResponse'
 import type {Model as CodexModel} from './protocol/v2/Model'
 import type {ModelListResponse} from './protocol/v2/ModelListResponse'
@@ -204,6 +205,17 @@ export const NotificationSchema = z.discriminatedUnion('method', [
       ...inTurn,
       tokenUsage: ThreadTokenUsageSchema,
     })
+  ),
+  // One per attempt to reconnect a lost connection. When Codex gives up, the failure
+  // comes with `turn/completed`.
+  notification(
+    'error',
+    z.looseObject({
+      ...inTurn,
+      willRetry: z.boolean(),
+    }) satisfies z.ZodType<
+      Pick<ErrorNotification, 'threadId' | 'turnId' | 'willRetry'>
+    >
   ),
   notification(
     'turn/completed',

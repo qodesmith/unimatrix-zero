@@ -13,6 +13,7 @@ import {afterEach, beforeEach, expect, it, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
 
 import recording from '../fake-reply.json'
+import {goOffline, goOnline} from '../go-offline'
 import {LiveReplies, ReplyView, useTurns} from '../main'
 
 const events: AppEvent[] = recording.map(event => EventSchema.parse(event))
@@ -396,4 +397,43 @@ it('says a Reply re-read the whole conversation, and says nothing on another', a
   expect(
     screen.getByText('Re-read the whole conversation to go on').all()
   ).toHaveLength(1)
+})
+
+it('shows Reconnecting… in place of Writing… from a reconnect until the next content, keeping the text so far', async () => {
+  const screen = await replay(before('TOOL_CALL_START'))
+  const article = screen.getByRole('article', {name: 'Reply'})
+
+  main.publish({treeId, replyId, type: 'RECONNECTING'})
+
+  await expect.element(article.getByText('Reconnecting…')).toBeVisible()
+  expect(article.getByText('Writing…').query()).toBeNull()
+  await expect
+    .element(article.getByText(/Let me look something up/))
+    .toBeVisible()
+
+  stream(before('TOOL_CALL_START'), before('TOOL_CALL_START') + 1)
+
+  await expect.element(article.getByText('Writing…')).toBeVisible()
+  expect(article.getByText('Reconnecting…').query()).toBeNull()
+})
+
+it('says a streaming Reply is offline while the OS says so, then Reconnecting… until the next content', async () => {
+  const screen = await replay(before('TOOL_CALL_START'))
+  const article = screen.getByRole('article', {name: 'Reply'})
+
+  goOffline()
+
+  await expect
+    .element(article.getByText('Offline · waiting for the connection'))
+    .toBeVisible()
+  expect(article.getByText('Writing…').query()).toBeNull()
+
+  goOnline()
+
+  await expect.element(article.getByText('Reconnecting…')).toBeVisible()
+  expect(article.getByText(/Offline/).query()).toBeNull()
+
+  stream(before('TOOL_CALL_START'), before('TOOL_CALL_START') + 1)
+
+  await expect.element(article.getByText('Writing…')).toBeVisible()
 })
