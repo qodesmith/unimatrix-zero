@@ -4,16 +4,9 @@ import {describe, expect, it} from 'vitest'
 
 import {attachmentAddTransition, startedAdding} from './machine'
 
-const attachment = {
-  id: '01a16096-00ad-7d3b-8205-000000000001',
-  name: 'notes.pdf',
-  mediaType: 'application/pdf',
-  size: 2048,
-} as const
-
 const adding = startedAdding('notes.pdf')
 
-const added = {status: 'added', attachment} satisfies AttachmentAddState
+const added = {status: 'added'} satisfies AttachmentAddState
 
 const refused = {
   status: 'refused',
@@ -24,8 +17,11 @@ const refused = {
 // @ts-expect-error only a refusal holds an error
 void ({status: 'adding', name: 'a', error: 'Gone'} satisfies AttachmentAddState)
 
+// @ts-expect-error the attachment main kept stays out of the machine
+void ({status: 'added', attachment: {}} satisfies AttachmentAddState)
+
 const ALL: AttachmentAddEvent[] = [
-  {type: 'added', attachment},
+  {type: 'added'},
   {type: 'refused', error: 'Not now'},
 ]
 
@@ -35,10 +31,8 @@ describe('the attachment add machine', () => {
       expect(adding).toEqual({status: 'adding', name: 'notes.pdf'})
     })
 
-    it('holds the attachment main kept', () => {
-      expect(
-        attachmentAddTransition(adding, {type: 'added', attachment})
-      ).toEqual(added)
+    it('ends the add once main kept the file', () => {
+      expect(attachmentAddTransition(adding, {type: 'added'})).toEqual(added)
     })
 
     it('holds main’s refusal, with the file’s name', () => {

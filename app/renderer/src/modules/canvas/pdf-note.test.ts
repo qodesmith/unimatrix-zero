@@ -70,7 +70,7 @@ it('counts the draft’s PDFs, and none of its other files, going to a Provider 
     pdfsSentAsText({
       index: indexOf(),
       attachedTo: null,
-      draft: [file(PDF), file('image/png'), file('text/plain'), file(PDF)],
+      attached: [file(PDF), file('image/png'), file('text/plain'), file(PDF)],
       to: GPT,
     })
   ).toBe(2)
@@ -84,7 +84,7 @@ it('counts none going to a Provider that takes PDFs, or before a Model is picked
       pdfsSentAsText({
         index: indexOf(root),
         attachedTo: root.reply,
-        draft: [file(PDF)],
+        attached: [file(PDF)],
         to,
       })
     ).toBe(0)
@@ -100,7 +100,7 @@ it('counts every PDF on the Thread above as well when the Thread is handed over,
     pdfsSentAsText({
       index: indexOf(root, offThread, next),
       attachedTo: next.reply,
-      draft: [file(PDF)],
+      attached: [file(PDF)],
       to: GPT,
     })
   ).toBe(4)
@@ -113,7 +113,7 @@ it('leaves the Thread’s PDFs out while the Thread stays on its Provider, which
     pdfsSentAsText({
       index: indexOf(root),
       attachedTo: root.reply,
-      draft: [file(PDF)],
+      attached: [file(PDF)],
       to: GPT,
     })
   ).toBe(1)

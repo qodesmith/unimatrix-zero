@@ -12,8 +12,7 @@ interface PdfCountInput {
   index: TreeIndex
   /** The Reply the Input is attached to; null at the root. */
   attachedTo: Reply | null
-  /** The draft's attachments. */
-  draft: readonly Attachment[]
+  attached: readonly Attachment[]
   /** The Model the Input would send on. */
   to: ModelChoice | null
 }
@@ -29,7 +28,12 @@ function pdfs(attachments: readonly Attachment[]) {
  * takes them only as text: the draft's, and on a hand-over every one on the
  * Thread above, since the new session is rebuilt from the Thread.
  */
-export function pdfsSentAsText({index, attachedTo, draft, to}: PdfCountInput) {
+export function pdfsSentAsText({
+  index,
+  attachedTo,
+  attached,
+  to,
+}: PdfCountInput) {
   if (!to || PROVIDER_CAPABILITIES[to.provider].pdfAttachments) return 0
 
   const handedOver = attachedTo !== null && attachedTo.provider !== to.provider
@@ -42,7 +46,7 @@ export function pdfsSentAsText({index, attachedTo, draft, to}: PdfCountInput) {
       })
     : []
 
-  return above.reduce((sum, count) => sum + count, pdfs(draft))
+  return above.reduce((sum, count) => sum + count, pdfs(attached))
 }
 
 export function pdfNote(count: number) {

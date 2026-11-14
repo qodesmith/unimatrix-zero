@@ -35,7 +35,6 @@ function RemoveButton({label, onClick}: {label: string; onClick: () => void}) {
   )
 }
 
-/** A thumbnail that opens the image large in a lightbox. */
 function ImageAttachment({
   attachment: {id, name},
   onRemove,

@@ -3,7 +3,7 @@ import type {Attachment} from '@uz/contract/attachments'
 
 import {useEffect, useRef, useState} from 'react'
 
-import {addFile} from '../add-file'
+import {useAddFile} from '../add-file'
 import {addToMain} from './actions'
 import {attachmentAddTransition, startedAdding} from './machine'
 
@@ -21,6 +21,7 @@ type Adds = ReadonlyMap<string, AttachmentAddState>
  * refused one stays, with main's message, until dismissed.
  */
 export function useAttachmentAdds(onAdded: (attachment: Attachment) => void) {
+  const addFile = useAddFile()
   const [adds, setAdds] = useState<Adds>(new Map())
   const latest = useRef(adds)
   const queue = useRef(Promise.resolve())
@@ -39,20 +40,16 @@ export function useAttachmentAdds(onAdded: (attachment: Attachment) => void) {
     const before = latest.current.get(key)
     const after = before && attachmentAddTransition(before, event)
 
-    if (!after || after === before) return
+    if (!after || after === before) return false
 
     const next = new Map(latest.current)
 
-    if (after.status === 'added') {
-      next.delete(key)
-      put(next)
-      added.current(after.attachment)
+    if (after.status === 'added') next.delete(key)
+    else next.set(key, after)
 
-      return
-    }
-
-    next.set(key, after)
     put(next)
+
+    return true
   }
 
   function attach(files: readonly File[]) {
@@ -64,11 +61,16 @@ export function useAttachmentAdds(onAdded: (attachment: Attachment) => void) {
       next.set(key, startedAdding(file.name))
       queue.current = queue.current
         .then(async () =>
-          addToMain({file, runAdd: addFile, send: event => send(key, event)})
+          addToMain({
+            file,
+            runAdd: addFile,
+            send: event => send(key, event),
+            onAdded: attachment => added.current(attachment),
+          })
         )
-        .catch(() =>
+        .catch(() => {
           send(key, {type: 'refused', error: 'Couldn’t attach this file'})
-        )
+        })
     }
 
     put(next)

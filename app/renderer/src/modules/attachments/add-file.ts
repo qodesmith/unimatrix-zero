@@ -32,8 +32,7 @@ async function fileToAdd(
   return {ok: true, file: {type: 'pasted', name: file.name, bytes}}
 }
 
-/** Main keeps a copy of the file for good, for a Prompt to send. */
-export async function addFile(file: File): Promise<AddOutcome> {
+async function addFile(file: File): Promise<AddOutcome> {
   const toAdd = await fileToAdd(file)
 
   if (!toAdd.ok) return toAdd
@@ -46,4 +45,9 @@ export async function addFile(file: File): Promise<AddOutcome> {
   return outcome.ok
     ? {ok: true, attachment: outcome.value.attachment}
     : {ok: false, error: outcome.error.message}
+}
+
+/** Main keeps a copy of the file for good, for a Prompt to send. */
+export function useAddFile() {
+  return addFile
 }

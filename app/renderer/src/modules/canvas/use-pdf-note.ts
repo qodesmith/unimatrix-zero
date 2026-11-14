@@ -13,10 +13,10 @@ const NO_TURNS = indexTurns({prompts: [], replies: []})
 /** The note for an Input whose PDFs would reach its Model only as text. */
 export function usePdfNote(
   attachedTo: Reply | null,
-  draft: readonly Attachment[],
+  attached: readonly Attachment[],
   to: ModelChoice | null
 ) {
   const index = use(CanvasContext)?.index ?? NO_TURNS
 
-  return pdfNote(pdfsSentAsText({index, attachedTo, draft, to}))
+  return pdfNote(pdfsSentAsText({index, attachedTo, attached, to}))
 }
