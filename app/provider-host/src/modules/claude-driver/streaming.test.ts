@@ -558,10 +558,7 @@ function streamed(event: SDKPartialAssistantMessage['event']): RecordedLine {
   }
 }
 
-/**
- * A message cut off mid-stream, as `claude` ends it before it retries: its
- * stop names the first block it threw away. Text blocks only.
- */
+/** Text blocks only. */
 function cutOff(texts: string[], fromBlock: number): RecordedLine[] {
   const start = read('warm.ndjson').find(
     line =>
@@ -602,12 +599,12 @@ function cutOff(texts: string[], fromBlock: number): RecordedLine[] {
         uuid: crypto.randomUUID(),
       },
     },
-    {
+    ...[1, 2].map((attempt): RecordedLine => ({
       kind: 'out',
       message: {
         type: 'system',
         subtype: 'api_retry',
-        attempt: 1,
+        attempt,
         max_retries: 300,
         retry_delay_ms: 523,
         error_status: null,
@@ -615,7 +612,7 @@ function cutOff(texts: string[], fromBlock: number): RecordedLine[] {
         session_id: SESSION_ID,
         uuid: crypto.randomUUID(),
       },
-    },
+    })),
   ]
 }
 
@@ -661,6 +658,7 @@ it('reports each retry, and shows once the message Claude starts over after cutt
 
   expect(textAndReconnects(events)).toEqual([
     expect.objectContaining({type: 'TEXT_DELTA', delta: 'TE'}),
+    expect.objectContaining({type: 'RECONNECTING'}),
     expect.objectContaining({type: 'RECONNECTING'}),
     expect.objectContaining({type: 'TEXT_REPLACE', text: ''}),
     expect.objectContaining({type: 'TEXT_DELTA', delta: 'TEAL'}),

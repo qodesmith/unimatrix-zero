@@ -9,10 +9,11 @@ import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {EventSchema} from '@uz/contract/events'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
-import {afterEach, beforeEach, expect, it, onTestFinished, vi} from 'vitest'
+import {afterEach, beforeEach, expect, it, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
 
 import recording from '../fake-reply.json'
+import {goOffline, goOnline} from '../go-offline'
 import {LiveReplies, ReplyView, useTurns} from '../main'
 
 const events: AppEvent[] = recording.map(event => EventSchema.parse(event))
@@ -415,22 +416,6 @@ it('shows Reconnecting… in place of Writing… from a reconnect until the next
   await expect.element(article.getByText('Writing…')).toBeVisible()
   expect(article.getByText('Reconnecting…').query()).toBeNull()
 })
-
-function goOffline() {
-  Object.defineProperty(navigator, 'onLine', {
-    configurable: true,
-    get: () => false,
-  })
-  globalThis.dispatchEvent(new Event('offline'))
-  onTestFinished(() => {
-    goOnline()
-  })
-}
-
-function goOnline() {
-  Reflect.deleteProperty(navigator, 'onLine')
-  globalThis.dispatchEvent(new Event('online'))
-}
 
 it('says a streaming Reply is offline while the OS says so, then Reconnecting… until the next content', async () => {
   const screen = await replay(before('TOOL_CALL_START'))

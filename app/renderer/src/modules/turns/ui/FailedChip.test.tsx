@@ -8,9 +8,10 @@ import {ConnectionsProvider} from '#modules/connections/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
-import {beforeEach, expect, it, onTestFinished} from 'vitest'
+import {beforeEach, expect, it} from 'vitest'
 import {render} from 'vitest-browser-react'
 
+import {goOffline, goOnline} from '../go-offline'
 import {FailedChip, LiveReplies, useTurns} from '../main'
 
 const treeId = '01a16096-00ad-7d3b-8205-6b76ddc26ce0'
@@ -272,22 +273,6 @@ it('shows why main refused a retry, beside the button', async () => {
     .element(screen.getByRole('button', {name: 'Retry'}))
     .toBeEnabled()
 })
-
-function goOffline() {
-  Object.defineProperty(navigator, 'onLine', {
-    configurable: true,
-    get: () => false,
-  })
-  globalThis.dispatchEvent(new Event('offline'))
-  onTestFinished(() => {
-    goOnline()
-  })
-}
-
-function goOnline() {
-  Reflect.deleteProperty(navigator, 'onLine')
-  globalThis.dispatchEvent(new Event('online'))
-}
 
 it('holds Retry while offline, saying so, and frees it once the connection is back', async () => {
   goOffline()
