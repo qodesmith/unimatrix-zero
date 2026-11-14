@@ -111,11 +111,11 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Id:** `claude-retry-watchdog`
 - **Kind:** D
 - **Provider:** Claude
-- **Relies on:** `CLAUDE_CODE_RETRY_WATCHDOG`, a variable the SDK types don't name. With it set, `claude` raises its retry limit for a lost connection or a server error from 10 to 300, about 3 hours at about 36 s each, and lifts the clamp of 15 on `CLAUDE_CODE_MAX_RETRIES`. 429 and 529 responses no longer use up attempts, so `claude` waits without limit through an overload, and it sends `api_retry` again every 30 s within one attempt's wait.
+- **Relies on:** `CLAUDE_CODE_RETRY_WATCHDOG`, a variable the SDK types don't name. With it set, `claude` raises its retry limit for a lost connection or a server error from 10 to 300, about 3 hours at about 36 s each, and lifts the clamp of 15 on `CLAUDE_CODE_MAX_RETRIES`. 429 and 529 responses no longer use up attempts, so `claude` waits without limit through an overload, and it sends `api_retry` again every 30 s within one attempt's wait. An interrupt ends the wait at once, since Stop is the only way out of a wait this long.
 - **App side:** `claude-driver` starts `claude` for Replies with it, after its environment strips every `CLAUDE_*` variable. One-shots start without it.
-- **User would see:** if the variable stopped working, a Reply that loses the network fails with "Connection lost" after 3 to 5 minutes instead of going on when the network is back.
+- **User would see:** if the variable stopped working, a Reply that loses the network fails with "Connection lost" after 3 to 5 minutes instead of going on when the network is back. If an interrupt stopped ending the wait, Stop would leave the Reply waiting for hours.
 - **Changed by:** upgrade
-- **Check:** `[dep:claude-retry-watchdog]` in `claude-driver`: a Reply whose connections are refused for 6 minutes, past the default retries, completes once they're let through, and `claude` reports a limit of 300.
+- **Check:** `[dep:claude-retry-watchdog]` in `claude-driver`: a Reply whose connections are refused for 6 minutes, past the default retries, completes once they're let through, and `claude` reports a limit of 300. A Reply stopped during a wait within one attempt, while connections are still refused, ends stopped and goes on from it once they're let through.
 
 ### A Reply at a usage limit fails at once
 

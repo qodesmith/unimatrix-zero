@@ -89,6 +89,18 @@ function linesOf(printed: string[]) {
   return printed.map(line => OutLine.parse(JSON.parse(line)))
 }
 
+/**
+ * True once `claude` has sent `api_retry` twice for one attempt, which the
+ * watchdog does 30 s into an attempt's wait. Early attempts wait less.
+ */
+function waitsWithinAnAttempt(printed: string[]) {
+  const attempts = linesOf(printed).flatMap(line =>
+    line.subtype === 'api_retry' ? [line.attempt] : []
+  )
+
+  return new Set(attempts).size < attempts.length
+}
+
 function recordedIn(events: Streamed[]) {
   const recorded = events.find(
     (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
@@ -992,6 +1004,69 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       proxy.close()
     }
   }, 900_000)
+
+  it('[dep:claude-retry-watchdog] stops a Reply in claude’s wait within one attempt, while connections are still refused, then goes on from it once they are let through', async () => {
+    const proxy = await startProxy()
+    const live = liveDriver([], {HTTPS_PROXY: proxy.url})
+
+    try {
+      const first = await live.reply('My ship is PELICAN.', null)
+
+      const counting = live.request(
+        'Write the numbers 1 to 1000, one per line.',
+        continuing(first.recorded.session)
+      )
+
+      const events: Streamed[] = []
+      let deltas = 0
+      let stopping = false
+
+      for await (const event of live.driver.startReply(counting)) {
+        events.push(event)
+
+        // Longer than the test runs, so only Stop can end the wait.
+        if (event.type === 'TEXT_DELTA' && ++deltas === 12) {
+          proxy.refuseFor(30 * 60_000)
+        }
+
+        if (
+          event.type === 'RECONNECTING' &&
+          !stopping &&
+          waitsWithinAnAttempt(live.printed)
+        ) {
+          stopping = true
+          await live.driver.stop(counting.replyId)
+        }
+      }
+
+      expect(events.at(-1)).toMatchObject({
+        type: 'RUN_FINISHED',
+        status: 'stopped',
+      })
+
+      proxy.letThrough()
+
+      // As main continues a stopped Reply its Provider never saved: from the Reply above.
+      const above =
+        events.find(
+          (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+        )?.session ?? first.recorded.session
+
+      const asked = await live.reply(
+        'What is my ship called? Just the name.',
+        continuing(above)
+      )
+
+      expect(asked.recorded.session.sessionId).toBe(
+        first.recorded.session.sessionId
+      )
+      expect(textOf(asked.events)).toMatch(/PELICAN/)
+
+      await live.done()
+    } finally {
+      proxy.close()
+    }
+  }, 300_000)
 
   it('[dep:claude-watchdog-usage-limit] fails a Reply at a usage limit at once, as it does without the watchdog', async () => {
     const api = await startLimitedApi()

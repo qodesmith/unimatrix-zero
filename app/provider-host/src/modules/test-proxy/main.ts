@@ -64,6 +64,11 @@ export async function startProxy() {
         refusing = false
       }, ms)
     },
+    /** Ends a refusal before its time is up. */
+    letThrough() {
+      clearTimeout(lifting)
+      refusing = false
+    },
     close() {
       clearTimeout(lifting)
       cutConnections()
