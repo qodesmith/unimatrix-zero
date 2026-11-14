@@ -28,12 +28,17 @@ export type SendOutcome = {ok: true; reply: Reply} | {ok: false; error: string}
 export function useSendPrompt(treeId: string, parentReplyId: string | null) {
   const queryClient = useQueryClient()
 
-  return async (text: string, model: ModelChoice): Promise<SendOutcome> => {
+  return async (
+    text: string,
+    attachmentIds: readonly string[],
+    model: ModelChoice
+  ): Promise<SendOutcome> => {
     const outcome = await bridge().send({
       type: 'prompt.send',
       treeId,
       parentReplyId,
       text,
+      ...(attachmentIds.length > 0 && {attachmentIds: [...attachmentIds]}),
       model,
     })
 

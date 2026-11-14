@@ -1,3 +1,4 @@
+import type {Attachment} from '@uz/contract/attachments'
 import type {Bridge} from '@uz/contract/bridge'
 import type {Command, CommandOutcome, CommandType} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
@@ -7,8 +8,11 @@ import type {Settings} from '@uz/contract/settings'
 import type {Tree} from '@uz/contract/trees'
 import type {Prompt, Reply, StreamingReply} from '@uz/contract/turns'
 
+import {AttachmentMediaTypeSchema} from '@uz/contract/attachments'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
+
+type AddedFile = Extract<Command, {type: 'attachment.add'}>['file']
 
 export const receivedAt = '2026-10-19T12:00:00.000Z'
 
@@ -55,6 +59,28 @@ export function fakeMain(saved: Saved = {}) {
   const layout: Layout = {...DEFAULT_LAYOUT, ...saved.layout}
   const sent: Command[] = []
   const listeners = new Set<(event: AppEvent) => void>()
+  const attachments = new Map<string, Attachment>()
+  const dropped = new Map<string, File>()
+
+  function keep(file: AddedFile) {
+    const from = file.type === 'dropped' ? dropped.get(file.fileId) : null
+
+    const attachment: Attachment = {
+      id: crypto.randomUUID(),
+      name: from?.name ?? (file.type === 'pasted' ? file.name : 'file'),
+      mediaType:
+        AttachmentMediaTypeSchema.safeParse(from?.type).data ?? 'text/plain',
+      size: from?.size ?? (file.type === 'pasted' ? file.bytes.byteLength : 0),
+    }
+
+    attachments.set(attachment.id, attachment)
+
+    return attachment
+  }
+
+  function attachmentsOf(ids: string[] = []) {
+    return ids.flatMap(id => attachments.get(id) ?? [])
+  }
 
   function publish(event: AppEvent) {
     for (const listener of listeners) listener(event)
@@ -67,7 +93,9 @@ export function fakeMain(saved: Saved = {}) {
     return tree
   }
 
-  function answer(command: Command): CommandOutcome<CommandType> {
+  function answer(
+    command: Exclude<Command, {type: 'attachment.add'}>
+  ): CommandOutcome<CommandType> {
     if ('provider' in command) return {ok: true, value: {}}
 
     if (command.type === 'app.ping') {
@@ -144,6 +172,7 @@ export function fakeMain(saved: Saved = {}) {
         treeId: command.treeId,
         parentReplyId: command.parentReplyId,
         text: command.text,
+        attachments: attachmentsOf(command.attachmentIds),
         createdAt: receivedAt,
       }
 
@@ -184,6 +213,10 @@ export function fakeMain(saved: Saved = {}) {
     send: (async (command: Command) => {
       sent.push(command)
 
+      if (command.type === 'attachment.add') {
+        return {ok: true, value: {attachment: keep(command.file)}}
+      }
+
       return answer(command)
     }) as Bridge['send'],
     subscribe: listener => {
@@ -207,7 +240,13 @@ export function fakeMain(saved: Saved = {}) {
 
       return () => listeners.delete(listener)
     },
-    registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
+    registerDroppedFile: async file => {
+      const id = crypto.randomUUID()
+
+      dropped.set(id, file)
+
+      return {ok: true, id}
+    },
   }
 
   return {...bridge, sent, trees, replies, layout, publish}
