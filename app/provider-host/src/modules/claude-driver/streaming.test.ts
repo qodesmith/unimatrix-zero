@@ -113,7 +113,6 @@ async function setUp(
   const configDir = folder('uz-claude-config-')
   const reports = folder('uz-claude-reports-')
   const idle = heldIdle()
-  // No Reply gives up on a silent `claude` until the test says.
   const silence = heldIdle()
   const exits: Promise<unknown>[] = []
   const environments: NodeJS.ProcessEnv[] = []

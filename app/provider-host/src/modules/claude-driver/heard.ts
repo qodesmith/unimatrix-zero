@@ -1,5 +1,6 @@
 import type {Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SDKMessage} from '@anthropic-ai/claude-agent-sdk'
+import type {ReplyRequest} from '@uz/contract/host'
 
 /** As long as the SDK gives `claude` to start. */
 export const HEARD_WITHIN_MS = 60_000
@@ -39,7 +40,7 @@ export async function* startingWith<T>(first: T, rest: AsyncGenerator<T>) {
 }
 
 export function silentEnding(
-  ids: {treeId: string; replyId: string},
+  ids: Pick<ReplyRequest, 'treeId' | 'replyId'>,
   {silent}: Silent
 ): Ending {
   const type = 'RUN_FINISHED'

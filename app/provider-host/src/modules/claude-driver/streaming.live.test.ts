@@ -1108,17 +1108,17 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     const request = live.request('Say hi.', null)
 
     try {
+      const sent = performance.now()
       const replying = Array.fromAsync(live.driver.startReply(request))
 
       await expect
-        .poll(
-          () =>
-            linesOf(live.printed).some(
-              line => line.type === 'system' && line.subtype === 'init'
-            ),
-          {timeout: 10_000}
+        .poll(() =>
+          linesOf(live.printed).some(
+            line => line.type === 'system' && line.subtype === 'init'
+          )
         )
         .toBe(true)
+      expect(performance.now() - sent).toBeLessThan(10_000)
       await live.driver.stop(request.replyId)
 
       expect((await replying).at(-1)).toMatchObject({
