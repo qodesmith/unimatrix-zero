@@ -1,9 +1,10 @@
 import type {ConvertedPage} from '#modules/pdf-conversion/main'
-import type {HostAttachment} from '@uz/contract/attachments'
+import type {HostAttachment, ImageMediaType} from '@uz/contract/attachments'
+import type {ReplyRequest} from '@uz/contract/host'
 
 import {readFile} from 'node:fs/promises'
 
-interface Text {
+export interface Text {
   type: 'text'
   text: string
 }
@@ -17,14 +18,7 @@ export type Piece = Text | {type: 'file'; file: HostAttachment}
 /** What a Provider is sent, before a driver puts it in its own wire format. */
 export type ContentPart =
   | Text
-  | {
-      type: 'image'
-      mediaType: Exclude<
-        HostAttachment['mediaType'],
-        'application/pdf' | 'text/plain'
-      >
-      base64: string
-    }
+  | {type: 'image'; mediaType: ImageMediaType; base64: string}
   | {type: 'document'; name: string; base64: string}
 
 export type ConvertPdf = (
@@ -39,10 +33,7 @@ export interface ContentOptions {
   convertPdf: ConvertPdf
 }
 
-interface Prompt {
-  text: string
-  attachments: HostAttachment[]
-}
+type Prompt = Pick<ReplyRequest['prompt'], 'text' | 'attachments'>
 
 export function lines(...texts: string[]): Piece[] {
   return texts.map(text => ({type: 'text', text}))
@@ -52,24 +43,30 @@ export function files(attached: HostAttachment[]): Piece[] {
   return attached.map(file => ({type: 'file', file}))
 }
 
-/** Each run of texts as one text, its lines joined. */
-export function joinLines(pieces: Piece[]): Piece[] {
-  const joined: Piece[] = []
+/** Adjacent texts become one, a line apart. */
+export function joinLines<Part extends {type: string}>(
+  parts: (Part | Text)[]
+): (Part | Text)[] {
+  const joined: (Part | Text)[] = []
 
-  for (const piece of pieces) {
+  for (const part of parts) {
     const last = joined.at(-1)
 
-    if (piece.type === 'text' && last?.type === 'text') {
+    if (isText(part) && last && isText(last)) {
       joined[joined.length - 1] = {
         type: 'text',
-        text: `${last.text}\n${piece.text}`,
+        text: `${last.text}\n${part.text}`,
       }
     } else {
-      joined.push(piece)
+      joined.push(part)
     }
   }
 
   return joined
+}
+
+function isText(part: {type: string}): part is Text {
+  return part.type === 'text'
 }
 
 /** A Prompt's files go before its text, as the vendors advise. */
@@ -160,25 +157,6 @@ async function partsOf(
   }
 }
 
-function joinParts(parts: ContentPart[]) {
-  const joined: ContentPart[] = []
-
-  for (const part of parts) {
-    const last = joined.at(-1)
-
-    if (part.type === 'text' && last?.type === 'text') {
-      joined[joined.length - 1] = {
-        type: 'text',
-        text: `${last.text}\n${part.text}`,
-      }
-    } else {
-      joined.push(part)
-    }
-  }
-
-  return joined
-}
-
 /**
  * Reads each file from its original, and converts a PDF afresh for a Provider
  * that can't take one, so losses never pile up. Never empty, and no text in it
@@ -194,7 +172,7 @@ export async function readContent(
     )
   )
 
-  const shown = joinParts(parts.flat()).filter(
+  const shown = joinLines(parts.flat()).filter(
     part => part.type !== 'text' || part.text !== ''
   )
 

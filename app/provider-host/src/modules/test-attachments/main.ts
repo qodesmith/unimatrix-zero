@@ -49,7 +49,6 @@ export function attachedFiles(folder: string) {
       Buffer.from('%PDF-1', 'ascii'),
       'c'
     ),
-    /** Names an original no longer there. */
     gone: {
       name: 'gone.txt',
       mediaType: 'text/plain',

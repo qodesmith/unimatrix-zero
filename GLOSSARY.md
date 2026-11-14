@@ -82,7 +82,7 @@ _Avoid_: User message, question
 
 **Attachment**:
 A file the user sends with a Prompt: an image, a PDF or a text file. The Tree keeps the original, and a Provider that can't take it as it is gets a conversion made from that original.
-_Avoid_: Upload, file
+_Avoid_: Upload
 
 **Reply**:
 The AI's Turn in response to one Prompt, however many internal messages, tool calls, or thinking blocks it contains.

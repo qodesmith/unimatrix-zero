@@ -7,7 +7,7 @@ import {z} from 'zod'
 const MANIFEST = 'manifest.json'
 
 /** Raised whenever what a page converts to changes, so older ones convert again. */
-export const CONVERSION_VERSION = 1
+const CONVERSION_VERSION = 1
 
 const ManifestSchema = z.strictObject({
   version: z.literal(CONVERSION_VERSION),

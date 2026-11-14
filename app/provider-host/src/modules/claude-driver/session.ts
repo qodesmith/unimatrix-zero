@@ -49,7 +49,6 @@ function blockOf(part: ContentPart): Blocks[number] {
   }
 }
 
-/** A Prompt with no files goes as plain text, as one always did. */
 function messageContent(content: ContentPart[]) {
   const [only, ...rest] = content
 

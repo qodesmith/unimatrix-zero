@@ -13,6 +13,8 @@ export const ImageMediaTypeSchema = z.enum([
   'image/webp',
 ])
 
+export type ImageMediaType = z.infer<typeof ImageMediaTypeSchema>
+
 /** Main reads it from the file's bytes, never from its name or the window. */
 export const AttachmentMediaTypeSchema = z.enum([
   ...ImageMediaTypeSchema.options,
