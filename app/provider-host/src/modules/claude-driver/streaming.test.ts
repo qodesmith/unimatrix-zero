@@ -1033,9 +1033,9 @@ it('ends a Reply stopped before its claude is heard at once, closing that claude
   const next = await claude.reply(FIRST_PROMPT)
 
   expect(textOf(next)).toBe('TEAL')
+  await expect.poll(() => claude.reports()[0]?.ended).toBe('input-closed')
   await claude.allClosed()
   expect(claude.reports()).toHaveLength(2)
-  expect(claude.reports()[0]?.ended).toBe('input-closed')
 })
 
 it('interrupts and closes a warm claude stopped before it is heard, and the Thread goes on from the Reply above in a new one', async () => {
@@ -1124,9 +1124,9 @@ it('fails a Reply as connection-lost when its claude says nothing in time, closi
   const retried = await claude.reply(FIRST_PROMPT)
 
   expect(textOf(retried)).toBe('TEAL')
+  await expect.poll(() => claude.reports()[0]?.ended).toBe('input-closed')
   await claude.allClosed()
   expect(claude.reports()).toHaveLength(2)
-  expect(claude.reports()[0]?.ended).toBe('input-closed')
 })
 
 it('never gives up on a claude once it is heard, however long it then takes', async () => {
