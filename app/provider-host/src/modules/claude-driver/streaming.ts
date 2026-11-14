@@ -17,7 +17,7 @@ import {failureOf} from '#modules/failures/main'
 import {createReplyRuns} from '#modules/reply-runs/main'
 import {explainingLabels, replayed} from '#modules/thread-replay/main'
 
-import {claudeEnvironment} from './environment'
+import {claudeReplyEnvironment} from './environment'
 import {createReplyMapper} from './replies'
 import {openSession} from './session'
 import {
@@ -166,7 +166,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     const options: Options = {
       pathToClaudeCodeExecutable: program.path,
-      env: claudeEnvironment(deps.env, configDir),
+      env: claudeReplyEnvironment(deps.env, configDir),
       cwd,
       settingSources: [],
       settings: {

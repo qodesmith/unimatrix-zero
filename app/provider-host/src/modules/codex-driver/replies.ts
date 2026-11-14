@@ -110,6 +110,10 @@ export function createReplyMapper(ids: ReplyIds) {
     map(notification: Notification): ContentEvent[] {
       const {method, params} = notification
 
+      if (method === 'error') {
+        return params.willRetry ? [{...ids, type: 'RECONNECTING'}] : []
+      }
+
       if (method === 'item/agentMessage/delta') {
         return onDelta(params.itemId, params.delta)
       }

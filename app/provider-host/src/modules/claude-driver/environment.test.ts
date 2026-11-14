@@ -1,6 +1,6 @@
 import {expect, it} from 'vitest'
 
-import {claudeEnvironment} from './environment'
+import {claudeEnvironment, claudeReplyEnvironment} from './environment'
 
 it('strips every variable that could outrank the subscription', () => {
   const env = claudeEnvironment(
@@ -25,5 +25,13 @@ it('strips every variable that could outrank the subscription', () => {
     CLAUDE_CONFIG_DIR: '/data/providers/claude',
     CLAUDE_SECURESTORAGE_CONFIG_DIR: '/data/providers/claude',
     DISABLE_UPDATES: '1',
+  })
+})
+
+it('lets a Reply wait out a lost connection, but not a usage limit', () => {
+  expect(claudeReplyEnvironment({PATH: '/usr/bin'}, '/claude')).toStrictEqual({
+    ...claudeEnvironment({PATH: '/usr/bin'}, '/claude'),
+    CLAUDE_CODE_RETRY_WATCHDOG: '1',
+    CLAUDE_CODE_RETRY_WATCHDOG_MAX_USAGE_LIMIT_WAIT_MS: '0',
   })
 })

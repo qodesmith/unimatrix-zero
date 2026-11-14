@@ -10,6 +10,7 @@ import type {ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {failureOf} from '#modules/failures/main'
+import {z} from 'zod'
 
 type StreamEvent = SDKPartialAssistantMessage['event']
 
@@ -24,16 +25,28 @@ const SYNTHETIC_MODEL = '<synthetic>'
 
 type ReplyIds = Pick<ReplyRequest, 'treeId' | 'replyId'>
 
+/** Not in the SDK's types: how `claude` ends a message cut off mid-stream. */
+const AbandonedStopSchema = z.looseObject({
+  abandoned_blocks: z.looseObject({
+    from_block_index: z.number().int().nonnegative(),
+  }),
+})
+
 /**
- * Turns one Reply's SDK messages into contract events. A stream that broke and
- * was silently resent has its text replaced; Subagent messages are left out.
+ * Turns one Reply's SDK messages into contract events. A message that broke
+ * and was sent again has its text replaced as the new one starts; Subagent
+ * messages are left out.
  */
 export function createReplyMapper(ids: ReplyIds) {
   let shown = ''
   let atMessageStart = ''
   let atBlockStart = ''
   let block: string | null = null
+  /** The text shown as each block of the open message began, by index. */
+  let blockStarts: string[] = []
   let messageOpen = false
+  /** Where a message `claude` cut off and will start over ends the text. */
+  let cutAt: string | null = null
   let mirrorFailed = false
   let lastMessage: {uuid: string; model: string} | null = null
   let limitLifts: number | undefined
@@ -81,14 +94,19 @@ export function createReplyMapper(ids: ReplyIds) {
   function onStreamEvent(event: StreamEvent): ContentEvent[] {
     if (event.type === 'message_start') {
       // A message that never stopped was cut off and is being sent again.
-      const resent = messageOpen ? replace(atMessageStart) : []
+      const from = messageOpen ? atMessageStart : cutAt
+      const resent = from === null ? [] : replace(from)
       messageOpen = true
       atMessageStart = shown
+      blockStarts = []
+      cutAt = null
 
       return resent
     }
 
     if (event.type === 'content_block_start') {
+      blockStarts[event.index] = shown
+
       if (event.content_block.type === 'text') {
         atBlockStart = shown
         block = ''
@@ -102,9 +120,20 @@ export function createReplyMapper(ids: ReplyIds) {
     if (event.type === 'message_delta') return [tokens(event.usage)]
 
     if (event.type === 'content_block_stop') block = null
-    else messageOpen = false
+    else onMessageStop(event)
 
     return []
+  }
+
+  /** The blocks before the first one `claude` threw away stay in the session. */
+  function onMessageStop(event: StreamEvent) {
+    messageOpen = false
+    const stop = AbandonedStopSchema.safeParse(event)
+
+    if (stop.success) {
+      const from = stop.data.abandoned_blocks.from_block_index
+      cutAt = blockStarts[from] ?? shown
+    }
   }
 
   /** `claude` reports the context window only with the result, per Model. */
@@ -150,6 +179,10 @@ export function createReplyMapper(ids: ReplyIds) {
     map(message: SDKMessage): ContentEvent[] {
       if (message.type === 'system' && message.subtype === 'mirror_error') {
         mirrorFailed = true
+      }
+
+      if (message.type === 'system' && message.subtype === 'api_retry') {
+        return [{...ids, type: 'RECONNECTING'}]
       }
 
       if (message.type === 'rate_limit_event') {
