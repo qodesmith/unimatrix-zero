@@ -19,6 +19,7 @@ import type {
 import type {CompactionSettings} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
+import {startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
 import {programOf} from '#modules/vendor-program/main'
 import {isReplyEvent} from '@uz/contract/host'
@@ -26,8 +27,6 @@ import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {spawnSync} from 'node:child_process'
 import {once} from 'node:events'
 import fs from 'node:fs'
-import http from 'node:http'
-import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import {describe, expect, it} from 'vitest'
@@ -61,45 +60,6 @@ function homeFrom(source: string) {
 
 type Streamed = StartReplyEvent
 
-/**
- * A CONNECT proxy that can cut every open connection, the way a dropped Wi-Fi
- * ends `codex`'s stream, while letting the reconnect through at once.
- */
-async function startProxy() {
-  const open = new Set<net.Socket>()
-  const server = http.createServer((_request, response) => response.end())
-
-  server.on('connect', (request, client: net.Socket) => {
-    const [host = '', port = '443'] = (request.url ?? '').split(':')
-
-    const upstream = net.connect(Number(port), host, () => {
-      client.write('HTTP/1.1 200 Connection Established\r\n\r\n')
-      upstream.pipe(client)
-      client.pipe(upstream)
-    })
-
-    for (const socket of [client, upstream]) {
-      open.add(socket)
-      socket.on('close', () => open.delete(socket))
-    }
-
-    client.on('error', () => upstream.destroy())
-    upstream.on('error', () => client.destroy())
-  })
-
-  server.listen(0, '127.0.0.1')
-  await once(server, 'listening')
-  const {port} = z.looseObject({port: z.number()}).parse(server.address())
-
-  return {
-    url: `http://127.0.0.1:${port}`,
-    cutConnections() {
-      for (const socket of open) socket.resetAndDestroy()
-    },
-    close: () => server.close(),
-  }
-}
-
 const WireLine = z.looseObject({
   id: z.union([z.number(), z.string()]).optional(),
   method: z.string().optional(),
@@ -107,6 +67,7 @@ const WireLine = z.looseObject({
     .looseObject({
       itemId: z.string().optional(),
       item: z.looseObject({id: z.string(), type: z.string()}).optional(),
+      willRetry: z.boolean().optional(),
     })
     .optional(),
 })
@@ -948,7 +909,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 180_000)
 
-  it('[dep:codex-reconnect-new-message] shows only the message Codex starts over, as a new item that leaves the first unfinished, after its connection drops mid-Reply', async () => {
+  it('[dep:codex-reconnect-new-message] [dep:codex-retry-notice] says it is reconnecting while its connections are refused mid-Reply, then shows only the message Codex starts over, as a new item that leaves the first unfinished, once they are back', async () => {
     if (!folder || !signedIn) return
 
     const proxy = await startProxy()
@@ -1009,11 +970,18 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       })) {
         events.push(event)
 
-        if (event.type === 'TEXT_DELTA' && ++deltas === 12)
-          proxy.cutConnections()
+        if (event.type === 'TEXT_DELTA' && ++deltas === 12) {
+          proxy.refuseFor(20_000)
+        }
       }
 
       expectComplete(events)
+      expect(
+        wireLinesIn(output).filter(
+          ({method, params}) => method === 'error' && params?.willRetry
+        ).length
+      ).toBeGreaterThan(0)
+      expect(events.some(event => event.type === 'RECONNECTING')).toBe(true)
 
       const lines = events
         .filter(isReplyEvent)

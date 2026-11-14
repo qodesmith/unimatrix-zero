@@ -20,6 +20,7 @@ import type {
 import type {CompactionSettings} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
+import {startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
 import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
@@ -65,6 +66,22 @@ const OutLine = z.looseObject({
   is_error: z.boolean().optional(),
   errors: z.array(z.string()).optional(),
   message: z.looseObject({model: z.string().optional()}).optional(),
+  attempt: z.number().optional(),
+  max_retries: z.number().optional(),
+  event: z.looseObject({type: z.string()}).optional(),
+  abandoned_blocks: z.unknown().optional(),
+})
+
+const SavedEntry = z.looseObject({
+  type: z.string(),
+  message: z
+    .looseObject({
+      content: z.union([
+        z.string(),
+        z.array(z.looseObject({type: z.string(), text: z.string().optional()})),
+      ]),
+    })
+    .optional(),
 })
 
 function linesOf(printed: string[]) {
@@ -841,6 +858,68 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     await live.done()
   }, 180_000)
+
+  it('[dep:claude-retry-watchdog] [dep:claude-api-retry] [dep:stream-event-order] waits out connections refused mid-Reply for longer than claude’s default retries, saying it is reconnecting, then completes and shows the message it started over once, as the session holds it', async () => {
+    const proxy = await startProxy()
+    const live = liveDriver([], {HTTPS_PROXY: proxy.url})
+    const events: Streamed[] = []
+    let deltas = 0
+
+    try {
+      for await (const event of live.driver.startReply(
+        live.request(
+          'Make up a three-word ship name, put it on the first line, then write the numbers 1 to 1000, one per line.',
+          null
+        )
+      )) {
+        events.push(event)
+
+        // claude's default 10 retries give up after 3 to 5 minutes.
+        if (event.type === 'TEXT_DELTA' && ++deltas === 12) {
+          proxy.refuseFor(6 * 60_000)
+        }
+      }
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+      const lines = linesOf(live.printed)
+      const retries = lines.filter(line => line.subtype === 'api_retry')
+
+      expect(
+        Math.max(...retries.map(line => line.attempt ?? 0))
+      ).toBeGreaterThan(10)
+
+      const limits = retries.map(line => line.max_retries ?? 0)
+
+      expect(limits.length).toBeGreaterThan(0)
+      expect(Math.min(...limits)).toBeGreaterThanOrEqual(300)
+      expect(events.some(event => event.type === 'RECONNECTING')).toBe(true)
+      expect(
+        lines.filter(
+          line =>
+            line.event?.type === 'message_stop' &&
+            line.abandoned_blocks !== undefined
+        ).length
+      ).toBeGreaterThan(0)
+
+      const saved = live
+        .entriesOf(recordedIn(events).session.sessionId)
+        .map(entry => SavedEntry.parse(entry))
+        .flatMap(({type, message}) =>
+          type === 'assistant' && Array.isArray(message?.content)
+            ? message.content.flatMap(part => part.text ?? [])
+            : []
+        )
+        .join('')
+
+      expect(saved).not.toBe('')
+      expect(shownText(events)).toBe(saved)
+
+      await live.done()
+    } finally {
+      proxy.close()
+    }
+  }, 900_000)
 
   it('[dep:thread-replay-as-conversation] [dep:reply-labels-unwritten] takes over a Thread ChatGPT wrote, told in one user message, writes no label, and goes on from it warm', async () => {
     const live = liveDriver([])

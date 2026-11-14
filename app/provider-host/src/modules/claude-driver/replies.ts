@@ -25,7 +25,10 @@ const SYNTHETIC_MODEL = '<synthetic>'
 
 type ReplyIds = Pick<ReplyRequest, 'treeId' | 'replyId'>
 
-/** Not in the SDK's types: how `claude` ends a message cut off mid-stream. */
+/**
+ * Not in the SDK's types: how `claude` ends a message cut off mid-stream, on
+ * the `stream_event` beside its `message_stop`.
+ */
 const AbandonedStopSchema = z.looseObject({
   abandoned_blocks: z.looseObject({
     from_block_index: z.number().int().nonnegative(),
@@ -91,7 +94,9 @@ export function createReplyMapper(ids: ReplyIds) {
     }
   }
 
-  function onStreamEvent(event: StreamEvent): ContentEvent[] {
+  function onStreamEvent(message: SDKPartialAssistantMessage): ContentEvent[] {
+    const {event} = message
+
     if (event.type === 'message_start') {
       // A message that never stopped was cut off and is being sent again.
       const from = messageOpen ? atMessageStart : cutAt
@@ -120,15 +125,15 @@ export function createReplyMapper(ids: ReplyIds) {
     if (event.type === 'message_delta') return [tokens(event.usage)]
 
     if (event.type === 'content_block_stop') block = null
-    else onMessageStop(event)
+    else onMessageStop(message)
 
     return []
   }
 
   /** The blocks before the first one `claude` threw away stay in the session. */
-  function onMessageStop(event: StreamEvent) {
+  function onMessageStop(message: SDKPartialAssistantMessage) {
     messageOpen = false
-    const stop = AbandonedStopSchema.safeParse(event)
+    const stop = AbandonedStopSchema.safeParse(message)
 
     if (stop.success) {
       const from = stop.data.abandoned_blocks.from_block_index
@@ -207,7 +212,7 @@ export function createReplyMapper(ids: ReplyIds) {
 
       if (message.parent_tool_use_id !== null) return []
 
-      if (message.type === 'stream_event') return onStreamEvent(message.event)
+      if (message.type === 'stream_event') return onStreamEvent(message)
 
       if (message.type === 'assistant') return onAssistant(message)
 

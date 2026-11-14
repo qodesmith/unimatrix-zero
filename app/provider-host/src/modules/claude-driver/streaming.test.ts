@@ -559,8 +559,8 @@ function streamed(event: SDKPartialAssistantMessage['event']): RecordedLine {
 }
 
 /**
- * A message cut off mid-stream, as `claude` ends it before it retries: its
- * stop names the first block it threw away. Text blocks only.
+ * A message cut off mid-stream, as `claude` 2.1.307 ends it before it retries:
+ * its stop names the first block it threw away. Text blocks only.
  */
 function cutOff(texts: string[], fromBlock: number): RecordedLine[] {
   const start = read('warm.ndjson').find(
@@ -592,12 +592,10 @@ function cutOff(texts: string[], fromBlock: number): RecordedLine[] {
       kind: 'out',
       message: {
         type: 'stream_event',
-        event: {
-          type: 'message_stop',
-          abandoned_blocks: {
-            api_message_id: 'msg_cut',
-            from_block_index: fromBlock,
-          },
+        event: {type: 'message_stop'},
+        abandoned_blocks: {
+          api_message_id: 'msg_cut',
+          from_block_index: fromBlock,
         },
         session_id: SESSION_ID,
         parent_tool_use_id: null,
