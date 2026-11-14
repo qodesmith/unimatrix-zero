@@ -22,6 +22,10 @@ _Avoid_: Engine, bot, assistant
 The Provider's own record of one Thread, which it uses to continue the conversation. It is a disposable copy: the Tree is the truth, and a Provider session can be rebuilt from its Thread.
 _Avoid_: Thread (Codex's word for it), conversation
 
+**One-shot**:
+A single question the app itself puts to a Provider outside any Tree, to get back one piece of text, such as a Tree's title or a Summary. It adds no Turn and keeps no Provider session, and the AI answers it with no tools and no Tree's System prompt.
+_Avoid_: Prompt (that is a user's Turn), side query, background request
+
 **Compaction**:
 A Provider replacing the early part of a Provider session with a summary, on its own once the Context size nears the Context window or the threshold set in Settings, or when asked. The Thread still shows every Turn in full, but the AI now remembers the Turns before the Compaction only from that summary. The Thread marks the Reply a Compaction happened in. A Compaction that was blocked or failed changed nothing and isn't one.
 _Avoid_: Compression, summarization, Summary (that is prose made for the user)
