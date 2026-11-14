@@ -44,7 +44,7 @@ export class RequestRefused extends Error {
 }
 
 /** A throttle or an overload: the server answered, so the connection is fine. */
-export function isBusyStatus(status: number | null | undefined) {
+export function isBusyStatus(status: number | null) {
   return status === 429 || status === 529
 }
 

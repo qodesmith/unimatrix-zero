@@ -26,13 +26,12 @@ interface LiveState {
   /** By Reply id, from a Stop or Retry asked until the machine is idle again. */
   runs: Record<string, ReplyRunState>
   /**
-   * By streaming Reply id, from a retry or a lost connection to its next
-   * content.
+   * By streaming Reply id, from the vendor program's retry notice or a lost
+   * connection to its next content.
    */
   waiting: Record<string, Wait>
 }
 
-/** A busy wait is a retry of a 429 or a 529: the connection is fine. */
 export type Wait = 'busy' | 'reconnecting'
 
 export type ReplyStore = Store<LiveState>
