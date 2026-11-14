@@ -41,12 +41,11 @@ function writing(body: (run: ReplyRun) => Promise<Ending>): WriteReply {
   }
 }
 
-async function failureOf(error: Error, limitLifts?: () => number) {
+async function failureOf(error: Error) {
   const runs = createReplyRuns(
     writing(async () => {
       throw error
-    }),
-    {limitLifts}
+    })
   )
 
   const events = await Array.fromAsync(runs.startReply(request))
@@ -124,7 +123,7 @@ it('never records a failed Reply', async () => {
   ])
 })
 
-it('fails a throw with its reason, a crashed program as a crash', async () => {
+it('fails a throw with its reason, a crashed program as a crash, and a limit named only in its text as a provider error', async () => {
   expect(await failureOf(new ProgramCrashed('Gone'))).toMatchObject({
     status: 'failed',
     failure: {code: 'program-crashed', message: 'Gone'},
@@ -132,13 +131,8 @@ it('fails a throw with its reason, a crashed program as a crash', async () => {
   expect(await failureOf(new Error('ENOSPC: no space left'))).toMatchObject({
     failure: {code: 'disk-full'},
   })
-  expect(
-    await failureOf(new Error('Usage limit reached'), () => 1_800_000_000)
-  ).toMatchObject({
-    failure: {
-      code: 'limit-reached',
-      resetsAt: new Date(1_800_000_000 * 1000).toISOString(),
-    },
+  expect(await failureOf(new Error('Usage limit reached'))).toMatchObject({
+    failure: {code: 'provider-error', message: 'Usage limit reached'},
   })
 })
 

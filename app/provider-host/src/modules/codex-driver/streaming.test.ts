@@ -1177,7 +1177,7 @@ it('names when a limit lifts by the full window Codex reported', async () => {
       .replace('"usedPercent":0', '"usedPercent":100')
       .replace(
         '"status":"completed","error":null',
-        '"status":"failed","error":{"message":"You’ve hit your usage limit."}'
+        '"status":"failed","error":{"message":"You’ve hit your usage limit.","codexErrorInfo":"usageLimitExceeded"}'
       )
   )
 
@@ -1192,13 +1192,39 @@ it('names when a limit lifts by the full window Codex reported', async () => {
   })
 })
 
+it('names a workspace out of credits a reached limit, with no reset time, though a window is full', async () => {
+  const limited = edited('started.ndjson', text =>
+    text
+      .replace('"usedPercent":0', '"usedPercent":100')
+      .replace(
+        '"rateLimitReachedType":null',
+        '"rateLimitReachedType":"workspace_owner_credits_depleted"'
+      )
+      .replace(
+        '"status":"completed","error":null',
+        '"status":"failed","error":{"message":"Your workspace is out of credits.","codexErrorInfo":"usageLimitExceeded"}'
+      )
+  )
+
+  vi.useFakeTimers({toFake: ['Date'], now: new Date('2026-10-23T09:00:00Z')})
+  const codex = await setUp([limited])
+
+  const events = await codex.reply(FIRST_PROMPT)
+
+  expect(events.at(-1)).toMatchObject({
+    status: 'failed',
+    failure: {code: 'limit-reached'},
+  })
+  expect(events.at(-1)).not.toHaveProperty('failure.resetsAt')
+})
+
 it('names when a limit lifts by a full window a later update leaves out', async () => {
   const limited = edited('started.ndjson', text => {
     const lines = text
       .replace('"usedPercent":0', '"usedPercent":100')
       .replace(
         '"status":"completed","error":null',
-        '"status":"failed","error":{"message":"You’ve hit your usage limit."}'
+        '"status":"failed","error":{"message":"You’ve hit your usage limit.","codexErrorInfo":"usageLimitExceeded"}'
       )
       .split('\n')
 

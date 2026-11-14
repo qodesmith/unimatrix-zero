@@ -1,3 +1,4 @@
+import type {ClaudeSignals} from '#modules/failures/main'
 import type {ContentEvent} from '#modules/reply-runs/main'
 import type {
   ModelUsage,
@@ -9,7 +10,7 @@ import type {
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
-import {failureOf, isBusyStatus} from '#modules/failures/main'
+import {claudeFailureOf, isBusyStatus} from '#modules/failures/main'
 import {z} from 'zod'
 
 type StreamEvent = SDKPartialAssistantMessage['event']
@@ -52,8 +53,8 @@ export function createReplyMapper(ids: ReplyIds) {
   let atCut: string | null = null
   let mirrorFailed = false
   let lastMessage: {uuid: string; model: string} | null = null
-  let limitLifts: number | undefined
-  let limitRejected = false
+  /** What a failed result is read with, beside its own fields. */
+  const signals: ClaudeSignals = {}
 
   function replace(text: string): ContentEvent[] {
     if (text === shown) return []
@@ -156,7 +157,13 @@ export function createReplyMapper(ids: ReplyIds) {
       : undefined
   }
 
-  function onAssistant({message, uuid}: SDKAssistantMessage): ContentEvent[] {
+  function onAssistant({
+    message,
+    uuid,
+    error,
+  }: SDKAssistantMessage): ContentEvent[] {
+    signals.assistantError = error
+
     if (message.model === SYNTHETIC_MODEL) return []
 
     lastMessage = {uuid, model: message.model}
@@ -187,6 +194,8 @@ export function createReplyMapper(ids: ReplyIds) {
       }
 
       if (message.type === 'system' && message.subtype === 'api_retry') {
+        signals.retryStatus = message.error_status
+
         return [
           {
             ...ids,
@@ -198,8 +207,15 @@ export function createReplyMapper(ids: ReplyIds) {
 
       if (message.type === 'rate_limit_event') {
         const {status, resetsAt} = message.rate_limit_info
-        limitRejected = status === 'rejected'
-        limitLifts = limitRejected ? resetsAt : undefined
+        signals.rejectedLimit = status === 'rejected' ? {resetsAt} : undefined
+      }
+
+      if (
+        message.type === 'system' &&
+        message.subtype === 'status' &&
+        message.compact_result !== undefined
+      ) {
+        signals.compactionFailed = message.compact_result === 'failed'
       }
 
       // The only sign a compaction went through: one blocked or failed sends none.
@@ -255,11 +271,17 @@ export function createReplyMapper(ids: ReplyIds) {
         ...windowField,
         type: 'RUN_FINISHED',
         status: 'failed',
-        failure: failureOf(message || 'Claude couldn’t finish this Reply.', {
-          resetsAt: limitLifts,
-          limitRejected,
-          terminalReason: result.terminal_reason,
-        }),
+        failure: claudeFailureOf(
+          message || 'Claude couldn’t finish this Reply.',
+          {
+            ...signals,
+            terminalReason: result.terminal_reason,
+            apiErrorStatus:
+              result.subtype === 'success'
+                ? result.api_error_status
+                : undefined,
+          }
+        ),
       }
     },
 

@@ -59,11 +59,13 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   function onRateLimits(notification: Notification) {
     if (notification.method !== 'account/rateLimits/updated') return
 
-    const {primary, secondary} = notification.params.rateLimits
+    const {primary, secondary, rateLimitReachedType} =
+      notification.params.rateLimits
 
     limits = {
       primary: primary ?? limits.primary,
       secondary: secondary ?? limits.secondary,
+      rateLimitReachedType,
     }
   }
 
@@ -482,7 +484,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   }
 
   return {
-    ...createReplyRuns(write, {limitLifts: () => limitLifts(limits)}),
+    ...createReplyRuns(write),
     cutSession,
     listModels,
   }

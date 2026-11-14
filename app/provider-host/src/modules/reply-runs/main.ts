@@ -50,18 +50,12 @@ interface Writing {
   cleanUps: ((status: FinishedStatus) => void)[]
 }
 
-interface ReplyRunsOptions {
-  /** When the Provider's full limit windows lift, in seconds since the epoch. */
-  limitLifts?: () => number | undefined
-}
-
 /**
  * A Reply's run around a driver's `write`: `RUN_STARTED` first, exactly one
  * `RUN_FINISHED` last, and a throw failed with its reason.
  */
 export function createReplyRuns(
-  write: WriteReply,
-  {limitLifts = () => undefined}: ReplyRunsOptions = {}
+  write: WriteReply
 ): Pick<ProviderDriver, 'startReply' | 'stop'> {
   const writing = new Map<string, Writing>()
 
@@ -100,10 +94,10 @@ export function createReplyRuns(
       const failure: RunFailure =
         error instanceof ProgramCrashed
           ? {code: 'program-crashed', message}
-          : failureOf(message, {
-              resetsAt: limitLifts(),
-              refusal: error instanceof RequestRefused ? error.data : undefined,
-            })
+          : failureOf(
+              message,
+              error instanceof RequestRefused ? error.data : undefined
+            )
 
       return {
         finished: {

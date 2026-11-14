@@ -180,6 +180,8 @@ const RateLimitWindowSchema = z.looseObject({
 const RateLimitsSchema = z.looseObject({
   primary: RateLimitWindowSchema.nullable().catch(null),
   secondary: RateLimitWindowSchema.nullable().catch(null),
+  // A value this Codex doesn't know yet still means a limit was reached.
+  rateLimitReachedType: z.string().nullable().optional().catch(null),
 })
 
 export type RateLimits = z.infer<typeof RateLimitsSchema>

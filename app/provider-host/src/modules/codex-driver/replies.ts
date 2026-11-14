@@ -3,7 +3,7 @@ import type {Notification} from './wire'
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
-import {failureOf, isBusyStatus} from '#modules/failures/main'
+import {codexFailureOf, isBusyStatus} from '#modules/failures/main'
 
 import {AgentMessageItemSchema, CONTEXT_COMPACTION} from './wire'
 
@@ -47,6 +47,7 @@ export function createReplyMapper(ids: ReplyIds) {
   >()
 
   let last: string | null = null
+  let retryErrorInfo: unknown
 
   /**
    * After a lost connection, `codex` starts the message over as a new one and
@@ -111,6 +112,8 @@ export function createReplyMapper(ids: ReplyIds) {
       const {method, params} = notification
 
       if (method === 'error') {
+        if (params.willRetry) retryErrorInfo = params.error.codexErrorInfo
+
         return params.willRetry
           ? [
               {
@@ -185,9 +188,9 @@ export function createReplyMapper(ids: ReplyIds) {
         ...ids,
         type: 'RUN_FINISHED',
         status: 'failed',
-        failure: failureOf(
+        failure: codexFailureOf(
           turn.error?.message ?? 'ChatGPT couldn’t finish this Reply.',
-          {resetsAt, codexErrorInfo: turn.error?.codexErrorInfo}
+          {resetsAt, retryErrorInfo, codexErrorInfo: turn.error?.codexErrorInfo}
         ),
       }
     },
