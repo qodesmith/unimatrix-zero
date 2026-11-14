@@ -141,8 +141,8 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
         stop.promise,
       ])
 
-      // A Stop asked before `open` loses the race to files already loaded, so
-      // `asked` is checked too.
+      // A Stop asked before `open` loses the race to a `filesOf` with nothing
+      // to wait for, so `asked` is checked too.
       if ('silent' in files || stop.asked) return {silent: 'stopped'}
 
       return start(request, restore, files, program)
