@@ -2,8 +2,11 @@ import type {Turns} from './saved-turns'
 import type {AppEvent} from '@uz/contract/events'
 import type {Reply} from '@uz/contract/turns'
 
+import {DEFAULT_LAYOUT} from '@uz/contract/layout'
+import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import {expect, it} from 'vitest'
 
+import {markStreamingWaiting} from './live-replies'
 import {createReplay} from './replay'
 import {turnsKey} from './saved-turns'
 
@@ -142,4 +145,101 @@ it('keeps a Stop asked before a retried run starts until that run finishes', () 
   live.replay([{...ids, type: 'RUN_FINISHED', status: 'stopped'}])
 
   expect(live.store.state.runs[ids.replyId]).toBeUndefined()
+})
+
+function waitingAfter(events: AppEvent[]) {
+  const live = createReplay()
+
+  live.replay(events)
+
+  return live.store.state.waiting[ids.replyId] === true
+}
+
+const reconnecting: AppEvent = {...ids, type: 'RECONNECTING'}
+
+it('keeps a Reply waiting from a reconnect, through a token report', () => {
+  expect(
+    waitingAfter([
+      {...ids, type: 'RUN_STARTED'},
+      {...ids, type: 'TEXT_DELTA', delta: 'Half a'},
+      reconnecting,
+      tokens,
+    ])
+  ).toBe(true)
+})
+
+it.each([
+  {...ids, type: 'TEXT_DELTA', delta: 'line'},
+  {...ids, type: 'TEXT_REPLACE', text: 'Half a line'},
+  {...ids, type: 'REASONING_DELTA', delta: 'Hmm'},
+  {...ids, type: 'TOOL_CALL_START', toolCallId: 'tool-2', toolName: 'search'},
+  {...ids, type: 'TOOL_CALL_ARGS', toolCallId: 'tool-1', delta: '{'},
+  {
+    ...ids,
+    type: 'TOOL_RESULT',
+    toolCallId: 'tool-1',
+    content: 'Found',
+    isError: false,
+  },
+  {...ids, type: 'RUN_STARTED'},
+  {...ids, type: 'RUN_FINISHED', status: 'complete'},
+] satisfies AppEvent[])('stops waiting at the next $type', event => {
+  expect(
+    waitingAfter([
+      {...ids, type: 'RUN_STARTED'},
+      {
+        ...ids,
+        type: 'TOOL_CALL_START',
+        toolCallId: 'tool-1',
+        toolName: 'search',
+      },
+      reconnecting,
+      event,
+    ])
+  ).toBe(false)
+})
+
+const other = {treeId: 'tree-2', replyId: 'reply-2'}
+
+it('marks every streaming Reply waiting when the network changes, and no finished one', () => {
+  const live = createReplay()
+
+  live.replay([
+    {...ids, type: 'RUN_STARTED'},
+    {...other, type: 'RUN_STARTED'},
+    {...other, type: 'RUN_FINISHED', status: 'complete'},
+  ])
+  markStreamingWaiting(live.store)
+
+  expect(live.store.state.waiting).toEqual({[ids.replyId]: true})
+})
+
+it('keeps a Reply waiting across a snapshot only while the snapshot still streams it', () => {
+  const live = createReplay()
+
+  live.replay([
+    {...ids, type: 'RUN_STARTED'},
+    {...other, type: 'RUN_STARTED'},
+  ])
+  markStreamingWaiting(live.store)
+
+  const kept = live.store.state.replies[ids.replyId]
+
+  if (!kept) throw new Error('The Reply is not streaming')
+
+  live.replay([
+    {
+      type: 'SNAPSHOT',
+      app: {version: '0.0.0'},
+      replies: [kept],
+      providers: [],
+      models: {claude: [], chatgpt: []},
+      lastModel: null,
+      signIn: null,
+      settings: DEFAULT_SETTINGS,
+      layout: DEFAULT_LAYOUT,
+    },
+  ])
+
+  expect(live.store.state.waiting).toEqual({[ids.replyId]: true})
 })

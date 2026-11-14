@@ -50,3 +50,8 @@ export function useThinking(replyId: string) {
     state => state.thinking[replyId] ?? NO_BLOCKS
   )
 }
+
+/** Whether the streaming Reply waits for its connection to come back. */
+export function useWaiting(replyId: string) {
+  return useSelector(useReplyStore(), state => state.waiting[replyId] === true)
+}
