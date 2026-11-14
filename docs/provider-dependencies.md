@@ -133,11 +133,11 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Id:** `claude-api-retry`
 - **Kind:** D
 - **Provider:** Claude
-- **Relies on:** `claude` sends a `system` message with `subtype: 'api_retry'` for each retry of a failed request, and for no other reason. Nothing says when the connection is back: the next sign is the new attempt's `message_start`. With Wi-Fi off mid-stream, the first one came 70 s late; on a stall, none came for 3 minutes.
-- **App side:** `claude-driver`'s Reply mapper reports each one as a wait on the connection, and the window shows "Reconnecting…" until the Reply's next content.
-- **User would see:** a Reply that looks as if it's still writing while `claude` waits for the network, unless the OS also reports offline.
+- **Relies on:** `claude` sends a `system` message with `subtype: 'api_retry'` for each retry of a failed request, and for no other reason. Nothing says when the connection is back: the next sign is the new attempt's `message_start`. With Wi-Fi off mid-stream, the first one came 70 s late; on a stall, none came for 3 minutes. Its `error_status` is the response's HTTP status: `429` with `error: 'rate_limit'` for a throttle, `529` with `error: 'overloaded'` for an overload, and `null` when no response came.
+- **App side:** `claude-driver`'s Reply mapper reports each one as a wait, busy when `error_status` is 429 or 529. The window shows "Busy, retrying…" for a busy wait and "Reconnecting…" for any other, until the Reply's next content.
+- **User would see:** a Reply that looks as if it's still writing while `claude` waits for the network, unless the OS also reports offline. If `error_status` changed, "Reconnecting…" while the server is busy, pointing at a connection that's fine.
 - **Changed by:** upgrade
-- **Check:** `[dep:claude-api-retry]` in `claude-driver`: a Reply whose connections are refused gets `api_retry` messages, and the driver reports the wait.
+- **Check:** `[dep:claude-api-retry]` in `claude-driver`: a Reply whose connections are refused gets `api_retry` messages, and the driver reports the wait. A Reply a local stand-in API throttles with a 429 gets one with `error_status: 429` and `error: 'rate_limit'`, the driver reports a busy wait, and Stop ends it, since a throttle under the watchdog doesn't end on its own.
 
 ### The Prompt stored under the app's id
 
@@ -309,11 +309,11 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Id:** `codex-retry-notice`
 - **Kind:** D
 - **Provider:** ChatGPT
-- **Relies on:** Codex sends an `error` notification with `willRetry: true` for each retry of a lost connection (`Reconnecting... 2/5`, then `Reconnecting... waiting for network`), and one with `willRetry: false` before a turn it gives up on fails. Nothing says when the connection is back: the next sign is `item/started` for a new message. With Wi-Fi off mid-stream it sent none at all.
-- **App side:** `codex-driver` reads the `error` notification, and its Reply mapper reports one with `willRetry: true` as a wait on the connection. The window shows "Reconnecting…" until the Reply's next content. One with `willRetry: false` is dropped, since the turn's failure comes with `turn/completed`.
-- **User would see:** a Reply that looks as if it's still writing while Codex waits for the network, unless the OS also reports offline.
+- **Relies on:** Codex sends an `error` notification with `willRetry: true` for each retry of a failed request (`Reconnecting... 2/5`, then `Reconnecting... waiting for network`), and one with `willRetry: false` before a turn it gives up on fails. Nothing says when the connection is back: the next sign is `item/started` for a new message. With Wi-Fi off mid-stream it sent none at all. Its `error.codexErrorInfo` names the cause, and its variant's `httpStatusCode` carries the response's HTTP status: `responseStreamDisconnected` with `httpStatusCode: 429` when the server throttles with `retry-after`. A string variant such as `rateLimitExceeded` carries no `httpStatusCode`.
+- **App side:** `codex-driver` reads the `error` notification, and its Reply mapper reports one with `willRetry: true` as a wait, busy when `httpStatusCode` is 429 or 529. The window shows "Busy, retrying…" for a busy wait and "Reconnecting…" for any other, until the Reply's next content. One with `willRetry: false` is dropped, since the turn's failure comes with `turn/completed`.
+- **User would see:** a Reply that looks as if it's still writing while Codex waits for the network, unless the OS also reports offline. If `httpStatusCode` changed, "Reconnecting…" while the server is busy, pointing at a connection that's fine.
 - **Changed by:** upgrade
-- **Check:** `[dep:codex-retry-notice]` in `codex-driver`: a Reply whose connections are refused for a while gets `error` notifications with `willRetry: true`, and completes once they're let through.
+- **Check:** `[dep:codex-retry-notice]` in `codex-driver`: a Reply whose connections are refused for a while gets `error` notifications with `willRetry: true`, and completes once they're let through. A Reply a local stand-in API throttles with a 429 and `retry-after` gets ones whose `codexErrorInfo` is `responseStreamDisconnected` with `httpStatusCode: 429`, the driver reports a busy wait, and the Reply fails as `limit-reached` once Codex stops retrying.
 
 ### Codex is sent a Prompt again after an app-server dies
 

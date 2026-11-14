@@ -19,7 +19,7 @@ import type {
 import type {CompactionSettings} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
-import {startProxy} from '#modules/test-proxy/main'
+import {listenLocally, startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
 import {programOf} from '#modules/vendor-program/main'
 import {isReplyEvent} from '@uz/contract/host'
@@ -27,6 +27,7 @@ import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {spawnSync} from 'node:child_process'
 import {once} from 'node:events'
 import fs from 'node:fs'
+import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import {describe, expect, it} from 'vitest'
@@ -70,6 +71,11 @@ const WireLine = z.looseObject({
       willRetry: z.boolean().optional(),
     })
     .optional(),
+})
+
+const ErrorNotice = z.looseObject({
+  willRetry: z.boolean(),
+  error: z.looseObject({codexErrorInfo: z.unknown()}),
 })
 
 function wireLinesIn(output: Buffer[]) {
@@ -1009,6 +1015,114 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       fs.rmSync(home, {recursive: true, force: true})
     }
   }, 600_000)
+
+  it('[dep:codex-retry-notice] says it is busy while the Model’s API throttles it with a retry-after, then fails as limit-reached once Codex stops retrying', async () => {
+    if (!folder || !signedIn) return
+
+    const api = http.createServer((request, response) => {
+      if (request.method === 'POST' && request.url?.endsWith('/responses')) {
+        response.writeHead(429, {
+          'content-type': 'application/json',
+          'retry-after': '1',
+        })
+        response.end(
+          JSON.stringify({
+            error: {type: 'rate_limit_exceeded', message: 'Too many requests'},
+          })
+        )
+
+        return
+      }
+
+      response.writeHead(404).end()
+    })
+
+    // Refusing the WebSocket upgrade makes Codex send its requests over HTTP.
+    api.on('upgrade', (_request, socket) =>
+      socket.end('HTTP/1.1 426 Upgrade Required\r\n\r\n')
+    )
+
+    const url = await listenLocally(api)
+    const home = homeFrom(signedIn)
+    const idle = heldIdle()
+    const exits: Promise<unknown>[] = []
+    const output: Buffer[] = []
+
+    const driver = createCodexDriver({
+      store: fakeStore().client,
+      spawn: (command, options) => {
+        const child = spawnCodex(command, options)
+        exits.push(once(child, 'exit').catch(() => undefined))
+        child.stdout.on('data', (chunk: Buffer) => output.push(chunk))
+
+        return child
+      },
+      commandFor: program => ({
+        command: program,
+        args: [
+          '-c',
+          `openai_base_url="${url}/v1"`,
+          '-c',
+          `chatgpt_base_url="${url}/backend-api/"`,
+        ],
+      }),
+      whenIdle: idle.whenIdle,
+    })
+
+    try {
+      const events = await Array.fromAsync(
+        driver.startReply({
+          treeId: crypto.randomUUID(),
+          replyId: crypto.randomUUID(),
+          model: MODEL,
+          systemPrompt: 'You answer in as few words as you can.',
+          prompt: {text: 'Say hi.', messageId: crypto.randomUUID()},
+          vendorProgram: {
+            program: {
+              path: folder,
+              build: {
+                url: 'https://example.com/codex.tar.gz',
+                sha256: '0'.repeat(64),
+                size: 1,
+                archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+              },
+            },
+            configDir: home,
+          },
+          session: null,
+          thread: [],
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+        })
+      )
+
+      const notices = wireLinesIn(output).flatMap(({method, params}) =>
+        method === 'error' ? [ErrorNotice.parse(params)] : []
+      )
+
+      expect(
+        notices
+          .filter(notice => notice.willRetry)
+          .map(notice => notice.error.codexErrorInfo)
+      ).toContainEqual({responseStreamDisconnected: {httpStatusCode: 429}})
+      expect(events).toContainEqual(
+        expect.objectContaining({type: 'RECONNECTING', busy: true})
+      )
+
+      const last = events.at(-1)
+
+      expect(last).toMatchObject({
+        type: 'RUN_FINISHED',
+        status: 'failed',
+        failure: {code: 'limit-reached'},
+      })
+
+      idle.pass()
+      await Promise.all(exits)
+    } finally {
+      api.close()
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 180_000)
 
   it('reports a compaction Codex makes on its own inside a turn, with the thread it compacted', async () => {
     if (!folder || !signedIn) return

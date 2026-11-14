@@ -43,6 +43,11 @@ export class RequestRefused extends Error {
   }
 }
 
+/** A throttle or an overload: the server answered, so the connection is fine. */
+export function isBusyStatus(status: number | null) {
+  return status === 429 || status === 529
+}
+
 /** What a Provider reported beside the message; these name the failure first. */
 export interface FailureSignals {
   /** In seconds since the epoch; it wins over the message's time. */
