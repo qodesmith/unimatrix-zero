@@ -100,11 +100,44 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Id:** `stream-event-order`
 - **Kind:** D/W
 - **Provider:** Claude
-- **Relies on:** an undocumented order: the complete `assistant` message for a text block arrives after its deltas and before its `content_block_stop`, and a second `message_start` with no `message_stop` between means the message is being sent again in full after a broken stream.
-- **App side:** `claude-driver`'s Reply mapper replaces an open block's streamed text with the full text of the `assistant` message, and on a second `message_start` resets the text shown to where that message began.
-- **User would see:** doubled Reply text if the order changed. If a broken stream carried on instead of starting over, the Reply would lose the text from before the break.
+- **Relies on:** an undocumented order: the complete `assistant` message for a text block arrives after its deltas and before its `content_block_stop`, and a second `message_start` with no `message_stop` between means the message is being sent again in full after a broken stream. When `claude` cuts a message off mid-stream and retries, the message ends with a `message_stop` carrying `abandoned_blocks: {api_message_id, from_block_index}`, a field the SDK types don't name. The blocks before `from_block_index` stay in the session, and the next `message_start` begins the message over.
+- **App side:** `claude-driver`'s Reply mapper replaces an open block's streamed text with the full text of the `assistant` message. On a second `message_start` it resets the text shown to where that message began. After an abandoned message it resets the text to where block `from_block_index` began, as the next message starts.
+- **User would see:** doubled Reply text if the order changed, or if `abandoned_blocks` were renamed. If a broken stream carried on instead of starting over, the Reply would lose the text from before the break.
 - **Changed by:** upgrade + drift. The stream events come from the API, and how a broken stream recovers is up to `claude` and the servers.
-- **Check:** `[dep:stream-event-order]` in `claude-driver`: a Reply's text is shown once. A stream sent again after a break has no check: it needs a stream cut mid-message.
+- **Check:** `[dep:stream-event-order]` in `claude-driver`: a Reply's text is shown once, and a Reply whose connection is cut mid-message shows the text the session holds, once. A second `message_start` with no `message_stop` between has no check: no cut has caused one.
+
+### A Reply waits hours for the connection
+
+- **Id:** `claude-retry-watchdog`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** `CLAUDE_CODE_RETRY_WATCHDOG`, a variable the SDK types don't name. With it set, `claude` raises its retry limit for a lost connection or a server error from 10 to 300, about 3 hours at about 36 s each, and lifts the clamp of 15 on `CLAUDE_CODE_MAX_RETRIES`. 429 and 529 responses no longer use up attempts, so `claude` waits without limit through an overload, and it sends `api_retry` again every 30 s within one attempt's wait.
+- **App side:** `claude-driver` starts `claude` for Replies with it, after its environment strips every `CLAUDE_*` variable. One-shots start without it.
+- **User would see:** if the variable stopped working, a Reply that loses the network fails with "Connection lost" after 3 to 5 minutes instead of going on when the network is back.
+- **Changed by:** upgrade
+- **Check:** `[dep:claude-retry-watchdog]` in `claude-driver`: a Reply whose connections are refused for 6 minutes, past the default retries, completes once they're let through, and `claude` reports a limit of 300.
+
+### A Reply at a usage limit fails at once
+
+- **Id:** `claude-watchdog-usage-limit`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** with `CLAUDE_CODE_RETRY_WATCHDOG` set, `claude` waits at a usage limit until it resets, unless `CLAUDE_CODE_RETRY_WATCHDOG_MAX_USAGE_LIMIT_WAIT_MS` caps the wait. The cap must be at least 1: `claude` reads `0` as unset and waits for the reset. `1` makes a Reply at a rejected limit fail at once, with the same failure as without the watchdog.
+- **App side:** `claude-driver` sets it to `1` beside the watchdog, for Replies only.
+- **User would see:** a Reply at a usage limit that streams nothing for hours or days, until the limit resets, instead of failing with "Limit reached · resets at…".
+- **Changed by:** upgrade
+- **Check:** `[dep:claude-watchdog-usage-limit]` in `claude-driver`: a Reply whose request a local forwarder answers with a rejected usage limit fails at once, with the same failure as a Reply started without the watchdog.
+
+### Claude reports each retry
+
+- **Id:** `claude-api-retry`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** `claude` sends a `system` message with `subtype: 'api_retry'` for each retry of a failed request, and for no other reason. Nothing says when the connection is back: the next sign is the new attempt's `message_start`. With Wi-Fi off mid-stream, the first one came 70 s late; on a stall, none came for 3 minutes.
+- **App side:** `claude-driver`'s Reply mapper turns each one into `RECONNECTING`, and the window shows "Reconnecting…" until the Reply's next content.
+- **User would see:** a Reply that looks as if it's still writing while `claude` waits for the network, unless the OS also reports offline.
+- **Changed by:** upgrade
+- **Check:** `[dep:claude-api-retry]` in `claude-driver`: a Reply whose connections are refused gets `api_retry` messages, and the driver reports the wait.
 
 ### The Prompt stored under the app's id
 
@@ -270,6 +303,17 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **User would see:** nothing while Codex keeps doing this. If Codex starts finishing or resuming the old item, the workaround is no longer needed; if it starts a real follow-on message while the first is unfinished, the app drops text that should stay.
 - **Changed by:** upgrade + drift. The new item's id comes from OpenAI's response, so a server that resumed a dropped stream would end the problem without a Codex release.
 - **Check:** `[dep:codex-reconnect-new-message]` in `codex-driver`: a Reply whose connection is cut, asserting Codex still leaves the first item unfinished and finishes a second.
+
+### Codex reports each retry
+
+- **Id:** `codex-retry-notice`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** Codex sends an `error` notification with `willRetry: true` for each retry of a lost connection (`Reconnecting... 2/5`, then `Reconnecting... waiting for network`), and one with `willRetry: false` before a turn it gives up on fails. Nothing says when the connection is back: the next sign is `item/started` for a new message. With Wi-Fi off mid-stream it sent none at all.
+- **App side:** `codex-driver` reads the `error` notification, and its Reply mapper turns one with `willRetry: true` into `RECONNECTING`. The window shows "Reconnecting…" until the Reply's next content. One with `willRetry: false` is dropped, since the turn's failure comes with `turn/completed`.
+- **User would see:** a Reply that looks as if it's still writing while Codex waits for the network, unless the OS also reports offline.
+- **Changed by:** upgrade
+- **Check:** `[dep:codex-retry-notice]` in `codex-driver`: a Reply whose connections are refused for a while gets `error` notifications with `willRetry: true`, and completes once they're let through.
 
 ### Codex is sent a Prompt again after an app-server dies
 

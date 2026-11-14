@@ -25,7 +25,9 @@ import {fakeStore} from '#modules/test-store/main'
 import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {spawn} from 'node:child_process'
+import {once} from 'node:events'
 import fs from 'node:fs'
+import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import {createInterface} from 'node:readline'
@@ -33,7 +35,7 @@ import {describe, expect, it} from 'vitest'
 import {z} from 'zod'
 
 import {planOf, readAccount} from './account'
-import {claudeEnvironment} from './environment'
+import {claudeEnvironment, claudeReplyEnvironment} from './environment'
 import {createClaudeDriver, spawnClaude} from './main'
 import {createRecorder} from './recording'
 import {RECORDINGS} from './replay'
@@ -117,6 +119,7 @@ function liveDriver(
   refuses: Parameters<typeof fakeStore>[0] = {}
 ) {
   let addedEnv = firstEnv
+  let droppedEnv: string[] = []
   let compactionSettings: CompactionSettings = {auto: true, threshold: null}
   const store = fakeStore(refuses)
   const printed: string[] = []
@@ -135,7 +138,13 @@ function liveDriver(
     store: store.client,
     spawn: options => {
       // `claudeEnvironment` strips every `CLAUDE_*` variable from the host's.
-      const child = start({...options, env: {...options.env, ...addedEnv}})
+      const env = Object.fromEntries(
+        Object.entries({...options.env, ...addedEnv}).filter(
+          ([name]) => !droppedEnv.includes(name)
+        )
+      )
+
+      const child = start({...options, env})
       createInterface({input: child.stdout}).on('line', line =>
         printed.push(line)
       )
@@ -198,6 +207,10 @@ function liveDriver(
     /** For each `claude` started from here on. */
     setEnv(env: Record<string, string>) {
       addedEnv = env
+    },
+    /** For each `claude` started from here on, even ones the driver sets. */
+    dropEnv(names: string[]) {
+      droppedEnv = names
     },
     /** For each Reply from here on, as main reads it from Settings. */
     setCompaction(next: CompactionSettings) {
@@ -289,6 +302,70 @@ async function compactedThread(live: Live) {
   live.setEnv({})
 
   return {first, third}
+}
+
+const HOUR_IN_SECONDS = 3600
+
+/**
+ * Stands in for the API at `ANTHROPIC_BASE_URL`: every Messages request is
+ * refused with a rejected five-hour limit, as the servers send it, and every
+ * other request goes on to the real API.
+ */
+async function startLimitedApi() {
+  // One reset for every request, so each failure names the same time.
+  const resets = String(Math.floor(Date.now() / 1000) + 2 * HOUR_IN_SECONDS)
+
+  const server = http.createServer((request, response) => {
+    const url = request.url ?? '/'
+
+    if (request.method === 'POST' && url.startsWith('/v1/messages')) {
+      request.resume()
+      response.writeHead(429, {
+        'content-type': 'application/json',
+        'retry-after': String(2 * HOUR_IN_SECONDS),
+        'anthropic-ratelimit-unified-status': 'rejected',
+        'anthropic-ratelimit-unified-reset': resets,
+        'anthropic-ratelimit-unified-representative-claim': 'five_hour',
+        'anthropic-ratelimit-unified-5h-status': 'rejected',
+        'anthropic-ratelimit-unified-5h-reset': resets,
+        'anthropic-ratelimit-unified-5h-utilization': '1.0',
+        'anthropic-ratelimit-unified-overage-status': 'rejected',
+      })
+      response.end(
+        JSON.stringify({
+          type: 'error',
+          error: {type: 'rate_limit_error', message: 'Rate limit exceeded'},
+        })
+      )
+
+      return
+    }
+
+    void (async () => {
+      const body = Buffer.concat(await Array.fromAsync(request))
+
+      const headers = Object.fromEntries(
+        Object.entries(request.headers).flatMap(([name, value]) =>
+          name === 'host' || value === undefined ? [] : [[name, String(value)]]
+        )
+      )
+
+      const upstream = await fetch(`https://api.anthropic.com${url}`, {
+        method: request.method,
+        headers,
+        ...(body.length > 0 ? {body} : {}),
+      })
+
+      response.writeHead(upstream.status, Object.fromEntries(upstream.headers))
+      response.end(Buffer.from(await upstream.arrayBuffer()))
+    })()
+  })
+
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const {port} = z.looseObject({port: z.number()}).parse(server.address())
+
+  return {url: `http://127.0.0.1:${port}`, close: () => server.close()}
 }
 
 /** About 12 tokens a sentence, measured. */
@@ -920,6 +997,39 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       proxy.close()
     }
   }, 900_000)
+
+  it('[dep:claude-watchdog-usage-limit] fails a Reply at a usage limit at once, as it does without the watchdog', async () => {
+    const api = await startLimitedApi()
+    const live = liveDriver([], {ANTHROPIC_BASE_URL: api.url})
+
+    async function limited() {
+      const events = await failedOn(live, live.request('Say hi.', null))
+      await live.closed()
+
+      return events.filter(isReplyEvent).reduce(foldReplyEvent, NEW_REPLY)
+        .failure
+    }
+
+    try {
+      const watched = await limited()
+
+      expect(
+        linesOf(live.printed).filter(line => line.subtype === 'api_retry')
+      ).toEqual([])
+
+      live.dropEnv(
+        Object.keys(claudeReplyEnvironment({}, configDir)).filter(
+          name => !(name in claudeEnvironment({}, configDir))
+        )
+      )
+
+      expect(await limited()).toEqual(watched)
+
+      await live.done()
+    } finally {
+      api.close()
+    }
+  }, 120_000)
 
   it('[dep:thread-replay-as-conversation] [dep:reply-labels-unwritten] takes over a Thread ChatGPT wrote, told in one user message, writes no label, and goes on from it warm', async () => {
     const live = liveDriver([])
