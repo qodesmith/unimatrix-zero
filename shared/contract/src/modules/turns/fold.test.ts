@@ -40,7 +40,9 @@ it('replaces the current text part when the stream is re-sent', () => {
 it('saves nothing of a wait for the connection', () => {
   const before = fold({type: 'TEXT_DELTA', delta: 'Hel'})
 
-  expect(foldReplyEvent(before, {...ids, type: 'RECONNECTING'})).toBe(before)
+  expect(
+    foldReplyEvent(before, {...ids, type: 'RECONNECTING', busy: false})
+  ).toBe(before)
 })
 
 it('puts a tool call between the text around it', () => {

@@ -9,7 +9,7 @@ import type {
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
-import {failureOf} from '#modules/failures/main'
+import {failureOf, isBusyStatus} from '#modules/failures/main'
 import {z} from 'zod'
 
 type StreamEvent = SDKPartialAssistantMessage['event']
@@ -187,7 +187,13 @@ export function createReplyMapper(ids: ReplyIds) {
       }
 
       if (message.type === 'system' && message.subtype === 'api_retry') {
-        return [{...ids, type: 'RECONNECTING'}]
+        return [
+          {
+            ...ids,
+            type: 'RECONNECTING',
+            busy: isBusyStatus(message.error_status),
+          },
+        ]
       }
 
       if (message.type === 'rate_limit_event') {

@@ -26,11 +26,14 @@ interface LiveState {
   /** By Reply id, from a Stop or Retry asked until the machine is idle again. */
   runs: Record<string, ReplyRunState>
   /**
-   * By streaming Reply id, from a sign of a lost connection to its next
+   * By streaming Reply id, from a retry or a lost connection to its next
    * content.
    */
-  waiting: Record<string, true>
+  waiting: Record<string, Wait>
 }
+
+/** A busy wait is a retry of a 429 or a 529: the connection is fine. */
+export type Wait = 'busy' | 'reconnecting'
 
 export type ReplyStore = Store<LiveState>
 
@@ -146,11 +149,16 @@ const ENDS_WAIT: ReadonlySet<ReplyEvent['type']> = new Set([
   'RUN_FINISHED',
 ])
 
-function waitingAfter(waiting: LiveState['waiting'], event: ReplyEvent) {
+function waitingAfter(
+  waiting: LiveState['waiting'],
+  event: ReplyEvent
+): LiveState['waiting'] {
   const {replyId} = event
 
   if (event.type === 'RECONNECTING') {
-    return waiting[replyId] ? waiting : {...waiting, [replyId]: true as const}
+    const wait: Wait = event.busy ? 'busy' : 'reconnecting'
+
+    return waiting[replyId] === wait ? waiting : {...waiting, [replyId]: wait}
   }
 
   return waiting[replyId] && ENDS_WAIT.has(event.type)
@@ -163,7 +171,10 @@ export function markStreamingWaiting(store: ReplyStore) {
   store.setState(state => ({
     ...state,
     waiting: Object.fromEntries(
-      Object.keys(state.replies).map(replyId => [replyId, true as const])
+      Object.keys(state.replies).map((replyId): [string, Wait] => [
+        replyId,
+        'reconnecting',
+      ])
     ),
   }))
 }
@@ -185,9 +196,11 @@ export function applyLiveEvent(
         event.replies.map(reply => [reply.replyId, reply])
       ),
       waiting: Object.fromEntries(
-        event.replies.flatMap(({replyId}) =>
-          state.waiting[replyId] ? [[replyId, true as const]] : []
-        )
+        event.replies.flatMap(({replyId}): [string, Wait][] => {
+          const wait = state.waiting[replyId]
+
+          return wait ? [[replyId, wait]] : []
+        })
       ),
     }))
     void queryClient.invalidateQueries({queryKey: ['turns']})

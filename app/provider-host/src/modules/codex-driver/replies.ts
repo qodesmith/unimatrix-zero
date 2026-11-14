@@ -3,9 +3,13 @@ import type {Notification} from './wire'
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
-import {failureOf} from '#modules/failures/main'
+import {failureOf, isBusyStatus} from '#modules/failures/main'
 
-import {AgentMessageItemSchema, CONTEXT_COMPACTION} from './wire'
+import {
+  AgentMessageItemSchema,
+  CONTEXT_COMPACTION,
+  ErrorStatusSchema,
+} from './wire'
 
 type ReplyIds = Pick<ReplyRequest, 'treeId' | 'replyId'>
 
@@ -32,6 +36,14 @@ export function turnOf(notification: Notification) {
   if (aboutTheAccount(notification)) return null
 
   return notification.params.turnId
+}
+
+function httpStatusOf(codexErrorInfo: unknown) {
+  const variant = ErrorStatusSchema.safeParse(codexErrorInfo)
+
+  return variant.success
+    ? Object.values(variant.data).at(0)?.httpStatusCode
+    : undefined
 }
 
 /**
@@ -111,7 +123,15 @@ export function createReplyMapper(ids: ReplyIds) {
       const {method, params} = notification
 
       if (method === 'error') {
-        return params.willRetry ? [{...ids, type: 'RECONNECTING'}] : []
+        return params.willRetry
+          ? [
+              {
+                ...ids,
+                type: 'RECONNECTING',
+                busy: isBusyStatus(httpStatusOf(params.error.codexErrorInfo)),
+              },
+            ]
+          : []
       }
 
       if (method === 'item/agentMessage/delta') {

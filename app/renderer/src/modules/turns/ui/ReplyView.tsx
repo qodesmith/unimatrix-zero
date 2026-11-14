@@ -1,4 +1,4 @@
-import type {ThinkingBlock} from '../live-replies'
+import type {ThinkingBlock, Wait} from '../live-replies'
 import type {Reply, ReplyPart, ReplyStatus} from '@uz/contract/turns'
 
 import {ProviderMark} from '#modules/connections/main'
@@ -106,10 +106,15 @@ function WrittenBy({reply}: {reply: Reply}) {
   )
 }
 
-function streamingLabel(online: boolean, waiting: boolean) {
+const WAIT_LABELS: Record<Wait, string> = {
+  busy: 'Busy, retrying…',
+  reconnecting: 'Reconnecting…',
+}
+
+function streamingLabel(online: boolean, wait: Wait | undefined) {
   if (!online) return 'Offline · waiting for the connection'
 
-  return waiting ? 'Reconnecting…' : 'Writing…'
+  return wait ? WAIT_LABELS[wait] : 'Writing…'
 }
 
 function StreamingLine({replyId}: {replyId: string}) {

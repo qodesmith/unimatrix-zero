@@ -403,7 +403,7 @@ it('shows Reconnecting… in place of Writing… from a reconnect until the next
   const screen = await replay(before('TOOL_CALL_START'))
   const article = screen.getByRole('article', {name: 'Reply'})
 
-  main.publish({treeId, replyId, type: 'RECONNECTING'})
+  main.publish({treeId, replyId, type: 'RECONNECTING', busy: false})
 
   await expect.element(article.getByText('Reconnecting…')).toBeVisible()
   expect(article.getByText('Writing…').query()).toBeNull()
@@ -415,6 +415,39 @@ it('shows Reconnecting… in place of Writing… from a reconnect until the next
 
   await expect.element(article.getByText('Writing…')).toBeVisible()
   expect(article.getByText('Reconnecting…').query()).toBeNull()
+})
+
+it('shows Busy, retrying… while the latest retry is for a busy server, under the offline label, until the next content', async () => {
+  const screen = await replay(before('TOOL_CALL_START'))
+  const article = screen.getByRole('article', {name: 'Reply'})
+
+  main.publish({treeId, replyId, type: 'RECONNECTING', busy: true})
+
+  await expect.element(article.getByText('Busy, retrying…')).toBeVisible()
+  expect(article.getByText('Writing…').query()).toBeNull()
+
+  goOffline()
+
+  await expect
+    .element(article.getByText('Offline · waiting for the connection'))
+    .toBeVisible()
+  expect(article.getByText('Busy, retrying…').query()).toBeNull()
+
+  goOnline()
+  main.publish({treeId, replyId, type: 'RECONNECTING', busy: true})
+
+  await expect.element(article.getByText('Busy, retrying…')).toBeVisible()
+
+  main.publish({treeId, replyId, type: 'RECONNECTING', busy: false})
+
+  await expect.element(article.getByText('Reconnecting…')).toBeVisible()
+  expect(article.getByText('Busy, retrying…').query()).toBeNull()
+
+  main.publish({treeId, replyId, type: 'RECONNECTING', busy: true})
+  stream(before('TOOL_CALL_START'), before('TOOL_CALL_START') + 1)
+
+  await expect.element(article.getByText('Writing…')).toBeVisible()
+  expect(article.getByText('Busy, retrying…').query()).toBeNull()
 })
 
 it('says a streaming Reply is offline while the OS says so, then Reconnecting… until the next content', async () => {

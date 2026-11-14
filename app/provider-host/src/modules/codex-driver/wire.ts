@@ -38,6 +38,15 @@ const TurnErrorSchema = z.looseObject({
   Pick<TurnError, 'message'> & Partial<Pick<TurnError, 'codexErrorInfo'>>
 >
 
+/**
+ * Codex forwards an upstream HTTP status on the `codexErrorInfo` variant it
+ * names.
+ */
+export const ErrorStatusSchema = z.record(
+  z.string(),
+  z.looseObject({httpStatusCode: z.number().nullable()})
+)
+
 const TurnSchema = z.looseObject({
   id: z.string(),
   status: z.enum(['completed', 'interrupted', 'failed', 'inProgress']),
@@ -206,15 +215,18 @@ export const NotificationSchema = z.discriminatedUnion('method', [
       tokenUsage: ThreadTokenUsageSchema,
     })
   ),
-  // One per attempt to reconnect a lost connection. When Codex gives up, the failure
-  // comes with `turn/completed`.
+  // One per retry of a failed request. When Codex gives up, the failure comes
+  // with `turn/completed`.
   notification(
     'error',
     z.looseObject({
       ...inTurn,
       willRetry: z.boolean(),
+      error: TurnErrorSchema,
     }) satisfies z.ZodType<
-      Pick<ErrorNotification, 'threadId' | 'turnId' | 'willRetry'>
+      Pick<ErrorNotification, 'threadId' | 'turnId' | 'willRetry'> & {
+        error: Pick<TurnError, 'message'>
+      }
     >
   ),
   notification(
