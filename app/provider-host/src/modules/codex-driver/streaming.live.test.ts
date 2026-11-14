@@ -327,7 +327,6 @@ const TurnCompleted = z.looseObject({
 interface CodedRepliesOptions {
   args?: string[]
   env?: NodeJS.ProcessEnv
-  /** Called with each line the app-server writes, as it writes it. */
   onLine?: (line: z.infer<typeof WireLine>) => void
 }
 
@@ -521,6 +520,11 @@ function streamFailed(code: string, message: string) {
 }
 
 const NO_RESPONSE = {responseStreamDisconnected: {httpStatusCode: null}}
+
+function expectRetriedWithNoResponse(retried: unknown[]) {
+  expect(retried.length).toBeGreaterThan(0)
+  expect(retried).toEqual(retried.map(() => NO_RESPONSE))
+}
 
 describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
   it('[dep:codex-rollout-files] streams, continues the loaded thread, appending to one rollout under sessions/, resumes from the app’s copy alone, then forks mid-Thread', async () => {
@@ -1288,8 +1292,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         first.session
       )
 
-      expect(dropped.retried.length).toBeGreaterThan(0)
-      expect(dropped.retried).toEqual(dropped.retried.map(() => NO_RESPONSE))
+      expectRetriedWithNoResponse(dropped.retried)
       expect(dropped.turnErrors).toEqual(['other'])
       expect(dropped.failure).toMatchObject({code: 'connection-lost'})
 
@@ -1335,8 +1338,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         padded.session
       )
 
-      expect(refused.retried.length).toBeGreaterThan(0)
-      expect(refused.retried).toEqual(refused.retried.map(() => NO_RESPONSE))
+      expectRetriedWithNoResponse(refused.retried)
       expect(refused.turnErrors).toEqual([
         {httpConnectionFailed: {httpStatusCode: null}},
       ])
@@ -1407,10 +1409,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
 
       expect(rateLimited.turnErrors).toEqual(['rateLimitExceeded'])
       expect(rateLimited.failure).toMatchObject({code: 'limit-reached'})
-      expect(usageStreamed.retried.length).toBeGreaterThan(0)
-      expect(usageStreamed.retried).toEqual(
-        usageStreamed.retried.map(() => NO_RESPONSE)
-      )
+      expectRetriedWithNoResponse(usageStreamed.retried)
       expect(usageStreamed.turnErrors).toEqual(['other'])
       expect(usageStreamed.failure).toMatchObject({code: 'connection-lost'})
 
