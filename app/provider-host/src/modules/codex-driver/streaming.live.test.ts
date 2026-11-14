@@ -1351,7 +1351,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 300_000)
 
-  it('[dep:codex-error-info] fails a stand-in API’s usage limit as limit-reached at the snapshot’s reset time, and its workspace out of credits as limit-reached with none', async () => {
+  it('[dep:codex-error-info] fails a stand-in API’s usage limit as limit-reached at the snapshot’s reset time, and its workspace out of credits and its spend cap as limit-reached with none', async () => {
     if (!folder || !signedIn) return
 
     const api = await startStandInApi()
@@ -1368,6 +1368,10 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
 
       const outOfCredits = await reply('Say hi.', null)
 
+      api.answerWith(usageLimit('workspace_owner_usage_limit_reached', resetAt))
+
+      const spendCapped = await reply('Say hi.', null)
+
       expect(limited.turnErrors).toEqual(['usageLimitExceeded'])
       expect(limited.failure).toMatchObject({
         code: 'limit-reached',
@@ -1376,6 +1380,9 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       expect(outOfCredits.turnErrors).toEqual(['usageLimitExceeded'])
       expect(outOfCredits.failure).toMatchObject({code: 'limit-reached'})
       expect(outOfCredits.failure).not.toHaveProperty('resetsAt')
+      expect(spendCapped.turnErrors).toEqual(['usageLimitExceeded'])
+      expect(spendCapped.failure).toMatchObject({code: 'limit-reached'})
+      expect(spendCapped.failure).not.toHaveProperty('resetsAt')
 
       await closed()
     } finally {

@@ -33,7 +33,7 @@ it.each([
   expect(failureOf(message)).toEqual({code, message})
 })
 
-it('names a Prompt over Codex’s text cap as too long, with both counts from the refusal', () => {
+it('names a Prompt over Codex’s text cap as too long, with the refusal’s counts when it sends both', () => {
   const message = 'Input exceeds the maximum length of 1048576 characters.'
 
   expect(
