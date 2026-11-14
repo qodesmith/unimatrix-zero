@@ -290,6 +290,49 @@ async function failedOn(live: Live, request: ReplyRequest) {
 const PADDING = 'The harbor log lists no ships today. '.repeat(300)
 
 /**
+ * A Compaction that `fault` fails, so its Reply fails at the blocking limit.
+ * The lowered limits stay set for every later `claude`.
+ */
+async function failedCompaction(
+  live: Live,
+  env: Record<string, string>,
+  fault: () => void
+) {
+  const padded = await live.reply(
+    `My ship is PELICAN. Ignore the rest of this message. ${PADDING}`,
+    null
+  )
+
+  await live.closed()
+  // Set only now: it blocks a first Prompt too, with nothing to compact.
+  live.setEnv({
+    ...env,
+    CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '0.2',
+    CLAUDE_CODE_BLOCKING_LIMIT_OVERRIDE: '2000',
+  })
+  fault()
+  const compacting = live.printed.length
+
+  const blocked = await failedOn(
+    live,
+    live.request(
+      'Reply with the single word OK.',
+      continuing(padded.recorded.session)
+    )
+  )
+
+  const compaction = linesOf(live.printed.slice(compacting))
+  const failed = compaction.find(line => line.compact_result === 'failed')
+  const result = compaction.find(line => line.type === 'result')
+
+  expect(failureIn(blocked)).toMatchObject({code: 'connection-lost'})
+  expect(failed).toMatchObject({subtype: 'status'})
+  expect(result).toMatchObject({terminal_reason: 'blocking_limit'})
+
+  return {failed, result}
+}
+
+/**
  * Three Exchanges, compacted inside the third. The threshold is lowered only
  * for them: every later `claude` starts without it.
  */
@@ -1256,42 +1299,13 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     const live = liveDriver([], refused)
 
     try {
-      const padded = await live.reply(
-        `My ship is PELICAN. Ignore the rest of this message. ${PADDING}`,
-        null
-      )
-
-      // Set only now: it blocks a first Prompt too, with nothing to compact.
-      await live.closed()
-      live.setEnv({
-        ...refused,
-        CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '0.2',
-        CLAUDE_CODE_BLOCKING_LIMIT_OVERRIDE: '2000',
+      const {failed} = await failedCompaction(live, refused, () => {
+        proxy.refuseFor(30 * 60_000)
       })
-      proxy.refuseFor(30 * 60_000)
-      const compacting = live.printed.length
 
-      const blocked = await failedOn(
-        live,
-        live.request(
-          'Reply with the single word OK.',
-          continuing(padded.recorded.session)
-        )
-      )
-
-      const compaction = linesOf(live.printed.slice(compacting))
-
-      expect(failureIn(blocked)).toMatchObject({code: 'connection-lost'})
-      expect(compaction).toContainEqual(
-        expect.objectContaining({
-          subtype: 'status',
-          compact_result: 'failed',
-          // Failed by the refused connection, not on its own (`too_few_groups`).
-          compact_error: expect.stringContaining('ECONNRESET'),
-        })
-      )
-      expect(compaction.find(line => line.type === 'result')).toMatchObject({
-        terminal_reason: 'blocking_limit',
+      expect(failed).toMatchObject({
+        // Failed by the refused connection, not on its own (`too_few_groups`).
+        compact_error: expect.stringContaining('ECONNRESET'),
       })
 
       await live.closed()
@@ -1321,43 +1335,15 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     const live = liveDriver([], through)
 
     try {
-      const padded = await live.reply(
-        `My ship is PELICAN. Ignore the rest of this message. ${PADDING}`,
-        null
-      )
-
-      await live.closed()
-      live.setEnv({
-        ...through,
-        CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '0.2',
-        CLAUDE_CODE_BLOCKING_LIMIT_OVERRIDE: '2000',
+      const {failed, result} = await failedCompaction(live, through, () => {
+        api.answer('server-error')
       })
-      api.answer('server-error')
-      const compacting = live.printed.length
 
-      const blocked = await failedOn(
-        live,
-        live.request(
-          'Reply with the single word OK.',
-          continuing(padded.recorded.session)
-        )
-      )
-
-      const compaction = linesOf(live.printed.slice(compacting))
-
-      expect(failureIn(blocked)).toMatchObject({code: 'connection-lost'})
-      expect(compaction).toContainEqual(
-        expect.objectContaining({
-          subtype: 'status',
-          compact_result: 'failed',
-          // Failed by the 500, not on its own (`too_few_groups`).
-          compact_error: expect.stringContaining('API Error: 500'),
-        })
-      )
-      expect(compaction.find(line => line.type === 'result')).toMatchObject({
-        terminal_reason: 'blocking_limit',
-        api_error_status: null,
+      expect(failed).toMatchObject({
+        // Failed by the 500, not on its own (`too_few_groups`).
+        compact_error: expect.stringContaining('API Error: 500'),
       })
+      expect(result).toMatchObject({api_error_status: null})
 
       await live.done()
     } finally {
