@@ -99,6 +99,9 @@ export function openSession(query: QueryFn, options: Options): ClaudeSession {
 
         const message = step.value
 
+        // The previous Prompt's `completed` comes after its `result`.
+        if ('command_uuid' in message && message.command_uuid !== uuid) continue
+
         if (message.type === 'system' && message.subtype === 'init') {
           sessionId = message.session_id
           started = true
