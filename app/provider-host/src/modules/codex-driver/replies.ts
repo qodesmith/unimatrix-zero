@@ -112,17 +112,17 @@ export function createReplyMapper(ids: ReplyIds) {
       const {method, params} = notification
 
       if (method === 'error') {
-        if (params.willRetry) retryErrorInfo = params.error.codexErrorInfo
+        if (!params.willRetry) return []
 
-        return params.willRetry
-          ? [
-              {
-                ...ids,
-                type: 'RECONNECTING',
-                busy: isBusyStatus(params.error.httpStatusCode),
-              },
-            ]
-          : []
+        retryErrorInfo = params.error.codexErrorInfo
+
+        return [
+          {
+            ...ids,
+            type: 'RECONNECTING',
+            busy: isBusyStatus(params.error.httpStatusCode),
+          },
+        ]
       }
 
       if (method === 'item/agentMessage/delta') {
