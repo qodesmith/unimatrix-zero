@@ -62,7 +62,7 @@ export function createClaudeDriver({
   env = process.env,
   whenIdle = idleFor(IDLE_CLOSE_MS),
   maxWarm = MAX_WARM,
-  heardWithinMs = HEARD_WITHIN_MS,
+  whenSilent = idleFor(HEARD_WITHIN_MS),
 }: ClaudeDriverOptions): ProviderDriver {
   const models = createModelList(readModelsWith(env))
 
@@ -73,7 +73,7 @@ export function createClaudeDriver({
     env,
     whenIdle,
     maxWarm,
-    heardWithinMs,
+    whenSilent,
     learnModels: models.learn,
     resolveModel: models.resolve,
   })

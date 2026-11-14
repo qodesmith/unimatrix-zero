@@ -1101,7 +1101,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     }
   }, 120_000)
 
-  it('[dep:claude-heard-within-a-minute] hears from claude within seconds of a Prompt sent with connections refused from the start, so the Reply goes on waiting', async () => {
+  it('[dep:claude-heard-within-a-minute] hears claude’s init within 10 s of a Prompt sent with connections refused from the start', async () => {
     const proxy = await startProxy()
     proxy.refuseFor(30 * 60_000)
     const live = liveDriver([], {HTTPS_PROXY: proxy.url})

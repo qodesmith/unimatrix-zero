@@ -1,7 +1,7 @@
 import type {WhenIdle} from '#modules/idle/main'
 import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
-import type {Silent} from './heard'
+import type {Silent, WhenSilent} from './heard'
 import type {ClaudeSession, QueryFn} from './session'
 import type {
   ModelInfo,
@@ -38,8 +38,7 @@ export interface ClaudeRepliesDeps {
   env: NodeJS.ProcessEnv
   whenIdle: WhenIdle
   maxWarm: number
-  /** How long a Reply waits for `claude`'s first message before failing. */
-  heardWithinMs: number
+  whenSilent: WhenSilent
   learnModels: (models: ModelInfo[]) => void
   resolveModel: (id: string) => string
 }
@@ -246,7 +245,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     let unstoppable: (() => void) | null = null
 
     try {
-      const first = await firstHeard(messages, run, deps.heardWithinMs)
+      const first = await firstHeard(messages, run, deps.whenSilent)
 
       if ('silent' in first) {
         // Else a `claude` only slow to start goes on to write the Reply.
@@ -422,7 +421,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     })
 
     if ('silent' in outcome) {
-      return silentEnding(ids, outcome, deps.heardWithinMs)
+      return silentEnding(ids, outcome)
     }
 
     if ('failure' in outcome) {

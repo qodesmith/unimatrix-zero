@@ -32,10 +32,16 @@ export interface FakeClaudeOptions {
   refuseResumeAt?: boolean
   /** Keeps it going once its input closes, until this file exists. */
   holdExit?: string
-  /** The runs, by n, that write nothing, as on a stalled network. */
-  silentRuns?: number[]
-  /** Waits this long after its `init` before the rest of the answer. */
-  pauseAfterInitMs?: number
+  /**
+   * Writes nothing more, as on a stalled network, from this Prompt of the nth
+   * run, both counted from 0.
+   */
+  silentFrom?: {run: number; prompt: number}
+  /**
+   * Holds the rest of its answer after its first text delta, until this file
+   * exists.
+   */
+  holdAfterFirstDelta?: string
 }
 
 const OPTIONS_VARIABLE = 'FAKE_CLAUDE_OPTIONS'
@@ -170,17 +176,23 @@ function write(message) {
   process.stdout.write(JSON.stringify(message) + '\\n')
 }
 
-const silent = options.silentRuns?.includes(run) ?? false
-let paused = false
+const silentFrom = options.silentFrom?.run === run ? options.silentFrom.prompt : null
+let silent = silentFrom === 0
+let held = false
 
 function answer() {
   if (silent) return
   while (steps[at]?.kind === 'out') {
     const {message} = steps[at++]
     write(message)
-    if (options.pauseAfterInitMs && !paused && message.type === 'system' && message.subtype === 'init') {
-      paused = true
-      setTimeout(answer, options.pauseAfterInitMs)
+    const hold = options.holdAfterFirstDelta
+    if (hold && !held && message.type === 'stream_event' && message.event.type === 'content_block_delta') {
+      held = true
+      const waiting = setInterval(() => {
+        if (!fs.existsSync(hold)) return
+        clearInterval(waiting)
+        answer()
+      }, 10)
       return
     }
   }
@@ -211,6 +223,7 @@ process.stdin.on('data', chunk => {
   for (let end = buffer.indexOf('\\n'); end >= 0; end = buffer.indexOf('\\n')) {
     const message = JSON.parse(buffer.slice(0, end))
     buffer = buffer.slice(end + 1)
+    if (message.type === 'user' && report.prompts.length === silentFrom) silent = true
     if (silent) {
       if (message.type === 'user') report.prompts.push(message.message.content)
       save()

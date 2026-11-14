@@ -1,41 +1,34 @@
 import type {Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SDKMessage} from '@anthropic-ai/claude-agent-sdk'
 
-import {setTimeout as delay} from 'node:timers/promises'
+/** As long as the SDK gives `claude` to start. */
+export const HEARD_WITHIN_MS = 60_000
 
 /**
- * As long as the SDK gives `claude` to start. `claude` is normally heard within
- * seconds of the Prompt, offline included; a network stalled before it starts
- * can keep it silent for hours.
+ * Calls `giveUp` once a Reply's `claude` has said nothing for too long. What it
+ * returns calls that off.
  */
-export const HEARD_WITHIN_MS = 60_000
+export type WhenSilent = (giveUp: () => void) => () => void
 
 /** A Reply given up on before `claude` was heard: Stop, or the wait ran out. */
 export interface Silent {
   silent: 'stopped' | 'timed-out'
 }
 
-/**
- * The first of `messages`, unless Stop or `withinMs` comes first. Stop is
- * the Reply's until then.
- */
+/** The first of `messages`, unless Stop or `whenSilent` comes first. */
 export async function firstHeard(
   messages: AsyncGenerator<SDKMessage>,
   run: ReplyRun,
-  withinMs: number
+  whenSilent: WhenSilent
 ): Promise<IteratorResult<SDKMessage> | Silent> {
-  const {promise: stopped, resolve: stop} = Promise.withResolvers<Silent>()
-  const unstoppable = run.stoppable(async () => stop({silent: 'stopped'}))
-  const waited = new AbortController()
+  const {promise: givenUp, resolve: giveUp} = Promise.withResolvers<Silent>()
+  const unstoppable = run.stoppable(async () => giveUp({silent: 'stopped'}))
+  const stopWaiting = whenSilent(() => giveUp({silent: 'timed-out'}))
 
   try {
-    return await Promise.race([
-      messages.next(),
-      stopped,
-      delay(withinMs, {silent: 'timed-out'} as const, {signal: waited.signal}),
-    ])
+    return await Promise.race([messages.next(), givenUp])
   } finally {
-    waited.abort()
+    stopWaiting()
     unstoppable()
   }
 }
@@ -47,8 +40,7 @@ export async function* startingWith<T>(first: T, rest: AsyncGenerator<T>) {
 
 export function silentEnding(
   ids: {treeId: string; replyId: string},
-  {silent}: Silent,
-  withinMs: number
+  {silent}: Silent
 ): Ending {
   const type = 'RUN_FINISHED'
 
@@ -61,7 +53,7 @@ export function silentEnding(
       status: 'failed',
       failure: {
         code: 'connection-lost',
-        message: `Claude didn’t answer for ${withinMs / 1000} seconds.`,
+        message: 'Claude didn’t answer for a minute.',
       },
     },
   }
