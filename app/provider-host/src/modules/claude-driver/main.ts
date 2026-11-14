@@ -6,6 +6,7 @@ import type {ProviderDriver} from '@uz/contract/host'
 import {idleFor} from '#modules/idle/main'
 import {getProgramReady} from '#modules/vendor-program/main'
 import {query} from '@anthropic-ai/claude-agent-sdk'
+import {PROVIDER_CAPABILITIES} from '@uz/contract/providers'
 import {spawn} from 'node:child_process'
 
 import {readAccount} from './account'
@@ -79,13 +80,7 @@ export function createClaudeDriver({
   })
 
   return {
-    capabilities: {
-      pdfAttachments: true,
-      skillScriptsInPlainTrees: true,
-      mcpOAuth: true,
-      sseMcp: true,
-      sessionFromTranscript: true,
-    },
+    capabilities: PROVIDER_CAPABILITIES.claude,
     ...createClaudeSignIn({
       getProgramReady,
       commandFor: path => ({command: path, args: []}),

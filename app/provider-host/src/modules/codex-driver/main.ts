@@ -5,6 +5,7 @@ import type {ProviderDriver, SignInRequest} from '@uz/contract/host'
 
 import {idleFor} from '#modules/idle/main'
 import {getProgramReady, programOf} from '#modules/vendor-program/main'
+import {PROVIDER_CAPABILITIES} from '@uz/contract/providers'
 import {spawn} from 'node:child_process'
 import fs from 'node:fs'
 
@@ -64,13 +65,7 @@ export function createCodexDriver({
   const replies = createCodexReplies({store, open, whenIdle})
 
   return {
-    capabilities: {
-      pdfAttachments: false,
-      skillScriptsInPlainTrees: false,
-      mcpOAuth: true,
-      sseMcp: false,
-      sessionFromTranscript: false,
-    },
+    capabilities: PROVIDER_CAPABILITIES.chatgpt,
     ...createCodexSignIn({getProgramReady, open, portFree, timeoutMs}),
     readConnection: notYet,
     listModels: replies.listModels,
