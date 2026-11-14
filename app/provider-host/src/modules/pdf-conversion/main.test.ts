@@ -2,7 +2,7 @@ import type {TestPage} from '#modules/test-pdfs/main'
 
 import {testPdf} from '#modules/test-pdfs/main'
 import {createHash} from 'node:crypto'
-import {mkdtemp, readdir, rm, writeFile} from 'node:fs/promises'
+import {mkdir, mkdtemp, readdir, rm, writeFile} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import path from 'node:path'
 import {afterEach, expect, it} from 'vitest'
@@ -119,6 +119,20 @@ it('converts afresh over a corrupt cache, and caches that', async () => {
   expect(await convertPdf(original, conversionDir)).toEqual(converted)
   await rm(original.path)
   expect(await convertPdf(original, conversionDir)).toEqual(converted)
+})
+
+it('converts afresh over a cache an older conversion wrote', async () => {
+  const {original, conversionDir} = await setUp(testPdf([{text: 'Cover'}]))
+  const folder = path.join(conversionDir, original.sha256)
+  await mkdir(folder, {recursive: true})
+  await writeFile(
+    path.join(folder, 'manifest.json'),
+    JSON.stringify({pages: [{text: 'Converted the old way', image: null}]})
+  )
+
+  const [page] = await convertPdf(original, conversionDir)
+
+  expect(page?.text).toBe('Cover')
 })
 
 it('refuses a file that isn’t a PDF with a sentence naming it', async () => {

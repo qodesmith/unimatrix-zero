@@ -6,7 +6,11 @@ import {z} from 'zod'
 
 const MANIFEST = 'manifest.json'
 
+/** Raised whenever what a page converts to changes, so older ones convert again. */
+export const CONVERSION_VERSION = 1
+
 const ManifestSchema = z.strictObject({
+  version: z.literal(CONVERSION_VERSION),
   pages: z.array(
     z.strictObject({
       text: z.string(),
@@ -52,7 +56,7 @@ export async function writeCache(folder: string, pages: ConvertedPage[]) {
   const partial = await mkdtemp(`${folder}.partial-`)
 
   try {
-    const manifest: Manifest = {pages: []}
+    const manifest: Manifest = {version: CONVERSION_VERSION, pages: []}
 
     for (const [index, {text, image}] of pages.entries()) {
       const name = image ? `page-${index + 1}.png` : null
