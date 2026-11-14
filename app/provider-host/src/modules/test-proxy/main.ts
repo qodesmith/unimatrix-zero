@@ -13,12 +13,19 @@ export async function listenLocally(server: http.Server) {
 }
 
 /**
+ * More than a client sends through TLS's handshake, a WebSocket upgrade and a
+ * small request; less than a Model request, with its instructions, carries.
+ */
+const PROMPT_BYTES = 8000
+
+/**
  * A CONNECT proxy for a vendor program's `HTTPS_PROXY`. It stands for a
  * network with no route to the Provider without touching the machine's own.
  */
 export async function startProxy() {
   const open = new Set<net.Socket>()
   let refusing = false
+  let resettingStreams = false
   let lifting: NodeJS.Timeout | undefined
 
   const server = http.createServer((_request, response) => response.end())
@@ -31,11 +38,26 @@ export async function startProxy() {
     }
 
     const [host = '', port = '443'] = (request.url ?? '').split(':')
+    let sent = 0
 
     const upstream = net.connect(Number(port), host, () => {
       client.write('HTTP/1.1 200 Connection Established\r\n\r\n')
       upstream.pipe(client)
       client.pipe(upstream)
+    })
+
+    client.on('data', (chunk: Buffer) => {
+      sent += chunk.length
+    })
+
+    upstream.on('data', () => {
+      if (resettingStreams && sent > PROMPT_BYTES) {
+        // Lets the chunk through first, so the answer has started to flow.
+        setImmediate(() => {
+          client.resetAndDestroy()
+          upstream.resetAndDestroy()
+        })
+      }
     })
 
     for (const socket of [client, upstream]) {
@@ -63,6 +85,16 @@ export async function startProxy() {
       lifting = setTimeout(() => {
         refusing = false
       }, ms)
+    },
+    /**
+     * Resets every open connection, then lets new ones through but resets
+     * each once the answer to a Model request starts to flow back. Codex can
+     * miss a reset on a WebSocket it reuses until its 300 s idle timeout, so
+     * no connection opened before survives.
+     */
+    resetStreams() {
+      resettingStreams = true
+      cutConnections()
     },
     /** Ends a refusal before its time is up. */
     letThrough() {

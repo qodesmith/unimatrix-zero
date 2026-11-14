@@ -27,6 +27,7 @@ import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {spawn} from 'node:child_process'
 import fs from 'node:fs'
 import http from 'node:http'
+import https from 'node:https'
 import os from 'node:os'
 import path from 'node:path'
 import {createInterface} from 'node:readline'
@@ -289,6 +290,49 @@ async function failedOn(live: Live, request: ReplyRequest) {
 const PADDING = 'The harbor log lists no ships today. '.repeat(300)
 
 /**
+ * A Compaction that `fault` fails, so its Reply fails at the blocking limit.
+ * The lowered limits stay set for every later `claude`.
+ */
+async function failedCompaction(
+  live: Live,
+  env: Record<string, string>,
+  fault: () => void
+) {
+  const padded = await live.reply(
+    `My ship is PELICAN. Ignore the rest of this message. ${PADDING}`,
+    null
+  )
+
+  await live.closed()
+  // Set only now: it blocks a first Prompt too, with nothing to compact.
+  live.setEnv({
+    ...env,
+    CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '0.2',
+    CLAUDE_CODE_BLOCKING_LIMIT_OVERRIDE: '2000',
+  })
+  fault()
+  const compacting = live.printed.length
+
+  const blocked = await failedOn(
+    live,
+    live.request(
+      'Reply with the single word OK.',
+      continuing(padded.recorded.session)
+    )
+  )
+
+  const compaction = linesOf(live.printed.slice(compacting))
+  const failed = compaction.find(line => line.compact_result === 'failed')
+  const result = compaction.find(line => line.type === 'result')
+
+  expect(failureIn(blocked)).toMatchObject({code: 'connection-lost'})
+  expect(failed).toMatchObject({subtype: 'status'})
+  expect(result).toMatchObject({terminal_reason: 'blocking_limit'})
+
+  return {failed, result}
+}
+
+/**
  * Three Exchanges, compacted inside the third. The threshold is lowered only
  * for them: every later `claude` starts without it.
  */
@@ -319,69 +363,123 @@ async function compactedThread(live: Live) {
 
 const HOUR_IN_SECONDS = 3600
 
-/**
- * Stands in for the API at `ANTHROPIC_BASE_URL`: every Messages request is
- * refused with a 429, and every other request goes on to the real API. A
- * five-hour limit carries the headers the servers send with one.
- */
-async function startLimitedApi(limit: 'five-hour' | 'throttle' = 'five-hour') {
-  // One reset for every request, so each failure names the same time.
-  const resets = String(Math.floor(Date.now() / 1000) + 2 * HOUR_IN_SECONDS)
+function apiError(type: string, message: string) {
+  return JSON.stringify({type: 'error', error: {type, message}})
+}
 
-  const limitHeaders =
-    limit === 'throttle'
-      ? {}
-      : {
-          'retry-after': String(2 * HOUR_IN_SECONDS),
-          'anthropic-ratelimit-unified-status': 'rejected',
-          'anthropic-ratelimit-unified-reset': resets,
-          'anthropic-ratelimit-unified-representative-claim': 'five_hour',
-          'anthropic-ratelimit-unified-5h-status': 'rejected',
-          'anthropic-ratelimit-unified-5h-reset': resets,
-          'anthropic-ratelimit-unified-5h-utilization': '1.0',
-          'anthropic-ratelimit-unified-overage-status': 'rejected',
-        }
+const RATE_LIMITED = apiError('rate_limit_error', 'Rate limit exceeded')
+
+function standInFailures(resets: number) {
+  return {
+    'five-hour': {
+      status: 429,
+      headers: {
+        'retry-after': String(2 * HOUR_IN_SECONDS),
+        'anthropic-ratelimit-unified-status': 'rejected',
+        'anthropic-ratelimit-unified-reset': String(resets),
+        'anthropic-ratelimit-unified-representative-claim': 'five_hour',
+        'anthropic-ratelimit-unified-5h-status': 'rejected',
+        'anthropic-ratelimit-unified-5h-reset': String(resets),
+        'anthropic-ratelimit-unified-5h-utilization': '1.0',
+        'anthropic-ratelimit-unified-overage-status': 'rejected',
+      },
+      body: RATE_LIMITED,
+    },
+    throttle: {status: 429, headers: {}, body: RATE_LIMITED},
+    'server-error': {
+      status: 500,
+      headers: {},
+      body: apiError('api_error', 'Internal server error'),
+    },
+    overloaded: {
+      status: 529,
+      headers: {},
+      body: apiError('overloaded_error', 'Overloaded'),
+    },
+    'low-credit': {
+      status: 400,
+      headers: {},
+      body: apiError(
+        'invalid_request_error',
+        'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'
+      ),
+    },
+    'payment-required': {
+      status: 402,
+      headers: {},
+      body: apiError('billing_error', 'Payment required'),
+    },
+  }
+}
+
+type StandInAnswer = keyof ReturnType<typeof standInFailures> | 'forward'
+
+/** Pipes a request to the real API and its answer back, unbuffered. */
+function forward(request: http.IncomingMessage, response: http.ServerResponse) {
+  const upstream = https.request(
+    `https://api.anthropic.com${request.url ?? '/'}`,
+    {
+      method: request.method,
+      headers: {...request.headers, host: 'api.anthropic.com'},
+    },
+    answered => {
+      response.writeHead(answered.statusCode ?? 502, answered.headers)
+      answered.pipe(response)
+    }
+  )
+
+  upstream.on('error', () => response.destroy())
+  request.pipe(upstream)
+}
+
+/**
+ * Stands in for the API at `ANTHROPIC_BASE_URL`: every Messages request gets
+ * the `answer` failure, or goes on to the real API for `'forward'`, and every
+ * other request goes on to it. A five-hour limit carries the headers the
+ * servers send with one.
+ */
+async function startStandInApi(answer: StandInAnswer = 'five-hour') {
+  // One reset for every request, so each failure names the same time.
+  const resets = Math.floor(Date.now() / 1000) + 2 * HOUR_IN_SECONDS
+  let current = answer
+
+  const failures = standInFailures(resets)
 
   const server = http.createServer((request, response) => {
-    const url = request.url ?? '/'
+    const messages =
+      request.method === 'POST' &&
+      (request.url ?? '').startsWith('/v1/messages')
 
-    if (request.method === 'POST' && url.startsWith('/v1/messages')) {
-      request.resume()
-      response.writeHead(429, {
-        'content-type': 'application/json',
-        ...limitHeaders,
-      })
-      response.end(
-        JSON.stringify({
-          type: 'error',
-          error: {type: 'rate_limit_error', message: 'Rate limit exceeded'},
-        })
-      )
+    if (!messages || current === 'forward') {
+      forward(request, response)
 
       return
     }
 
-    void (async () => {
-      const body = Buffer.concat(await Array.fromAsync(request))
+    const failure = failures[current]
 
-      const headers = Object.fromEntries(
-        Object.entries(request.headers).flatMap(([name, value]) =>
-          name === 'host' || value === undefined ? [] : [[name, String(value)]]
-        )
-      )
-
-      const upstream = await fetch(`https://api.anthropic.com${url}`, {
-        method: request.method,
-        headers,
-        ...(body.length > 0 ? {body} : {}),
-      })
-
-      response.writeHead(upstream.status, Object.fromEntries(upstream.headers))
-      response.end(Buffer.from(await upstream.arrayBuffer()))
-    })()
+    request.resume()
+    response.writeHead(failure.status, {
+      'content-type': 'application/json',
+      ...failure.headers,
+    })
+    response.end(failure.body)
   })
 
-  return {url: await listenLocally(server), close: () => server.close()}
+  return {
+    url: await listenLocally(server),
+    /** In seconds since the epoch. */
+    resets,
+    /** For each Messages request from here on. */
+    answer(next: StandInAnswer) {
+      current = next
+    },
+    close: () => server.close(),
+  }
+}
+
+function failureIn(events: Streamed[]) {
+  return events.filter(isReplyEvent).reduce(foldReplyEvent, NEW_REPLY).failure
 }
 
 /** About 12 tokens a sentence, measured. */
@@ -1096,15 +1194,14 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
   }, 300_000)
 
   it('[dep:claude-watchdog-usage-limit] fails a Reply at a usage limit at once, as it does without the watchdog', async () => {
-    const api = await startLimitedApi()
+    const api = await startStandInApi()
     const live = liveDriver([], {ANTHROPIC_BASE_URL: api.url})
 
     async function limited() {
       const events = await failedOn(live, live.request('Say hi.', null))
       await live.closed()
 
-      return events.filter(isReplyEvent).reduce(foldReplyEvent, NEW_REPLY)
-        .failure
+      return failureIn(events)
     }
 
     try {
@@ -1160,7 +1257,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
   }, 60_000)
 
   it('[dep:claude-api-retry] reports claude’s retry of a 429 throttle as busy, and Stop ends the Reply in that wait', async () => {
-    const api = await startLimitedApi('throttle')
+    const api = await startStandInApi('throttle')
     const live = liveDriver([], {ANTHROPIC_BASE_URL: api.url})
     const request = live.request('Say hi.', null)
     const events: Streamed[] = []
@@ -1192,6 +1289,146 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       api.close()
     }
   }, 120_000)
+
+  it('[dep:claude-failure-fields] fails a Reply as connection-lost once claude gives up on refused connections, both in a Compaction and in a new session past a lowered retry limit', async () => {
+    const proxy = await startProxy()
+    const refused = {HTTPS_PROXY: proxy.url, CLAUDE_CODE_MAX_RETRIES: '2'}
+    const live = liveDriver([], refused)
+
+    try {
+      const {failed} = await failedCompaction(live, refused, () => {
+        proxy.refuseFor(30 * 60_000)
+      })
+
+      expect(failed).toMatchObject({
+        // Failed by the refused connection, not on its own (`too_few_groups`).
+        compact_error: expect.stringContaining('ECONNRESET'),
+      })
+
+      await live.closed()
+      live.setEnv(refused)
+      const sending = live.printed.length
+      const lost = await failedOn(live, live.request('Say hi.', null))
+      const lines = linesOf(live.printed.slice(sending))
+
+      expect(failureIn(lost)).toMatchObject({code: 'connection-lost'})
+      expect(
+        lines.findLast(line => line.subtype === 'api_retry')
+      ).toMatchObject({error_status: null})
+      expect(lines.find(line => line.type === 'result')).toMatchObject({
+        terminal_reason: 'api_error',
+        api_error_status: null,
+      })
+
+      await live.done()
+    } finally {
+      proxy.close()
+    }
+  }, 300_000)
+
+  it('[dep:claude-failure-fields] fails a Reply as connection-lost when the stand-in API answers a Compaction’s summary request with a 500', async () => {
+    const api = await startStandInApi('forward')
+    const through = {ANTHROPIC_BASE_URL: api.url, CLAUDE_CODE_MAX_RETRIES: '2'}
+    const live = liveDriver([], through)
+
+    try {
+      const {failed, result} = await failedCompaction(live, through, () => {
+        api.answer('server-error')
+      })
+
+      expect(failed).toMatchObject({
+        // Failed by the 500, not on its own (`too_few_groups`).
+        compact_error: expect.stringContaining('API Error: 500'),
+      })
+      expect(result).toMatchObject({api_error_status: null})
+
+      await live.done()
+    } finally {
+      api.close()
+    }
+  }, 300_000)
+
+  it('[dep:claude-failure-fields] fails a Reply the stand-in API refuses with a rejected five-hour limit as limit-reached at its reset time, with a credit balance too low as limit-reached with none, and with a 402, a 500 or a 529 as a provider error', async () => {
+    const live = liveDriver([])
+
+    async function answeredWith(
+      answer: StandInAnswer,
+      env: Record<string, string> = {}
+    ) {
+      const api = await startStandInApi(answer)
+      live.setEnv({
+        ANTHROPIC_BASE_URL: api.url,
+        CLAUDE_CODE_MAX_RETRIES: '2',
+        ...env,
+      })
+      const from = live.printed.length
+
+      try {
+        const events = await failedOn(live, live.request('Say hi.', null))
+        await live.closed()
+
+        return {
+          failure: failureIn(events),
+          lines: linesOf(live.printed.slice(from)),
+          resets: api.resets,
+        }
+      } finally {
+        api.close()
+      }
+    }
+
+    const fiveHour = await answeredWith('five-hour')
+
+    expect(fiveHour.failure).toEqual({
+      code: 'limit-reached',
+      message: expect.any(String),
+      resetsAt: new Date(fiveHour.resets * 1000).toISOString(),
+    })
+    expect(fiveHour.lines).toContainEqual(
+      expect.objectContaining({
+        type: 'rate_limit_event',
+        rate_limit_info: expect.objectContaining({
+          status: 'rejected',
+          resetsAt: fiveHour.resets,
+        }),
+      })
+    )
+
+    const lowCredit = await answeredWith('low-credit')
+
+    expect(lowCredit.failure).toEqual({
+      code: 'limit-reached',
+      message: expect.any(String),
+    })
+    expect(lowCredit.lines).toContainEqual(
+      expect.objectContaining({type: 'assistant', error: 'billing_error'})
+    )
+    expect(
+      lowCredit.lines.filter(line => line.type === 'rate_limit_event')
+    ).toEqual([])
+
+    const paymentRequired = await answeredWith('payment-required')
+
+    expect(paymentRequired.failure).toMatchObject({code: 'provider-error'})
+
+    const serverError = await answeredWith('server-error')
+
+    expect(serverError.failure).toMatchObject({code: 'provider-error'})
+    expect(
+      serverError.lines.find(line => line.type === 'result')
+    ).toMatchObject({api_error_status: 500})
+
+    const overloaded = await answeredWith('overloaded', {
+      CLAUDE_CODE_RETRY_WATCHDOG_MAX_WAIT_MS: '5000',
+    })
+
+    expect(overloaded.failure).toMatchObject({code: 'provider-error'})
+    expect(overloaded.lines.find(line => line.type === 'result')).toMatchObject(
+      {api_error_status: 529}
+    )
+
+    await live.done()
+  }, 180_000)
 
   it('[dep:thread-replay-as-conversation] [dep:reply-labels-unwritten] takes over a Thread ChatGPT wrote, told in one user message, writes no label, and goes on from it warm', async () => {
     const live = liveDriver([])

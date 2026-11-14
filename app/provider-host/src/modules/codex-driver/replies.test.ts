@@ -261,7 +261,10 @@ it('names when a limit lifts as Codex reported it apart from the message', () =>
   const turn = {
     id: 'turn',
     status: 'failed',
-    error: {message: 'You’ve hit your usage limit.'},
+    error: {
+      message: 'You’ve hit your usage limit.',
+      codexErrorInfo: 'usageLimitExceeded',
+    },
   } as const
 
   expect(createReplyMapper(ids).finished(turn, 1793970000)).toEqual({
@@ -273,5 +276,39 @@ it('names when a limit lifts as Codex reported it apart from the message', () =>
       message: 'You’ve hit your usage limit.',
       resetsAt: '2026-11-06T13:00:00.000Z',
     },
+  })
+})
+
+it.each<[string, string, CodexErrorInfo[]]>([
+  [
+    'a retry with no status',
+    'connection-lost',
+    [{responseStreamDisconnected: {httpStatusCode: null}}],
+  ],
+  ['no retry', 'provider-error', []],
+  [
+    'a retry with a status, the last after one with none',
+    'provider-error',
+    [
+      {responseStreamDisconnected: {httpStatusCode: null}},
+      {responseStreamDisconnected: {httpStatusCode: 429}},
+    ],
+  ],
+])('ends a turn that failed as other after %s as %s', (_, code, retries) => {
+  const mapper = createReplyMapper(ids)
+
+  for (const retry of retries) mapper.map(retryNotice(true, retry))
+
+  mapper.map(retryNotice(false, 'other'))
+
+  expect(
+    mapper.finished({
+      id: 'turn',
+      status: 'failed',
+      error: {message: 'stream disconnected', codexErrorInfo: 'other'},
+    })
+  ).toMatchObject({
+    status: 'failed',
+    failure: {code, message: 'stream disconnected'},
   })
 })

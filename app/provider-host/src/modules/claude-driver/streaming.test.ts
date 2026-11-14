@@ -2,6 +2,7 @@ import type {FakeClaudeOptions, RecordedLine} from './replay'
 import type {
   SDKAssistantMessageError,
   SDKPartialAssistantMessage,
+  SDKResultSuccess,
 } from '@anthropic-ai/claude-agent-sdk'
 import type {
   ReplyRecorded,
@@ -904,30 +905,143 @@ it('keeps a limit Claude rejected the turn for a reached limit, with no reset ti
   await claude.allClosed()
 })
 
-it('names a limit Claude ran into, with when it lifts', async () => {
-  const limited = edited('warm.ndjson', lines =>
-    lines.map(line =>
+const REWORDED = 'Reworded by the vendor'
+
+/** The warm Reply failed, with `added` just before its result. */
+function failedAfter(
+  added: RecordedLine[],
+  result: Partial<
+    Pick<SDKResultSuccess, 'terminal_reason' | 'api_error_status'>
+  >
+) {
+  return edited('warm.ndjson', lines =>
+    lines.flatMap(line =>
       line.kind === 'out' && line.message.type === 'result'
-        ? {
-            ...line,
-            message: {
-              ...line.message,
-              is_error: true,
-              result: 'You’ve hit your limit · resets 2026-10-24T15:00:00Z',
+        ? [
+            ...added,
+            {
+              ...line,
+              message: {
+                ...line.message,
+                is_error: true,
+                result: REWORDED,
+                terminal_reason: 'api_error',
+                ...result,
+              },
             },
-          }
-        : line
+          ]
+        : [line]
     )
   )
+}
 
-  const claude = await setUp([limited])
+/** The message `claude` makes up for a failed request. */
+function apiErrorMessage(error: SDKAssistantMessageError): RecordedLine {
+  return {
+    kind: 'out',
+    message: {
+      type: 'assistant',
+      message: {
+        model: '<synthetic>',
+        role: 'assistant',
+        content: [{type: 'text', text: REWORDED}],
+      },
+      parent_tool_use_id: null,
+      error,
+      session_id: SESSION_ID,
+      uuid: crypto.randomUUID(),
+    },
+  }
+}
+
+function compactionStatus(result: 'success' | 'failed'): RecordedLine {
+  return {
+    kind: 'out',
+    message: {
+      type: 'system',
+      subtype: 'status',
+      status: null,
+      compact_result: result,
+      session_id: SESSION_ID,
+      uuid: crypto.randomUUID(),
+    },
+  }
+}
+
+it.each([
+  [null, null, 'connection-lost'],
+  [500, 500, 'provider-error'],
+  [null, 500, 'provider-error'],
+] as const)(
+  'fails a Reply whose last retry had the status %s and its result %s as %s',
+  async (retryStatus, resultStatus, code) => {
+    const claude = await setUp([
+      failedAfter(
+        [
+          // The first retry has the other status, so only the last one decides.
+          retryStatus === null
+            ? retried(1, 500, 'server_error')
+            : retried(1, null, 'unknown'),
+          retried(
+            2,
+            retryStatus,
+            retryStatus === null ? 'unknown' : 'server_error'
+          ),
+          apiErrorMessage('server_error'),
+        ],
+        {api_error_status: resultStatus}
+      ),
+    ])
+
+    const events = await claude.reply(FIRST_PROMPT)
+
+    expect(events.at(-1)).toMatchObject({
+      status: 'failed',
+      failure: {code, message: REWORDED},
+    })
+    await claude.allClosed()
+  }
+)
+
+it.each([
+  ['failed', 'connection-lost', 'failed'],
+  ['went through', 'too-long', 'success'],
+] as const)(
+  'fails a blocked Reply whose last Compaction %s as %s',
+  async (_, code, result) => {
+    const claude = await setUp([
+      failedAfter(
+        [
+          compactionStatus(result === 'failed' ? 'success' : 'failed'),
+          compactionStatus(result),
+          apiErrorMessage('invalid_request'),
+        ],
+        {terminal_reason: 'blocking_limit', api_error_status: null}
+      ),
+    ])
+
+    const events = await claude.reply(FIRST_PROMPT)
+
+    expect(events.at(-1)).toMatchObject({
+      status: 'failed',
+      failure: {code, message: REWORDED},
+    })
+    await claude.allClosed()
+  }
+)
+
+it('names a credit balance too low a reached limit, with no reset time', async () => {
+  const claude = await setUp([
+    failedAfter([apiErrorMessage('billing_error')], {api_error_status: 400}),
+  ])
 
   const events = await claude.reply(FIRST_PROMPT)
 
   expect(events.at(-1)).toMatchObject({
     status: 'failed',
-    failure: {code: 'limit-reached', resetsAt: '2026-10-24T15:00:00.000Z'},
+    failure: {code: 'limit-reached', message: REWORDED},
   })
+  expect(events.at(-1)).not.toHaveProperty('failure.resetsAt')
   await claude.allClosed()
 })
 

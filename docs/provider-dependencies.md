@@ -370,16 +370,46 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Changed by:** upgrade + drift. The port and the wording ship in the program; the `missing_codex_entitlement` answer comes from OpenAI's servers.
 - **Check:** `[dep:codex-sign-in-port-and-refusal]` in `codex-driver`: the pinned program holds the phrase, and a sign-in takes the port. It cancels any Codex sign-in open on the machine at the time.
 
-### Failures sorted by their wording
+### A needed app update, told by its wording
 
 - **Id:** `failures-by-wording`
-- **Kind:** W
+- **Kind:** D
 - **Provider:** both
-- **Relies on:** the vendors' English failure text. Needs-app-update matches `requires a newer version of (Codex|Claude Code)`: Codex's wording is OpenAI's real server text, Claude's was made up. Connection-lost and limit-reached match lists of words and error codes.
-- **App side:** `failures` sorts every failure but too-long by regex; too-long reads typed fields since #224. On needs-app-update, main marks the Model unusable for good.
-- **User would see:** if the wording changes, the vendor's raw text instead of "Connection lost" or "Limit reached · resets at…", with the reported reset time dropped. A Model the program is too old for stays pickable, or an unrelated message holding the phrase disables a Model for good.
-- **Changed by:** upgrade + drift. `claude` writes its own limit lines; limit and version text from the servers can change at any time.
-- **Check:** none: the pinned builds already send typed codes for limit-reached and connection-lost, so a check that the problem remains would fail today; moving those onto the codes is app work, tracked in #237. Needs-app-update has no typed code and can't be caused on demand.
+- **Relies on:** the servers' English text for a Model the pinned program is too old for, which no typed code marks: `requires a newer version of (Codex|Claude Code)`. Codex's wording is OpenAI's real server text; Claude's was made up.
+- **App side:** `failures` names needs-app-update by that phrase, and main marks the Model unusable for good. Disk-full matches the operating system's `ENOSPC` text, not a vendor's. Every other kind is sorted by typed fields (`claude-failure-fields`, `codex-error-info`).
+- **User would see:** if the wording changes, a Model the program is too old for stays pickable and fails with the vendor's raw text. An unrelated message holding the phrase disables a Model for good.
+- **Changed by:** upgrade + drift. The text comes from the servers.
+- **Check:** none: needs-app-update can't be caused on demand, since it needs a Model newer than the pinned program.
+
+### Claude's failure fields
+
+- **Id:** `claude-failure-fields`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** the fields `claude` sends over a Reply that fails, as #248 recorded them:
+  - **A lost connection** that runs out of retries ends with a `result` whose `terminal_reason` is `api_error` and `api_error_status` is null, after an `api_retry` whose `error_status` is null. A 500 or 529 carries its status in both.
+  - **A failed Compaction** in a blocked turn sends a `status` message with `compact_result: 'failed'`, then a `result` with `terminal_reason: 'blocking_limit'`. A refused connection and a 500 on the summary request send the same fields.
+  - **A rejected usage limit** sends a `rate_limit_event` with `status: 'rejected'`, and `resetsAt` when the response has a reset header.
+  - **A credit balance too low** sends an assistant message with `error: 'billing_error'`, and no `rate_limit_event`. A 402 sends `error: 'unknown'`.
+- **App side:** `claude-driver` reads these over the Reply, and `failures` sorts a Claude failure into connection-lost and limit-reached from them alone. The reset time comes only from `resetsAt`.
+- **User would see:** the vendor's raw text as a provider error instead of "Connection lost" or "Limit reached · resets at…", or no reset time. A changed status could show a server error as a lost connection.
+- **Changed by:** upgrade + drift. `claude` maps the answers to fields, and Anthropic's servers send the answers.
+- **Check:** `[dep:claude-failure-fields]` in `claude-driver`: a Reply whose connections are refused past a lowered retry limit fails as connection-lost, and one a local stand-in API answers with a 500 fails as a provider error. A Compaction fails as connection-lost both when its connections are refused and when the stand-in answers its summary request with a 500. The stand-in's rejected five-hour limit fails as limit-reached with its reset time, and its credit-balance 400 as limit-reached with none. Its 402 fails as a provider error, and so does its 529 under a lowered `CLAUDE_CODE_RETRY_WATCHDOG_MAX_WAIT_MS`.
+
+### Codex's error codes
+
+- **Id:** `codex-error-info`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** the `codexErrorInfo` Codex sends on a failed turn, and on each `error` notification with `willRetry: true`, as #248 recorded them:
+  - **A retry with no HTTP response** carries `responseStreamDisconnected` with `httpStatusCode: null`.
+  - **A lost connection:** a turn that gives up on a dropped stream, or on an app-server started offline, fails with `other`. A Compaction on refused connections fails with `httpConnectionFailed` and `httpStatusCode: null`. Many other failures also send `other`.
+  - **A limit:** a usage limit, a quota, or a workspace out of credits or at its spend cap fails with `usageLimitExceeded`. A rate limit fails with `rateLimitExceeded`, and a 429 Codex stops retrying with `responseTooManyFailedAttempts` and `httpStatusCode: 429`.
+  - **The reset time:** the rate-limit snapshot carries the windows' `resetsAt` and a `rateLimitReachedType` only with a `usage_limit_reached` answer.
+- **App side:** `codex-driver` keeps the last retry notice's `codexErrorInfo`, and `failures` sorts a ChatGPT failure into connection-lost and limit-reached from the codes alone. The reset time comes from the snapshot, and there is none for a credits or spend-cap `rateLimitReachedType`.
+- **User would see:** the vendor's raw text as a provider error instead of "Connection lost" or "Limit reached · resets at…", or a reset time for a limit no window lifts.
+- **Changed by:** upgrade + drift. Codex maps the answers to codes, and OpenAI's servers send the answers.
+- **Check:** `[dep:codex-error-info]` in `codex-driver`: a Reply whose streams are reset as they flow fails as connection-lost, and so does a Compaction whose connections are refused. A local stand-in API's usage limit fails as limit-reached with the snapshot's reset time, its workspace out of credits and its spend cap as limit-reached with none, and its streamed rate limit as limit-reached. Its streamed `usage_limit_reached` fails as connection-lost. The 429 Codex stops retrying is in `[dep:codex-retry-notice]`'s check, which carries this id too. An app-server started offline has no check: it needs the machine's network off, since one started behind a proxy that refuses every connection waits without end instead.
 
 ### Claude's Compaction settings
 
