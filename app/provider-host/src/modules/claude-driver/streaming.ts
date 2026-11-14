@@ -124,6 +124,10 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     restore: Restore,
     run: ReplyRun
   ): Promise<Live | Silent> {
+    const {program} = request.vendorProgram
+
+    if (!program) throw new Error('The manifest names no Claude program.')
+
     const stop = {asked: false, ...Promise.withResolvers<Silent>()}
 
     const unstoppable = run.stoppable(async () => {
@@ -137,10 +141,11 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
         stop.promise,
       ])
 
-      // Files already in win the race against a Stop asked before `open`.
+      // A Stop asked before `open` loses the race to files already loaded, so
+      // `asked` is checked too.
       if ('silent' in files || stop.asked) return {silent: 'stopped'}
 
-      return start(request, restore, files)
+      return start(request, restore, files, program)
     } finally {
       unstoppable()
     }
@@ -149,12 +154,10 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   function start(
     request: ReplyRequest,
     restore: Restore,
-    files: SessionFile[]
+    files: SessionFile[],
+    program: NonNullable<ReplyRequest['vendorProgram']['program']>
   ): Live {
-    const {program, configDir} = request.vendorProgram
-
-    if (!program) throw new Error('The manifest names no Claude program.')
-
+    const {configDir} = request.vendorProgram
     const cwd = configDir
     const projectKey = projectKeyOf(cwd)
     const {resume, fork, upTo} = resumption(request.session, restore)
