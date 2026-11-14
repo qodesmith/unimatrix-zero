@@ -1102,6 +1102,56 @@ it('interrupts and closes a warm claude stopped before it is heard, and the Thre
   expect(resumed?.args).toContain(`--resume=${SESSION_ID}`)
 })
 
+it('ends a Reply stopped while it waits for a stalled claude to close at once, starting no claude, and the next Reply resumes once it has closed', async () => {
+  const hold = path.join(folder('uz-claude-hold-'), 'go')
+
+  const claude = await setUp(['warm.ndjson', 'resumed.ndjson'], {
+    silentFrom: {run: 0, prompt: 1},
+    holdExit: hold,
+  })
+
+  cleanUps.push(async () => fs.writeFileSync(hold, ''))
+
+  const session = recordedIn(await claude.reply(FIRST_PROMPT))
+  const stalledId = crypto.randomUUID()
+  const stalling = claude.reply(SECOND_PROMPT, session, {replyId: stalledId})
+  await expect.poll(() => claude.reports()[0]?.prompts).toHaveLength(2)
+  await claude.driver.stop(stalledId)
+
+  expect((await stalling).at(-1)).toMatchObject({status: 'stopped'})
+
+  const waitingId = crypto.randomUUID()
+  const waiting = claude.reply(SECOND_PROMPT, session, {replyId: waitingId})
+  await expect.poll(() => claude.reports()[0]?.inputClosed).toBe(true)
+  await claude.driver.stop(waitingId)
+
+  const stopped = await Promise.race([
+    waiting,
+    new Promise<null>(resolve => {
+      setTimeout(resolve, 0, null)
+    }),
+  ])
+
+  expect(stopped?.map(event => event.type)).toEqual([
+    'RUN_STARTED',
+    'RUN_FINISHED',
+  ])
+  expect(stopped?.at(-1)).toMatchObject({status: 'stopped'})
+
+  fs.writeFileSync(hold, '')
+  await expect.poll(() => claude.reports()[0]?.ended).toBe('input-closed')
+
+  // A `claude` started for the stopped Reply would have taken this recording.
+  const next = await claude.reply(THIRD_PROMPT, session)
+
+  expect(next.at(-1)).toMatchObject({status: 'complete'})
+  await claude.allClosed()
+  const [, resumed] = claude.reports()
+
+  expect(resumed?.args).toContain(`--resume=${SESSION_ID}`)
+  expect(resumed?.runningAtStart).toEqual([])
+})
+
 it('fails a Reply as connection-lost when a warm claude says nothing in time, though the Prompt before it was still completing, and interrupts that claude', async () => {
   const claude = await setUp(['compacted.ndjson'], {
     silentFrom: {run: 0, prompt: 1},
@@ -1122,8 +1172,8 @@ it('fails a Reply as connection-lost when a warm claude says nothing in time, th
   await claude.allClosed()
 })
 
-it('ends a Reply asked to stop before its claude starts, without waiting to hear it', async () => {
-  const claude = await setUp(['warm.ndjson'], {silentFrom: {run: 0, prompt: 0}})
+it('ends a Reply asked to stop before its claude starts, starting none, and the next Reply works', async () => {
+  const claude = await setUp(['warm.ndjson'])
 
   const stopped = await claude.reply(FIRST_PROMPT, null, {stopAfterDeltas: 0})
 
@@ -1131,6 +1181,11 @@ it('ends a Reply asked to stop before its claude starts, without waiting to hear
     type: 'RUN_FINISHED',
     status: 'stopped',
   })
+
+  // A `claude` started for the stopped Reply would have taken this recording.
+  const next = await claude.reply(FIRST_PROMPT)
+
+  expect(textOf(next)).toBe('TEAL')
   await claude.allClosed()
 })
 

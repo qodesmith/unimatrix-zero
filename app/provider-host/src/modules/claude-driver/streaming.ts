@@ -2,6 +2,7 @@ import type {WhenIdle} from '#modules/idle/main'
 import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {Silent, WhenSilent} from './heard'
+import type {Restore} from './resumption'
 import type {ClaudeSession, QueryFn} from './session'
 import type {
   ModelInfo,
@@ -10,17 +11,18 @@ import type {
   SpawnOptions,
   SpawnedProcess,
 } from '@anthropic-ai/claude-agent-sdk'
-import type {ReplyRequest, ReplySession, SessionFile} from '@uz/contract/host'
+import type {ReplyRequest, SessionFile} from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 import type {RunFailure} from '@uz/contract/turns'
 
 import {failureOf} from '#modules/failures/main'
 import {createReplyRuns} from '#modules/reply-runs/main'
-import {explainingLabels, replayed} from '#modules/thread-replay/main'
+import {explainingLabels} from '#modules/thread-replay/main'
 
 import {claudeReplyEnvironment} from './environment'
 import {firstHeard, silentEnding, startingWith} from './heard'
 import {createReplyMapper} from './replies'
+import {cutAt, resumption, servedThrough, textOf} from './resumption'
 import {openSession} from './session'
 import {
   appSessionStore,
@@ -43,8 +45,6 @@ export interface ClaudeRepliesDeps {
   resolveModel: (id: string) => string
 }
 
-type Restore = 'none' | 'store' | 'file'
-
 interface Live extends ClaudeSession {
   model: string
   compactionSettings: CompactionSettings
@@ -57,36 +57,10 @@ interface Live extends ClaudeSession {
 
 type Mapper = ReturnType<typeof createReplyMapper>
 
-/** The last message kept, when a fork, a rewind or a Retry's cut cuts it. */
-function cutAt(session: ReplySession) {
-  switch (session.type) {
-    case 'continue':
-      return null
-    case 'fork':
-    case 'rewind':
-      return session.messageId
-    case 'cut':
-      return session.keepThrough
-    default:
-      throw new Error('Unknown session.')
-  }
-}
-
-function servedThrough(session: ReplyRequest['session']) {
-  return session?.type === 'fork' ? session.servedThrough : undefined
-}
-
-function resumption(session: ReplyRequest['session'], restore: Restore) {
-  if (!session || restore === 'none') {
-    return {resume: null, fork: false, upTo: null}
-  }
-
-  return {
-    resume: session.sessionId,
-    fork: session.type === 'fork',
-    upTo: cutAt(session),
-  }
-}
+/** A Reply stopped before any `claude` started has no session. */
+type Answered =
+  | {session: Live; outcome: Outcome}
+  | {session: null; outcome: Silent}
 
 /** Nothing for a default, so `claude` compacts where it would on its own. */
 function claudeSettingsOf({auto, threshold}: CompactionSettings) {
@@ -126,13 +100,6 @@ function sessionLost(outcome: Outcome) {
   )
 }
 
-/** A session started for a Thread is told all of it with its first Prompt. */
-function textOf({session, thread, prompt}: ReplyRequest) {
-  return session === null && thread.length > 0
-    ? replayed(thread, prompt.text)
-    : prompt.text
-}
-
 /** Replies from a warm `claude`, or a new one that resumes, forks or starts. */
 export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   const warm = createWarmSessions<Live>({
@@ -142,22 +109,59 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   })
 
   /** Waits for a closing `claude` in the session, which may still write to it. */
-  async function open(request: ReplyRequest, restore: Restore): Promise<Live> {
-    const {program, configDir} = request.vendorProgram
+  async function filesOf(request: ReplyRequest, restore: Restore) {
+    if (request.session) await warm.closed(request.session.sessionId)
+
+    const {resume} = resumption(request.session, restore)
+    const projectKey = projectKeyOf(request.vendorProgram.configDir)
+
+    return resume ? deps.store.loadFiles({projectKey, sessionId: resume}) : []
+  }
+
+  /** Until `claude` starts, Stop ends the Reply with nothing to interrupt. */
+  async function open(
+    request: ReplyRequest,
+    restore: Restore,
+    run: ReplyRun
+  ): Promise<Live | Silent> {
+    const {program} = request.vendorProgram
 
     if (!program) throw new Error('The manifest names no Claude program.')
 
-    if (request.session) await warm.closed(request.session.sessionId)
+    const stop = {asked: false, ...Promise.withResolvers<Silent>()}
 
+    const unstoppable = run.stoppable(async () => {
+      stop.asked = true
+      stop.resolve({silent: 'stopped'})
+    })
+
+    try {
+      const files = await Promise.race([
+        filesOf(request, restore),
+        stop.promise,
+      ])
+
+      // A Stop asked before `open` loses the race to a `filesOf` with nothing
+      // to wait for, so `asked` is checked too.
+      if ('silent' in files || stop.asked) return {silent: 'stopped'}
+
+      return start(request, restore, files, program)
+    } finally {
+      unstoppable()
+    }
+  }
+
+  function start(
+    request: ReplyRequest,
+    restore: Restore,
+    files: SessionFile[],
+    program: NonNullable<ReplyRequest['vendorProgram']['program']>
+  ): Live {
+    const {configDir} = request.vendorProgram
     const cwd = configDir
     const projectKey = projectKeyOf(cwd)
     const {resume, fork, upTo} = resumption(request.session, restore)
-    let files: SessionFile[] = []
     let activeConfigDir = configDir
-
-    if (resume) {
-      files = await deps.store.loadFiles({projectKey, sessionId: resume})
-    }
 
     const sessionStore = appSessionStore(
       deps.store,
@@ -328,7 +332,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     request: ReplyRequest,
     mapper: Mapper,
     run: ReplyRun
-  ): AsyncGenerator<ContentEvent, {session: Live; outcome: Outcome}> {
+  ): AsyncGenerator<ContentEvent, Answered> {
     const claimed = claimable(request)
 
     if (claimed) {
@@ -341,7 +345,10 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       warm.drop(claimed)
     }
 
-    const session = await open(request, request.session ? 'store' : 'none')
+    const session = await open(request, request.session ? 'store' : 'none', run)
+
+    if ('silent' in session) return {session: null, outcome: session}
+
     warm.add(session)
     const outcome = yield* reply(session, mapper, request, run)
 
@@ -364,7 +371,10 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     if (!writtenBack) return {session, outcome}
 
-    const fallback = await open(request, 'file')
+    const fallback = await open(request, 'file', run)
+
+    if ('silent' in fallback) return {session: null, outcome: fallback}
+
     warm.add(fallback)
 
     return {
@@ -382,7 +392,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     request: ReplyRequest,
     mapper: Mapper,
     run: ReplyRun
-  ): AsyncGenerator<ContentEvent, {session: Live; outcome: Outcome}> {
+  ): AsyncGenerator<ContentEvent, Answered> {
     const {treeId, replyId, thread} = request
     const rebuilt = {treeId, replyId, type: 'SESSION_REBUILT'} as const
 
@@ -394,7 +404,13 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     const restored = yield* replyOnce(request, mapper, run)
 
-    if (thread.length === 0 || !sessionLost(restored.outcome)) return restored
+    if (
+      thread.length === 0 ||
+      restored.session === null ||
+      !sessionLost(restored.outcome)
+    ) {
+      return restored
+    }
 
     warm.drop(restored.session)
     yield rebuilt
@@ -410,7 +426,11 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     const {treeId, replyId} = request
     const ids = {treeId, replyId}
     const mapper = createReplyMapper(ids)
-    const {session, outcome} = yield* answer(request, mapper, run)
+    const answered = yield* answer(request, mapper, run)
+
+    if (answered.session === null) return silentEnding(ids, answered.outcome)
+
+    const {session, outcome} = answered
 
     run.afterward(status => {
       if (status === 'failed' || session.ended || 'silent' in outcome) {
