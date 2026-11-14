@@ -116,6 +116,7 @@ async function setUp(
   const configDir = folder('uz-claude-config-')
   const reports = folder('uz-claude-reports-')
   const idle = heldIdle()
+  const silence = heldIdle()
   const exits: Promise<unknown>[] = []
   const environments: NodeJS.ProcessEnv[] = []
 
@@ -139,6 +140,7 @@ async function setUp(
       ),
     },
     whenIdle: idle.whenIdle,
+    whenSilent: silence.whenIdle,
   })
 
   const treeId = crypto.randomUUID()
@@ -234,6 +236,8 @@ async function setUp(
     reports: reportsSoFar,
     environments,
     allClosed,
+    /** Runs out every wait for a silent `claude` begun so far. */
+    passSilence: silence.pass,
   }
 }
 
@@ -1040,15 +1044,145 @@ it('sends a Prompt that starts with a claude command marked to be delivered as w
   })
 })
 
-it('passes on a stop asked before claude has the Prompt', async () => {
-  const claude = await setUp(['stopped.ndjson'])
+it('ends a Reply stopped before its claude is heard at once, closing that claude, and the next Reply works in a new one', async () => {
+  const claude = await setUp(['warm.ndjson', 'warm.ndjson'], {
+    silentFrom: {run: 0, prompt: 0},
+  })
 
-  const stopped = await claude.reply(COUNT_PROMPT, null, {stopAfterDeltas: 0})
+  const replyId = crypto.randomUUID()
+
+  const stopping = claude.reply(FIRST_PROMPT, null, {replyId})
+  await expect.poll(() => claude.reports()[0]?.prompts).toEqual([FIRST_PROMPT])
+  await claude.driver.stop(replyId)
+  const stopped = await stopping
+
+  expect(stopped.map(event => event.type)).toEqual([
+    'RUN_STARTED',
+    'RUN_FINISHED',
+  ])
+  expect(stopped.at(-1)).toMatchObject({status: 'stopped'})
+
+  const next = await claude.reply(FIRST_PROMPT)
+
+  expect(textOf(next)).toBe('TEAL')
+  await expect.poll(() => claude.reports()[0]?.ended).toBe('input-closed')
+  await claude.allClosed()
+  expect(claude.reports()).toHaveLength(2)
+})
+
+it('interrupts and closes a warm claude stopped before it is heard, and the Thread goes on from the Reply above in a new one', async () => {
+  const claude = await setUp(['warm.ndjson', 'resumed.ndjson'], {
+    silentFrom: {run: 0, prompt: 2},
+  })
+
+  const first = await claude.reply(FIRST_PROMPT)
+
+  const session = recordedIn(
+    await claude.reply(SECOND_PROMPT, recordedIn(first))
+  )
+
+  const replyId = crypto.randomUUID()
+
+  const stopping = claude.reply(THIRD_PROMPT, session, {replyId})
+  await expect.poll(() => claude.reports()[0]?.prompts).toHaveLength(3)
+  await claude.driver.stop(replyId)
+
+  expect((await stopping).at(-1)).toMatchObject({status: 'stopped'})
+  await expect
+    .poll(() => claude.reports()[0]?.silentRequests)
+    .toContain('interrupt')
+
+  const next = await claude.reply(THIRD_PROMPT, session)
+
+  expect(textOf(next)).toBe('TEAL OTTER')
+  await claude.allClosed()
+  const [stalled, resumed] = claude.reports()
+
+  expect(stalled?.ended).toBe('input-closed')
+  expect(resumed?.args).toContain(`--resume=${SESSION_ID}`)
+})
+
+it('fails a Reply as connection-lost when a warm claude says nothing in time, though the Prompt before it was still completing, and interrupts that claude', async () => {
+  const claude = await setUp(['compacted.ndjson'], {
+    silentFrom: {run: 0, prompt: 1},
+  })
+
+  const first = await claude.reply('My code word is TEAL.')
+  const failing = claude.reply('My ship is PELICAN.', recordedIn(first))
+  await expect.poll(() => claude.reports()[0]?.prompts).toHaveLength(2)
+  claude.passSilence()
+
+  expect((await failing).at(-1)).toMatchObject({
+    status: 'failed',
+    failure: {code: 'connection-lost'},
+  })
+  await expect
+    .poll(() => claude.reports()[0]?.silentRequests)
+    .toContain('interrupt')
+  await claude.allClosed()
+})
+
+it('ends a Reply asked to stop before its claude starts, without waiting to hear it', async () => {
+  const claude = await setUp(['warm.ndjson'], {silentFrom: {run: 0, prompt: 0}})
+
+  const stopped = await claude.reply(FIRST_PROMPT, null, {stopAfterDeltas: 0})
 
   expect(stopped.at(-1)).toMatchObject({
     type: 'RUN_FINISHED',
     status: 'stopped',
   })
+  await claude.allClosed()
+})
+
+it('fails a Reply as connection-lost when its claude says nothing in time, closing that claude, and a Retry works in a new one', async () => {
+  const claude = await setUp(['warm.ndjson', 'warm.ndjson'], {
+    silentFrom: {run: 0, prompt: 0},
+  })
+
+  const failing = claude.reply(FIRST_PROMPT)
+  await expect.poll(() => claude.reports()[0]?.prompts).toEqual([FIRST_PROMPT])
+  claude.passSilence()
+  const failed = await failing
+
+  expect(failed.map(event => event.type)).toEqual([
+    'RUN_STARTED',
+    'RUN_FINISHED',
+  ])
+  expect(failed.at(-1)).toMatchObject({
+    status: 'failed',
+    failure: {code: 'connection-lost'},
+  })
+
+  const retry = await claude.reply(FIRST_PROMPT)
+
+  expect(textOf(retry)).toBe('TEAL')
+  await expect.poll(() => claude.reports()[0]?.ended).toBe('input-closed')
+  await claude.allClosed()
+  expect(claude.reports()).toHaveLength(2)
+})
+
+it('never gives up on a claude once it is heard, however long it then takes', async () => {
+  const held = path.join(folder('uz-held-'), 'go')
+  const claude = await setUp(['warm.ndjson'], {holdAfterFirstDelta: held})
+
+  const messageId = crypto.randomUUID()
+
+  const replying = claude.reply(FIRST_PROMPT, null, {messageId})
+
+  // `claude` stores the Prompt only after its `init`.
+  await expect
+    .poll(() =>
+      claude.store
+        .entriesOf(claude.projectKey, SESSION_ID)
+        .map(entry => entry.uuid)
+    )
+    .toContain(messageId)
+  claude.passSilence()
+  fs.writeFileSync(held, '')
+  const events = await replying
+
+  expect(textOf(events)).toBe('TEAL')
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
 })
 
 it('stops a Reply where it is, records it, and continues the Thread warm from it', async () => {

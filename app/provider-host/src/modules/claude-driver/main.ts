@@ -10,6 +10,7 @@ import {spawn} from 'node:child_process'
 
 import {readAccount} from './account'
 import {claudeEnvironment} from './environment'
+import {HEARD_WITHIN_MS} from './heard'
 import {signOut, startLogin} from './login'
 import {createModelList} from './models'
 import {runClaudeOneShot} from './one-shot'
@@ -61,6 +62,7 @@ export function createClaudeDriver({
   env = process.env,
   whenIdle = idleFor(IDLE_CLOSE_MS),
   maxWarm = MAX_WARM,
+  whenSilent = idleFor(HEARD_WITHIN_MS),
 }: ClaudeDriverOptions): ProviderDriver {
   const models = createModelList(readModelsWith(env))
 
@@ -71,6 +73,7 @@ export function createClaudeDriver({
     env,
     whenIdle,
     maxWarm,
+    whenSilent,
     learnModels: models.learn,
     resolveModel: models.resolve,
   })

@@ -71,6 +71,8 @@ const OutLine = z.looseObject({
   max_retries: z.number().optional(),
   event: z.looseObject({type: z.string()}).optional(),
   abandoned_blocks: z.unknown().optional(),
+  state: z.string().optional(),
+  command_uuid: z.string().optional(),
 })
 
 const SavedEntry = z.looseObject({
@@ -933,7 +935,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 180_000)
 
-  it('[dep:stream-event-order] [dep:prompt-stored-under-app-uuid] shows a Reply’s text once, and stores the Prompt under the id the app gave it', async () => {
+  it('[dep:stream-event-order] [dep:prompt-stored-under-app-uuid] [dep:claude-heard-within-a-minute] shows a Reply’s text once, stores the Prompt under the id the app gave it, and marks that id completed after the result', async () => {
     const live = liveDriver([])
     const request = live.request('Reply with the single word TEAL.', null)
     const events = await Array.fromAsync(live.driver.startReply(request))
@@ -946,6 +948,24 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     expect(live.entriesOf(sessionId)).toContainEqual(
       expect.objectContaining({type: 'user', uuid: request.prompt.messageId})
     )
+    await expect
+      .poll(() => {
+        const lines = linesOf(live.printed)
+        const result = lines.findIndex(line => line.type === 'result')
+
+        return (
+          result >= 0 &&
+          lines
+            .slice(result + 1)
+            .some(
+              line =>
+                line.type === 'command_lifecycle' &&
+                line.state === 'completed' &&
+                line.command_uuid === request.prompt.messageId
+            )
+        )
+      })
+      .toBe(true)
 
     await live.done()
   }, 180_000)
@@ -1107,6 +1127,37 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       api.close()
     }
   }, 120_000)
+
+  it('[dep:claude-heard-within-a-minute] hears claude’s init within 10 s of a Prompt sent with connections refused from the start', async () => {
+    const proxy = await startProxy()
+    proxy.refuseFor(30 * 60_000)
+    const live = liveDriver([], {HTTPS_PROXY: proxy.url})
+    const request = live.request('Say hi.', null)
+
+    try {
+      const sent = performance.now()
+      const replying = Array.fromAsync(live.driver.startReply(request))
+
+      await expect
+        .poll(() =>
+          linesOf(live.printed).some(
+            line => line.type === 'system' && line.subtype === 'init'
+          )
+        )
+        .toBe(true)
+      expect(performance.now() - sent).toBeLessThan(10_000)
+      await live.driver.stop(request.replyId)
+
+      expect((await replying).at(-1)).toMatchObject({
+        type: 'RUN_FINISHED',
+        status: 'stopped',
+      })
+
+      await live.done()
+    } finally {
+      proxy.close()
+    }
+  }, 60_000)
 
   it('[dep:claude-api-retry] reports claude’s retry of a 429 throttle as busy, and Stop ends the Reply in that wait', async () => {
     const api = await startLimitedApi('throttle')

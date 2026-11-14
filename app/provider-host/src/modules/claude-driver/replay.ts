@@ -32,6 +32,16 @@ export interface FakeClaudeOptions {
   refuseResumeAt?: boolean
   /** Keeps it going once its input closes, until this file exists. */
   holdExit?: string
+  /**
+   * Writes nothing more, as on a stalled network, from this Prompt of the nth
+   * run, both counted from 0.
+   */
+  silentFrom?: {run: number; prompt: number}
+  /**
+   * Holds the rest of its answer after its first text delta, until this file
+   * exists.
+   */
+  holdAfterFirstDelta?: string
 }
 
 const OPTIONS_VARIABLE = 'FAKE_CLAUDE_OPTIONS'
@@ -62,6 +72,8 @@ export const FakeClaudeRunSchema = z.strictObject({
   /** The entry uuids of the transcript it resumed. */
   resumedFrom: z.array(z.string()),
   toolResults: z.array(z.string()),
+  /** The subtype of each control request it took after it went silent. */
+  silentRequests: z.array(z.string()),
   inputClosed: z.boolean(),
   ended: z
     .enum([
@@ -94,7 +106,7 @@ function stillRunning(file) {
 const runningAtStart = fs.readdirSync(reports).filter(stillRunning).map(file => Number.parseInt(file, 10))
 const args = process.argv.slice(2)
 const configDir = process.env.CLAUDE_CONFIG_DIR
-const report = {args, configDir, runningAtStart, prompts: [], clientComposed: [], systemPrompt: [], resumedFrom: [], toolResults: [], inputClosed: false, ended: null}
+const report = {args, configDir, runningAtStart, prompts: [], clientComposed: [], systemPrompt: [], resumedFrom: [], toolResults: [], silentRequests: [], inputClosed: false, ended: null}
 save()
 const recording = options.recordings[run]
 const lines = fs.readFileSync(recording, 'utf8')
@@ -166,8 +178,26 @@ function write(message) {
   process.stdout.write(JSON.stringify(message) + '\\n')
 }
 
+const silentFrom = options.silentFrom?.run === run ? options.silentFrom.prompt : null
+let silent = silentFrom === 0
+let held = false
+
 function answer() {
-  while (steps[at]?.kind === 'out') write(steps[at++].message)
+  if (silent) return
+  while (steps[at]?.kind === 'out') {
+    const {message} = steps[at++]
+    write(message)
+    const hold = options.holdAfterFirstDelta
+    if (hold && !held && message.type === 'stream_event' && message.event.type === 'content_block_delta') {
+      held = true
+      const waiting = setInterval(() => {
+        if (!fs.existsSync(hold)) return
+        clearInterval(waiting)
+        answer()
+      }, 10)
+      return
+    }
+  }
 }
 
 function expected(kind, matches) {
@@ -195,6 +225,13 @@ process.stdin.on('data', chunk => {
   for (let end = buffer.indexOf('\\n'); end >= 0; end = buffer.indexOf('\\n')) {
     const message = JSON.parse(buffer.slice(0, end))
     buffer = buffer.slice(end + 1)
+    if (message.type === 'user' && report.prompts.length === silentFrom) silent = true
+    if (silent) {
+      if (message.type === 'user') report.prompts.push(message.message.content)
+      if (message.type === 'control_request') report.silentRequests.push(message.request.subtype)
+      save()
+      continue
+    }
     const step = expected('in', ({message: recorded}) =>
       recorded.type === message.type &&
       (message.type !== 'control_request' || recorded.request.subtype === message.request.subtype))
@@ -220,8 +257,10 @@ process.stdin.on('data', chunk => {
   }
 })
 function closeInput() {
-  expected('end', () => true)
-  answer()
+  if (!silent) {
+    expected('end', () => true)
+    answer()
+  }
   report.ended = 'input-closed'
   save()
   process.exit(0)
