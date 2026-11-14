@@ -148,10 +148,7 @@ const ENDS_WAIT: ReadonlySet<ReplyEvent['type']> = new Set([
   'RUN_FINISHED',
 ])
 
-function waitingAfter(
-  waiting: LiveState['waiting'],
-  event: ReplyEvent
-): LiveState['waiting'] {
+function waitingAfter(waiting: LiveState['waiting'], event: ReplyEvent) {
   const {replyId} = event
 
   if (event.type === 'RECONNECTING') {
@@ -170,9 +167,9 @@ export function markStreamingWaiting(store: ReplyStore) {
   store.setState(state => ({
     ...state,
     waiting: Object.fromEntries(
-      Object.keys(state.replies).map((replyId): [string, Wait] => [
+      Object.keys(state.replies).map(replyId => [
         replyId,
-        'reconnecting',
+        'reconnecting' as const,
       ])
     ),
   }))
@@ -195,7 +192,7 @@ export function applyLiveEvent(
         event.replies.map(reply => [reply.replyId, reply])
       ),
       waiting: Object.fromEntries(
-        event.replies.flatMap(({replyId}): [string, Wait][] => {
+        event.replies.flatMap(({replyId}) => {
           const wait = state.waiting[replyId]
 
           return wait ? [[replyId, wait]] : []
