@@ -1,6 +1,6 @@
 import {
-  ATTACHMENT_SIZE_LIMIT,
   ATTACHMENTS_PER_PROMPT,
+  ATTACHMENT_SIZE_LIMIT,
   AttachmentSchema,
 } from '#modules/attachments/main'
 import {LayoutSchema, LayoutUpdateSchema} from '#modules/layout/main'

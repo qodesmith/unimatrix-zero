@@ -477,6 +477,39 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Changed by:** upgrade + drift. The Model decides how it reads the replay.
 - **Check:** `[dep:thread-replay-as-conversation]` in `claude-driver`: a new session told a ChatGPT-written Thread recalls it, and the next Prompt goes on from it warm.
 
+### Claude takes images and PDFs as base64 blocks
+
+- **Id:** `claude-attachment-blocks`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** `claude` takes a streamed user message whose `content` is an array of `text`, base64 `image` and base64 `document` (`application/pdf`) blocks, and passes each to the Model. It shrinks and re-encodes an image the API would refuse (measured in [#204](https://github.com/qodesmith/unimatrix-zero/issues/204#issuecomment-6767172446)), puts a text note in place of one it can't read, and goes on with the turn. It caps the images and documents in one request (100 or 600, by the Model's Context window), dropping the oldest without a word.
+- **App side:** `claude-driver` sends a Prompt's images and PDFs as base64 blocks read from the originals, and a text file as text under its name, never as a text document, so it doesn't count toward that cap. A rebuilt session's replay carries every earlier Prompt's files the same way (`prompt-content`, `thread-replay`). The app checks no size, dimension or count before sending.
+- **User would see:** a Reply that never mentions an attached image or PDF, or that fails over one; in a long Thread with many files, an AI that has forgotten the earliest ones.
+- **Changed by:** upgrade
+- **Check:** `[dep:claude-attachment-blocks]` in `claude-driver`: a Prompt with a PNG and a one-page PDF gets a Reply naming the word in each, and a new session told a Thread whose earlier Prompt had the PDF recalls its word. The shrinking and the cap have no check.
+
+### Codex takes images as `data:` URLs
+
+- **Id:** `codex-data-url-images`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** `turn/start` takes an `image` item whose `url` is a `data:` URL, and Codex fits each inline image to the Model before every request (2048 px for no `detail`). It replaces an image it can't use, an `http(s)` URL, or one with `detail: low` with a text note, and goes on with the turn (read from the pinned source in [#204](https://github.com/qodesmith/unimatrix-zero/issues/204#issuecomment-6767172446)).
+- **App side:** `codex-driver` sends each image of a Prompt, and of a text replay after a refused inject, inline as a `data:` URL with no `detail`, never as a `localImage`, which would show the Model the file's path under the app's data. Each PDF goes converted to text and page images first (`prompt-content`).
+- **User would see:** a Reply that never mentions an attached image, or that says the image was omitted.
+- **Changed by:** upgrade
+- **Check:** `[dep:codex-data-url-images]` in `codex-driver`: a Prompt with a PNG gets a Reply naming the word in it.
+
+### Codex takes images in injected history
+
+- **Id:** `codex-injected-images`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** `thread/inject_items` takes a user `message` whose content holds `input_image` items with `data:` URLs beside `input_text`, and Codex prepares those images as it does a Prompt's before each request.
+- **App side:** `codex-driver` gives a new thread each earlier Prompt's images this way, and its PDFs converted from the originals on every hand-over (`prompt-content`). A refused inject falls back to the text replay, which carries the images in `turn/start`.
+- **User would see:** after a hand-over, a ChatGPT that can't say what an earlier image showed; if Codex refused the items, every hand-over with an image would go by text replay.
+- **Changed by:** upgrade
+- **Check:** `[dep:codex-injected-images]` in `codex-driver`: a new thread given a Claude-written Thread whose earlier Prompt had a PNG names the word in it, with no second thread for a replay.
+
 ### A new session's setup tokens
 
 - **Id:** `setup-tokens`

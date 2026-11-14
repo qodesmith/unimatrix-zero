@@ -1,9 +1,11 @@
 import type {WhenIdle} from '#modules/idle/main'
+import type {ConvertPdf} from '#modules/prompt-content/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {CodexCommand, SpawnCodex} from './app-server'
 import type {ProviderDriver, SignInRequest} from '@uz/contract/host'
 
 import {idleFor} from '#modules/idle/main'
+import {convertPdf} from '#modules/pdf-conversion/main'
 import {getProgramReady, programOf} from '#modules/vendor-program/main'
 import {PROVIDER_CAPABILITIES} from '@uz/contract/providers'
 import {spawn} from 'node:child_process'
@@ -38,6 +40,7 @@ interface CodexDriverOptions {
   env?: NodeJS.ProcessEnv
   whenIdle?: WhenIdle
   timeoutMs?: number
+  convertPdf?: ConvertPdf
 }
 
 export function createCodexDriver({
@@ -47,6 +50,7 @@ export function createCodexDriver({
   env = process.env,
   whenIdle = idleFor(IDLE_CLOSE_MS),
   timeoutMs = SIGN_IN_TIMEOUT_MS,
+  convertPdf: convert = convertPdf,
 }: CodexDriverOptions): ProviderDriver {
   async function open({program, configDir}: SignInRequest) {
     if (!program) throw new Error('The manifest names no Codex program.')
@@ -62,7 +66,12 @@ export function createCodexDriver({
     )
   }
 
-  const replies = createCodexReplies({store, open, whenIdle})
+  const replies = createCodexReplies({
+    store,
+    open,
+    whenIdle,
+    convertPdf: convert,
+  })
 
   return {
     capabilities: PROVIDER_CAPABILITIES.chatgpt,

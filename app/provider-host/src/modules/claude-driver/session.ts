@@ -1,3 +1,4 @@
+import type {ContentPart} from '#modules/prompt-content/main'
 import type {
   ModelInfo,
   Options,
@@ -18,7 +19,44 @@ export type QueryFn = (params: {
   options: Options
 }) => Query
 
-type Input = {kind: 'prompt'; text: string; uuid: UUID} | {kind: 'end'}
+type Input =
+  | {kind: 'prompt'; content: ContentPart[]; uuid: UUID}
+  | {kind: 'end'}
+
+type Blocks = Exclude<SDKUserMessage['message']['content'], string>
+
+function blockOf(part: ContentPart): Blocks[number] {
+  switch (part.type) {
+    case 'text':
+      return {type: 'text', text: part.text}
+    case 'image':
+      return {
+        type: 'image',
+        source: {type: 'base64', media_type: part.mediaType, data: part.base64},
+      }
+    case 'document':
+      return {
+        type: 'document',
+        source: {
+          type: 'base64',
+          media_type: 'application/pdf',
+          data: part.base64,
+        },
+        title: part.name,
+      }
+    default:
+      throw new Error('Unknown content.')
+  }
+}
+
+/** A Prompt with no files goes as plain text, as one always did. */
+function messageContent(content: ContentPart[]) {
+  const [only, ...rest] = content
+
+  return only?.type === 'text' && rest.length === 0
+    ? only.text
+    : content.map(blockOf)
+}
 
 /** One `claude` kept open between Prompts; `messageId` is where it continues. */
 export interface ClaudeSession {
@@ -28,7 +66,7 @@ export interface ClaudeSession {
   readonly started: boolean
   readonly ended: boolean
   /** Yields up to the Prompt's `result`; `claude` stores it as `uuid`. */
-  send(text: string, uuid: UUID): AsyncGenerator<SDKMessage>
+  send(content: ContentPart[], uuid: UUID): AsyncGenerator<SDKMessage>
   /** Resolves once `claude` takes it; the `result` still follows on `send`. */
   interrupt(): Promise<void>
   /** Waits for `claude` to exit by itself, to finish writing; else stops it. */
@@ -48,7 +86,7 @@ export function openSession(query: QueryFn, options: Options): ClaudeSession {
 
       yield {
         type: 'user',
-        message: {role: 'user', content: input.text},
+        message: {role: 'user', content: messageContent(input.content)},
         parent_tool_use_id: null,
         uuid: input.uuid,
       }
@@ -89,8 +127,8 @@ export function openSession(query: QueryFn, options: Options): ClaudeSession {
       return ended
     },
 
-    async *send(text, uuid) {
-      inbox.push({kind: 'prompt', text, uuid})
+    async *send(content, uuid) {
+      inbox.push({kind: 'prompt', content, uuid})
 
       for (;;) {
         const step = await next()

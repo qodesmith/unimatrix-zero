@@ -1,5 +1,5 @@
 /** In PDF points, from the page's bottom-left corner. */
-export interface TestImage {
+interface TestImage {
   x: number
   y: number
   w: number

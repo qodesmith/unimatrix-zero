@@ -132,6 +132,7 @@ export function PromptInput({
 
   const held =
     !canSend || sending || adding || tooMany > 0 || pick.heldBecause !== null
+
   const empty = draft.trim() === '' && attachments.length === 0
 
   useEffect(() => {

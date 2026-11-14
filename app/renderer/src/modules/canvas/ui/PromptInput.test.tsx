@@ -18,8 +18,8 @@ import {SettingsProvider} from '#modules/settings/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {fromPartial} from '@total-typescript/shoehorn'
 import {
-  ATTACHMENT_SIZE_LIMIT,
   ATTACHMENTS_PER_PROMPT,
+  ATTACHMENT_SIZE_LIMIT,
   AttachmentMediaTypeSchema,
   attachmentUrl,
 } from '@uz/contract/attachments'
@@ -800,6 +800,7 @@ it('sends the files in the order attached, with no text needed, and empties the 
 it('holds Send, saying how many to remove, while the Input holds more files than a Prompt takes', async () => {
   await renderInput()
   const sendButton = page.getByRole('button', {name: 'Send'})
+
   const files = Array.from({length: ATTACHMENTS_PER_PROMPT + 2}, (_, at) =>
     textFile(`${at}.txt`, `File ${at}`)
   )

@@ -12,11 +12,12 @@ const request = {
   replyId: '01a16096-00ae-7d3b-8205-6b76ddc26ce0',
   model: 'fake',
   systemPrompt: '',
-  prompt: {text: 'Hi', messageId: crypto.randomUUID()},
+  prompt: {text: 'Hi', attachments: [], messageId: crypto.randomUUID()},
   vendorProgram: {program: null, configDir: '/claude'},
   session: null,
   thread: [],
   compactionSettings: {auto: true, threshold: null},
+  conversionDir: '/conversions',
 }
 
 function fakeMain() {
@@ -190,7 +191,11 @@ it('stops a Reply on main’s word', async () => {
     type: 'reply.start',
     request: {
       ...request,
-      prompt: {text: 'Please /hang', messageId: crypto.randomUUID()},
+      prompt: {
+        text: 'Please /hang',
+        attachments: [],
+        messageId: crypto.randomUUID(),
+      },
     },
   })
   await expect

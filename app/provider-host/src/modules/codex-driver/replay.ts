@@ -56,7 +56,10 @@ export const FakeCodexRunSchema = z.strictObject({
   cwd: z.string(),
   vendorVariables: z.array(z.string()),
   methods: z.array(z.string()),
+  /** The text of each `turn/start`'s first text item. */
   prompts: z.array(z.string()),
+  /** Each `turn/start`'s whole input. */
+  inputs: z.array(z.array(z.looseObject({type: z.string()}))),
   threadModels: z.array(NullableStringSchema),
   threadConfigs: z.array(z.looseObject({}).nullable()),
   /** At each `thread/start`, `thread/fork` or `thread/resume`. */
@@ -96,7 +99,7 @@ const reportFile = path.join(reports, run + '.json')
 const home = process.env.CODEX_HOME
 const standIn = ${JSON.stringify(CODEX_HOME_STAND_IN)}
 const vendorVariables = Object.keys(process.env).filter(name => /^(OPENAI|CODEX|ANTHROPIC|CLAUDE)_/i.test(name))
-const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], threadModels: [], threadConfigs: [], threadInstructions: [], turnModels: [], modelLists: [], resumedFrom: [], contexts: [], injected: [], forkedThrough: null, interrupted: null, reverted: null, ended: null}
+const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], inputs: [], threadModels: [], threadConfigs: [], threadInstructions: [], turnModels: [], modelLists: [], resumedFrom: [], contexts: [], injected: [], forkedThrough: null, interrupted: null, reverted: null, ended: null}
 
 function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
@@ -222,7 +225,8 @@ process.stdin.on('data', chunk => {
       report.threadInstructions.push(message.params.developerInstructions ?? null)
     }
     if (message.method === 'turn/start') {
-      report.prompts.push(message.params.input[0].text)
+      report.prompts.push(message.params.input.find(item => item.type === 'text')?.text ?? '')
+      report.inputs.push(message.params.input)
       report.turnModels.push(message.params.model)
       const rollout = rolloutOf(message.params.threadId)
       report.contexts.push(rollout ? historyOf(rollout).map(line => line.id) : [])
