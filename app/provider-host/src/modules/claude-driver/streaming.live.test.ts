@@ -1101,6 +1101,37 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     }
   }, 120_000)
 
+  it('[dep:claude-heard-within-a-minute] hears from claude within seconds of a Prompt sent with connections refused from the start, so the Reply goes on waiting', async () => {
+    const proxy = await startProxy()
+    proxy.refuseFor(30 * 60_000)
+    const live = liveDriver([], {HTTPS_PROXY: proxy.url})
+    const request = live.request('Say hi.', null)
+
+    try {
+      const replying = Array.fromAsync(live.driver.startReply(request))
+
+      await expect
+        .poll(
+          () =>
+            linesOf(live.printed).some(
+              line => line.type === 'system' && line.subtype === 'init'
+            ),
+          {timeout: 10_000}
+        )
+        .toBe(true)
+      await live.driver.stop(request.replyId)
+
+      expect((await replying).at(-1)).toMatchObject({
+        type: 'RUN_FINISHED',
+        status: 'stopped',
+      })
+
+      await live.done()
+    } finally {
+      proxy.close()
+    }
+  }, 60_000)
+
   it('[dep:thread-replay-as-conversation] [dep:reply-labels-unwritten] takes over a Thread ChatGPT wrote, told in one user message, writes no label, and goes on from it warm', async () => {
     const live = liveDriver([])
 

@@ -1,6 +1,7 @@
 import type {WhenIdle} from '#modules/idle/main'
 import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
+import type {Silent} from './heard'
 import type {ClaudeSession, QueryFn} from './session'
 import type {
   ModelInfo,
@@ -18,6 +19,7 @@ import {createReplyRuns} from '#modules/reply-runs/main'
 import {explainingLabels, replayed} from '#modules/thread-replay/main'
 
 import {claudeReplyEnvironment} from './environment'
+import {firstHeard, silentEnding, startingWith} from './heard'
 import {createReplyMapper} from './replies'
 import {openSession} from './session'
 import {
@@ -36,6 +38,8 @@ export interface ClaudeRepliesDeps {
   env: NodeJS.ProcessEnv
   whenIdle: WhenIdle
   maxWarm: number
+  /** How long a Reply waits for `claude`'s first message before failing. */
+  heardWithinMs: number
   learnModels: (models: ModelInfo[]) => void
   resolveModel: (id: string) => string
 }
@@ -97,6 +101,7 @@ function claudeSettingsOf({auto, threshold}: CompactionSettings) {
 type Outcome =
   | {result: SDKResultMessage}
   | {failure: RunFailure; heard: boolean}
+  | Silent
 
 function crashed(message: string): RunFailure {
   return {code: 'program-crashed', message}
@@ -112,6 +117,8 @@ const SESSION_LOST =
 
 function sessionLost(outcome: Outcome) {
   if ('failure' in outcome) return SESSION_LOST.test(outcome.failure.message)
+
+  if ('silent' in outcome) return false
 
   const {result} = outcome
 
@@ -224,7 +231,8 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
   /**
    * The Prompt goes out under the id main gave it, and main records it as it
-   * stores the entry. Stop interrupts `claude` once it has the Prompt.
+   * stores the entry. Stop interrupts `claude` once it is heard; before that,
+   * Stop gives up on `claude`, as the wait for it running out does.
    */
   async function* reply(
     session: Live,
@@ -233,20 +241,29 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     run: ReplyRun
   ): AsyncGenerator<ContentEvent, Outcome> {
     const {prompt} = request
+    const messages = session.send(textOf(request), prompt.messageId)
     let heard = false
     let unstoppable: (() => void) | null = null
 
     try {
-      for await (const message of session.send(
-        textOf(request),
-        prompt.messageId
-      )) {
-        unstoppable ??= run.stoppable(async () => session.interrupt())
+      const first = await firstHeard(messages, run, deps.heardWithinMs)
+
+      if ('silent' in first) {
+        // Else a `claude` only slow to start goes on to write the Reply.
+        void session.interrupt().catch(() => undefined)
+
+        return first
+      }
+
+      if (!first.done) {
         heard = true
+        unstoppable = run.stoppable(async () => session.interrupt())
 
-        if (message.type === 'result') return {result: message}
+        for await (const message of startingWith(first.value, messages)) {
+          if (message.type === 'result') return {result: message}
 
-        yield* mapper.map(message)
+          yield* mapper.map(message)
+        }
       }
 
       return {
@@ -328,7 +345,9 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     const session = await open(request, request.session ? 'store' : 'none')
     warm.add(session)
     const outcome = yield* reply(session, mapper, request, run)
-    const refused = !session.started && session.restore === 'store'
+
+    const refused =
+      !('silent' in outcome) && !session.started && session.restore === 'store'
 
     if (!refused || !request.session) return {session, outcome}
 
@@ -395,9 +414,16 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     const {session, outcome} = yield* answer(request, mapper, run)
 
     run.afterward(status => {
-      if (status === 'failed' || session.ended) warm.drop(session)
-      else warm.release(session)
+      if (status === 'failed' || session.ended || 'silent' in outcome) {
+        warm.drop(session)
+      } else {
+        warm.release(session)
+      }
     })
+
+    if ('silent' in outcome) {
+      return silentEnding(ids, outcome, deps.heardWithinMs)
+    }
 
     if ('failure' in outcome) {
       return {

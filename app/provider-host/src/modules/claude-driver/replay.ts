@@ -32,6 +32,10 @@ export interface FakeClaudeOptions {
   refuseResumeAt?: boolean
   /** Keeps it going once its input closes, until this file exists. */
   holdExit?: string
+  /** The runs, by n, that write nothing, as on a stalled network. */
+  silentRuns?: number[]
+  /** Waits this long after its `init` before the rest of the answer. */
+  pauseAfterInitMs?: number
 }
 
 const OPTIONS_VARIABLE = 'FAKE_CLAUDE_OPTIONS'
@@ -166,8 +170,20 @@ function write(message) {
   process.stdout.write(JSON.stringify(message) + '\\n')
 }
 
+const silent = options.silentRuns?.includes(run) ?? false
+let paused = false
+
 function answer() {
-  while (steps[at]?.kind === 'out') write(steps[at++].message)
+  if (silent) return
+  while (steps[at]?.kind === 'out') {
+    const {message} = steps[at++]
+    write(message)
+    if (options.pauseAfterInitMs && !paused && message.type === 'system' && message.subtype === 'init') {
+      paused = true
+      setTimeout(answer, options.pauseAfterInitMs)
+      return
+    }
+  }
 }
 
 function expected(kind, matches) {
@@ -195,6 +211,11 @@ process.stdin.on('data', chunk => {
   for (let end = buffer.indexOf('\\n'); end >= 0; end = buffer.indexOf('\\n')) {
     const message = JSON.parse(buffer.slice(0, end))
     buffer = buffer.slice(end + 1)
+    if (silent) {
+      if (message.type === 'user') report.prompts.push(message.message.content)
+      save()
+      continue
+    }
     const step = expected('in', ({message: recorded}) =>
       recorded.type === message.type &&
       (message.type !== 'control_request' || recorded.request.subtype === message.request.subtype))
@@ -220,8 +241,10 @@ process.stdin.on('data', chunk => {
   }
 })
 function closeInput() {
-  expected('end', () => true)
-  answer()
+  if (!silent) {
+    expected('end', () => true)
+    answer()
+  }
   report.ended = 'input-closed'
   save()
   process.exit(0)

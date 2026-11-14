@@ -106,7 +106,8 @@ function edited(name: string, edit: (lines: RecordedLine[]) => RecordedLine[]) {
 async function setUp(
   recordings: string[],
   behavior: FakeClaudeOptions = {},
-  store = fakeStore()
+  store = fakeStore(),
+  {heardWithinMs}: {heardWithinMs?: number} = {}
 ) {
   const fake = await replayClaude()
   cleanUps.push(fake.cleanUp)
@@ -136,6 +137,7 @@ async function setUp(
       ),
     },
     whenIdle: idle.whenIdle,
+    ...(heardWithinMs === undefined ? {} : {heardWithinMs}),
   })
 
   const treeId = crypto.randomUUID()
@@ -1008,15 +1010,83 @@ it('sends a Prompt that starts with a claude command marked to be delivered as w
   })
 })
 
-it('passes on a stop asked before claude has the Prompt', async () => {
-  const claude = await setUp(['stopped.ndjson'])
+/** Long enough for a `claude` to start on a slow machine, short for a test. */
+const HEARD_WITHIN_TEST_MS = 1500
 
-  const stopped = await claude.reply(COUNT_PROMPT, null, {stopAfterDeltas: 0})
+it('ends a Reply stopped before its claude is heard at once, closing that claude, and the next Reply works in a new one', async () => {
+  const claude = await setUp(['warm.ndjson', 'warm.ndjson'], {silentRuns: [0]})
+  const replyId = crypto.randomUUID()
+
+  const stopping = claude.reply(FIRST_PROMPT, null, {replyId})
+  await expect.poll(() => claude.reports()).toHaveLength(1)
+  await claude.driver.stop(replyId)
+  const stopped = await stopping
+
+  expect(stopped.map(event => event.type)).toEqual([
+    'RUN_STARTED',
+    'RUN_FINISHED',
+  ])
+  expect(stopped.at(-1)).toMatchObject({status: 'stopped'})
+
+  const next = await claude.reply(FIRST_PROMPT)
+
+  expect(textOf(next)).toBe('TEAL')
+  await claude.allClosed()
+  expect(claude.reports()).toHaveLength(2)
+  expect(claude.reports()[0]?.ended).toBe('input-closed')
+})
+
+it('ends a Reply asked to stop before its claude starts, without waiting to hear it', async () => {
+  const claude = await setUp(['warm.ndjson'], {silentRuns: [0]})
+
+  const stopped = await claude.reply(FIRST_PROMPT, null, {stopAfterDeltas: 0})
 
   expect(stopped.at(-1)).toMatchObject({
     type: 'RUN_FINISHED',
     status: 'stopped',
   })
+  await claude.allClosed()
+})
+
+it('fails a Reply as connection-lost when its claude says nothing in time, closing that claude, and a Retry works in a new one', async () => {
+  const claude = await setUp(
+    ['warm.ndjson', 'warm.ndjson'],
+    {silentRuns: [0]},
+    fakeStore(),
+    {heardWithinMs: HEARD_WITHIN_TEST_MS}
+  )
+
+  const failed = await claude.reply(FIRST_PROMPT)
+
+  expect(failed.map(event => event.type)).toEqual([
+    'RUN_STARTED',
+    'RUN_FINISHED',
+  ])
+  expect(failed.at(-1)).toMatchObject({
+    status: 'failed',
+    failure: {code: 'connection-lost'},
+  })
+
+  const retried = await claude.reply(FIRST_PROMPT)
+
+  expect(textOf(retried)).toBe('TEAL')
+  await claude.allClosed()
+  expect(claude.reports()).toHaveLength(2)
+  expect(claude.reports()[0]?.ended).toBe('input-closed')
+})
+
+it('waits as long as it takes once its claude is heard in time', async () => {
+  const claude = await setUp(
+    ['warm.ndjson'],
+    {pauseAfterInitMs: HEARD_WITHIN_TEST_MS + 500},
+    fakeStore(),
+    {heardWithinMs: HEARD_WITHIN_TEST_MS}
+  )
+
+  const events = await claude.reply(FIRST_PROMPT)
+
+  expect(textOf(events)).toBe('TEAL')
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
 })
 
 it('stops a Reply where it is, records it, and continues the Thread warm from it', async () => {

@@ -139,6 +139,17 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Changed by:** upgrade
 - **Check:** `[dep:claude-api-retry]` in `claude-driver`: a Reply whose connections are refused gets `api_retry` messages, and the driver reports the wait.
 
+### `claude` is heard within a minute of the Prompt
+
+- **Id:** `claude-heard-within-a-minute`
+- **Kind:** D/W
+- **Provider:** Claude
+- **Relies on:** `claude` writes its first message within seconds of a Prompt, offline included: `init` came within 0.3 s with connections refused and 3.3 s after Wi-Fi off. Only a network stalled before `claude` starts kept it silent, for hours, and the SDK puts no limit on that: its 60 s `initialize_timeout` covers `startup()` and prewarm, not `query()`.
+- **App side:** `claude-driver` fails a Reply as connection-lost when `claude` sends nothing for 60 s after the Prompt, and closes that `claude`. Until `claude` is heard, Stop ends the Reply the same way.
+- **User would see:** if `claude` came to take longer than 60 s to say anything, every Reply would fail with "Connection lost" while `claude` was still starting. If the SDK put its own limit on `query()`, the app's would be needless, or would come second.
+- **Changed by:** upgrade
+- **Check:** `[dep:claude-heard-within-a-minute]` in `claude-driver`: a Reply sent with connections refused from the start hears `init` within 10 s. Whether the SDK still sets no limit has no check: #248 stalled the network by hand before `claude` started, and no test proxy has been shown to cause the same silence.
+
 ### The Prompt stored under the app's id
 
 - **Id:** `prompt-stored-under-app-uuid`
