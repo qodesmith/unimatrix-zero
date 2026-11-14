@@ -1,5 +1,8 @@
 import type {FakeClaudeOptions, RecordedLine} from './replay'
-import type {SDKPartialAssistantMessage} from '@anthropic-ai/claude-agent-sdk'
+import type {
+  SDKAssistantMessageError,
+  SDKPartialAssistantMessage,
+} from '@anthropic-ai/claude-agent-sdk'
 import type {
   ReplyRecorded,
   ReplyRequest,
@@ -603,21 +606,29 @@ function cutOff(texts: string[], fromBlock: number): RecordedLine[] {
         uuid: crypto.randomUUID(),
       },
     },
-    ...[1, 2].map((attempt): RecordedLine => ({
-      kind: 'out',
-      message: {
-        type: 'system',
-        subtype: 'api_retry',
-        attempt,
-        max_retries: 300,
-        retry_delay_ms: 523,
-        error_status: null,
-        error: 'unknown',
-        session_id: SESSION_ID,
-        uuid: crypto.randomUUID(),
-      },
-    })),
+    ...[1, 2].map(attempt => retried(attempt, null, 'unknown')),
   ]
+}
+
+function retried(
+  attempt: number,
+  status: number | null,
+  error: SDKAssistantMessageError
+): RecordedLine {
+  return {
+    kind: 'out',
+    message: {
+      type: 'system',
+      subtype: 'api_retry',
+      attempt,
+      max_retries: 300,
+      retry_delay_ms: 523,
+      error_status: status,
+      error,
+      session_id: SESSION_ID,
+      uuid: crypto.randomUUID(),
+    },
+  }
 }
 
 function beforeFirstMessage(added: RecordedLine[]) {
@@ -662,12 +673,33 @@ it('reports each retry, and shows once the message Claude starts over after cutt
 
   expect(textAndReconnects(events)).toEqual([
     expect.objectContaining({type: 'TEXT_DELTA', delta: 'TE'}),
-    expect.objectContaining({type: 'RECONNECTING'}),
-    expect.objectContaining({type: 'RECONNECTING'}),
+    expect.objectContaining({type: 'RECONNECTING', busy: false}),
+    expect.objectContaining({type: 'RECONNECTING', busy: false}),
     expect.objectContaining({type: 'TEXT_REPLACE', text: ''}),
     expect.objectContaining({type: 'TEXT_DELTA', delta: 'TEAL'}),
   ])
   expect(textOf(events)).toBe('TEAL')
+
+  await claude.reply(SECOND_PROMPT, recordedIn(events))
+  await claude.allClosed()
+})
+
+it('reports a retry of a 429 or a 529 as busy, and one of a 500 as reconnecting', async () => {
+  const claude = await setUp([
+    beforeFirstMessage([
+      retried(1, 429, 'rate_limit'),
+      retried(2, 529, 'overloaded'),
+      retried(3, 500, 'server_error'),
+    ]),
+  ])
+
+  const events = await claude.reply(FIRST_PROMPT)
+
+  expect(
+    replyEvents(events).flatMap(event =>
+      event.type === 'RECONNECTING' ? [event.busy] : []
+    )
+  ).toEqual([true, true, false])
 
   await claude.reply(SECOND_PROMPT, recordedIn(events))
   await claude.allClosed()
@@ -1121,9 +1153,9 @@ it('fails a Reply as connection-lost when its claude says nothing in time, closi
     failure: {code: 'connection-lost'},
   })
 
-  const retried = await claude.reply(FIRST_PROMPT)
+  const retry = await claude.reply(FIRST_PROMPT)
 
-  expect(textOf(retried)).toBe('TEAL')
+  expect(textOf(retry)).toBe('TEAL')
   await expect.poll(() => claude.reports()[0]?.ended).toBe('input-closed')
   await claude.allClosed()
   expect(claude.reports()).toHaveLength(2)

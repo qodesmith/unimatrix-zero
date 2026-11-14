@@ -321,12 +321,26 @@ const HOUR_IN_SECONDS = 3600
 
 /**
  * Stands in for the API at `ANTHROPIC_BASE_URL`: every Messages request is
- * refused with a rejected five-hour limit, as the servers send it, and every
- * other request goes on to the real API.
+ * refused with a 429, and every other request goes on to the real API. A
+ * five-hour limit carries the headers the servers send with one.
  */
-async function startLimitedApi() {
+async function startLimitedApi(limit: 'five-hour' | 'throttle' = 'five-hour') {
   // One reset for every request, so each failure names the same time.
   const resets = String(Math.floor(Date.now() / 1000) + 2 * HOUR_IN_SECONDS)
+
+  const limitHeaders =
+    limit === 'throttle'
+      ? {}
+      : {
+          'retry-after': String(2 * HOUR_IN_SECONDS),
+          'anthropic-ratelimit-unified-status': 'rejected',
+          'anthropic-ratelimit-unified-reset': resets,
+          'anthropic-ratelimit-unified-representative-claim': 'five_hour',
+          'anthropic-ratelimit-unified-5h-status': 'rejected',
+          'anthropic-ratelimit-unified-5h-reset': resets,
+          'anthropic-ratelimit-unified-5h-utilization': '1.0',
+          'anthropic-ratelimit-unified-overage-status': 'rejected',
+        }
 
   const server = http.createServer((request, response) => {
     const url = request.url ?? '/'
@@ -335,14 +349,7 @@ async function startLimitedApi() {
       request.resume()
       response.writeHead(429, {
         'content-type': 'application/json',
-        'retry-after': String(2 * HOUR_IN_SECONDS),
-        'anthropic-ratelimit-unified-status': 'rejected',
-        'anthropic-ratelimit-unified-reset': resets,
-        'anthropic-ratelimit-unified-representative-claim': 'five_hour',
-        'anthropic-ratelimit-unified-5h-status': 'rejected',
-        'anthropic-ratelimit-unified-5h-reset': resets,
-        'anthropic-ratelimit-unified-5h-utilization': '1.0',
-        'anthropic-ratelimit-unified-overage-status': 'rejected',
+        ...limitHeaders,
       })
       response.end(
         JSON.stringify({
@@ -1151,6 +1158,40 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       proxy.close()
     }
   }, 60_000)
+
+  it('[dep:claude-api-retry] reports claude’s retry of a 429 throttle as busy, and Stop ends the Reply in that wait', async () => {
+    const api = await startLimitedApi('throttle')
+    const live = liveDriver([], {ANTHROPIC_BASE_URL: api.url})
+    const request = live.request('Say hi.', null)
+    const events: Streamed[] = []
+    let stopping = false
+
+    try {
+      for await (const event of live.driver.startReply(request)) {
+        events.push(event)
+
+        if (event.type === 'RECONNECTING' && !stopping) {
+          stopping = true
+          await live.driver.stop(request.replyId)
+        }
+      }
+
+      expect(events.at(-1)).toMatchObject({
+        type: 'RUN_FINISHED',
+        status: 'stopped',
+      })
+      expect(events.find(event => event.type === 'RECONNECTING')).toMatchObject(
+        {busy: true}
+      )
+      expect(
+        linesOf(live.printed).find(line => line.subtype === 'api_retry')
+      ).toMatchObject({error_status: 429, error: 'rate_limit'})
+
+      await live.done()
+    } finally {
+      api.close()
+    }
+  }, 120_000)
 
   it('[dep:thread-replay-as-conversation] [dep:reply-labels-unwritten] takes over a Thread ChatGPT wrote, told in one user message, writes no label, and goes on from it warm', async () => {
     const live = liveDriver([])

@@ -51,7 +51,7 @@ export function useThinking(replyId: string) {
   )
 }
 
-/** Whether the streaming Reply waits for its connection to come back. */
+/** What the streaming Reply waits on, if it waits. */
 export function useWaiting(replyId: string) {
-  return useSelector(useReplyStore(), state => state.waiting[replyId] === true)
+  return useSelector(useReplyStore(), state => state.waiting[replyId])
 }

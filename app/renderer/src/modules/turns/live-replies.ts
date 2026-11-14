@@ -26,11 +26,13 @@ interface LiveState {
   /** By Reply id, from a Stop or Retry asked until the machine is idle again. */
   runs: Record<string, ReplyRunState>
   /**
-   * By streaming Reply id, from a sign of a lost connection to its next
-   * content.
+   * By streaming Reply id, from the vendor program's retry notice or a lost
+   * connection to its next content.
    */
-  waiting: Record<string, true>
+  waiting: Record<string, Wait>
 }
+
+export type Wait = 'busy' | 'reconnecting'
 
 export type ReplyStore = Store<LiveState>
 
@@ -150,7 +152,9 @@ function waitingAfter(waiting: LiveState['waiting'], event: ReplyEvent) {
   const {replyId} = event
 
   if (event.type === 'RECONNECTING') {
-    return waiting[replyId] ? waiting : {...waiting, [replyId]: true as const}
+    const wait: Wait = event.busy ? 'busy' : 'reconnecting'
+
+    return waiting[replyId] === wait ? waiting : {...waiting, [replyId]: wait}
   }
 
   return waiting[replyId] && ENDS_WAIT.has(event.type)
@@ -163,7 +167,10 @@ export function markStreamingWaiting(store: ReplyStore) {
   store.setState(state => ({
     ...state,
     waiting: Object.fromEntries(
-      Object.keys(state.replies).map(replyId => [replyId, true as const])
+      Object.keys(state.replies).map(replyId => [
+        replyId,
+        'reconnecting' as const,
+      ])
     ),
   }))
 }
@@ -185,9 +192,11 @@ export function applyLiveEvent(
         event.replies.map(reply => [reply.replyId, reply])
       ),
       waiting: Object.fromEntries(
-        event.replies.flatMap(({replyId}) =>
-          state.waiting[replyId] ? [[replyId, true as const]] : []
-        )
+        event.replies.flatMap(({replyId}) => {
+          const wait = state.waiting[replyId]
+
+          return wait ? [[replyId, wait]] : []
+        })
       ),
     }))
     void queryClient.invalidateQueries({queryKey: ['turns']})

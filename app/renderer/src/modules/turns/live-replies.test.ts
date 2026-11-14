@@ -152,10 +152,11 @@ function waitsAfter(events: AppEvent[]) {
 
   live.replay(events)
 
-  return live.store.state.waiting[ids.replyId] === true
+  return live.store.state.waiting[ids.replyId]
 }
 
-const reconnecting: AppEvent = {...ids, type: 'RECONNECTING'}
+const reconnecting: AppEvent = {...ids, type: 'RECONNECTING', busy: false}
+const busy: AppEvent = {...ids, type: 'RECONNECTING', busy: true}
 
 it('keeps a Reply waiting from a reconnect, through a token report', () => {
   expect(
@@ -165,7 +166,14 @@ it('keeps a Reply waiting from a reconnect, through a token report', () => {
       reconnecting,
       tokens,
     ])
-  ).toBe(true)
+  ).toBe('reconnecting')
+})
+
+it('waits as busy or reconnecting by the latest retry', () => {
+  const started: AppEvent = {...ids, type: 'RUN_STARTED'}
+
+  expect(waitsAfter([started, reconnecting, busy])).toBe('busy')
+  expect(waitsAfter([started, busy, reconnecting])).toBe('reconnecting')
 })
 
 it.each([
@@ -193,10 +201,10 @@ it.each([
         toolCallId: 'tool-1',
         toolName: 'search',
       },
-      reconnecting,
+      busy,
       event,
     ])
-  ).toBe(false)
+  ).toBeUndefined()
 })
 
 const other = {treeId: 'tree-2', replyId: 'reply-2'}
@@ -211,7 +219,7 @@ it('marks every streaming Reply waiting, and no finished one', () => {
   ])
   markStreamingWaiting(live.store)
 
-  expect(live.store.state.waiting).toEqual({[ids.replyId]: true})
+  expect(live.store.state.waiting).toEqual({[ids.replyId]: 'reconnecting'})
 })
 
 it('keeps a Reply waiting across a snapshot only while the snapshot still streams it', () => {
@@ -241,5 +249,5 @@ it('keeps a Reply waiting across a snapshot only while the snapshot still stream
     },
   ])
 
-  expect(live.store.state.waiting).toEqual({[ids.replyId]: true})
+  expect(live.store.state.waiting).toEqual({[ids.replyId]: 'reconnecting'})
 })

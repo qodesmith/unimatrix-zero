@@ -252,12 +252,14 @@ export const SessionRebuiltEvent = z.strictObject({
 })
 
 /**
- * Display only: the vendor program is retrying a lost connection. Its next
- * content says the connection is back, since nothing else does.
+ * Display only: the vendor program is retrying a request. Its next content
+ * says the retry went through, since nothing else does.
  */
 export const ReconnectingEvent = z.strictObject({
   ...replyIds,
   type: z.literal('RECONNECTING'),
+  /** The server answered with a 429 or a 529, so the connection is fine. */
+  busy: z.boolean(),
 })
 
 /** Ends the whole Reply; a Subagent ends with SUBAGENT_FINISHED. */

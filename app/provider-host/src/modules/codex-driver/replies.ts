@@ -3,7 +3,7 @@ import type {Notification} from './wire'
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
-import {failureOf} from '#modules/failures/main'
+import {failureOf, isBusyStatus} from '#modules/failures/main'
 
 import {AgentMessageItemSchema, CONTEXT_COMPACTION} from './wire'
 
@@ -111,7 +111,15 @@ export function createReplyMapper(ids: ReplyIds) {
       const {method, params} = notification
 
       if (method === 'error') {
-        return params.willRetry ? [{...ids, type: 'RECONNECTING'}] : []
+        return params.willRetry
+          ? [
+              {
+                ...ids,
+                type: 'RECONNECTING',
+                busy: isBusyStatus(params.error.httpStatusCode),
+              },
+            ]
+          : []
       }
 
       if (method === 'item/agentMessage/delta') {

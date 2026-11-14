@@ -1,8 +1,10 @@
+import type {CodexErrorInfo} from './protocol/v2/CodexErrorInfo'
 import type {Notification} from './wire'
 
 import {expect, it} from 'vitest'
 
 import {createReplyMapper} from './replies'
+import {NotificationSchema} from './wire'
 
 const ids = {treeId: crypto.randomUUID(), replyId: crypto.randomUUID()}
 const inTurn = {threadId: 'thread', turnId: 'turn'}
@@ -88,21 +90,50 @@ it('adds a message that never streamed, and leaves one that matches', () => {
   expect(mapper.map(message('a', 'Hi'))).toEqual([])
 })
 
-function retryNotice(willRetry: boolean): Notification {
-  return {
+function retryNotice(
+  willRetry: boolean,
+  codexErrorInfo: CodexErrorInfo | null = null
+) {
+  return NotificationSchema.parse({
     method: 'error',
-    params: {...inTurn, willRetry},
-  }
+    params: {
+      ...inTurn,
+      willRetry,
+      error: {message: 'Reconnecting... 2/5', codexErrorInfo},
+    },
+  })
 }
 
 it('reports a wait while Codex retries, and nothing for an error it gives up on', () => {
   const mapper = createReplyMapper(ids)
 
   expect(mapper.map(retryNotice(true))).toEqual([
-    {...ids, type: 'RECONNECTING'},
+    {...ids, type: 'RECONNECTING', busy: false},
   ])
   expect(mapper.map(retryNotice(false))).toEqual([])
 })
+
+it.each([
+  ['a 429', true, {responseStreamDisconnected: {httpStatusCode: 429}}],
+  ['a 529', true, {responseStreamConnectionFailed: {httpStatusCode: 529}}],
+  ['a 500', false, {responseStreamDisconnected: {httpStatusCode: 500}}],
+  ['no status', false, {responseStreamDisconnected: {httpStatusCode: null}}],
+  ['a rate limit without a status', false, 'rateLimitExceeded'],
+  [
+    'a variant without a status',
+    false,
+    {activeTurnNotSteerable: {turnKind: 'review'}},
+  ],
+] satisfies [string, boolean, CodexErrorInfo][])(
+  'reports a retry of %s as busy: %s',
+  (_, busy, codexErrorInfo) => {
+    const mapper = createReplyMapper(ids)
+
+    expect(mapper.map(retryNotice(true, codexErrorInfo))).toEqual([
+      {...ids, type: 'RECONNECTING', busy},
+    ])
+  }
+)
 
 it('passes reasoning on and reads each request’s own token count', () => {
   const mapper = createReplyMapper(ids)
