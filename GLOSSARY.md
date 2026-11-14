@@ -80,6 +80,10 @@ _Avoid_: Node, box, message
 A user's Turn: exactly one message. A Prompt always follows a Reply (except the root) and is followed by at most one Reply.
 _Avoid_: User message, question
 
+**Attachment**:
+A file the user sends with a Prompt: an image, a PDF or a text file. The Tree keeps the original, and a Provider that can't take it as it is gets a conversion made from that original.
+_Avoid_: Upload, file
+
 **Reply**:
 The AI's Turn in response to one Prompt, however many internal messages, tool calls, or thinking blocks it contains.
 _Avoid_: Response, answer, completion
