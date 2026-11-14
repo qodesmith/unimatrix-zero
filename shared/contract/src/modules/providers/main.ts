@@ -20,6 +20,27 @@ export const CapabilitiesSchema = z.strictObject({
 
 export type Capabilities = z.infer<typeof CapabilitiesSchema>
 
+/**
+ * Fixed by each vendor program's protocol. `pdfAttachments` false: the app
+ * sends each PDF converted to text and page images.
+ */
+export const PROVIDER_CAPABILITIES: Record<ProviderId, Capabilities> = {
+  claude: {
+    pdfAttachments: true,
+    skillScriptsInPlainTrees: true,
+    mcpOAuth: true,
+    sseMcp: true,
+    sessionFromTranscript: true,
+  },
+  chatgpt: {
+    pdfAttachments: false,
+    skillScriptsInPlainTrees: false,
+    mcpOAuth: true,
+    sseMcp: false,
+    sessionFromTranscript: false,
+  },
+}
+
 export const ModelSchema = z.strictObject({
   id: z.string().min(1),
   name: z.string().min(1),

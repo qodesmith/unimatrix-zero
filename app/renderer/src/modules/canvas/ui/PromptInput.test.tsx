@@ -1,4 +1,5 @@
 import type {CanvasState} from '../canvas-context'
+import type {Attachment} from '@uz/contract/attachments'
 import type {Bridge} from '@uz/contract/bridge'
 import type {Command} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
@@ -16,9 +17,15 @@ import {ConnectionsProvider} from '#modules/connections/main'
 import {SettingsProvider} from '#modules/settings/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {fromPartial} from '@total-typescript/shoehorn'
+import {
+  ATTACHMENTS_PER_PROMPT,
+  ATTACHMENT_SIZE_LIMIT,
+  AttachmentMediaTypeSchema,
+  attachmentUrl,
+} from '@uz/contract/attachments'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
-import {expect, it} from 'vitest'
+import {expect, it, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {page, userEvent} from 'vitest/browser'
 
@@ -75,6 +82,8 @@ function attachedReply(provider: ProviderId, modelId: string): Reply {
 
 interface Setup {
   attachedTo?: Reply
+  /** The Prompts above the attached Reply. */
+  prompts?: Prompt[]
   lastModel?: ModelChoice | null
   providers?: ProviderStatus[]
   models?: Record<ProviderId, Model[]>
@@ -88,6 +97,28 @@ interface Sends {
   refusal: string | null
 }
 
+interface Files {
+  registered: File[]
+  /** What main kept, in the order it answered. */
+  added: Attachment[]
+  /** Each File by the id `registerDroppedFile` gave it. */
+  byId: Map<string, File>
+  /** True for a File with no path, such as a pasted screenshot. */
+  noPath: boolean
+  waiting: (() => void)[]
+  hold: boolean
+  refusal: string | null
+}
+
+function kept(name: string, mediaType: string, size: number): Attachment {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    mediaType: AttachmentMediaTypeSchema.parse(mediaType),
+    size,
+  }
+}
+
 function fakeMain({
   lastModel = null,
   providers = READY,
@@ -98,10 +129,49 @@ function fakeMain({
   const sent: Command[] = []
   const listeners: ((event: AppEvent) => void)[] = []
   const sends: Sends = {waiting: [], hold: false, refusal: null}
+  const attachments = new Map<string, Attachment>()
+
+  const files: Files = {
+    registered: [],
+    added: [],
+    byId: new Map(),
+    noPath: false,
+    waiting: [],
+    hold: false,
+    refusal: null,
+  }
+
+  async function add({file}: Extract<Command, {type: 'attachment.add'}>) {
+    if (files.hold) {
+      const {promise, resolve} = Promise.withResolvers<undefined>()
+      files.waiting.push(() => resolve(undefined))
+      await promise
+    }
+
+    if (files.refusal !== null) {
+      return {
+        ok: false,
+        error: {code: 'handler-failed', message: files.refusal},
+      }
+    }
+
+    const from = file.type === 'dropped' ? files.byId.get(file.fileId) : null
+
+    const attachment = from
+      ? kept(from.name, from.type, from.size)
+      : kept(file.type === 'pasted' ? file.name : 'gone', 'image/png', 3)
+
+    attachments.set(attachment.id, attachment)
+    files.added.push(attachment)
+
+    return {ok: true, value: {attachment}}
+  }
 
   const bridge: Bridge = {
     send: (async (command: Command) => {
       sent.push(command)
+
+      if (command.type === 'attachment.add') return add(command)
 
       if (command.type !== 'prompt.send') return {ok: true, value: {}}
 
@@ -123,6 +193,9 @@ function fakeMain({
         treeId,
         parentReplyId: command.parentReplyId,
         text: command.text,
+        attachments: (command.attachmentIds ?? []).flatMap(
+          id => attachments.get(id) ?? []
+        ),
         createdAt,
       }
 
@@ -156,23 +229,37 @@ function fakeMain({
 
       return () => undefined
     },
-    registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
+    registerDroppedFile: async (file: File) => {
+      files.registered.push(file)
+
+      if (files.noPath) {
+        return {
+          ok: false,
+          error: {code: 'no-path', message: 'The file has no path.'},
+        }
+      }
+
+      const id = crypto.randomUUID()
+      files.byId.set(id, file)
+
+      return {ok: true, id}
+    },
   }
 
   function publish(event: AppEvent) {
     for (const listener of listeners) listener(event)
   }
 
-  return {...bridge, sent, sends, publish}
+  return {...bridge, sent, sends, files, publish}
 }
 
 async function renderInput(setup: Setup = {}) {
   const main = fakeMain(setup)
   globalThis.window.uz = main
-  const {attachedTo} = setup
+  const {attachedTo, prompts = []} = setup
 
   const canvas = fromPartial<CanvasState>({
-    index: indexTurns({prompts: [], replies: attachedTo ? [attachedTo] : []}),
+    index: indexTurns({prompts, replies: attachedTo ? [attachedTo] : []}),
   })
 
   function Providers({children}: {children: ReactNode}) {
@@ -471,17 +558,350 @@ it('sends a Prompt once however often it is submitted while main takes it', asyn
   expect(sentTexts(main)).toEqual(['Hello?'])
 })
 
-it('keeps what was typed, and the Model picked, while main took the Prompt', async () => {
+it('keeps what was typed, the files attached and the Model picked while main took the Prompt, dropping the files sent', async () => {
   const main = await renderInput()
   const input = page.getByRole('textbox', {name: 'Prompt'})
 
+  await attach(textFile('sent.txt', 'Sent'))
   main.sends.hold = true
   await send(main)
   await userEvent.keyboard('And another thing')
+  await attach(textFile('later.txt', 'Later'))
   await picker().click()
   await page.getByRole('option', {name: 'Haiku'}).click()
 
   main.sends.waiting[0]?.()
   await expect.element(input).toHaveValue('And another thing')
+  await expect.element(attachedFile('sent.txt')).not.toBeInTheDocument()
+  await expect.element(attachedFile('later.txt')).toBeVisible()
   await expectPicked('Claude', 'Haiku')
+})
+
+function addedFiles(main: ReturnType<typeof fakeMain>) {
+  return main.sent.flatMap(command =>
+    command.type === 'attachment.add' ? [command.file] : []
+  )
+}
+
+function textFile(name: string, text: string) {
+  return new File([text], name, {type: 'text/plain'})
+}
+
+function attachedFile(name: string) {
+  return page.getByRole('group', {name})
+}
+
+it('opens the file chooser from the attach button, and attaches each file picked by the id main gave its path', async () => {
+  const main = await renderInput()
+  const chooser = page.getByLabelText('Files to attach')
+
+  const opened = vi
+    .spyOn(chooser.element() as HTMLInputElement, 'click')
+    .mockImplementation(() => undefined)
+
+  await page.getByRole('button', {name: 'Attach files'}).click()
+  expect(opened).toHaveBeenCalledOnce()
+
+  await chooser.upload([
+    textFile('notes.txt', 'Some notes'),
+    textFile('todo.txt', 'Buy milk'),
+  ])
+
+  await expectAdded('notes.txt')
+  await expectAdded('todo.txt')
+  expect(main.files.registered.map(({name}) => name)).toEqual([
+    'notes.txt',
+    'todo.txt',
+  ])
+  expect(addedFiles(main)).toEqual(
+    [...main.files.byId.keys()].map(fileId => ({type: 'dropped', fileId}))
+  )
+})
+
+async function startAttaching(...files: File[]) {
+  await page.getByLabelText('Files to attach').upload(files)
+}
+
+async function expectAdded(name: string) {
+  await expect.element(attachedFile(name)).toBeVisible()
+  await expect
+    .element(attachedFile(name).getByText('Adding…'))
+    .not.toBeInTheDocument()
+}
+
+async function attach(...files: File[]) {
+  await startAttaching(...files)
+
+  for (const {name} of files) await expectAdded(name)
+}
+
+function dataOf(files: File[]) {
+  const data = new DataTransfer()
+
+  for (const file of files) data.items.add(file)
+
+  return data
+}
+
+function paste(files: File[]) {
+  const event = new ClipboardEvent('paste', {
+    clipboardData: dataOf(files),
+    bubbles: true,
+    cancelable: true,
+  })
+
+  page.getByRole('textbox', {name: 'Prompt'}).element().dispatchEvent(event)
+}
+
+it('attaches a pasted file by its bytes only when it has no path, and by the id main gave its path otherwise', async () => {
+  const main = await renderInput()
+
+  const screenshot = new File([new Uint8Array([1, 2, 3])], 'image.png', {
+    type: 'image/png',
+  })
+
+  main.files.noPath = true
+  paste([screenshot])
+  await expectAdded('image.png')
+
+  main.files.noPath = false
+  paste([textFile('copied.txt', 'Copied')])
+  await expectAdded('copied.txt')
+
+  expect(main.files.registered.map(({name}) => name)).toEqual([
+    'image.png',
+    'copied.txt',
+  ])
+  expect(addedFiles(main)).toEqual([
+    {type: 'pasted', name: 'image.png', bytes: new Uint8Array([1, 2, 3])},
+    {type: 'dropped', fileId: [...main.files.byId.keys()][0]},
+  ])
+})
+
+it('pastes plain text into the Prompt as text, attaching nothing', async () => {
+  const main = await renderInput()
+  const input = page.getByRole('textbox', {name: 'Prompt'})
+
+  await input.fill('Copied words')
+  await userEvent.keyboard('{ControlOrMeta>}a{/ControlOrMeta}')
+  await userEvent.copy()
+  await input.fill('')
+  await userEvent.paste()
+
+  await expect.element(input).toHaveValue('Copied words')
+  expect(main.files.registered).toEqual([])
+  expect(addedFiles(main)).toEqual([])
+})
+
+it('attaches files dropped onto the Input by the id main gave each path', async () => {
+  const main = await renderInput()
+  const data = dataOf([textFile('dropped.txt', 'Dropped')])
+  const input = page.getByRole('textbox', {name: 'Prompt'}).element()
+
+  const over = new DragEvent('dragover', {
+    dataTransfer: data,
+    bubbles: true,
+    cancelable: true,
+  })
+
+  input.dispatchEvent(over)
+  expect(over.defaultPrevented).toBe(true)
+  input.dispatchEvent(
+    new DragEvent('drop', {dataTransfer: data, bubbles: true, cancelable: true})
+  )
+
+  await expectAdded('dropped.txt')
+  expect(main.files.registered.map(({name}) => name)).toEqual(['dropped.txt'])
+  expect(addedFiles(main)).toEqual([
+    {type: 'dropped', fileId: [...main.files.byId.keys()][0]},
+  ])
+})
+
+it('shows a file as being added, holding Send, until main has kept it', async () => {
+  const main = await renderInput()
+  const sendButton = page.getByRole('button', {name: 'Send'})
+
+  main.files.hold = true
+  await page.getByRole('textbox', {name: 'Prompt'}).fill('Hello?')
+  await startAttaching(textFile('notes.txt', 'Some notes'))
+
+  await expect
+    .element(attachedFile('notes.txt').getByText('Adding…'))
+    .toBeVisible()
+  await expect.element(sendButton).toBeDisabled()
+
+  await expect.poll(() => main.files.waiting.length).toBe(1)
+  main.files.waiting[0]?.()
+  await expect
+    .element(attachedFile('notes.txt').getByText('10 bytes'))
+    .toBeVisible()
+  await expect.element(sendButton).toBeEnabled()
+})
+
+it('shows main’s refusal on the file, which holds no send back and can be dismissed', async () => {
+  const main = await renderInput()
+
+  main.files.refusal = 'The disk is full.'
+  await startAttaching(textFile('notes.txt', 'Some notes'))
+
+  await expect
+    .element(attachedFile('notes.txt').getByRole('alert'))
+    .toHaveTextContent('The disk is full.')
+
+  await send(main)
+
+  await page.getByRole('button', {name: 'Dismiss notes.txt'}).click()
+  await expect.element(attachedFile('notes.txt')).not.toBeInTheDocument()
+})
+
+it('refuses a file over the size limit without asking main', async () => {
+  const main = await renderInput()
+
+  await startAttaching(
+    new File([new Uint8Array(ATTACHMENT_SIZE_LIMIT + 1)], 'huge.bin')
+  )
+
+  await expect
+    .element(attachedFile('huge.bin').getByRole('alert'))
+    .toHaveTextContent('Larger than 20 MB, the most one file can be')
+  expect(main.files.registered).toEqual([])
+  expect(addedFiles(main)).toEqual([])
+})
+
+function sentPrompts(main: ReturnType<typeof fakeMain>) {
+  return main.sent.flatMap(command =>
+    command.type === 'prompt.send' ? [command] : []
+  )
+}
+
+it('sends the files in the order attached, with no text needed, and empties the Input', async () => {
+  const main = await renderInput()
+  const sendButton = page.getByRole('button', {name: 'Send'})
+
+  await expect.element(sendButton).toBeDisabled()
+  await attach(textFile('first.txt', 'One'), textFile('second.txt', 'Two'))
+  await attach(textFile('third.txt', 'Three'))
+  await sendButton.click()
+
+  await expect.poll(() => sentPrompts(main).length).toBe(1)
+  expect(sentPrompts(main)[0]).toMatchObject({
+    text: '',
+    attachmentIds: main.files.added.map(({id}) => id),
+  })
+  expect(main.files.added.map(({name}) => name)).toEqual([
+    'first.txt',
+    'second.txt',
+    'third.txt',
+  ])
+  await expect.element(attachedFile('first.txt')).not.toBeInTheDocument()
+  await expect.element(attachedFile('third.txt')).not.toBeInTheDocument()
+})
+
+it('holds Send, saying how many to remove, while the Input holds more files than a Prompt takes', async () => {
+  await renderInput()
+  const sendButton = page.getByRole('button', {name: 'Send'})
+
+  const files = Array.from({length: ATTACHMENTS_PER_PROMPT + 2}, (_, at) =>
+    textFile(`${at}.txt`, `File ${at}`)
+  )
+
+  await attach(...files)
+  await expect.element(sendButton).toBeDisabled()
+  await expect
+    .element(page.getByText('A Prompt takes at most 20 files; remove 2.'))
+    .toBeInTheDocument()
+
+  await page.getByRole('button', {name: 'Remove 0.txt'}).click()
+  await page.getByRole('button', {name: 'Remove 1.txt'}).click()
+  await expect.element(sendButton).toBeEnabled()
+})
+
+it('removes a file before sending, and sends without it', async () => {
+  const main = await renderInput()
+
+  await attach(textFile('kept.txt', 'Kept'), textFile('dropped.txt', 'Gone'))
+  await page.getByRole('button', {name: 'Remove dropped.txt'}).click()
+  await expect.element(attachedFile('dropped.txt')).not.toBeInTheDocument()
+
+  await send(main)
+  expect(sentPrompts(main)[0]?.attachmentIds).toEqual([main.files.added[0]?.id])
+})
+
+it('shows an image as a thumbnail that opens large in a lightbox, and another file as a chip with its name and size', async () => {
+  const main = await renderInput()
+
+  await attach(
+    new File([new Uint8Array(3)], 'shot.png', {type: 'image/png'}),
+    new File([new Uint8Array(2048)], 'notes.pdf', {type: 'application/pdf'})
+  )
+
+  const [image] = main.files.added
+  const thumbnail = attachedFile('shot.png')
+
+  await expect
+    .element(thumbnail.getByRole('img', {name: 'shot.png'}))
+    .toHaveAttribute('src', attachmentUrl(image?.id ?? ''))
+  await expect.element(thumbnail.getByText('3 bytes')).not.toBeInTheDocument()
+  await expect
+    .element(attachedFile('notes.pdf').getByText('2 KB'))
+    .toBeVisible()
+  expect(attachedFile('notes.pdf').getByRole('img').query()).toBeNull()
+
+  await page.getByRole('button', {name: 'Open shot.png'}).click()
+  await expect
+    .element(
+      page
+        .getByRole('dialog', {name: 'shot.png'})
+        .getByRole('img', {name: 'shot.png'})
+    )
+    .toHaveAttribute('src', attachmentUrl(image?.id ?? ''))
+})
+
+const PDF_NOTE = '1 PDF sent as text (layout and images not included)'
+
+function pdf(name: string) {
+  return new File(['%PDF'], name, {type: 'application/pdf'})
+}
+
+it('says a PDF goes as text once a Model whose Provider takes none as is is picked, beside the re-read note, never disabling the attach button', async () => {
+  await renderInput({attachedTo: sized(49_000)})
+
+  await attach(pdf('paper.pdf'))
+  expect(page.getByRole('note').query()).toBeNull()
+
+  await picker().click()
+  await page.getByRole('option', {name: 'GPT-5'}).click()
+
+  await expect
+    .element(page.getByRole('note').filter({hasText: PDF_NOTE}))
+    .toBeVisible()
+  await expect
+    .element(page.getByRole('note').filter({hasText: SWITCH_NOTE}))
+    .toBeVisible()
+  await expect
+    .element(page.getByRole('button', {name: 'Attach files'}))
+    .toBeEnabled()
+})
+
+it('counts the PDFs on the Thread above when it is handed over to such a Provider', async () => {
+  const attachedTo = attachedReply('claude', 'opus-4-7')
+
+  await renderInput({
+    attachedTo,
+    prompts: [
+      {
+        id: attachedTo.promptId,
+        treeId,
+        parentReplyId: null,
+        text: 'Read this',
+        attachments: [kept('paper.pdf', 'application/pdf', 4)],
+        createdAt,
+      },
+    ],
+  })
+
+  await picker().click()
+  await page.getByRole('option', {name: 'GPT-5'}).click()
+
+  await expect.element(page.getByRole('note')).toHaveTextContent(PDF_NOTE)
 })

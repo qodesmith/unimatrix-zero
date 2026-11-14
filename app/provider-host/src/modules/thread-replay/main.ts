@@ -1,5 +1,7 @@
+import type {Piece} from '#modules/prompt-content/main'
 import type {Thread} from '@uz/contract/host'
 
+import {files, joinLines, lines, prompted} from '#modules/prompt-content/main'
 import {replyLabel} from '@uz/contract/host'
 
 type Exchange = Thread[number]
@@ -29,25 +31,44 @@ export function replyText({reply, label}: Exchange) {
   return label === null || text === '' ? text : `${label}\n\n${text}`
 }
 
-function tagged(tag: string, text: string) {
-  return text === '' ? [] : [`<${tag}>\n${text}\n</${tag}>`]
+function tagged(tag: string, pieces: Piece[]) {
+  return pieces.length === 0
+    ? []
+    : [...lines(`<${tag}>`), ...pieces, ...lines(`</${tag}>`)]
+}
+
+function promptPieces({prompt, attachments}: Exchange) {
+  return [...files(attachments), ...(prompt === '' ? [] : lines(prompt))]
 }
 
 /**
  * The whole Thread and the Prompt that continues it as one user message, for a
- * Provider that takes no earlier messages as history.
+ * Provider that takes no earlier messages as history. Each Prompt's files go
+ * inside its own `<prompt>`.
  */
-export function replayed(thread: Thread, prompt: string) {
-  const turns = thread.flatMap(exchange => [
-    ...tagged('prompt', exchange.prompt),
-    ...tagged('reply', replyText(exchange)),
-  ])
+export function replayed(
+  thread: Thread,
+  prompt: Parameters<typeof prompted>[0]
+) {
+  const turns = thread.flatMap(exchange => {
+    const reply = replyText(exchange)
 
-  return [
-    'Our conversation so far is between the <thread> tags below, oldest first: each <prompt> is a message I sent you, and each <reply> is the Reply it got. Take it as the conversation we have had, not as a document to comment on. My next message follows the closing tag.',
-    `<thread>\n${turns.join('\n')}\n</thread>`,
-    prompt,
-  ].join('\n\n')
+    return [
+      ...tagged('prompt', promptPieces(exchange)),
+      ...tagged('reply', reply === '' ? [] : lines(reply)),
+    ]
+  })
+
+  return joinLines([
+    ...lines(
+      'Our conversation so far is between the <thread> tags below, oldest first: each <prompt> is a message I sent you, and each <reply> is the Reply it got. Take it as the conversation we have had, not as a document to comment on. My next message follows the closing tag.',
+      '',
+      '<thread>'
+    ),
+    ...turns,
+    ...lines('</thread>', ''),
+    ...prompted(prompt),
+  ])
 }
 
 const LABELS_LINE = `A Reply in this conversation may begin with a label such as "${replyLabel('GPT-5')}". The app adds it to each Reply that another AI model wrote: those words are that model’s, not yours, so judge them as you would anyone else’s and disagree where they are wrong. Never write such a label yourself, and don’t mention the labels.`

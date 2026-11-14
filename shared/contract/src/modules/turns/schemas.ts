@@ -1,3 +1,4 @@
+import {AttachmentSchema} from '#modules/attachments/main'
 import {ProviderIdSchema} from '#modules/providers/main'
 import {z} from 'zod'
 
@@ -6,6 +7,8 @@ export const PromptSchema = z.strictObject({
   treeId: z.uuid(),
   parentReplyId: z.uuid().nullable(),
   text: z.string(),
+  /** In the order they were attached. */
+  attachments: z.array(AttachmentSchema),
   createdAt: z.iso.datetime(),
 })
 

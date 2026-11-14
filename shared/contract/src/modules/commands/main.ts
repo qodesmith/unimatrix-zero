@@ -1,3 +1,8 @@
+import {
+  ATTACHMENTS_PER_PROMPT,
+  ATTACHMENT_SIZE_LIMIT,
+  AttachmentSchema,
+} from '#modules/attachments/main'
 import {LayoutSchema, LayoutUpdateSchema} from '#modules/layout/main'
 import {ModelChoiceSchema, ProviderIdSchema} from '#modules/providers/main'
 import {SettingsSchema, SettingsUpdateSchema} from '#modules/settings/main'
@@ -59,14 +64,21 @@ export const TreeTurnsResult = z.strictObject({
  * Into a Reply that already has a Prompt after it, the Prompt starts a Branch.
  * A failed Prompt there, or a failed root Prompt, goes in the same step.
  */
-export const PromptSendCommand = z.strictObject({
-  type: z.literal('prompt.send'),
-  treeId: z.uuid(),
-  parentReplyId: z.uuid().nullable(),
-  text: z.string().trim().min(1),
-  /** As the Input's picker shows it; main never swaps it for another. */
-  model: ModelChoiceSchema,
-})
+export const PromptSendCommand = z
+  .strictObject({
+    type: z.literal('prompt.send'),
+    treeId: z.uuid(),
+    parentReplyId: z.uuid().nullable(),
+    text: z.string().trim(),
+    /** From `attachment.add`, in the order the Prompt shows them. */
+    attachmentIds: z.array(z.uuid()).max(ATTACHMENTS_PER_PROMPT).optional(),
+    /** As the Input's picker shows it; main never swaps it for another. */
+    model: ModelChoiceSchema,
+  })
+  .refine(
+    ({text, attachmentIds = []}) => text !== '' || attachmentIds.length > 0,
+    {message: 'A Prompt needs text or an attachment.', path: ['text']}
+  )
 
 const TurnIdsSchema = z.strictObject({
   promptIds: z.array(z.uuid()),
@@ -148,6 +160,29 @@ export const ImageLoadResult = z.strictObject({
   dataUrl: z.string().startsWith('data:image/'),
 })
 
+/**
+ * Keeps a copy of the file for good, for a Prompt to send. A dropped or picked
+ * file comes by the id `registerDroppedFile` gave it; a pasted one, which has
+ * no path, by its bytes.
+ */
+export const AttachmentAddCommand = z.strictObject({
+  type: z.literal('attachment.add'),
+  file: z.discriminatedUnion('type', [
+    z.strictObject({type: z.literal('dropped'), fileId: z.uuid()}),
+    z.strictObject({
+      type: z.literal('pasted'),
+      name: z.string(),
+      bytes: z
+        .instanceof(Uint8Array)
+        .refine(bytes => bytes.byteLength <= ATTACHMENT_SIZE_LIMIT),
+    }),
+  ]),
+})
+
+export const AttachmentAddResult = z.strictObject({
+  attachment: AttachmentSchema,
+})
+
 /** `SETTINGS_CHANGED` follows with every Setting. */
 export const SettingsUpdateCommand = z.strictObject({
   type: z.literal('settings.update'),
@@ -179,6 +214,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   SignInCodeCommand,
   SignInCancelCommand,
   ImageLoadCommand,
+  AttachmentAddCommand,
   SettingsUpdateCommand,
   LayoutUpdateCommand,
 ])
@@ -204,6 +240,7 @@ const resultSchemas = {
   'sign-in.code': Done,
   'sign-in.cancel': Done,
   'image.load': ImageLoadResult,
+  'attachment.add': AttachmentAddResult,
   'settings.update': SettingsSchema,
   'layout.update': LayoutSchema,
 } as const satisfies Record<CommandType, z.ZodType>

@@ -4,8 +4,10 @@ import type {SpawnOptions} from '@anthropic-ai/claude-agent-sdk'
 import type {ProviderDriver} from '@uz/contract/host'
 
 import {idleFor} from '#modules/idle/main'
+import {convertPdf} from '#modules/pdf-conversion/main'
 import {getProgramReady} from '#modules/vendor-program/main'
 import {query} from '@anthropic-ai/claude-agent-sdk'
+import {PROVIDER_CAPABILITIES} from '@uz/contract/providers'
 import {spawn} from 'node:child_process'
 
 import {readAccount} from './account'
@@ -63,6 +65,7 @@ export function createClaudeDriver({
   whenIdle = idleFor(IDLE_CLOSE_MS),
   maxWarm = MAX_WARM,
   whenSilent = idleFor(HEARD_WITHIN_MS),
+  convertPdf: convert = convertPdf,
 }: ClaudeDriverOptions): ProviderDriver {
   const models = createModelList(readModelsWith(env))
 
@@ -76,16 +79,11 @@ export function createClaudeDriver({
     whenSilent,
     learnModels: models.learn,
     resolveModel: models.resolve,
+    convertPdf: convert,
   })
 
   return {
-    capabilities: {
-      pdfAttachments: true,
-      skillScriptsInPlainTrees: true,
-      mcpOAuth: true,
-      sseMcp: true,
-      sessionFromTranscript: true,
-    },
+    capabilities: PROVIDER_CAPABILITIES.claude,
     ...createClaudeSignIn({
       getProgramReady,
       commandFor: path => ({command: path, args: []}),

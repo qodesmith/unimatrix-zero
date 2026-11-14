@@ -7,6 +7,7 @@ import type {
 } from '#modules/providers/main'
 import type {ApprovalAnswer, ReplyEvent} from '#modules/turns/main'
 
+import {HostAttachmentSchema} from '#modules/attachments/main'
 import {VendorBuildSchema} from '#modules/manifest/main'
 import {ModelSchema, SignInUpdateSchema} from '#modules/providers/main'
 import {CompactionSettingsSchema} from '#modules/settings/main'
@@ -83,6 +84,11 @@ export type ReplySession = z.infer<typeof ReplySessionSchema>
 export const ThreadSchema = z.array(
   z.strictObject({
     prompt: z.string(),
+    /**
+     * The originals, so each hand-over converts afresh and losses never pile
+     * up.
+     */
+    attachments: z.array(HostAttachmentSchema),
     reply: z.array(ReplyPartSchema),
     /**
      * Goes before the Reply's text for the AI alone, when another Model than
@@ -119,6 +125,7 @@ export const ReplyRequestSchema = z.strictObject({
   systemPrompt: z.string(),
   prompt: z.strictObject({
     text: z.string(),
+    attachments: z.array(HostAttachmentSchema),
     /** Main's name for the Prompt in the session, for a Provider that takes one. */
     messageId: z.uuid().pipe(UuidPartsSchema),
   }),
@@ -131,6 +138,11 @@ export const ReplyRequestSchema = z.strictObject({
    */
   thread: ThreadSchema,
   compactionSettings: CompactionSettingsSchema,
+  /**
+   * Where the host keeps what it converted an attachment to, by the original's
+   * SHA-256, for a Provider that can't take the original.
+   */
+  conversionDir: z.string().min(1),
 })
 
 export type ReplyRequest = z.infer<typeof ReplyRequestSchema>

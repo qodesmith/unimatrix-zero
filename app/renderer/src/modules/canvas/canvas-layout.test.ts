@@ -14,7 +14,14 @@ function at(step: number) {
 }
 
 function prompt(id: string, parentReplyId: string | null): Prompt {
-  return {id, treeId, parentReplyId, text: id, createdAt: at(++clock)}
+  return {
+    id,
+    treeId,
+    parentReplyId,
+    text: id,
+    attachments: [],
+    createdAt: at(++clock),
+  }
 }
 
 function reply(id: string, promptId: string): Reply {

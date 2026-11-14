@@ -14,11 +14,12 @@ const request: ReplyRequest = {
   ...ids,
   model: 'gpt-6.1-sol',
   systemPrompt: '',
-  prompt: {text: 'Hello', messageId: crypto.randomUUID()},
+  prompt: {text: 'Hello', attachments: [], messageId: crypto.randomUUID()},
   vendorProgram: {program: null, configDir: '/config'},
   session: null,
   thread: [],
   compactionSettings: {auto: true, threshold: null},
+  conversionDir: '/conversions',
 }
 
 const delta: ContentEvent = {...ids, type: 'TEXT_DELTA', delta: 'Hi'}

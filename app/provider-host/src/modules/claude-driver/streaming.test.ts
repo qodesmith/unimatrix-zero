@@ -4,6 +4,7 @@ import type {
   SDKPartialAssistantMessage,
   SDKResultSuccess,
 } from '@anthropic-ai/claude-agent-sdk'
+import type {HostAttachment} from '@uz/contract/attachments'
 import type {
   ReplyRecorded,
   ReplyRequest,
@@ -15,6 +16,11 @@ import type {
 import type {Model} from '@uz/contract/providers'
 import type {CompactionSettings} from '@uz/contract/settings'
 
+import {
+  PDF_BASE64,
+  PNG_BASE64,
+  attachedFiles,
+} from '#modules/test-attachments/main'
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
 import {explainingLabels} from '#modules/thread-replay/main'
@@ -35,6 +41,8 @@ import {
   replayClaude,
 } from './replay'
 import {projectKeyOf} from './transcripts'
+
+const CONVERSION_DIR = path.join(os.tmpdir(), 'uz-conversions')
 
 const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
   auto: true,
@@ -154,6 +162,7 @@ async function setUp(
     messageId?: ReplyRequest['prompt']['messageId']
     compactionSettings?: CompactionSettings
     thread?: Thread
+    attachments?: HostAttachment[]
   }
 
   const vendorProgram = {
@@ -174,6 +183,7 @@ async function setUp(
       messageId = crypto.randomUUID(),
       compactionSettings = DEFAULT_COMPACTION_SETTINGS,
       thread = [],
+      attachments = [],
     }: ReplyOptions = {}
   ) {
     const events: Streamed[] = []
@@ -184,11 +194,12 @@ async function setUp(
       replyId,
       model,
       systemPrompt: '',
-      prompt: {text, messageId},
+      prompt: {text, attachments, messageId},
       vendorProgram,
       session: session && {type: 'continue', ...session},
       thread,
       compactionSettings,
+      conversionDir: CONVERSION_DIR,
     })) {
       events.push(event)
 
@@ -1805,11 +1816,13 @@ it('starts claude with the Compaction Settings, and with nothing for the default
 const HANDED_OVER: Thread = [
   {
     prompt: 'Name a color.',
+    attachments: [],
     reply: [{type: 'text', text: 'Teal.'}],
     label: '[Reply written by GPT-6 Sol]',
   },
   {
     prompt: 'And an animal?',
+    attachments: [],
     reply: [
       {
         type: 'tool-call',
@@ -1857,8 +1870,8 @@ it('takes over a Thread ChatGPT wrote: a new session, told the whole Thread and 
   )
   expect(started?.prompts).toHaveLength(1)
   expect(started?.prompts[0]).toContain(HANDED_OVER_TURNS)
-  expect(started?.prompts[0]?.endsWith(`</thread>\n\n${FIRST_PROMPT}`)).toBe(
-    true
+  expect(started?.prompts[0]).toMatch(
+    /<\/thread>\n\nReply with the single word TEAL\.$/u
   )
   expect(
     claude.store
@@ -1876,7 +1889,12 @@ it('keeps the line that explains the labels when a rebuilt session resumes in a 
 
   const thread: Thread = [
     ...HANDED_OVER,
-    {prompt: FIRST_PROMPT, reply: [{type: 'text', text: 'TEAL'}], label: null},
+    {
+      prompt: FIRST_PROMPT,
+      attachments: [],
+      reply: [{type: 'text', text: 'TEAL'}],
+      label: null,
+    },
   ]
 
   const events = await claude.reply(THIRD_PROMPT, recordedIn(first), {thread})
@@ -2006,4 +2024,96 @@ it('rebuilds nothing for a failure that isn’t a lost session', async () => {
     failure: {message: 'Overloaded'},
   })
   expect(claude.reports()).toHaveLength(2)
+})
+
+it('sends a Prompt’s files before its text, from the originals: a text file inline under its name, an image and a PDF as base64 blocks', async () => {
+  const claude = await setUp(['warm.ndjson'])
+  const {notes, chart, report} = attachedFiles(folder('uz-attachments-'))
+
+  const events = await claude.reply(FIRST_PROMPT, null, {
+    attachments: [notes, chart, report],
+  })
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(claude.reports()[0]?.prompts).toEqual([
+    [
+      {type: 'text', text: '<file name="notes.txt">\nBuy milk.\n</file>'},
+      {
+        type: 'image',
+        source: {type: 'base64', media_type: 'image/png', data: PNG_BASE64},
+      },
+      {
+        type: 'document',
+        source: {
+          type: 'base64',
+          media_type: 'application/pdf',
+          data: PDF_BASE64,
+        },
+        title: 'report.pdf',
+      },
+      {type: 'text', text: FIRST_PROMPT},
+    ],
+  ])
+
+  await claude.allClosed()
+})
+
+it('replays an earlier Prompt’s PDF to a rebuilt session as a document block inside its <prompt>, read from the original', async () => {
+  const claude = await setUp(['warm.ndjson'])
+  const {report} = attachedFiles(folder('uz-attachments-'))
+
+  const thread: Thread = [
+    {
+      prompt: 'Sum this up.',
+      attachments: [report],
+      reply: [{type: 'text', text: 'Sales rose.'}],
+      label: '[Reply written by GPT-6 Sol]',
+    },
+  ]
+
+  const events = await claude.reply(FIRST_PROMPT, null, {thread})
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+  const [replay] = claude.reports()[0]?.prompts ?? []
+
+  expect(replay).toEqual([
+    {type: 'text', text: expect.stringMatching(/\n<thread>\n<prompt>$/u)},
+    {
+      type: 'document',
+      source: {type: 'base64', media_type: 'application/pdf', data: PDF_BASE64},
+      title: 'report.pdf',
+    },
+    {
+      type: 'text',
+      text: [
+        'Sum this up.',
+        '</prompt>',
+        '<reply>\n[Reply written by GPT-6 Sol]\n\nSales rose.\n</reply>',
+        '</thread>',
+        '',
+        FIRST_PROMPT,
+      ].join('\n'),
+    },
+  ])
+
+  await claude.allClosed()
+})
+
+it('fails the Reply, starting no claude, when an attached file’s original can’t be read', async () => {
+  const claude = await setUp(['warm.ndjson'])
+  const {gone} = attachedFiles(folder('uz-attachments-'))
+
+  const events = await claude.reply(FIRST_PROMPT, null, {attachments: [gone]})
+
+  expect(events.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'failed',
+    failure: {
+      message: expect.stringMatching(
+        /^Couldn’t read the attached file “gone\.txt”/u
+      ),
+    },
+  })
+  expect(claude.reports()).toEqual([])
 })

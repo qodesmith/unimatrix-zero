@@ -3,6 +3,7 @@ import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Node, NodeProps} from '@xyflow/react'
 import type {Ref} from 'react'
 
+import {AttachmentList} from '#modules/attachments/main'
 import {useSettings} from '#modules/settings/main'
 import {FailedChip, ReplyView, useReply} from '#modules/turns/main'
 import {Card} from '#shadcn/ui/card'
@@ -13,7 +14,7 @@ import {useEffect, useRef, useState} from 'react'
 
 import {useCanvas} from '../canvas-context'
 import {TURN_WIDTH} from '../canvas-layout'
-import {EMPTY_DRAFT} from '../drafts'
+import {EMPTY_DRAFT, holdsPrompt} from '../drafts'
 import {branchesOf, isFork, previousReply} from '../tree'
 import {CappedText} from './CappedText'
 import {ContextMeter, ContextSize} from './ContextSize'
@@ -38,14 +39,22 @@ function PromptText({prompt}: {prompt: Prompt}) {
   const {limitTurnHeight, expandedTurnIds, toggleExpanded} = useCanvas()
 
   return (
-    <CappedText
-      limit={limitTurnHeight}
-      maxHeightClass="max-h-32"
-      expanded={expandedTurnIds.has(prompt.id)}
-      onToggle={() => toggleExpanded(prompt.id)}
-    >
-      <p className="text-sm whitespace-pre-wrap">{prompt.text}</p>
-    </CappedText>
+    <>
+      <AttachmentList
+        attachments={prompt.attachments}
+        className={cn(prompt.text !== '' && 'mb-2')}
+      />
+      {prompt.text !== '' && (
+        <CappedText
+          limit={limitTurnHeight}
+          maxHeightClass="max-h-32"
+          expanded={expandedTurnIds.has(prompt.id)}
+          onToggle={() => toggleExpanded(prompt.id)}
+        >
+          <p className="text-sm whitespace-pre-wrap">{prompt.text}</p>
+        </CappedText>
+      )}
+    </>
   )
 }
 
@@ -143,9 +152,9 @@ function useInputState(reply: Reply | null, hovered: boolean): InputState {
 
   if (!live || live.status === 'failed') return 'none'
 
-  const draft = drafts.get(live.id)?.text ?? ''
-
-  return activeReplyId === live.id || draft.trim() !== '' || hovered
+  return activeReplyId === live.id ||
+    holdsPrompt(drafts.get(live.id)) ||
+    hovered
     ? 'revealed'
     : 'hidden'
 }

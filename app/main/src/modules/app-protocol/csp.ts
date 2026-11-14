@@ -15,7 +15,8 @@ export function renderCsp({
     "default-src 'none'",
     `script-src ${script.join(' ')}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
+    // Attachment thumbnails, served by id.
+    "img-src 'self' data: uzfile:",
     "font-src 'self' data:",
     `connect-src ${["'self'", ...connectSources].join(' ')}`,
     "object-src 'none'",

@@ -54,6 +54,47 @@ export const prompts = sqliteTable('prompts', {
   createdAt: createdAt(),
 })
 
+/** One per add: the same file added twice gets two, each with its own name. */
+export const attachments = sqliteTable('attachments', {
+  id: id(),
+  /** Names the original under `userData/attachments/`, which adds share. */
+  sha256: text('sha256').notNull(),
+  name: text('name').notNull(),
+  mediaType: text('media_type', {
+    enum: [
+      'image/png',
+      'image/jpeg',
+      'image/gif',
+      'image/webp',
+      'application/pdf',
+      'text/plain',
+    ],
+  }).notNull(),
+  size: integer('size').notNull(),
+  createdAt: createdAt(),
+})
+
+export const promptAttachments = sqliteTable(
+  'prompt_attachments',
+  {
+    id: id(),
+    promptId: text('prompt_id')
+      .notNull()
+      .references(() => prompts.id, {onDelete: 'cascade'}),
+    attachmentId: text('attachment_id')
+      .notNull()
+      .references(() => attachments.id),
+    /** Its place among the Prompt's attachments, from 0. */
+    position: integer('position').notNull(),
+  },
+  table => [
+    uniqueIndex('prompt_attachments_position').on(
+      table.promptId,
+      table.position
+    ),
+  ]
+)
+
 export const replies = sqliteTable(
   'replies',
   {

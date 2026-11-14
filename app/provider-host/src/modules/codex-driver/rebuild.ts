@@ -1,3 +1,4 @@
+import type {ContentPart, Piece} from '#modules/prompt-content/main'
 import type {AppServer} from './app-server'
 import type {ResponseItem} from './protocol/ResponseItem'
 import type {LoadedThread} from './threads'
@@ -5,8 +6,10 @@ import type {ParamsOf} from './wire'
 import type {ReplyRequest, Thread} from '@uz/contract/host'
 
 import {RequestRefused} from '#modules/failures/main'
+import {prompted} from '#modules/prompt-content/main'
 import {explainingLabels, replyText} from '#modules/thread-replay/main'
 
+import {messageContent} from './input'
 import {configOf, loadThread} from './threads'
 
 /** How Codex refuses to resume or fork a thread whose rollout it can't find. */
@@ -36,12 +39,11 @@ export function settingsOf(request: ReplyRequest) {
   } satisfies ParamsOf<'thread/start'>
 }
 
-function prompted(text: string) {
-  return {
-    type: 'message',
-    role: 'user',
-    content: [{type: 'input_text', text}],
-  } satisfies ResponseItem
+/** Where threads open, and how a Prompt's files are read for Codex. */
+export interface Opening {
+  server: Pick<AppServer, 'request'>
+  threads: Map<string, LoadedThread>
+  read: (pieces: Piece[]) => Promise<ContentPart[]>
 }
 
 function replied(text: string) {
@@ -52,15 +54,27 @@ function replied(text: string) {
   } satisfies ResponseItem
 }
 
-function itemsOf(thread: Thread) {
-  return thread.flatMap(exchange => {
-    const reply = replyText(exchange)
+/** Each Prompt's files read afresh from the originals. */
+async function itemsOf(thread: Thread, read: Opening['read']) {
+  const turns = await Promise.all(
+    thread.map(async exchange => {
+      const reply = replyText(exchange)
 
-    return [
-      prompted(exchange.prompt),
-      ...(reply === '' ? [] : [replied(reply)]),
-    ]
-  })
+      const prompt = {
+        type: 'message',
+        role: 'user',
+        content: messageContent(
+          await read(
+            prompted({text: exchange.prompt, attachments: exchange.attachments})
+          )
+        ),
+      } satisfies ResponseItem
+
+      return [prompt, ...(reply === '' ? [] : [replied(reply)])]
+    })
+  )
+
+  return turns.flat()
 }
 
 /**
@@ -68,15 +82,12 @@ function itemsOf(thread: Thread) {
  * own. False when Codex refuses the items, which leaves a text replay.
  */
 async function injectThread(
-  server: Pick<AppServer, 'request'>,
+  server: Opening['server'],
   threadId: string,
-  thread: Thread
+  items: Awaited<ReturnType<typeof itemsOf>>
 ) {
   try {
-    await server.request('thread/inject_items', {
-      threadId,
-      items: itemsOf(thread),
-    })
+    await server.request('thread/inject_items', {threadId, items})
 
     return true
   } catch (error) {
@@ -91,13 +102,14 @@ async function injectThread(
  * else in a thread of its own, with the Prompt.
  */
 async function newThread(
-  server: Pick<AppServer, 'request'>,
-  threads: Map<string, LoadedThread>,
+  {server, threads, read}: Opening,
   request: ReplyRequest
 ): Promise<Opened> {
   const {threshold} = request.compactionSettings
 
   const settings = settingsOf(request)
+  // Before the thread starts, so an unreadable original leaves none behind.
+  const items = await itemsOf(request.thread, read)
 
   async function open() {
     return loadThread(
@@ -119,7 +131,7 @@ async function newThread(
     return {thread, dropped: false, replay: false, rebuilt: false}
   }
 
-  if (await injectThread(server, thread.id, request.thread)) {
+  if (await injectThread(server, thread.id, items)) {
     return {thread, dropped: false, replay: false, rebuilt: true}
   }
 
@@ -134,12 +146,11 @@ async function newThread(
  * no longer has. Null `restore`: the Provider has no session of the Thread.
  */
 export async function openThread(
-  server: Pick<AppServer, 'request'>,
-  threads: Map<string, LoadedThread>,
+  opening: Opening,
   request: ReplyRequest,
   restore: (() => Promise<Restored>) | null
 ): Promise<Opened> {
-  if (!restore) return newThread(server, threads, request)
+  if (!restore) return newThread(opening, request)
 
   try {
     return {...(await restore()), replay: false, rebuilt: false}
@@ -149,6 +160,6 @@ export async function openThread(
 
     if (request.thread.length === 0 || !lost) throw error
 
-    return newThread(server, threads, request)
+    return newThread(opening, request)
   }
 }

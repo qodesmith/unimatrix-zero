@@ -1,13 +1,13 @@
 import type {WhenIdle} from '#modules/idle/main'
+import type {ContentPart, ConvertPdf} from '#modules/prompt-content/main'
 import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {Silent, WhenSilent} from './heard'
-import type {Restore} from './resumption'
+import type {Outcome, Restore} from './resumption'
 import type {ClaudeSession, QueryFn} from './session'
 import type {
   ModelInfo,
   Options,
-  SDKResultMessage,
   SpawnOptions,
   SpawnedProcess,
 } from '@anthropic-ai/claude-agent-sdk'
@@ -22,7 +22,13 @@ import {explainingLabels} from '#modules/thread-replay/main'
 import {claudeReplyEnvironment} from './environment'
 import {firstHeard, silentEnding, startingWith} from './heard'
 import {createReplyMapper} from './replies'
-import {cutAt, resumption, servedThrough, textOf} from './resumption'
+import {
+  contentOf,
+  cutAt,
+  resumption,
+  servedThrough,
+  sessionLost,
+} from './resumption'
 import {openSession} from './session'
 import {
   appSessionStore,
@@ -43,6 +49,7 @@ export interface ClaudeRepliesDeps {
   whenSilent: WhenSilent
   learnModels: (models: ModelInfo[]) => void
   resolveModel: (id: string) => string
+  convertPdf: ConvertPdf
 }
 
 interface Live extends ClaudeSession {
@@ -57,6 +64,12 @@ interface Live extends ClaudeSession {
 
 type Mapper = ReturnType<typeof createReplyMapper>
 
+/** The Prompt, with the Thread when it is told, as `claude` is sent it. */
+interface Sending {
+  request: ReplyRequest
+  content: ContentPart[]
+}
+
 /** A Reply stopped before any `claude` started has no session. */
 type Answered =
   | {session: Live; outcome: Outcome}
@@ -70,34 +83,8 @@ function claudeSettingsOf({auto, threshold}: CompactionSettings) {
   }
 }
 
-/** `heard` says whether `claude` sent anything back to the Prompt. */
-type Outcome =
-  | {result: SDKResultMessage}
-  | {failure: RunFailure; heard: boolean}
-  | Silent
-
 function crashed(message: string): RunFailure {
   return {code: 'program-crashed', message}
-}
-
-/**
- * How `claude` refuses a session it has no transcript of, and a point to
- * resume at that is off the session's newest chain. It writes nothing to the
- * session either time.
- */
-const SESSION_LOST =
-  /No conversation found with session ID|No message found with message\.uuid of/
-
-function sessionLost(outcome: Outcome) {
-  if ('failure' in outcome) return SESSION_LOST.test(outcome.failure.message)
-
-  if ('silent' in outcome) return false
-
-  const {result} = outcome
-
-  return (
-    result.subtype !== 'success' && SESSION_LOST.test(result.errors.join(' '))
-  )
 }
 
 /** Replies from a warm `claude`, or a new one that resumes, forks or starts. */
@@ -240,11 +227,10 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   async function* reply(
     session: Live,
     mapper: Mapper,
-    request: ReplyRequest,
+    {request, content}: Sending,
     run: ReplyRun
   ): AsyncGenerator<ContentEvent, Outcome> {
-    const {prompt} = request
-    const messages = session.send(textOf(request), prompt.messageId)
+    const messages = session.send(content, request.prompt.messageId)
     let heard = false
     let unstoppable: (() => void) | null = null
 
@@ -333,10 +319,16 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     mapper: Mapper,
     run: ReplyRun
   ): AsyncGenerator<ContentEvent, Answered> {
+    // Before any `claude`, so an unreadable original leaves none to close.
+    const sending: Sending = {
+      request,
+      content: await contentOf(request, deps.convertPdf),
+    }
+
     const claimed = claimable(request)
 
     if (claimed) {
-      const outcome = yield* reply(claimed, mapper, request, run)
+      const outcome = yield* reply(claimed, mapper, sending, run)
 
       if (!('failure' in outcome) || outcome.heard || !claimed.ended) {
         return {session: claimed, outcome}
@@ -350,7 +342,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     if ('silent' in session) return {session: null, outcome: session}
 
     warm.add(session)
-    const outcome = yield* reply(session, mapper, request, run)
+    const outcome = yield* reply(session, mapper, sending, run)
 
     const refused =
       !('silent' in outcome) && !session.started && session.restore === 'store'
@@ -379,7 +371,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     return {
       session: fallback,
-      outcome: yield* reply(fallback, mapper, request, run),
+      outcome: yield* reply(fallback, mapper, sending, run),
     }
   }
 

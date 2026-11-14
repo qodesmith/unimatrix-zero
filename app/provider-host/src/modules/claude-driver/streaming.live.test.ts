@@ -19,6 +19,7 @@ import type {
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 
+import {pdfSaying, pngShowing} from '#modules/test-attachments/main'
 import {heldIdle} from '#modules/test-idle/main'
 import {listenLocally, startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -43,6 +44,7 @@ import {projectKeyOf} from './transcripts'
 
 const program = process.env.UZ_LIVE_CLAUDE_PROGRAM ?? ''
 const configDir = process.env.UZ_LIVE_CLAUDE_CONFIG ?? ''
+const CONVERSION_DIR = path.join(os.tmpdir(), 'uz-conversions')
 const recording = process.env.UZ_RECORD === 'yes'
 
 type Streamed = StartReplyEvent
@@ -189,7 +191,7 @@ function liveDriver(
       replyId: crypto.randomUUID(),
       model: 'haiku',
       systemPrompt: 'You answer in as few words as you can.',
-      prompt: {text, messageId: crypto.randomUUID()},
+      prompt: {text, attachments: [], messageId: crypto.randomUUID()},
       vendorProgram: {
         program: {
           path: program,
@@ -200,6 +202,7 @@ function liveDriver(
       session,
       thread: [],
       compactionSettings,
+      conversionDir: CONVERSION_DIR,
     }
   }
 
@@ -1436,11 +1439,13 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     const fromChatgpt: Thread = [
       {
         prompt: 'Pick a color for the boat, one word.',
+        attachments: [],
         reply: [{type: 'text', text: 'Teal.'}],
         label: '[Reply written by GPT-6.1 Sol]',
       },
       {
         prompt: 'And an animal to paint on it, one word.',
+        attachments: [],
         reply: [{type: 'text', text: 'Otter.'}],
         label: '[Reply written by GPT-6.1 Sol]',
       },
@@ -1472,6 +1477,56 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 180_000)
 
+  it('[dep:claude-attachment-blocks] reads an image and a PDF sent as base64 blocks with a Prompt, and a PDF replayed with a Thread ChatGPT wrote', async () => {
+    const live = liveDriver([])
+    const files = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-files-'))
+
+    try {
+      const heron = await pngShowing(files, 'HERON')
+      const maple = pdfSaying(files, 'The secret word is MAPLE.')
+
+      const asked = live.request(
+        'What word does the image show, and what is the secret word in the PDF? Just the two words.',
+        null
+      )
+
+      const sent = await Array.fromAsync(
+        live.driver.startReply({
+          ...asked,
+          prompt: {...asked.prompt, attachments: [heron, maple]},
+        })
+      )
+
+      expect(sent.at(-1)).toMatchObject({status: 'complete'})
+      expect(textOf(sent)).toMatch(/heron/i)
+      expect(textOf(sent)).toMatch(/maple/i)
+
+      const replayed = await Array.fromAsync(
+        live.driver.startReply({
+          ...live.request(
+            'What was the secret word in the PDF I sent? Just the word.',
+            null
+          ),
+          thread: [
+            {
+              prompt: 'Keep this PDF in mind.',
+              attachments: [maple],
+              reply: [{type: 'text', text: 'Noted.'}],
+              label: '[Reply written by GPT-6.1 Sol]',
+            },
+          ],
+        })
+      )
+
+      expect(replayed.at(-1)).toMatchObject({status: 'complete'})
+      expect(textOf(replayed)).toMatch(/maple/i)
+
+      await live.done()
+    } finally {
+      fs.rmSync(files, {recursive: true, force: true})
+    }
+  }, 180_000)
+
   it('[dep:lost-session-refusals] rebuilds from the Thread a session it has no copy of, and one resumed at an entry off its newest chain', async () => {
     const live = liveDriver([])
     const teal = 'Reply with the single word TEAL.'
@@ -1489,8 +1544,18 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.closed()
 
     const thread: Thread = [
-      {prompt: teal, reply: [{type: 'text', text: 'TEAL'}], label: null},
-      {prompt: otter, reply: [{type: 'text', text: 'OTTER'}], label: null},
+      {
+        prompt: teal,
+        attachments: [],
+        reply: [{type: 'text', text: 'TEAL'}],
+        label: null,
+      },
+      {
+        prompt: otter,
+        attachments: [],
+        reply: [{type: 'text', text: 'OTTER'}],
+        label: null,
+      },
     ]
 
     const offChain = await Array.fromAsync(

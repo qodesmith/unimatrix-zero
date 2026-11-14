@@ -6,6 +6,7 @@
     "#modules/*": "./src/modules/*.ts"
   },
   "exports": {
+    "./attachments": "./src/modules/attachments/main.ts",
     "./commands": "./src/modules/commands/main.ts",
     "./events": "./src/modules/events/main.ts",
     "./bridge": "./src/modules/bridge/main.ts",

@@ -1,4 +1,6 @@
+import type {ConvertPdf} from '#modules/prompt-content/main'
 import type {FakeCodexOptions} from './replay'
+import type {HostAttachment} from '@uz/contract/attachments'
 import type {
   PromptRecorded,
   ReplyRecorded,
@@ -10,6 +12,12 @@ import type {
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 
+import {
+  PAGE_IMAGE_BASE64,
+  PNG_BASE64,
+  attachedFiles,
+  fakeConverter,
+} from '#modules/test-attachments/main'
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
 import {explainingLabels} from '#modules/thread-replay/main'
@@ -38,6 +46,8 @@ const RESUMED_TURN = '01a168e8-7ae7-71d3-b6fa-169bec1fd887'
 const FORKED_THREAD_ID = '01a168e8-9d25-7df2-b2f4-208bfb1bbd5e'
 const FORKED_TURN = '01a168e8-9d50-7fb1-a539-2fd85f3c4b2b'
 const MODEL = 'gpt-6.1-sol'
+
+const CONVERSION_DIR = path.join(os.tmpdir(), 'uz-conversions')
 
 const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
   auto: true,
@@ -134,8 +144,12 @@ async function setUp(
   recordings: string[],
   {
     store = fakeStore(),
+    convertPdf = fakeConverter().convertPdf,
     ...behavior
-  }: {store?: ReturnType<typeof fakeStore>} & FakeCodexOptions = {}
+  }: {
+    store?: ReturnType<typeof fakeStore>
+    convertPdf?: ConvertPdf
+  } & FakeCodexOptions = {}
 ) {
   const fake = await replayCodex()
   cleanUps.push(fake.cleanUp)
@@ -169,6 +183,7 @@ async function setUp(
       ),
     },
     whenIdle: idle.whenIdle,
+    convertPdf,
   })
 
   const treeId = crypto.randomUUID()
@@ -195,11 +210,13 @@ async function setUp(
       model = MODEL,
       compactionSettings = DEFAULT_COMPACTION_SETTINGS,
       thread = [],
+      attachments = [],
     }: {
       stopAfter?: number
       model?: string
       compactionSettings?: CompactionSettings
       thread?: Thread
+      attachments?: HostAttachment[]
     } = {}
   ) {
     const replyId = crypto.randomUUID()
@@ -211,11 +228,12 @@ async function setUp(
       replyId,
       model,
       systemPrompt: SYSTEM_PROMPT,
-      prompt: {text, messageId: crypto.randomUUID()},
+      prompt: {text, attachments, messageId: crypto.randomUUID()},
       vendorProgram,
       session: session && {type: 'continue', ...session},
       thread,
       compactionSettings,
+      conversionDir: CONVERSION_DIR,
     })) {
       events.push(event)
 
@@ -1658,11 +1676,13 @@ it('lists the Models on the app-server a Reply already started', async () => {
 const HANDED_OVER: Thread = [
   {
     prompt: 'Name a color.',
+    attachments: [],
     reply: [{type: 'text', text: 'Teal.'}],
     label: '[Reply written by Haiku 5.5]',
   },
   {
     prompt: 'And an animal?',
+    attachments: [],
     reply: [
       {
         type: 'tool-call',
@@ -1675,7 +1695,7 @@ const HANDED_OVER: Thread = [
     ],
     label: '[Reply written by Haiku 5.5]',
   },
-  {prompt: 'Still there?', reply: [], label: null},
+  {prompt: 'Still there?', attachments: [], reply: [], label: null},
 ]
 
 /**
@@ -1795,6 +1815,7 @@ it('keeps the line that explains the labels when a rebuilt thread resumes in a n
     ...HANDED_OVER,
     {
       prompt: FIRST_PROMPT,
+      attachments: [],
       reply: [{type: 'text', text: 'Hi there, friend!'}],
       label: null,
     },
@@ -1877,4 +1898,140 @@ it('rebuilds a thread the app has no copy of from the Thread', async () => {
   )
 
   await codex.allClosed()
+})
+
+const CHART_URL = `data:image/png;base64,${PNG_BASE64}`
+const PAGE_URL = `data:image/png;base64,${PAGE_IMAGE_BASE64}`
+
+/** As the fake converter converts `report.pdf`. */
+const REPORT_PAGES =
+  '<file name="report.pdf" page="1">\nSales rose.\n</file>\n<file name="report.pdf" page="2">\nA chart.\n</file>'
+
+it('sends a Prompt’s files before its text: a text file inline under its name, an image as a data URL, and a PDF converted from its original, a rendered page as an image after its text', async () => {
+  const converter = fakeConverter()
+
+  const codex = await setUp(['started.ndjson'], {
+    convertPdf: converter.convertPdf,
+  })
+
+  const {notes, chart, report} = attachedFiles(folder('uz-attachments-'))
+
+  const events = await codex.reply(FIRST_PROMPT, null, {
+    attachments: [notes, chart, report],
+  })
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(codex.reports()[0]?.inputs).toEqual([
+    [
+      {
+        type: 'text',
+        text: '<file name="notes.txt">\nBuy milk.\n</file>',
+        text_elements: [],
+      },
+      {type: 'image', url: CHART_URL},
+      {type: 'text', text: REPORT_PAGES, text_elements: []},
+      {type: 'image', url: PAGE_URL},
+      {type: 'text', text: FIRST_PROMPT, text_elements: []},
+    ],
+  ])
+  expect(converter.calls).toEqual([
+    {original: report, conversionDir: CONVERSION_DIR},
+  ])
+
+  await codex.allClosed()
+})
+
+it('hands a Thread over with an earlier Prompt’s PDF converted and its image as input_image, converting from the original on every hand-over', async () => {
+  const converter = fakeConverter()
+  const {chart, report} = attachedFiles(folder('uz-attachments-'))
+
+  const thread: Thread = [
+    {
+      prompt: 'Sum these up.',
+      attachments: [report, chart],
+      reply: [{type: 'text', text: 'Sales rose.'}],
+      label: '[Reply written by Haiku 5.5]',
+    },
+  ]
+
+  for (const handOver of [1, 2]) {
+    const codex = await setUp([injecting()], {convertPdf: converter.convertPdf})
+    const events = await codex.reply(FIRST_PROMPT, null, {thread})
+
+    expect(events.at(-1)).toMatchObject({status: 'complete'})
+    expect(codex.reports()[0]?.injected[0]).toEqual({
+      type: 'message',
+      role: 'user',
+      content: [
+        {type: 'input_text', text: REPORT_PAGES},
+        {type: 'input_image', image_url: PAGE_URL},
+        {type: 'input_image', image_url: CHART_URL},
+        {type: 'input_text', text: 'Sum these up.'},
+      ],
+    })
+    expect(converter.calls).toHaveLength(handOver)
+    expect(converter.calls.at(-1)).toEqual({
+      original: report,
+      conversionDir: CONVERSION_DIR,
+    })
+
+    await codex.allClosed()
+  }
+})
+
+it('replays an earlier Prompt’s image inside its <prompt> in the text replay when Codex refuses the items, and the Prompt’s own after the Thread', async () => {
+  const codex = await setUp([injectRefused()])
+  const {chart, notes} = attachedFiles(folder('uz-attachments-'))
+
+  const thread: Thread = [
+    {
+      prompt: 'What is this?',
+      attachments: [chart],
+      reply: [{type: 'text', text: 'A chart.'}],
+      label: null,
+    },
+  ]
+
+  const events = await codex.reply(FIRST_PROMPT, null, {
+    thread,
+    attachments: [notes],
+  })
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+  const [input] = codex.reports()[0]?.inputs ?? []
+
+  expect(input).toEqual([
+    {
+      type: 'text',
+      text: expect.stringMatching(/\n<thread>\n<prompt>$/u),
+      text_elements: [],
+    },
+    {type: 'image', url: CHART_URL},
+    {
+      type: 'text',
+      text: `What is this?\n</prompt>\n<reply>\nA chart.\n</reply>\n</thread>\n\n<file name="notes.txt">\nBuy milk.\n</file>\n${FIRST_PROMPT}`,
+      text_elements: [],
+    },
+  ])
+
+  await codex.allClosed()
+})
+
+it('fails the Reply, starting no codex, when an attached file’s original can’t be read', async () => {
+  const codex = await setUp(['started.ndjson'])
+  const {gone} = attachedFiles(folder('uz-attachments-'))
+
+  const events = await codex.reply(FIRST_PROMPT, null, {attachments: [gone]})
+
+  expect(events.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'failed',
+    failure: {
+      message: expect.stringMatching(
+        /^Couldn’t read the attached file “gone\.txt”/u
+      ),
+    },
+  })
+  expect(codex.reports()).toEqual([])
 })
