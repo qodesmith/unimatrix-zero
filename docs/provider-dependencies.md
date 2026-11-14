@@ -128,13 +128,13 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Changed by:** upgrade
 - **Check:** `[dep:claude-watchdog-usage-limit]` in `claude-driver`: a Reply whose request a local forwarder answers with a rejected usage limit fails at once, with the same failure as a Reply started without the watchdog.
 
-### Claude reports each retry
+### Claude reports each attempt to reconnect
 
 - **Id:** `claude-api-retry`
 - **Kind:** D
 - **Provider:** Claude
 - **Relies on:** `claude` sends a `system` message with `subtype: 'api_retry'` for each retry of a failed request, and for no other reason. Nothing says when the connection is back: the next sign is the new attempt's `message_start`. With Wi-Fi off mid-stream, the first one came 70 s late; on a stall, none came for 3 minutes.
-- **App side:** `claude-driver`'s Reply mapper turns each one into `RECONNECTING`, and the window shows "Reconnecting…" until the Reply's next content.
+- **App side:** `claude-driver`'s Reply mapper reports each one as a wait on the connection, and the window shows "Reconnecting…" until the Reply's next content.
 - **User would see:** a Reply that looks as if it's still writing while `claude` waits for the network, unless the OS also reports offline.
 - **Changed by:** upgrade
 - **Check:** `[dep:claude-api-retry]` in `claude-driver`: a Reply whose connections are refused gets `api_retry` messages, and the driver reports the wait.
@@ -304,13 +304,13 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Changed by:** upgrade + drift. The new item's id comes from OpenAI's response, so a server that resumed a dropped stream would end the problem without a Codex release.
 - **Check:** `[dep:codex-reconnect-new-message]` in `codex-driver`: a Reply whose connection is cut, asserting Codex still leaves the first item unfinished and finishes a second.
 
-### Codex reports each retry
+### Codex reports each attempt to reconnect
 
 - **Id:** `codex-retry-notice`
 - **Kind:** D
 - **Provider:** ChatGPT
 - **Relies on:** Codex sends an `error` notification with `willRetry: true` for each retry of a lost connection (`Reconnecting... 2/5`, then `Reconnecting... waiting for network`), and one with `willRetry: false` before a turn it gives up on fails. Nothing says when the connection is back: the next sign is `item/started` for a new message. With Wi-Fi off mid-stream it sent none at all.
-- **App side:** `codex-driver` reads the `error` notification, and its Reply mapper turns one with `willRetry: true` into `RECONNECTING`. The window shows "Reconnecting…" until the Reply's next content. One with `willRetry: false` is dropped, since the turn's failure comes with `turn/completed`.
+- **App side:** `codex-driver` reads the `error` notification, and its Reply mapper reports one with `willRetry: true` as a wait on the connection. The window shows "Reconnecting…" until the Reply's next content. One with `willRetry: false` is dropped, since the turn's failure comes with `turn/completed`.
 - **User would see:** a Reply that looks as if it's still writing while Codex waits for the network, unless the OS also reports offline.
 - **Changed by:** upgrade
 - **Check:** `[dep:codex-retry-notice]` in `codex-driver`: a Reply whose connections are refused for a while gets `error` notifications with `willRetry: true`, and completes once they're let through.

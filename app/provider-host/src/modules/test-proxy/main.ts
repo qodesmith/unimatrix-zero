@@ -3,6 +3,15 @@ import http from 'node:http'
 import net from 'node:net'
 import {z} from 'zod'
 
+/** Starts `server` on a free local port, and gives its URL. */
+export async function listenLocally(server: http.Server) {
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const {port} = z.looseObject({port: z.number()}).parse(server.address())
+
+  return `http://127.0.0.1:${port}`
+}
+
 /**
  * A CONNECT proxy for a vendor program's `HTTPS_PROXY`. It stands for a
  * network with no route to the Provider without touching the machine's own.
@@ -38,20 +47,19 @@ export async function startProxy() {
     upstream.on('error', () => client.destroy())
   })
 
-  server.listen(0, '127.0.0.1')
-  await once(server, 'listening')
-  const {port} = z.looseObject({port: z.number()}).parse(server.address())
+  const url = await listenLocally(server)
 
   function cutConnections() {
     for (const socket of open) socket.resetAndDestroy()
   }
 
   return {
-    url: `http://127.0.0.1:${port}`,
+    url,
     /** Resets every open connection and every new one until `ms` has passed. */
     refuseFor(ms: number) {
       refusing = true
       cutConnections()
+      clearTimeout(lifting)
       lifting = setTimeout(() => {
         refusing = false
       }, ms)

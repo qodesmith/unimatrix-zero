@@ -48,8 +48,8 @@ export function createReplyMapper(ids: ReplyIds) {
   /** The text shown as each block of the open message began, by index. */
   let blockStarts: string[] = []
   let messageOpen = false
-  /** Where a message `claude` cut off and will start over ends the text. */
-  let cutAt: string | null = null
+  /** The text shown before the blocks `claude` cut off and will start over. */
+  let atCut: string | null = null
   let mirrorFailed = false
   let lastMessage: {uuid: string; model: string} | null = null
   let limitLifts: number | undefined
@@ -99,12 +99,12 @@ export function createReplyMapper(ids: ReplyIds) {
 
     if (event.type === 'message_start') {
       // A message that never stopped was cut off and is being sent again.
-      const from = messageOpen ? atMessageStart : cutAt
+      const from = messageOpen ? atMessageStart : atCut
       const resent = from === null ? [] : replace(from)
       messageOpen = true
       atMessageStart = shown
       blockStarts = []
-      cutAt = null
+      atCut = null
 
       return resent
     }
@@ -137,7 +137,7 @@ export function createReplyMapper(ids: ReplyIds) {
 
     if (stop.success) {
       const from = stop.data.abandoned_blocks.from_block_index
-      cutAt = blockStarts[from] ?? shown
+      atCut = blockStarts[from] ?? shown
     }
   }
 

@@ -559,8 +559,8 @@ function streamed(event: SDKPartialAssistantMessage['event']): RecordedLine {
 }
 
 /**
- * A message cut off mid-stream, as `claude` 2.1.307 ends it before it retries:
- * its stop names the first block it threw away. Text blocks only.
+ * A message cut off mid-stream, as `claude` ends it before it retries: its
+ * stop names the first block it threw away. Text blocks only.
  */
 function cutOff(texts: string[], fromBlock: number): RecordedLine[] {
   const start = read('warm.ndjson').find(
@@ -639,7 +639,7 @@ function textEvents(events: Streamed[]) {
   )
 }
 
-it('starts claude for a Reply to wait out a lost connection for hours, though not a usage limit', async () => {
+it('starts claude for a Reply with the retry watchdog on, and its wait at a usage limit capped', async () => {
   const claude = await setUp(['warm.ndjson'])
 
   await claude.reply(FIRST_PROMPT)

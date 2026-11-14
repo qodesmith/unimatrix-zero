@@ -206,7 +206,7 @@ export const NotificationSchema = z.discriminatedUnion('method', [
       tokenUsage: ThreadTokenUsageSchema,
     })
   ),
-  // One per retry of a lost connection. When Codex gives up, the failure
+  // One per attempt to reconnect a lost connection. When Codex gives up, the failure
   // comes with `turn/completed`.
   notification(
     'error',

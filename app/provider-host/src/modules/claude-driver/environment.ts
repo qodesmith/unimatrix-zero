@@ -13,11 +13,7 @@ export function claudeEnvironment(base: NodeJS.ProcessEnv, configDir: string) {
   }
 }
 
-/**
- * A Reply waits out a lost connection for about 3 hours instead of 3 to 5
- * minutes, and still fails at once at a usage limit instead of waiting there
- * until it resets. `claude` reads a cap of `0` as none, so the cap is 1 ms.
- */
+/** `claude` reads a usage-limit wait of `0` as no cap, so the cap is 1 ms. */
 export function claudeReplyEnvironment(
   base: NodeJS.ProcessEnv,
   configDir: string

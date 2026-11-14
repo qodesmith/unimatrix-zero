@@ -20,12 +20,11 @@ import type {
 import type {CompactionSettings} from '@uz/contract/settings'
 
 import {heldIdle} from '#modules/test-idle/main'
-import {startProxy} from '#modules/test-proxy/main'
+import {listenLocally, startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
 import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {spawn} from 'node:child_process'
-import {once} from 'node:events'
 import fs from 'node:fs'
 import http from 'node:http'
 import os from 'node:os'
@@ -361,11 +360,7 @@ async function startLimitedApi() {
     })()
   })
 
-  server.listen(0, '127.0.0.1')
-  await once(server, 'listening')
-  const {port} = z.looseObject({port: z.number()}).parse(server.address())
-
-  return {url: `http://127.0.0.1:${port}`, close: () => server.close()}
+  return {url: await listenLocally(server), close: () => server.close()}
 }
 
 /** About 12 tokens a sentence, measured. */

@@ -147,7 +147,7 @@ it('keeps a Stop asked before a retried run starts until that run finishes', () 
   expect(live.store.state.runs[ids.replyId]).toBeUndefined()
 })
 
-function waitingAfter(events: AppEvent[]) {
+function waitsAfter(events: AppEvent[]) {
   const live = createReplay()
 
   live.replay(events)
@@ -159,7 +159,7 @@ const reconnecting: AppEvent = {...ids, type: 'RECONNECTING'}
 
 it('keeps a Reply waiting from a reconnect, through a token report', () => {
   expect(
-    waitingAfter([
+    waitsAfter([
       {...ids, type: 'RUN_STARTED'},
       {...ids, type: 'TEXT_DELTA', delta: 'Half a'},
       reconnecting,
@@ -185,7 +185,7 @@ it.each([
   {...ids, type: 'RUN_FINISHED', status: 'complete'},
 ] satisfies AppEvent[])('stops waiting at the next $type', event => {
   expect(
-    waitingAfter([
+    waitsAfter([
       {...ids, type: 'RUN_STARTED'},
       {
         ...ids,
