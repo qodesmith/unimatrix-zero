@@ -319,8 +319,8 @@ const HOUR_IN_SECONDS = 3600
 
 /**
  * Stands in for the API at `ANTHROPIC_BASE_URL`: every Messages request is
- * refused with a 429, as the servers send it, and every other request goes on
- * to the real API.
+ * refused with a 429, and every other request goes on to the real API. A
+ * five-hour limit carries the headers the servers send with one.
  */
 async function startLimitedApi(limit: 'five-hour' | 'throttle' = 'five-hour') {
   // One reset for every request, so each failure names the same time.
