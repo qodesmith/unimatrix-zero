@@ -39,13 +39,17 @@ const TurnErrorSchema = z.looseObject({
 >
 
 /**
- * Codex forwards an upstream HTTP status on the `codexErrorInfo` variant it
- * names.
+ * The HTTP status Codex forwards on the `codexErrorInfo` variant it names,
+ * null on a variant without one.
  */
-export const ErrorStatusSchema = z.record(
-  z.string(),
-  z.looseObject({httpStatusCode: z.number().nullable()})
-)
+const HttpStatusSchema = z
+  .record(z.string(), z.looseObject({httpStatusCode: z.number().nullable()}))
+  .transform(variant => Object.values(variant).at(0)?.httpStatusCode ?? null)
+
+const RetryErrorSchema = TurnErrorSchema.transform(error => ({
+  ...error,
+  httpStatusCode: HttpStatusSchema.safeParse(error.codexErrorInfo).data ?? null,
+}))
 
 const TurnSchema = z.looseObject({
   id: z.string(),
@@ -222,7 +226,7 @@ export const NotificationSchema = z.discriminatedUnion('method', [
     z.looseObject({
       ...inTurn,
       willRetry: z.boolean(),
-      error: TurnErrorSchema,
+      error: RetryErrorSchema,
     }) satisfies z.ZodType<
       Pick<ErrorNotification, 'threadId' | 'turnId' | 'willRetry'> & {
         error: Pick<TurnError, 'message'>
