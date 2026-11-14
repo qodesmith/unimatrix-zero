@@ -6,10 +6,13 @@ import type {Model, ProviderId} from '@uz/contract/providers'
 import type {CompactionSettings} from '@uz/contract/settings'
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {createAttachments} from '#modules/attachments/main'
 import {openDatabase, schema} from '#modules/database/main'
 import {createSessions} from '#modules/sessions/main'
 import {createTrees} from '#modules/trees/main'
 import {eq} from 'drizzle-orm'
+import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 
@@ -40,6 +43,7 @@ let hostReachable: boolean
 let listedModels: Record<ProviderId, Model[]>
 let turns: ReturnType<typeof createTurns>
 let treeId: string
+let attachmentsDir: string
 
 const hosts: ReplyHosts = {
   ready: provider => hostReady && (provider === 'claude' || chatgptConnected),
@@ -66,6 +70,7 @@ function launch() {
     vendorProgramFor: () => vendorProgram,
     compactionSettingsFor: () => compactionSettings,
     listedModels: provider => listedModels[provider],
+    attachmentsDir,
     now: () => clock,
     onTurnsChanged: () => undefined,
     onReplyFinished: reply => finished.push(reply),
@@ -86,12 +91,14 @@ beforeEach(() => {
   clock = createdAt
   hostReachable = true
   listedModels = {claude: [], chatgpt: []}
+  attachmentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-turns-'))
   turns = launch()
   treeId = createTrees(db).create(createdAt).id
 })
 
 afterEach(() => {
   vi.useRealTimers()
+  fs.rmSync(attachmentsDir, {recursive: true, force: true})
 })
 
 /** The new Reply's id, with the host's commands and the events so far cleared. */
@@ -250,11 +257,16 @@ describe('sending the root Prompt', () => {
           replyId: sent.reply.id,
           model: 'claude-opus-5',
           systemPrompt: '',
-          prompt: {text: 'Hello', messageId: expect.any(String)},
+          prompt: {
+            text: 'Hello',
+            attachments: [],
+            messageId: expect.any(String),
+          },
           vendorProgram,
           session: null,
           thread: [],
           compactionSettings: {auto: true, threshold: null},
+          conversionDir: path.join(attachmentsDir, 'conversions'),
         },
       },
     ])
@@ -955,15 +967,20 @@ describe('a Prompt answering a Reply', () => {
           replyId: sent?.reply.id,
           model: 'claude-haiku-5-5',
           systemPrompt: '',
-          prompt: {text: 'And then?', messageId: expect.any(String)},
+          prompt: {
+            text: 'And then?',
+            attachments: [],
+            messageId: expect.any(String),
+          },
           vendorProgram,
           session: {
             sessionId: 's1',
             messageId: 'm1',
             type: 'continue',
           },
-          thread: [{prompt: 'Hi', reply: [], label: null}],
+          thread: [{prompt: 'Hi', attachments: [], reply: [], label: null}],
           compactionSettings: {auto: true, threshold: null},
+          conversionDir: path.join(attachmentsDir, 'conversions'),
         },
       },
     ])
@@ -1400,6 +1417,156 @@ describe('continuing from a Reply its Provider never saved', () => {
   })
 })
 
+function originalPdf(name: string) {
+  const sha256 =
+    '0716f9264c9fe19f5d7455276107f3ddcc1d3497f63d60689a73558ae8a1bf5e'
+
+  return {
+    name,
+    mediaType: 'application/pdf',
+    sha256,
+    path: path.join(attachmentsDir, sha256),
+  }
+}
+
+function originalPng(name: string) {
+  const sha256 =
+    '4c4b6a3be1314ab86138bef4314dde022e600960d8689a2c8f8631802d20dab6'
+
+  return {
+    name,
+    mediaType: 'image/png',
+    sha256,
+    path: path.join(attachmentsDir, sha256),
+  }
+}
+
+describe('a Prompt with attachments', () => {
+  const PDF = new TextEncoder().encode('%PDF-1.7\n')
+  const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
+  let attachments: ReturnType<typeof createAttachments>
+
+  beforeEach(() => {
+    attachments = createAttachments({
+      db,
+      dir: attachmentsDir,
+      droppedPath: () => null,
+    })
+  })
+
+  async function attach(name: string, bytes: Uint8Array<ArrayBuffer>) {
+    return attachments.add({type: 'pasted', name, bytes})
+  }
+
+  it('lists them in the order sent, and gives the host the originals and where to keep conversions', async () => {
+    const image = await attach('chart.png', PNG)
+    const pdf = await attach('report.pdf', PDF)
+
+    const sent = turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: null,
+      text: 'Compare these.',
+      attachmentIds: [pdf.id, image.id],
+    })
+
+    expect(sent?.prompt.attachments).toEqual([pdf, image])
+    expect(turns.list(treeId).prompts).toMatchObject([
+      {attachments: [pdf, image]},
+    ])
+    expect(requests()).toMatchObject([
+      {
+        prompt: {
+          attachments: [originalPdf('report.pdf'), originalPng('chart.png')],
+        },
+        conversionDir: path.join(attachmentsDir, 'conversions'),
+      },
+    ])
+  })
+
+  it('is refused for an attachment main never gave out, saving nothing', () => {
+    expect(() =>
+      turns.sendPrompt({
+        model: picked,
+        treeId,
+        parentReplyId: null,
+        text: 'Look.',
+        attachmentIds: [crypto.randomUUID()],
+      })
+    ).toThrow('An attachment is no longer available. Attach it again.')
+    expect(turns.list(treeId)).toEqual({prompts: [], replies: []})
+    expect(hostCommands).toEqual([])
+  })
+
+  it('gives the host the originals again on a Retry', async () => {
+    const pdf = await attach('report.pdf', PDF)
+
+    const sent = turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: null,
+      text: 'Summarize.',
+      attachmentIds: [pdf.id],
+    })
+
+    if (!sent) throw new Error('Nothing was sent')
+
+    fail(sent.reply.id)
+    hostCommands = []
+
+    turns.retry(treeId, sent.reply.id)
+
+    expect(requests()).toMatchObject([
+      {prompt: {attachments: [originalPdf('report.pdf')]}},
+    ])
+  })
+
+  it('hands the Thread over to another Provider with the earlier Prompt’s original PDF and image', async () => {
+    chatgptConnected = true
+    listedModels = {
+      claude: [listed('fake', 'Fake')],
+      chatgpt: [listed('gpt-6-sol', 'GPT-6 Sol')],
+    }
+    const pdf = await attach('report.pdf', PDF)
+    const image = await attach('chart.png', PNG)
+
+    const first = turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: null,
+      text: 'What do these show?',
+      attachmentIds: [pdf.id, image.id],
+    })
+
+    if (!first) throw new Error('Nothing was sent')
+
+    record(first.reply.id)
+    finish(first.reply.id)
+    hostCommands = []
+
+    turns.sendPrompt({
+      model: {provider: 'chatgpt', model: 'gpt-6-sol'},
+      treeId,
+      parentReplyId: first.reply.id,
+      text: 'Go on.',
+    })
+
+    expect(requests()).toMatchObject([
+      {
+        session: null,
+        prompt: {text: 'Go on.', attachments: []},
+        thread: [
+          {
+            prompt: 'What do these show?',
+            attachments: [originalPdf('report.pdf'), originalPng('chart.png')],
+          },
+        ],
+      },
+    ])
+  })
+})
+
 describe('stopping a Reply', () => {
   it('asks the host writing it to interrupt it', () => {
     const replyId = sendPrompt(null)
@@ -1521,11 +1688,12 @@ describe('retrying a Reply', () => {
           replyId,
           model: 'fake',
           systemPrompt: '',
-          prompt: {text: 'Hi', messageId: expect.any(String)},
+          prompt: {text: 'Hi', attachments: [], messageId: expect.any(String)},
           vendorProgram,
           session: null,
           thread: [],
           compactionSettings: {auto: true, threshold: null},
+          conversionDir: path.join(attachmentsDir, 'conversions'),
         },
       },
     ])

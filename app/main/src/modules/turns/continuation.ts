@@ -37,6 +37,7 @@ export interface Recovery {
   model: string
   systemPrompt: string
   text: string
+  promptId: string
   parentReplyId: string | null
   session: ReplyRequest['session']
 }
@@ -311,6 +312,7 @@ export function recovery(
     model: row.model,
     systemPrompt: systemPrompt.text,
     text: prompt.text,
+    promptId: prompt.id,
     parentReplyId: prompt.parentReplyId,
     session:
       continued?.session && continued.provider === row.provider

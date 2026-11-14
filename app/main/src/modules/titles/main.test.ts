@@ -61,6 +61,7 @@ beforeEach(() => {
     vendorProgramFor,
     compactionSettingsFor: () => ({auto: true, threshold: null}),
     listedModels: () => [],
+    attachmentsDir: '/attachments',
     now: () => new Date('2026-10-19T12:00:00.000Z'),
     onTurnsChanged: () => undefined,
     onReplyFinished: finished => pending.push(titles.replyFinished(finished)),

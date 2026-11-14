@@ -4,8 +4,10 @@ import {
   hmrOrigin,
   proxyDevServer,
   registerAppSchemes,
+  serveAttachments,
   serveBundle,
 } from '#modules/app-protocol/main'
+import {createAttachments} from '#modules/attachments/main'
 import {registerCommandChannel} from '#modules/commands/main'
 import {createConnections} from '#modules/connections/main'
 import {DatabaseOpenError, openDatabase} from '#modules/database/main'
@@ -102,6 +104,17 @@ function openWindow(db: Database) {
     turns.hostSessionAppended(provider, sessionId, uuids)
   )
 
+  const attachmentsDir = path.join(app.getPath('userData'), 'attachments')
+  const droppedFiles = createDroppedFiles()
+
+  const attachments = createAttachments({
+    db,
+    dir: attachmentsDir,
+    droppedPath: droppedFiles.pathOf,
+  })
+
+  serveAttachments(protocol, id => attachments.original(id))
+
   const trees = createTrees(db)
   const treeRows = createTreeRows(trees, hub.publish)
 
@@ -151,6 +164,7 @@ function openWindow(db: Database) {
     compactionSettingsFor: provider =>
       compactionSettingsFor(settings.read(), provider),
     listedModels: provider => connections.models(provider),
+    attachmentsDir,
     now: () => new Date(),
     onTurnsChanged: treeRows.turnsChanged,
     onReplyFinished: finished => {
@@ -192,13 +206,14 @@ function openWindow(db: Database) {
       trees,
       turns,
       connections,
+      attachments,
       images: createRemoteImages(globalThis.fetch),
       settings,
       layout,
       publish: hub.publish,
     }
   )
-  createDroppedFiles().listen(ipcMain, fromAppWindow)
+  droppedFiles.listen(ipcMain, fromAppWindow)
   registerSubscribeChannel(ipcMain, hub, fromAppWindow)
 
   setAppMenu()

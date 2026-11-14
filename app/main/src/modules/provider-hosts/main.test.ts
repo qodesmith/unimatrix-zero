@@ -304,11 +304,12 @@ it('sends commands to the Provider’s host', () => {
       replyId: textDelta.replyId,
       model: 'fake',
       systemPrompt: '',
-      prompt: {text: 'Hi', messageId: crypto.randomUUID()},
+      prompt: {text: 'Hi', attachments: [], messageId: crypto.randomUUID()},
       vendorProgram: {program: null, configDir: '/claude'},
       session: null,
       thread: [],
       compactionSettings: {auto: true, threshold: null},
+      conversionDir: '/attachments/conversions',
     },
   }
 
