@@ -649,7 +649,7 @@ it('starts claude for a Reply to wait out a lost connection for hours, though no
   expect(claude.environments).toEqual([
     expect.objectContaining({
       CLAUDE_CODE_RETRY_WATCHDOG: '1',
-      CLAUDE_CODE_RETRY_WATCHDOG_MAX_USAGE_LIMIT_WAIT_MS: '0',
+      CLAUDE_CODE_RETRY_WATCHDOG_MAX_USAGE_LIMIT_WAIT_MS: '1',
     }),
   ])
 

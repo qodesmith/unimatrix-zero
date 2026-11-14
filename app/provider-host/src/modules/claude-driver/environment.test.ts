@@ -32,6 +32,6 @@ it('lets a Reply wait out a lost connection, but not a usage limit', () => {
   expect(claudeReplyEnvironment({PATH: '/usr/bin'}, '/claude')).toStrictEqual({
     ...claudeEnvironment({PATH: '/usr/bin'}, '/claude'),
     CLAUDE_CODE_RETRY_WATCHDOG: '1',
-    CLAUDE_CODE_RETRY_WATCHDOG_MAX_USAGE_LIMIT_WAIT_MS: '0',
+    CLAUDE_CODE_RETRY_WATCHDOG_MAX_USAGE_LIMIT_WAIT_MS: '1',
   })
 })
