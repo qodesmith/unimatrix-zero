@@ -24,6 +24,8 @@ interface NodeBundleOptions {
   mode: string
   define?: Record<string, string>
   plugins?: Plugin[]
+  /** Loaded from `node_modules` at runtime: native code, or files read beside it. */
+  external?: (string | RegExp)[]
 }
 
 /** One fully bundled Node-side build (main, preload, Provider hosts, shell). */
@@ -34,6 +36,7 @@ export function nodeBundle({
   mode,
   define = {},
   plugins = [],
+  external = [],
 }: NodeBundleOptions): UserConfig {
   const ext = format === 'es' ? 'mjs' : 'cjs'
 
@@ -64,7 +67,7 @@ export function nodeBundle({
         fileName: (_format, name) => `${name}.${ext}`,
       },
       rolldownOptions: {
-        external: ['electron', ...nodeBuiltins],
+        external: ['electron', ...nodeBuiltins, ...external],
         output: {chunkFileNames: `[name]-[hash].${ext}`},
       },
     },
