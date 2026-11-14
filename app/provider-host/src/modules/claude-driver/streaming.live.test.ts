@@ -369,45 +369,8 @@ function apiError(type: string, message: string) {
 
 const RATE_LIMITED = apiError('rate_limit_error', 'Rate limit exceeded')
 
-type StandInAnswer =
-  | 'five-hour'
-  | 'throttle'
-  | 'server-error'
-  | 'overloaded'
-  | 'low-credit'
-  | 'payment-required'
-  | 'forward'
-
-/** Pipes a request to the real API and its answer back, unbuffered. */
-function forward(request: http.IncomingMessage, response: http.ServerResponse) {
-  const upstream = https.request(
-    `https://api.anthropic.com${request.url ?? '/'}`,
-    {
-      method: request.method,
-      headers: {...request.headers, host: 'api.anthropic.com'},
-    },
-    answered => {
-      response.writeHead(answered.statusCode ?? 502, answered.headers)
-      answered.pipe(response)
-    }
-  )
-
-  upstream.on('error', () => response.destroy())
-  request.pipe(upstream)
-}
-
-/**
- * Stands in for the API at `ANTHROPIC_BASE_URL`: every Messages request gets
- * the `answer` failure, or goes on to the real API for `'forward'`, and every
- * other request goes on to it. A five-hour limit carries the headers the
- * servers send with one.
- */
-async function startStandInApi(answer: StandInAnswer = 'five-hour') {
-  // One reset for every request, so each failure names the same time.
-  const resets = Math.floor(Date.now() / 1000) + 2 * HOUR_IN_SECONDS
-  let current = answer
-
-  const failures = {
+function standInFailures(resets: number) {
+  return {
     'five-hour': {
       status: 429,
       headers: {
@@ -447,6 +410,40 @@ async function startStandInApi(answer: StandInAnswer = 'five-hour') {
       body: apiError('billing_error', 'Payment required'),
     },
   }
+}
+
+type StandInAnswer = keyof ReturnType<typeof standInFailures> | 'forward'
+
+/** Pipes a request to the real API and its answer back, unbuffered. */
+function forward(request: http.IncomingMessage, response: http.ServerResponse) {
+  const upstream = https.request(
+    `https://api.anthropic.com${request.url ?? '/'}`,
+    {
+      method: request.method,
+      headers: {...request.headers, host: 'api.anthropic.com'},
+    },
+    answered => {
+      response.writeHead(answered.statusCode ?? 502, answered.headers)
+      answered.pipe(response)
+    }
+  )
+
+  upstream.on('error', () => response.destroy())
+  request.pipe(upstream)
+}
+
+/**
+ * Stands in for the API at `ANTHROPIC_BASE_URL`: every Messages request gets
+ * the `answer` failure, or goes on to the real API for `'forward'`, and every
+ * other request goes on to it. A five-hour limit carries the headers the
+ * servers send with one.
+ */
+async function startStandInApi(answer: StandInAnswer = 'five-hour') {
+  // One reset for every request, so each failure names the same time.
+  const resets = Math.floor(Date.now() / 1000) + 2 * HOUR_IN_SECONDS
+  let current = answer
+
+  const failures = standInFailures(resets)
 
   const server = http.createServer((request, response) => {
     const messages =
