@@ -978,8 +978,12 @@ it.each([
     const claude = await setUp([
       failedAfter(
         [
+          // The first retry has the other status, so only the last one decides.
+          retryStatus === null
+            ? retried(1, 500, 'server_error')
+            : retried(1, null, 'unknown'),
           retried(
-            1,
+            2,
             retryStatus,
             retryStatus === null ? 'unknown' : 'server_error'
           ),
@@ -1000,11 +1004,11 @@ it.each([
 )
 
 it.each([
-  ['failed', 'failed', 'connection-lost'],
-  ['went through', 'success', 'too-long'],
+  ['failed', 'connection-lost', 'failed'],
+  ['went through', 'too-long', 'success'],
 ] as const)(
-  'fails a blocked Reply whose last Compaction %s (%s) as %s',
-  async (_, result, code) => {
+  'fails a blocked Reply whose last Compaction %s as %s',
+  async (_, code, result) => {
     const claude = await setUp([
       failedAfter(
         [

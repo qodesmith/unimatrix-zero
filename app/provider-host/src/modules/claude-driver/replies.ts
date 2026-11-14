@@ -53,7 +53,6 @@ export function createReplyMapper(ids: ReplyIds) {
   let atCut: string | null = null
   let mirrorFailed = false
   let lastMessage: {uuid: string; model: string} | null = null
-  /** What a failed result is read with, beside its own fields. */
   const signals: ClaudeSignals = {}
 
   function replace(text: string): ContentEvent[] {
@@ -187,8 +186,7 @@ export function createReplyMapper(ids: ReplyIds) {
     return replace(atBlockStart + text)
   }
 
-  /** What the messages that show nothing say about the Reply. */
-  function note(message: SDKMessage) {
+  function trackState(message: SDKMessage) {
     if (message.type === 'rate_limit_event') {
       const {status, resetsAt} = message.rate_limit_info
       signals.rejectedLimit = status === 'rejected' ? {resetsAt} : undefined
@@ -209,7 +207,7 @@ export function createReplyMapper(ids: ReplyIds) {
 
   return {
     map(message: SDKMessage): ContentEvent[] {
-      note(message)
+      trackState(message)
 
       if (message.type === 'system' && message.subtype === 'api_retry') {
         return [

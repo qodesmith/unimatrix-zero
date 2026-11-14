@@ -393,7 +393,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
   - **A credit balance too low** sends an assistant message with `error: 'billing_error'`, and no `rate_limit_event`. A 402 sends `error: 'unknown'`.
 - **App side:** `claude-driver` reads these over the Reply, and `failures` sorts a Claude failure into connection-lost and limit-reached from them alone. The reset time comes only from `resetsAt`.
 - **User would see:** the vendor's raw text as a provider error instead of "Connection lost" or "Limit reached · resets at…", or no reset time. A changed status could show a server error as a lost connection.
-- **Changed by:** upgrade
+- **Changed by:** upgrade + drift. `claude` maps the answers to fields, and Anthropic's servers send the answers.
 - **Check:** `[dep:claude-failure-fields]` in `claude-driver`: a Reply whose connections are refused past a lowered retry limit fails as connection-lost, and one a local stand-in API answers with a 500 fails as a provider error. A Compaction whose connections are refused fails as connection-lost. The stand-in's rejected five-hour limit fails as limit-reached with its reset time, and its credit-balance 400 as limit-reached with none. Its 402 fails as a provider error, and so does its 529 under a lowered `CLAUDE_CODE_RETRY_WATCHDOG_MAX_WAIT_MS`.
 
 ### Codex's error codes

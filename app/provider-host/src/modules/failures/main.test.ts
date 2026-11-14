@@ -6,7 +6,6 @@ import {claudeFailureOf, codexFailureOf, failureOf} from './main'
 
 const MESSAGE = 'Reworded by the vendor'
 
-/** #248's lost connection: the last `api_retry` and the result had no status. */
 const CLAUDE_LOST: ClaudeSignals = {
   terminalReason: 'api_error',
   apiErrorStatus: null,

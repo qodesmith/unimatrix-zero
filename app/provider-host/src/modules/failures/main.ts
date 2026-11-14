@@ -61,7 +61,6 @@ export interface ClaudeSignals {
 
 /** What Codex reported over a turn that failed, beside its message. */
 export interface CodexSignals {
-  /** The turn error's. */
   codexErrorInfo?: unknown
   /** The `codexErrorInfo` of the last `error` notification with `willRetry`. */
   retryErrorInfo?: unknown
