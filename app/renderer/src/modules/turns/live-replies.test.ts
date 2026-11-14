@@ -201,7 +201,7 @@ it.each([
 
 const other = {treeId: 'tree-2', replyId: 'reply-2'}
 
-it('marks every streaming Reply waiting when the network changes, and no finished one', () => {
+it('marks every streaming Reply waiting, and no finished one', () => {
   const live = createReplay()
 
   live.replay([

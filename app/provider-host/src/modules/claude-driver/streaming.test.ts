@@ -631,7 +631,7 @@ function beforeFirstMessage(added: RecordedLine[]) {
   })
 }
 
-function textEvents(events: Streamed[]) {
+function textAndReconnects(events: Streamed[]) {
   return replyEvents(events).flatMap(event =>
     ['TEXT_DELTA', 'TEXT_REPLACE', 'RECONNECTING'].includes(event.type)
       ? [event]
@@ -659,7 +659,7 @@ it('reports each retry, and shows once the message Claude starts over after cutt
 
   const events = await claude.reply(FIRST_PROMPT)
 
-  expect(textEvents(events)).toEqual([
+  expect(textAndReconnects(events)).toEqual([
     expect.objectContaining({type: 'TEXT_DELTA', delta: 'TE'}),
     expect.objectContaining({type: 'RECONNECTING'}),
     expect.objectContaining({type: 'TEXT_REPLACE', text: ''}),
