@@ -72,6 +72,8 @@ export const FakeClaudeRunSchema = z.strictObject({
   /** The entry uuids of the transcript it resumed. */
   resumedFrom: z.array(z.string()),
   toolResults: z.array(z.string()),
+  /** The subtype of each control request it took after it went silent. */
+  silentRequests: z.array(z.string()),
   inputClosed: z.boolean(),
   ended: z
     .enum([
@@ -104,7 +106,7 @@ function stillRunning(file) {
 const runningAtStart = fs.readdirSync(reports).filter(stillRunning).map(file => Number.parseInt(file, 10))
 const args = process.argv.slice(2)
 const configDir = process.env.CLAUDE_CONFIG_DIR
-const report = {args, configDir, runningAtStart, prompts: [], clientComposed: [], systemPrompt: [], resumedFrom: [], toolResults: [], inputClosed: false, ended: null}
+const report = {args, configDir, runningAtStart, prompts: [], clientComposed: [], systemPrompt: [], resumedFrom: [], toolResults: [], silentRequests: [], inputClosed: false, ended: null}
 save()
 const recording = options.recordings[run]
 const lines = fs.readFileSync(recording, 'utf8')
@@ -226,6 +228,7 @@ process.stdin.on('data', chunk => {
     if (message.type === 'user' && report.prompts.length === silentFrom) silent = true
     if (silent) {
       if (message.type === 'user') report.prompts.push(message.message.content)
+      if (message.type === 'control_request') report.silentRequests.push(message.request.subtype)
       save()
       continue
     }

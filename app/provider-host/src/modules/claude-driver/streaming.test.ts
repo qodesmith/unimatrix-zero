@@ -1038,7 +1038,7 @@ it('ends a Reply stopped before its claude is heard at once, closing that claude
   expect(claude.reports()[0]?.ended).toBe('input-closed')
 })
 
-it('closes a warm claude stopped before it is heard, and the Thread goes on from the Reply above in a new one', async () => {
+it('interrupts and closes a warm claude stopped before it is heard, and the Thread goes on from the Reply above in a new one', async () => {
   const claude = await setUp(['warm.ndjson', 'resumed.ndjson'], {
     silentFrom: {run: 0, prompt: 2},
   })
@@ -1056,6 +1056,9 @@ it('closes a warm claude stopped before it is heard, and the Thread goes on from
   await claude.driver.stop(replyId)
 
   expect((await stopping).at(-1)).toMatchObject({status: 'stopped'})
+  await expect
+    .poll(() => claude.reports()[0]?.silentRequests)
+    .toContain('interrupt')
 
   const next = await claude.reply(THIRD_PROMPT, session)
 
@@ -1067,7 +1070,7 @@ it('closes a warm claude stopped before it is heard, and the Thread goes on from
   expect(resumed?.args).toContain(`--resume=${SESSION_ID}`)
 })
 
-it('fails a Reply as connection-lost when a warm claude says nothing in time, though the Prompt before it was still completing', async () => {
+it('fails a Reply as connection-lost when a warm claude says nothing in time, though the Prompt before it was still completing, and interrupts that claude', async () => {
   const claude = await setUp(['compacted.ndjson'], {
     silentFrom: {run: 0, prompt: 1},
   })
@@ -1081,6 +1084,9 @@ it('fails a Reply as connection-lost when a warm claude says nothing in time, th
     status: 'failed',
     failure: {code: 'connection-lost'},
   })
+  await expect
+    .poll(() => claude.reports()[0]?.silentRequests)
+    .toContain('interrupt')
   await claude.allClosed()
 })
 
