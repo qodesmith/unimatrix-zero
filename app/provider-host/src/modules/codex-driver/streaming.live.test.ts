@@ -7,6 +7,7 @@
  * the ids the driver tests pin change each time.
  */
 import type {SpawnCodex} from './app-server'
+import type {RateLimitReachedType} from './protocol/v2/RateLimitReachedType'
 import type {
   PromptRecorded,
   ReplyRecorded,
@@ -30,6 +31,7 @@ import fs from 'node:fs'
 import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
+import {StringDecoder} from 'node:string_decoder'
 import {describe, expect, it} from 'vitest'
 import {z} from 'zod'
 
@@ -40,6 +42,7 @@ import {portFree} from './port'
 import {createRecorder} from './recording'
 import {RECORDINGS} from './replay'
 import {NOT_ENTITLED, SIGN_IN_PORT} from './sign-in'
+import {CONTEXT_COMPACTION} from './wire'
 
 const folder = process.env.UZ_LIVE_CODEX_PROGRAM
 const signedIn = process.env.UZ_LIVE_CODEX_HOME
@@ -314,6 +317,210 @@ function threadReplies(program: string, home: string) {
 
   return {reply, closed, threadsStarted}
 }
+
+const TurnCompleted = z.looseObject({
+  turn: z.looseObject({
+    error: z.looseObject({codexErrorInfo: z.unknown()}).nullable(),
+  }),
+})
+
+interface CodedRepliesOptions {
+  args?: string[]
+  env?: NodeJS.ProcessEnv
+  /** Called with each line the app-server writes, as it writes it. */
+  onLine?: (line: z.infer<typeof WireLine>) => void
+}
+
+/** Replies on one app-server, each with the codes Codex sent over it. */
+function codedReplies(
+  program: string,
+  home: string,
+  {args = [], env = process.env, onLine}: CodedRepliesOptions = {}
+) {
+  const treeId = crypto.randomUUID()
+  const idle = heldIdle()
+  const exits: Promise<unknown>[] = []
+  const lines: z.infer<typeof WireLine>[] = []
+
+  const driver = createCodexDriver({
+    store: fakeStore().client,
+    spawn: (command, options) => {
+      const child = spawnCodex(command, options)
+      const decoder = new StringDecoder('utf8')
+      let partial = ''
+
+      exits.push(once(child, 'exit').catch(() => undefined))
+      child.stdout.on('data', (chunk: Buffer) => {
+        const whole = (partial + decoder.write(chunk)).split('\n')
+        partial = whole.pop() ?? ''
+
+        for (const text of whole.filter(Boolean)) {
+          const line = WireLine.parse(JSON.parse(text))
+          lines.push(line)
+          onLine?.(line)
+        }
+      })
+
+      return child
+    },
+    commandFor: command => ({command, args}),
+    env,
+    whenIdle: idle.whenIdle,
+  })
+
+  async function reply(text: string, session: SessionRef | null) {
+    const from = lines.length
+
+    const events = await Array.fromAsync(
+      driver.startReply({
+        treeId,
+        replyId: crypto.randomUUID(),
+        model: MODEL,
+        systemPrompt: 'You answer in as few words as you can.',
+        prompt: {text, messageId: crypto.randomUUID()},
+        vendorProgram: {
+          program: {
+            path: program,
+            build: {
+              url: 'https://example.com/codex.tar.gz',
+              sha256: '0'.repeat(64),
+              size: 1,
+              archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+            },
+          },
+          configDir: home,
+        },
+        session: session && {...session, type: 'continue'},
+        thread: [],
+        compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+      })
+    )
+
+    const sent = lines.slice(from)
+    const last = events.at(-1)
+
+    const recorded = events.find(
+      (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+    )
+
+    return {
+      events,
+      session: recorded?.session ?? null,
+      failure: last?.type === 'RUN_FINISHED' ? last.failure : undefined,
+      /** The `codexErrorInfo` of each `error` notice Codex retried after. */
+      retried: sent.flatMap(({method, params}) => {
+        if (method !== 'error') return []
+
+        const notice = ErrorNotice.parse(params)
+
+        return notice.willRetry ? [notice.error.codexErrorInfo] : []
+      }),
+      /** Each turn's `codexErrorInfo`, null for a turn that didn't fail. */
+      turnErrors: sent.flatMap(({method, params}) =>
+        method === 'turn/completed'
+          ? [TurnCompleted.parse(params).turn.error?.codexErrorInfo ?? null]
+          : []
+      ),
+    }
+  }
+
+  async function closed() {
+    idle.pass()
+    await Promise.all(exits)
+  }
+
+  return {reply, closed}
+}
+
+type Answer = (response: http.ServerResponse) => void
+
+function notFound(response: http.ServerResponse) {
+  response.writeHead(404).end()
+}
+
+/**
+ * A Model API on a local port that answers each Responses request with the
+ * answer last set. Every other request gets a 404.
+ */
+async function startStandInApi() {
+  let answer: Answer = notFound
+
+  const api = http.createServer((request, response) => {
+    if (request.method === 'POST' && request.url?.endsWith('/responses')) {
+      answer(response)
+
+      return
+    }
+
+    notFound(response)
+  })
+
+  // Refusing the WebSocket upgrade makes Codex send its requests over HTTP.
+  api.on('upgrade', (_request, socket) =>
+    socket.end('HTTP/1.1 426 Upgrade Required\r\n\r\n')
+  )
+
+  const url = await listenLocally(api)
+
+  return {
+    args: [
+      '-c',
+      `openai_base_url="${url}/v1"`,
+      '-c',
+      `chatgpt_base_url="${url}/backend-api/"`,
+    ],
+    answerWith(next: Answer) {
+      answer = next
+    },
+    close() {
+      api.close()
+    },
+  }
+}
+
+/** ChatGPT's 429 at a usage limit, its five-hour window full until `resetAt`. */
+function usageLimit(reachedType: RateLimitReachedType, resetAt: number) {
+  return (response: http.ServerResponse) => {
+    const now = Math.floor(Date.now() / 1000)
+
+    response.writeHead(429, {
+      'content-type': 'application/json',
+      'x-codex-primary-used-percent': '100',
+      'x-codex-primary-window-minutes': '300',
+      'x-codex-primary-reset-at': String(resetAt),
+      'x-codex-secondary-used-percent': '40',
+      'x-codex-secondary-window-minutes': '10080',
+      'x-codex-secondary-reset-at': String(now + 3 * 24 * 3600),
+      'x-codex-rate-limit-reached-type': reachedType,
+    })
+    response.end(
+      JSON.stringify({
+        error: {
+          type: 'usage_limit_reached',
+          message: 'The usage limit has been reached',
+          plan_type: 'plus',
+          resets_at: resetAt,
+          resets_in_seconds: resetAt - now,
+        },
+      })
+    )
+  }
+}
+
+/** A stream that starts and then fails with `code`. */
+function streamFailed(code: string, message: string) {
+  return (response: http.ServerResponse) => {
+    const failed = {
+      type: 'response.failed',
+      response: {id: 'resp_stand_in', error: {code, message}},
+    }
+
+    response.writeHead(200, {'content-type': 'text/event-stream'})
+    response.end(`event: response.failed\ndata: ${JSON.stringify(failed)}\n\n`)
+  }
+}
+
+const NO_RESPONSE = {responseStreamDisconnected: {httpStatusCode: null}}
 
 describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
   it('[dep:codex-rollout-files] streams, continues the loaded thread, appending to one rollout under sessions/, resumes from the app’s copy alone, then forks mid-Thread', async () => {
@@ -1016,108 +1223,198 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 600_000)
 
-  it('[dep:codex-retry-notice] says it is busy while the Model’s API throttles it with a retry-after, then fails as limit-reached once Codex stops retrying', async () => {
+  it('[dep:codex-retry-notice] [dep:codex-error-info] says it is busy while the Model’s API throttles it with a retry-after, then fails as limit-reached once Codex stops retrying', async () => {
     if (!folder || !signedIn) return
 
-    const api = http.createServer((request, response) => {
-      if (request.method === 'POST' && request.url?.endsWith('/responses')) {
-        response.writeHead(429, {
-          'content-type': 'application/json',
-          'retry-after': '1',
-        })
-        response.end(
-          JSON.stringify({
-            error: {type: 'rate_limit_exceeded', message: 'Too many requests'},
-          })
-        )
-
-        return
-      }
-
-      response.writeHead(404).end()
-    })
-
-    // Refusing the WebSocket upgrade makes Codex send its requests over HTTP.
-    api.on('upgrade', (_request, socket) =>
-      socket.end('HTTP/1.1 426 Upgrade Required\r\n\r\n')
-    )
-
-    const url = await listenLocally(api)
+    const api = await startStandInApi()
     const home = homeFrom(signedIn)
-    const idle = heldIdle()
-    const exits: Promise<unknown>[] = []
-    const output: Buffer[] = []
+    const {reply, closed} = codedReplies(folder, home, {args: api.args})
 
-    const driver = createCodexDriver({
-      store: fakeStore().client,
-      spawn: (command, options) => {
-        const child = spawnCodex(command, options)
-        exits.push(once(child, 'exit').catch(() => undefined))
-        child.stdout.on('data', (chunk: Buffer) => output.push(chunk))
-
-        return child
-      },
-      commandFor: program => ({
-        command: program,
-        args: [
-          '-c',
-          `openai_base_url="${url}/v1"`,
-          '-c',
-          `chatgpt_base_url="${url}/backend-api/"`,
-        ],
-      }),
-      whenIdle: idle.whenIdle,
+    api.answerWith(response => {
+      response.writeHead(429, {
+        'content-type': 'application/json',
+        'retry-after': '1',
+      })
+      response.end(
+        JSON.stringify({
+          error: {type: 'rate_limit_exceeded', message: 'Too many requests'},
+        })
+      )
     })
 
     try {
-      const events = await Array.fromAsync(
-        driver.startReply({
-          treeId: crypto.randomUUID(),
-          replyId: crypto.randomUUID(),
-          model: MODEL,
-          systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text: 'Say hi.', messageId: crypto.randomUUID()},
-          vendorProgram: {
-            program: {
-              path: folder,
-              build: {
-                url: 'https://example.com/codex.tar.gz',
-                sha256: '0'.repeat(64),
-                size: 1,
-                archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
-              },
-            },
-            configDir: home,
-          },
-          session: null,
-          thread: [],
-          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
-        })
-      )
+      const throttled = await reply('Say hi.', null)
 
-      const notices = wireLinesIn(output).flatMap(({method, params}) =>
-        method === 'error' ? [ErrorNotice.parse(params)] : []
-      )
-
-      expect(
-        notices
-          .filter(notice => notice.willRetry)
-          .map(notice => notice.error.codexErrorInfo)
-      ).toContainEqual({responseStreamDisconnected: {httpStatusCode: 429}})
-      expect(events).toContainEqual(
+      expect(throttled.retried).toContainEqual({
+        responseStreamDisconnected: {httpStatusCode: 429},
+      })
+      expect(throttled.events).toContainEqual(
         expect.objectContaining({type: 'RECONNECTING', busy: true})
       )
-
-      const last = events.at(-1)
-
-      expect(last).toMatchObject({
+      expect(throttled.turnErrors).toEqual([
+        {responseTooManyFailedAttempts: {httpStatusCode: 429}},
+      ])
+      expect(throttled.events.at(-1)).toMatchObject({
         type: 'RUN_FINISHED',
         status: 'failed',
         failure: {code: 'limit-reached'},
       })
 
-      idle.pass()
-      await Promise.all(exits)
+      await closed()
+    } finally {
+      api.close()
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 180_000)
+
+  it('[dep:codex-error-info] fails as connection-lost once every stream is reset as it flows', async () => {
+    if (!folder || !signedIn) return
+
+    const proxy = await startProxy()
+    const home = homeFrom(signedIn)
+
+    const {reply, closed} = codedReplies(folder, home, {
+      env: {...process.env, HTTPS_PROXY: proxy.url},
+    })
+
+    try {
+      const first = await reply('Reply with the single word TEAL.', null)
+
+      expectComplete(first.events)
+      proxy.resetStreams()
+
+      const dropped = await reply(
+        'Reply with the single word OTTER.',
+        first.session
+      )
+
+      expect(dropped.retried.length).toBeGreaterThan(0)
+      expect(dropped.retried).toEqual(dropped.retried.map(() => NO_RESPONSE))
+      expect(dropped.turnErrors).toEqual(['other'])
+      expect(dropped.failure).toMatchObject({code: 'connection-lost'})
+
+      await closed()
+    } finally {
+      proxy.close()
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 180_000)
+
+  it('[dep:codex-error-info] fails as connection-lost when a Compaction’s connections are refused', async () => {
+    if (!folder || !signedIn) return
+
+    const proxy = await startProxy()
+    const home = homeFrom(signedIn)
+
+    // Codex checks the limit as a turn starts, so the padded turn compacts in the next.
+    const {reply, closed} = codedReplies(folder, home, {
+      args: ['-c', 'model_auto_compact_token_limit=16000'],
+      env: {...process.env, HTTPS_PROXY: proxy.url},
+      onLine: ({method, params}) => {
+        if (
+          method === 'item/started' &&
+          params?.item?.type === CONTEXT_COMPACTION
+        ) {
+          proxy.refuseFor(10 * 60_000)
+        }
+      },
+    })
+
+    const padding = 'The harbor log lists no ships today. '.repeat(400)
+
+    try {
+      const padded = await reply(
+        `Reply with the single word TEAL. Ignore the rest of this message. ${padding}`,
+        null
+      )
+
+      expectComplete(padded.events)
+
+      const refused = await reply(
+        'Reply with the single word OTTER.',
+        padded.session
+      )
+
+      expect(refused.retried.length).toBeGreaterThan(0)
+      expect(refused.retried).toEqual(refused.retried.map(() => NO_RESPONSE))
+      expect(refused.turnErrors).toEqual([
+        {httpConnectionFailed: {httpStatusCode: null}},
+      ])
+      expect(refused.failure).toMatchObject({code: 'connection-lost'})
+
+      await closed()
+    } finally {
+      proxy.close()
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:codex-error-info] fails a stand-in API’s usage limit as limit-reached at the snapshot’s reset time, and its workspace out of credits as limit-reached with none', async () => {
+    if (!folder || !signedIn) return
+
+    const api = await startStandInApi()
+    const home = homeFrom(signedIn)
+    const {reply, closed} = codedReplies(folder, home, {args: api.args})
+    const resetAt = Math.floor(Date.now() / 1000) + 3600
+
+    try {
+      api.answerWith(usageLimit('rate_limit_reached', resetAt))
+
+      const limited = await reply('Say hi.', null)
+
+      api.answerWith(usageLimit('workspace_owner_credits_depleted', resetAt))
+
+      const outOfCredits = await reply('Say hi.', null)
+
+      expect(limited.turnErrors).toEqual(['usageLimitExceeded'])
+      expect(limited.failure).toMatchObject({
+        code: 'limit-reached',
+        resetsAt: new Date(resetAt * 1000).toISOString(),
+      })
+      expect(outOfCredits.turnErrors).toEqual(['usageLimitExceeded'])
+      expect(outOfCredits.failure).toMatchObject({code: 'limit-reached'})
+      expect(outOfCredits.failure).not.toHaveProperty('resetsAt')
+
+      await closed()
+    } finally {
+      api.close()
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 180_000)
+
+  it('[dep:codex-error-info] fails a stand-in API’s streamed rate limit as limit-reached, and its streamed usage_limit_reached as connection-lost', async () => {
+    if (!folder || !signedIn) return
+
+    const api = await startStandInApi()
+    const home = homeFrom(signedIn)
+    const {reply, closed} = codedReplies(folder, home, {args: api.args})
+
+    try {
+      api.answerWith(
+        streamFailed(
+          'rate_limit_exceeded',
+          'Rate limit reached. Please try again in 0.2s.'
+        )
+      )
+
+      const rateLimited = await reply('Say hi.', null)
+
+      api.answerWith(
+        streamFailed('usage_limit_reached', 'The usage limit has been reached')
+      )
+
+      const usageStreamed = await reply('Say hi.', null)
+
+      expect(rateLimited.turnErrors).toEqual(['rateLimitExceeded'])
+      expect(rateLimited.failure).toMatchObject({code: 'limit-reached'})
+      expect(usageStreamed.retried.length).toBeGreaterThan(0)
+      expect(usageStreamed.retried).toEqual(
+        usageStreamed.retried.map(() => NO_RESPONSE)
+      )
+      expect(usageStreamed.turnErrors).toEqual(['other'])
+      expect(usageStreamed.failure).toMatchObject({code: 'connection-lost'})
+
+      await closed()
     } finally {
       api.close()
       fs.rmSync(home, {recursive: true, force: true})
