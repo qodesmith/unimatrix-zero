@@ -24,7 +24,10 @@ interface NodeBundleOptions {
   mode: string
   define?: Record<string, string>
   plugins?: Plugin[]
-  /** Loaded from `node_modules` at runtime: native code, or files read beside it. */
+  /**
+   * Loaded from `node_modules` at runtime: native code, or files read beside
+   * it.
+   */
   external?: (string | RegExp)[]
 }
 
