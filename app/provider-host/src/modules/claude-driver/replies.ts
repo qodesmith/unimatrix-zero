@@ -187,15 +187,31 @@ export function createReplyMapper(ids: ReplyIds) {
     return replace(atBlockStart + text)
   }
 
+  /** What the messages that show nothing say about the Reply. */
+  function note(message: SDKMessage) {
+    if (message.type === 'rate_limit_event') {
+      const {status, resetsAt} = message.rate_limit_info
+      signals.rejectedLimit = status === 'rejected' ? {resetsAt} : undefined
+    }
+
+    if (message.type !== 'system') return
+
+    if (message.subtype === 'mirror_error') mirrorFailed = true
+
+    if (message.subtype === 'api_retry') {
+      signals.retryStatus = message.error_status
+    }
+
+    if (message.subtype === 'status' && message.compact_result !== undefined) {
+      signals.compactionFailed = message.compact_result === 'failed'
+    }
+  }
+
   return {
     map(message: SDKMessage): ContentEvent[] {
-      if (message.type === 'system' && message.subtype === 'mirror_error') {
-        mirrorFailed = true
-      }
+      note(message)
 
       if (message.type === 'system' && message.subtype === 'api_retry') {
-        signals.retryStatus = message.error_status
-
         return [
           {
             ...ids,
@@ -203,19 +219,6 @@ export function createReplyMapper(ids: ReplyIds) {
             busy: isBusyStatus(message.error_status),
           },
         ]
-      }
-
-      if (message.type === 'rate_limit_event') {
-        const {status, resetsAt} = message.rate_limit_info
-        signals.rejectedLimit = status === 'rejected' ? {resetsAt} : undefined
-      }
-
-      if (
-        message.type === 'system' &&
-        message.subtype === 'status' &&
-        message.compact_result !== undefined
-      ) {
-        signals.compactionFailed = message.compact_result === 'failed'
       }
 
       // The only sign a compaction went through: one blocked or failed sends none.

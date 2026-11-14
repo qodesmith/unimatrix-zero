@@ -2,6 +2,7 @@ import type {FakeClaudeOptions, RecordedLine} from './replay'
 import type {
   SDKAssistantMessageError,
   SDKPartialAssistantMessage,
+  SDKResultSuccess,
 } from '@anthropic-ai/claude-agent-sdk'
 import type {
   ReplyRecorded,
@@ -909,7 +910,9 @@ const REWORDED = 'Reworded by the vendor'
 /** The warm Reply failed, with `added` just before its result. */
 function failedAfter(
   added: RecordedLine[],
-  result: Record<string, unknown> = {}
+  result: Partial<
+    Pick<SDKResultSuccess, 'terminal_reason' | 'api_error_status'>
+  > = {}
 ) {
   return edited('warm.ndjson', lines =>
     lines.flatMap(line =>

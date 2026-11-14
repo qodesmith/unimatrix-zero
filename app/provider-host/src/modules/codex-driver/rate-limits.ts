@@ -10,7 +10,7 @@ export function limitLifts({
   secondary,
   rateLimitReachedType,
 }: RateLimits) {
-  if (rateLimitReachedType != null && rateLimitReachedType !== WINDOWED) {
+  if ((rateLimitReachedType ?? WINDOWED) !== WINDOWED) {
     return undefined
   }
 
