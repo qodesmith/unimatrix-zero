@@ -37,6 +37,7 @@ let chatgptConnected: boolean
 let compactionSettings: CompactionSettings
 let clock: Date
 let hostReachable: boolean
+let folderMade: boolean
 let listedModels: Record<ProviderId, Model[]>
 let turns: ReturnType<typeof createTurns>
 let treeId: string
@@ -64,7 +65,11 @@ function launch() {
     },
     hosts,
     vendorProgramFor: () => vendorProgram,
-    treeFolderFor: id => `/trees/${id}`,
+    treeFolderFor: id => {
+      if (!folderMade) throw new Error('ENOSPC: no space left on device')
+
+      return `/trees/${id}`
+    },
     compactionSettingsFor: () => compactionSettings,
     listedModels: provider => listedModels[provider],
     now: () => clock,
@@ -86,6 +91,7 @@ beforeEach(() => {
   compactionSettings = {auto: true, threshold: null}
   clock = createdAt
   hostReachable = true
+  folderMade = true
   listedModels = {claude: [], chatgpt: []}
   turns = launch()
   treeId = createTrees(db).create(createdAt).id
@@ -330,6 +336,15 @@ describe('sending the root Prompt', () => {
       })
     ).toThrow('This Tree already has its first Prompt.')
     expect(hostCommands).toEqual([])
+  })
+
+  it('is refused when the Tree’s folder can’t be made, and nothing is saved', () => {
+    folderMade = false
+
+    expect(() =>
+      turns.sendPrompt({model: picked, treeId, parentReplyId: null, text: 'Hi'})
+    ).toThrow('ENOSPC')
+    expect(turns.list(treeId)).toEqual({prompts: [], replies: []})
   })
 })
 
@@ -1539,6 +1554,15 @@ describe('retrying a Reply', () => {
     turns.stop(treeId, replyId)
 
     expect(hostCommands).toEqual([{type: 'reply.stop', replyId}])
+  })
+
+  it('is refused when the Tree’s folder can’t be made, leaving the Reply failed', () => {
+    const replyId = sendPrompt(null)
+    fail(replyId)
+    folderMade = false
+
+    expect(() => turns.retry(treeId, replyId)).toThrow('ENOSPC')
+    expect(saved(replyId).status).toBe('failed')
   })
 
   it('forgets where its Provider saved the failed attempt', () => {
