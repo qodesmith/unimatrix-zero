@@ -41,6 +41,6 @@
   - #83: the `read_skill` MCP tool and the "needs a Workspace with commands" marking.
   - PRD §6's attachment rule and PR #256's PDF conversion in the Provider host.
   - ADR 0018: its "Sandbox by default" and YOLO clauses, and "inside the Sandbox, no card" under Supervised.
-  - ADR 0007, ADR 0010, ADR 0011, ADR 0014 and ADR 0017, each by an amendment note.
+  - ADR 0007, ADR 0010, ADR 0011 and ADR 0014, each by an amendment note, and ADR 0017 inside its list of fields.
 - **Workspace, plain Tree and YOLO leave the vocabulary.** In older tickets and ADRs, a Workspace reads as the Tree's files, and YOLO as Full access.
 - **Provider dependency entries that assume a Claude with no tools** (`verbatim-prompts`, `setup-tokens`) and a Codex that sends no server requests (`codex-server-requests-refused`) go stale when this is built, and change with that code.
