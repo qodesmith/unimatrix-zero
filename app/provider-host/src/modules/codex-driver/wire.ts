@@ -8,6 +8,7 @@ import type {ErrorNotification} from './protocol/v2/ErrorNotification'
 import type {LoginAccountResponse} from './protocol/v2/LoginAccountResponse'
 import type {Model as CodexModel} from './protocol/v2/Model'
 import type {ModelListResponse} from './protocol/v2/ModelListResponse'
+import type {PatchChangeKind} from './protocol/v2/PatchChangeKind'
 import type {RateLimitWindow} from './protocol/v2/RateLimitWindow'
 import type {Thread} from './protocol/v2/Thread'
 import type {ThreadItem} from './protocol/v2/ThreadItem'
@@ -201,14 +202,16 @@ const FileChangeItemSchema = z.looseObject({
   changes: z.array(
     z.looseObject({
       path: z.string(),
-      kind: z.looseObject({type: z.string()}),
+      kind: z.looseObject({type: z.enum(['add', 'delete', 'update'])}),
       diff: z.string(),
     })
   ),
   status: ToolStatusSchema,
 }) satisfies z.ZodType<
   Pick<ItemOf<'fileChange'>, 'type' | 'id' | 'status'> & {
-    changes: Pick<ItemOf<'fileChange'>['changes'][number], 'path' | 'diff'>[]
+    changes: (Pick<ItemOf<'fileChange'>['changes'][number], 'path' | 'diff'> & {
+      kind: Pick<PatchChangeKind, 'type'>
+    })[]
   }
 >
 
