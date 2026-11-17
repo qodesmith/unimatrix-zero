@@ -64,7 +64,7 @@ function launch() {
     },
     hosts,
     vendorProgramFor: () => vendorProgram,
-    treeFolderFor: treeId => `/trees/${treeId}`,
+    treeFolderFor: id => `/trees/${id}`,
     compactionSettingsFor: () => compactionSettings,
     listedModels: provider => listedModels[provider],
     now: () => clock,
@@ -1910,7 +1910,6 @@ describe('deleting a Prompt', () => {
         replyId: first,
         session: cutAtFirst,
         vendorProgram,
-        treeFolder: `/trees/${treeId}`,
       },
     ])
   })

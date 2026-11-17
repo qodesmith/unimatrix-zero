@@ -25,6 +25,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import {afterEach, expect, it} from 'vitest'
+import {z} from 'zod'
 
 import {createClaudeDriver, spawnClaude} from './main'
 import {
@@ -295,6 +296,92 @@ it('runs claude in the Tree’s folder with full access, its tools for files, co
   expect(report?.systemPrompt).toEqual([])
   expect(report?.appendedPrompt).toBe('')
   expect(report?.promptSnapshot).toBe(false)
+})
+
+it('shows each tool call with its arguments and result, the text after them a part of its own', async () => {
+  const claude = await setUp(['tools.ndjson'])
+  const events = await claude.reply('Write notes.txt, then cat it.')
+
+  expect(shown(events).content).toEqual([
+    {
+      type: 'tool-call',
+      toolCallId: expect.any(String),
+      toolName: 'Write',
+      args: expect.stringMatching(/"content": ?"HERON"/),
+      result: {
+        content: expect.stringMatching(
+          /^File created successfully at: \S+\/notes\.txt/
+        ),
+        isError: false,
+      },
+    },
+    {
+      type: 'tool-call',
+      toolCallId: expect.any(String),
+      toolName: 'Bash',
+      args: expect.stringContaining('cat notes.txt'),
+      result: {content: 'HERON', isError: false},
+    },
+    {type: 'text', text: 'HERON'},
+  ])
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+})
+
+/** A line `claude` wrote that holds every one of `parts`. */
+function isOut(line: RecordedLine, ...parts: string[]) {
+  return (
+    line.kind === 'out' &&
+    parts.every(part => JSON.stringify(line.message).includes(part))
+  )
+}
+
+it('replaces only the text after a tool call when its message ends other than it streamed', async () => {
+  const ended = edited('tools.ndjson', lines => {
+    const start = lines.findIndex(line => isOut(line, '"message_start"'))
+    const write = lines.find(line => isOut(line, '"assistant"', '"Write"'))
+
+    if (write?.kind !== 'out') throw new Error('No Write message')
+
+    const said: RecordedLine = {
+      kind: 'out',
+      message: {
+        ...write.message,
+        uuid: '11111111-1111-4111-8111-111111111111',
+        message: {
+          ...z.looseObject({}).parse(write.message.message),
+          content: [{type: 'text', text: 'Let me write it.'}],
+        },
+      },
+    }
+
+    return [
+      ...lines.slice(0, start),
+      said,
+      ...lines
+        .slice(start)
+        .map(line =>
+          isOut(line, '"assistant"', '"text":"HERON"')
+            ? RecordedLineSchema.parse(
+                JSON.parse(
+                  JSON.stringify(line).replace(
+                    '"text":"HERON"',
+                    '"text":"HERON."'
+                  )
+                )
+              )
+            : line
+        ),
+    ]
+  })
+
+  const claude = await setUp([ended])
+  const events = await claude.reply('Write notes.txt, then cat it.')
+
+  expect(
+    shown(events).content.map(part =>
+      part.type === 'text' ? part.text : part.toolName
+    )
+  ).toEqual(['Let me write it.', 'Write', 'Bash', 'HERON.'])
 })
 
 it('streams a Reply, records where Claude saved it, and reports its Context size', async () => {

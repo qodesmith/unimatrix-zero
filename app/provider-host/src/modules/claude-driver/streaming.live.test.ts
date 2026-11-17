@@ -22,6 +22,7 @@ import type {CompactionSettings} from '@uz/contract/settings'
 import {heldIdle} from '#modules/test-idle/main'
 import {listenLocally, startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
+import {query} from '@anthropic-ai/claude-agent-sdk'
 import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {spawn} from 'node:child_process'
@@ -37,6 +38,7 @@ import {z} from 'zod'
 import {planOf, readAccount} from './account'
 import {claudeEnvironment, claudeReplyEnvironment} from './environment'
 import {createClaudeDriver, spawnClaude} from './main'
+import {runClaudeOneShot} from './one-shot'
 import {createRecorder} from './recording'
 import {RECORDINGS} from './replay'
 import {projectKeyOf} from './transcripts'
@@ -46,6 +48,16 @@ const configDir = process.env.UZ_LIVE_CLAUDE_CONFIG ?? ''
 const recording = process.env.UZ_RECORD === 'yes'
 
 type Streamed = StartReplyEvent
+
+const TOOLS_PROMPT =
+  'Create a file named notes.txt in the current folder holding the single word HERON, with your Write tool, then run `cat notes.txt` with Bash, and reply with only what it printed.'
+
+const InitLine = z.looseObject({
+  type: z.literal('system'),
+  subtype: z.literal('init'),
+  tools: z.array(z.string()),
+  permissionMode: z.string(),
+})
 
 let sharedTreeFolder: string | null = null
 
@@ -1026,6 +1038,168 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     await live.done()
   }, 300_000)
+
+  it('[dep:claude-tools-full-access] writes a file in the Tree’s folder and runs a command there, asking nothing, with Claude Code’s tools but no Subagents, and shows each tool call', async () => {
+    const live = liveDriver(['tools.ndjson'])
+    const notes = path.join(treeFolder(), 'notes.txt')
+    fs.rmSync(notes, {force: true})
+
+    const {events} = await live.reply(TOOLS_PROMPT, null)
+
+    expect(fs.readFileSync(notes, 'utf8').trim()).toBe('HERON')
+
+    const calls = events
+      .filter(isReplyEvent)
+      .reduce(foldReplyEvent, NEW_REPLY)
+      .content.flatMap(part => (part.type === 'tool-call' ? [part] : []))
+
+    expect(calls.map(call => call.toolName)).toEqual(['Write', 'Bash'])
+    expect(calls.every(call => call.result?.isError === false)).toBe(true)
+    expect(shownText(events)).toMatch(/HERON\s*$/)
+
+    const lines = live.printed.map(line => JSON.parse(line))
+
+    const [init] = lines.flatMap(line => {
+      const parsed = InitLine.safeParse(line)
+
+      return parsed.success ? [parsed.data] : []
+    })
+
+    expect(init?.tools).toEqual(
+      expect.arrayContaining([
+        'Bash',
+        'Read',
+        'Write',
+        'Edit',
+        'WebFetch',
+        'WebSearch',
+      ])
+    )
+    expect(init?.tools).not.toContain('Agent')
+    expect(init?.tools).not.toContain('Task')
+    expect(init?.permissionMode).toBe('bypassPermissions')
+    expect(lines.filter(line => line.type === 'control_request')).toEqual([])
+
+    await live.done()
+  }, 300_000)
+
+  it('[dep:claude-resume-moved-folder] resumes a session from the app’s copy alone in a Tree folder other than the one it started in, and works there', async () => {
+    const live = liveDriver([])
+    const first = await live.reply('Remember the codeword ZANZIBAR.', null)
+
+    await live.closed()
+    forgetTranscript(first.recorded.session.sessionId)
+
+    const moved = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-tree-'))
+    )
+
+    try {
+      const events = await Array.fromAsync(
+        live.driver.startReply({
+          ...live.request(
+            'Run `pwd` with Bash, then reply with the codeword and what it printed, on one line.',
+            continuing(first.recorded.session)
+          ),
+          treeFolder: moved,
+        })
+      )
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+      expect(recordedIn(events).session.sessionId).toBe(
+        first.recorded.session.sessionId
+      )
+      expect(events.map(event => event.type)).not.toContain('SESSION_REBUILT')
+      expect(shownText(events)).toMatch(/ZANZIBAR/)
+      expect(shownText(events)).toContain(moved)
+
+      await live.done()
+    } finally {
+      fs.rmSync(moved, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:claude-prompt-fresh] adds the System prompt after Claude Code’s own, and applies a changed one to the session it resumes', async () => {
+    const live = liveDriver([])
+
+    async function replyUnder(
+      systemPrompt: string,
+      session: ReplyRequest['session']
+    ) {
+      const events = await Array.fromAsync(
+        live.driver.startReply({
+          ...live.request('Say hi.', session),
+          systemPrompt,
+        })
+      )
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+      return {events, recorded: recordedIn(events)}
+    }
+
+    const first = await replyUnder(
+      'End every reply with the word KIWI in capitals.',
+      null
+    )
+
+    expect(shownText(first.events)).toMatch(/KIWI\W*$/)
+
+    await live.closed()
+
+    const second = await replyUnder(
+      'End every reply with the word MANGO in capitals.',
+      continuing(first.recorded.session)
+    )
+
+    expect(second.recorded.session.sessionId).toBe(
+      first.recorded.session.sessionId
+    )
+    expect(shownText(second.events)).toMatch(/MANGO\W*$/)
+
+    await live.done()
+  }, 300_000)
+
+  it('[dep:claude-one-shot-no-tools] runs a one-shot with no tools at all', async () => {
+    const inits: unknown[] = []
+
+    const answer = await runClaudeOneShot(
+      {
+        query: params => {
+          const running = query(params)
+
+          async function* watched() {
+            for await (const message of running) {
+              if (message.type === 'system' && message.subtype === 'init') {
+                inits.push(message.tools)
+              }
+
+              yield message
+            }
+          }
+
+          return Object.assign(watched(), {close: () => running.close()})
+        },
+        env: process.env,
+      },
+      {
+        model: 'haiku',
+        prompt:
+          'Run `pwd`, then reply with what it printed, or NONE if you can’t.',
+        vendorProgram: {
+          program: {
+            path: program,
+            build: {url: 'https://x.test/', sha256: '', size: 0},
+          },
+          configDir,
+        },
+      },
+      new AbortController().signal
+    )
+
+    expect(inits).toEqual([[]])
+    expect(answer).not.toContain(configDir)
+  }, 120_000)
 
   it('[dep:synthetic-model-name] marks the message it makes up for a failed Reply by the Model name <synthetic>, with no isSynthetic flag', async () => {
     const live = liveDriver([])

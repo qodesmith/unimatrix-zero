@@ -174,7 +174,7 @@ const ToolStatusSchema = z.enum([
 ]) satisfies z.ZodType<ItemOf<'commandExecution'>['status']>
 
 /** `aggregatedOutput` and `exitCode` are null until the item completes. */
-export const CommandExecutionItemSchema = z.looseObject({
+const CommandExecutionItemSchema = z.looseObject({
   type: z.literal('commandExecution'),
   id: z.string(),
   command: z.string(),
@@ -189,7 +189,7 @@ export const CommandExecutionItemSchema = z.looseObject({
   >
 >
 
-export const FileChangeItemSchema = z.looseObject({
+const FileChangeItemSchema = z.looseObject({
   type: z.literal('fileChange'),
   id: z.string(),
   changes: z.array(
@@ -202,12 +202,19 @@ export const FileChangeItemSchema = z.looseObject({
   status: ToolStatusSchema,
 }) satisfies z.ZodType<Pick<ItemOf<'fileChange'>, 'type' | 'id' | 'status'>>
 
-const ItemSchema = z.union([
-  AgentMessageItemSchema,
+export const ToolItemSchema = z.union([
   CommandExecutionItemSchema,
   FileChangeItemSchema,
+])
+
+const ItemSchema = z.union([
+  AgentMessageItemSchema,
+  ToolItemSchema,
   z.looseObject({type: z.string()}),
 ])
+
+/** A thread item as a notification carries it. */
+export type Item = z.infer<typeof ItemSchema>
 
 /**
  * Codex sends no `item/completed` for a compaction that fails or that a hook

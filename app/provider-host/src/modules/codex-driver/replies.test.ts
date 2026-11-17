@@ -23,6 +23,41 @@ function message(id: string, text: string): Notification {
   }
 }
 
+function command(method: 'item/started' | 'item/completed'): Notification {
+  const done = method === 'item/completed'
+
+  return {
+    method,
+    params: {
+      ...inTurn,
+      item: {
+        type: 'commandExecution',
+        id: 'cmd',
+        command: 'ls',
+        cwd: '/tree',
+        status: done ? 'completed' : 'inProgress',
+        aggregatedOutput: done ? 'notes.txt\n' : null,
+        exitCode: done ? 0 : null,
+      },
+    },
+  }
+}
+
+it('replaces only the text after a tool call, and keeps a message the call cut short', () => {
+  const mapper = createReplyMapper(ids)
+  mapper.map(delta('a', 'Let me look'))
+  mapper.map(command('item/started'))
+  mapper.map(command('item/completed'))
+
+  expect([
+    ...mapper.map(delta('b', 'One fil')),
+    ...mapper.map(message('b', 'One file.')),
+  ]).toEqual([
+    {...ids, type: 'TEXT_DELTA', delta: 'One fil'},
+    {...ids, type: 'TEXT_REPLACE', text: 'One file.'},
+  ])
+})
+
 it('replaces what streamed when the finished message differs', () => {
   const mapper = createReplyMapper(ids)
 

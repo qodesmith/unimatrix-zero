@@ -75,6 +75,9 @@ function treeFolder() {
 
 type Streamed = StartReplyEvent
 
+const TOOLS_PROMPT =
+  'Create a file named notes.txt in the current folder holding the single word HERON, with your file editing tool, then run `cat notes.txt` in your shell, and reply with only what it printed.'
+
 const WireLine = z.looseObject({
   id: z.union([z.number(), z.string()]).optional(),
   method: z.string().optional(),
@@ -1626,18 +1629,26 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 300_000)
 
-  it('[dep:codex-server-requests-refused] runs a shell command for the AI without sending the app one server request', async () => {
+  it('[dep:codex-full-access] [dep:codex-server-requests-refused] writes a file in the Tree’s folder and runs a command there, asking the app nothing, and shows each tool call', async () => {
     if (!folder || !signedIn) return
 
     const home = homeFrom(signedIn)
+
+    const tree = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-tree-'))
+    )
+
     const idle = heldIdle()
     const exits: Promise<unknown>[] = []
     const output: Buffer[] = []
 
+    const recorder = createRecorder([path.join(RECORDINGS, 'tools.ndjson')])
+    const start = process.env.UZ_RECORD === 'yes' ? recorder.spawn : spawnCodex
+
     const driver = createCodexDriver({
       store: fakeStore().client,
       spawn: (command, options) => {
-        const child = spawnCodex(command, options)
+        const child = start(command, options)
         exits.push(once(child, 'exit').catch(() => undefined))
         child.stdout.on('data', (chunk: Buffer) => output.push(chunk))
 
@@ -1654,7 +1665,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           model: MODEL,
           systemPrompt: 'You answer in as few words as you can.',
           prompt: {
-            text: 'Run `pwd` in your shell, then reply with only what it printed.',
+            text: TOOLS_PROMPT,
             messageId: crypto.randomUUID(),
           },
           vendorProgram: {
@@ -1669,7 +1680,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             },
             configDir: home,
           },
-          treeFolder: treeFolder(),
+          treeFolder: tree,
           session: null,
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -1677,16 +1688,22 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       )
 
       expectComplete(events)
+      expect(fs.readFileSync(path.join(tree, 'notes.txt'), 'utf8').trim()).toBe(
+        'HERON'
+      )
+
+      const calls = events
+        .filter(isReplyEvent)
+        .reduce(foldReplyEvent, NEW_REPLY)
+        .content.flatMap(part => (part.type === 'tool-call' ? [part] : []))
+
+      expect(calls.map(call => call.toolName)).toEqual(
+        expect.arrayContaining(['fileChange', 'commandExecution'])
+      )
+      expect(calls.every(call => call.result?.isError === false)).toBe(true)
 
       const lines = wireLinesIn(output)
 
-      expect(
-        lines.some(
-          ({method, params}) =>
-            method === 'item/completed' &&
-            params?.item?.type === 'commandExecution'
-        )
-      ).toBe(true)
       expect(
         lines.filter(line => line.id !== undefined && line.method !== undefined)
       ).toEqual([])
@@ -1695,8 +1712,105 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       await Promise.all(exits)
     } finally {
       fs.rmSync(home, {recursive: true, force: true})
+      fs.rmSync(tree, {recursive: true, force: true})
     }
   }, 180_000)
+
+  it('[dep:codex-resume-moved-folder] resumes a thread from the app’s copy alone in a Tree folder other than the one it started in, and works there', async () => {
+    if (!folder || !signedIn) return
+
+    const store = fakeStore()
+    const homes = [homeFrom(signedIn), homeFrom(signedIn)]
+
+    const trees = [0, 1].map(() =>
+      fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-tree-')))
+    )
+
+    const idle = heldIdle()
+    const exits: Promise<unknown>[] = []
+    const treeId = crypto.randomUUID()
+
+    function driver() {
+      return createCodexDriver({
+        store: store.client,
+        spawn: (command, options) => {
+          const child = spawnCodex(command, options)
+          exits.push(once(child, 'exit').catch(() => undefined))
+
+          return child
+        },
+        whenIdle: idle.whenIdle,
+      })
+    }
+
+    async function reply(at: number, text: string, session: SessionRef | null) {
+      const events = await Array.fromAsync(
+        driver().startReply({
+          treeId,
+          replyId: crypto.randomUUID(),
+          model: MODEL,
+          systemPrompt: 'You answer in as few words as you can.',
+          prompt: {text, messageId: crypto.randomUUID()},
+          vendorProgram: {
+            program: {
+              path: folder ?? '',
+              build: {
+                url: 'https://example.com/codex.tar.gz',
+                sha256: '0'.repeat(64),
+                size: 1,
+                archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+              },
+            },
+            configDir: homes[at] ?? '',
+          },
+          treeFolder: trees[at] ?? '',
+          session: session && {...session, type: 'continue'},
+          thread: [],
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+        })
+      )
+
+      expectComplete(events)
+
+      const recorded = events.find(
+        (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+      )
+
+      if (!recorded) throw new Error('The Reply was not recorded')
+
+      return {events, session: recorded.session}
+    }
+
+    try {
+      const first = await reply(0, 'Remember the codeword ZANZIBAR.', null)
+      idle.pass()
+      await Promise.all(exits)
+
+      const second = await reply(
+        1,
+        'Run `pwd` in your shell, then reply with the codeword and what it printed, on one line.',
+        first.session
+      )
+
+      expect(second.session.sessionId).toBe(first.session.sessionId)
+
+      const text = second.events
+        .filter(isReplyEvent)
+        .reduce(foldReplyEvent, NEW_REPLY)
+        .content.flatMap(part => (part.type === 'text' ? [part.text] : []))
+        .join('')
+
+      expect(text).toMatch(/ZANZIBAR/)
+      expect(text).toContain(trees[1])
+
+      idle.pass()
+      await Promise.all(exits)
+    } finally {
+      for (const made of [...homes, ...trees]) {
+        fs.rmSync(made, {recursive: true, force: true})
+      }
+    }
+  }, 300_000)
 })
 
 describe.skipIf(!folder)('a live Codex nobody signed in to', () => {

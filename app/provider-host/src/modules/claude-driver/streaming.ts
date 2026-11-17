@@ -17,10 +17,9 @@ import type {RunFailure} from '@uz/contract/turns'
 
 import {failureOf} from '#modules/failures/main'
 import {createReplyRuns} from '#modules/reply-runs/main'
-import {explainingLabels} from '#modules/thread-replay/main'
 
-import {claudeReplyEnvironment} from './environment'
 import {firstHeard, silentEnding, startingWith} from './heard'
+import {replyOptions} from './options'
 import {createReplyMapper} from './replies'
 import {cutAt, resumption, servedThrough, textOf} from './resumption'
 import {openSession} from './session'
@@ -64,31 +63,6 @@ type Mapper = ReturnType<typeof createReplyMapper>
 type Answered =
   | {session: Live; outcome: Outcome}
   | {session: null; outcome: Silent}
-
-/**
- * Claude Code's tools for files, commands and the web, named one by one: its
- * preset adds tools that outlive the Reply or leave the Tree's folder, such as
- * cron jobs and worktrees.
- */
-const TOOLS = [
-  'Bash',
-  'Read',
-  'Write',
-  'Edit',
-  'Glob',
-  'Grep',
-  'NotebookEdit',
-  'WebFetch',
-  'WebSearch',
-] as const
-
-/** Nothing for a default, so `claude` compacts where it would on its own. */
-function claudeSettingsOf({auto, threshold}: CompactionSettings) {
-  return {
-    ...(auto ? {} : {autoCompactEnabled: false}),
-    ...(threshold === null ? {} : {autoCompactWindow: threshold}),
-  }
-}
 
 /** `heard` says whether `claude` sent anything back to the Prompt. */
 type Outcome =
@@ -187,8 +161,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     program: NonNullable<ReplyRequest['vendorProgram']['program']>
   ): Live {
     const {configDir} = request.vendorProgram
-    const cwd = request.treeFolder
-    const projectKey = projectKeyOf(cwd)
+    const projectKey = projectKeyOf(request.treeFolder)
     const {resume, fork, upTo} = resumption(request.session, restore)
     let activeConfigDir = configDir
     const kept = storeFor(request)
@@ -202,34 +175,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
         : sessionStore
 
     const options: Options = {
-      pathToClaudeCodeExecutable: program.path,
-      env: claudeReplyEnvironment(deps.env, configDir),
-      cwd,
-      settingSources: [],
-      settings: {
-        autoMemoryEnabled: false,
-        ...claudeSettingsOf(request.compactionSettings),
-      },
-      tools: [...TOOLS],
-      // Subagents wait for #84.
-      disallowedTools: ['Agent'],
-      // Full access, until the Permission mode decides (ADR 0022).
-      permissionMode: 'bypassPermissions',
-      allowDangerouslySkipPermissions: true,
-      strictMcpConfig: true,
-      mcpServers: {},
-      // Else a Prompt such as `/compact` is run as a `claude` command.
-      verbatimPrompts: true,
-      includePartialMessages: true,
-      thinking: {type: 'adaptive', display: 'summarized'},
-      // On every open, and rendered afresh: else `claude` keeps the first.
-      systemPrompt: {
-        type: 'preset',
-        preset: 'claude_code',
-        append: explainingLabels(request.systemPrompt, request.thread),
-        snapshot: false,
-      },
-      model: request.model,
+      ...replyOptions(request, program.path, deps.env),
       ...(resume ? {resume} : {}),
       ...(fork ? {forkSession: true} : {}),
       ...(upTo ? {resumeSessionAt: upTo} : {}),

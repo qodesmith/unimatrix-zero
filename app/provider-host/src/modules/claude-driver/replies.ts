@@ -48,9 +48,7 @@ const AbandonedStopSchema = z.looseObject({
 
 /** A result's text; an image or a document in it is named, not shown. */
 function resultText(content: ToolResultContent) {
-  if (content === undefined) return ''
-
-  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return content ?? ''
 
   return content
     .map(part => (part.type === 'text' ? part.text : `[${part.type}]`))
@@ -92,8 +90,6 @@ export function createReplyMapper(ids: ReplyIds) {
     toolCalls.add(id)
     shown = ''
     atMessageStart = ''
-    atBlockStart = ''
-    block = null
 
     return [{...ids, type: 'TOOL_CALL_START', toolCallId: id, toolName: name}]
   }
@@ -260,7 +256,7 @@ export function createReplyMapper(ids: ReplyIds) {
   }
 
   function onToolResults({message}: SDKUserMessage): ContentEvent[] {
-    if (typeof message.content === 'string') return []
+    if (!Array.isArray(message.content)) return []
 
     return message.content.flatMap(part =>
       part.type === 'tool_result' && toolCalls.has(part.tool_use_id)

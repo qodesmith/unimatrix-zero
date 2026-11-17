@@ -342,6 +342,34 @@ it('streams a Reply, records where Codex saved it, and reports its Context size'
   ])
 })
 
+it('shows a file change and a command as tool calls with their results, the text after them a part of its own', async () => {
+  const codex = await setUp(['tools.ndjson'])
+  const events = await codex.reply('Write notes.txt, then cat it.')
+
+  expect(shown(events).content).toEqual([
+    {type: 'text', text: 'I’ll create the file, then read it in the shell.\n'},
+    {
+      type: 'tool-call',
+      toolCallId: expect.any(String),
+      toolName: 'fileChange',
+      args: expect.stringContaining('notes.txt'),
+      result: {
+        content: expect.stringMatching(/^add \S+\/notes\.txt$/),
+        isError: false,
+      },
+    },
+    {
+      type: 'tool-call',
+      toolCallId: expect.any(String),
+      toolName: 'commandExecution',
+      args: expect.stringContaining('cat notes.txt'),
+      result: {content: 'HERON\n', isError: false},
+    },
+    {type: 'text', text: 'HERON'},
+  ])
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+})
+
 it('runs codex in its own CODEX_HOME, updater off and nothing that outranks the plan', async () => {
   const codex = await setUp(['started.ndjson'])
   await codex.reply(FIRST_PROMPT)

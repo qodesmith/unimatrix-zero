@@ -64,7 +64,7 @@ beforeEach(() => {
         send: sendToHost,
       },
       vendorProgramFor: () => ({program: null, configDir: '/claude'}),
-      treeFolderFor: treeId => `/trees/${treeId}`,
+      treeFolderFor: id => `/trees/${id}`,
       compactionSettingsFor: () => ({auto: true, threshold: null}),
       listedModels: () => [],
       now,

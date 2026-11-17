@@ -1,5 +1,5 @@
 import type {ContentEvent} from '#modules/reply-runs/main'
-import type {Notification} from './wire'
+import type {Item, Notification} from './wire'
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 import type {z} from 'zod'
@@ -9,8 +9,7 @@ import {codexFailureOf, isBusyStatus} from '#modules/failures/main'
 import {
   AgentMessageItemSchema,
   CONTEXT_COMPACTION,
-  CommandExecutionItemSchema,
-  FileChangeItemSchema,
+  ToolItemSchema,
 } from './wire'
 
 type ReplyIds = Pick<ReplyRequest, 'treeId' | 'replyId'>
@@ -22,20 +21,13 @@ type CodexTurn = Extract<
   {method: 'turn/completed'}
 >['params']['turn']
 
-type CommandExecution = z.infer<typeof CommandExecutionItemSchema>
+type ToolItem = z.infer<typeof ToolItemSchema>
 
-type FileChange = z.infer<typeof FileChangeItemSchema>
+/** A malformed tool item reads as some other item, as an unknown one does. */
+function toolItemOf(item: Item): ToolItem | null {
+  const tool = ToolItemSchema.safeParse(item)
 
-type ToolItem = CommandExecution | FileChange
-
-function toolItemOf(item: unknown): ToolItem | null {
-  const command = CommandExecutionItemSchema.safeParse(item)
-
-  if (command.success) return command.data
-
-  const change = FileChangeItemSchema.safeParse(item)
-
-  return change.success ? change.data : null
+  return tool.success ? tool.data : null
 }
 
 function argsOf(item: ToolItem) {
@@ -188,6 +180,28 @@ export function createReplyMapper(ids: ReplyIds) {
     ]
   }
 
+  /** A tool call's result, a compaction or a finished message. */
+  function onItemCompleted(item: Item, threadId: string): ContentEvent[] {
+    const tool = toolItemOf(item)
+
+    if (tool) return finishToolCall(tool)
+
+    if (item.type === CONTEXT_COMPACTION) {
+      return [
+        {
+          ...ids,
+          type: 'CONTEXT_COMPACTED',
+          sessionId: threadId,
+          boundaryId: null,
+        },
+      ]
+    }
+
+    const message = AgentMessageItemSchema.safeParse(item)
+
+    return message.success ? onMessage(message.data.id, message.data.text) : []
+  }
+
   return {
     map(notification: Notification): ContentEvent[] {
       const {method, params} = notification
@@ -217,26 +231,7 @@ export function createReplyMapper(ids: ReplyIds) {
       }
 
       if (method === 'item/completed') {
-        const tool = toolItemOf(params.item)
-
-        if (tool) return finishToolCall(tool)
-
-        if (params.item.type === CONTEXT_COMPACTION) {
-          return [
-            {
-              ...ids,
-              type: 'CONTEXT_COMPACTED',
-              sessionId: params.threadId,
-              boundaryId: null,
-            },
-          ]
-        }
-
-        const message = AgentMessageItemSchema.safeParse(params.item)
-
-        return message.success
-          ? onMessage(message.data.id, message.data.text)
-          : []
+        return onItemCompleted(params.item, params.threadId)
       }
 
       if (
