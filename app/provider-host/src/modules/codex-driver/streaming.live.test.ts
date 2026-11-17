@@ -33,7 +33,7 @@ import os from 'node:os'
 import path from 'node:path'
 import {createInterface} from 'node:readline'
 import {StringDecoder} from 'node:string_decoder'
-import {describe, expect, it} from 'vitest'
+import {afterAll, describe, expect, it} from 'vitest'
 import {z} from 'zod'
 
 import {startAppServer} from './app-server'
@@ -73,6 +73,11 @@ function treeFolder() {
 
   return sharedTreeFolder
 }
+
+afterAll(() => {
+  if (sharedTreeFolder)
+    fs.rmSync(sharedTreeFolder, {recursive: true, force: true})
+})
 
 type Streamed = StartReplyEvent
 

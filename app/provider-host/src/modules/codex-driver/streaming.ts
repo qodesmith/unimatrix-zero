@@ -369,7 +369,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
           },
         ],
         model: request.model,
-        // A thread a cut loaded runs read-only in the config folder until now.
+        // Every turn too (ADR 0022): a thread a deletion cut resumed is read-only in the config folder.
         cwd: request.treeFolder,
         approvalPolicy: 'never',
         sandboxPolicy: {type: 'dangerFullAccess'},
