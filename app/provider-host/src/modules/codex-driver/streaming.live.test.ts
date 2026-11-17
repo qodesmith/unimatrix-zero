@@ -62,6 +62,17 @@ function homeFrom(source: string) {
   return home
 }
 
+let sharedTreeFolder: string | null = null
+
+/** One Tree's folder for every Reply, as a Tree's Replies share one. */
+function treeFolder() {
+  sharedTreeFolder ??= fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-tree-'))
+  )
+
+  return sharedTreeFolder
+}
+
 type Streamed = StartReplyEvent
 
 const WireLine = z.looseObject({
@@ -193,6 +204,7 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
           },
           configDir: home,
         },
+        treeFolder: treeFolder(),
         session: session && {...session, type: 'continue'},
         thread: [],
         compactionSettings: {auto: true, threshold},
@@ -281,6 +293,7 @@ function threadReplies(program: string, home: string) {
           },
           configDir: home,
         },
+        treeFolder: treeFolder(),
         session,
         thread,
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -389,6 +402,7 @@ function codedReplies(
           },
           configDir: home,
         },
+        treeFolder: treeFolder(),
         session: session && {...session, type: 'continue'},
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -594,6 +608,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             },
             configDir: home,
           },
+          treeFolder: treeFolder(),
           session: session && {...session, type: fork ? 'fork' : 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -750,6 +765,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           },
           configDir: home,
         },
+        treeFolder: treeFolder(),
         session: session && {
           ...session,
           type: rewind ? 'rewind' : 'continue',
@@ -911,6 +927,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           systemPrompt: 'You answer in as few words as you can.',
           prompt: {text, messageId: crypto.randomUUID()},
           vendorProgram: vendorProgram(home),
+          treeFolder: treeFolder(),
           session: session && {...session, type: 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -1034,6 +1051,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             },
             configDir: home,
           },
+          treeFolder: treeFolder(),
           session,
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -1181,6 +1199,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           },
           configDir: home,
         },
+        treeFolder: treeFolder(),
         session: null,
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -1476,6 +1495,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             },
             configDir: home,
           },
+          treeFolder: treeFolder(),
           session: session && {...session, type: 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -1649,6 +1669,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             },
             configDir: home,
           },
+          treeFolder: treeFolder(),
           session: null,
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -1721,6 +1742,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
             },
             configDir: home,
           },
+          treeFolder: treeFolder(),
           session: null,
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,

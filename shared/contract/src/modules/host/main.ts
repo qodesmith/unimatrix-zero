@@ -123,6 +123,8 @@ export const ReplyRequestSchema = z.strictObject({
     messageId: z.uuid().pipe(UuidPartsSchema),
   }),
   vendorProgram: SignInRequestSchema,
+  /** The Tree's own folder, which exists: the AI works there. */
+  treeFolder: z.string().min(1),
   /** Null starts a session. */
   session: ReplySessionSchema.nullable(),
   /**

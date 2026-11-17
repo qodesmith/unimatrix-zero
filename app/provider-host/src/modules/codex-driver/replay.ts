@@ -61,7 +61,11 @@ export const FakeCodexRunSchema = z.strictObject({
   threadConfigs: z.array(z.looseObject({}).nullable()),
   /** At each `thread/start`, `thread/fork` or `thread/resume`. */
   threadInstructions: z.array(NullableStringSchema),
+  /** At each `thread/start`, `thread/fork` or `thread/resume`. */
+  threadAccess: z.array(z.looseObject({})),
   turnModels: z.array(NullableStringSchema),
+  /** At each `turn/start`. */
+  turnAccess: z.array(z.looseObject({})),
   modelLists: z.array(z.looseObject({})),
   resumedFrom: z.array(z.looseObject({type: z.string(), id: z.string()})),
   /** At each `turn/start`, the ids of what the thread held. */
@@ -96,7 +100,7 @@ const reportFile = path.join(reports, run + '.json')
 const home = process.env.CODEX_HOME
 const standIn = ${JSON.stringify(CODEX_HOME_STAND_IN)}
 const vendorVariables = Object.keys(process.env).filter(name => /^(OPENAI|CODEX|ANTHROPIC|CLAUDE)_/i.test(name))
-const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], threadModels: [], threadConfigs: [], threadInstructions: [], turnModels: [], modelLists: [], resumedFrom: [], contexts: [], injected: [], forkedThrough: null, interrupted: null, reverted: null, ended: null}
+const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], threadModels: [], threadConfigs: [], threadInstructions: [], threadAccess: [], turnModels: [], turnAccess: [], modelLists: [], resumedFrom: [], contexts: [], injected: [], forkedThrough: null, interrupted: null, reverted: null, ended: null}
 
 function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
@@ -220,10 +224,14 @@ process.stdin.on('data', chunk => {
       report.threadModels.push(message.params.model ?? null)
       report.threadConfigs.push(message.params.config ?? null)
       report.threadInstructions.push(message.params.developerInstructions ?? null)
+      const {cwd, sandbox, approvalPolicy} = message.params
+      report.threadAccess.push({cwd, sandbox, approvalPolicy})
     }
     if (message.method === 'turn/start') {
       report.prompts.push(message.params.input[0].text)
       report.turnModels.push(message.params.model)
+      const {cwd, sandboxPolicy, approvalPolicy} = message.params
+      report.turnAccess.push({cwd, sandboxPolicy, approvalPolicy})
       const rollout = rolloutOf(message.params.threadId)
       report.contexts.push(rollout ? historyOf(rollout).map(line => line.id) : [])
     }

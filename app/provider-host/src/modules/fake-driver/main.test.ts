@@ -12,6 +12,7 @@ const request = {
   model: 'fake',
   systemPrompt: '',
   vendorProgram: {program: null, configDir: '/claude'},
+  treeFolder: '/tree',
   session: null,
   thread: [],
   compactionSettings: {auto: true, threshold: null},

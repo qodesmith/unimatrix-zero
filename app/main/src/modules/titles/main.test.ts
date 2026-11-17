@@ -59,6 +59,7 @@ beforeEach(() => {
       send: () => undefined,
     },
     vendorProgramFor,
+    treeFolderFor: treeId => `/trees/${treeId}`,
     compactionSettingsFor: () => ({auto: true, threshold: null}),
     listedModels: () => [],
     now: () => new Date('2026-10-19T12:00:00.000Z'),

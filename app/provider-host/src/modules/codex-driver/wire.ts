@@ -164,6 +164,51 @@ export const AgentMessageItemSchema = z.looseObject({
   text: z.string(),
 })
 
+type ItemOf<T extends ThreadItem['type']> = Extract<ThreadItem, {type: T}>
+
+const ToolStatusSchema = z.enum([
+  'inProgress',
+  'completed',
+  'failed',
+  'declined',
+]) satisfies z.ZodType<ItemOf<'commandExecution'>['status']>
+
+/** `aggregatedOutput` and `exitCode` are null until the item completes. */
+export const CommandExecutionItemSchema = z.looseObject({
+  type: z.literal('commandExecution'),
+  id: z.string(),
+  command: z.string(),
+  cwd: z.string(),
+  status: ToolStatusSchema,
+  aggregatedOutput: z.string().nullable(),
+  exitCode: z.number().nullable(),
+}) satisfies z.ZodType<
+  Pick<
+    ItemOf<'commandExecution'>,
+    'type' | 'id' | 'command' | 'status' | 'aggregatedOutput' | 'exitCode'
+  >
+>
+
+export const FileChangeItemSchema = z.looseObject({
+  type: z.literal('fileChange'),
+  id: z.string(),
+  changes: z.array(
+    z.looseObject({
+      path: z.string(),
+      kind: z.looseObject({type: z.string()}),
+      diff: z.string(),
+    })
+  ),
+  status: ToolStatusSchema,
+}) satisfies z.ZodType<Pick<ItemOf<'fileChange'>, 'type' | 'id' | 'status'>>
+
+const ItemSchema = z.union([
+  AgentMessageItemSchema,
+  CommandExecutionItemSchema,
+  FileChangeItemSchema,
+  z.looseObject({type: z.string()}),
+])
+
 /**
  * Codex sends no `item/completed` for a compaction that fails or that a hook
  * stops. The item is `{id}` only, so one that installed nothing can't be told
@@ -218,16 +263,8 @@ export const NotificationSchema = z.discriminatedUnion('method', [
   ),
   notification('item/reasoning/summaryTextDelta', DeltaSchema),
   notification('item/reasoning/textDelta', DeltaSchema),
-  notification(
-    'item/completed',
-    z.looseObject({
-      ...inTurn,
-      item: z.union([
-        AgentMessageItemSchema,
-        z.looseObject({type: z.string()}),
-      ]),
-    })
-  ),
+  notification('item/started', z.looseObject({...inTurn, item: ItemSchema})),
+  notification('item/completed', z.looseObject({...inTurn, item: ItemSchema})),
   notification(
     'thread/tokenUsage/updated',
     z.looseObject({

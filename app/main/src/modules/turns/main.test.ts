@@ -64,6 +64,7 @@ function launch() {
     },
     hosts,
     vendorProgramFor: () => vendorProgram,
+    treeFolderFor: treeId => `/trees/${treeId}`,
     compactionSettingsFor: () => compactionSettings,
     listedModels: provider => listedModels[provider],
     now: () => clock,
@@ -252,6 +253,7 @@ describe('sending the root Prompt', () => {
           systemPrompt: '',
           prompt: {text: 'Hello', messageId: expect.any(String)},
           vendorProgram,
+          treeFolder: `/trees/${treeId}`,
           session: null,
           thread: [],
           compactionSettings: {auto: true, threshold: null},
@@ -957,6 +959,7 @@ describe('a Prompt answering a Reply', () => {
           systemPrompt: '',
           prompt: {text: 'And then?', messageId: expect.any(String)},
           vendorProgram,
+          treeFolder: `/trees/${treeId}`,
           session: {
             sessionId: 's1',
             messageId: 'm1',
@@ -1523,6 +1526,7 @@ describe('retrying a Reply', () => {
           systemPrompt: '',
           prompt: {text: 'Hi', messageId: expect.any(String)},
           vendorProgram,
+          treeFolder: `/trees/${treeId}`,
           session: null,
           thread: [],
           compactionSettings: {auto: true, threshold: null},
@@ -1906,6 +1910,7 @@ describe('deleting a Prompt', () => {
         replyId: first,
         session: cutAtFirst,
         vendorProgram,
+        treeFolder: `/trees/${treeId}`,
       },
     ])
   })

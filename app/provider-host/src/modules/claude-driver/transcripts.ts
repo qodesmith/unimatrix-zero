@@ -34,6 +34,26 @@ export function projectKeyOf(cwd: string) {
   return `${key.slice(0, KEY_LENGTH)}-${djb2(normalized)}`
 }
 
+/**
+ * The app's copy with every session filed under `projectKey`, whichever folder
+ * `claude` ran in. Sessions from before each Tree had a folder of its own were
+ * filed under the configuration folder's key, which keeps them resumable.
+ */
+export function underOneKey(
+  store: SessionStoreClient,
+  projectKey: string
+): SessionStoreClient {
+  return {
+    ...store,
+    append: async (key, entries) => store.append({...key, projectKey}, entries),
+    load: async (key, through) => store.load({...key, projectKey}, through),
+    listSubkeys: async folder => store.listSubkeys({...folder, projectKey}),
+    saveFiles: async (folder, files) =>
+      store.saveFiles({...folder, projectKey}, files),
+    loadFiles: async folder => store.loadFiles({...folder, projectKey}),
+  }
+}
+
 function keyOf({projectKey, sessionId, subpath}: SessionKey) {
   return subpath === undefined
     ? {projectKey, sessionId}

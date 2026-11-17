@@ -115,6 +115,7 @@ async function setUp(
   const fake = await replayClaude()
   cleanUps.push(fake.cleanUp)
   const configDir = folder('uz-claude-config-')
+  const treeFolder = folder('uz-claude-tree-')
   const reports = folder('uz-claude-reports-')
   const idle = heldIdle()
   const silence = heldIdle()
@@ -186,6 +187,7 @@ async function setUp(
       systemPrompt: '',
       prompt: {text, messageId},
       vendorProgram,
+      treeFolder,
       session: session && {type: 'continue', ...session},
       thread,
       compactionSettings,
@@ -231,6 +233,7 @@ async function setUp(
     driver,
     vendorProgram,
     configDir,
+    treeFolder,
     projectKey: projectKeyOf(configDir),
     store,
     reply,
@@ -272,6 +275,27 @@ const THIRD_PROMPT = 'Which two words did you reply with? Just the words.'
 const FORK_PROMPT = 'Which word did you reply with? Just the word.'
 const COUNT_PROMPT = 'Count from 1 to 300, one number per line.'
 const ASK_PROMPT = 'What did I ask you to do? Answer in five words.'
+
+it('runs claude in the Tree’s folder with full access, its tools for files, commands and the web but no Subagents, and its own prompt rendered afresh', async () => {
+  const claude = await setUp(['warm.ndjson'])
+  await claude.reply(FIRST_PROMPT)
+  const [report] = claude.reports()
+
+  expect(report?.cwd).toBe(claude.treeFolder)
+  expect(report?.args).toEqual(
+    expect.arrayContaining([
+      '--tools=Bash,Read,Write,Edit,Glob,Grep,NotebookEdit,WebFetch,WebSearch',
+      '--disallowedTools=Agent',
+      '--permission-mode=bypassPermissions',
+      '--allow-dangerously-skip-permissions',
+      '--setting-sources=',
+      '--strict-mcp-config',
+    ])
+  )
+  expect(report?.systemPrompt).toEqual([])
+  expect(report?.appendedPrompt).toBe('')
+  expect(report?.promptSnapshot).toBe(false)
+})
 
 it('streams a Reply, records where Claude saved it, and reports its Context size', async () => {
   const claude = await setUp(['warm.ndjson'])
@@ -1851,7 +1875,7 @@ it('takes over a Thread ChatGPT wrote: a new session, told the whole Thread and 
   const [started] = claude.reports()
 
   expect(started?.args.join(' ')).not.toMatch(/--resume/)
-  expect(started?.systemPrompt.join('')).toBe(explainingLabels('', HANDED_OVER))
+  expect(started?.appendedPrompt).toBe(explainingLabels('', HANDED_OVER))
   expect(events.filter(event => event.type === 'SESSION_REBUILT')).toHaveLength(
     1
   )
@@ -1887,7 +1911,7 @@ it('keeps the line that explains the labels when a rebuilt session resumes in a 
   const [, resumed] = claude.reports()
 
   expect(resumed?.args).toContain(`--resume=${SESSION_ID}`)
-  expect(resumed?.systemPrompt.join('')).toBe(explainingLabels('', thread))
+  expect(resumed?.appendedPrompt).toBe(explainingLabels('', thread))
 })
 
 it('sends a Tree’s first Prompt as written, with no Thread to tell', async () => {

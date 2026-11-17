@@ -140,6 +140,7 @@ async function setUp(
   const fake = await replayCodex()
   cleanUps.push(fake.cleanUp)
   const configDir = folder('uz-codex-home-')
+  const treeFolder = folder('uz-codex-tree-')
   const reports = folder('uz-codex-reports-')
   const idle = heldIdle()
   const exits: Promise<unknown>[] = []
@@ -213,6 +214,7 @@ async function setUp(
       systemPrompt: SYSTEM_PROMPT,
       prompt: {text, messageId: crypto.randomUUID()},
       vendorProgram,
+      treeFolder,
       session: session && {type: 'continue', ...session},
       thread,
       compactionSettings,
@@ -266,6 +268,7 @@ async function setUp(
 
   return {
     configDir,
+    treeFolder,
     store,
     driver,
     vendorProgram,
@@ -1449,6 +1452,29 @@ it('cuts deleted Turns from the loaded thread on the next Prompt, before Codex s
   expect(report?.contexts.at(-1)).toEqual([REWOUND_THREAD_ID, HI_TURN])
 })
 
+it('starts, resumes and forks every thread in the Tree’s folder with full access', async () => {
+  const opened = await setUp(['started.ndjson'])
+  const first = await opened.reply(FIRST_PROMPT)
+  await opened.reply(SECOND_PROMPT, recordedIn(first))
+  await opened.allClosed()
+
+  const resumed = await setUp(['resumed.ndjson'], {store: opened.store})
+  await resumed.reply(THIRD_PROMPT, recordedIn(first))
+
+  const forked = await setUp(['forked.ndjson'], {store: opened.store})
+  await forked.reply(FORK_PROMPT, {...recordedIn(first), type: 'fork'})
+
+  const fullAccess = {sandbox: 'danger-full-access', approvalPolicy: 'never'}
+
+  expect(
+    [opened, resumed, forked].map(codex => codex.reports()[0]?.threadAccess)
+  ).toEqual([
+    [{cwd: opened.treeFolder, ...fullAccess}],
+    [{cwd: resumed.treeFolder, ...fullAccess}],
+    [{cwd: forked.treeFolder, ...fullAccess}],
+  ])
+})
+
 it('starts a Reply in a thread only once a cut of it has finished', async () => {
   const opened = await setUp(['started.ndjson'])
   const first = await opened.reply(FIRST_PROMPT)
@@ -1480,6 +1506,14 @@ it('starts a Reply in a thread only once a cut of it has finished', async () => 
   const [report] = codex.reports()
 
   expect(report?.contexts).toEqual([[THREAD_ID, FIRST_TURN]])
+  // The cut loaded the thread read-only in the config folder.
+  expect(report?.turnAccess).toEqual([
+    {
+      cwd: codex.treeFolder,
+      sandboxPolicy: {type: 'dangerFullAccess'},
+      approvalPolicy: 'never',
+    },
+  ])
 })
 
 it('fails a cut when Codex can’t start', async () => {

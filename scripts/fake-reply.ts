@@ -41,6 +41,7 @@ export async function recordFakeReply(): Promise<ReplyEvent[]> {
     systemPrompt: '',
     prompt: {text: 'Show me everything', messageId: crypto.randomUUID()},
     vendorProgram: {program: null, configDir: '/fake'},
+    treeFolder: '/fake-tree',
     session: null,
     thread: [],
     compactionSettings: {auto: true, threshold: null},

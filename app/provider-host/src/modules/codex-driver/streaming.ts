@@ -369,6 +369,10 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
           },
         ],
         model: request.model,
+        // A thread a cut loaded runs read-only in the config folder until now.
+        cwd: request.treeFolder,
+        approvalPolicy: 'never',
+        sandboxPolicy: {type: 'dangerFullAccess'},
       })
 
       thread.model = request.model

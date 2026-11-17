@@ -19,7 +19,7 @@ import {createRemoteImages} from '#modules/remote-images/main'
 import {createSessions} from '#modules/sessions/main'
 import {createSettings} from '#modules/settings/main'
 import {createTitles} from '#modules/titles/main'
-import {createTreeRows, createTrees} from '#modules/trees/main'
+import {createTreeRows, createTrees, makeTreeFolder} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
 import {signInRequestFor} from '#modules/vendor-programs/main'
 import {
@@ -148,6 +148,7 @@ function openWindow(db: Database) {
     publish: hub.publish,
     hosts,
     vendorProgramFor: provider => signInRequestFor(provider, machine),
+    treeFolderFor: treeId => makeTreeFolder(machine.userData, treeId),
     compactionSettingsFor: provider =>
       compactionSettingsFor(settings.read(), provider),
     listedModels: provider => connections.models(provider),

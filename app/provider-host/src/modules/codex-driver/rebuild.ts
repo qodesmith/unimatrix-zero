@@ -25,10 +25,11 @@ export interface Opened {
 
 export type Restored = Omit<Opened, 'replay' | 'rebuilt'>
 
+/** Full access, until the Permission mode decides (ADR 0022). */
 export function settingsOf(request: ReplyRequest) {
   return {
-    cwd: request.vendorProgram.configDir,
-    sandbox: 'read-only',
+    cwd: request.treeFolder,
+    sandbox: 'danger-full-access',
     approvalPolicy: 'never',
     model: request.model,
     developerInstructions:

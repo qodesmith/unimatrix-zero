@@ -6,6 +6,7 @@ import type {
   SDKMessage,
   SDKPartialAssistantMessage,
   SDKResultMessage,
+  SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
@@ -20,6 +21,15 @@ type BlockDelta = Extract<StreamEvent, {type: 'content_block_delta'}>['delta']
 type MessageUsage = Extract<StreamEvent, {type: 'message_delta'}>['usage']
 
 type RunFinished = Extract<ReplyEvent, {type: 'RUN_FINISHED'}>
+
+type AssistantPart = SDKAssistantMessage['message']['content'][number]
+
+type ToolUse = Extract<AssistantPart, {type: 'tool_use'}>
+
+type ToolResultContent = Extract<
+  Exclude<SDKUserMessage['message']['content'], string>[number],
+  {type: 'tool_result'}
+>['content']
 
 /** What `claude` names the Model of a message it made up, such as an error. */
 const SYNTHETIC_MODEL = '<synthetic>'
@@ -36,10 +46,22 @@ const AbandonedStopSchema = z.looseObject({
   }),
 })
 
+/** A result's text; an image or a document in it is named, not shown. */
+function resultText(content: ToolResultContent) {
+  if (content === undefined) return ''
+
+  if (typeof content === 'string') return content
+
+  return content
+    .map(part => (part.type === 'text' ? part.text : `[${part.type}]`))
+    .join('\n')
+}
+
 /**
  * Turns one Reply's SDK messages into contract events. A message that broke
  * and was sent again has its text replaced as the new one starts; Subagent
- * messages are left out.
+ * messages are left out. The text tracked is the current text part's, which a
+ * tool call ends.
  */
 export function createReplyMapper(ids: ReplyIds) {
   let shown = ''
@@ -54,6 +76,9 @@ export function createReplyMapper(ids: ReplyIds) {
   let mirrorFailed = false
   let lastMessage: {uuid: string; model: string} | null = null
   const signals: ClaudeSignals = {}
+  const toolCalls = new Set<string>()
+  /** The tool call each block of the open message streams, by index. */
+  let toolBlocks: string[] = []
 
   function replace(text: string): ContentEvent[] {
     if (text === shown) return []
@@ -63,7 +88,17 @@ export function createReplyMapper(ids: ReplyIds) {
     return [{...ids, type: 'TEXT_REPLACE', text}]
   }
 
-  function onDelta(delta: BlockDelta): ContentEvent[] {
+  function startToolCall({id, name}: ToolUse): ContentEvent[] {
+    toolCalls.add(id)
+    shown = ''
+    atMessageStart = ''
+    atBlockStart = ''
+    block = null
+
+    return [{...ids, type: 'TOOL_CALL_START', toolCallId: id, toolName: name}]
+  }
+
+  function onDelta(delta: BlockDelta, index: number): ContentEvent[] {
     if (delta.type === 'text_delta') {
       block = (block ?? '') + delta.text
       shown += delta.text
@@ -73,6 +108,14 @@ export function createReplyMapper(ids: ReplyIds) {
 
     if (delta.type === 'thinking_delta') {
       return [{...ids, type: 'REASONING_DELTA', delta: delta.thinking}]
+    }
+
+    const toolCallId = toolBlocks[index]
+
+    if (delta.type === 'input_json_delta' && toolCallId !== undefined) {
+      return [
+        {...ids, type: 'TOOL_CALL_ARGS', toolCallId, delta: delta.partial_json},
+      ]
     }
 
     return []
@@ -104,6 +147,7 @@ export function createReplyMapper(ids: ReplyIds) {
       messageOpen = true
       atMessageStart = shown
       blockStarts = []
+      toolBlocks = []
       atCut = null
 
       return resent
@@ -117,10 +161,18 @@ export function createReplyMapper(ids: ReplyIds) {
         block = ''
       }
 
+      if (event.content_block.type === 'tool_use') {
+        toolBlocks[event.index] = event.content_block.id
+
+        return startToolCall(event.content_block)
+      }
+
       return []
     }
 
-    if (event.type === 'content_block_delta') return onDelta(event.delta)
+    if (event.type === 'content_block_delta') {
+      return onDelta(event.delta, event.index)
+    }
 
     if (event.type === 'message_delta') return [tokens(event.usage)]
 
@@ -156,18 +208,8 @@ export function createReplyMapper(ids: ReplyIds) {
       : undefined
   }
 
-  function onAssistant({
-    message,
-    uuid,
-    error,
-  }: SDKAssistantMessage): ContentEvent[] {
-    signals.assistantError = error
-
-    if (message.model === SYNTHETIC_MODEL) return []
-
-    lastMessage = {uuid, model: message.model}
-
-    const text = message.content
+  function textOf(content: AssistantPart[]): ContentEvent[] {
+    const text = content
       .flatMap(part => (part.type === 'text' ? [part.text] : []))
       .join('')
 
@@ -184,6 +226,55 @@ export function createReplyMapper(ids: ReplyIds) {
     block = text
 
     return replace(atBlockStart + text)
+  }
+
+  /** A tool call streamed has started already; one that wasn't starts whole. */
+  function unstreamedToolCalls(content: AssistantPart[]): ContentEvent[] {
+    return content.flatMap(part =>
+      part.type === 'tool_use' && !toolCalls.has(part.id)
+        ? [
+            ...startToolCall(part),
+            {
+              ...ids,
+              type: 'TOOL_CALL_ARGS' as const,
+              toolCallId: part.id,
+              delta: JSON.stringify(part.input),
+            },
+          ]
+        : []
+    )
+  }
+
+  function onAssistant({
+    message,
+    uuid,
+    error,
+  }: SDKAssistantMessage): ContentEvent[] {
+    signals.assistantError = error
+
+    if (message.model === SYNTHETIC_MODEL) return []
+
+    lastMessage = {uuid, model: message.model}
+
+    return [...textOf(message.content), ...unstreamedToolCalls(message.content)]
+  }
+
+  function onToolResults({message}: SDKUserMessage): ContentEvent[] {
+    if (typeof message.content === 'string') return []
+
+    return message.content.flatMap(part =>
+      part.type === 'tool_result' && toolCalls.has(part.tool_use_id)
+        ? [
+            {
+              ...ids,
+              type: 'TOOL_RESULT' as const,
+              toolCallId: part.tool_use_id,
+              content: resultText(part.content),
+              isError: part.is_error === true,
+            },
+          ]
+        : []
+    )
   }
 
   function trackState(message: SDKMessage) {
@@ -238,6 +329,8 @@ export function createReplyMapper(ids: ReplyIds) {
       if (message.type === 'stream_event') return onStreamEvent(message)
 
       if (message.type === 'assistant') return onAssistant(message)
+
+      if (message.type === 'user') return onToolResults(message)
 
       return []
     },

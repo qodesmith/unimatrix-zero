@@ -47,6 +47,17 @@ const recording = process.env.UZ_RECORD === 'yes'
 
 type Streamed = StartReplyEvent
 
+let sharedTreeFolder: string | null = null
+
+/** One Tree's folder for every Reply, as a Tree's Replies share one. */
+function treeFolder() {
+  sharedTreeFolder ??= fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-tree-'))
+  )
+
+  return sharedTreeFolder
+}
+
 function textOf(events: Streamed[]) {
   return events
     .flatMap(event => (event.type === 'TEXT_DELTA' ? [event.delta] : []))
@@ -118,7 +129,7 @@ function transcriptOf(sessionId: string) {
   return path.join(
     configDir,
     'projects',
-    projectKeyOf(configDir),
+    projectKeyOf(treeFolder()),
     `${sessionId}.jsonl`
   )
 }
@@ -197,6 +208,7 @@ function liveDriver(
         },
         configDir,
       },
+      treeFolder: treeFolder(),
       session,
       thread: [],
       compactionSettings,
