@@ -47,7 +47,7 @@ export function replyOptions(
       ...claudeSettingsOf(request.compactionSettings),
     },
     tools: [...TOOLS],
-    // Subagents wait for #84.
+    // The app can't show Subagents yet (#84).
     disallowedTools: ['Agent'],
     // Full access, until the Permission mode decides (ADR 0022).
     permissionMode: 'bypassPermissions',

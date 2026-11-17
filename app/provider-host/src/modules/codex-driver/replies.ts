@@ -1,8 +1,7 @@
 import type {ContentEvent} from '#modules/reply-runs/main'
-import type {Item, Notification} from './wire'
+import type {Item, Notification, ToolItem} from './wire'
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
-import type {z} from 'zod'
 
 import {codexFailureOf, isBusyStatus} from '#modules/failures/main'
 
@@ -20,8 +19,6 @@ type CodexTurn = Extract<
   Notification,
   {method: 'turn/completed'}
 >['params']['turn']
-
-type ToolItem = z.infer<typeof ToolItemSchema>
 
 /** A malformed tool item reads as some other item, as an unknown one does. */
 function toolItemOf(item: Item): ToolItem | null {

@@ -164,9 +164,12 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     const projectKey = projectKeyOf(request.treeFolder)
     const {resume, fork, upTo} = resumption(request.session, restore)
     let activeConfigDir = configDir
-    const kept = storeFor(request)
+    const appCopy = storeFor(request)
 
-    const sessionStore = appSessionStore(kept, servedThrough(request.session))
+    const sessionStore = appSessionStore(
+      appCopy,
+      servedThrough(request.session)
+    )
 
     // The fallback resumes from the transcript written back, not the store.
     const store =
@@ -208,7 +211,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       model: request.model,
       compactionSettings: request.compactionSettings,
       restore,
-      store: kept,
+      store: appCopy,
       projectKey,
       activeConfigDir: () => activeConfigDir,
       // A fork is a new session, with nothing of its own saved yet.

@@ -213,8 +213,9 @@ const ItemSchema = z.union([
   z.looseObject({type: z.string()}),
 ])
 
-/** A thread item as a notification carries it. */
 export type Item = z.infer<typeof ItemSchema>
+
+export type ToolItem = z.infer<typeof ToolItemSchema>
 
 /**
  * Codex sends no `item/completed` for a compaction that fails or that a hook

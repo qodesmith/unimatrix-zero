@@ -25,12 +25,13 @@ import {fakeStore} from '#modules/test-store/main'
 import {programOf} from '#modules/vendor-program/main'
 import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
-import {spawnSync} from 'node:child_process'
+import {spawn as spawnProcess, spawnSync} from 'node:child_process'
 import {once} from 'node:events'
 import fs from 'node:fs'
 import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
+import {createInterface} from 'node:readline'
 import {StringDecoder} from 'node:string_decoder'
 import {describe, expect, it} from 'vitest'
 import {z} from 'zod'
@@ -88,6 +89,11 @@ const WireLine = z.looseObject({
       willRetry: z.boolean().optional(),
     })
     .optional(),
+})
+
+const FeatureListAnswer = z.looseObject({
+  id: z.literal(2),
+  result: z.looseObject({data: z.array(z.looseObject({name: z.string()}))}),
 })
 
 const ErrorNotice = z.looseObject({
@@ -1957,13 +1963,64 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
 
     const binary = fs.readFileSync(program)
 
+    // A feature's name is held without its `features.` table.
     const settings = CODEX_ARGS.filter(arg => arg !== '-c').map(
-      arg => arg.split('=')[0] ?? ''
+      arg => arg.split('=')[0]?.replace(/^features\./, '') ?? ''
     )
 
     expect(settings.length).toBeGreaterThan(0)
     expect(settings.filter(name => !binary.includes(name))).toEqual([])
   })
+
+  it('[dep:codex-subagents-off] turns off the Subagents Codex turns on by default', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const program = programIn(folder)
+
+    const child = spawnProcess(program, CODEX_ARGS, {
+      cwd: home,
+      env: codexEnvironment(process.env, home),
+      stdio: ['pipe', 'pipe', 'ignore'],
+    })
+
+    const answered = new Promise<unknown>(resolve => {
+      createInterface({input: child.stdout}).on('line', line => {
+        const message = FeatureListAnswer.safeParse(JSON.parse(line))
+
+        if (message.success) resolve(message.data.result.data)
+      })
+    })
+
+    function send(message: {id?: number; method: string; params?: unknown}) {
+      child.stdin.write(`${JSON.stringify(message)}\n`)
+    }
+
+    try {
+      send({
+        id: 1,
+        method: 'initialize',
+        params: {
+          clientInfo: {name: 'uz_live', title: 'UZ live', version: '0'},
+          capabilities: null,
+        },
+      })
+      send({method: 'initialized'})
+      send({id: 2, method: 'experimentalFeature/list', params: {}})
+
+      expect(await answered).toContainEqual(
+        expect.objectContaining({
+          name: 'multi_agent',
+          enabled: false,
+          defaultEnabled: true,
+        })
+      )
+    } finally {
+      child.stdin.end()
+      await once(child, 'exit')
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 60_000)
 
   it('[dep:codex-sign-in-port-and-refusal] holds the refused-workspace wording the app matches, and takes the sign-in port for a sign-in', async () => {
     if (!folder) return

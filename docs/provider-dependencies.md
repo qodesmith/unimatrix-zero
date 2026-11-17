@@ -392,6 +392,17 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Changed by:** upgrade
 - **Check:** `[dep:codex-full-access]` in `codex-driver`: a Reply writes a file in the Tree's folder and runs a command there.
 
+### Codex's Subagents turned off
+
+- **Id:** `codex-subagents-off`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** Codex turns its `multi_agent` feature on by default, which lets the Model start Subagents, and `features.multi_agent=false` turns it off.
+- **App side:** `codex-driver`'s environment turns it off, as `claude-driver` leaves out Claude's `Agent` tool, until the app can show Subagents. Under full access a Subagent could write and run anything, with nothing in the Reply to show it.
+- **User would see:** a Reply that hands work to Subagents the Reply never shows.
+- **Changed by:** upgrade
+- **Check:** `[dep:codex-subagents-off]` in `codex-driver`: the app-server, started as the app starts it, lists `multi_agent` as on by default and off.
+
 ### A thread resumed in another folder
 
 - **Id:** `codex-resume-moved-folder`

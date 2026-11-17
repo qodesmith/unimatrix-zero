@@ -71,7 +71,6 @@ export const FakeClaudeRunSchema = z.strictObject({
   clientComposed: z.array(z.boolean()),
   /** Empty when `claude` runs its own. */
   systemPrompt: z.array(z.string()),
-  /** What goes after `claude`'s own. */
   appendedPrompt: z.string().nullable(),
   /** False when `claude` renders the System prompt afresh each request. */
   promptSnapshot: z.boolean().nullable(),
