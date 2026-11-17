@@ -177,7 +177,6 @@ export function createReplyMapper(ids: ReplyIds) {
     ]
   }
 
-  /** A tool call's result, a compaction or a finished message. */
   function onItemCompleted(item: Item, threadId: string): ContentEvent[] {
     const tool = toolItemOf(item)
 

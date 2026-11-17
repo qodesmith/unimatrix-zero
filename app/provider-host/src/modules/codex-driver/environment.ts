@@ -6,7 +6,7 @@ import {vendorEnvironment} from '#modules/vendor-environment/main'
  * which the app never writes. `cli_auth_credentials_store="file"` keeps the
  * sign-in in `CODEX_HOME`, inside the data folder, should Codex's default move
  * to the Keychain. `features.multi_agent=false` leaves Subagents out until the
- * app can show them (#84).
+ * app can show them.
  */
 export const CODEX_ARGS = [
   '-c',
