@@ -51,7 +51,7 @@ The files the AI creates and edits in a Tree, kept as they stood at every Reply,
 _Avoid_: Workspace, project, plain Tree (every Tree has files)
 
 **Linked folder**:
-A folder of the user's that a Tree works in, chosen with "Work in a folder…": the Tree's files live there and the AI works there. It holds one Thread at a time, "the Thread in the folder"; the other Threads have Working copies in the app. A _folder_, on its own, always means a real folder on disk; the sidebar's groups of Trees are Collections.
+A folder of the user's that a Tree works in, chosen with "Work in a folder…": the Tree's files live there and the AI works there. It holds one Thread at a time, "the Thread in the folder"; the other Threads have Working copies in the app. A Tree can stop working in its Linked folder, which leaves the folder as it is. A _folder_, on its own, always means a real folder on disk; the sidebar's groups of Trees are Collections.
 _Avoid_: Project, workspace, repo
 
 **Snapshot**:
@@ -67,11 +67,11 @@ Changes the user made by hand to the Tree's files between Replies, recorded as t
 _Avoid_: Manual change, local change
 
 **Not versioned**:
-Said of an edit the AI makes to a file outside the Tree's files, such as `~/.zshrc`: every Branch shares the one real file, no Snapshot holds the edit, and the Reply marks it _not versioned_.
+Said of an edit the AI makes to a file outside the Tree's files, such as `~/.zshrc`: every Branch shares the one real file and no Snapshot holds the edit. The Reply marks an edit _not versioned_ only when the AI made it by editing that file; a command's writes are not marked, and the Reply shows the command instead.
 _Avoid_: External edit, side effect
 
 **Sandbox**:
-The boundary the Provider's program puts around every command the AI runs under Auto-accept edits or Supervised: it can write only in the Working copy, cannot read the user's credentials, and cannot reach the internet without the user's approval. It holds whether or not the user approved the command; the approval card decides if a command runs, the Sandbox decides what it can reach. Full access has none.
+The boundary the Provider's program puts around every command the AI runs in every Permission mode but Full access: it can write only in the Working copy, cannot read the user's credentials, and cannot reach the internet unless it is approved. It holds whether or not the command was approved; the Approval card or the Reviewer decides if a command runs, the Sandbox decides what it can reach. Full access has none.
 _Avoid_: Fence, jail, container, VM, working copy
 
 ### Conversation structure
@@ -172,7 +172,7 @@ A named group of Trees in the sidebar, made by the user. A Tree is in at most on
 _Avoid_: Folder, project, group
 
 **Settings**:
-The single place for the user's global preferences: how the app looks and behaves, and the defaults new Trees start from. Settings never changes an existing Tree, except the Compaction Settings, which apply to every Thread from its next Reply, and the Permission mode, which every Tree follows; anything else that shapes what the AI does in one Tree belongs to that Tree.
+The single place for the user's global preferences: how the app looks and behaves, and the defaults new Trees start from. Settings never changes an existing Tree, except the Compaction Settings, which apply to every Thread from its next Reply, and the Permission mode, which every Tree follows and which can also be changed beside the Input; anything else that shapes what the AI does in one Tree belongs to that Tree.
 _Avoid_: Preferences, options, config
 
 **Compaction Settings**:
@@ -195,8 +195,12 @@ _Avoid_: Tool settings, capabilities, permissions panel
 The question a Reply pauses on when the AI wants to do something the Permission mode or the Tree does not let it do on its own, such as run a command, edit a file, or reach a host. Once answered (Allow once, Always allow in this Tree, or Deny) it collapses into a chip with the outcome; approval history is not stored, and an Always allow holds for every Branch of the Tree.
 _Avoid_: Permission prompt, confirmation dialog, tool approval
 
+**Reviewer**:
+The Provider's own AI that, under the Auto Permission mode, decides in the user's place whether the AI may do something that would otherwise need an Approval card. Its decision shows in the Reply as a chip with its reason, and the user cannot overrule it there.
+_Avoid_: Guardian, classifier, auto-review
+
 **Permission mode**:
-The global Setting that decides what the AI may do without asking, in every Tree: _Full access_ (the default: nothing asks and there is no Sandbox), _Auto_ (the Provider's own reviewer decides), _Auto-accept edits_ (edits to the Tree's files go ahead and other edits ask; commands run inside the Sandbox without asking, and leaving it asks) or _Supervised_ (every edit and command asks). Reading a file never asks.
+The global Setting that decides what the AI may do without asking, in every Tree, from the next Reply: _Full access_ (the default: nothing asks and there is no Sandbox), _Auto_ (the Reviewer decides instead of the user), _Auto-accept edits_ (edits to the Tree's files go ahead and other edits ask; commands run inside the Sandbox without asking, and leaving it asks) or _Supervised_ (every edit asks, and so does every command except read-only ones). Reading a file never asks.
 _Avoid_: YOLO, bypass permissions, permission level, capability tier
 
 **Export**:
