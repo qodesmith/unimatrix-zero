@@ -203,7 +203,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **App side:** `claude-driver` names its tools for files, commands and the web, and runs every Reply in the Tree's folder with full access, until the Permission mode decides (ADR 0022). Its Reply mapper shows each tool call and its result.
 - **User would see:** a Reply that can't open, write or run anything, that stalls on a permission request nothing answers, or that starts Subagents or background jobs the app can't show.
 - **Changed by:** upgrade
-- **Check:** `[dep:claude-tools-full-access]` in `claude-driver`: a Reply writes a file in the Tree's folder and runs a command there, `claude` lists the named tools and no `Agent` or `Task`, and sends no control request.
+- **Check:** `[dep:claude-tools-full-access]` in `claude-driver`: a Reply writes a file in the Tree's folder and runs a command there, `claude` lists exactly the named tools, so no `Agent` or `Task`, and sends no control request.
 
 ### A session resumed in another folder
 

@@ -828,6 +828,96 @@ it('keeps the blocks of a cut-off message that come before the first one Claude 
   await claude.allClosed()
 })
 
+/**
+ * `tools.ndjson` with a message before its first: the text "Let me write.",
+ * then a Write cut off mid-arguments and ended by `stop`, if any.
+ */
+function toolCallCutOff(stop: RecordedLine[]) {
+  return edited('tools.ndjson', lines => {
+    const start = lines.findIndex(line => isOut(line, '"message_start"'))
+    const startLine = lines[start]
+
+    if (!startLine) throw new Error('The recording has no message_start')
+
+    return [
+      ...lines.slice(0, start),
+      startLine,
+      streamed({
+        type: 'content_block_start',
+        index: 0,
+        content_block: {type: 'text', text: '', citations: null},
+      }),
+      streamed({
+        type: 'content_block_delta',
+        index: 0,
+        delta: {type: 'text_delta', text: 'Let me write.'},
+      }),
+      streamed({type: 'content_block_stop', index: 0}),
+      streamed({
+        type: 'content_block_start',
+        index: 1,
+        content_block: {
+          type: 'tool_use',
+          id: 'toolu_cut',
+          name: 'Write',
+          input: {},
+        },
+      }),
+      streamed({
+        type: 'content_block_delta',
+        index: 1,
+        delta: {type: 'input_json_delta', partial_json: '{"file_pa'},
+      }),
+      ...stop,
+      ...lines.slice(start),
+    ]
+  })
+}
+
+const SHOWN_AFTER_CUT_TOOL_CALL = [
+  {type: 'text', text: 'Let me write.'},
+  {
+    type: 'tool-call',
+    toolCallId: 'toolu_cut',
+    toolName: 'Write',
+    args: '{"file_pa',
+    result: {content: 'Cut off and sent again.', isError: true},
+  },
+  expect.objectContaining({type: 'tool-call', toolName: 'Write'}),
+  expect.objectContaining({type: 'tool-call', toolName: 'Bash'}),
+  {type: 'text', text: 'HERON'},
+]
+
+it('ends a tool call Claude threw away as failed, and shows the text before it once', async () => {
+  const claude = await setUp([
+    toolCallCutOff([
+      {
+        kind: 'out',
+        message: {
+          type: 'stream_event',
+          event: {type: 'message_stop'},
+          abandoned_blocks: {api_message_id: 'msg_cut', from_block_index: 1},
+          session_id: SESSION_ID,
+          parent_tool_use_id: null,
+          uuid: crypto.randomUUID(),
+        },
+      },
+    ]),
+  ])
+
+  const events = await claude.reply('Write notes.txt, then cat it.')
+
+  expect(shown(events).content).toEqual(SHOWN_AFTER_CUT_TOOL_CALL)
+})
+
+it('ends a tool call as failed when its message never stopped and starts over', async () => {
+  const claude = await setUp([toolCallCutOff([])])
+
+  const events = await claude.reply('Write notes.txt, then cat it.')
+
+  expect(shown(events).content).toEqual(SHOWN_AFTER_CUT_TOOL_CALL)
+})
+
 it('shows thinking as it streams, and never as part of the Reply', async () => {
   const thinking = edited('warm.ndjson', lines => {
     const start = lines.findIndex(

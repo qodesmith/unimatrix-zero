@@ -1817,6 +1817,56 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       }
     }
   }, 300_000)
+
+  it('[dep:codex-subagents-off] turns off the Subagents Codex turns on by default', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const program = programIn(folder)
+
+    const child = spawnProcess(program, CODEX_ARGS, {
+      cwd: home,
+      env: codexEnvironment(process.env, home),
+      stdio: ['pipe', 'pipe', 'ignore'],
+    })
+
+    const answered = new Promise<unknown>(resolve => {
+      createInterface({input: child.stdout}).on('line', line => {
+        const message = FeatureListAnswer.safeParse(JSON.parse(line))
+
+        if (message.success) resolve(message.data.result.data)
+      })
+    })
+
+    function send(message: {id?: number; method: string; params?: unknown}) {
+      child.stdin.write(`${JSON.stringify(message)}\n`)
+    }
+
+    try {
+      send({
+        id: 1,
+        method: 'initialize',
+        params: {
+          clientInfo: {name: 'uz_live', title: 'UZ live', version: '0'},
+          capabilities: null,
+        },
+      })
+      send({method: 'initialized'})
+      send({id: 2, method: 'experimentalFeature/list', params: {}})
+
+      expect(await answered).toContainEqual(
+        expect.objectContaining({
+          name: 'multi_agent',
+          enabled: false,
+          defaultEnabled: true,
+        })
+      )
+    } finally {
+      child.stdin.end()
+      await once(child, 'exit')
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 60_000)
 })
 
 describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
@@ -1971,56 +2021,6 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
     expect(settings.length).toBeGreaterThan(0)
     expect(settings.filter(name => !binary.includes(name))).toEqual([])
   })
-
-  it('[dep:codex-subagents-off] turns off the Subagents Codex turns on by default', async () => {
-    if (!folder || !signedIn) return
-
-    const home = homeFrom(signedIn)
-    const program = programIn(folder)
-
-    const child = spawnProcess(program, CODEX_ARGS, {
-      cwd: home,
-      env: codexEnvironment(process.env, home),
-      stdio: ['pipe', 'pipe', 'ignore'],
-    })
-
-    const answered = new Promise<unknown>(resolve => {
-      createInterface({input: child.stdout}).on('line', line => {
-        const message = FeatureListAnswer.safeParse(JSON.parse(line))
-
-        if (message.success) resolve(message.data.result.data)
-      })
-    })
-
-    function send(message: {id?: number; method: string; params?: unknown}) {
-      child.stdin.write(`${JSON.stringify(message)}\n`)
-    }
-
-    try {
-      send({
-        id: 1,
-        method: 'initialize',
-        params: {
-          clientInfo: {name: 'uz_live', title: 'UZ live', version: '0'},
-          capabilities: null,
-        },
-      })
-      send({method: 'initialized'})
-      send({id: 2, method: 'experimentalFeature/list', params: {}})
-
-      expect(await answered).toContainEqual(
-        expect.objectContaining({
-          name: 'multi_agent',
-          enabled: false,
-          defaultEnabled: true,
-        })
-      )
-    } finally {
-      child.stdin.end()
-      await once(child, 'exit')
-      fs.rmSync(home, {recursive: true, force: true})
-    }
-  }, 60_000)
 
   it('[dep:codex-sign-in-port-and-refusal] holds the refused-workspace wording the app matches, and takes the sign-in port for a sign-in', async () => {
     if (!folder) return

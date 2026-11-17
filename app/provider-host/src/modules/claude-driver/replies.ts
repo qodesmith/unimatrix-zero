@@ -31,6 +31,9 @@ type ToolResultContent = Extract<
   {type: 'tool_result'}
 >['content']
 
+/** A tool call's result when `claude` threw its block away to send it again. */
+const CUT_OFF = 'Cut off and sent again.'
+
 /** What `claude` names the Model of a message it made up, such as an error. */
 const SYNTHETIC_MODEL = '<synthetic>'
 
@@ -57,9 +60,10 @@ function resultText(content: ToolResultContent) {
 
 /**
  * Turns one Reply's SDK messages into contract events. A message that broke
- * and was sent again has its text replaced as the new one starts; Subagent
- * messages are left out. The text tracked is the current text part's, which a
- * tool call ends.
+ * and was sent again has its text replaced as the new one starts, and each
+ * tool call in the blocks thrown away ends as failed; Subagent messages are
+ * left out. The text tracked is the current text part's, which a tool call
+ * ends.
  */
 export function createReplyMapper(ids: ReplyIds) {
   let shown = ''
@@ -92,6 +96,18 @@ export function createReplyMapper(ids: ReplyIds) {
     atMessageStart = ''
 
     return [{...ids, type: 'TOOL_CALL_START', toolCallId: id, toolName: name}]
+  }
+
+  function endToolCallsFrom(index: number): ContentEvent[] {
+    return toolBlocks.slice(index).flatMap(toolCallId => [
+      {
+        ...ids,
+        type: 'TOOL_RESULT' as const,
+        toolCallId,
+        content: CUT_OFF,
+        isError: true,
+      },
+    ])
   }
 
   function onDelta(delta: BlockDelta, index: number): ContentEvent[] {
@@ -138,6 +154,7 @@ export function createReplyMapper(ids: ReplyIds) {
 
     if (event.type === 'message_start') {
       // A message that never stopped was cut off and is being sent again.
+      const cut = messageOpen ? endToolCallsFrom(0) : []
       const from = messageOpen ? atMessageStart : atCut
       const resent = from === null ? [] : replace(from)
       messageOpen = true
@@ -146,7 +163,7 @@ export function createReplyMapper(ids: ReplyIds) {
       toolBlocks = []
       atCut = null
 
-      return resent
+      return [...cut, ...resent]
     }
 
     if (event.type === 'content_block_start') {
@@ -172,21 +189,28 @@ export function createReplyMapper(ids: ReplyIds) {
 
     if (event.type === 'message_delta') return [tokens(event.usage)]
 
-    if (event.type === 'content_block_stop') block = null
-    else onMessageStop(message)
+    if (event.type === 'content_block_stop') {
+      block = null
 
-    return []
+      return []
+    }
+
+    return onMessageStop(message)
   }
 
   /** The blocks before the first one `claude` threw away stay in the session. */
-  function onMessageStop(message: SDKPartialAssistantMessage) {
+  function onMessageStop(message: SDKPartialAssistantMessage): ContentEvent[] {
     messageOpen = false
     const stop = AbandonedStopSchema.safeParse(message)
 
-    if (stop.success) {
-      const from = stop.data.abandoned_blocks.from_block_index
-      atCut = blockStarts[from] ?? shown
-    }
+    if (!stop.success) return []
+
+    const from = stop.data.abandoned_blocks.from_block_index
+    const cut = endToolCallsFrom(from)
+    // A tool call's part can't be taken back: only the text after it can go.
+    atCut = cut.length > 0 ? '' : (blockStarts[from] ?? shown)
+
+    return cut
   }
 
   /** `claude` reports the context window only with the result, per Model. */

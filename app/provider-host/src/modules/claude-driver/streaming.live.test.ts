@@ -1065,18 +1065,19 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       return parsed.success ? [parsed.data] : []
     })
 
-    expect(init?.tools).toEqual(
-      expect.arrayContaining([
+    expect(init?.tools.toSorted()).toEqual(
+      [
         'Bash',
         'Read',
         'Write',
         'Edit',
+        'Glob',
+        'Grep',
+        'NotebookEdit',
         'WebFetch',
         'WebSearch',
-      ])
+      ].toSorted()
     )
-    expect(init?.tools).not.toContain('Agent')
-    expect(init?.tools).not.toContain('Task')
     expect(init?.permissionMode).toBe('bypassPermissions')
     expect(lines.filter(line => line.type === 'control_request')).toEqual([])
 
