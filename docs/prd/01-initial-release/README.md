@@ -4,7 +4,7 @@ Unimatrix Zero is a free desktop app (Electron; Mac, Windows, Linux) that drives
 
 This document is the v1 spec, assembled from the decisions on the [Unimatrix Zero v1 spec](https://github.com/qodesmith/unimatrix-zero/issues/1) map. It is an index with detail: each section states what was decided and links the ticket that holds the full reasoning. The vocabulary is [`GLOSSARY.md`](../../../GLOSSARY.md); the hard-to-reverse choices are in [`docs/adr/`](../../adr/). Where this document, a ticket and an ADR disagree, the ADR wins, then the ticket's latest resolution or amendment, then this document.
 
-**Status:** complete. The last live check, native Windows ([#58](https://github.com/qodesmith/unimatrix-zero/issues/58)), corrected ADR 0018's Codex-on-Windows line ([PR #61](https://github.com/qodesmith/unimatrix-zero/pull/61)).
+**Status:** complete. The last live check, native Windows ([#58](https://github.com/qodesmith/unimatrix-zero/issues/58)), corrected ADR 0018's Codex-on-Windows line ([PR #61](https://github.com/qodesmith/unimatrix-zero/pull/61)). [ADR 0022](../../adr/0022-one-kind-of-tree-and-permission-modes.md) later replaced plain Trees, Workspace tiers, YOLO and the attachment rule; §6, §8, §9, §10 and §17 carry it.
 
 ## Sections
 
@@ -17,8 +17,8 @@ Each section is its own file, sized to be read alone by whoever works one implem
 5. [Canvas mode and chat mode](./05-canvas-mode-and-chat-mode.md)
 6. [The Input: Prompts, attachments, Models](./06-the-input-prompts-attachments-models.md)
 7. [Replies](./07-replies.md)
-8. [System prompts, the Tools panel, approvals and YOLO](./08-system-prompts-the-tools-panel-approvals-and-yolo.md)
-9. [Workspaces](./09-workspaces.md)
+8. [System prompts, the Tools panel, approvals and Permission modes](./08-system-prompts-the-tools-panel-approvals-and-permission-modes.md)
+9. [The Tree's files](./09-the-trees-files.md)
 10. [The Sandbox](./10-the-sandbox.md)
 11. [Subagents](./11-subagents.md)
 12. [Sidebar, Collections and search](./12-sidebar-collections-and-search.md)
@@ -38,27 +38,30 @@ Each section is its own file, sized to be read alone by whoever works one implem
 
 **ADRs**
 
-| ADR                                                                               | Decision                                                                                  |
-| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| [0001](../../adr/0001-app-owns-the-tree.md)                                       | The app owns the Tree; Provider sessions are disposable copies                            |
-| [0002](../../adr/0002-uuidv7-ids.md)                                              | UUIDv7 ids everywhere                                                                     |
-| [0003](../../adr/0003-migration-foreign-key-guard.md)                             | Migrations behind a backup and a foreign-key guard                                        |
-| [0004](../../adr/0004-app-keeps-provider-session-data.md)                         | The app keeps its own copy of Provider session data; deleting rewinds the session         |
-| [0005](../../adr/0005-no-ai-library.md)                                           | No AI library                                                                             |
-| [0006](../../adr/0006-unsigned-distribution.md)                                   | Unsigned distribution; the infrastructure and secrets rules                               |
-| [0007](../../adr/0007-thin-shell-signed-app-bundles.md)                           | Thin shell with signed app bundles; versioning; the manifest                              |
-| [0008](../../adr/0008-app-managed-vendor-programs.md)                             | App-managed vendor programs with isolated config                                          |
-| [0009](../../adr/0009-themes-are-versioned-token-only-json.md)                    | Themes are versioned, token-only JSON                                                     |
-| [0010](../../adr/0010-linked-folder-holds-one-thread.md)                          | A linked folder holds one Thread; one hidden store per Workspace; never delete on its own |
-| [0011](../../adr/0011-archives-are-their-own-versioned-format.md)                 | Archives are their own versioned format                                                   |
-| [0012](../../adr/0012-stable-identity-separate-from-display-name.md)              | Stored identity is separate from the display name                                         |
-| [0013](../../adr/0013-utility-process-per-provider-main-is-the-hub.md)            | One utility process per Provider; main is the hub                                         |
-| [0014](../../adr/0014-electron-security-posture.md)                               | Electron security posture                                                                 |
-| [0015](../../adr/0015-types-derive-from-schemas-ipc-contract.md)                  | Types derive from schemas; the IPC contract is its own source of truth                    |
-| [0016](../../adr/0016-releases-built-and-signed-on-the-maintainers-machine.md)    | Releases are built and signed on the maintainer's machine                                 |
-| [0017](../../adr/0017-reports-go-through-a-stateless-relay-into-github-issues.md) | Reports go through a stateless relay into GitHub Issues                                   |
-| [0018](../../adr/0018-commands-run-inside-the-vendor-sandbox.md)                  | Commands run inside the vendor Sandbox; YOLO removes it                                   |
-| [0019](../../adr/0019-canvas-is-a-display-for-the-tree.md)                        | Canvas mode is a display for the Tree, rendered with React Flow; chat mode is a slideout  |
+| ADR                                                                               | Decision                                                                                             |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| [0001](../../adr/0001-app-owns-the-tree.md)                                       | The app owns the Tree; Provider sessions are disposable copies                                       |
+| [0002](../../adr/0002-uuidv7-ids.md)                                              | UUIDv7 ids everywhere                                                                                |
+| [0003](../../adr/0003-migration-foreign-key-guard.md)                             | Migrations behind a backup and a foreign-key guard                                                   |
+| [0004](../../adr/0004-app-keeps-provider-session-data.md)                         | The app keeps its own copy of Provider session data; deleting rewinds the session                    |
+| [0005](../../adr/0005-no-ai-library.md)                                           | No AI library                                                                                        |
+| [0006](../../adr/0006-unsigned-distribution.md)                                   | Unsigned distribution; the infrastructure and secrets rules                                          |
+| [0007](../../adr/0007-thin-shell-signed-app-bundles.md)                           | Thin shell with signed app bundles; versioning; the manifest                                         |
+| [0008](../../adr/0008-app-managed-vendor-programs.md)                             | App-managed vendor programs with isolated config                                                     |
+| [0009](../../adr/0009-themes-are-versioned-token-only-json.md)                    | Themes are versioned, token-only JSON                                                                |
+| [0010](../../adr/0010-linked-folder-holds-one-thread.md)                          | A linked folder holds one Thread; one hidden store per Tree; never delete on its own                 |
+| [0011](../../adr/0011-archives-are-their-own-versioned-format.md)                 | Archives are their own versioned format                                                              |
+| [0012](../../adr/0012-stable-identity-separate-from-display-name.md)              | Stored identity is separate from the display name                                                    |
+| [0013](../../adr/0013-utility-process-per-provider-main-is-the-hub.md)            | One utility process per Provider; main is the hub                                                    |
+| [0014](../../adr/0014-electron-security-posture.md)                               | Electron security posture                                                                            |
+| [0015](../../adr/0015-types-derive-from-schemas-ipc-contract.md)                  | Types derive from schemas; the IPC contract is its own source of truth                               |
+| [0016](../../adr/0016-releases-built-and-signed-on-the-maintainers-machine.md)    | Releases are built and signed on the maintainer's machine                                            |
+| [0017](../../adr/0017-reports-go-through-a-stateless-relay-into-github-issues.md) | Reports go through a stateless relay into GitHub Issues                                              |
+| [0018](../../adr/0018-commands-run-inside-the-vendor-sandbox.md)                  | Commands run inside the vendor Sandbox; amended by 0022: only under Auto-accept edits and Supervised |
+| [0019](../../adr/0019-canvas-is-a-display-for-the-tree.md)                        | Canvas mode is a display for the Tree, rendered with React Flow; chat mode is a slideout             |
+| [0020](../../adr/0020-renderer-ui-is-shadcn-on-base-ui.md)                        | Renderer UI is shadcn on Base UI                                                                     |
+| [0021](../../adr/0021-layout-is-kept-apart-from-settings.md)                      | Layout is kept apart from Settings                                                                   |
+| [0022](../../adr/0022-one-kind-of-tree-and-permission-modes.md)                   | One kind of Tree under a Permission mode, Full access by default; attachments reach the AI by path   |
 
 Decisions deliberately left without an ADR, because they sit behind one function or are cheap to reverse: the replay mechanism (#10), Summaries (#28), disk usage (#29), the subscription-terms posture (#21).
 

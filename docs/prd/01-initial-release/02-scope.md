@@ -1,6 +1,6 @@
 # 2. Scope
 
-**In v1:** Claude and ChatGPT; canvas mode and chat mode on one Tree; Mac, Windows and Linux; attachments; Workspaces (files the AI edits, app-owned or a linked folder, with Snapshots per Reply); Subagents; MCP servers, Skills and Plugins; Summaries; Export, Archive and restore; full-text search; usage display; Themes (format, built-ins, import/export); Reports.
+**In v1:** Claude and ChatGPT; canvas mode and chat mode on one Tree; Mac, Windows and Linux; attachments of any type, given to the AI by path; the Tree's files (files the AI edits, in the app or a linked folder, with Snapshots per Reply) in every Tree; Permission modes; Subagents; MCP servers, Skills and Plugins; Summaries; Export, Archive and restore; full-text search; usage display; Themes (format, built-ins, import/export); Reports.
 
 **Out of scope** (ruled out on the map; a redraw of the destination is a new effort):
 
