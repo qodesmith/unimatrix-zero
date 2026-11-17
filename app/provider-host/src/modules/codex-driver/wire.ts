@@ -185,7 +185,13 @@ const CommandExecutionItemSchema = z.looseObject({
 }) satisfies z.ZodType<
   Pick<
     ItemOf<'commandExecution'>,
-    'type' | 'id' | 'command' | 'status' | 'aggregatedOutput' | 'exitCode'
+    | 'type'
+    | 'id'
+    | 'command'
+    | 'cwd'
+    | 'status'
+    | 'aggregatedOutput'
+    | 'exitCode'
   >
 >
 
@@ -200,7 +206,11 @@ const FileChangeItemSchema = z.looseObject({
     })
   ),
   status: ToolStatusSchema,
-}) satisfies z.ZodType<Pick<ItemOf<'fileChange'>, 'type' | 'id' | 'status'>>
+}) satisfies z.ZodType<
+  Pick<ItemOf<'fileChange'>, 'type' | 'id' | 'status'> & {
+    changes: Pick<ItemOf<'fileChange'>['changes'][number], 'path' | 'diff'>[]
+  }
+>
 
 export const ToolItemSchema = z.union([
   CommandExecutionItemSchema,

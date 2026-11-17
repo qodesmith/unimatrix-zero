@@ -45,14 +45,34 @@ function command(method: 'item/started' | 'item/completed'): Notification {
 
 it('replaces only the text after a tool call, and keeps a message the call cut short', () => {
   const mapper = createReplyMapper(ids)
-  mapper.map(delta('a', 'Let me look'))
-  mapper.map(command('item/started'))
-  mapper.map(command('item/completed'))
 
   expect([
+    ...mapper.map(delta('a', 'Let me look')),
+    ...mapper.map(command('item/started')),
+    ...mapper.map(command('item/completed')),
     ...mapper.map(delta('b', 'One fil')),
     ...mapper.map(message('b', 'One file.')),
   ]).toEqual([
+    {...ids, type: 'TEXT_DELTA', delta: 'Let me look'},
+    {
+      ...ids,
+      type: 'TOOL_CALL_START',
+      toolCallId: 'cmd',
+      toolName: 'commandExecution',
+    },
+    {
+      ...ids,
+      type: 'TOOL_CALL_ARGS',
+      toolCallId: 'cmd',
+      delta: JSON.stringify({command: 'ls', cwd: '/tree'}),
+    },
+    {
+      ...ids,
+      type: 'TOOL_RESULT',
+      toolCallId: 'cmd',
+      content: 'notes.txt\n',
+      isError: false,
+    },
     {...ids, type: 'TEXT_DELTA', delta: 'One fil'},
     {...ids, type: 'TEXT_REPLACE', text: 'One file.'},
   ])
