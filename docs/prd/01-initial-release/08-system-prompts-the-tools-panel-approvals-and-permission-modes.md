@@ -11,7 +11,7 @@ Source: [Capability tiers and system prompts](https://github.com/qodesmith/unima
 - **Permission modes.** One global Setting ([§17](./17-settings-and-themes.md)), modeled on T3 Code's, that replaces YOLO ([ADR 0022](../../adr/0022-one-kind-of-tree-and-permission-modes.md)). Reads never ask in any mode, because Codex cannot restrict them and a read card would be a promise only Claude keeps.
   - **Full access** (the default): no approval cards and no Sandbox. Claude `permissionMode: 'bypassPermissions'` with `allowDangerouslySkipPermissions`; Codex `danger-full-access` with `approval_policy: never`. Nothing is protected, credentials included; the maintainer accepts that risk.
   - **Auto:** the vendor's own reviewer decides. Claude `permissionMode: 'auto'`; Codex `on-request` with its `auto_review` reviewer.
-  - **Auto-accept edits:** edits inside the Tree's files go ahead; edits elsewhere and every command get a card. Commands run inside the Sandbox ([§10](./10-the-sandbox.md)).
+  - **Auto-accept edits:** edits inside the Tree's files go ahead, and edits elsewhere get a card. Commands run inside the Sandbox without asking; leaving it gets a card ([§10](./10-the-sandbox.md)).
   - **Supervised:** every edit and every command gets a card. Commands run inside the Sandbox.
   - "Always allow in this Tree" still covers trust in one Tree. Whether a Tree or a Prompt can also pick its own mode, as in T3 Code, is open (below).
 
@@ -20,4 +20,4 @@ Source: [Capability tiers and system prompts](https://github.com/qodesmith/unima
 - Which system prompt every Tree runs: the vendors' agent prompts with the System prompt appended, or the System prompt alone, and what the first choice costs a cold first Turn on Claude, which re-read about 36k tokens of Claude Code's prompt and tool definitions in [#7](https://github.com/qodesmith/unimatrix-zero/issues/7) ([ADR 0022](../../adr/0022-one-kind-of-tree-and-permission-modes.md), open).
 - Whether the Permission mode is only global or also per Tree or per Prompt, and when a change reaches a streaming Reply (ADR 0022, open).
 - Claude's `permissionMode: 'auto'` under subscription sign-in with `settingSources: []` (Agent SDK 0.3.307), Codex's `auto_review` through `app-server`, whether the Sandbox holds in Auto, and what the user sees when either reviewer refuses (ADR 0022, open).
-- The exact settings for Auto-accept edits and Supervised: Claude `acceptEdits` and `default` with the Sandbox's automatic approval of sandboxed commands off, and the Codex settings that give the same cards (ADR 0022, open).
+- The exact settings for Supervised: Claude `default` with the Sandbox's automatic approval of sandboxed commands off, and the Codex approval policy that gives every command a card (ADR 0022, open). Auto-accept edits keeps ADR 0018's: Claude `acceptEdits` with sandboxed commands approved automatically, Codex `on-request`.

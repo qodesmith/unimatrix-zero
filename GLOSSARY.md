@@ -196,7 +196,7 @@ The question a Reply pauses on when the AI wants to do something the Permission 
 _Avoid_: Permission prompt, confirmation dialog, tool approval
 
 **Permission mode**:
-The global Setting that decides what the AI may do without asking, in every Tree: _Full access_ (the default: nothing asks and there is no Sandbox), _Auto_ (the Provider's own reviewer decides), _Auto-accept edits_ (edits to the Tree's files go ahead; other edits and commands ask) or _Supervised_ (every edit and command asks). Reading a file never asks.
+The global Setting that decides what the AI may do without asking, in every Tree: _Full access_ (the default: nothing asks and there is no Sandbox), _Auto_ (the Provider's own reviewer decides), _Auto-accept edits_ (edits to the Tree's files go ahead and other edits ask; commands run inside the Sandbox without asking, and leaving it asks) or _Supervised_ (every edit and command asks). Reading a file never asks.
 _Avoid_: YOLO, bypass permissions, permission level, capability tier
 
 **Export**:
