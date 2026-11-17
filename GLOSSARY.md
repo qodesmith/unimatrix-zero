@@ -46,24 +46,32 @@ _Avoid_: Integration, extension, connector (reserved for claude.ai's own connect
 A folder bundling Skills and MCP servers, added in Settings. The app uses only those parts: its Skills and MCP servers appear under the Plugin and can be switched on and off together or one by one, and anything else it contains is not supported.
 _Avoid_: Extension, add-on, package
 
-**Workspace**:
-An optional property of a Tree: a set of files the AI can create and edit as part of the conversation. Each Reply has the files as they stood when it finished. The files live either in the app (_app-owned_) or in a folder of the user's (_linked folder_). A Tree without a Workspace is a _plain_ Tree: it has no files, though it may still use tools such as web search. A Workspace lets the AI either _write files_ or _write files and run commands_. A _folder_, on its own, always means a real folder on the user's disk; the sidebar's groups of Trees are Collections.
-_Avoid_: Project, folder, agent mode, dev mode
+**Tree's files**:
+The files the AI creates and edits in a Tree, kept as they stood at every Reply, so each Branch has its own. Every Tree has them: they live in the Tree's own folder in the app, which appears only once the AI first writes a file, or in a Linked folder. A file anywhere else on disk is outside them.
+_Avoid_: Workspace, project, plain Tree (every Tree has files)
+
+**Linked folder**:
+A folder of the user's that a Tree works in, chosen with "Work in a folder…": the Tree's files live there and the AI works there. It holds one Thread at a time, "the Thread in the folder"; the other Threads have Working copies in the app. A Tree can stop working in its Linked folder, which leaves the folder as it is. A _folder_, on its own, always means a real folder on disk; the sidebar's groups of Trees are Collections.
+_Avoid_: Project, workspace, repo
 
 **Snapshot**:
-A Workspace's files as they stood when one Reply finished, or when a User edit was recorded.
+The Tree's files as they stood when one Reply finished, or when a User edit was recorded.
 _Avoid_: Checkpoint, commit, version
 
 **Working copy**:
-A folder on disk holding one Thread's current files, where the AI works for that Thread. A linked folder is always the working copy of exactly one Thread, called "the Thread in the folder".
+A folder on disk holding one Thread's current files, where the AI works for that Thread. A Linked folder is always the Working copy of exactly one Thread, called "the Thread in the folder".
 _Avoid_: Worktree, sandbox
 
 **User edit**:
-Changes the user made by hand to a Workspace's files between Replies, recorded as their own Snapshot.
+Changes the user made by hand to the Tree's files between Replies, recorded as their own Snapshot.
 _Avoid_: Manual change, local change
 
+**Not versioned**:
+Said of an edit the AI makes to a file outside the Tree's files, such as `~/.zshrc`: every Branch shares the one real file and no Snapshot holds the edit. The Reply marks an edit _not versioned_ only when the AI made it by editing that file; a command's writes are not marked, and the Reply shows the command instead.
+_Avoid_: External edit, side effect
+
 **Sandbox**:
-The boundary the Provider's program puts around every command the AI runs in a Workspace: it can write only in the working copy, cannot read the user's credentials, and cannot reach the internet without the user's approval. It holds whether or not the user approved the command; the approval card decides if a command runs, the Sandbox decides what it can reach. Only YOLO removes it.
+The boundary the Provider's program puts around every command the AI runs in every Permission mode but Full access: it can write only in the Working copy, cannot read the user's credentials, and cannot reach the internet unless it is approved. It holds whether or not the command was approved; the Approval card or the Reviewer decides if a command runs, the Sandbox decides what it can reach. Full access has none.
 _Avoid_: Fence, jail, container, VM, working copy
 
 ### Conversation structure
@@ -79,6 +87,14 @@ _Avoid_: Node, box, message
 **Prompt**:
 A user's Turn: exactly one message. A Prompt always follows a Reply (except the root) and is followed by at most one Reply.
 _Avoid_: User message, question
+
+**Attachment**:
+A file of any type the user sends with a Prompt. The Tree keeps a copy as it was when sent, and the AI gets its path, plus the file itself where the Model takes that type directly. Naming a path in a Prompt instead points the AI at the live file.
+_Avoid_: Upload
+
+**Extraction**:
+The text, and for a PDF the page images, the app takes from an Attachment when it is attached, kept beside it so a Model that can't read the original can read these.
+_Avoid_: Conversion, preview
 
 **Reply**:
 The AI's Turn in response to one Prompt, however many internal messages, tool calls, or thinking blocks it contains.
@@ -156,7 +172,7 @@ A named group of Trees in the sidebar, made by the user. A Tree is in at most on
 _Avoid_: Folder, project, group
 
 **Settings**:
-The single place for the user's global preferences: how the app looks and behaves, and the defaults new Trees start from. Settings never changes an existing Tree, except the Compaction Settings, which apply to every Thread from its next Reply; anything else that shapes what the AI does in one Tree belongs to that Tree.
+The single place for the user's global preferences: how the app looks and behaves, and the defaults new Trees start from. Settings never changes an existing Tree, except the Compaction Settings, which apply to every Thread from its next Reply, and the Permission mode, which every Tree follows and which can also be changed beside the Input; anything else that shapes what the AI does in one Tree belongs to that Tree.
 _Avoid_: Preferences, options, config
 
 **Compaction Settings**:
@@ -172,16 +188,20 @@ How the window is arranged, such as whether the sidebar is open, which the app r
 _Avoid_: Window state, UI state, view state
 
 **Tools panel**:
-A Tree's own list of what the AI may use there: web search, Subagents, each MCP server, Skill and Plugin, the Provider's own built-in tools and account connectors, and the Workspace's permission level. New Trees start from the defaults in Settings; changing the panel changes only that Tree.
+A Tree's own list of what the AI may use there: web search, Subagents, each MCP server, Skill and Plugin, and the Provider's own built-in tools and account connectors. New Trees start from the defaults in Settings; changing the panel changes only that Tree.
 _Avoid_: Tool settings, capabilities, permissions panel
 
 **Approval card**:
-The question a Reply pauses on when the AI wants to do something the Tree does not let it do on its own, such as run a command, write outside the Workspace, or reach a host. Once answered (Allow once, Always allow in this Tree, or Deny) it collapses into a chip with the outcome; approval history is not stored, and an Always allow holds for every Branch of the Tree.
+The question a Reply pauses on when the AI wants to do something the Permission mode or the Tree does not let it do on its own, such as run a command, edit a file, or reach a host. Once answered (Allow once, Always allow in this Tree, or Deny) it collapses into a chip with the outcome; approval history is not stored, and an Always allow holds for every Branch of the Tree.
 _Avoid_: Permission prompt, confirmation dialog, tool approval
 
-**YOLO**:
-A global Setting, off by default, for users who take the AI's risks on themselves: the app stops asking for approval and removes the Sandbox. It never changes what a Tree can do: tools that are off stay off, a write files Workspace still runs no commands, and a plain Tree stays plain.
-_Avoid_: Bypass permissions, full access, auto mode
+**Reviewer**:
+The Provider's own AI that, under the Auto Permission mode, decides in the user's place whether the AI may do something that would otherwise need an Approval card. Its decision shows in the Reply as a chip with its reason, and the user cannot overrule it there.
+_Avoid_: Guardian, classifier, auto-review
+
+**Permission mode**:
+The global Setting that decides what the AI may do without asking, in every Tree, from the next Reply: _Full access_ (the default: nothing asks and there is no Sandbox), _Auto_ (the Reviewer decides instead of the user), _Auto-accept edits_ (edits to the Tree's files go ahead and other edits ask; commands run inside the Sandbox without asking, and leaving it asks) or _Supervised_ (every edit asks, and so does every command except read-only ones). Reading a file never asks.
+_Avoid_: YOLO, bypass permissions, permission level, capability tier
 
 **Export**:
 A one-way, human-readable copy of a Thread or a Tree, written as Markdown. An Export can never be restored.
