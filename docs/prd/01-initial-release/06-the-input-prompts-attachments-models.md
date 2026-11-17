@@ -17,7 +17,7 @@ Source: [Canvas mode UX](https://github.com/qodesmith/unimatrix-zero/issues/14),
 
 ## Verify while building
 
-- The hidden extraction window: a spike verifying it was running when [ADR 0022](../../adr/0022-one-kind-of-tree-and-permission-modes.md) was written; if it fails, extraction is reopened.
+- The hidden extraction window on Windows, Linux and in a packaged build, which the spike ([#262](https://github.com/qodesmith/unimatrix-zero/issues/262#issuecomment-6950240100)) did not test.
 - JPEG page image sizes against the spike's PNG sizes (scanned pages averaged 1.2 MB as PNG).
 - The exact wording of each chip's line per type and Provider.
 - Claude's exact limit weighting for cached tokens, which the re-read note's wording assumes ([#7](https://github.com/qodesmith/unimatrix-zero/issues/7)).
