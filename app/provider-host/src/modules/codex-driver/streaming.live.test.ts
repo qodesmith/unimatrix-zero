@@ -1728,6 +1728,113 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 180_000)
 
+  it('[dep:codex-full-access] writes a file in the Tree’s folder in a Reply on a thread a cut loaded and kept loaded', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+
+    const tree = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-tree-'))
+    )
+
+    const idle = heldIdle()
+    const exits: Promise<unknown>[] = []
+
+    const vendorProgram: SignInRequest = {
+      program: {
+        path: folder,
+        build: {
+          url: 'https://example.com/codex.tar.gz',
+          sha256: '0'.repeat(64),
+          size: 1,
+          archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+        },
+      },
+      configDir: home,
+    }
+
+    const driver = createCodexDriver({
+      store: fakeStore().client,
+      spawn: (command, options) => {
+        const child = spawnCodex(command, options)
+        exits.push(once(child, 'exit').catch(() => undefined))
+
+        return child
+      },
+      whenIdle: idle.whenIdle,
+    })
+
+    async function reply(text: string, session: SessionRef | null) {
+      const events = await Array.fromAsync(
+        driver.startReply({
+          treeId: crypto.randomUUID(),
+          replyId: crypto.randomUUID(),
+          model: MODEL,
+          systemPrompt: 'You answer in as few words as you can.',
+          prompt: {text, messageId: crypto.randomUUID()},
+          vendorProgram,
+          treeFolder: tree,
+          session: session && {...session, type: 'continue'},
+          thread: [],
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+        })
+      )
+
+      expectComplete(events)
+
+      const prompted = events.find(
+        (event): event is PromptRecorded => event.type === 'PROMPT_RECORDED'
+      )
+
+      const recorded = events.find(
+        (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+      )
+
+      if (!prompted || !recorded) throw new Error('The Reply was not recorded')
+
+      return {prompted, recorded}
+    }
+
+    try {
+      const hi = await reply('Say hi in three words.', null)
+
+      const bye = await reply(
+        'Now say bye in three words.',
+        hi.recorded.session
+      )
+
+      idle.pass()
+      await Promise.all(exits)
+
+      const kept = hi.recorded.session
+
+      await expect(
+        driver.cutSession({
+          session: {
+            type: 'cut',
+            ...kept,
+            keepThrough: kept.messageId,
+            dropFrom: bye.prompted.session.messageId,
+          },
+          vendorProgram,
+        })
+      ).resolves.toBe(true)
+
+      await reply(TOOLS_PROMPT, kept)
+
+      expect(fs.readFileSync(path.join(tree, 'notes.txt'), 'utf8').trim()).toBe(
+        'HERON'
+      )
+      expect(fs.readdirSync(tree)).toEqual(['notes.txt'])
+
+      idle.pass()
+      await Promise.all(exits)
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+      fs.rmSync(tree, {recursive: true, force: true})
+    }
+  }, 300_000)
+
   it('[dep:codex-resume-moved-folder] resumes a thread from the app’s copy alone in a Tree folder other than the one it started in, and works there', async () => {
     if (!folder || !signedIn) return
 

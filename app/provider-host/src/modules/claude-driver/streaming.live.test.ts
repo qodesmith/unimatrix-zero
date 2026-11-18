@@ -1140,7 +1140,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     }
   }, 300_000)
 
-  it('[dep:claude-prompt-fresh] adds the System prompt after Claude Code’s own, and applies a changed one to the session it resumes', async () => {
+  it('[dep:claude-prompt-fresh] applies a changed System prompt to the session it resumes', async () => {
     const live = liveDriver([])
 
     async function replyUnder(

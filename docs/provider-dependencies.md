@@ -102,7 +102,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Provider:** Claude
 - **Relies on:** an undocumented order: the complete `assistant` message for a text block arrives after its deltas and before its `content_block_stop`, and a second `message_start` with no `message_stop` between means the message is being sent again in full after a broken stream. When `claude` cuts a message off mid-stream and retries, the message ends with a `message_stop` carrying `abandoned_blocks: {api_message_id, from_block_index}`, a field the SDK types don't name. The blocks before `from_block_index` stay in the session, and the next `message_start` begins the message over.
 - **App side:** `claude-driver`'s Reply mapper replaces an open block's streamed text with the full text of the `assistant` message. On a second `message_start` it resets the text shown to where that message began. After an abandoned message it resets the text to where block `from_block_index` began, as the next message starts. Each tool call in the thrown-away blocks, or in a message sent again, ends as failed with "Cut off and sent again." A tool call's part stays, so when one is cut only the text after the last tool call is reset.
-- **User would see:** doubled Reply text if the order changed, or if `abandoned_blocks` were renamed. If a broken stream carried on instead of starting over, the Reply would lose the text from before the break. If `abandoned_blocks` were renamed, a thrown-away tool call would never get a result.
+- **User would see:** doubled Reply text if the order changed. If `abandoned_blocks` were renamed, doubled Reply text, and a thrown-away tool call that never gets a result. If a broken stream carried on instead of starting over, the Reply would lose the text from before the break.
 - **Changed by:** upgrade + drift. The stream events come from the API, and how a broken stream recovers is up to `claude` and the servers.
 - **Check:** `[dep:stream-event-order]` in `claude-driver`: a Reply's text is shown once, and a Reply whose connection is cut mid-message shows the text the session holds, once. A second `message_start` with no `message_stop` between has no check: no cut has caused one.
 
@@ -225,7 +225,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **App side:** `claude-driver` appends the System prompt, and the line explaining Reply labels, to Claude Code's prompt each time a session opens.
 - **User would see:** a changed System prompt that a continued Thread ignores.
 - **Changed by:** upgrade
-- **Check:** `[dep:claude-prompt-fresh]` in `claude-driver`: a session resumed under a changed System prompt follows the new one.
+- **Check:** `[dep:claude-prompt-fresh]` in `claude-driver`: a session resumed under a changed System prompt follows the new one. That Claude Code's own prompt runs before `append` has no check.
 
 ### One-shots with no tools
 
@@ -390,7 +390,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **App side:** `codex-driver` runs every thread and every turn in the Tree's folder with full access, until the Permission mode decides (ADR 0022). A turn carries the settings too, because a thread a cut loaded runs read-only in the config folder until then. Its Reply mapper shows `fileChange` and `commandExecution` items as tool calls with their results.
 - **User would see:** a Reply that can't write or run anything, or that works in the config folder.
 - **Changed by:** upgrade
-- **Check:** `[dep:codex-full-access]` in `codex-driver`: a Reply writes a file in the Tree's folder and runs a command there.
+- **Check:** `[dep:codex-full-access]` in `codex-driver`: a Reply writes a file in the Tree's folder and runs a command there, and a Reply on a thread a cut loaded read-only does the same.
 
 ### Codex's Subagents turned off
 
