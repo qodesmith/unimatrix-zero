@@ -31,13 +31,16 @@ type ToolResultContent = Extract<
   {type: 'tool_result'}
 >['content']
 
-/** A tool call's result when `claude` threw its block away to send it again. */
-const CUT_OFF = 'Cut off and sent again.'
-
 /** What `claude` names the Model of a message it made up, such as an error. */
 const SYNTHETIC_MODEL = '<synthetic>'
 
 type ReplyIds = Pick<ReplyRequest, 'treeId' | 'replyId'>
+
+/** Where a message `claude` cut off starts over, and the tool calls it drops. */
+interface Cut {
+  text: string
+  toolCalls: string[]
+}
 
 /**
  * Not in the SDK's types: how `claude` ends a message cut off mid-stream, on
@@ -60,10 +63,9 @@ function resultText(content: ToolResultContent) {
 
 /**
  * Turns one Reply's SDK messages into contract events. A message that broke
- * and was sent again has its text replaced as the new one starts, and each
- * tool call in the blocks thrown away ends as failed; Subagent messages are
- * left out. The text tracked is the current text part's, which a tool call
- * ends.
+ * and was sent again is cut back, tool calls and all, as the new one starts;
+ * Subagent messages are left out. The text tracked is the current text part's,
+ * which a tool call ends.
  */
 export function createReplyMapper(ids: ReplyIds) {
   let shown = ''
@@ -73,8 +75,8 @@ export function createReplyMapper(ids: ReplyIds) {
   /** The text shown as each block of the open message began, by index. */
   let blockStarts: string[] = []
   let messageOpen = false
-  /** The text shown before the blocks `claude` cut off and will start over. */
-  let atCut: string | null = null
+  /** Where the blocks `claude` cut off, and will send again, began. */
+  let atCut: Cut | null = null
   let mirrorFailed = false
   let lastMessage: {uuid: string; model: string} | null = null
   const signals: ClaudeSignals = {}
@@ -93,21 +95,24 @@ export function createReplyMapper(ids: ReplyIds) {
   function startToolCall({id, name}: ToolUse): ContentEvent[] {
     toolCalls.add(id)
     shown = ''
-    atMessageStart = ''
 
     return [{...ids, type: 'TOOL_CALL_START', toolCallId: id, toolName: name}]
   }
 
-  function endToolCallsFrom(index: number): ContentEvent[] {
-    return toolBlocks.slice(index).flatMap(toolCallId => [
-      {
-        ...ids,
-        type: 'TOOL_RESULT' as const,
-        toolCallId,
-        content: CUT_OFF,
-        isError: true,
-      },
-    ])
+  /** From block `index` of the open message, which began with `text` shown. */
+  function cutFrom(index: number, text: string): Cut {
+    return {text, toolCalls: toolBlocks.slice(index).filter(Boolean)}
+  }
+
+  function cutBack({text, toolCalls: dropped}: Cut): ContentEvent[] {
+    const [toolCallId] = dropped
+
+    if (toolCallId === undefined) return replace(text)
+
+    for (const id of dropped) toolCalls.delete(id)
+    shown = text
+
+    return [{...ids, type: 'CONTENT_CUT_BACK', toolCallId, text}]
   }
 
   function onDelta(delta: BlockDelta, index: number): ContentEvent[] {
@@ -154,16 +159,15 @@ export function createReplyMapper(ids: ReplyIds) {
 
     if (event.type === 'message_start') {
       // A message that never stopped was cut off and is being sent again.
-      const cut = messageOpen ? endToolCallsFrom(0) : []
-      const from = messageOpen ? atMessageStart : atCut
-      const resent = from === null ? [] : replace(from)
+      const cut = messageOpen ? cutFrom(0, atMessageStart) : atCut
+      const resent = cut === null ? [] : cutBack(cut)
       messageOpen = true
       atMessageStart = shown
       blockStarts = []
       toolBlocks = []
       atCut = null
 
-      return [...cut, ...resent]
+      return resent
     }
 
     if (event.type === 'content_block_start') {
@@ -195,22 +199,20 @@ export function createReplyMapper(ids: ReplyIds) {
       return []
     }
 
-    return onMessageStop(message)
+    onMessageStop(message)
+
+    return []
   }
 
   /** The blocks before the first one `claude` threw away stay in the session. */
-  function onMessageStop(message: SDKPartialAssistantMessage): ContentEvent[] {
+  function onMessageStop(message: SDKPartialAssistantMessage) {
     messageOpen = false
     const stop = AbandonedStopSchema.safeParse(message)
 
-    if (!stop.success) return []
+    if (!stop.success) return
 
     const from = stop.data.abandoned_blocks.from_block_index
-    const cut = endToolCallsFrom(from)
-    // A tool call's part can't be taken back: only the text after it can go.
-    atCut = cut.length > 0 ? '' : (blockStarts[from] ?? shown)
-
-    return cut
+    atCut = cutFrom(from, blockStarts[from] ?? shown)
   }
 
   /** `claude` reports the context window only with the result, per Model. */

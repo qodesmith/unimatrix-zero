@@ -35,9 +35,27 @@ function withToolCall(
   )
 }
 
+function cutBack(
+  content: ReplyPart[],
+  toolCallId: string,
+  text: string
+): ReplyPart[] {
+  const at = content.findIndex(
+    part => part.type === 'tool-call' && part.toolCallId === toolCallId
+  )
+
+  if (at === -1) return content
+
+  const kept = content.slice(0, at)
+  const before = kept.at(-1)?.type === 'text' ? kept.slice(0, -1) : kept
+
+  return text === '' ? before : [...before, {type: 'text', text}]
+}
+
 const CONTENT_EVENT_TYPES = [
   'TEXT_DELTA',
   'TEXT_REPLACE',
+  'CONTENT_CUT_BACK',
   'TOOL_CALL_START',
   'TOOL_CALL_ARGS',
   'TOOL_RESULT',
@@ -63,6 +81,10 @@ function foldContent(content: ReplyPart[], event: ContentEvent): ReplyPart[] {
 
   if (event.type === 'TEXT_REPLACE') {
     return withLastText(content, () => event.text)
+  }
+
+  if (event.type === 'CONTENT_CUT_BACK') {
+    return cutBack(content, event.toolCallId, event.text)
   }
 
   if (event.type === 'TOOL_CALL_START') {

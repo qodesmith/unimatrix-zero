@@ -828,31 +828,53 @@ it('keeps the blocks of a cut-off message that come before the first one Claude 
   await claude.allClosed()
 })
 
+/** The text "Let me write." as block 0. */
+function leadIn() {
+  return [
+    streamed({
+      type: 'content_block_start',
+      index: 0,
+      content_block: {type: 'text', text: '', citations: null},
+    }),
+    streamed({
+      type: 'content_block_delta',
+      index: 0,
+      delta: {type: 'text_delta', text: 'Let me write.'},
+    }),
+    streamed({type: 'content_block_stop', index: 0}),
+  ]
+}
+
+/** The recorded first message, its one block moved behind `leadIn()`. */
+function withLeadIn(message: RecordedLine[]) {
+  return message.map(line =>
+    isOut(line, '"index":0')
+      ? RecordedLineSchema.parse(
+          JSON.parse(JSON.stringify(line).replace('"index":0', '"index":1'))
+        )
+      : line
+  )
+}
+
 /**
  * `tools.ndjson` with a message before its first: the text "Let me write.",
- * then a Write cut off mid-arguments and ended by `stop`, if any.
+ * then a Write cut off mid-arguments and ended by `stop`, if any. With
+ * `resentInFull`, the first message is sent again with that text before it.
  */
-function toolCallCutOff(stop: RecordedLine[]) {
+function toolCallCutOff(stop: RecordedLine[], resentInFull = false) {
   return edited('tools.ndjson', lines => {
     const start = lines.findIndex(line => isOut(line, '"message_start"'))
+    const end = lines.findIndex(line => isOut(line, '"message_stop"'))
     const startLine = lines[start]
 
     if (!startLine) throw new Error('The recording has no message_start')
 
+    const first = lines.slice(start + 1, end + 1)
+
     return [
       ...lines.slice(0, start),
       startLine,
-      streamed({
-        type: 'content_block_start',
-        index: 0,
-        content_block: {type: 'text', text: '', citations: null},
-      }),
-      streamed({
-        type: 'content_block_delta',
-        index: 0,
-        delta: {type: 'text_delta', text: 'Let me write.'},
-      }),
-      streamed({type: 'content_block_stop', index: 0}),
+      ...leadIn(),
       streamed({
         type: 'content_block_start',
         index: 1,
@@ -869,26 +891,25 @@ function toolCallCutOff(stop: RecordedLine[]) {
         delta: {type: 'input_json_delta', partial_json: '{"file_pa'},
       }),
       ...stop,
-      ...lines.slice(start),
+      startLine,
+      ...(resentInFull ? [...leadIn(), ...withLeadIn(first)] : first),
+      ...lines.slice(end + 1),
     ]
   })
 }
 
 const SHOWN_AFTER_CUT_TOOL_CALL = [
   {type: 'text', text: 'Let me write.'},
-  {
+  expect.objectContaining({
     type: 'tool-call',
-    toolCallId: 'toolu_cut',
     toolName: 'Write',
-    args: '{"file_pa',
-    result: {content: 'Cut off and sent again.', isError: true},
-  },
-  expect.objectContaining({type: 'tool-call', toolName: 'Write'}),
+    result: expect.objectContaining({isError: false}),
+  }),
   expect.objectContaining({type: 'tool-call', toolName: 'Bash'}),
   {type: 'text', text: 'HERON'},
 ]
 
-it('ends a tool call Claude threw away as failed, and shows the text before it once', async () => {
+it('takes back a tool call Claude threw away, and shows the text before it once', async () => {
   const claude = await setUp([
     toolCallCutOff([
       {
@@ -910,8 +931,8 @@ it('ends a tool call Claude threw away as failed, and shows the text before it o
   expect(shown(events).content).toEqual(SHOWN_AFTER_CUT_TOOL_CALL)
 })
 
-it('ends a tool call as failed when its message never stopped and starts over', async () => {
-  const claude = await setUp([toolCallCutOff([])])
+it('takes back a tool call and the text before it when its message never stopped and is sent again in full', async () => {
+  const claude = await setUp([toolCallCutOff([], true)])
 
   const events = await claude.reply('Write notes.txt, then cat it.')
 
