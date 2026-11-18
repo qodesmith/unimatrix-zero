@@ -171,7 +171,7 @@ function prettyArgs(args: string) {
 
 const TOOL_PROGRESS = {
   running: {label: 'running…', status: 'running'},
-  cutOff: {label: 'cut off', status: 'error'},
+  cutOff: {label: 'cut off', status: undefined},
   failed: {label: 'failed', status: 'error'},
   done: {label: 'done', status: undefined},
 } as const

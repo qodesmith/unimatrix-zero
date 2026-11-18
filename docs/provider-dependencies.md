@@ -104,7 +104,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **App side:** `claude-driver`'s Reply mapper replaces an open block's streamed text with the full text of the `assistant` message. On a second `message_start` it resets the text shown to where that message began. After an abandoned message it resets the text to where block `from_block_index` began, as the next message starts. Each tool call in the thrown-away blocks, or in a message sent again, ends as failed with "Cut off and sent again." A tool call's part stays, so when one is cut only the text after the last tool call is reset.
 - **User would see:** doubled Reply text if the order changed. If `abandoned_blocks` were renamed, doubled Reply text, and a thrown-away tool call that never gets a result. If a broken stream carried on instead of starting over, the Reply would lose the text from before the break.
 - **Changed by:** upgrade + drift. The stream events come from the API, and how a broken stream recovers is up to `claude` and the servers.
-- **Check:** `[dep:stream-event-order]` in `claude-driver`: a Reply's text is shown once, and a Reply whose connection is cut mid-message shows the text the session holds, once. A second `message_start` with no `message_stop` between has no check: no cut has caused one.
+- **Check:** `[dep:stream-event-order]` in `claude-driver`: a Reply's text is shown once, and a Reply whose connection is cut mid-message shows the text the session holds, once. A second `message_start` with no `message_stop` between has no check: no cut has caused one. A tool call in thrown-away blocks has no check: the cut Reply makes none.
 
 ### A Reply waits hours for the connection
 

@@ -261,7 +261,7 @@ it('shows the tool call as running until its result arrives', async () => {
     .toBeVisible()
 })
 
-it('shows a tool call with no result as cut off once its Reply has stopped or been interrupted', async () => {
+it('shows a tool call with no result as cut off, not as an error, once its Reply has stopped or been interrupted', async () => {
   const content: Reply['content'] = [
     {
       type: 'tool-call',
@@ -279,8 +279,15 @@ it('shows a tool call with no result as cut off once its Reply has stopped or be
 
   const toolCalls = screen.getByRole('group', {name: 'Tool call Bash'})
 
-  await expect.element(toolCalls.nth(0).getByText('cut off')).toBeVisible()
-  await expect.element(toolCalls.nth(1).getByText('cut off')).toBeVisible()
+  for (const nth of [0, 1]) {
+    const cutOff = toolCalls.nth(nth).getByText('cut off')
+
+    await expect.element(cutOff).toBeVisible()
+    expect(cutOff.element().parentElement).not.toHaveAttribute(
+      'data-status',
+      'error'
+    )
+  }
 })
 
 it('highlights the code block', async () => {
