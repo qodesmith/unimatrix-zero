@@ -1702,6 +1702,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       expect(fs.readFileSync(path.join(tree, 'notes.txt'), 'utf8').trim()).toBe(
         'HERON'
       )
+      expect(fs.readdirSync(tree)).toEqual(['notes.txt'])
 
       const calls = events
         .filter(isReplyEvent)

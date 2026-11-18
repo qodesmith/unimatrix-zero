@@ -64,7 +64,7 @@ it('replaces only the text after a tool call, and keeps a message the call cut s
       ...ids,
       type: 'TOOL_CALL_ARGS',
       toolCallId: 'cmd',
-      delta: JSON.stringify({command: 'ls', cwd: '/tree'}),
+      delta: '{"command":"ls","cwd":"/tree"}',
     },
     {
       ...ids,

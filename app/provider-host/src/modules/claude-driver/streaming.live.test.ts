@@ -1046,47 +1046,62 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
   it('[dep:claude-tools-full-access] writes a file in the Tree’s folder and runs a command there, asking nothing, with Claude Code’s tools but no Subagents, and shows each tool call', async () => {
     const live = liveDriver(['tools.ndjson'])
-    const notes = path.join(treeFolder(), 'notes.txt')
-    fs.rmSync(notes, {force: true})
 
-    const {events} = await live.reply(TOOLS_PROMPT, null)
-
-    expect(fs.readFileSync(notes, 'utf8').trim()).toBe('HERON')
-
-    const calls = events
-      .filter(isReplyEvent)
-      .reduce(foldReplyEvent, NEW_REPLY)
-      .content.flatMap(part => (part.type === 'tool-call' ? [part] : []))
-
-    expect(calls.map(call => call.toolName)).toEqual(['Write', 'Bash'])
-    expect(calls.every(call => call.result?.isError === false)).toBe(true)
-    expect(shownText(events)).toMatch(/HERON\s*$/)
-
-    const lines = live.printed.map(line => JSON.parse(line))
-
-    const [init] = lines.flatMap(line => {
-      const parsed = InitLine.safeParse(line)
-
-      return parsed.success ? [parsed.data] : []
-    })
-
-    expect(init?.tools.toSorted()).toEqual(
-      [
-        'Bash',
-        'Read',
-        'Write',
-        'Edit',
-        'Glob',
-        'Grep',
-        'NotebookEdit',
-        'WebFetch',
-        'WebSearch',
-      ].toSorted()
+    const tree = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-tree-'))
     )
-    expect(init?.permissionMode).toBe('bypassPermissions')
-    expect(lines.filter(line => line.type === 'control_request')).toEqual([])
 
-    await live.done()
+    try {
+      const events = await Array.fromAsync(
+        live.driver.startReply({
+          ...live.request(TOOLS_PROMPT, null),
+          treeFolder: tree,
+        })
+      )
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+      expect(fs.readFileSync(path.join(tree, 'notes.txt'), 'utf8').trim()).toBe(
+        'HERON'
+      )
+      expect(fs.readdirSync(tree)).toEqual(['notes.txt'])
+
+      const calls = events
+        .filter(isReplyEvent)
+        .reduce(foldReplyEvent, NEW_REPLY)
+        .content.flatMap(part => (part.type === 'tool-call' ? [part] : []))
+
+      expect(calls.map(call => call.toolName)).toEqual(['Write', 'Bash'])
+      expect(calls.every(call => call.result?.isError === false)).toBe(true)
+      expect(shownText(events)).toMatch(/HERON\s*$/)
+
+      const lines = live.printed.map(line => JSON.parse(line))
+
+      const [init] = lines.flatMap(line => {
+        const parsed = InitLine.safeParse(line)
+
+        return parsed.success ? [parsed.data] : []
+      })
+
+      expect(init?.tools.toSorted()).toEqual(
+        [
+          'Bash',
+          'Read',
+          'Write',
+          'Edit',
+          'Glob',
+          'Grep',
+          'NotebookEdit',
+          'WebFetch',
+          'WebSearch',
+        ].toSorted()
+      )
+      expect(init?.permissionMode).toBe('bypassPermissions')
+      expect(lines.filter(line => line.type === 'control_request')).toEqual([])
+
+      await live.done()
+    } finally {
+      fs.rmSync(tree, {recursive: true, force: true})
+    }
   }, 300_000)
 
   it('[dep:claude-resume-moved-folder] resumes a session from the app’s copy alone in a Tree folder other than the one it started in, and works there', async () => {
