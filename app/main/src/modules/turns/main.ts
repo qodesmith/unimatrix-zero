@@ -176,6 +176,7 @@ export function createTurns({
       // Before the Prompt is saved: once it is, the Reply it answers has a
       // Prompt after it, and its session would fork.
       const session = sessionOn(provider, {treeId, parentReplyId}, failed)
+
       const treeFolder = treeFolderFor(treeId)
 
       const {prompt, reply} = insertExchange(db, {

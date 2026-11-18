@@ -114,9 +114,13 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     if (request.session) await warm.closed(request.session.sessionId)
 
     const {resume} = resumption(request.session, restore)
-    const projectKey = projectKeyOf(request.vendorProgram.configDir)
 
-    return resume ? deps.store.loadFiles({projectKey, sessionId: resume}) : []
+    return resume
+      ? storeFor(request).loadFiles({
+          projectKey: projectKeyOf(request.treeFolder),
+          sessionId: resume,
+        })
+      : []
   }
 
   /** Until `claude` starts, Stop ends the Reply with nothing to interrupt. */
