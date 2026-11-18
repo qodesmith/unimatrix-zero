@@ -1307,7 +1307,6 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
       const limits = retries.map(line => line.max_retries ?? 0)
 
-      expect(limits.length).toBeGreaterThan(0)
       expect(Math.max(...limits)).toBeGreaterThanOrEqual(300)
       expect(events.some(event => event.type === 'RECONNECTING')).toBe(true)
       expect(

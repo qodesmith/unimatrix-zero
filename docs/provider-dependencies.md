@@ -115,7 +115,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **App side:** `claude-driver` starts `claude` for Replies with it, after its environment strips every `CLAUDE_*` variable. One-shots start without it.
 - **User would see:** if the variable stopped working, a Reply that loses the network fails with "Connection lost" after 3 to 5 minutes instead of going on when the network is back. If an interrupt stopped ending the wait, Stop would leave the Reply waiting for hours.
 - **Changed by:** upgrade
-- **Check:** `[dep:claude-retry-watchdog]` in `claude-driver`: a Reply whose connections are refused for 6 minutes, past the default retries, completes once they're let through, and the largest limit `claude` reports on an `api_retry` line is 300. Some lines report less, since `claude` caps a line's limit at its attempt plus a retry budget other retries can use up. A Reply stopped during a wait within one attempt, while connections are still refused, ends stopped and goes on from it once they're let through.
+- **Check:** `[dep:claude-retry-watchdog]` in `claude-driver`: a Reply whose connections are refused for 6 minutes, past the default retries, completes once they're let through, and the largest limit `claude` reports on an `api_retry` line is at least 300. Some lines report less: for a failure with a smaller budget of its own, such as a stream timeout, `claude` caps a line's limit at its attempt plus what is left of that budget. A Reply stopped during a wait within one attempt, while connections are still refused, ends stopped and goes on from it once they're let through.
 
 ### A Reply at a usage limit fails at once
 
