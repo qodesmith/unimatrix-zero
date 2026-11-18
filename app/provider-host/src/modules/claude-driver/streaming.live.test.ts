@@ -61,11 +61,15 @@ const InitLine = z.looseObject({
 
 let sharedTreeFolder: string | null = null
 
-/** One Tree's folder for every Reply, as a Tree's Replies share one. */
-function treeFolder() {
-  sharedTreeFolder ??= fs.realpathSync(
+function newTreeFolder() {
+  return fs.realpathSync(
     fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-tree-'))
   )
+}
+
+/** One Tree's folder for every Reply, as a Tree's Replies share one. */
+function treeFolder() {
+  sharedTreeFolder ??= newTreeFolder()
 
   return sharedTreeFolder
 }
@@ -1047,9 +1051,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
   it('[dep:claude-tools-full-access] writes a file in the Tree’s folder and runs a command there, asking nothing, with Claude Code’s tools but no Subagents, and shows each tool call', async () => {
     const live = liveDriver(['tools.ndjson'])
 
-    const tree = fs.realpathSync(
-      fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-tree-'))
-    )
+    const tree = newTreeFolder()
 
     try {
       const events = await Array.fromAsync(
@@ -1111,9 +1113,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.closed()
     forgetTranscript(first.recorded.session.sessionId)
 
-    const moved = fs.realpathSync(
-      fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-tree-'))
-    )
+    const moved = newTreeFolder()
 
     try {
       const events = await Array.fromAsync(

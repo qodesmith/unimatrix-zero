@@ -65,11 +65,15 @@ function homeFrom(source: string) {
 
 let sharedTreeFolder: string | null = null
 
-/** One Tree's folder for every Reply, as a Tree's Replies share one. */
-function treeFolder() {
-  sharedTreeFolder ??= fs.realpathSync(
+function newTreeFolder() {
+  return fs.realpathSync(
     fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-tree-'))
   )
+}
+
+/** One Tree's folder for every Reply, as a Tree's Replies share one. */
+function treeFolder() {
+  sharedTreeFolder ??= newTreeFolder()
 
   return sharedTreeFolder
 }
@@ -1645,9 +1649,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
 
     const home = homeFrom(signedIn)
 
-    const tree = fs.realpathSync(
-      fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-tree-'))
-    )
+    const tree = newTreeFolder()
 
     const idle = heldIdle()
     const exits: Promise<unknown>[] = []
@@ -1733,9 +1735,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
 
     const home = homeFrom(signedIn)
 
-    const tree = fs.realpathSync(
-      fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-tree-'))
-    )
+    const tree = newTreeFolder()
 
     const idle = heldIdle()
     const exits: Promise<unknown>[] = []
@@ -1841,9 +1841,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     const store = fakeStore()
     const homes = [homeFrom(signedIn), homeFrom(signedIn)]
 
-    const trees = [0, 1].map(() =>
-      fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-tree-')))
-    )
+    const trees = [0, 1].map(() => newTreeFolder())
 
     const idle = heldIdle()
     const exits: Promise<unknown>[] = []

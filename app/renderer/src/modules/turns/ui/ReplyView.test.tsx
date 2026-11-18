@@ -3,13 +3,15 @@ import type {Command} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {Reply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
+import type {Locator} from 'vitest/browser'
 
 import {ConnectionsProvider} from '#modules/connections/main'
+import {followColorScheme} from '#modules/theme/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {EventSchema} from '@uz/contract/events'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
-import {afterEach, beforeEach, expect, it, vi} from 'vitest'
+import {afterEach, beforeEach, expect, it, onTestFinished, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
 
 import recording from '../fake-reply.json'
@@ -183,6 +185,10 @@ async function replay(upTo = before('RUN_FINISHED')) {
   return screen
 }
 
+function colorOf(text: Locator) {
+  return getComputedStyle(text.element()).color
+}
+
 function visibleOrder(article: Element) {
   return [
     ...article.querySelectorAll('p, [data-slot="collapsible"], [role="group"]'),
@@ -270,22 +276,30 @@ it('shows a tool call with no result as cut off, not as an error, once its Reply
       args: '{"command":"sleep 600"}',
       result: null,
     },
+    {
+      type: 'tool-call',
+      toolCallId: 'tool-2',
+      toolName: 'Read',
+      args: '{"file_path":"missing.txt"}',
+      result: {content: 'No such file', isError: true},
+    },
   ]
+
+  onTestFinished(followColorScheme())
 
   const screen = await renderSaved(
     {status: 'stopped', content},
     {status: 'interrupted', content}
   )
 
-  const toolCalls = screen.getByRole('group', {name: 'Tool call Bash'})
-
   for (const nth of [0, 1]) {
-    const cutOff = toolCalls.nth(nth).getByText('cut off')
+    const cutOff = screen.getByRole('group', {name: 'Tool call Bash'}).nth(nth)
+    const failed = screen.getByRole('group', {name: 'Tool call Read'}).nth(nth)
 
-    await expect.element(cutOff).toBeVisible()
-    expect(cutOff.element().parentElement).not.toHaveAttribute(
-      'data-status',
-      'error'
+    await expect.element(cutOff.getByText('cut off')).toBeVisible()
+    await expect.element(failed.getByText('failed')).toBeVisible()
+    expect(colorOf(cutOff.getByText('Bash', {exact: true}))).not.toBe(
+      colorOf(failed.getByText('Read', {exact: true}))
     )
   }
 })
