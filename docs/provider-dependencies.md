@@ -101,10 +101,10 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Kind:** D/W
 - **Provider:** Claude
 - **Relies on:** an undocumented order: the complete `assistant` message for a text block arrives after its deltas and before its `content_block_stop`, and a second `message_start` with no `message_stop` between means the message is being sent again in full after a broken stream. When `claude` cuts a message off mid-stream and retries, the message ends with a `message_stop` carrying `abandoned_blocks: {api_message_id, from_block_index}`, a field the SDK types don't name. The blocks before `from_block_index` stay in the session, and the next `message_start` begins the message over.
-- **App side:** `claude-driver`'s Reply mapper replaces an open block's streamed text with the full text of the `assistant` message. On a second `message_start` it resets the text shown to where that message began. After an abandoned message it resets the text to where block `from_block_index` began, as the next message starts.
-- **User would see:** doubled Reply text if the order changed, or if `abandoned_blocks` were renamed. If a broken stream carried on instead of starting over, the Reply would lose the text from before the break.
+- **App side:** `claude-driver`'s Reply mapper replaces an open block's streamed text with the full text of the `assistant` message. On a second `message_start` it resets the text shown to where that message began. After an abandoned message it resets the text to where block `from_block_index` began, as the next message starts. When the cut takes a tool call, the Reply is cut back to before the first one (`CONTENT_CUT_BACK`), so the tool calls and the text since that point go too.
+- **User would see:** doubled Reply text if the order changed. If `abandoned_blocks` were renamed, doubled Reply text, and a thrown-away tool call that never gets a result. If a broken stream carried on instead of starting over, the Reply would lose the text from before the break.
 - **Changed by:** upgrade + drift. The stream events come from the API, and how a broken stream recovers is up to `claude` and the servers.
-- **Check:** `[dep:stream-event-order]` in `claude-driver`: a Reply's text is shown once, and a Reply whose connection is cut mid-message shows the text the session holds, once. A second `message_start` with no `message_stop` between has no check: no cut has caused one.
+- **Check:** `[dep:stream-event-order]` in `claude-driver`: a Reply's text is shown once, and a Reply whose connection is cut mid-message shows the text the session holds, once. A second `message_start` with no `message_stop` between has no check: no cut has caused one. A tool call in thrown-away blocks has no check: the cut Reply makes none.
 
 ### A Reply waits hours for the connection
 
@@ -166,8 +166,8 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Id:** `verbatim-prompts`
 - **Kind:** D
 - **Provider:** Claude
-- **Relies on:** `claude` honors the SDK's `verbatimPrompts` option, which sends each user message marked `client_composed`: `claude` delivers its text as written, with no slash-command dispatch and no `@path` file-mention expansion. Without the mark, a Prompt such as `/compact` is run as a command, and its turn ends with no assistant message. The mark also skips the turn-start attachment pass: nested `CLAUDE.md` and rules files, skill and tool listings, and per-turn reminders arrive only after the turn's first tool call. With no settings and no tools, that pass held nothing over two warm turns on one day; what it holds on a cold resume, or after a date change between turns, is unchecked.
-- **App side:** `claude-driver` turns the option on for every Reply and every one-shot, so each Prompt reaches the AI as text, and each Reply ends at a message the app can record. With no tools, a turn makes no tool call, so nothing the pass skips arrives later.
+- **Relies on:** `claude` honors the SDK's `verbatimPrompts` option, which sends each user message marked `client_composed`: `claude` delivers its text as written, with no slash-command dispatch and no `@path` file-mention expansion. Without the mark, a Prompt such as `/compact` is run as a command, and its turn ends with no assistant message. The mark also skips the turn-start attachment pass: nested `CLAUDE.md` and rules files, skill and tool listings, and per-turn reminders arrive only after the turn's first tool call. A session's start still carries its own context (the working folder, platform, date, Model and account), as a recorded first Reply with tools shows. The CLI has an internal `text_not_typed` mark that keeps the pass; the SDK doesn't offer it.
+- **App side:** `claude-driver` turns the option on for every Reply and every one-shot, so each Prompt reaches the AI as text, and each Reply ends at a message the app can record. With no settings, Skills or MCP servers, the pass has no `CLAUDE.md` or listings to add; its per-turn reminders, such as a file changed since the AI read it, reach a turn only after its first tool call.
 - **User would see:** a Prompt such as `/compact` run instead of answered: a Reply with no text, marked complete, whose Input says it can't be continued. An `@path` in a Prompt would show the AI that file.
 - **Changed by:** upgrade
 - **Check:** `[dep:verbatim-prompts]` in `claude-driver`: `/compact` sent as a Prompt gets an answer and no Compaction, and the next Prompt goes on from it. `@path`, and one-shots, have no check.
@@ -189,10 +189,54 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Kind:** D
 - **Provider:** Claude
 - **Relies on:** the private function the SDK and `claude` name a session's project folder with: every non-alphanumeric character becomes `-`, and past 200 characters the name is cut and a hash of the path added. Session files live at `projects/<key>/<session>.jsonl`, beside a `tool-results/` folder.
-- **App side:** `claude-driver` computes the key with its own copy of that function, and uses it as the session store's key, to put tool results back on disk, and to write the transcript back on a refused resume.
+- **App side:** `claude-driver` computes the key with its own copy of that function, for the Tree's folder that `claude` runs in, to put tool results back on disk and to write the transcript back on a refused resume. The app's copy files every session under the key of `claude`'s configuration folder instead, the folder sessions ran in before each Tree had its own.
 - **User would see:** tool results lost on resume, and a transcript written back where `claude` doesn't look, so resumes fail.
 - **Changed by:** upgrade
-- **Check:** `[dep:project-key-copy]` in `claude-driver`: `claude` writes the session under the key the app computes, and the app's copy holds it under the same key. A path long enough to be hashed has no check.
+- **Check:** `[dep:project-key-copy]` in `claude-driver`: `claude` writes the session under the key the app computes for the Tree's folder, and the app's copy holds it under the configuration folder's. A path long enough to be hashed has no check.
+
+### Claude Code's tools under full access
+
+- **Id:** `claude-tools-full-access`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** `claude` offers the Model exactly the tools named in the SDK's `tools` list, `disallowedTools: ['Agent']` keeps the Subagent tool (listed as `Task`) out, and `permissionMode: 'bypassPermissions'` with `allowDangerouslySkipPermissions` runs every tool call in `cwd` without asking. The `claude_code` tool preset would add tools that outlive a Reply or leave the folder (cron jobs, worktrees, remote triggers).
+- **App side:** `claude-driver` names its tools for files, commands and the web, and runs every Reply in the Tree's folder with full access, until the Permission mode decides (ADR 0022). Its Reply mapper shows each tool call and its result.
+- **User would see:** a Reply that can't open, write or run anything, that stalls on a permission request nothing answers, or that starts Subagents or background jobs the app can't show.
+- **Changed by:** upgrade
+- **Check:** `[dep:claude-tools-full-access]` in `claude-driver`: a Reply writes a file in the Tree's folder and runs a command there, `claude` lists exactly the named tools, so no `Agent` or `Task`, and sends no control request.
+
+### A session resumed in another folder
+
+- **Id:** `claude-resume-moved-folder`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** the SDK asks the session store for a session under the key of the `cwd` it runs in, and `claude` resumes a session whose entries name another `cwd`, then works in the new one.
+- **App side:** `claude-driver` files every session in the app's copy under one key, so a session `claude` started in its configuration folder, before each Tree had a folder of its own, resumes in the Tree's folder.
+- **User would see:** every Thread from before the change rebuilt from the Thread on its next Reply, a cold Turn, instead of resumed.
+- **Changed by:** upgrade
+- **Check:** `[dep:claude-resume-moved-folder]` in `claude-driver`: a session started in one folder resumes from the app's copy alone in another, remembers what it was told, and runs `pwd` there.
+
+### Claude Code's prompt, rendered afresh
+
+- **Id:** `claude-prompt-fresh`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** `systemPrompt: {type: 'preset', preset: 'claude_code', append}` runs Claude Code's own prompt with `append` after it, and `snapshot: false` renders it again on every request. Without it, `claude` keeps the prompt a session first ran with, `append` included, and ignores a later one on resume.
+- **App side:** `claude-driver` appends the System prompt, and the line explaining Reply labels, to Claude Code's prompt each time a session opens.
+- **User would see:** a changed System prompt that a continued Thread ignores.
+- **Changed by:** upgrade
+- **Check:** `[dep:claude-prompt-fresh]` in `claude-driver`: a session resumed under a changed System prompt follows the new one. That Claude Code's own prompt runs before `append` has no check.
+
+### One-shots with no tools
+
+- **Id:** `claude-one-shot-no-tools`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** `tools: []` starts `claude` with no tools at all.
+- **App side:** `claude-driver` runs titles and Summaries as one-shots outside any Tree, in the configuration folder, with no tools.
+- **User would see:** a title or Summary that reads or runs something on the user's machine.
+- **Changed by:** upgrade
+- **Check:** `[dep:claude-one-shot-no-tools]` in `claude-driver`: a one-shot asked to run a command reports no tools at its start.
 
 ### Resuming through a swapped config folder
 
@@ -337,16 +381,49 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Changed by:** upgrade
 - **Check:** none: needs Codex killed between reading `turn/start` and answering it, a window a test can't hit on purpose.
 
+### Codex under full access
+
+- **Id:** `codex-full-access`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** `sandbox: 'danger-full-access'` with `approvalPolicy: 'never'` on `thread/start`, `thread/resume` and `thread/fork`, and `sandboxPolicy: {type: 'dangerFullAccess'}` with the same `cwd` and policy on `turn/start`, lets Codex edit files and run commands in `cwd` without asking. A turn's settings hold for its thread from then on.
+- **App side:** `codex-driver` runs every thread and every turn in the Tree's folder with full access, until the Permission mode decides (ADR 0022). A turn carries the settings too, because a thread a cut loaded runs read-only in the config folder until then. Its Reply mapper shows `fileChange` and `commandExecution` items as tool calls with their results.
+- **User would see:** a Reply that can't write or run anything, or that works in the config folder.
+- **Changed by:** upgrade
+- **Check:** `[dep:codex-full-access]` in `codex-driver`: a Reply writes a file in the Tree's folder and runs a command there, and a Reply on a thread a cut loaded read-only writes a file there too.
+
+### Codex's Subagents turned off
+
+- **Id:** `codex-subagents-off`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** Codex turns its `multi_agent` feature on by default, which lets the Model start Subagents, and `features.multi_agent=false` turns it off.
+- **App side:** `codex-driver`'s environment turns it off, as `claude-driver` leaves out Claude's `Agent` tool, until the app can show Subagents. Under full access a Subagent could write and run anything, with nothing in the Reply to show it.
+- **User would see:** a Reply that hands work to Subagents the Reply never shows.
+- **Changed by:** upgrade
+- **Check:** `[dep:codex-subagents-off]` in `codex-driver`: the app-server, started as the app starts it, lists `multi_agent` as on by default and off.
+
+### A thread resumed in another folder
+
+- **Id:** `codex-resume-moved-folder`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** a `cwd` given to `thread/resume` wins over the one the thread's rollout recorded, and nothing in the rollout's old `cwd` fails the resume.
+- **App side:** `codex-driver` resumes every thread in the Tree's folder, including threads Codex started in its config folder before each Tree had a folder of its own.
+- **User would see:** every Thread from before the change rebuilt from the Thread on its next Reply, a cold Turn, instead of resumed.
+- **Changed by:** upgrade
+- **Check:** `[dep:codex-resume-moved-folder]` in `codex-driver`: a thread started in one folder resumes from the app's copy alone in another, remembers what it was told, and runs `pwd` there.
+
 ### Codex sends no server requests
 
 - **Id:** `codex-server-requests-refused`
 - **Kind:** D
 - **Provider:** ChatGPT
-- **Relies on:** with `approvalPolicy: 'never'`, a read-only sandbox and no client capabilities, Codex sends none of its server requests (approvals, user input, tool calls, token refreshes) during a Reply.
+- **Relies on:** with `approvalPolicy: 'never'`, full access and no client capabilities, Codex sends none of its server requests (approvals, user input, tool calls, token refreshes) during a Reply. It asks for user input only in Plan mode, and denies an MCP tool's approval outright under `never`.
 - **App side:** the app-server client in `codex-driver` refuses every server request at once.
 - **User would see:** a Reply that stalls or fails in Codex's wording, for example when an upgrade adds a request type or a connector asks the user for input.
 - **Changed by:** upgrade + drift. An upgrade can add request types, the Model picks the tools it calls, and OpenAI's servers supply the connectors.
-- **Check:** `[dep:codex-server-requests-refused]` in `codex-driver`: a Reply that runs a shell command, with no server request on the wire.
+- **Check:** `[dep:codex-server-requests-refused]` in `codex-driver`: a Reply that writes a file and runs a shell command, with no server request on the wire.
 
 ### Codex's protocol types
 
@@ -482,7 +559,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Id:** `setup-tokens`
 - **Kind:** D
 - **Provider:** both
-- **Relies on:** how many tokens the vendor program puts before the Thread in a new session's first turn, as the app starts it: about 600 for `claude` with no tools or settings, and about 14,500 for Codex.
+- **Relies on:** how many tokens the vendor program puts before the Thread in a new session's first turn, as the app starts it: about 9,200 for `claude` with Claude Code's own prompt and the app's tools, and about 14,500 for Codex.
 - **App side:** a Reply's Context size includes its own Provider's overhead, so the re-read note's estimate swaps that overhead for the new Provider's, each rounded up, before a Prompt goes to another Provider (`canvas`).
 - **User would see:** an estimate off by the difference, and a note shown or left out near its 20k mark.
 - **Changed by:** upgrade + drift. The program's own instructions change with releases, and Codex's with its server-side Model catalog.

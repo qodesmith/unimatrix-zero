@@ -25,6 +25,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import {afterEach, expect, it} from 'vitest'
+import {z} from 'zod'
 
 import {createClaudeDriver, spawnClaude} from './main'
 import {
@@ -115,6 +116,7 @@ async function setUp(
   const fake = await replayClaude()
   cleanUps.push(fake.cleanUp)
   const configDir = folder('uz-claude-config-')
+  const treeFolder = folder('uz-claude-tree-')
   const reports = folder('uz-claude-reports-')
   const idle = heldIdle()
   const silence = heldIdle()
@@ -186,6 +188,7 @@ async function setUp(
       systemPrompt: '',
       prompt: {text, messageId},
       vendorProgram,
+      treeFolder,
       session: session && {type: 'continue', ...session},
       thread,
       compactionSettings,
@@ -231,6 +234,7 @@ async function setUp(
     driver,
     vendorProgram,
     configDir,
+    treeFolder,
     projectKey: projectKeyOf(configDir),
     store,
     reply,
@@ -272,6 +276,113 @@ const THIRD_PROMPT = 'Which two words did you reply with? Just the words.'
 const FORK_PROMPT = 'Which word did you reply with? Just the word.'
 const COUNT_PROMPT = 'Count from 1 to 300, one number per line.'
 const ASK_PROMPT = 'What did I ask you to do? Answer in five words.'
+
+it('runs claude in the Tree’s folder with full access, its tools for files, commands and the web but no Subagents, and its own prompt rendered afresh', async () => {
+  const claude = await setUp(['warm.ndjson'])
+  await claude.reply(FIRST_PROMPT)
+  const [report] = claude.reports()
+
+  expect(report?.cwd).toBe(claude.treeFolder)
+  expect(report?.args).toEqual(
+    expect.arrayContaining([
+      '--tools=Bash,Read,Write,Edit,Glob,Grep,NotebookEdit,WebFetch,WebSearch',
+      '--disallowedTools=Agent',
+      '--permission-mode=bypassPermissions',
+      '--allow-dangerously-skip-permissions',
+      '--setting-sources=',
+      '--strict-mcp-config',
+    ])
+  )
+  expect(report?.systemPrompt).toEqual([])
+  expect(report?.appendedPrompt).toBe('')
+  expect(report?.promptSnapshot).toBe(false)
+})
+
+it('shows each tool call with its arguments and result, the text after them a part of its own', async () => {
+  const claude = await setUp(['tools.ndjson'])
+  const events = await claude.reply('Write notes.txt, then cat it.')
+
+  expect(shown(events).content).toEqual([
+    {
+      type: 'tool-call',
+      toolCallId: expect.any(String),
+      toolName: 'Write',
+      args: expect.stringMatching(/"content": ?"HERON"/),
+      result: {
+        content: expect.stringMatching(
+          /^File created successfully at: \S+\/notes\.txt/
+        ),
+        isError: false,
+      },
+    },
+    {
+      type: 'tool-call',
+      toolCallId: expect.any(String),
+      toolName: 'Bash',
+      args: expect.stringContaining('cat notes.txt'),
+      result: {content: 'HERON', isError: false},
+    },
+    {type: 'text', text: 'HERON'},
+  ])
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+})
+
+/** A line `claude` wrote that holds every one of `parts`. */
+function isOut(line: RecordedLine, ...parts: string[]) {
+  return (
+    line.kind === 'out' &&
+    parts.every(part => JSON.stringify(line.message).includes(part))
+  )
+}
+
+it('replaces only the text after a tool call when its message ends other than it streamed', async () => {
+  const ended = edited('tools.ndjson', lines => {
+    const start = lines.findIndex(line => isOut(line, '"message_start"'))
+    const write = lines.find(line => isOut(line, '"assistant"', '"Write"'))
+
+    if (write?.kind !== 'out') throw new Error('No Write message')
+
+    const said: RecordedLine = {
+      kind: 'out',
+      message: {
+        ...write.message,
+        uuid: '11111111-1111-4111-8111-111111111111',
+        message: {
+          ...z.looseObject({}).parse(write.message.message),
+          content: [{type: 'text', text: 'Let me write it.'}],
+        },
+      },
+    }
+
+    return [
+      ...lines.slice(0, start),
+      said,
+      ...lines
+        .slice(start)
+        .map(line =>
+          isOut(line, '"assistant"', '"text":"HERON"')
+            ? RecordedLineSchema.parse(
+                JSON.parse(
+                  JSON.stringify(line).replace(
+                    '"text":"HERON"',
+                    '"text":"HERON."'
+                  )
+                )
+              )
+            : line
+        ),
+    ]
+  })
+
+  const claude = await setUp([ended])
+  const events = await claude.reply('Write notes.txt, then cat it.')
+
+  expect(
+    shown(events).content.map(part =>
+      part.type === 'text' ? part.text : part.toolName
+    )
+  ).toEqual(['Let me write it.', 'Write', 'Bash', 'HERON.'])
+})
 
 it('streams a Reply, records where Claude saved it, and reports its Context size', async () => {
   const claude = await setUp(['warm.ndjson'])
@@ -715,6 +826,117 @@ it('keeps the blocks of a cut-off message that come before the first one Claude 
 
   await claude.reply(SECOND_PROMPT, recordedIn(events))
   await claude.allClosed()
+})
+
+/** The text "Let me write." as block 0. */
+function leadIn() {
+  return [
+    streamed({
+      type: 'content_block_start',
+      index: 0,
+      content_block: {type: 'text', text: '', citations: null},
+    }),
+    streamed({
+      type: 'content_block_delta',
+      index: 0,
+      delta: {type: 'text_delta', text: 'Let me write.'},
+    }),
+    streamed({type: 'content_block_stop', index: 0}),
+  ]
+}
+
+/** The recorded first message, its one block moved behind `leadIn()`. */
+function withLeadIn(message: RecordedLine[]) {
+  return message.map(line =>
+    isOut(line, '"index":0')
+      ? RecordedLineSchema.parse(
+          JSON.parse(JSON.stringify(line).replace('"index":0', '"index":1'))
+        )
+      : line
+  )
+}
+
+/**
+ * `tools.ndjson` with a message before its first: the text "Let me write.",
+ * then a Write cut off mid-arguments and ended by `stop`, if any. With
+ * `resentInFull`, the first message is sent again with that text before it.
+ */
+function toolCallCutOff(stop: RecordedLine[], resentInFull = false) {
+  return edited('tools.ndjson', lines => {
+    const start = lines.findIndex(line => isOut(line, '"message_start"'))
+    const end = lines.findIndex(line => isOut(line, '"message_stop"'))
+    const startLine = lines[start]
+
+    if (!startLine) throw new Error('The recording has no message_start')
+
+    const first = lines.slice(start + 1, end + 1)
+
+    return [
+      ...lines.slice(0, start),
+      startLine,
+      ...leadIn(),
+      streamed({
+        type: 'content_block_start',
+        index: 1,
+        content_block: {
+          type: 'tool_use',
+          id: 'toolu_cut',
+          name: 'Write',
+          input: {},
+        },
+      }),
+      streamed({
+        type: 'content_block_delta',
+        index: 1,
+        delta: {type: 'input_json_delta', partial_json: '{"file_pa'},
+      }),
+      ...stop,
+      startLine,
+      ...(resentInFull ? [...leadIn(), ...withLeadIn(first)] : first),
+      ...lines.slice(end + 1),
+    ]
+  })
+}
+
+const SHOWN_AFTER_CUT_TOOL_CALL = [
+  {type: 'text', text: 'Let me write.'},
+  expect.objectContaining({
+    type: 'tool-call',
+    toolName: 'Write',
+    result: expect.objectContaining({isError: false}),
+  }),
+  expect.objectContaining({type: 'tool-call', toolName: 'Bash'}),
+  {type: 'text', text: 'HERON'},
+]
+
+it('takes back a tool call Claude threw away, and shows the text before it once', async () => {
+  const claude = await setUp([
+    toolCallCutOff([
+      {
+        kind: 'out',
+        message: {
+          type: 'stream_event',
+          event: {type: 'message_stop'},
+          abandoned_blocks: {api_message_id: 'msg_cut', from_block_index: 1},
+          session_id: SESSION_ID,
+          parent_tool_use_id: null,
+          uuid: crypto.randomUUID(),
+        },
+      },
+    ]),
+  ])
+
+  const events = await claude.reply('Write notes.txt, then cat it.')
+
+  expect(shown(events).content).toEqual(SHOWN_AFTER_CUT_TOOL_CALL)
+})
+
+it('takes back a tool call and the text before it when its message never stopped and is sent again in full', async () => {
+  const claude = await setUp([toolCallCutOff([], true)])
+
+  const events = await claude.reply('Write notes.txt, then cat it.')
+
+  expect(shown(events).content).toEqual(SHOWN_AFTER_CUT_TOOL_CALL)
 })
 
 it('shows thinking as it streams, and never as part of the Reply', async () => {
@@ -1851,7 +2073,7 @@ it('takes over a Thread ChatGPT wrote: a new session, told the whole Thread and 
   const [started] = claude.reports()
 
   expect(started?.args.join(' ')).not.toMatch(/--resume/)
-  expect(started?.systemPrompt.join('')).toBe(explainingLabels('', HANDED_OVER))
+  expect(started?.appendedPrompt).toBe(explainingLabels('', HANDED_OVER))
   expect(events.filter(event => event.type === 'SESSION_REBUILT')).toHaveLength(
     1
   )
@@ -1887,7 +2109,7 @@ it('keeps the line that explains the labels when a rebuilt session resumes in a 
   const [, resumed] = claude.reports()
 
   expect(resumed?.args).toContain(`--resume=${SESSION_ID}`)
-  expect(resumed?.systemPrompt.join('')).toBe(explainingLabels('', thread))
+  expect(resumed?.appendedPrompt).toBe(explainingLabels('', thread))
 })
 
 it('sends a Tree’s first Prompt as written, with no Thread to tell', async () => {

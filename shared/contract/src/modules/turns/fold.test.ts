@@ -37,6 +37,36 @@ it('replaces the current text part when the stream is re-sent', () => {
   ).toEqual([{type: 'text', text: 'Hello again'}])
 })
 
+it('cuts back to before a tool call a re-sent stream threw away, replacing the text before it', () => {
+  const cut = fold(
+    {type: 'TEXT_DELTA', delta: 'Kept. Let me write.'},
+    {type: 'TOOL_CALL_START', toolCallId: 't1', toolName: 'Write'},
+    {type: 'TEXT_DELTA', delta: 'After.'},
+    {type: 'CONTENT_CUT_BACK', toolCallId: 't1', text: 'Kept. '}
+  )
+
+  expect(cut.content).toEqual([{type: 'text', text: 'Kept. '}])
+})
+
+it('drops the text part before a cut tool call when it goes back to empty', () => {
+  const cut = fold(
+    {type: 'TOOL_CALL_START', toolCallId: 't0', toolName: 'Read'},
+    {type: 'TEXT_DELTA', delta: 'Let me write.'},
+    {type: 'TOOL_CALL_START', toolCallId: 't1', toolName: 'Write'},
+    {type: 'CONTENT_CUT_BACK', toolCallId: 't1', text: ''}
+  )
+
+  expect(cut.content).toEqual([
+    {
+      type: 'tool-call',
+      toolCallId: 't0',
+      toolName: 'Read',
+      args: '',
+      result: null,
+    },
+  ])
+})
+
 it('saves nothing of a wait for the connection', () => {
   const before = fold({type: 'TEXT_DELTA', delta: 'Hel'})
 

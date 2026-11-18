@@ -55,6 +55,8 @@ export interface TurnsDeps {
   publish: (event: AppEvent) => void
   hosts: ReplyHosts
   vendorProgramFor: (provider: ProviderId) => SignInRequest
+  /** Made as each Reply starts, if it is missing. */
+  treeFolderFor: (treeId: string) => string
   /** Read as each Reply starts, so a change applies from the next one. */
   compactionSettingsFor: (provider: ProviderId) => CompactionSettings
   /** For telling the AI which Replies another Model wrote, and its name. */
@@ -78,6 +80,7 @@ export function createTurns({
   publish,
   hosts,
   vendorProgramFor,
+  treeFolderFor,
   compactionSettingsFor,
   listedModels,
   now,
@@ -174,6 +177,8 @@ export function createTurns({
       // Prompt after it, and its session would fork.
       const session = sessionOn(provider, {treeId, parentReplyId}, failed)
 
+      const treeFolder = treeFolderFor(treeId)
+
       const {prompt, reply} = insertExchange(db, {
         treeId,
         parentReplyId,
@@ -192,6 +197,7 @@ export function createTurns({
         systemPrompt,
         prompt: {text, messageId: randomUUID()},
         vendorProgram: vendorProgramFor(provider),
+        treeFolder,
         session,
         thread,
         compactionSettings: compactionSettingsFor(provider),
@@ -230,6 +236,8 @@ export function createTurns({
         listedModels
       )
 
+      const treeFolder = treeFolderFor(treeId)
+
       resetReply(db, replyId)
 
       return startOnHost(provider, {
@@ -239,6 +247,7 @@ export function createTurns({
         systemPrompt,
         prompt: {text, messageId: randomUUID()},
         vendorProgram: vendorProgramFor(provider),
+        treeFolder,
         session,
         thread,
         compactionSettings: compactionSettingsFor(provider),

@@ -15,7 +15,7 @@ export const RE_READ_NOTE_FROM = 20_000
  * a recorded first Reply to a one-line Prompt, rounded up.
  */
 export const SETUP_TOKENS: Record<ProviderId, number> = {
-  claude: 1000,
+  claude: 10_000,
   chatgpt: 15_000,
 }
 

@@ -8,6 +8,7 @@ import type {ErrorNotification} from './protocol/v2/ErrorNotification'
 import type {LoginAccountResponse} from './protocol/v2/LoginAccountResponse'
 import type {Model as CodexModel} from './protocol/v2/Model'
 import type {ModelListResponse} from './protocol/v2/ModelListResponse'
+import type {PatchChangeKind} from './protocol/v2/PatchChangeKind'
 import type {RateLimitWindow} from './protocol/v2/RateLimitWindow'
 import type {Thread} from './protocol/v2/Thread'
 import type {ThreadItem} from './protocol/v2/ThreadItem'
@@ -164,6 +165,71 @@ export const AgentMessageItemSchema = z.looseObject({
   text: z.string(),
 })
 
+type ItemOf<T extends ThreadItem['type']> = Extract<ThreadItem, {type: T}>
+
+const ToolStatusSchema = z.enum([
+  'inProgress',
+  'completed',
+  'failed',
+  'declined',
+]) satisfies z.ZodType<ItemOf<'commandExecution'>['status']>
+
+/** `aggregatedOutput` and `exitCode` are null until the item completes. */
+const CommandExecutionItemSchema = z.looseObject({
+  type: z.literal('commandExecution'),
+  id: z.string(),
+  command: z.string(),
+  cwd: z.string(),
+  status: ToolStatusSchema,
+  aggregatedOutput: z.string().nullable(),
+  exitCode: z.number().nullable(),
+}) satisfies z.ZodType<
+  Pick<
+    ItemOf<'commandExecution'>,
+    | 'type'
+    | 'id'
+    | 'command'
+    | 'cwd'
+    | 'status'
+    | 'aggregatedOutput'
+    | 'exitCode'
+  >
+>
+
+const FileChangeItemSchema = z.looseObject({
+  type: z.literal('fileChange'),
+  id: z.string(),
+  changes: z.array(
+    z.looseObject({
+      path: z.string(),
+      kind: z.looseObject({type: z.enum(['add', 'delete', 'update'])}),
+      diff: z.string(),
+    })
+  ),
+  status: ToolStatusSchema,
+}) satisfies z.ZodType<
+  Pick<ItemOf<'fileChange'>, 'type' | 'id' | 'status'> & {
+    changes: (Pick<ItemOf<'fileChange'>['changes'][number], 'path' | 'diff'> & {
+      kind: Pick<PatchChangeKind, 'type'>
+    })[]
+  }
+>
+
+export const ToolItemSchema = z.union([
+  CommandExecutionItemSchema,
+  FileChangeItemSchema,
+])
+
+const ItemSchema = z.union([
+  AgentMessageItemSchema,
+  ToolItemSchema,
+  z.looseObject({type: z.string()}),
+])
+
+export type Item = z.infer<typeof ItemSchema>
+
+export type ToolItem = z.infer<typeof ToolItemSchema>
+
 /**
  * Codex sends no `item/completed` for a compaction that fails or that a hook
  * stops. The item is `{id}` only, so one that installed nothing can't be told
@@ -218,16 +284,8 @@ export const NotificationSchema = z.discriminatedUnion('method', [
   ),
   notification('item/reasoning/summaryTextDelta', DeltaSchema),
   notification('item/reasoning/textDelta', DeltaSchema),
-  notification(
-    'item/completed',
-    z.looseObject({
-      ...inTurn,
-      item: z.union([
-        AgentMessageItemSchema,
-        z.looseObject({type: z.string()}),
-      ]),
-    })
-  ),
+  notification('item/started', z.looseObject({...inTurn, item: ItemSchema})),
+  notification('item/completed', z.looseObject({...inTurn, item: ItemSchema})),
   notification(
     'thread/tokenUsage/updated',
     z.looseObject({

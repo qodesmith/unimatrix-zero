@@ -369,6 +369,10 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
           },
         ],
         model: request.model,
+        // Every turn too (ADR 0022): a deletion cut resumes its thread read-only in the config folder.
+        cwd: request.treeFolder,
+        approvalPolicy: 'never',
+        sandboxPolicy: {type: 'dangerFullAccess'},
       })
 
       thread.model = request.model

@@ -10,6 +10,8 @@ it('holds no email, home folder or account id but the stand-ins in a committed r
       '/Users/sam',
       '-Users-sam',
       '00000000-0000-4000-8000-000000000000',
+      // Claude Code's commit attribution, which every session carries.
+      'noreply@anthropic.com',
     ])
   ).toEqual([])
 })

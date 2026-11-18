@@ -1,11 +1,15 @@
 import type {ContentEvent} from '#modules/reply-runs/main'
-import type {Notification} from './wire'
+import type {Item, Notification, ToolItem} from './wire'
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {codexFailureOf, isBusyStatus} from '#modules/failures/main'
 
-import {AgentMessageItemSchema, CONTEXT_COMPACTION} from './wire'
+import {
+  AgentMessageItemSchema,
+  CONTEXT_COMPACTION,
+  ToolItemSchema,
+} from './wire'
 
 type ReplyIds = Pick<ReplyRequest, 'treeId' | 'replyId'>
 
@@ -15,6 +19,39 @@ type CodexTurn = Extract<
   Notification,
   {method: 'turn/completed'}
 >['params']['turn']
+
+/** A malformed tool item reads as some other item, as an unknown one does. */
+function toolItemOf(item: Item): ToolItem | null {
+  const tool = ToolItemSchema.safeParse(item)
+
+  return tool.success ? tool.data : null
+}
+
+function argsOf(item: ToolItem) {
+  if (item.type === 'commandExecution') {
+    return {command: item.command, cwd: item.cwd}
+  }
+
+  return {changes: item.changes}
+}
+
+function resultOf(item: ToolItem) {
+  if (item.type === 'commandExecution') {
+    return {
+      content: item.aggregatedOutput ?? '',
+      isError:
+        item.status !== 'completed' ||
+        (item.exitCode !== null && item.exitCode !== 0),
+    }
+  }
+
+  return {
+    content: item.changes
+      .map(change => `${change.kind.type} ${change.path}`)
+      .join('\n'),
+    isError: item.status !== 'completed',
+  }
+}
 
 type AccountNotification = Extract<Notification, {method: `account/${string}`}>
 
@@ -36,10 +73,12 @@ export function turnOf(notification: Notification) {
 
 /**
  * When a finished message differs from what streamed, its text replaces it.
- * Reasoning is passed on for display and never kept.
+ * Reasoning is passed on for display and never kept. The text tracked is the
+ * current text part's, which a tool call ends.
  */
 export function createReplyMapper(ids: ReplyIds) {
   let shown = ''
+  const toolCalls = new Set<string>()
 
   const messages = new Map<
     string,
@@ -107,6 +146,58 @@ export function createReplyMapper(ids: ReplyIds) {
     return [{...ids, type: 'TEXT_REPLACE', text: shown}]
   }
 
+  /** A message cut short before a tool call stays as it is. */
+  function startToolCall(item: ToolItem): ContentEvent[] {
+    toolCalls.add(item.id)
+    shown = ''
+    last = null
+
+    return [
+      {
+        ...ids,
+        type: 'TOOL_CALL_START',
+        toolCallId: item.id,
+        toolName: item.type,
+      },
+      {
+        ...ids,
+        type: 'TOOL_CALL_ARGS',
+        toolCallId: item.id,
+        delta: JSON.stringify(argsOf(item)),
+      },
+    ]
+  }
+
+  function finishToolCall(item: ToolItem): ContentEvent[] {
+    const started = toolCalls.has(item.id) ? [] : startToolCall(item)
+
+    return [
+      ...started,
+      {...ids, type: 'TOOL_RESULT', toolCallId: item.id, ...resultOf(item)},
+    ]
+  }
+
+  function onItemCompleted(item: Item, threadId: string): ContentEvent[] {
+    const tool = toolItemOf(item)
+
+    if (tool) return finishToolCall(tool)
+
+    if (item.type === CONTEXT_COMPACTION) {
+      return [
+        {
+          ...ids,
+          type: 'CONTEXT_COMPACTED',
+          sessionId: threadId,
+          boundaryId: null,
+        },
+      ]
+    }
+
+    const message = AgentMessageItemSchema.safeParse(item)
+
+    return message.success ? onMessage(message.data.id, message.data.text) : []
+  }
+
   return {
     map(notification: Notification): ContentEvent[] {
       const {method, params} = notification
@@ -129,23 +220,14 @@ export function createReplyMapper(ids: ReplyIds) {
         return onDelta(params.itemId, params.delta)
       }
 
+      if (method === 'item/started') {
+        const tool = toolItemOf(params.item)
+
+        return tool && !toolCalls.has(tool.id) ? startToolCall(tool) : []
+      }
+
       if (method === 'item/completed') {
-        if (params.item.type === CONTEXT_COMPACTION) {
-          return [
-            {
-              ...ids,
-              type: 'CONTEXT_COMPACTED',
-              sessionId: params.threadId,
-              boundaryId: null,
-            },
-          ]
-        }
-
-        const message = AgentMessageItemSchema.safeParse(params.item)
-
-        return message.success
-          ? onMessage(message.data.id, message.data.text)
-          : []
+        return onItemCompleted(params.item, params.threadId)
       }
 
       if (

@@ -144,6 +144,17 @@ export const TextReplaceEvent = z.strictObject({
   text: z.string(),
 })
 
+/**
+ * A re-sent stream that threw a tool call away: the content cut back to before
+ * that call, with the text part before it replaced, or dropped when empty.
+ */
+export const ContentCutBackEvent = z.strictObject({
+  ...replyEvent,
+  type: z.literal('CONTENT_CUT_BACK'),
+  toolCallId: z.string(),
+  text: z.string(),
+})
+
 /** Display only: thinking is never stored. */
 export const ReasoningDeltaEvent = z.strictObject({
   ...replyEvent,
@@ -276,6 +287,7 @@ export const ReplyEventSchema = z.discriminatedUnion('type', [
   RunStartedEvent,
   TextDeltaEvent,
   TextReplaceEvent,
+  ContentCutBackEvent,
   ReasoningDeltaEvent,
   ToolCallStartEvent,
   ToolCallArgsEvent,

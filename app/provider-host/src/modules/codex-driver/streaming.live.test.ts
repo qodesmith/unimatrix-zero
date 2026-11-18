@@ -25,14 +25,15 @@ import {fakeStore} from '#modules/test-store/main'
 import {programOf} from '#modules/vendor-program/main'
 import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
-import {spawnSync} from 'node:child_process'
+import {spawn as spawnProcess, spawnSync} from 'node:child_process'
 import {once} from 'node:events'
 import fs from 'node:fs'
 import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
+import {createInterface} from 'node:readline'
 import {StringDecoder} from 'node:string_decoder'
-import {describe, expect, it} from 'vitest'
+import {afterAll, describe, expect, it} from 'vitest'
 import {z} from 'zod'
 
 import {startAppServer} from './app-server'
@@ -62,7 +63,30 @@ function homeFrom(source: string) {
   return home
 }
 
+let sharedTreeFolder: string | null = null
+
+function newTreeFolder() {
+  return fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-tree-'))
+  )
+}
+
+/** One Tree's folder for every Reply, as a Tree's Replies share one. */
+function treeFolder() {
+  sharedTreeFolder ??= newTreeFolder()
+
+  return sharedTreeFolder
+}
+
+afterAll(() => {
+  if (sharedTreeFolder)
+    fs.rmSync(sharedTreeFolder, {recursive: true, force: true})
+})
+
 type Streamed = StartReplyEvent
+
+const TOOLS_PROMPT =
+  'Create a file named notes.txt in the current folder holding the single word HERON, with your file editing tool, then run `cat notes.txt` in your shell, and reply with only what it printed.'
 
 const WireLine = z.looseObject({
   id: z.union([z.number(), z.string()]).optional(),
@@ -74,6 +98,11 @@ const WireLine = z.looseObject({
       willRetry: z.boolean().optional(),
     })
     .optional(),
+})
+
+const FeatureListAnswer = z.looseObject({
+  id: z.literal(2),
+  result: z.looseObject({data: z.array(z.looseObject({name: z.string()}))}),
 })
 
 const ErrorNotice = z.looseObject({
@@ -193,6 +222,7 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
           },
           configDir: home,
         },
+        treeFolder: treeFolder(),
         session: session && {...session, type: 'continue'},
         thread: [],
         compactionSettings: {auto: true, threshold},
@@ -281,6 +311,7 @@ function threadReplies(program: string, home: string) {
           },
           configDir: home,
         },
+        treeFolder: treeFolder(),
         session,
         thread,
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -389,6 +420,7 @@ function codedReplies(
           },
           configDir: home,
         },
+        treeFolder: treeFolder(),
         session: session && {...session, type: 'continue'},
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -594,6 +626,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             },
             configDir: home,
           },
+          treeFolder: treeFolder(),
           session: session && {...session, type: fork ? 'fork' : 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -750,6 +783,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           },
           configDir: home,
         },
+        treeFolder: treeFolder(),
         session: session && {
           ...session,
           type: rewind ? 'rewind' : 'continue',
@@ -911,6 +945,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           systemPrompt: 'You answer in as few words as you can.',
           prompt: {text, messageId: crypto.randomUUID()},
           vendorProgram: vendorProgram(home),
+          treeFolder: treeFolder(),
           session: session && {...session, type: 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -1034,6 +1069,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             },
             configDir: home,
           },
+          treeFolder: treeFolder(),
           session,
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -1181,6 +1217,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           },
           configDir: home,
         },
+        treeFolder: treeFolder(),
         session: null,
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -1476,6 +1513,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             },
             configDir: home,
           },
+          treeFolder: treeFolder(),
           session: session && {...session, type: 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -1606,18 +1644,24 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 300_000)
 
-  it('[dep:codex-server-requests-refused] runs a shell command for the AI without sending the app one server request', async () => {
+  it('[dep:codex-full-access] [dep:codex-server-requests-refused] writes a file in the Tree’s folder and runs a command there, asking the app nothing, and shows each tool call', async () => {
     if (!folder || !signedIn) return
 
     const home = homeFrom(signedIn)
+
+    const tree = newTreeFolder()
+
     const idle = heldIdle()
     const exits: Promise<unknown>[] = []
     const output: Buffer[] = []
 
+    const recorder = createRecorder([path.join(RECORDINGS, 'tools.ndjson')])
+    const start = process.env.UZ_RECORD === 'yes' ? recorder.spawn : spawnCodex
+
     const driver = createCodexDriver({
       store: fakeStore().client,
       spawn: (command, options) => {
-        const child = spawnCodex(command, options)
+        const child = start(command, options)
         exits.push(once(child, 'exit').catch(() => undefined))
         child.stdout.on('data', (chunk: Buffer) => output.push(chunk))
 
@@ -1634,7 +1678,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           model: MODEL,
           systemPrompt: 'You answer in as few words as you can.',
           prompt: {
-            text: 'Run `pwd` in your shell, then reply with only what it printed.',
+            text: TOOLS_PROMPT,
             messageId: crypto.randomUUID(),
           },
           vendorProgram: {
@@ -1649,6 +1693,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
             },
             configDir: home,
           },
+          treeFolder: tree,
           session: null,
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -1656,16 +1701,23 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       )
 
       expectComplete(events)
+      expect(fs.readFileSync(path.join(tree, 'notes.txt'), 'utf8').trim()).toBe(
+        'HERON'
+      )
+      expect(fs.readdirSync(tree)).toEqual(['notes.txt'])
+
+      const calls = events
+        .filter(isReplyEvent)
+        .reduce(foldReplyEvent, NEW_REPLY)
+        .content.flatMap(part => (part.type === 'tool-call' ? [part] : []))
+
+      expect(calls.map(call => call.toolName)).toEqual(
+        expect.arrayContaining(['fileChange', 'commandExecution'])
+      )
+      expect(calls.every(call => call.result?.isError === false)).toBe(true)
 
       const lines = wireLinesIn(output)
 
-      expect(
-        lines.some(
-          ({method, params}) =>
-            method === 'item/completed' &&
-            params?.item?.type === 'commandExecution'
-        )
-      ).toBe(true)
       expect(
         lines.filter(line => line.id !== undefined && line.method !== undefined)
       ).toEqual([])
@@ -1674,8 +1726,258 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       await Promise.all(exits)
     } finally {
       fs.rmSync(home, {recursive: true, force: true})
+      fs.rmSync(tree, {recursive: true, force: true})
     }
   }, 180_000)
+
+  it('[dep:codex-full-access] writes a file in the Tree’s folder in a Reply on a thread a cut loaded and kept loaded', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+
+    const tree = newTreeFolder()
+
+    const idle = heldIdle()
+    const exits: Promise<unknown>[] = []
+
+    const vendorProgram: SignInRequest = {
+      program: {
+        path: folder,
+        build: {
+          url: 'https://example.com/codex.tar.gz',
+          sha256: '0'.repeat(64),
+          size: 1,
+          archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+        },
+      },
+      configDir: home,
+    }
+
+    const driver = createCodexDriver({
+      store: fakeStore().client,
+      spawn: (command, options) => {
+        const child = spawnCodex(command, options)
+        exits.push(once(child, 'exit').catch(() => undefined))
+
+        return child
+      },
+      whenIdle: idle.whenIdle,
+    })
+
+    async function reply(text: string, session: SessionRef | null) {
+      const events = await Array.fromAsync(
+        driver.startReply({
+          treeId: crypto.randomUUID(),
+          replyId: crypto.randomUUID(),
+          model: MODEL,
+          systemPrompt: 'You answer in as few words as you can.',
+          prompt: {text, messageId: crypto.randomUUID()},
+          vendorProgram,
+          treeFolder: tree,
+          session: session && {...session, type: 'continue'},
+          thread: [],
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+        })
+      )
+
+      expectComplete(events)
+
+      const prompted = events.find(
+        (event): event is PromptRecorded => event.type === 'PROMPT_RECORDED'
+      )
+
+      const recorded = events.find(
+        (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+      )
+
+      if (!prompted || !recorded) throw new Error('The Reply was not recorded')
+
+      return {prompted, recorded}
+    }
+
+    try {
+      const hi = await reply('Say hi in three words.', null)
+
+      const bye = await reply(
+        'Now say bye in three words.',
+        hi.recorded.session
+      )
+
+      idle.pass()
+      await Promise.all(exits)
+
+      const kept = hi.recorded.session
+
+      await expect(
+        driver.cutSession({
+          session: {
+            type: 'cut',
+            ...kept,
+            keepThrough: kept.messageId,
+            dropFrom: bye.prompted.session.messageId,
+          },
+          vendorProgram,
+        })
+      ).resolves.toBe(true)
+
+      await reply(TOOLS_PROMPT, kept)
+
+      expect(fs.readFileSync(path.join(tree, 'notes.txt'), 'utf8').trim()).toBe(
+        'HERON'
+      )
+      expect(fs.readdirSync(tree)).toEqual(['notes.txt'])
+
+      idle.pass()
+      await Promise.all(exits)
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+      fs.rmSync(tree, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:codex-resume-moved-folder] resumes a thread from the app’s copy alone in a Tree folder other than the one it started in, and works there', async () => {
+    if (!folder || !signedIn) return
+
+    const store = fakeStore()
+    const homes = [homeFrom(signedIn), homeFrom(signedIn)]
+
+    const trees = [0, 1].map(() => newTreeFolder())
+
+    const idle = heldIdle()
+    const exits: Promise<unknown>[] = []
+    const treeId = crypto.randomUUID()
+
+    function driver() {
+      return createCodexDriver({
+        store: store.client,
+        spawn: (command, options) => {
+          const child = spawnCodex(command, options)
+          exits.push(once(child, 'exit').catch(() => undefined))
+
+          return child
+        },
+        whenIdle: idle.whenIdle,
+      })
+    }
+
+    async function reply(at: number, text: string, session: SessionRef | null) {
+      const events = await Array.fromAsync(
+        driver().startReply({
+          treeId,
+          replyId: crypto.randomUUID(),
+          model: MODEL,
+          systemPrompt: 'You answer in as few words as you can.',
+          prompt: {text, messageId: crypto.randomUUID()},
+          vendorProgram: {
+            program: {
+              path: folder ?? '',
+              build: {
+                url: 'https://example.com/codex.tar.gz',
+                sha256: '0'.repeat(64),
+                size: 1,
+                archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+              },
+            },
+            configDir: homes[at] ?? '',
+          },
+          treeFolder: trees[at] ?? '',
+          session: session && {...session, type: 'continue'},
+          thread: [],
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+        })
+      )
+
+      expectComplete(events)
+
+      const recorded = events.find(
+        (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+      )
+
+      if (!recorded) throw new Error('The Reply was not recorded')
+
+      return {events, session: recorded.session}
+    }
+
+    try {
+      const first = await reply(0, 'Remember the codeword ZANZIBAR.', null)
+      idle.pass()
+      await Promise.all(exits)
+
+      const second = await reply(
+        1,
+        'Run `pwd` in your shell, then reply with the codeword and what it printed, on one line.',
+        first.session
+      )
+
+      expect(second.session.sessionId).toBe(first.session.sessionId)
+
+      const text = second.events
+        .filter(isReplyEvent)
+        .reduce(foldReplyEvent, NEW_REPLY)
+        .content.flatMap(part => (part.type === 'text' ? [part.text] : []))
+        .join('')
+
+      expect(text).toMatch(/ZANZIBAR/)
+      expect(text).toContain(trees[1])
+
+      idle.pass()
+      await Promise.all(exits)
+    } finally {
+      for (const made of [...homes, ...trees]) {
+        fs.rmSync(made, {recursive: true, force: true})
+      }
+    }
+  }, 300_000)
+
+  it('[dep:codex-subagents-off] turns off the Subagents Codex turns on by default', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const program = programIn(folder)
+
+    const child = spawnProcess(program, CODEX_ARGS, {
+      cwd: home,
+      env: codexEnvironment(process.env, home),
+      stdio: ['pipe', 'pipe', 'ignore'],
+    })
+
+    const answered = new Promise<unknown>(resolve => {
+      createInterface({input: child.stdout}).on('line', line => {
+        const message = FeatureListAnswer.safeParse(JSON.parse(line))
+
+        if (message.success) resolve(message.data.result.data)
+      })
+    })
+
+    function send(message: {id?: number; method: string; params?: unknown}) {
+      child.stdin.write(`${JSON.stringify(message)}\n`)
+    }
+
+    try {
+      send({
+        id: 1,
+        method: 'initialize',
+        params: {
+          clientInfo: {name: 'uz_live', title: 'UZ live', version: '0'},
+          capabilities: null,
+        },
+      })
+      send({method: 'initialized'})
+      send({id: 2, method: 'experimentalFeature/list', params: {}})
+
+      expect(await answered).toContainEqual(
+        expect.objectContaining({
+          name: 'multi_agent',
+          enabled: false,
+          defaultEnabled: true,
+        })
+      )
+    } finally {
+      child.stdin.end()
+      await once(child, 'exit')
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 60_000)
 })
 
 describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
@@ -1721,6 +2023,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
             },
             configDir: home,
           },
+          treeFolder: treeFolder(),
           session: null,
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
@@ -1821,8 +2124,9 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
 
     const binary = fs.readFileSync(program)
 
+    // A feature's name is held without its `features.` table.
     const settings = CODEX_ARGS.filter(arg => arg !== '-c').map(
-      arg => arg.split('=')[0] ?? ''
+      arg => arg.split('=')[0]?.replace(/^features\./, '') ?? ''
     )
 
     expect(settings.length).toBeGreaterThan(0)

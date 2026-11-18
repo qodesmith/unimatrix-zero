@@ -5,7 +5,8 @@ import {vendorEnvironment} from '#modules/vendor-environment/main'
  * `.codex/config.toml` loads only if `CODEX_HOME`'s `config.toml` trusts it,
  * which the app never writes. `cli_auth_credentials_store="file"` keeps the
  * sign-in in `CODEX_HOME`, inside the data folder, should Codex's default move
- * to the Keychain.
+ * to the Keychain. `features.multi_agent=false` leaves Subagents out until the
+ * app can show them.
  */
 export const CODEX_ARGS = [
   '-c',
@@ -14,6 +15,8 @@ export const CODEX_ARGS = [
   'project_doc_max_bytes=0',
   '-c',
   'cli_auth_credentials_store="file"',
+  '-c',
+  'features.multi_agent=false',
 ]
 
 /** The host's environment, minus anything that could outrank the subscription. */

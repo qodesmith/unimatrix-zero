@@ -7,6 +7,8 @@ import {schema} from '#modules/database/main'
 import {TREE_TITLE_MAX_LENGTH} from '@uz/contract/trees'
 import {and, desc, eq, getColumns, isNull, sql} from 'drizzle-orm'
 
+export {makeTreeFolder} from './folder'
+
 const {trees, prompts} = schema
 
 const rootText = sql<string | null>`(

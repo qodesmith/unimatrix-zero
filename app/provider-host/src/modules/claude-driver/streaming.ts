@@ -17,10 +17,9 @@ import type {RunFailure} from '@uz/contract/turns'
 
 import {failureOf} from '#modules/failures/main'
 import {createReplyRuns} from '#modules/reply-runs/main'
-import {explainingLabels} from '#modules/thread-replay/main'
 
-import {claudeReplyEnvironment} from './environment'
 import {firstHeard, silentEnding, startingWith} from './heard'
+import {replyOptions} from './options'
 import {createReplyMapper} from './replies'
 import {cutAt, resumption, servedThrough, textOf} from './resumption'
 import {openSession} from './session'
@@ -29,6 +28,7 @@ import {
   projectKeyOf,
   readNewToolResults,
   restoreFiles,
+  underOneKey,
   writeTranscriptBack,
 } from './transcripts'
 import {createWarmSessions} from './warm'
@@ -49,6 +49,8 @@ interface Live extends ClaudeSession {
   model: string
   compactionSettings: CompactionSettings
   restore: Restore
+  store: SessionStoreClient
+  /** Where `claude` files the session in its configuration folder. */
   projectKey: string
   /** The SDK swaps in its own configuration folder on a restore. */
   activeConfigDir: () => string
@@ -61,14 +63,6 @@ type Mapper = ReturnType<typeof createReplyMapper>
 type Answered =
   | {session: Live; outcome: Outcome}
   | {session: null; outcome: Silent}
-
-/** Nothing for a default, so `claude` compacts where it would on its own. */
-function claudeSettingsOf({auto, threshold}: CompactionSettings) {
-  return {
-    ...(auto ? {} : {autoCompactEnabled: false}),
-    ...(threshold === null ? {} : {autoCompactWindow: threshold}),
-  }
-}
 
 /** `heard` says whether `claude` sent anything back to the Prompt. */
 type Outcome =
@@ -108,14 +102,25 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     resolveModel: deps.resolveModel,
   })
 
+  function storeFor(request: ReplyRequest) {
+    return underOneKey(
+      deps.store,
+      projectKeyOf(request.vendorProgram.configDir)
+    )
+  }
+
   /** Waits for a closing `claude` in the session, which may still write to it. */
   async function filesOf(request: ReplyRequest, restore: Restore) {
     if (request.session) await warm.closed(request.session.sessionId)
 
     const {resume} = resumption(request.session, restore)
-    const projectKey = projectKeyOf(request.vendorProgram.configDir)
 
-    return resume ? deps.store.loadFiles({projectKey, sessionId: resume}) : []
+    return resume
+      ? storeFor(request).loadFiles({
+          projectKey: projectKeyOf(request.treeFolder),
+          sessionId: resume,
+        })
+      : []
   }
 
   /** Until `claude` starts, Stop ends the Reply with nothing to interrupt. */
@@ -158,13 +163,13 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     program: NonNullable<ReplyRequest['vendorProgram']['program']>
   ): Live {
     const {configDir} = request.vendorProgram
-    const cwd = configDir
-    const projectKey = projectKeyOf(cwd)
+    const projectKey = projectKeyOf(request.treeFolder)
     const {resume, fork, upTo} = resumption(request.session, restore)
     let activeConfigDir = configDir
+    const appCopy = storeFor(request)
 
     const sessionStore = appSessionStore(
-      deps.store,
+      appCopy,
       servedThrough(request.session)
     )
 
@@ -175,24 +180,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
         : sessionStore
 
     const options: Options = {
-      pathToClaudeCodeExecutable: program.path,
-      env: claudeReplyEnvironment(deps.env, configDir),
-      cwd,
-      settingSources: [],
-      settings: {
-        autoMemoryEnabled: false,
-        ...claudeSettingsOf(request.compactionSettings),
-      },
-      tools: [],
-      strictMcpConfig: true,
-      mcpServers: {},
-      // Else a Prompt such as `/compact` is run as a `claude` command.
-      verbatimPrompts: true,
-      includePartialMessages: true,
-      thinking: {type: 'adaptive', display: 'summarized'},
-      // On every open: `claude` keeps no System prompt with the session.
-      systemPrompt: explainingLabels(request.systemPrompt, request.thread),
-      model: request.model,
+      ...replyOptions(request, program.path, deps.env),
       ...(resume ? {resume} : {}),
       ...(fork ? {forkSession: true} : {}),
       ...(upTo ? {resumeSessionAt: upTo} : {}),
@@ -225,6 +213,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       model: request.model,
       compactionSettings: request.compactionSettings,
       restore,
+      store: appCopy,
       projectKey,
       activeConfigDir: () => activeConfigDir,
       // A fork is a new session, with nothing of its own saved yet.
@@ -295,7 +284,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     if (files.length === 0) return
 
-    await deps.store.saveFiles(
+    await session.store.saveFiles(
       {projectKey: session.projectKey, sessionId},
       files
     )
@@ -360,7 +349,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     warm.drop(session)
 
     const writtenBack = await writeTranscriptBack(
-      deps.store,
+      session.store,
       {
         configDir: request.vendorProgram.configDir,
         projectKey: session.projectKey,

@@ -91,7 +91,7 @@ function chatgptToClaude(threadTokens: number) {
 it('swaps the setup the Context size carries for the new Provider’s', () => {
   expect(chatgptToClaude(5000)).toBeNull()
   expect(chatgptToClaude(30_000)).toBe(
-    'Switching to Claude will re-read ~31k tokens of this conversation (uses more of your limit).'
+    'Switching to Claude will re-read ~40k tokens of this conversation (uses more of your limit).'
   )
 })
 
