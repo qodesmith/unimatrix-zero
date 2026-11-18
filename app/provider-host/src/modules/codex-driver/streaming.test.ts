@@ -1503,7 +1503,7 @@ it('starts, resumes and forks every thread in the Tree’s folder with full acce
   ])
 })
 
-it('starts a Reply in a thread only once a cut of it has finished', async () => {
+it('starts a Reply in a thread only once a cut of it has finished, in the Tree’s folder with full access', async () => {
   const opened = await setUp(['started.ndjson'])
   const first = await opened.reply(FIRST_PROMPT)
   await opened.reply(SECOND_PROMPT, recordedIn(first))

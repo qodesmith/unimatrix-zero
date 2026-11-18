@@ -261,6 +261,28 @@ it('shows the tool call as running until its result arrives', async () => {
     .toBeVisible()
 })
 
+it('shows a tool call with no result as cut off once its Reply has stopped or been interrupted', async () => {
+  const content: Reply['content'] = [
+    {
+      type: 'tool-call',
+      toolCallId: 'tool-1',
+      toolName: 'Bash',
+      args: '{"command":"sleep 600"}',
+      result: null,
+    },
+  ]
+
+  const screen = await renderSaved(
+    {status: 'stopped', content},
+    {status: 'interrupted', content}
+  )
+
+  const toolCalls = screen.getByRole('group', {name: 'Tool call Bash'})
+
+  await expect.element(toolCalls.nth(0).getByText('cut off')).toBeVisible()
+  await expect.element(toolCalls.nth(1).getByText('cut off')).toBeVisible()
+})
+
 it('highlights the code block', async () => {
   const screen = await replay()
   const code = screen.getByRole('article').element().querySelector('pre code')

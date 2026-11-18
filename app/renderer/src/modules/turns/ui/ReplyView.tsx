@@ -69,7 +69,7 @@ export function ReplyView({reply}: {reply: Reply}) {
               streaming={streaming && index === content.length - 1}
             />
           ) : (
-            <ToolCallView part={part} />
+            <ToolCallView part={part} streaming={streaming} />
           )}
         </Fragment>
       ))}
@@ -171,15 +171,20 @@ function prettyArgs(args: string) {
 
 const TOOL_PROGRESS = {
   running: {label: 'running…', status: 'running'},
+  cutOff: {label: 'cut off', status: 'error'},
   failed: {label: 'failed', status: 'error'},
   done: {label: 'done', status: undefined},
 } as const
 
-function ToolCallView({part}: {part: ToolCall}) {
-  const {toolName, args, result} = part
+function toolProgress(result: ToolCall['result'], streaming: boolean) {
+  if (result === null) return streaming ? 'running' : 'cutOff'
 
-  const progress =
-    result === null ? 'running' : result.isError ? 'failed' : 'done'
+  return result.isError ? 'failed' : 'done'
+}
+
+function ToolCallView({part, streaming}: {part: ToolCall; streaming: boolean}) {
+  const {toolName, args, result} = part
+  const progress = toolProgress(result, streaming)
 
   return (
     <Trace

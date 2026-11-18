@@ -390,7 +390,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **App side:** `codex-driver` runs every thread and every turn in the Tree's folder with full access, until the Permission mode decides (ADR 0022). A turn carries the settings too, because a thread a cut loaded runs read-only in the config folder until then. Its Reply mapper shows `fileChange` and `commandExecution` items as tool calls with their results.
 - **User would see:** a Reply that can't write or run anything, or that works in the config folder.
 - **Changed by:** upgrade
-- **Check:** `[dep:codex-full-access]` in `codex-driver`: a Reply writes a file in the Tree's folder and runs a command there, and a Reply on a thread a cut loaded read-only does the same.
+- **Check:** `[dep:codex-full-access]` in `codex-driver`: a Reply writes a file in the Tree's folder and runs a command there, and a Reply on a thread a cut loaded read-only writes a file there too.
 
 ### Codex's Subagents turned off
 
