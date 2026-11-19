@@ -39,7 +39,7 @@ The libraries (System prompts, MCP servers, Skills, Plugins) are content, as The
 | Each Provider's Compaction Settings                                                | "Every Thread, from its next Reply."                                                                    |
 | The Summary prompts                                                                | "Every Summary made from now on."                                                                       |
 
-**The narrowing prompt.** Changing the global Permission mode can leave Trees with a wider mode of their own; [§8](./08-system-prompts-the-tools-panel-approvals-and-permission-modes.md) says when the prompt appears and what it does.
+**The narrowing prompt.** Narrowing the global Permission mode can leave Trees with a wider mode of their own; [§8](./08-system-prompts-the-tools-panel-approvals-and-permission-modes.md) says when the prompt appears and what it does.
 
 **Font size** runs from 12 to 24 pixels in steps of 2. Beside its control on this page, ⌘+ and ⌘− change it a step at a time, and ⌘0 sets it back to 16. It grows text and the widths that cap a line of it, not the spacing, and it is not Zoom, which scales the canvas alone; the window itself never zooms.
 
