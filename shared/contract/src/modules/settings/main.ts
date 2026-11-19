@@ -39,8 +39,8 @@ function thresholdSchema({min, max}: CompactionThresholdRange) {
 }
 
 /**
- * Global, never per Tree. Only the Compaction Settings change what the AI
- * does, in every Thread from its next Reply.
+ * The Compaction Settings reach every Thread from its next Reply, and no Tree
+ * has its own; every other key never reaches the AI (ADR 0023).
  */
 export const SettingsSchema = z.strictObject({
   themeMode: ThemeModeSchema,
