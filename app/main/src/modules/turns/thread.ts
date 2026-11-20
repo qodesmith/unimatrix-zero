@@ -102,8 +102,8 @@ export function withAttachments(
   ])
 
   return {
-    thread: thread.map((turn, at) => ({
-      ...turn,
+    thread: thread.map((exchange, at) => ({
+      ...exchange,
       attachments: planned[at] ?? [],
     })),
     attachments: planned.at(-1) ?? [],

@@ -1,4 +1,4 @@
-import type {PendingAdd} from '../attachment-add/use-attachment-adds'
+import type {PendingAdd} from '../attachment-add/use-attachment-add'
 import type {
   Attachment as AttachmentData,
   AttachmentKind,

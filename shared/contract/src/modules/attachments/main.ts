@@ -146,7 +146,11 @@ export function inlineForm(
 /** What a Prompt's inline images come to, against the per-Prompt limit. */
 export function inlineImagesSize(attachments: readonly Sized[]) {
   return attachments
-    .filter(attachment => inlineForm('claude', attachment) === 'image')
+    .filter(
+      attachment =>
+        attachmentKind(attachment.mediaType) === 'image' &&
+        inlineImageSize(attachment) <= INLINE_IMAGE_SIZE_LIMIT
+    )
     .reduce((sum, attachment) => sum + inlineImageSize(attachment), 0)
 }
 
