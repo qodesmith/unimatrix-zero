@@ -43,7 +43,7 @@ function expectLockedDown(response: Response) {
 }
 
 describe('serving an attachment by id', () => {
-  it('serves the original with the type read from its bytes, sandboxed', async () => {
+  it('serves the original with the type main kept for it, sandboxed', async () => {
     const response = await respond(attachmentUrl(IMAGE_ID))
 
     expect(response.status).toBe(200)
