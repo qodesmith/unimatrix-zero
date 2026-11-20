@@ -99,7 +99,7 @@ export function attachmentUrl(id: string) {
   return `${ATTACHMENT_SCHEME}://unimatrix-zero/attachments/${id}`
 }
 
-/** How a file goes inline, beside its path; null when it goes by path only. */
+/** How a file goes inline, beside its path. */
 export type InlineForm = 'image' | 'pdf' | 'text'
 
 type Sized = Pick<Attachment, 'mediaType' | 'size' | 'shrunkSize'>

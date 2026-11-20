@@ -62,17 +62,14 @@ export function attachedFiles(folder: string) {
       folder: false,
       inline: {type: 'pdf'},
     },
-    /** Over the inline limits, so a shrunk copy goes inline in its place. */
     photo: {
       name: 'photo.jpg',
       path: photo,
       folder: false,
       inline: {type: 'image', mediaType: 'image/jpeg', path: shrunk},
     },
-    /** A type no Provider takes inline. */
     archive: {name: 'archive.zip', path: archive, folder: false, inline: null},
     project: {name: 'project', path: project, folder: true, inline: null},
-    /** Its copy is missing. */
     gone: {
       name: 'gone.txt',
       path: path.join(folder, 'gone.txt'),
