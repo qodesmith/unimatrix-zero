@@ -49,7 +49,6 @@ export async function recordFakeReply(): Promise<ReplyEvent[]> {
     session: null,
     thread: [],
     compactionSettings: {auto: true, threshold: null},
-    conversionDir: '/fake/conversions',
   })) {
     if (!isReplyEvent(event)) continue
 

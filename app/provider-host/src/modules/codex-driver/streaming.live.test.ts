@@ -20,7 +20,7 @@ import type {
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 
-import {pngShowing} from '#modules/test-attachments/main'
+import {fileHolding, pngShowing} from '#modules/test-attachments/main'
 import {heldIdle} from '#modules/test-idle/main'
 import {listenLocally, startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -52,8 +52,6 @@ const signedIn = process.env.UZ_LIVE_CODEX_HOME
 
 /** The Model ChatGPT's `model/list` marked as its default when recorded. */
 const MODEL = 'gpt-6.1-sol'
-
-const CONVERSION_DIR = path.join(os.tmpdir(), 'uz-conversions')
 
 const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
   auto: true,
@@ -230,7 +228,6 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
         session: session && {...session, type: 'continue'},
         thread: [],
         compactionSettings: {auto: true, threshold},
-        conversionDir: CONVERSION_DIR,
       })
     )
 
@@ -323,7 +320,6 @@ function threadReplies(program: string, home: string) {
         session,
         thread,
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
-        conversionDir: CONVERSION_DIR,
       })
     )
 
@@ -335,13 +331,19 @@ function threadReplies(program: string, home: string) {
 
     if (!recorded) throw new Error('The Reply was not recorded')
 
-    const shown = events
+    const {content} = events
       .filter(isReplyEvent)
       .reduce(foldReplyEvent, NEW_REPLY)
-      .content.flatMap(part => (part.type === 'text' ? [part.text] : []))
+
+    const shown = content
+      .flatMap(part => (part.type === 'text' ? [part.text] : []))
       .join('')
 
-    return {text: shown, session: recorded.session}
+    const calls = content.flatMap(part =>
+      part.type === 'tool-call' ? [part] : []
+    )
+
+    return {text: shown, calls, session: recorded.session}
   }
 
   async function closed() {
@@ -433,7 +435,6 @@ function codedReplies(
         session: session && {...session, type: 'continue'},
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
-        conversionDir: CONVERSION_DIR,
       })
     )
 
@@ -640,7 +641,6 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session: session && {...session, type: fork ? 'fork' : 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
-          conversionDir: CONVERSION_DIR,
         })
       )
 
@@ -801,7 +801,6 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         },
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
-        conversionDir: CONVERSION_DIR,
       })) {
         events.push(event)
 
@@ -961,7 +960,6 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session: session && {...session, type: 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
-          conversionDir: CONVERSION_DIR,
         })
       )
 
@@ -1086,7 +1084,6 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session,
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
-          conversionDir: CONVERSION_DIR,
         })
       )
     }
@@ -1236,7 +1233,6 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         session: null,
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
-        conversionDir: CONVERSION_DIR,
       })) {
         events.push(event)
 
@@ -1533,7 +1529,6 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session: session && {...session, type: 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
-          conversionDir: CONVERSION_DIR,
         })
       )
 
@@ -1715,7 +1710,6 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session: null,
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
-          conversionDir: CONVERSION_DIR,
         })
       )
 
@@ -1790,7 +1784,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           replyId: crypto.randomUUID(),
           model: MODEL,
           systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text, messageId: crypto.randomUUID()},
+          prompt: {text, attachments: [], messageId: crypto.randomUUID()},
           vendorProgram,
           treeFolder: tree,
           session: session && {...session, type: 'continue'},
@@ -1886,7 +1880,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           replyId: crypto.randomUUID(),
           model: MODEL,
           systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text, messageId: crypto.randomUUID()},
+          prompt: {text, attachments: [], messageId: crypto.randomUUID()},
           vendorProgram: {
             program: {
               path: folder ?? '',
@@ -2047,7 +2041,6 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
           session: null,
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
-          conversionDir: CONVERSION_DIR,
         })
       )
 
@@ -2100,7 +2093,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
     }
   }, 300_000)
 
-  it('[dep:codex-data-url-images] [dep:codex-injected-images] reads an image sent as a data URL with a Prompt, and one injected with a Thread Claude wrote', async () => {
+  it('[dep:codex-data-url-images] [dep:codex-injected-images] reads an image sent as a data URL with a Prompt, and one injected with a Thread Claude wrote, opening neither from its path', async () => {
     if (!folder || !signedIn) return
 
     const home = homeFrom(signedIn)
@@ -2108,16 +2101,18 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
     const {reply, closed, threadsStarted} = threadReplies(folder, home)
 
     try {
-      const heron = await pngShowing(files, 'HERON')
+      const heron = pngShowing(files, 'HERON')
 
       const sent = await reply(
-        'What word does the image show? Just the word.',
+        'Without using any tool: what word does the attached image show? Just the word.',
         null,
         [],
         [heron]
       )
 
       expect(sent.text).toMatch(/heron/i)
+      // The image's path is in the Prompt too: a tool call would read it there.
+      expect(sent.calls).toEqual([])
 
       const fromClaude: Thread = [
         {
@@ -2129,14 +2124,46 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
       ]
 
       const injected = await reply(
-        'What word did the image I sent show? Just the word.',
+        'Without using any tool: what word did the image I sent show? Just the word.',
         null,
         fromClaude
       )
 
       expect(injected.text).toMatch(/heron/i)
+      expect(injected.calls).toEqual([])
       // One thread for each Reply: Codex took the image, so no text replay.
       expect(threadsStarted()).toBe(2)
+
+      await closed()
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+      fs.rmSync(files, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:codex-opens-attachment-path] opens a file it is given only the path line of, with a command', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const files = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-files-'))
+    const {reply, closed} = threadReplies(folder, home)
+
+    try {
+      const memo = fileHolding(
+        files,
+        'memo.txt',
+        Buffer.from('The secret word is MAPLE.\n', 'utf8')
+      )
+
+      const sent = await reply(
+        'What is the secret word in the attached file? Just the word.',
+        null,
+        [],
+        [memo]
+      )
+
+      expect(sent.text).toMatch(/maple/i)
+      expect(sent.calls.some(call => call.args.includes('memo.txt'))).toBe(true)
 
       await closed()
     } finally {

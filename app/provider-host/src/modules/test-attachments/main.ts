@@ -1,92 +1,174 @@
-import type {ConvertedPage} from '#modules/pdf-conversion/main'
-import type {ConvertPdf} from '#modules/prompt-content/main'
 import type {HostAttachment} from '@uz/contract/attachments'
 
-import {createHash} from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import zlib from 'node:zlib'
 
 /** A PNG's first four bytes, in base64. */
 export const PNG_BASE64 = 'iVBORw=='
 
+/** A JPEG's first three bytes, in base64: the shrunk copy of `photo`. */
+export const SHRUNK_BASE64 = '/9j/'
+
 /** `%PDF-1`, in base64. */
 export const PDF_BASE64 = 'JVBERi0x'
 
-/** Two bytes, in base64, that a fake converter renders a page as. */
-export const PAGE_IMAGE_BASE64 = 'AQI='
-
-/** Originals as main keeps them, each named by its SHA-256. */
-export function attachedFiles(folder: string) {
-  function attach(
-    name: string,
-    mediaType: HostAttachment['mediaType'],
-    bytes: Uint8Array,
-    sha: string
-  ): HostAttachment {
-    const sha256 = sha.repeat(64)
-    const file = path.join(folder, sha256)
-    fs.writeFileSync(file, bytes)
-
-    return {name, mediaType, sha256, path: file}
-  }
-
-  return {
-    notes: attach(
-      'notes.txt',
-      'text/plain',
-      Buffer.from('Buy milk.', 'utf8'),
-      'a'
-    ),
-    chart: attach(
-      'chart.png',
-      'image/png',
-      Uint8Array.from([0x89, 0x50, 0x4e, 0x47]),
-      'b'
-    ),
-    report: attach(
-      'report.pdf',
-      'application/pdf',
-      Buffer.from('%PDF-1', 'ascii'),
-      'c'
-    ),
-    gone: {
-      name: 'gone.txt',
-      mediaType: 'text/plain',
-      sha256: 'd'.repeat(64),
-      path: path.join(folder, 'd'.repeat(64)),
-    } satisfies HostAttachment,
-  }
-}
-
-function keep(
-  folder: string,
-  name: string,
-  mediaType: HostAttachment['mediaType'],
-  bytes: Uint8Array
-): HostAttachment {
-  const sha256 = createHash('sha256').update(bytes).digest('hex')
-  const file = path.join(folder, sha256)
+function keep(folder: string, name: string, bytes: Uint8Array) {
+  const file = path.join(folder, name)
   fs.writeFileSync(file, bytes)
 
-  return {name, mediaType, sha256, path: file}
+  return file
 }
 
-/** For a live check: a PNG a Model can read `word` in. */
-export async function pngShowing(folder: string, word: string) {
-  const {createCanvas} = await import('@napi-rs/canvas')
-  const canvas = createCanvas(480, 160)
-  const context = canvas.getContext('2d')
-  context.fillStyle = '#ffffff'
-  context.fillRect(0, 0, 480, 160)
-  context.fillStyle = '#000000'
-  context.font = 'bold 72px sans-serif'
-  context.fillText(word, 40, 110)
-
-  return keep(folder, 'word.png', 'image/png', await canvas.encode('png'))
+/** As main marks a file the Provider doesn't take, or the budget left out. */
+export function byPathOnly(attachment: HostAttachment): HostAttachment {
+  return {...attachment, inline: null}
 }
 
-/** For a live check: a one-page PDF whose text says `sentence`. */
-export function pdfSaying(folder: string, sentence: string) {
+/**
+ * Attachments as main hands them over, each copy under its own name and
+ * marked inline as main would mark it for Claude.
+ */
+export function attachedFiles(folder: string) {
+  function save(name: string, ...bytes: number[]) {
+    return keep(folder, name, Uint8Array.from(bytes))
+  }
+
+  const notes = keep(folder, 'notes.txt', Buffer.from('Buy milk.', 'utf8'))
+  const chart = save('chart.png', 0x89, 0x50, 0x4e, 0x47)
+  const report = keep(folder, 'report.pdf', Buffer.from('%PDF-1', 'ascii'))
+  const photo = save('photo.jpg', 0xff, 0xd8, 0xff, 0xe0)
+  const shrunk = save('photo.shrunk.jpg', 0xff, 0xd8, 0xff)
+  const archive = save('archive.zip', 0x50, 0x4b)
+  const project = path.join(folder, 'project')
+  fs.mkdirSync(project)
+
+  return {
+    notes: {
+      name: 'notes.txt',
+      path: notes,
+      folder: false,
+      inline: {type: 'text'},
+    },
+    chart: {
+      name: 'chart.png',
+      path: chart,
+      folder: false,
+      inline: {type: 'image', mediaType: 'image/png', path: chart},
+    },
+    report: {
+      name: 'report.pdf',
+      path: report,
+      folder: false,
+      inline: {type: 'pdf'},
+    },
+    /** Over the inline limits, so a shrunk copy goes inline in its place. */
+    photo: {
+      name: 'photo.jpg',
+      path: photo,
+      folder: false,
+      inline: {type: 'image', mediaType: 'image/jpeg', path: shrunk},
+    },
+    /** A type no Provider takes inline. */
+    archive: {name: 'archive.zip', path: archive, folder: false, inline: null},
+    project: {name: 'project', path: project, folder: true, inline: null},
+    /** Its copy is missing. */
+    gone: {
+      name: 'gone.txt',
+      path: path.join(folder, 'gone.txt'),
+      folder: false,
+      inline: {type: 'text'},
+    },
+  } satisfies Record<string, HostAttachment>
+}
+
+/** 5 × 7 dots each, a row a string. */
+const GLYPHS = new Map([
+  ['E', ['#####', '#....', '#....', '####.', '#....', '#....', '#####']],
+  ['H', ['#...#', '#...#', '#...#', '#####', '#...#', '#...#', '#...#']],
+  ['N', ['#...#', '##..#', '#.#.#', '#.#.#', '#..##', '#...#', '#...#']],
+  ['O', ['.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.']],
+  ['R', ['####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#']],
+])
+
+const DOT = 16
+const MARGIN = 32
+
+function chunk(type: string, data: Uint8Array) {
+  const body = Buffer.concat([Buffer.from(type, 'ascii'), data])
+  const framed = Buffer.alloc(body.length + 8)
+  framed.writeUInt32BE(data.length, 0)
+  body.copy(framed, 4)
+  framed.writeUInt32BE(zlib.crc32(body), body.length + 4)
+
+  return framed
+}
+
+/** Black dots on white, 8-bit grayscale. */
+function wordPng(word: string) {
+  const glyphs = Array.from(word, letter => {
+    const glyph = GLYPHS.get(letter)
+
+    if (!glyph) throw new Error(`No glyph for “${letter}”.`)
+
+    return glyph
+  })
+
+  const width = MARGIN * 2 + glyphs.length * 6 * DOT - DOT
+  const height = MARGIN * 2 + 7 * DOT
+  const rows = Buffer.alloc((width + 1) * height, 0xff)
+
+  for (let y = 0; y < height; y++) rows[y * (width + 1)] = 0
+
+  for (const [at, glyph] of glyphs.entries()) {
+    for (const [row, dots] of glyph.entries()) {
+      for (const [column, dot] of Array.from(dots).entries()) {
+        if (dot !== '#') continue
+
+        const left = MARGIN + (at * 6 + column) * DOT
+        const top = MARGIN + row * DOT
+
+        for (let y = top; y < top + DOT; y++) {
+          rows.fill(
+            0,
+            y * (width + 1) + 1 + left,
+            y * (width + 1) + 1 + left + DOT
+          )
+        }
+      }
+    }
+  }
+
+  const header = Buffer.alloc(13)
+  header.writeUInt32BE(width, 0)
+  header.writeUInt32BE(height, 4)
+  header.set([8, 0, 0, 0, 0], 8)
+
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', header),
+    chunk('IDAT', zlib.deflateSync(rows)),
+    chunk('IEND', new Uint8Array()),
+  ])
+}
+
+/**
+ * For a live check: a PNG a Model can read `word` in, of the letters E, H, N,
+ * O and R, sent inline. Its name says nothing of the word.
+ */
+export function pngShowing(folder: string, word: string): HostAttachment {
+  const file = keep(folder, 'word.png', wordPng(word))
+
+  return {
+    name: 'word.png',
+    path: file,
+    folder: false,
+    inline: {type: 'image', mediaType: 'image/png', path: file},
+  }
+}
+
+/** For a live check: a one-page PDF whose text says `sentence`, sent inline. */
+export function pdfSaying(folder: string, sentence: string): HostAttachment {
   const text = `BT /F1 24 Tf 72 700 Td (${sentence}) Tj ET`
 
   const objects = [
@@ -114,27 +196,19 @@ export function pdfSaying(folder: string, sentence: string) {
   pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${entries.join('')}`
   pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`
 
-  return keep(folder, 'note.pdf', 'application/pdf', Buffer.from(pdf, 'latin1'))
+  return {
+    name: 'note.pdf',
+    path: keep(folder, 'note.pdf', Buffer.from(pdf, 'latin1')),
+    folder: false,
+    inline: {type: 'pdf'},
+  }
 }
 
-/**
- * Converts every PDF to a page of text, then a page rendered as an image, and
- * keeps what it was asked to convert.
- */
-export function fakeConverter() {
-  const calls: {original: HostAttachment; conversionDir: string}[] = []
-
-  async function convertPdf(
-    original: HostAttachment,
-    conversionDir: string
-  ): Promise<ConvertedPage[]> {
-    calls.push({original, conversionDir})
-
-    return [
-      {text: 'Sales rose.', image: null},
-      {text: 'A chart.', image: Uint8Array.from([1, 2])},
-    ]
-  }
-
-  return {convertPdf: convertPdf satisfies ConvertPdf, calls}
+/** For a live check: a file of `bytes` the AI can only open from its path. */
+export function fileHolding(
+  folder: string,
+  name: string,
+  bytes: Uint8Array
+): HostAttachment {
+  return {name, path: keep(folder, name, bytes), folder: false, inline: null}
 }

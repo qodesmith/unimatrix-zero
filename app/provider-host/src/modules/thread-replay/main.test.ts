@@ -107,23 +107,40 @@ it('replays the whole Thread in order before the Prompt, without a Reply that sh
   )
 })
 
-function attached(
-  name: string,
-  mediaType: HostAttachment['mediaType']
-): HostAttachment {
-  return {
-    name,
-    mediaType,
-    sha256: 'a'.repeat(64),
-    path: `/attachments/${name}`,
-  }
+const report: HostAttachment = {
+  name: 'report.pdf',
+  path: '/attachments/report.pdf',
+  folder: false,
+  inline: {type: 'pdf'},
 }
 
-it('puts each Prompt’s files inside its own <prompt>, in order and before its text, and the next Prompt’s before it', () => {
-  const report = attached('report.pdf', 'application/pdf')
-  const chart = attached('chart.png', 'image/png')
-  const notes = attached('notes.txt', 'text/plain')
+const chart: HostAttachment = {
+  name: 'chart.png',
+  path: '/attachments/chart.png',
+  folder: false,
+  inline: {
+    type: 'image',
+    mediaType: 'image/png',
+    path: '/attachments/chart.png',
+  },
+}
 
+/** An earlier Prompt's PDF that Claude's media budget left out. */
+const dropped: HostAttachment = {
+  name: 'old.pdf',
+  path: '/attachments/old.pdf',
+  folder: false,
+  inline: null,
+}
+
+const project: HostAttachment = {
+  name: 'project',
+  path: '/work/project',
+  folder: true,
+  inline: null,
+}
+
+it('puts each Prompt’s path lines inside its own <prompt>, in order and before its text, each inline file right after its own line, and keeps the line of a file that goes by path only', () => {
   const pieces = replayed(
     [
       {
@@ -132,24 +149,43 @@ it('puts each Prompt’s files inside its own <prompt>, in order and before its 
         reply: [{type: 'text', text: 'Done.'}],
         label: null,
       },
-      {prompt: '', attachments: [notes], reply: [], label: null},
+      {prompt: '', attachments: [dropped], reply: [], label: null},
     ],
-    {text: 'And these?', attachments: [chart, notes]}
+    {text: 'And these?', attachments: [chart, project]}
   )
 
   expect(pieces).toEqual([
-    {type: 'text', text: expect.stringMatching(/\n\n<thread>\n<prompt>$/u)},
+    {
+      type: 'text',
+      text: expect.stringMatching(
+        /\n\n<thread>\n<prompt>\n\[Attached file "report\.pdf" is saved at: \/attachments\/report\.pdf\]$/u
+      ),
+    },
     {type: 'file', file: report},
+    {
+      type: 'text',
+      text: '[Attached file "chart.png" is saved at: /attachments/chart.png]',
+    },
     {type: 'file', file: chart},
     {
       type: 'text',
-      text: 'Sum these up.\n</prompt>\n<reply>\nDone.\n</reply>\n<prompt>',
+      text: [
+        'Sum these up.',
+        '</prompt>',
+        '<reply>\nDone.\n</reply>',
+        '<prompt>',
+        '[Attached file "old.pdf" is saved at: /attachments/old.pdf]',
+        '</prompt>',
+        '</thread>',
+        '',
+        '[Attached file "chart.png" is saved at: /attachments/chart.png]',
+      ].join('\n'),
     },
-    {type: 'file', file: notes},
-    {type: 'text', text: '</prompt>\n</thread>\n'},
     {type: 'file', file: chart},
-    {type: 'file', file: notes},
-    {type: 'text', text: 'And these?'},
+    {
+      type: 'text',
+      text: '[Attached folder "project" is at: /work/project]\nAnd these?',
+    },
   ])
 })
 

@@ -19,7 +19,7 @@ import type {
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 
-import {pdfSaying, pngShowing} from '#modules/test-attachments/main'
+import {byPathOnly, pdfSaying, pngShowing} from '#modules/test-attachments/main'
 import {heldIdle} from '#modules/test-idle/main'
 import {listenLocally, startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -46,7 +46,6 @@ import {projectKeyOf} from './transcripts'
 
 const program = process.env.UZ_LIVE_CLAUDE_PROGRAM ?? ''
 const configDir = process.env.UZ_LIVE_CLAUDE_CONFIG ?? ''
-const CONVERSION_DIR = path.join(os.tmpdir(), 'uz-conversions')
 const recording = process.env.UZ_RECORD === 'yes'
 
 type Streamed = StartReplyEvent
@@ -85,6 +84,13 @@ function textOf(events: Streamed[]) {
   return events
     .flatMap(event => (event.type === 'TEXT_DELTA' ? [event.delta] : []))
     .join('')
+}
+
+function toolCallsIn(events: Streamed[]) {
+  return events
+    .filter(isReplyEvent)
+    .reduce(foldReplyEvent, NEW_REPLY)
+    .content.flatMap(part => (part.type === 'tool-call' ? [part] : []))
 }
 
 function shownText(events: Streamed[]) {
@@ -235,7 +241,6 @@ function liveDriver(
       session,
       thread: [],
       compactionSettings,
-      conversionDir: CONVERSION_DIR,
     }
   }
 
@@ -1683,16 +1688,16 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 180_000)
 
-  it('[dep:claude-attachment-blocks] reads an image and a PDF sent as base64 blocks with a Prompt, and a PDF replayed with a Thread ChatGPT wrote', async () => {
+  it('[dep:claude-attachment-blocks] reads an image and a PDF sent as base64 blocks with a Prompt, and a PDF replayed with a Thread ChatGPT wrote, opening neither from its path', async () => {
     const live = liveDriver([])
     const files = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-files-'))
 
     try {
-      const heron = await pngShowing(files, 'HERON')
+      const heron = pngShowing(files, 'HERON')
       const maple = pdfSaying(files, 'The secret word is MAPLE.')
 
       const asked = live.request(
-        'What word does the image show, and what is the secret word in the PDF? Just the two words.',
+        'Without using any tool: what word does the attached image show, and what is the secret word in the attached PDF? Just the two words.',
         null
       )
 
@@ -1706,11 +1711,13 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       expect(sent.at(-1)).toMatchObject({status: 'complete'})
       expect(textOf(sent)).toMatch(/heron/i)
       expect(textOf(sent)).toMatch(/maple/i)
+      // Each file's path is in the Prompt too: a tool call would read it there.
+      expect(toolCallsIn(sent)).toEqual([])
 
       const replayed = await Array.fromAsync(
         live.driver.startReply({
           ...live.request(
-            'What was the secret word in the PDF I sent? Just the word.',
+            'Without using any tool: what was the secret word in the PDF I sent? Just the word.',
             null
           ),
           thread: [
@@ -1726,6 +1733,42 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
       expect(replayed.at(-1)).toMatchObject({status: 'complete'})
       expect(textOf(replayed)).toMatch(/maple/i)
+      expect(toolCallsIn(replayed)).toEqual([])
+
+      await live.done()
+    } finally {
+      fs.rmSync(files, {recursive: true, force: true})
+    }
+  }, 180_000)
+
+  it('[dep:claude-opens-attachment-path] opens a PDF it is given only the path line of with Read, which takes it as a PDF by the path’s extension', async () => {
+    const live = liveDriver([])
+    const files = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-files-'))
+
+    try {
+      const maple = byPathOnly(pdfSaying(files, 'The secret word is MAPLE.'))
+
+      const asked = live.request(
+        'What is the secret word in the attached PDF? Just the word.',
+        null
+      )
+
+      const events = await Array.fromAsync(
+        live.driver.startReply({
+          ...asked,
+          prompt: {...asked.prompt, attachments: [maple]},
+        })
+      )
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+      expect(shownText(events)).toMatch(/maple/i)
+
+      const reads = toolCallsIn(events).filter(
+        call => call.toolName === 'Read' && call.args.includes('note.pdf')
+      )
+
+      expect(reads.length).toBeGreaterThan(0)
+      expect(reads.some(call => call.result?.isError === false)).toBe(true)
 
       await live.done()
     } finally {

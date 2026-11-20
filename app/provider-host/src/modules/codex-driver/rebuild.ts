@@ -1,5 +1,6 @@
-import type {ContentPart, Piece} from '#modules/prompt-content/main'
+import type {Piece} from '#modules/prompt-content/main'
 import type {AppServer} from './app-server'
+import type {CodexPart} from './input'
 import type {ResponseItem} from './protocol/ResponseItem'
 import type {LoadedThread} from './threads'
 import type {ParamsOf} from './wire'
@@ -40,11 +41,11 @@ export function settingsOf(request: ReplyRequest) {
   } satisfies ParamsOf<'thread/start'>
 }
 
-/** Where threads open, and how a Prompt's files are read for Codex. */
+/** Where threads open, and how a Prompt's inline files are read for Codex. */
 export interface Opening {
   server: Pick<AppServer, 'request'>
   threads: Map<string, LoadedThread>
-  read: (pieces: Piece[]) => Promise<ContentPart[]>
+  read: (pieces: Piece[]) => Promise<CodexPart[]>
 }
 
 function replied(text: string) {
@@ -55,7 +56,7 @@ function replied(text: string) {
   } satisfies ResponseItem
 }
 
-/** Each Prompt's files read afresh from the originals. */
+/** Each Prompt's path lines and inline files, the files read afresh. */
 async function itemsOf(thread: Thread, read: Opening['read']) {
   const turns = await Promise.all(
     thread.map(async exchange => {
@@ -109,7 +110,7 @@ async function newThread(
   const {threshold} = request.compactionSettings
 
   const settings = settingsOf(request)
-  // Before the thread starts, so an unreadable original leaves none behind.
+  // Before the thread starts, so an unreadable file leaves none behind.
   const items = await itemsOf(request.thread, read)
 
   async function open() {

@@ -1,4 +1,3 @@
-import type {ConvertPdf} from '#modules/prompt-content/main'
 import type {FakeCodexOptions} from './replay'
 import type {HostAttachment} from '@uz/contract/attachments'
 import type {
@@ -13,10 +12,10 @@ import type {
 import type {CompactionSettings} from '@uz/contract/settings'
 
 import {
-  PAGE_IMAGE_BASE64,
   PNG_BASE64,
+  SHRUNK_BASE64,
   attachedFiles,
-  fakeConverter,
+  byPathOnly,
 } from '#modules/test-attachments/main'
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -46,8 +45,6 @@ const RESUMED_TURN = '01a168e8-7ae7-71d3-b6fa-169bec1fd887'
 const FORKED_THREAD_ID = '01a168e8-9d25-7df2-b2f4-208bfb1bbd5e'
 const FORKED_TURN = '01a168e8-9d50-7fb1-a539-2fd85f3c4b2b'
 const MODEL = 'gpt-6.1-sol'
-
-const CONVERSION_DIR = path.join(os.tmpdir(), 'uz-conversions')
 
 const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
   auto: true,
@@ -144,12 +141,8 @@ async function setUp(
   recordings: string[],
   {
     store = fakeStore(),
-    convertPdf = fakeConverter().convertPdf,
     ...behavior
-  }: {
-    store?: ReturnType<typeof fakeStore>
-    convertPdf?: ConvertPdf
-  } & FakeCodexOptions = {}
+  }: {store?: ReturnType<typeof fakeStore>} & FakeCodexOptions = {}
 ) {
   const fake = await replayCodex()
   cleanUps.push(fake.cleanUp)
@@ -184,7 +177,6 @@ async function setUp(
       ),
     },
     whenIdle: idle.whenIdle,
-    convertPdf,
   })
 
   const treeId = crypto.randomUUID()
@@ -235,7 +227,6 @@ async function setUp(
       session: session && {type: 'continue', ...session},
       thread,
       compactionSettings,
-      conversionDir: CONVERSION_DIR,
     })) {
       events.push(event)
 
@@ -1963,23 +1954,17 @@ it('rebuilds a thread the app has no copy of from the Thread', async () => {
 })
 
 const CHART_URL = `data:image/png;base64,${PNG_BASE64}`
-const PAGE_URL = `data:image/png;base64,${PAGE_IMAGE_BASE64}`
+const PHOTO_URL = `data:image/jpeg;base64,${SHRUNK_BASE64}`
 
-/** As the fake converter converts `report.pdf`. */
-const REPORT_PAGES =
-  '<file name="report.pdf" page="1">\nSales rose.\n</file>\n<file name="report.pdf" page="2">\nA chart.\n</file>'
+it('sends each attachment’s path line before the Prompt’s text, in the order attached, and right after its own line each file main marked inline: a text file under its name and an image, from its inline copy, as a data URL; a PDF goes by its line alone', async () => {
+  const codex = await setUp(['started.ndjson'])
 
-it('sends a Prompt’s files before its text: a text file inline under its name, an image as a data URL, and a PDF converted from its original, a rendered page as an image after its text', async () => {
-  const converter = fakeConverter()
-
-  const codex = await setUp(['started.ndjson'], {
-    convertPdf: converter.convertPdf,
-  })
-
-  const {notes, chart, report} = attachedFiles(folder('uz-attachments-'))
+  const {notes, chart, report, photo, archive, project} = attachedFiles(
+    folder('uz-attachments-')
+  )
 
   const events = await codex.reply(FIRST_PROMPT, null, {
-    attachments: [notes, chart, report],
+    attachments: [notes, chart, byPathOnly(report), photo, archive, project],
   })
 
   expect(events.at(-1)).toMatchObject({status: 'complete'})
@@ -1987,61 +1972,123 @@ it('sends a Prompt’s files before its text: a text file inline under its name,
     [
       {
         type: 'text',
-        text: '<file name="notes.txt">\nBuy milk.\n</file>',
+        text: [
+          `[Attached file "notes.txt" is saved at: ${notes.path}]`,
+          '<file name="notes.txt">\nBuy milk.\n</file>',
+          `[Attached file "chart.png" is saved at: ${chart.path}]`,
+        ].join('\n'),
         text_elements: [],
       },
       {type: 'image', url: CHART_URL},
-      {type: 'text', text: REPORT_PAGES, text_elements: []},
-      {type: 'image', url: PAGE_URL},
-      {type: 'text', text: FIRST_PROMPT, text_elements: []},
+      {
+        type: 'text',
+        text: [
+          `[Attached file "report.pdf" is saved at: ${report.path}]`,
+          `[Attached file "photo.jpg" is saved at: ${photo.path}]`,
+        ].join('\n'),
+        text_elements: [],
+      },
+      {type: 'image', url: PHOTO_URL},
+      {
+        type: 'text',
+        text: [
+          `[Attached file "archive.zip" is saved at: ${archive.path}]`,
+          `[Attached folder "project" is at: ${project.path}]`,
+          FIRST_PROMPT,
+        ].join('\n'),
+        text_elements: [],
+      },
     ],
-  ])
-  expect(converter.calls).toEqual([
-    {original: report, conversionDir: CONVERSION_DIR},
   ])
 
   await codex.allClosed()
 })
 
-it('hands a Thread over with an earlier Prompt’s PDF converted and its image as input_image, converting from the original on every hand-over', async () => {
-  const converter = fakeConverter()
-  const {chart, report} = attachedFiles(folder('uz-attachments-'))
+it('sends a Prompt of attachments alone, each marked for its path only, as their path lines', async () => {
+  const codex = await setUp(['started.ndjson'])
+  const {notes, chart} = attachedFiles(folder('uz-attachments-'))
+
+  const events = await codex.reply('', null, {
+    attachments: [notes, chart].map(byPathOnly),
+  })
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(codex.reports()[0]?.inputs).toEqual([
+    [
+      {
+        type: 'text',
+        text: [
+          `[Attached file "notes.txt" is saved at: ${notes.path}]`,
+          `[Attached file "chart.png" is saved at: ${chart.path}]`,
+        ].join('\n'),
+        text_elements: [],
+      },
+    ],
+  ])
+
+  await codex.allClosed()
+})
+
+it('fails the Reply, starting no codex, when a PDF arrives marked inline, which Codex takes none of', async () => {
+  const codex = await setUp(['started.ndjson'])
+  const {report} = attachedFiles(folder('uz-attachments-'))
+
+  const events = await codex.reply(FIRST_PROMPT, null, {attachments: [report]})
+
+  expect(events.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'failed',
+    failure: {message: 'ChatGPT takes no PDF inline: “report.pdf”.'},
+  })
+  expect(codex.reports()).toEqual([])
+})
+
+it('hands a Thread over with each earlier Prompt’s path lines in its own user message, an image as input_image and a text file under its name after their lines, and only the line of a PDF', async () => {
+  const {chart, report, notes} = attachedFiles(folder('uz-attachments-'))
 
   const thread: Thread = [
     {
       prompt: 'Sum these up.',
-      attachments: [report, chart],
+      attachments: [byPathOnly(report), chart, notes],
       reply: [{type: 'text', text: 'Sales rose.'}],
       label: '[Reply written by Haiku 5.5]',
     },
   ]
 
-  for (const handOver of [1, 2]) {
-    const codex = await setUp([injecting()], {convertPdf: converter.convertPdf})
-    const events = await codex.reply(FIRST_PROMPT, null, {thread})
+  const codex = await setUp([injecting()])
+  const events = await codex.reply(FIRST_PROMPT, null, {thread})
 
-    expect(events.at(-1)).toMatchObject({status: 'complete'})
-    expect(codex.reports()[0]?.injected[0]).toEqual({
-      type: 'message',
-      role: 'user',
-      content: [
-        {type: 'input_text', text: REPORT_PAGES},
-        {type: 'input_image', image_url: PAGE_URL},
-        {type: 'input_image', image_url: CHART_URL},
-        {type: 'input_text', text: 'Sum these up.'},
-      ],
-    })
-    expect(converter.calls).toHaveLength(handOver)
-    expect(converter.calls.at(-1)).toEqual({
-      original: report,
-      conversionDir: CONVERSION_DIR,
-    })
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(codex.reports()[0]?.injected[0]).toEqual({
+    type: 'message',
+    role: 'user',
+    content: [
+      {
+        type: 'input_text',
+        text: [
+          `[Attached file "report.pdf" is saved at: ${report.path}]`,
+          `[Attached file "chart.png" is saved at: ${chart.path}]`,
+        ].join('\n'),
+      },
+      {type: 'input_image', image_url: CHART_URL},
+      {
+        type: 'input_text',
+        text: [
+          `[Attached file "notes.txt" is saved at: ${notes.path}]`,
+          '<file name="notes.txt">\nBuy milk.\n</file>',
+          'Sum these up.',
+        ].join('\n'),
+      },
+    ],
+  })
+  expect(codex.reports()[0]?.inputs).toEqual([
+    [{type: 'text', text: FIRST_PROMPT, text_elements: []}],
+  ])
 
-    await codex.allClosed()
-  }
+  await codex.allClosed()
 })
 
-it('replays an earlier Prompt’s image inside its <prompt> in the text replay when Codex refuses the items, and the Prompt’s own after the Thread', async () => {
+it('replays an earlier Prompt’s path line and image inside its <prompt> in the text replay when Codex refuses the items, and the Prompt’s own after the Thread', async () => {
   const codex = await setUp([injectRefused()])
   const {chart, notes} = attachedFiles(folder('uz-attachments-'))
 
@@ -2066,13 +2113,24 @@ it('replays an earlier Prompt’s image inside its <prompt> in the text replay w
   expect(input).toEqual([
     {
       type: 'text',
-      text: expect.stringMatching(/\n<thread>\n<prompt>$/u),
+      text: expect.stringContaining(
+        `\n<thread>\n<prompt>\n[Attached file "chart.png" is saved at: ${chart.path}]`
+      ),
       text_elements: [],
     },
     {type: 'image', url: CHART_URL},
     {
       type: 'text',
-      text: `What is this?\n</prompt>\n<reply>\nA chart.\n</reply>\n</thread>\n\n<file name="notes.txt">\nBuy milk.\n</file>\n${FIRST_PROMPT}`,
+      text: [
+        'What is this?',
+        '</prompt>',
+        '<reply>\nA chart.\n</reply>',
+        '</thread>',
+        '',
+        `[Attached file "notes.txt" is saved at: ${notes.path}]`,
+        '<file name="notes.txt">\nBuy milk.\n</file>',
+        FIRST_PROMPT,
+      ].join('\n'),
       text_elements: [],
     },
   ])
@@ -2080,7 +2138,7 @@ it('replays an earlier Prompt’s image inside its <prompt> in the text replay w
   await codex.allClosed()
 })
 
-it('fails the Reply, starting no codex, when an attached file’s original can’t be read', async () => {
+it('fails the Reply, starting no codex, when a file marked inline can’t be read', async () => {
   const codex = await setUp(['started.ndjson'])
   const {gone} = attachedFiles(folder('uz-attachments-'))
 

@@ -19,7 +19,9 @@ import type {CompactionSettings} from '@uz/contract/settings'
 import {
   PDF_BASE64,
   PNG_BASE64,
+  SHRUNK_BASE64,
   attachedFiles,
+  byPathOnly,
 } from '#modules/test-attachments/main'
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -42,8 +44,6 @@ import {
   replayClaude,
 } from './replay'
 import {projectKeyOf} from './transcripts'
-
-const CONVERSION_DIR = path.join(os.tmpdir(), 'uz-conversions')
 
 const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
   auto: true,
@@ -202,7 +202,6 @@ async function setUp(
       session: session && {type: 'continue', ...session},
       thread,
       compactionSettings,
-      conversionDir: CONVERSION_DIR,
     })) {
       events.push(event)
 
@@ -2248,21 +2247,35 @@ it('rebuilds nothing for a failure that isn’t a lost session', async () => {
   expect(claude.reports()).toHaveLength(2)
 })
 
-it('sends a Prompt’s files before its text, from the originals: a text file inline under its name, an image and a PDF as base64 blocks', async () => {
+it('sends each attachment’s path line before the Prompt’s text, in the order attached, and right after its own line each file main marked inline: a text file under its name, an image from its inline copy and a PDF as a document', async () => {
   const claude = await setUp(['warm.ndjson'])
-  const {notes, chart, report} = attachedFiles(folder('uz-attachments-'))
+
+  const {notes, chart, report, photo, archive, project} = attachedFiles(
+    folder('uz-attachments-')
+  )
 
   const events = await claude.reply(FIRST_PROMPT, null, {
-    attachments: [notes, chart, report],
+    attachments: [notes, chart, report, photo, archive, project],
   })
 
   expect(events.at(-1)).toMatchObject({status: 'complete'})
   expect(claude.reports()[0]?.prompts).toEqual([
     [
-      {type: 'text', text: '<file name="notes.txt">\nBuy milk.\n</file>'},
+      {
+        type: 'text',
+        text: [
+          `[Attached file "notes.txt" is saved at: ${notes.path}]`,
+          '<file name="notes.txt">\nBuy milk.\n</file>',
+          `[Attached file "chart.png" is saved at: ${chart.path}]`,
+        ].join('\n'),
+      },
       {
         type: 'image',
         source: {type: 'base64', media_type: 'image/png', data: PNG_BASE64},
+      },
+      {
+        type: 'text',
+        text: `[Attached file "report.pdf" is saved at: ${report.path}]`,
       },
       {
         type: 'document',
@@ -2273,21 +2286,56 @@ it('sends a Prompt’s files before its text, from the originals: a text file in
         },
         title: 'report.pdf',
       },
-      {type: 'text', text: FIRST_PROMPT},
+      {
+        type: 'text',
+        text: `[Attached file "photo.jpg" is saved at: ${photo.path}]`,
+      },
+      {
+        type: 'image',
+        source: {type: 'base64', media_type: 'image/jpeg', data: SHRUNK_BASE64},
+      },
+      {
+        type: 'text',
+        text: [
+          `[Attached file "archive.zip" is saved at: ${archive.path}]`,
+          `[Attached folder "project" is at: ${project.path}]`,
+          FIRST_PROMPT,
+        ].join('\n'),
+      },
     ],
   ])
 
   await claude.allClosed()
 })
 
-it('replays an earlier Prompt’s PDF to a rebuilt session as a document block inside its <prompt>, read from the original', async () => {
+it('sends a file main marked for its path only as its path line and nothing more, whatever its type, and a Prompt of attachments alone as their lines', async () => {
   const claude = await setUp(['warm.ndjson'])
-  const {report} = attachedFiles(folder('uz-attachments-'))
+  const {notes, chart, report} = attachedFiles(folder('uz-attachments-'))
+
+  const events = await claude.reply('', null, {
+    attachments: [notes, chart, report].map(byPathOnly),
+  })
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(claude.reports()[0]?.prompts).toEqual([
+    [
+      `[Attached file "notes.txt" is saved at: ${notes.path}]`,
+      `[Attached file "chart.png" is saved at: ${chart.path}]`,
+      `[Attached file "report.pdf" is saved at: ${report.path}]`,
+    ].join('\n'),
+  ])
+
+  await claude.allClosed()
+})
+
+it('tells a rebuilt session each earlier Prompt’s path lines inside its <prompt>, a PDF still marked inline as a document after its line, and only the line of an image the media budget left out', async () => {
+  const claude = await setUp(['warm.ndjson'])
+  const {report, chart} = attachedFiles(folder('uz-attachments-'))
 
   const thread: Thread = [
     {
-      prompt: 'Sum this up.',
-      attachments: [report],
+      prompt: 'Sum these up.',
+      attachments: [byPathOnly(chart), report],
       reply: [{type: 'text', text: 'Sales rose.'}],
       label: '[Reply written by GPT-6 Sol]',
     },
@@ -2300,7 +2348,18 @@ it('replays an earlier Prompt’s PDF to a rebuilt session as a document block i
   const [replay] = claude.reports()[0]?.prompts ?? []
 
   expect(replay).toEqual([
-    {type: 'text', text: expect.stringMatching(/\n<thread>\n<prompt>$/u)},
+    {
+      type: 'text',
+      text: expect.stringContaining(
+        [
+          '',
+          '<thread>',
+          '<prompt>',
+          `[Attached file "chart.png" is saved at: ${chart.path}]`,
+          `[Attached file "report.pdf" is saved at: ${report.path}]`,
+        ].join('\n')
+      ),
+    },
     {
       type: 'document',
       source: {type: 'base64', media_type: 'application/pdf', data: PDF_BASE64},
@@ -2309,7 +2368,7 @@ it('replays an earlier Prompt’s PDF to a rebuilt session as a document block i
     {
       type: 'text',
       text: [
-        'Sum this up.',
+        'Sum these up.',
         '</prompt>',
         '<reply>\n[Reply written by GPT-6 Sol]\n\nSales rose.\n</reply>',
         '</thread>',
@@ -2322,7 +2381,7 @@ it('replays an earlier Prompt’s PDF to a rebuilt session as a document block i
   await claude.allClosed()
 })
 
-it('fails the Reply, starting no claude, when an attached file’s original can’t be read', async () => {
+it('fails the Reply, starting no claude, when a file marked inline can’t be read', async () => {
   const claude = await setUp(['warm.ndjson'])
   const {gone} = attachedFiles(folder('uz-attachments-'))
 

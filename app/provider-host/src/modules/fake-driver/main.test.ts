@@ -16,7 +16,6 @@ const request = {
   session: null,
   thread: [],
   compactionSettings: {auto: true, threshold: null},
-  conversionDir: '/conversions',
 }
 
 type Streamed = StartReplyEvent

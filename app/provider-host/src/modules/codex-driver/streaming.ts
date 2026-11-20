@@ -1,5 +1,4 @@
 import type {WhenIdle} from '#modules/idle/main'
-import type {ConvertPdf} from '#modules/prompt-content/main'
 import type {
   ContentEvent,
   Ending,
@@ -40,7 +39,6 @@ export interface CodexRepliesDeps {
   store: SessionStoreClient
   open: OpenAppServer
   whenIdle: WhenIdle
-  convertPdf: ConvertPdf
 }
 
 type CutRequest = Parameters<ProviderDriver['cutSession']>[0]
@@ -443,7 +441,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
 
     if (session) await cuts.get(session.sessionId)
 
-    const content = await codexContent(request, deps.convertPdf)
+    const content = await codexContent(request)
 
     for (let attempt = 1; ; attempt++) {
       const running = await claim(request.vendorProgram)

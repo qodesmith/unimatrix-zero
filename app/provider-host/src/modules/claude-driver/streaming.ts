@@ -1,4 +1,5 @@
 import type {WhenIdle} from '#modules/idle/main'
+import type {ContentPart} from '#modules/prompt-content/main'
 import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {Silent, WhenSilent} from './heard'
@@ -21,7 +22,7 @@ import {createReplyRuns} from '#modules/reply-runs/main'
 import {firstHeard, silentEnding, startingWith} from './heard'
 import {replyOptions} from './options'
 import {createReplyMapper} from './replies'
-import {cutAt, resumption, servedThrough, textOf} from './resumption'
+import {contentOf, cutAt, resumption, servedThrough} from './resumption'
 import {openSession} from './session'
 import {
   appSessionStore,
@@ -58,6 +59,12 @@ interface Live extends ClaudeSession {
 }
 
 type Mapper = ReturnType<typeof createReplyMapper>
+
+/** The Prompt, with the Thread when it is told, as `claude` is sent it. */
+interface Sending {
+  request: ReplyRequest
+  content: ContentPart[]
+}
 
 /** A Reply stopped before any `claude` started has no session. */
 type Answered =
@@ -229,11 +236,10 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   async function* reply(
     session: Live,
     mapper: Mapper,
-    request: ReplyRequest,
+    {request, content}: Sending,
     run: ReplyRun
   ): AsyncGenerator<ContentEvent, Outcome> {
-    const {prompt} = request
-    const messages = session.send(textOf(request), prompt.messageId)
+    const messages = session.send(content, request.prompt.messageId)
     let heard = false
     let unstoppable: (() => void) | null = null
 
@@ -322,10 +328,12 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     mapper: Mapper,
     run: ReplyRun
   ): AsyncGenerator<ContentEvent, Answered> {
+    // Before any `claude`, so an unreadable file leaves none to close.
+    const sending: Sending = {request, content: await contentOf(request)}
     const claimed = claimable(request)
 
     if (claimed) {
-      const outcome = yield* reply(claimed, mapper, request, run)
+      const outcome = yield* reply(claimed, mapper, sending, run)
 
       if (!('failure' in outcome) || outcome.heard || !claimed.ended) {
         return {session: claimed, outcome}
@@ -339,7 +347,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     if ('silent' in session) return {session: null, outcome: session}
 
     warm.add(session)
-    const outcome = yield* reply(session, mapper, request, run)
+    const outcome = yield* reply(session, mapper, sending, run)
 
     const refused =
       !('silent' in outcome) && !session.started && session.restore === 'store'
@@ -368,7 +376,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     return {
       session: fallback,
-      outcome: yield* reply(fallback, mapper, request, run),
+      outcome: yield* reply(fallback, mapper, sending, run),
     }
   }
 

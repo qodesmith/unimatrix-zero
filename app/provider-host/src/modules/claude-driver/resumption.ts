@@ -1,5 +1,6 @@
 import type {ReplyRequest, ReplySession} from '@uz/contract/host'
 
+import {prompted, readContent} from '#modules/prompt-content/main'
 import {replayed} from '#modules/thread-replay/main'
 
 export type Restore = 'none' | 'store' | 'file'
@@ -35,9 +36,14 @@ export function resumption(session: ReplyRequest['session'], restore: Restore) {
   }
 }
 
-/** A session started for a Thread is told all of it with its first Prompt. */
-export function textOf({session, thread, prompt}: ReplyRequest) {
-  return session === null && thread.length > 0
-    ? replayed(thread, prompt.text)
-    : prompt.text
+/**
+ * A session started for a Thread is told all of it with its first Prompt,
+ * each inline file read afresh.
+ */
+export async function contentOf({session, thread, prompt}: ReplyRequest) {
+  return readContent(
+    session === null && thread.length > 0
+      ? replayed(thread, prompt)
+      : prompted(prompt)
+  )
 }
