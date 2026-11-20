@@ -146,7 +146,7 @@ export function inlineForm(
 }
 
 /** What a Prompt's inline images come to, against the per-Prompt limit. */
-export function inlineImagesSize(attachments: Sized[]) {
+export function inlineImagesSize(attachments: readonly Sized[]) {
   return attachments
     .filter(attachment => inlineForm('claude', attachment) === 'image')
     .reduce((sum, attachment) => sum + inlineImageSize(attachment), 0)
@@ -177,33 +177,47 @@ function mediaSize(form: InlineForm, attachment: Sized) {
  * Fills Claude's budget from the newest image or PDF back, and stops at the
  * first that doesn't fit: it and every older one go by path only.
  */
-function withinBudget(prompts: Sized[][], forms: (InlineForm | null)[][]) {
+function withinBudget(
+  prompts: readonly (readonly Sized[])[],
+  forms: readonly (InlineForm | null)[][]
+): InlinePlan {
   const budget: MediaBudgetUse = {base64Bytes: 0, files: 0, pathOnly: 0}
   let full = false
 
-  for (const [promptAt, attachments] of [...prompts.entries()].reverse()) {
-    for (const [at, attachment] of [...attachments.entries()].reverse()) {
-      const form = forms[promptAt]?.[at] ?? null
+  function taken(form: InlineForm | null, attachment: Sized | undefined) {
+    if (form === null || form === 'text' || !attachment) return form
 
-      if (form === null || form === 'text') continue
+    const bytes = budget.base64Bytes + mediaSize(form, attachment)
 
-      const bytes = budget.base64Bytes + mediaSize(form, attachment)
+    full ||=
+      bytes > CLAUDE_MEDIA_BUDGET.base64Bytes ||
+      budget.files === CLAUDE_MEDIA_BUDGET.files
 
-      full ||=
-        bytes > CLAUDE_MEDIA_BUDGET.base64Bytes ||
-        budget.files === CLAUDE_MEDIA_BUDGET.files
+    if (full) {
+      budget.pathOnly += 1
 
-      if (full) {
-        forms[promptAt]![at] = null
-        budget.pathOnly += 1
-      } else {
-        budget.base64Bytes = bytes
-        budget.files += 1
-      }
+      return null
     }
+
+    budget.base64Bytes = bytes
+    budget.files += 1
+
+    return form
   }
 
-  return budget
+  const planned = forms
+    .map((ofPrompt, promptAt) => ({ofPrompt, promptAt}))
+    .toReversed()
+    .map(({ofPrompt, promptAt}) =>
+      ofPrompt
+        .map((form, at) => ({form, attachment: prompts[promptAt]?.[at]}))
+        .toReversed()
+        .map(({form, attachment}) => taken(form, attachment))
+        .toReversed()
+    )
+    .toReversed()
+
+  return {forms: planned, budget}
 }
 
 /**
@@ -212,16 +226,15 @@ function withinBudget(prompts: Sized[][], forms: (InlineForm | null)[][]) {
  */
 export function planInline(
   provider: ProviderId,
-  prompts: Sized[][]
+  prompts: readonly (readonly Sized[])[]
 ): InlinePlan {
   const forms = prompts.map(attachments =>
     attachments.map(attachment => inlineForm(provider, attachment))
   )
 
-  return {
-    forms,
-    budget: provider === 'claude' ? withinBudget(prompts, forms) : null,
-  }
+  return provider === 'claude'
+    ? withinBudget(prompts, forms)
+    : {forms, budget: null}
 }
 
 /**
