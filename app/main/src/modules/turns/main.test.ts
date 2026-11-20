@@ -1512,7 +1512,7 @@ describe('a Prompt with attachments', () => {
     return sent
   }
 
-  /** A first Turn Claude finished, for the next Prompt to continue. */
+  /** A first Exchange Claude finished, for the next Prompt to continue. */
   function answered(attachmentIds: string[]) {
     const {reply} = sendWith(null, attachmentIds)
     record(reply.id)

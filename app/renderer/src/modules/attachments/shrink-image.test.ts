@@ -8,12 +8,15 @@ import {shrunkImage} from './shrink-image'
 
 type Paint = (context: OffscreenCanvasRenderingContext2D) => void
 
+/** The same pixels every run, and none a PNG can pack small. */
 function noise(context: OffscreenCanvasRenderingContext2D) {
   const {width, height} = context.canvas
   const pixels = context.createImageData(width, height)
+  let seed = 1
 
   for (let at = 0; at < pixels.data.length; at += 1) {
-    pixels.data[at] = at % 4 === 3 ? 255 : Math.floor(Math.random() * 256)
+    seed = (seed * 48_271) % 2_147_483_647
+    pixels.data[at] = at % 4 === 3 ? 255 : seed % 256
   }
 
   context.putImageData(pixels, 0, 0)

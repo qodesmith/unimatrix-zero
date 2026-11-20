@@ -21,7 +21,11 @@ import {
 } from '#shadcn/ui/dialog'
 import {Spinner} from '#shadcn/ui/spinner'
 import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
-import {attachmentKind, attachmentUrl} from '@uz/contract/attachments'
+import {
+  attachmentKind,
+  attachmentUrl,
+  planInline,
+} from '@uz/contract/attachments'
 import {cn} from 'cn'
 import {
   CircleAlertIcon,
@@ -225,13 +229,16 @@ export function AttachmentList({
 }: AttachmentListProps) {
   if (attachments.length === 0 && pending.length === 0) return null
 
+  // Planned together: one Prompt can pass Claude's media budget by itself.
+  const forms = provider ? planInline(provider, [attachments]).forms[0] : null
+
   return (
     <AttachmentGroup
       role="group"
       aria-label="Attachments"
       className={cn('flex-wrap gap-1.5 overflow-visible', className)}
     >
-      {attachments.map(attachment => {
+      {attachments.map((attachment, at) => {
         const isPathOnly = pathOnly.has(attachment.id)
 
         const Shown =
@@ -246,7 +253,9 @@ export function AttachmentList({
             note={
               isPathOnly
                 ? PATH_ONLY_NOW
-                : provider && modelUse(provider, attachment)
+                : forms
+                  ? modelUse(forms[at] ?? null, attachment)
+                  : null
             }
             pathOnly={isPathOnly}
             onRemove={onRemove && (() => onRemove(attachment.id))}

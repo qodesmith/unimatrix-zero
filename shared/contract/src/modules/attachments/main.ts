@@ -7,7 +7,6 @@ const MIB = 1024 * 1024
 /** Larger files are refused as they are attached. */
 export const ATTACHMENT_SIZE_LIMIT = 50 * MIB
 
-/** At most this many go with one Prompt. */
 export const ATTACHMENTS_PER_PROMPT = 100
 
 /** An image goes inline at most this long on its long side, in pixels. */

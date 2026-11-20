@@ -977,6 +977,25 @@ it('says on each file what the picked Model does with it, and says it again for 
     .toHaveAccessibleDescription('Sent as an image')
 })
 
+it('says a PDF goes by path when the Prompt alone passes Claude’s media budget, oldest first', async () => {
+  const MIB = 1024 * 1024
+
+  await renderInput({
+    attachedTo: attachedReply('claude', 'opus-4-7'),
+    attachments: [
+      kept('first.pdf', 'application/pdf', 9 * MIB),
+      kept('second.pdf', 'application/pdf', 9 * MIB),
+    ],
+  })
+
+  await expect
+    .element(description('first.pdf'))
+    .toHaveTextContent('9 MB · The AI can open this file')
+  await expect
+    .element(description('second.pdf'))
+    .toHaveTextContent('9 MB · Claude reads the whole PDF')
+})
+
 it('says what the Model does with an image in a tooltip on its thumbnail', async () => {
   await renderInput({attachments: DRAFTED})
 
