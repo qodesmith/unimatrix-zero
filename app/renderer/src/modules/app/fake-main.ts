@@ -8,11 +8,14 @@ import type {Settings} from '@uz/contract/settings'
 import type {Tree} from '@uz/contract/trees'
 import type {Prompt, Reply, StreamingReply} from '@uz/contract/turns'
 
-import {AttachmentMediaTypeSchema} from '@uz/contract/attachments'
+import {
+  AttachmentMediaTypeSchema,
+  FOLDER_MEDIA_TYPE,
+} from '@uz/contract/attachments'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 
-type AddedFile = Extract<Command, {type: 'attachment.add'}>['file']
+type AttachmentAdd = Extract<Command, {type: 'attachment.add'}>
 
 export const receivedAt = '2026-10-19T12:00:00.000Z'
 
@@ -48,6 +51,18 @@ interface Saved {
   layout?: Partial<Layout>
 }
 
+/**
+ * By the type the window gave the File; a dropped folder looks like a file
+ * here.
+ */
+function mediaTypeOf(type = '') {
+  const known = AttachmentMediaTypeSchema.safeParse(type).data
+
+  if (known && known !== FOLDER_MEDIA_TYPE) return known
+
+  return type.startsWith('text/') ? 'text/plain' : 'application/octet-stream'
+}
+
 export type FakeMain = ReturnType<typeof fakeMain>
 
 /** Main's side of the bridge for App tests, keeping each command it was sent. */
@@ -62,15 +77,16 @@ export function fakeMain(saved: Saved = {}) {
   const attachments = new Map<string, Attachment>()
   const dropped = new Map<string, File>()
 
-  function keep(file: AddedFile) {
+  function keep({file, shrunk}: AttachmentAdd) {
     const from = file.type === 'dropped' ? dropped.get(file.fileId) : null
 
     const attachment: Attachment = {
       id: crypto.randomUUID(),
       name: from?.name ?? (file.type === 'pasted' ? file.name : 'file'),
-      mediaType:
-        AttachmentMediaTypeSchema.safeParse(from?.type).data ?? 'text/plain',
+      mediaType: mediaTypeOf(from?.type),
       size: from?.size ?? (file.type === 'pasted' ? file.bytes.byteLength : 0),
+      shrunkSize: shrunk?.byteLength ?? null,
+      folderPath: null,
     }
 
     attachments.set(attachment.id, attachment)
@@ -214,7 +230,7 @@ export function fakeMain(saved: Saved = {}) {
       sent.push(command)
 
       if (command.type === 'attachment.add') {
-        return {ok: true, value: {attachment: keep(command.file)}}
+        return {ok: true, value: {attachment: keep(command)}}
       }
 
       return answer(command)

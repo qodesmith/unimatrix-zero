@@ -120,6 +120,8 @@ function fakeMain(saved: Saved) {
       name: from?.name ?? 'pasted',
       mediaType: 'text/plain',
       size: from?.size ?? 0,
+      shrunkSize: null,
+      folderPath: null,
     }
 
     attachments.set(attachment.id, attachment)
@@ -581,7 +583,7 @@ it('keeps a hover Input holding only files revealed, with the files in it', asyn
     .element(
       nodeOf('Reply three')
         .getByRole('group', {name: 'notes.txt'})
-        .getByText('5 bytes')
+        .getByText(/^5 bytes/)
     )
     .toBeVisible()
 
@@ -2560,6 +2562,8 @@ const SHOT: Attachment = {
   name: 'shot.png',
   mediaType: 'image/png',
   size: 3,
+  shrunkSize: null,
+  folderPath: null,
 }
 
 const NOTES: Attachment = {
@@ -2567,6 +2571,8 @@ const NOTES: Attachment = {
   name: 'notes.pdf',
   mediaType: 'application/pdf',
   size: 2048,
+  shrunkSize: null,
+  folderPath: null,
 }
 
 function withAttachments(saved: Saved, promptN: number): Saved {
@@ -2643,6 +2649,221 @@ it('shows a Prompt’s images as thumbnails and its other files as chips, on the
     )
     .toBeVisible()
   expect(attachedFile('notes.pdf').elements()).toHaveLength(2)
+})
+
+const MIB = 1024 * 1024
+
+function media(
+  n: number,
+  name: string,
+  mediaType: Attachment['mediaType'],
+  size: number
+): Attachment {
+  return {
+    id: uuid(n),
+    name,
+    mediaType,
+    size,
+    shrunkSize: null,
+    folderPath: null,
+  }
+}
+
+/**
+ * Three Exchanges whose images and PDF come to more than Claude takes inline
+ * in one request: each 9 MiB image is 12 MiB of base64, the PDF 4 MiB.
+ */
+function promptWith(sent: Prompt, attachments: Attachment[]): Prompt {
+  return {...sent, attachments}
+}
+
+function mediaTree(provider: Reply['provider'] = 'claude'): Saved {
+  clock = 0
+
+  function sized(answer: Reply): Reply {
+    return {...answer, provider, contextSize: 10_000}
+  }
+
+  return {
+    prompts: [
+      promptWith(prompt(1, null, 'Prompt one'), [
+        media(911, 'first.png', 'image/png', 9 * MIB),
+        media(912, 'paper.pdf', 'application/pdf', 3 * MIB),
+        media(913, 'notes.txt', 'text/plain', 100),
+      ]),
+      promptWith(prompt(2, 11, 'Prompt two'), [
+        media(921, 'second.png', 'image/png', 9 * MIB),
+      ]),
+      promptWith(prompt(3, 12, 'Prompt three'), [
+        media(931, 'third.png', 'image/png', 9 * MIB),
+        media(932, 'fourth.png', 'image/png', 9 * MIB),
+      ]),
+    ],
+    replies: [
+      sized(reply(11, 1, 'Reply one')),
+      sized(reply(12, 2, 'Reply two')),
+      sized(reply(13, 3, 'Reply three')),
+    ],
+  }
+}
+
+async function openDetailsOf(replyText: string) {
+  const node = nodeOf(replyText)
+
+  await node.getByRole('button', {name: 'Context size details'}).click()
+
+  return node.getByRole('complementary', {name: 'Context size details'})
+}
+
+it('shows in a Claude Reply’s Context size details how much of Claude’s media budget its Thread uses, and how many earlier attachments now go by path only', async () => {
+  await renderCanvas(mediaTree())
+  await expect.element(page.getByText('Reply three')).toBeVisible()
+
+  const first = await openDetailsOf('Reply one')
+
+  await expect
+    .element(first)
+    .toMatchTextContent(/Inline media16\.0 \/ 20 MiB · 2 \/ 90 files$/)
+
+  await expect
+    .element(await openDetailsOf('Reply two'))
+    .toMatchTextContent(
+      /Inline media16\.0 \/ 20 MiB · 2 \/ 90 files1 earlier attachment now goes by path only$/
+    )
+  await expect
+    .element(await openDetailsOf('Reply three'))
+    .toMatchTextContent(
+      /Inline media12\.0 \/ 20 MiB · 1 \/ 90 files4 earlier attachments now go by path only$/
+    )
+})
+
+it('shows no media budget on a ChatGPT Reply, nor on a Claude Reply whose Thread has no attachments', async () => {
+  const saved = mediaTree('chatgpt')
+
+  await renderCanvas({
+    ...saved,
+    prompts: [...saved.prompts, prompt(4, null, 'Prompt four')],
+    replies: [
+      ...saved.replies,
+      {...reply(14, 4, 'Reply four'), contextSize: 10_000},
+    ],
+  })
+  await expect.element(page.getByText('Reply three')).toBeVisible()
+
+  for (const replyText of ['Reply three', 'Reply four']) {
+    const details = await openDetailsOf(replyText)
+
+    await expect.element(details).toMatchTextContent(/Thread up to here10\.0k/)
+    await expect.element(details).not.toMatchTextContent(/Inline media/)
+  }
+})
+
+function thumbnailIn(turn: Locator, name: string) {
+  return turn.getByRole('button', {name: `Open ${name}`})
+}
+
+it('says on an earlier Prompt’s attachment that it now goes by path only, once Claude’s media budget has left it out of the Thread the Prompt is shown on', async () => {
+  await renderCanvas(mediaTree())
+  await expect.element(page.getByText('Reply three')).toBeVisible()
+  await clickInputUnder('Reply three')
+
+  const one = nodeOf('Prompt one')
+  const two = nodeOf('Prompt two')
+  const three = nodeOf('Prompt three')
+
+  await expect
+    .element(one.getByRole('group', {name: 'paper.pdf'}))
+    .toMatchTextContent(/3 MB · Sent by path only now$/)
+  await expect
+    .element(thumbnailIn(one, 'first.png'))
+    .toHaveAccessibleDescription('Sent by path only now')
+  await expect
+    .element(one.getByRole('group', {name: 'notes.txt'}))
+    .toMatchTextContent(/100 bytes$/)
+  await expect
+    .element(thumbnailIn(two, 'second.png'))
+    .toHaveAccessibleDescription('Sent by path only now')
+  await expect
+    .element(thumbnailIn(three, 'third.png'))
+    .toHaveAccessibleDescription('Sent by path only now')
+  await expect
+    .element(thumbnailIn(three, 'fourth.png'))
+    .toHaveAccessibleDescription('')
+
+  // Reply one's Thread fits, and Prompt three is no longer on the Active Thread.
+  await clickInputUnder('Reply one')
+  await expect
+    .element(one.getByRole('group', {name: 'paper.pdf'}))
+    .toMatchTextContent(/3 MB$/)
+  await expect
+    .element(thumbnailIn(one, 'first.png'))
+    .toHaveAccessibleDescription('')
+  await expect
+    .element(thumbnailIn(three, 'third.png'))
+    .toHaveAccessibleDescription('Sent by path only now')
+})
+
+it('says so in the slideout by the slideout’s Thread, and marks the thumbnail', async () => {
+  await renderCanvas(mediaTree())
+  await expect.element(page.getByText('Reply three')).toBeVisible()
+
+  await openChatAt('Reply two')
+  await expect
+    .element(thumbnailIn(slideout(), 'first.png'))
+    .toHaveAccessibleDescription('Sent by path only now')
+  await expect
+    .element(
+      slideout()
+        .getByRole('group', {name: 'first.png'})
+        .getByRole('img', {name: 'Sent by path only now'})
+    )
+    .toBeVisible()
+  await expect
+    .element(slideout().getByRole('group', {name: 'paper.pdf'}))
+    .toMatchTextContent(/3 MB$/)
+  await expect
+    .element(thumbnailIn(slideout(), 'second.png'))
+    .toHaveAccessibleDescription('')
+  expect(
+    slideout()
+      .getByRole('group', {name: 'second.png'})
+      .getByRole('img', {name: 'Sent by path only now'})
+      .query()
+  ).toBeNull()
+})
+
+it('says nothing on a sent attachment when the Thread ends in a ChatGPT Reply', async () => {
+  await renderCanvas(mediaTree('chatgpt'))
+  await expect.element(page.getByText('Reply three')).toBeVisible()
+  await clickInputUnder('Reply three')
+
+  await expect
+    .element(nodeOf('Prompt one').getByRole('group', {name: 'paper.pdf'}))
+    .toMatchTextContent(/3 MB$/)
+  await expect
+    .element(thumbnailIn(nodeOf('Prompt one'), 'first.png'))
+    .toHaveAccessibleDescription('')
+})
+
+it('shows a sent folder as a chip with its name and path', async () => {
+  clock = 0
+
+  await renderCanvas({
+    prompts: [
+      promptWith(prompt(1, null, 'Prompt one'), [
+        {
+          ...media(941, 'project', 'inode/directory', 0),
+          folderPath: '/Users/sam/project',
+        },
+      ]),
+    ],
+    replies: [reply(11, 1, 'Reply one')],
+  })
+  await expect.element(page.getByText('Reply one')).toBeVisible()
+
+  await expect
+    .element(nodeOf('Prompt one').getByRole('group', {name: 'project'}))
+    .toMatchTextContent(/^project\/Users\/sam\/project$/)
 })
 
 it('holds Send on a restored Model that is no longer offered, until another is picked', async () => {

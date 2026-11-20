@@ -1,5 +1,6 @@
 import type {PendingAdd} from '../attachment-add/use-attachment-adds'
 import type {Attachment as AttachmentData} from '@uz/contract/attachments'
+import type {ProviderId} from '@uz/contract/providers'
 
 import {
   Attachment,
@@ -19,10 +20,20 @@ import {
   DialogTrigger,
 } from '#shadcn/ui/dialog'
 import {Spinner} from '#shadcn/ui/spinner'
+import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
 import {attachmentKind, attachmentUrl} from '@uz/contract/attachments'
 import {cn} from 'cn'
-import {CircleAlertIcon, FileIcon, FileTextIcon, XIcon} from 'lucide-react'
+import {
+  CircleAlertIcon,
+  FileIcon,
+  FileSymlinkIcon,
+  FileTextIcon,
+  FolderIcon,
+  XIcon,
+} from 'lucide-react'
+import {useId} from 'react'
 
+import {PATH_ONLY_NOW, modelUse} from '../model-use'
 import {formatSize} from '../size'
 
 function RemoveButton({label, onClick}: {label: string; onClick: () => void}) {
@@ -35,24 +46,59 @@ function RemoveButton({label, onClick}: {label: string; onClick: () => void}) {
   )
 }
 
+interface ShownProps {
+  attachment: AttachmentData
+  /** What the Model does with it, or what became of it since it was sent. */
+  note: string | null
+  pathOnly: boolean
+  onRemove?: () => void
+}
+
+/** A thumbnail has no text, so its note is a description and a tooltip. */
 function ImageAttachment({
   attachment: {id, name},
+  note,
+  pathOnly,
   onRemove,
-}: {
-  attachment: AttachmentData
-  onRemove?: () => void
-}) {
+}: ShownProps) {
   const src = attachmentUrl(id)
+  const noteId = useId()
 
   return (
     <Attachment role="group" aria-label={name} size="xs" className="min-w-0">
       <Dialog>
-        <DialogTrigger
-          render={<AttachmentTrigger aria-label={`Open ${name}`} />}
-        />
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <DialogTrigger
+                render={
+                  <AttachmentTrigger
+                    aria-label={`Open ${name}`}
+                    aria-describedby={note === null ? undefined : noteId}
+                  />
+                }
+              />
+            }
+          />
+          {note !== null && <TooltipContent>{note}</TooltipContent>}
+        </Tooltip>
         <AttachmentMedia variant="image" className="w-12!">
-          <img src={src} alt={name} />
+          <img src={src} alt={name} className={cn(pathOnly && 'opacity-50')} />
+          {pathOnly && (
+            <span
+              role="img"
+              aria-label={PATH_ONLY_NOW}
+              className="absolute right-0.5 bottom-0.5 flex size-4 items-center justify-center rounded-sm bg-muted text-muted-foreground"
+            >
+              <FileSymlinkIcon className="size-3" />
+            </span>
+          )}
         </AttachmentMedia>
+        {note !== null && (
+          <span id={noteId} className="sr-only">
+            {note}
+          </span>
+        )}
         <DialogContent className="max-w-[calc(100%-4rem)] p-3 sm:max-w-[min(64rem,calc(100%-4rem))]">
           <DialogTitle className="truncate pr-8">{name}</DialogTitle>
           <img
@@ -67,15 +113,24 @@ function ImageAttachment({
   )
 }
 
-/** Any other file: a chip with its name and size. */
+const ICONS = {
+  pdf: FileIcon,
+  file: FileIcon,
+  text: FileTextIcon,
+  folder: FolderIcon,
+}
+
+/**
+ * Any other file: a chip with its name, its size and its note. A folder shows
+ * its path where a file shows its size, since nothing of it was copied.
+ */
 function FileAttachment({
-  attachment: {name, mediaType, size},
+  attachment: {name, mediaType, size, folderPath},
+  note,
   onRemove,
-}: {
-  attachment: AttachmentData
-  onRemove?: () => void
-}) {
-  const Icon = attachmentKind(mediaType) === 'text' ? FileTextIcon : FileIcon
+}: ShownProps) {
+  const kind = attachmentKind(mediaType)
+  const Icon = kind === 'image' ? FileIcon : ICONS[kind]
 
   return (
     <Attachment role="group" aria-label={name} size="xs" className="min-w-0">
@@ -84,7 +139,20 @@ function FileAttachment({
       </AttachmentMedia>
       <AttachmentContent>
         <AttachmentTitle>{name}</AttachmentTitle>
-        <AttachmentDescription>{formatSize(size)}</AttachmentDescription>
+        {folderPath === null ? (
+          <AttachmentDescription>
+            {[formatSize(size), note].filter(part => part !== null).join(' · ')}
+          </AttachmentDescription>
+        ) : (
+          <>
+            <AttachmentDescription title={folderPath}>
+              {folderPath}
+            </AttachmentDescription>
+            {note !== null && (
+              <AttachmentDescription>{note}</AttachmentDescription>
+            )}
+          </>
+        )}
       </AttachmentContent>
       {onRemove && <RemoveButton label={`Remove ${name}`} onClick={onRemove} />}
     </Attachment>
@@ -127,6 +195,13 @@ function PendingAttachment({
 
 interface AttachmentListProps {
   attachments: readonly AttachmentData[]
+  /**
+   * The Provider of the Model these are about to go to: each one then says
+   * what that Model does with it.
+   */
+  provider?: ProviderId | null
+  /** Those sent that now go by their path alone, by id; each says so. */
+  pathOnly?: ReadonlySet<string>
   /** Files still being added, and those main refused. */
   pending?: readonly PendingAdd[]
   /** Given, each attachment offers to be removed. */
@@ -136,10 +211,13 @@ interface AttachmentListProps {
 }
 
 const NONE: readonly PendingAdd[] = []
+const NO_IDS: ReadonlySet<string> = new Set()
 
 /** Images as thumbnails, other files as chips, in the order attached. */
 export function AttachmentList({
   attachments,
+  provider = null,
+  pathOnly = NO_IDS,
   pending = NONE,
   onRemove,
   onDismiss,
@@ -154,19 +232,24 @@ export function AttachmentList({
       className={cn('flex-wrap gap-1.5 overflow-visible', className)}
     >
       {attachments.map(attachment => {
-        const remove = onRemove && (() => onRemove(attachment.id))
+        const isPathOnly = pathOnly.has(attachment.id)
 
-        return attachmentKind(attachment.mediaType) === 'image' ? (
-          <ImageAttachment
+        const Shown =
+          attachmentKind(attachment.mediaType) === 'image'
+            ? ImageAttachment
+            : FileAttachment
+
+        return (
+          <Shown
             key={attachment.id}
             attachment={attachment}
-            onRemove={remove}
-          />
-        ) : (
-          <FileAttachment
-            key={attachment.id}
-            attachment={attachment}
-            onRemove={remove}
+            note={
+              isPathOnly
+                ? PATH_ONLY_NOW
+                : provider && modelUse(provider, attachment)
+            }
+            pathOnly={isPathOnly}
+            onRemove={onRemove && (() => onRemove(attachment.id))}
           />
         )
       })}

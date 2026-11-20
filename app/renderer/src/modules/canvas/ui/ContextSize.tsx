@@ -1,6 +1,9 @@
+import type {MediaBudgetUse} from '@uz/contract/attachments'
+
 import {Badge} from '#shadcn/ui/badge'
 import {Button} from '#shadcn/ui/button'
 import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
+import {CLAUDE_MEDIA_BUDGET} from '@uz/contract/attachments'
 import {cn} from 'cn'
 import {InfoIcon, XIcon} from 'lucide-react'
 import {useRef, useState} from 'react'
@@ -13,6 +16,39 @@ interface ContextSizeProps {
   /** 0 at the root; null when the previous Reply never reported one. */
   previousContextSize: number | null
   contextWindow: number | null
+  /**
+   * Claude's media budget in use by the Thread; null when there is none to
+   * show.
+   */
+  inlineMedia: MediaBudgetUse | null
+}
+
+const MIB = 1024 * 1024
+
+function InlineMedia({use}: {use: MediaBudgetUse}) {
+  const {base64Bytes, files} = CLAUDE_MEDIA_BUDGET
+
+  return (
+    <>
+      <dt className="text-muted-foreground">Inline media</dt>
+      <dd className="text-right font-mono">
+        <span className="block">
+          {(use.base64Bytes / MIB).toFixed(1)} / {base64Bytes / MIB} MiB
+          <span className="sr-only"> · </span>
+        </span>
+        <span className="block">
+          {use.files} / {files} files
+        </span>
+      </dd>
+      {use.pathOnly > 0 && (
+        <dd className="col-span-2 text-muted-foreground">
+          {use.pathOnly === 1
+            ? '1 earlier attachment now goes by path only'
+            : `${use.pathOnly} earlier attachments now go by path only`}
+        </dd>
+      )}
+    </>
+  )
 }
 
 /** Signed, since a compaction can shrink the Thread. */
@@ -28,6 +64,7 @@ export function ContextSize({
   contextSize,
   previousContextSize,
   contextWindow,
+  inlineMedia,
 }: ContextSizeProps) {
   const [open, setOpen] = useState(false)
   const info = useRef<HTMLButtonElement>(null)
@@ -71,6 +108,7 @@ export function ContextSize({
         contextSize={contextSize}
         previousContextSize={previousContextSize}
         contextWindow={contextWindow}
+        inlineMedia={inlineMedia}
       />
     </>
   )
@@ -83,6 +121,7 @@ function ContextSizeDrawer({
   contextSize,
   previousContextSize,
   contextWindow,
+  inlineMedia,
 }: ContextSizeProps & {open: boolean; onClose: () => void}) {
   const added =
     previousContextSize === null ? null : contextSize - previousContextSize
@@ -91,7 +130,7 @@ function ContextSizeDrawer({
     <aside
       aria-label="Context size details"
       className={cn(
-        'absolute inset-y-0 left-0 z-10 w-56 border-r border-border bg-popover text-popover-foreground transition-[translate,opacity,visibility] duration-slide ease-slide motion-reduce:transition-none',
+        'absolute inset-y-0 left-0 z-10 w-56 overflow-y-auto border-r border-border bg-popover text-popover-foreground transition-[translate,opacity,visibility] duration-slide ease-slide motion-reduce:transition-none',
         !open && 'invisible -translate-x-[2.5rem] opacity-0'
       )}
       onKeyDown={event => {
@@ -119,6 +158,7 @@ function ContextSizeDrawer({
             <dd className="font-mono">{formatTokens(contextWindow)}</dd>
           </>
         )}
+        {inlineMedia && <InlineMedia use={inlineMedia} />}
       </dl>
     </aside>
   )

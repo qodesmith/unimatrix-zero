@@ -2,7 +2,11 @@ import type {Draft} from '../drafts'
 import type {Attachment} from '@uz/contract/attachments'
 import type {ComponentProps, DragEvent, KeyboardEvent, Ref} from 'react'
 
-import {AttachmentList, useAttachmentAdds} from '#modules/attachments/main'
+import {
+  AttachmentList,
+  formatSize,
+  useAttachmentAdds,
+} from '#modules/attachments/main'
 import {ModelPicker, useModelPick} from '#modules/models/main'
 import {useSettings} from '#modules/settings/main'
 import {FieldError} from '#shadcn/ui/field'
@@ -12,13 +16,16 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from '#shadcn/ui/input-group'
-import {ATTACHMENTS_PER_PROMPT} from '@uz/contract/attachments'
+import {
+  ATTACHMENTS_PER_PROMPT,
+  INLINE_IMAGES_PER_PROMPT_LIMIT,
+  inlineImagesSize,
+} from '@uz/contract/attachments'
 import {useEffect, useRef, useState} from 'react'
 
 import {useAttachedReply} from '../canvas-context'
 import {EMPTY_DRAFT} from '../drafts'
 import {usePromptSend} from '../prompt-send/use-prompt-send'
-import {usePdfNote} from '../use-pdf-note'
 import {useReReadNote} from '../use-re-read-note'
 import {AttachButton} from './AttachButton'
 import {StopButton} from './StopButton'
@@ -58,21 +65,6 @@ function carriesFiles(event: DragEvent) {
   return event.dataTransfer.types.includes('Files')
 }
 
-function Notes({notes}: {notes: (string | null)[]}) {
-  return notes.map(
-    note =>
-      note && (
-        <p
-          key={note}
-          role="note"
-          className="mb-1 px-1 text-xs text-muted-foreground"
-        >
-          {note}
-        </p>
-      )
-  )
-}
-
 /** What the picker says about the Model it shows, and why Send waits. */
 function PickNotes({pick}: {pick: ReturnType<typeof useModelPick>}) {
   if (!pick.notice && !pick.heldBecause) return null
@@ -83,6 +75,23 @@ function PickNotes({pick}: {pick: ReturnType<typeof useModelPick>}) {
       {pick.heldBecause && <span>{pick.heldBecause}</span>}
     </p>
   )
+}
+
+/** Why the files in the Input keep it from sending; null when they don't. */
+function attachmentsHeldBecause(attachments: readonly Attachment[]) {
+  const tooMany = attachments.length - ATTACHMENTS_PER_PROMPT
+
+  if (tooMany > 0) {
+    return `A Prompt takes at most ${ATTACHMENTS_PER_PROMPT} files; remove ${tooMany}.`
+  }
+
+  return inlineImagesSize([...attachments]) > INLINE_IMAGES_PER_PROMPT_LIMIT
+    ? `A Prompt takes at most ${formatSize(INLINE_IMAGES_PER_PROMPT_LIMIT)} of images; remove some.`
+    : null
+}
+
+function refusalOf(state: ReturnType<typeof usePromptSend>['state']) {
+  return state.status === 'refused' ? state.error : null
 }
 
 function DraftAttachments(props: ComponentProps<typeof AttachmentList>) {
@@ -120,7 +129,6 @@ export function PromptInput({
   const {selected} = pick
 
   const reReadNote = useReReadNote(attachedTo, selected)
-  const pdfNote = usePdfNote(attachedTo, attachments, selected)
 
   const adds = useAttachmentAdds(attachment =>
     updateDraft({attachments: [...latest.current.attachments, attachment]})
@@ -128,10 +136,14 @@ export function PromptInput({
 
   const sending = promptSend.state.status === 'sending'
   const adding = adds.pending.some(({status}) => status === 'adding')
-  const tooMany = attachments.length - ATTACHMENTS_PER_PROMPT
+  const filesHeldBecause = attachmentsHeldBecause(attachments)
 
   const held =
-    !canSend || sending || adding || tooMany > 0 || pick.heldBecause !== null
+    !canSend ||
+    sending ||
+    adding ||
+    filesHeldBecause !== null ||
+    pick.heldBecause !== null
 
   const empty = draft.trim() === '' && attachments.length === 0
 
@@ -199,10 +211,15 @@ export function PromptInput({
         adds.attach([...event.dataTransfer.files])
       }}
     >
-      <Notes notes={[reReadNote, pdfNote]} />
+      {reReadNote && (
+        <p role="note" className="mb-1 px-1 text-xs text-muted-foreground">
+          {reReadNote}
+        </p>
+      )}
       <InputGroup className="bg-background">
         <DraftAttachments
           attachments={attachments}
+          provider={selected?.provider}
           pending={adds.pending}
           onRemove={id =>
             updateDraft({
@@ -235,11 +252,7 @@ export function PromptInput({
           className="flex-wrap justify-between"
         >
           <FieldError className="text-xs">
-            {tooMany > 0
-              ? `A Prompt takes at most ${ATTACHMENTS_PER_PROMPT} files; remove ${tooMany}.`
-              : promptSend.state.status === 'refused'
-                ? promptSend.state.error
-                : null}
+            {filesHeldBecause ?? refusalOf(promptSend.state)}
           </FieldError>
           <div className="ml-auto flex items-center gap-1">
             <AttachButton onPicked={adds.attach} />

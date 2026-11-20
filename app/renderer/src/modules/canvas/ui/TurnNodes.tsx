@@ -3,7 +3,6 @@ import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Node, NodeProps} from '@xyflow/react'
 import type {Ref} from 'react'
 
-import {AttachmentList} from '#modules/attachments/main'
 import {useSettings} from '#modules/settings/main'
 import {FailedChip, ReplyView, useReply} from '#modules/turns/main'
 import {Card} from '#shadcn/ui/card'
@@ -15,12 +14,14 @@ import {useEffect, useRef, useState} from 'react'
 import {useCanvas} from '../canvas-context'
 import {TURN_WIDTH} from '../canvas-layout'
 import {EMPTY_DRAFT, holdsPrompt} from '../drafts'
+import {inlineMediaOf} from '../inline-media'
 import {branchesOf, isFork, previousReply} from '../tree'
 import {CappedText} from './CappedText'
 import {ContextMeter, ContextSize} from './ContextSize'
 import {FoldedStack, ForkPill} from './ForkPill'
 import {PromptBox} from './PromptBox'
 import {PromptInput} from './PromptInput'
+import {SentAttachments} from './SentAttachments'
 import {StopButton} from './StopButton'
 import {TooltipButton} from './TooltipButton'
 
@@ -40,8 +41,8 @@ function PromptText({prompt}: {prompt: Prompt}) {
 
   return (
     <>
-      <AttachmentList
-        attachments={prompt.attachments}
+      <SentAttachments
+        prompt={prompt}
         className={cn(prompt.text !== '' && 'mb-2')}
       />
       {prompt.text !== '' && (
@@ -79,6 +80,7 @@ function ReplyBody({reply}: {reply: Reply}) {
             contextSize={contextSize}
             previousContextSize={previous ? previous.contextSize : 0}
             contextWindow={contextWindow}
+            inlineMedia={inlineMediaOf(index, reply)}
           />
         )}
         <OpenChatButton replyId={reply.id} className="ml-auto" />
