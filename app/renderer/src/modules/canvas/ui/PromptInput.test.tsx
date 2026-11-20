@@ -806,7 +806,7 @@ it('refuses a file over the size limit without asking main', async () => {
 
   await expect
     .element(attachedFile('huge.bin').getByRole('alert'))
-    .toHaveTextContent('Larger than 50 MB, the most one file can be')
+    .toHaveTextContent('Larger than 50 MiB, the most one file can be')
   expect(main.files.registered).toEqual([])
   expect(addedFiles(main)).toEqual([])
 })
@@ -873,7 +873,7 @@ it('holds Send, saying why, while the Input’s images come to more than a Promp
   await expect.element(sendButton).toBeDisabled()
   await expect
     .element(
-      page.getByText('A Prompt takes at most 80 MB of images; remove some.')
+      page.getByText('A Prompt takes at most 80 MiB of images; remove some.')
     )
     .toBeInTheDocument()
 
@@ -911,7 +911,7 @@ it('shows an image as a thumbnail that opens large in a lightbox, and another fi
     .toHaveAttribute('src', attachmentUrl(image?.id ?? ''))
   await expect.element(thumbnail.getByText('3 bytes')).not.toBeInTheDocument()
   await expect
-    .element(attachedFile('notes.pdf').getByText(/^2 KB/))
+    .element(attachedFile('notes.pdf').getByText(/^2 KiB/))
     .toBeVisible()
   expect(attachedFile('notes.pdf').getByRole('img').query()).toBeNull()
 
@@ -946,16 +946,16 @@ it('says on each file what the picked Model does with it, and says it again for 
 
   await expect
     .element(description('paper.pdf'))
-    .toHaveTextContent('2 KB · Claude reads the whole PDF')
+    .toHaveTextContent('2 KiB · Claude reads the whole PDF')
   await expect
     .element(description('notes.txt'))
-    .toHaveTextContent('32 KB · Sent as text')
+    .toHaveTextContent('32 KiB · Sent as text')
   await expect
     .element(description('log.txt'))
-    .toHaveTextContent('32 KB · The AI can open this file')
+    .toHaveTextContent('32 KiB · The AI can open this file')
   await expect
     .element(description('archive.zip'))
-    .toHaveTextContent('4 KB · The AI can open this file')
+    .toHaveTextContent('4 KiB · The AI can open this file')
   await expect
     .element(description('project'))
     .toHaveTextContent('The AI can open this folder')
@@ -968,10 +968,10 @@ it('says on each file what the picked Model does with it, and says it again for 
 
   await expect
     .element(description('paper.pdf'))
-    .toHaveTextContent('2 KB · The AI can open this file')
+    .toHaveTextContent('2 KiB · The AI can open this file')
   await expect
     .element(description('notes.txt'))
-    .toHaveTextContent('32 KB · Sent as text')
+    .toHaveTextContent('32 KiB · Sent as text')
   await expect
     .element(page.getByRole('button', {name: 'Open shot.png'}))
     .toHaveAccessibleDescription('Sent as an image')
@@ -990,10 +990,10 @@ it('says a PDF goes by path when the Prompt alone passes Claude’s media budget
 
   await expect
     .element(description('first.pdf'))
-    .toHaveTextContent('9 MB · The AI can open this file')
+    .toHaveTextContent('9 MiB · The AI can open this file')
   await expect
     .element(description('second.pdf'))
-    .toHaveTextContent('9 MB · Claude reads the whole PDF')
+    .toHaveTextContent('9 MiB · Claude reads the whole PDF')
 })
 
 it('says what the Model does with an image in a tooltip on its thumbnail', async () => {
@@ -1015,7 +1015,7 @@ it('shows each file’s size alone until a Model is picked', async () => {
   })
 
   await expect
-    .element(attachedFile('paper.pdf').getByText('2 KB', {exact: true}))
+    .element(attachedFile('paper.pdf').getByText('2 KiB', {exact: true}))
     .toBeVisible()
   expect(description('paper.pdf').query()).toBeNull()
   expect(description('project').query()).toBeNull()

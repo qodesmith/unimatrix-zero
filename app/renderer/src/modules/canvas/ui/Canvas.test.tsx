@@ -2619,7 +2619,7 @@ it('sends a failed Prompt back to its Input with its files, and sends them again
     .element(sent.getByRole('img', {name: 'shot.png'}))
     .toHaveAttribute('src', attachmentUrl(SHOT.id))
   await expect
-    .element(sent.getByRole('group', {name: 'notes.pdf'}).getByText('2 KB'))
+    .element(sent.getByRole('group', {name: 'notes.pdf'}).getByText('2 KiB'))
     .toBeVisible()
   await expect
     .element(input.getByRole('group', {name: 'shot.png'}))
@@ -2636,7 +2636,7 @@ it('shows a Prompt’s images as thumbnails and its other files as chips, on the
     .element(root.getByRole('img', {name: 'shot.png'}))
     .toHaveAttribute('src', attachmentUrl(SHOT.id))
   await expect
-    .element(root.getByRole('group', {name: 'notes.pdf'}).getByText('2 KB'))
+    .element(root.getByRole('group', {name: 'notes.pdf'}).getByText('2 KiB'))
     .toBeVisible()
 
   await openChatAt('Reply one')
@@ -2645,7 +2645,7 @@ it('shows a Prompt’s images as thumbnails and its other files as chips, on the
     .toHaveAttribute('src', attachmentUrl(SHOT.id))
   await expect
     .element(
-      slideout().getByRole('group', {name: 'notes.pdf'}).getByText('2 KB')
+      slideout().getByRole('group', {name: 'notes.pdf'}).getByText('2 KiB')
     )
     .toBeVisible()
   expect(attachedFile('notes.pdf').elements()).toHaveLength(2)
@@ -2773,7 +2773,7 @@ it('says on an earlier Prompt’s attachment that it now goes by path only, once
 
   await expect
     .element(one.getByRole('group', {name: 'paper.pdf'}))
-    .toMatchTextContent(/3 MB · Sent by path only now$/)
+    .toMatchTextContent(/3 MiB · Sent by path only now$/)
   await expect
     .element(thumbnailIn(one, 'first.png'))
     .toHaveAccessibleDescription('Sent by path only now')
@@ -2794,7 +2794,7 @@ it('says on an earlier Prompt’s attachment that it now goes by path only, once
   await clickInputUnder('Reply one')
   await expect
     .element(one.getByRole('group', {name: 'paper.pdf'}))
-    .toMatchTextContent(/3 MB$/)
+    .toMatchTextContent(/3 MiB$/)
   await expect
     .element(thumbnailIn(one, 'first.png'))
     .toHaveAccessibleDescription('')
@@ -2820,7 +2820,7 @@ it('says so in the slideout by the slideout’s Thread, and marks the thumbnail'
     .toBeVisible()
   await expect
     .element(slideout().getByRole('group', {name: 'paper.pdf'}))
-    .toMatchTextContent(/3 MB$/)
+    .toMatchTextContent(/3 MiB$/)
   await expect
     .element(thumbnailIn(slideout(), 'second.png'))
     .toHaveAccessibleDescription('')
@@ -2832,6 +2832,34 @@ it('says so in the slideout by the slideout’s Thread, and marks the thumbnail'
   ).toBeNull()
 })
 
+it('keeps saying so in the slideout by the slideout’s Thread while another Branch’s Input is active', async () => {
+  const tree = mediaTree()
+
+  await renderCanvas({
+    prompts: [...tree.prompts, prompt(4, 11, 'Prompt four')],
+    replies: [
+      ...tree.replies,
+      {...reply(14, 4, 'Reply four'), provider: 'claude'},
+    ],
+  })
+  await expect.element(page.getByText('Reply four')).toBeVisible()
+
+  await openChatAt('Reply three')
+  await expect
+    .element(thumbnailIn(slideout(), 'first.png'))
+    .toHaveAccessibleDescription('Sent by path only now')
+
+  // The slideout lies over that Input here, so it takes focus without a click.
+  await canvas().getByText('Reply four').hover()
+  inputUnder('Reply four').element().focus()
+  await expect
+    .element(thumbnailIn(nodeOf('Prompt one'), 'first.png'))
+    .toHaveAccessibleDescription('')
+  await expect
+    .element(thumbnailIn(slideout(), 'first.png'))
+    .toHaveAccessibleDescription('Sent by path only now')
+})
+
 it('says nothing on a sent attachment when the Thread ends in a ChatGPT Reply', async () => {
   await renderCanvas(mediaTree('chatgpt'))
   await expect.element(page.getByText('Reply three')).toBeVisible()
@@ -2839,7 +2867,7 @@ it('says nothing on a sent attachment when the Thread ends in a ChatGPT Reply', 
 
   await expect
     .element(nodeOf('Prompt one').getByRole('group', {name: 'paper.pdf'}))
-    .toMatchTextContent(/3 MB$/)
+    .toMatchTextContent(/3 MiB$/)
   await expect
     .element(thumbnailIn(nodeOf('Prompt one'), 'first.png'))
     .toHaveAccessibleDescription('')

@@ -1,8 +1,7 @@
 import type {ProviderId} from '#modules/providers/main'
 
+import {MIB} from '#modules/sizes/main'
 import {z} from 'zod'
-
-const MIB = 1024 * 1024
 
 /** Larger files are refused as they are attached. */
 export const ATTACHMENT_SIZE_LIMIT = 50 * MIB

@@ -6,6 +6,7 @@ import {
   INLINE_IMAGES_PER_PROMPT_LIMIT,
   inlineImagesSize,
 } from '@uz/contract/attachments'
+import {formatSize} from '@uz/contract/sizes'
 import {asc, eq, getTableColumns, inArray} from 'drizzle-orm'
 
 const {attachments, promptAttachments} = schema
@@ -15,8 +16,6 @@ export type AttachmentRow = typeof attachments.$inferSelect
 type Reader = Pick<Database, 'select'>
 
 type Writer = Pick<Database, 'select' | 'insert'>
-
-const LIMIT_MIB = INLINE_IMAGES_PER_PROMPT_LIMIT / 1024 / 1024
 
 export function toAttachment(row: AttachmentRow): Attachment {
   return {
@@ -47,7 +46,7 @@ export function refuseTooManyImages(db: Reader, ids: string[]) {
 
   if (inlineImagesSize(sent) > INLINE_IMAGES_PER_PROMPT_LIMIT) {
     throw new Error(
-      `A Prompt sends up to ${LIMIT_MIB} MiB of images; these come to more. Remove some and send again.`
+      `A Prompt sends up to ${formatSize(INLINE_IMAGES_PER_PROMPT_LIMIT)} of images; these come to more. Remove some and send again.`
     )
   }
 }

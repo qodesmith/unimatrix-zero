@@ -1583,7 +1583,7 @@ describe('a Prompt with attachments', () => {
   })
 
   it.each([picked, GPT])(
-    'sends a text file of 32 KB inline and one a byte larger by path only, on $provider',
+    'sends a text file of 32 KiB inline and one a byte larger by path only, on $provider',
     async model => {
       const small = await attach(
         'small.txt',

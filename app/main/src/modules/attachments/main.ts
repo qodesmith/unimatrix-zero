@@ -10,6 +10,7 @@ import {
   INLINE_IMAGE_SIZE_LIMIT,
   attachmentKind,
 } from '@uz/contract/attachments'
+import {formatSize} from '@uz/contract/sizes'
 import {eq} from 'drizzle-orm'
 import {createHash} from 'node:crypto'
 import path from 'node:path'
@@ -43,8 +44,6 @@ export interface AttachmentsDeps {
 
 export type Attachments = ReturnType<typeof createAttachments>
 
-const LIMIT_MIB = ATTACHMENT_SIZE_LIMIT / 1024 / 1024
-
 function refuseUnfit(bytes: Uint8Array, label: string) {
   if (bytes.byteLength === 0) {
     throw new Error(`There’s nothing in ${label} to attach.`)
@@ -52,7 +51,7 @@ function refuseUnfit(bytes: Uint8Array, label: string) {
 
   if (bytes.byteLength > ATTACHMENT_SIZE_LIMIT) {
     throw new Error(
-      `Unimatrix Zero attaches files up to ${LIMIT_MIB} MiB; ${label} is larger.`
+      `Unimatrix Zero attaches files up to ${formatSize(ATTACHMENT_SIZE_LIMIT)}; ${label} is larger.`
     )
   }
 }

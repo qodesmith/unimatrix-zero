@@ -712,10 +712,13 @@ describe('connecting a Provider', () => {
       type: 'SIGN_IN_STEP',
       provider: 'claude',
       step: 'get-ready',
-      progress: {receivedBytes: 24_000_000, totalBytes: 100_000_000},
+      progress: {
+        receivedBytes: 24 * 1024 * 1024,
+        totalBytes: 100 * 1024 * 1024,
+      },
     })
     await expect
-      .element(claudeCard().getByText('Getting Claude ready… 24 of 100 MB'))
+      .element(claudeCard().getByText('Getting Claude ready… 24 of 100 MiB'))
       .toBeVisible()
     await expect
       .element(page.getByRole('button', {name: 'Connect ChatGPT'}))

@@ -65,6 +65,9 @@ export function ChatSlideout({
     ? (index.promptById.get(end.promptId)?.parentReplyId ?? null)
     : end.id
 
+  // A failed Reply's Prompt is back in the Input, so it sends nothing yet.
+  const sendsFrom = inputAt === null ? undefined : index.replyById.get(inputAt)
+
   function inFieldElsewhere({target}: Event) {
     return (
       target instanceof Element &&
@@ -191,7 +194,7 @@ export function ChatSlideout({
         >
           <div ref={content} className="mx-auto flex max-w-180 flex-col gap-3">
             {shown.map(turnId => (
-              <ChatTurn key={turnId} turnId={turnId} threadEnd={end} />
+              <ChatTurn key={turnId} turnId={turnId} threadEnd={sendsFrom} />
             ))}
             {failed && (
               <div data-chat-turn={end.id}>
@@ -211,7 +214,7 @@ export function ChatSlideout({
   )
 }
 
-function ChatTurn({turnId, threadEnd}: {turnId: string; threadEnd: Reply}) {
+function ChatTurn({turnId, threadEnd}: {turnId: string; threadEnd?: Reply}) {
   const {index} = useCanvas()
   const prompt = index.promptById.get(turnId)
   const reply = index.replyById.get(turnId)
@@ -221,7 +224,7 @@ function ChatTurn({turnId, threadEnd}: {turnId: string; threadEnd: Reply}) {
   return reply ? <ChatReply reply={reply} /> : null
 }
 
-function ChatPrompt({prompt, threadEnd}: {prompt: Prompt; threadEnd: Reply}) {
+function ChatPrompt({prompt, threadEnd}: {prompt: Prompt; threadEnd?: Reply}) {
   return (
     <Message align="end" data-chat-turn={prompt.id}>
       <MessageContent>

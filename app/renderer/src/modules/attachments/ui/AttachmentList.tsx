@@ -26,6 +26,7 @@ import {
   attachmentUrl,
   planInline,
 } from '@uz/contract/attachments'
+import {formatSize} from '@uz/contract/sizes'
 import {cn} from 'cn'
 import {
   CircleAlertIcon,
@@ -38,7 +39,6 @@ import {
 import {useId} from 'react'
 
 import {PATH_ONLY_NOW, modelUse} from '../model-use'
-import {formatSize} from '../size'
 
 function RemoveButton({label, onClick}: {label: string; onClick: () => void}) {
   return (

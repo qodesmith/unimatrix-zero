@@ -3,8 +3,7 @@ import type {AttachmentAddEvent} from './machine'
 import type {Attachment} from '@uz/contract/attachments'
 
 import {ATTACHMENT_SIZE_LIMIT} from '@uz/contract/attachments'
-
-import {formatSize} from '../size'
+import {formatSize} from '@uz/contract/sizes'
 
 interface AddInput {
   file: File

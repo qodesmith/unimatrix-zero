@@ -1,10 +1,15 @@
-const UNITS = ['KB', 'MB', 'GB']
+export const MIB = 1024 * 1024
+
+const UNITS = ['KiB', 'MiB', 'GiB']
 
 function rounded(value: number) {
   return value < 10 ? value.toFixed(1).replace(/\.0$/u, '') : Math.round(value)
 }
 
-/** A file's size as a chip shows it: 512 bytes, 2.4 KB, 18 MB. */
+/**
+ * A size in bytes as the app says it everywhere, in binary units: 512 bytes,
+ * 2.4 KiB, 18 MiB.
+ */
 export function formatSize(bytes: number) {
   if (bytes < 1024) return bytes === 1 ? '1 byte' : `${bytes} bytes`
 

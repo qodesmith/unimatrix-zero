@@ -2,11 +2,7 @@ import type {Draft} from '../drafts'
 import type {Attachment} from '@uz/contract/attachments'
 import type {ComponentProps, DragEvent, KeyboardEvent, Ref} from 'react'
 
-import {
-  AttachmentList,
-  formatSize,
-  useAttachmentAdds,
-} from '#modules/attachments/main'
+import {AttachmentList, useAttachmentAdds} from '#modules/attachments/main'
 import {ModelPicker, useModelPick} from '#modules/models/main'
 import {useSettings} from '#modules/settings/main'
 import {FieldError} from '#shadcn/ui/field'
@@ -21,6 +17,7 @@ import {
   INLINE_IMAGES_PER_PROMPT_LIMIT,
   inlineImagesSize,
 } from '@uz/contract/attachments'
+import {formatSize} from '@uz/contract/sizes'
 import {useEffect, useRef, useState} from 'react'
 
 import {useAttachedReply} from '../canvas-context'

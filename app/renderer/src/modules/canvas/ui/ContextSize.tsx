@@ -4,6 +4,7 @@ import {Badge} from '#shadcn/ui/badge'
 import {Button} from '#shadcn/ui/button'
 import {Tooltip, TooltipContent, TooltipTrigger} from '#shadcn/ui/tooltip'
 import {CLAUDE_MEDIA_BUDGET} from '@uz/contract/attachments'
+import {MIB} from '@uz/contract/sizes'
 import {cn} from 'cn'
 import {InfoIcon, XIcon} from 'lucide-react'
 import {useRef, useState} from 'react'
@@ -22,8 +23,6 @@ interface ContextSizeProps {
    */
   inlineMedia: MediaBudgetUse | null
 }
-
-const MIB = 1024 * 1024
 
 function InlineMedia({use}: {use: MediaBudgetUse}) {
   const {base64Bytes, files} = CLAUDE_MEDIA_BUDGET
