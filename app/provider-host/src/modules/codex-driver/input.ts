@@ -31,7 +31,7 @@ function turnInput(parts: CodexPart[]): UserInput[] {
   })
 }
 
-async function read(pieces: Piece[]): Promise<CodexPart[]> {
+export async function read(pieces: Piece[]): Promise<CodexPart[]> {
   const parts = await readContent(pieces)
 
   return parts.map(part => {
@@ -51,7 +51,6 @@ export async function codexContent(request: ReplyRequest) {
   const prompt = await read(prompted(request.prompt))
 
   return {
-    read,
     /** After the whole Thread, when the thread holds none of it. */
     async input(replay: boolean) {
       return turnInput(

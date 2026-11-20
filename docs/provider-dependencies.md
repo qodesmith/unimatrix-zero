@@ -567,7 +567,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 
 ### `claude` drops the oldest media past its own limits
 
-- **Id:** `claude-media-cap`
+- **Id:** `claude-media-limits`
 - **Kind:** D/W
 - **Provider:** Claude
 - **Relies on:** `claude` holds the images and documents of one request, the whole session's included, under limits of its own, about 24 MiB of base64 and 100 files, and past them drops the oldest without a word ([#204](https://github.com/qodesmith/unimatrix-zero/issues/204#issuecomment-6767172446) section 3 and ADR 0022). The API's own count is 100 images or PDF pages for a 200k-token Context window, and 600 above it.

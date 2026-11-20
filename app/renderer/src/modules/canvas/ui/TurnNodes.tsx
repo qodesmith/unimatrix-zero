@@ -14,7 +14,7 @@ import {useEffect, useRef, useState} from 'react'
 import {useCanvas} from '../canvas-context'
 import {TURN_WIDTH} from '../canvas-layout'
 import {EMPTY_DRAFT, holdsPrompt} from '../drafts'
-import {inlineMediaOf} from '../inline-media'
+import {mediaBudgetUseOf} from '../media-budget'
 import {branchesOf, isFork, previousReply} from '../tree'
 import {CappedText} from './CappedText'
 import {ContextMeter, ContextSize} from './ContextSize'
@@ -80,7 +80,7 @@ function ReplyBody({reply}: {reply: Reply}) {
             contextSize={contextSize}
             previousContextSize={previous ? previous.contextSize : 0}
             contextWindow={contextWindow}
-            inlineMedia={inlineMediaOf(index, reply)}
+            mediaBudgetUse={mediaBudgetUseOf(index, reply)}
           />
         )}
         <OpenChatButton replyId={reply.id} className="ml-auto" />

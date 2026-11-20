@@ -50,12 +50,11 @@ function unsent(text: string, sent: string) {
   return text.startsWith(sent) ? text.slice(sent.length) : text
 }
 
-/** What was attached after `sentIds` while main took the Prompt. */
-function unsentAttachments(
+function withoutAttachments(
   attachments: readonly Attachment[],
-  sentIds: readonly string[]
+  ids: readonly string[]
 ) {
-  return attachments.filter(({id}) => !sentIds.includes(id))
+  return attachments.filter(({id}) => !ids.includes(id))
 }
 
 function carriesFiles(event: DragEvent) {
@@ -171,7 +170,7 @@ export function PromptInput({
 
         updateDraft({
           text: unsent(now.text, draft),
-          attachments: unsentAttachments(now.attachments, attachmentIds),
+          attachments: withoutAttachments(now.attachments, attachmentIds),
         })
         onSent?.(replyId)
       },
@@ -220,7 +219,7 @@ export function PromptInput({
           pending={adds.pending}
           onRemove={id =>
             updateDraft({
-              attachments: unsentAttachments(latest.current.attachments, [id]),
+              attachments: withoutAttachments(latest.current.attachments, [id]),
             })
           }
           onDismiss={adds.dismiss}

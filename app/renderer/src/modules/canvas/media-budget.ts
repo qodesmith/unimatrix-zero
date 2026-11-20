@@ -16,7 +16,7 @@ function promptsTo(index: TreeIndex, replyId: string): Prompt[] {
  * another Provider's Reply, which has no such budget, and for a Thread with no
  * attachments.
  */
-export function inlineMediaOf(
+export function mediaBudgetUseOf(
   index: TreeIndex,
   reply: Reply
 ): MediaBudgetUse | null {
@@ -60,6 +60,20 @@ export function pathOnlyNow(
 }
 
 /**
+ * A failed Reply's Prompt is back in the Input, so its Thread ends at the Reply
+ * above.
+ */
+function sentEnd(index: TreeIndex, replyId: string): Reply | null {
+  const reply = index.replyById.get(replyId)
+
+  if (reply?.status !== 'failed') return reply ?? null
+
+  const above = index.promptById.get(reply.promptId)?.parentReplyId ?? null
+
+  return above === null ? null : (index.replyById.get(above) ?? null)
+}
+
+/**
  * The Reply whose Thread says how a Prompt's attachments go now: the active
  * Reply when the Prompt is on its Thread. Off it, the Prompt is the newest of
  * its own Thread, where the budget has left out nothing it sent inline.
@@ -69,8 +83,7 @@ export function threadEndFor(
   activeReplyId: string | null,
   prompt: Prompt
 ): Reply | null {
-  return activeReplyId !== null &&
-    pathTo(index, activeReplyId).includes(prompt.id)
-    ? (index.replyById.get(activeReplyId) ?? null)
-    : null
+  const end = activeReplyId === null ? null : sentEnd(index, activeReplyId)
+
+  return end !== null && pathTo(index, end.id).includes(prompt.id) ? end : null
 }

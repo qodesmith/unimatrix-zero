@@ -1,6 +1,4 @@
-import type {Piece} from '#modules/prompt-content/main'
 import type {AppServer} from './app-server'
-import type {CodexPart} from './input'
 import type {ResponseItem} from './protocol/ResponseItem'
 import type {LoadedThread} from './threads'
 import type {ParamsOf} from './wire'
@@ -10,7 +8,7 @@ import {RequestRefused} from '#modules/failures/main'
 import {prompted} from '#modules/prompt-content/main'
 import {explainingLabels, replyText} from '#modules/thread-replay/main'
 
-import {messageContent} from './input'
+import {messageContent, read} from './input'
 import {configOf, loadThread} from './threads'
 
 /** How Codex refuses to resume or fork a thread whose rollout it can't find. */
@@ -41,11 +39,9 @@ export function settingsOf(request: ReplyRequest) {
   } satisfies ParamsOf<'thread/start'>
 }
 
-/** Where threads open, and how a Prompt's inline files are read for Codex. */
 export interface Opening {
   server: Pick<AppServer, 'request'>
   threads: Map<string, LoadedThread>
-  read: (pieces: Piece[]) => Promise<CodexPart[]>
 }
 
 function replied(text: string) {
@@ -57,7 +53,7 @@ function replied(text: string) {
 }
 
 /** Each Prompt's path lines and inline files, the files read afresh. */
-async function itemsOf(thread: Thread, read: Opening['read']) {
+async function itemsOf(thread: Thread) {
   const turns = await Promise.all(
     thread.map(async exchange => {
       const reply = replyText(exchange)
@@ -104,14 +100,14 @@ async function injectThread(
  * else in a thread of its own, with the Prompt.
  */
 async function newThread(
-  {server, threads, read}: Opening,
+  {server, threads}: Opening,
   request: ReplyRequest
 ): Promise<Opened> {
   const {threshold} = request.compactionSettings
 
   const settings = settingsOf(request)
   // Before the thread starts, so an unreadable file leaves none behind.
-  const items = await itemsOf(request.thread, read)
+  const items = await itemsOf(request.thread)
 
   async function open() {
     return loadThread(

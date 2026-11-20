@@ -451,7 +451,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
         const {server, threads} = running
 
         const opened = await openThread(
-          {server, threads, read: content.read},
+          {server, threads},
           request,
           session && (async () => restore(running, request, session, dropFrom))
         )

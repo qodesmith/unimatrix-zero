@@ -21,7 +21,7 @@ interface ContextSizeProps {
    * Claude's media budget in use by the Thread; null when there is none to
    * show.
    */
-  inlineMedia: MediaBudgetUse | null
+  mediaBudgetUse: MediaBudgetUse | null
 }
 
 function InlineMedia({use}: {use: MediaBudgetUse}) {
@@ -63,7 +63,7 @@ export function ContextSize({
   contextSize,
   previousContextSize,
   contextWindow,
-  inlineMedia,
+  mediaBudgetUse,
 }: ContextSizeProps) {
   const [open, setOpen] = useState(false)
   const info = useRef<HTMLButtonElement>(null)
@@ -107,7 +107,7 @@ export function ContextSize({
         contextSize={contextSize}
         previousContextSize={previousContextSize}
         contextWindow={contextWindow}
-        inlineMedia={inlineMedia}
+        mediaBudgetUse={mediaBudgetUse}
       />
     </>
   )
@@ -120,7 +120,7 @@ function ContextSizeDrawer({
   contextSize,
   previousContextSize,
   contextWindow,
-  inlineMedia,
+  mediaBudgetUse,
 }: ContextSizeProps & {open: boolean; onClose: () => void}) {
   const added =
     previousContextSize === null ? null : contextSize - previousContextSize
@@ -157,7 +157,7 @@ function ContextSizeDrawer({
             <dd className="font-mono">{formatTokens(contextWindow)}</dd>
           </>
         )}
-        {inlineMedia && <InlineMedia use={inlineMedia} />}
+        {mediaBudgetUse && <InlineMedia use={mediaBudgetUse} />}
       </dl>
     </aside>
   )

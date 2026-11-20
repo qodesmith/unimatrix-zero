@@ -2801,6 +2801,35 @@ it('says on an earlier Prompt’s attachment that it now goes by path only, once
     .toHaveAccessibleDescription('')
 })
 
+it('judges the canvas’s sent attachments by the Thread up to the Reply above while the Active Reply is a failed one', async () => {
+  const {prompts, replies} = mediaTree()
+  const [first, second] = replies
+
+  await renderCanvas({
+    prompts: prompts.slice(0, 2),
+    replies: [
+      ...(first ? [first] : []),
+      ...(second
+        ? [
+            {
+              ...second,
+              status: 'failed' as const,
+              failure: {
+                code: 'connection-lost' as const,
+                message: 'ECONNRESET',
+              },
+            },
+          ]
+        : []),
+    ],
+  })
+  await chipDrawn()
+
+  await expect
+    .element(thumbnailIn(nodeOf('Prompt one'), 'first.png'))
+    .toHaveAccessibleDescription('')
+})
+
 it('says so in the slideout by the slideout’s Thread, and marks the thumbnail', async () => {
   await renderCanvas(mediaTree())
   await expect.element(page.getByText('Reply three')).toBeVisible()

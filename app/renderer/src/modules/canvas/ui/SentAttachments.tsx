@@ -3,7 +3,7 @@ import type {Prompt, Reply} from '@uz/contract/turns'
 import {AttachmentList} from '#modules/attachments/main'
 
 import {useCanvas} from '../canvas-context'
-import {pathOnlyNow, threadEndFor} from '../inline-media'
+import {pathOnlyNow, threadEndFor} from '../media-budget'
 
 interface SentAttachmentsProps {
   prompt: Prompt
