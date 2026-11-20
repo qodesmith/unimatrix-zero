@@ -89,7 +89,7 @@ interface Sending {
 /**
  * One plan over the whole Thread and the Prompt being sent, for the Provider
  * they go to: a hand-over gets the new Provider's rules, and Claude's media
- * budget counts every earlier Prompt (ADR 0022).
+ * budget counts every earlier Prompt.
  */
 export function withAttachments(
   db: Database,

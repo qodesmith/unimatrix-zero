@@ -573,7 +573,7 @@ describe('Reply commands', () => {
 })
 
 describe('attachments', () => {
-  it('attaches a pasted file, which a Prompt with no text then sends and lists', async () => {
+  it('attaches a pasted file, which a Prompt with no text then sends and lists, leaving its Tree no first line', async () => {
     const tree = await createTree()
 
     const added = await send({
@@ -610,6 +610,7 @@ describe('attachments', () => {
       ok: true,
       value: {prompts: [{attachments: [attachment]}]},
     })
+    expect((await listed())[0]?.firstLine).toBeNull()
   })
 })
 

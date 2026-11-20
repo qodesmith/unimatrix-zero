@@ -37,7 +37,7 @@ describe('inlineForm', () => {
     ).toBeNull()
   })
 
-  it('sends a text file inline up to 32 KB on both Providers', () => {
+  it('sends a text file inline up to 32 KiB on both Providers', () => {
     const under = file('text/plain', 32 * 1024)
     const over = file('text/plain', 32 * 1024 + 1)
 

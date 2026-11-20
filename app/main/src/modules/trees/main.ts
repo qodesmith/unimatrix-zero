@@ -30,11 +30,14 @@ const rowFields = {
   lastActiveAt: lastActiveAt.mapWith(trees.createdAt),
 }
 
-/** A Prompt is trimmed when sent, so its first line has text. */
+/**
+ * A Prompt is trimmed when sent, so its first line has text unless it carries
+ * attachments alone.
+ */
 function firstLineOf(text: string | null) {
   const line = text?.split('\n', 1)[0]?.trim()
 
-  return line === undefined ? null : line.slice(0, TREE_TITLE_MAX_LENGTH)
+  return line ? line.slice(0, TREE_TITLE_MAX_LENGTH) : null
 }
 
 type TreeRow = NonNullable<ReturnType<ReturnType<typeof selectRows>['get']>>

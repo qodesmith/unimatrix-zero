@@ -718,7 +718,9 @@ describe('connecting a Provider', () => {
       },
     })
     await expect
-      .element(claudeCard().getByText('Getting Claude ready… 24 of 100 MiB'))
+      .element(
+        claudeCard().getByText('Getting Claude ready… 24 MiB of 100 MiB')
+      )
       .toBeVisible()
     await expect
       .element(page.getByRole('button', {name: 'Connect ChatGPT'}))

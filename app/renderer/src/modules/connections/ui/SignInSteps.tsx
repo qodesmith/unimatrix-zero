@@ -7,7 +7,7 @@ import {Field, FieldError, FieldLabel} from '#shadcn/ui/field'
 import {Input} from '#shadcn/ui/input'
 import {Progress} from '#shadcn/ui/progress'
 import {PROVIDER_NAMES, SignInStepEvent} from '@uz/contract/providers'
-import {MIB} from '@uz/contract/sizes'
+import {formatSize} from '@uz/contract/sizes'
 import {cn} from 'cn'
 import {CheckIcon} from 'lucide-react'
 import {useId, useState} from 'react'
@@ -86,10 +86,6 @@ export function Checklist({
       </p>
     </div>
   )
-}
-
-function megabytes(bytes: number) {
-  return Math.round(bytes / MIB)
 }
 
 interface StepDetailProps {
@@ -243,7 +239,7 @@ const STEPS: Record<
     label: name => `Get ${name} ready`,
     status: (name, {progress}) =>
       progress
-        ? `Getting ${name} ready… ${megabytes(progress.receivedBytes)} of ${megabytes(progress.totalBytes)} MiB`
+        ? `Getting ${name} ready… ${formatSize(progress.receivedBytes)} of ${formatSize(progress.totalBytes)}`
         : `Getting ${name} ready…`,
     Detail: DownloadProgress,
   },

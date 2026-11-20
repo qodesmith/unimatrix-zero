@@ -1,5 +1,8 @@
 import type {PendingAdd} from '../attachment-add/use-attachment-adds'
-import type {Attachment as AttachmentData} from '@uz/contract/attachments'
+import type {
+  Attachment as AttachmentData,
+  AttachmentKind,
+} from '@uz/contract/attachments'
 import type {ProviderId} from '@uz/contract/providers'
 
 import {
@@ -118,11 +121,12 @@ function ImageAttachment({
 }
 
 const ICONS = {
+  image: FileIcon,
   pdf: FileIcon,
   file: FileIcon,
   text: FileTextIcon,
   folder: FolderIcon,
-}
+} satisfies Record<AttachmentKind, typeof FileIcon>
 
 /**
  * Any other file: a chip with its name, its size and its note. A folder shows
@@ -134,7 +138,7 @@ function FileAttachment({
   onRemove,
 }: ShownProps) {
   const kind = attachmentKind(mediaType)
-  const Icon = kind === 'image' ? FileIcon : ICONS[kind]
+  const Icon = ICONS[kind]
 
   return (
     <Attachment role="group" aria-label={name} size="xs" className="min-w-0">
