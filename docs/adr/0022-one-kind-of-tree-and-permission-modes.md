@@ -44,3 +44,4 @@
   - ADR 0007, ADR 0010, ADR 0011 and ADR 0014, each by an amendment note, and ADR 0017 inside its list of fields.
 - **Workspace, plain Tree and YOLO leave the vocabulary.** In older tickets and ADRs, a Workspace reads as the Tree's files, and YOLO as Full access.
 - **Provider dependency entries that assume a Claude with no tools** (`verbatim-prompts`, `setup-tokens`) and a Codex that sends no server requests (`codex-server-requests-refused`) go stale when this is built, and change with that code.
+- **Amended: a Tree may use its own Permission mode** ([ADR 0023](./0023-three-kinds-of-setting-and-a-trees-own-permission-mode.md)). The global mode, set in Settings → Permissions, reaches every Tree that has no mode of its own. The label beside the Input shows the Tree's effective mode, and its menu changes only that Tree. This replaces "The Permission mode is global only" and the label's menu changing the global mode.

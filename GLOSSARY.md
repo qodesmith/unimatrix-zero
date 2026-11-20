@@ -172,11 +172,11 @@ A named group of Trees in the sidebar, made by the user. A Tree is in at most on
 _Avoid_: Folder, project, group
 
 **Settings**:
-The single place for the user's global preferences: how the app looks and behaves, and the defaults new Trees start from. Settings never changes an existing Tree, except the Compaction Settings, which apply to every Thread from its next Reply, and the Permission mode, which every Tree follows and which can also be changed beside the Input; anything else that shapes what the AI does in one Tree belongs to that Tree.
+The single place for the user's global preferences, each of one kind: _look and behavior_, which never reaches the AI; _defaults for new Trees_, copied into a Tree when it is created and never changing an existing one; or _live AI Settings_, which reach every Tree from the next AI call unless a Tree uses its own value, where the Setting allows one. The libraries of System prompts, MCP servers, Skills and Plugins are content kept in Settings, not Settings themselves.
 _Avoid_: Preferences, options, config
 
 **Compaction Settings**:
-The global Settings, one set for each Provider, that decide when it makes a Compaction on its own: a threshold, the Context size it compacts at, and for Claude a switch that turns automatic Compaction off. They reach every Thread from its next Reply; an unset threshold leaves it to the Provider's default.
+The live AI Settings, one set for each Provider, that decide when it makes a Compaction on its own: a threshold, the Context size it compacts at, and for Claude a switch that turns automatic Compaction off. They reach every Thread from its next Reply; an unset threshold leaves it to the Provider's default.
 _Avoid_: Compaction (that is the event), auto-compact settings
 
 **Font size**:
@@ -188,8 +188,12 @@ How the window is arranged, such as whether the sidebar is open, which the app r
 _Avoid_: Window state, UI state, view state
 
 **Tools panel**:
-A Tree's own list of what the AI may use there: web search, Subagents, each MCP server, Skill and Plugin, and the Provider's own built-in tools and account connectors. New Trees start from the defaults in Settings; changing the panel changes only that Tree.
+A Tree's own list of what the AI may use there: web search, Subagents, each MCP server, Skill and Plugin, and the Provider's own built-in tools and account connectors. It is part of the Tree panel. New Trees start from the defaults in Settings; changing the panel changes only that Tree.
 _Avoid_: Tool settings, capabilities, permissions panel
+
+**Tree panel**:
+The one place where a Tree's own values are shown and changed: its System prompt, its Tools panel, its own Permission mode and its "Always allow in this Tree" grants.
+_Avoid_: Tree settings, Tree properties, Tree's panel
 
 **Approval card**:
 The question a Reply pauses on when the AI wants to do something the Permission mode or the Tree does not let it do on its own, such as run a command, edit a file, or reach a host. Once answered (Allow once, Always allow in this Tree, or Deny) it collapses into a chip with the outcome; approval history is not stored, and an Always allow holds for every Branch of the Tree.
@@ -200,7 +204,7 @@ The Provider's own AI that, under the Auto Permission mode, decides in the user'
 _Avoid_: Guardian, classifier, auto-review
 
 **Permission mode**:
-The global Setting that decides what the AI may do without asking, in every Tree, from the next Reply: _Full access_ (the default: nothing asks and there is no Sandbox), _Auto_ (the Reviewer decides instead of the user), _Auto-accept edits_ (edits to the Tree's files go ahead and other edits ask; commands run inside the Sandbox without asking, and leaving it asks) or _Supervised_ (every edit asks, and so does every command except read-only ones). Reading a file never asks.
+The live AI Setting that decides what the AI may do without asking, from the next Reply. A Tree may use its own mode; every other Tree follows the global one. The modes are _Full access_ (the default: nothing asks and there is no Sandbox), _Auto_ (the Reviewer decides instead of the user), _Auto-accept edits_ (edits to the Tree's files go ahead and other edits ask; commands run inside the Sandbox without asking, and leaving it asks) and _Supervised_ (every edit asks, and so does every command except read-only ones). Reading a file never asks.
 _Avoid_: YOLO, bypass permissions, permission level, capability tier
 
 **Export**:
