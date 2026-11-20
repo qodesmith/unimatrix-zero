@@ -599,6 +599,8 @@ describe('attachments', () => {
       name: 'notes.txt',
       mediaType: 'text/plain',
       size: 5,
+      shrunkSize: null,
+      folderPath: null,
     })
     expect(sent).toMatchObject({
       ok: true,
@@ -607,6 +609,27 @@ describe('attachments', () => {
     expect(await send({type: 'tree.turns', treeId: tree.id})).toMatchObject({
       ok: true,
       value: {prompts: [{attachments: [attachment]}]},
+    })
+  })
+})
+
+describe('attaching an image with the window’s shrunk copy', () => {
+  it('keeps the shrunk copy with the original', async () => {
+    const added = await send({
+      type: 'attachment.add',
+      file: {
+        type: 'pasted',
+        name: 'photo.png',
+        bytes: Uint8Array.from([
+          0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+        ]),
+      },
+      shrunk: Uint8Array.from([0xff, 0xd8, 0xff]),
+    })
+
+    expect(added).toMatchObject({
+      ok: true,
+      value: {attachment: {mediaType: 'image/png', size: 8, shrunkSize: 3}},
     })
   })
 })

@@ -1,7 +1,10 @@
 import type {Database} from '#modules/database/main'
 
 import {openDatabase} from '#modules/database/main'
-import {ATTACHMENT_SIZE_LIMIT} from '@uz/contract/attachments'
+import {
+  ATTACHMENT_SIZE_LIMIT,
+  INLINE_IMAGE_SIZE_LIMIT,
+} from '@uz/contract/attachments'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -14,6 +17,13 @@ const migrationsFolder = path.resolve(import.meta.dirname, '../../../drizzle')
 const PNG = Uint8Array.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d,
 ])
+
+const ABC_SHA256 =
+  'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
+
+/** Of the six bytes the shrunk-copy tests send as a JPEG. */
+const JPEG_SHA256 =
+  'fc16d7dcee9cae83ef3923222a81ccd8fe96c9d25fdb7f504d66f1011e0cd870'
 
 let folder: string
 let dir: string
@@ -92,9 +102,16 @@ describe('the media type', () => {
       'a RIFF file that is not WebP',
       bytesOf('RIFF$\u0000\u0000\u0000WAVEfmt '),
     ],
-  ])('refuses %s', async (_kind, bytes) => {
-    await expect(paste('song.txt', bytes)).rejects.toThrow(
-      'Unimatrix Zero attaches images, PDFs and text files; song.txt is none of these.'
+  ])('attaches %s as a file of no known type', async (_kind, bytes) => {
+    const attachment = await paste('song.wav', bytes)
+
+    expect(attachment).toMatchObject({
+      name: 'song.wav',
+      mediaType: 'application/octet-stream',
+      size: bytes.byteLength,
+    })
+    expect(fs.readFileSync(originalOf(attachment.id))).toEqual(
+      Buffer.from(bytes)
     )
   })
 })
@@ -113,7 +130,7 @@ describe('adding a file', () => {
     )
 
     await expect(attachments.add({type: 'dropped', fileId})).rejects.toThrow(
-      'Unimatrix Zero attaches files up to 20 MB; big.txt is larger.'
+      'Unimatrix Zero attaches files up to 50 MiB; big.txt is larger.'
     )
   })
 
@@ -146,6 +163,8 @@ describe('adding a file', () => {
       name: 'photo.png',
       mediaType: 'image/png',
       size: PNG.byteLength,
+      shrunkSize: null,
+      folderPath: null,
     })
     expect(fs.readFileSync(originalOf(attachment.id))).toEqual(Buffer.from(PNG))
   })
@@ -154,6 +173,7 @@ describe('adding a file', () => {
     [PNG, 'Pasted image.png'],
     [bytesOf('%PDF-1.4\n'), 'Pasted PDF.pdf'],
     [bytesOf('Hello'), 'Pasted text.txt'],
+    [Uint8Array.from([0, 1, 2]), 'Pasted file'],
   ])(
     'names a pasted file that came with no name by what it is',
     async (bytes, name) => {
@@ -163,22 +183,136 @@ describe('adding a file', () => {
     }
   )
 
-  it('keeps one owner-only file, named by its SHA-256, for every add of the same bytes, each add with its own id and name', async () => {
-    const sha256 =
-      'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
+  it('keeps the copy under the file’s own name, in a folder named by its SHA-256, owner-only', async () => {
+    const attachment = await paste('notes.md', bytesOf('abc'))
 
-    const kept = path.join(dir, sha256)
+    const kept = path.join(dir, ABC_SHA256, 'notes.md')
 
+    expect(originalOf(attachment.id)).toBe(kept)
+    expect(fs.readFileSync(kept, 'utf8')).toBe('abc')
+    expect(fs.statSync(kept).mode.toString(8).slice(-3)).toBe('600')
+  })
+
+  it('gives the same bytes added under another name a second name beside the first, sharing the bytes, each add with its own id', async () => {
     const first = await paste('one.txt', bytesOf('abc'))
-    const written = fs.statSync(kept)
     const second = await paste('two.txt', bytesOf('abc'))
 
     expect(second.id).not.toBe(first.id)
-    expect([first.name, second.name]).toEqual(['one.txt', 'two.txt'])
-    expect(originalOf(first.id)).toBe(kept)
-    expect(originalOf(second.id)).toBe(kept)
-    expect(fs.readdirSync(dir).toSorted()).toEqual([sha256, 'conversions'])
-    expect(fs.statSync(kept).ino).toBe(written.ino)
-    expect(written.mode.toString(8).slice(-3)).toBe('600')
+    expect(originalOf(first.id)).toBe(path.join(dir, ABC_SHA256, 'one.txt'))
+    expect(originalOf(second.id)).toBe(path.join(dir, ABC_SHA256, 'two.txt'))
+    expect(fs.readFileSync(originalOf(second.id), 'utf8')).toBe('abc')
+    expect(fs.statSync(originalOf(second.id)).ino).toBe(
+      fs.statSync(originalOf(first.id)).ino
+    )
+    expect(fs.readdirSync(dir)).toEqual([ABC_SHA256])
+  })
+
+  it('keeps the first copy when the same bytes are added under the same name again', async () => {
+    const first = await paste('one.txt', bytesOf('abc'))
+    const written = fs.statSync(originalOf(first.id))
+
+    const second = await paste('one.txt', bytesOf('abc'))
+
+    expect(second.id).not.toBe(first.id)
+    expect(fs.statSync(originalOf(second.id)).ino).toBe(written.ino)
+    expect(fs.readdirSync(path.join(dir, ABC_SHA256))).toEqual(['one.txt'])
+  })
+
+  it.each([
+    ['a path', '../../etc/passwd', 'passwd'],
+    [
+      'a Windows path',
+      String.raw`C:\Users\me\photo.png`,
+      'C:_Users_me_photo.png',
+    ],
+    ['control characters', 'a\u0000b\u001Fc\n.txt', 'abc.txt'],
+    ['only dots', '..', 'Pasted text.txt'],
+    ['one dot', '.', 'Pasted text.txt'],
+  ])(
+    'makes a name with %s safe for a file name, and stores the copy under it',
+    async (_case, name, safe) => {
+      const attachment = await paste(name, bytesOf('abc'))
+
+      expect(attachment.name).toBe(safe)
+      expect(originalOf(attachment.id)).toBe(path.join(dir, ABC_SHA256, safe))
+      expect(fs.readFileSync(originalOf(attachment.id), 'utf8')).toBe('abc')
+    }
+  )
+
+  it('cuts a name longer than a file system takes, keeping its extension', async () => {
+    const attachment = await paste(`${'é'.repeat(200)}.tar.gz`, bytesOf('abc'))
+
+    expect(attachment.name).toBe(`${'é'.repeat(126)}.gz`)
+    expect(fs.readFileSync(originalOf(attachment.id), 'utf8')).toBe('abc')
+  })
+})
+
+describe('a shrunk copy of an image', () => {
+  const JPEG = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10])
+
+  it('is kept beside the original, named by its own SHA-256 and type', async () => {
+    const attachment = await attachments.add(
+      {type: 'pasted', name: 'photo.png', bytes: PNG},
+      JPEG
+    )
+
+    expect(attachment).toMatchObject({
+      mediaType: 'image/png',
+      size: PNG.byteLength,
+      shrunkSize: JPEG.byteLength,
+    })
+    expect(
+      fs.readFileSync(path.join(dir, 'shrunk', `${JPEG_SHA256}.jpg`))
+    ).toEqual(Buffer.from(JPEG))
+    expect(fs.readFileSync(originalOf(attachment.id))).toEqual(Buffer.from(PNG))
+  })
+
+  it.each([
+    ['the original is not an image', bytesOf('Hello'), JPEG],
+    ['it is not a PNG or JPEG', PNG, bytesOf('GIF89a\u0001\u0000')],
+    [
+      'it is over the size an image goes inline at',
+      PNG,
+      new Uint8Array(INLINE_IMAGE_SIZE_LIMIT + 1)
+        .fill(0xff, 0, 3)
+        .fill(0xd8, 1, 2),
+    ],
+  ])(
+    'is ignored when %s, and the original still attaches',
+    async (_case, bytes, shrunk) => {
+      const attachment = await attachments.add(
+        {type: 'pasted', name: 'original', bytes},
+        shrunk
+      )
+
+      expect(attachment).toMatchObject({
+        size: bytes.byteLength,
+        shrunkSize: null,
+      })
+      expect(fs.existsSync(path.join(dir, 'shrunk'))).toBe(false)
+    }
+  )
+})
+
+describe('a dropped folder', () => {
+  it('is attached as its path alone, with nothing copied and nothing to serve', async () => {
+    const project = path.join(folder, 'my project')
+    fs.mkdirSync(project)
+    fs.writeFileSync(path.join(project, 'readme.md'), 'Hello')
+    const fileId = crypto.randomUUID()
+    dropped.set(fileId, `${project}/`)
+
+    const attachment = await attachments.add({type: 'dropped', fileId})
+
+    expect(attachment).toEqual({
+      id: expect.any(String),
+      name: 'my project',
+      mediaType: 'inode/directory',
+      size: 0,
+      shrunkSize: null,
+      folderPath: project,
+    })
+    expect(fs.existsSync(dir)).toBe(false)
+    expect(attachments.original(attachment.id)).toBeNull()
   })
 })

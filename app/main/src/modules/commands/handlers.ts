@@ -146,8 +146,8 @@ export const handlers: Handlers = {
 
   'image.load': async ({url}, {images}) => images.load(url),
 
-  'attachment.add': async ({file}, {attachments}) => ({
-    attachment: await attachments.add(file),
+  'attachment.add': async ({file, shrunk}, {attachments}) => ({
+    attachment: await attachments.add(file, shrunk),
   }),
 
   'settings.update': ({changes}, {settings, publish}) => {

@@ -310,7 +310,6 @@ it('sends commands to the Provider’s host', () => {
       session: null,
       thread: [],
       compactionSettings: {auto: true, threshold: null},
-      conversionDir: '/attachments/conversions',
     },
   }
 

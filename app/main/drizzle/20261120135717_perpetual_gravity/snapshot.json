@@ -2,9 +2,7 @@
   "version": "7",
   "dialect": "sqlite",
   "id": "8fb103ff-1ef4-40e6-a7b9-bc6b1ae83d31",
-  "prevIds": [
-    "f0b8a702-de6f-4c5f-9e31-d42c33cb6d38"
-  ],
+  "prevIds": ["f0b8a702-de6f-4c5f-9e31-d42c33cb6d38"],
   "ddl": [
     {
       "name": "attachments",
@@ -1025,13 +1023,9 @@
     {
       "table": "compactions",
       "name": "fk_compactions_reply_id_replies_id_fk",
-      "columns": [
-        "reply_id"
-      ],
+      "columns": ["reply_id"],
       "tableTo": "replies",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "SET NULL",
       "nameExplicit": false,
@@ -1040,13 +1034,9 @@
     {
       "table": "prompt_attachments",
       "name": "fk_prompt_attachments_prompt_id_prompts_id_fk",
-      "columns": [
-        "prompt_id"
-      ],
+      "columns": ["prompt_id"],
       "tableTo": "prompts",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -1055,13 +1045,9 @@
     {
       "table": "prompt_attachments",
       "name": "fk_prompt_attachments_attachment_id_attachments_id_fk",
-      "columns": [
-        "attachment_id"
-      ],
+      "columns": ["attachment_id"],
       "tableTo": "attachments",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
       "nameExplicit": false,
@@ -1070,13 +1056,9 @@
     {
       "table": "prompts",
       "name": "fk_prompts_tree_id_trees_id_fk",
-      "columns": [
-        "tree_id"
-      ],
+      "columns": ["tree_id"],
       "tableTo": "trees",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -1085,13 +1067,9 @@
     {
       "table": "prompts",
       "name": "fk_prompts_parent_reply_id_replies_id_fk",
-      "columns": [
-        "parent_reply_id"
-      ],
+      "columns": ["parent_reply_id"],
       "tableTo": "replies",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -1100,13 +1078,9 @@
     {
       "table": "replies",
       "name": "fk_replies_tree_id_trees_id_fk",
-      "columns": [
-        "tree_id"
-      ],
+      "columns": ["tree_id"],
       "tableTo": "trees",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -1115,13 +1089,9 @@
     {
       "table": "replies",
       "name": "fk_replies_prompt_id_prompts_id_fk",
-      "columns": [
-        "prompt_id"
-      ],
+      "columns": ["prompt_id"],
       "tableTo": "prompts",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -1130,13 +1100,9 @@
     {
       "table": "replies",
       "name": "fk_replies_system_prompt_id_system_prompts_id_fk",
-      "columns": [
-        "system_prompt_id"
-      ],
+      "columns": ["system_prompt_id"],
       "tableTo": "system_prompts",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
       "nameExplicit": false,
@@ -1145,117 +1111,91 @@
     {
       "table": "attachments",
       "name": "attachments_pk",
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "entityType": "pks"
     },
     {
       "table": "compactions",
       "name": "compactions_pk",
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "entityType": "pks"
     },
     {
       "table": "layout",
       "name": "layout_pk",
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "entityType": "pks"
     },
     {
       "table": "prompt_attachments",
       "name": "prompt_attachments_pk",
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "entityType": "pks"
     },
     {
       "table": "prompts",
       "name": "prompts_pk",
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "entityType": "pks"
     },
     {
       "table": "providers",
       "name": "providers_pk",
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "entityType": "pks"
     },
     {
       "table": "replies",
       "name": "replies_pk",
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "entityType": "pks"
     },
     {
       "table": "session_entries",
       "name": "session_entries_pk",
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "entityType": "pks"
     },
     {
       "table": "session_files",
       "name": "session_files_pk",
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "entityType": "pks"
     },
     {
       "table": "settings",
       "name": "settings_pk",
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "entityType": "pks"
     },
     {
       "table": "system_prompts",
       "name": "system_prompts_pk",
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "entityType": "pks"
     },
     {
       "table": "themes",
       "name": "themes_pk",
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "entityType": "pks"
     },
     {
       "table": "trees",
       "name": "trees_pk",
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "entityType": "pks"
     }

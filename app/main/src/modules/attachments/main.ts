@@ -1,24 +1,41 @@
 import type {Database} from '#modules/database/main'
-import type {Attachment, AttachmentMediaType} from '@uz/contract/attachments'
+import type {FileMediaType} from './media-type'
+import type {Attachment} from '@uz/contract/attachments'
 import type {Command} from '@uz/contract/commands'
 
 import {schema} from '#modules/database/main'
-import {ATTACHMENT_SIZE_LIMIT} from '@uz/contract/attachments'
+import {
+  ATTACHMENT_SIZE_LIMIT,
+  FOLDER_MEDIA_TYPE,
+  INLINE_IMAGE_SIZE_LIMIT,
+  attachmentKind,
+} from '@uz/contract/attachments'
 import {eq} from 'drizzle-orm'
 import {createHash} from 'node:crypto'
-import fs from 'node:fs'
 import path from 'node:path'
 
 import {sniffMediaType} from './media-type'
-import {keepOriginal, originalPath, readDropped} from './originals'
+import {safeName} from './names'
+import {
+  isFolder,
+  keepOriginal,
+  keepShrunk,
+  originalPath,
+  readDropped,
+} from './originals'
+import {toAttachment} from './prompts'
 
-export {attachToPrompt, attachmentsOf, originalsOf} from './prompts'
+export {hostAttachments} from './host'
 
-export type AttachmentFile = Extract<Command, {type: 'attachment.add'}>['file']
+export {attachToPrompt, attachmentsOf, refuseTooManyImages} from './prompts'
+
+type AttachmentAdd = Extract<Command, {type: 'attachment.add'}>
+
+export type AttachmentFile = AttachmentAdd['file']
 
 export interface AttachmentsDeps {
   db: Database
-  /** `userData/attachments/`, where the originals are kept. */
+  /** `userData/attachments/`, where the copies are kept. */
   dir: string
   /** Null for an id the dropped-files module never gave out. */
   droppedPath: (fileId: string) => string | null
@@ -26,63 +43,45 @@ export interface AttachmentsDeps {
 
 export type Attachments = ReturnType<typeof createAttachments>
 
-const LIMIT_MB = ATTACHMENT_SIZE_LIMIT / 1024 / 1024
+const LIMIT_MIB = ATTACHMENT_SIZE_LIMIT / 1024 / 1024
 
-/** For a pasted file, which may come with no name. */
-const FALLBACK_NAMES = {
-  'image/png': 'Pasted image.png',
-  'image/jpeg': 'Pasted image.jpg',
-  'image/gif': 'Pasted image.gif',
-  'image/webp': 'Pasted image.webp',
-  'application/pdf': 'Pasted PDF.pdf',
-  'text/plain': 'Pasted text.txt',
-} satisfies Record<AttachmentMediaType, string>
-
-/** Where a Provider host keeps what it converts; main never writes there. */
-export function conversionDir(dir: string) {
-  return path.join(dir, 'conversions')
-}
-
-function refuseUnfit(bytes: Uint8Array, label: string): AttachmentMediaType {
+function refuseUnfit(bytes: Uint8Array, label: string) {
   if (bytes.byteLength === 0) {
     throw new Error(`There’s nothing in ${label} to attach.`)
   }
 
   if (bytes.byteLength > ATTACHMENT_SIZE_LIMIT) {
     throw new Error(
-      `Unimatrix Zero attaches files up to ${LIMIT_MB} MB; ${label} is larger.`
+      `Unimatrix Zero attaches files up to ${LIMIT_MIB} MiB; ${label} is larger.`
     )
   }
-
-  const mediaType = sniffMediaType(bytes)
-
-  if (!mediaType) {
-    throw new Error(
-      `Unimatrix Zero attaches images, PDFs and text files; ${label} is none of these.`
-    )
-  }
-
-  return mediaType
 }
 
-function toAttachment(row: typeof schema.attachments.$inferSelect): Attachment {
-  return {
-    id: row.id,
-    name: row.name,
-    mediaType: row.mediaType,
-    size: row.size,
+function sha256Of(bytes: Uint8Array) {
+  return createHash('sha256').update(bytes).digest('hex')
+}
+
+/**
+ * Null leaves the original to go as it is: the window's copy is kept only for
+ * an image, and only as a PNG or JPEG small enough to go inline.
+ */
+function shrunkToKeep(mediaType: FileMediaType, bytes: Uint8Array | undefined) {
+  if (bytes === undefined || attachmentKind(mediaType) !== 'image') return null
+
+  const shrunkMediaType = sniffMediaType(bytes)
+
+  if (shrunkMediaType !== 'image/png' && shrunkMediaType !== 'image/jpeg') {
+    return null
   }
+
+  return bytes.byteLength > INLINE_IMAGE_SIZE_LIMIT
+    ? null
+    : {sha256: sha256Of(bytes), mediaType: shrunkMediaType, bytes}
 }
 
 export function createAttachments({db, dir, droppedPath}: AttachmentsDeps) {
-  fs.mkdirSync(conversionDir(dir), {recursive: true, mode: 0o700})
-
-  async function bytesOf(file: AttachmentFile) {
-    if (file.type === 'pasted') {
-      return {name: path.basename(file.name.trim()).trim(), bytes: file.bytes}
-    }
-
-    const filePath = droppedPath(file.fileId)
+  function droppedPathOf(fileId: string) {
+    const filePath = droppedPath(fileId)
 
     if (filePath === null) {
       throw new Error(
@@ -90,32 +89,80 @@ export function createAttachments({db, dir, droppedPath}: AttachmentsDeps) {
       )
     }
 
-    return readDropped(filePath, ATTACHMENT_SIZE_LIMIT)
+    return filePath
+  }
+
+  /** A folder is its path alone: nothing of it is read or copied. */
+  function addFolder(dropped: string) {
+    const folderPath = path.resolve(dropped)
+
+    return db
+      .insert(schema.attachments)
+      .values({
+        sha256: null,
+        name: safeName(folderPath, FOLDER_MEDIA_TYPE),
+        mediaType: FOLDER_MEDIA_TYPE,
+        size: 0,
+        folderPath,
+      })
+      .returning()
+      .get()
+  }
+
+  async function addFile(
+    file: {name: string; bytes: Uint8Array},
+    shrunkBytes: Uint8Array | undefined
+  ) {
+    refuseUnfit(file.bytes, file.name.trim() || 'the pasted file')
+
+    const mediaType = sniffMediaType(file.bytes)
+    const name = safeName(file.name, mediaType)
+    const sha256 = sha256Of(file.bytes)
+    await keepOriginal(dir, {sha256, name}, file.bytes)
+
+    const shrunk = shrunkToKeep(mediaType, shrunkBytes)
+
+    if (shrunk) await keepShrunk(dir, shrunk, shrunk.bytes)
+
+    return db
+      .insert(schema.attachments)
+      .values({
+        sha256,
+        name,
+        mediaType,
+        size: file.bytes.byteLength,
+        shrunkSha256: shrunk?.sha256,
+        shrunkMediaType: shrunk?.mediaType,
+        shrunkSize: shrunk?.bytes.byteLength,
+      })
+      .returning()
+      .get()
   }
 
   return {
-    /** The original is kept once per content; each add gets its own id. */
-    async add(file: AttachmentFile): Promise<Attachment> {
-      const {name, bytes} = await bytesOf(file)
-      const mediaType = refuseUnfit(bytes, name || 'the pasted file')
-      const sha256 = createHash('sha256').update(bytes).digest('hex')
-      await keepOriginal(dir, sha256, bytes)
+    /**
+     * A file's bytes are kept once per content, under each name they were
+     * added by; each add gets its own id. `shrunk` is the window's smaller
+     * copy of a large image.
+     */
+    async add(file: AttachmentFile, shrunk?: Uint8Array): Promise<Attachment> {
+      if (file.type === 'pasted') {
+        return toAttachment(await addFile(file, shrunk))
+      }
 
-      const row = db
-        .insert(schema.attachments)
-        .values({
-          sha256,
-          name: name || FALLBACK_NAMES[mediaType],
-          mediaType,
-          size: bytes.byteLength,
-        })
-        .returning()
-        .get()
+      const dropped = droppedPathOf(file.fileId)
 
-      return toAttachment(row)
+      if (await isFolder(dropped)) return toAttachment(addFolder(dropped))
+
+      const read = await readDropped(dropped, ATTACHMENT_SIZE_LIMIT)
+
+      return toAttachment(await addFile(read, shrunk))
     },
 
-    /** For serving by id; null for an id main never gave out. */
+    /**
+     * For serving by id; null for an id main never gave out, and for a folder,
+     * which has no copy.
+     */
     original(id: string) {
       const row = db
         .select()
@@ -123,8 +170,11 @@ export function createAttachments({db, dir, droppedPath}: AttachmentsDeps) {
         .where(eq(schema.attachments.id, id))
         .get()
 
-      return row
-        ? {path: originalPath(dir, row.sha256), mediaType: row.mediaType}
+      return row && row.sha256 !== null
+        ? {
+            path: originalPath(dir, row.sha256, row.name),
+            mediaType: row.mediaType,
+          }
         : null
     },
   }

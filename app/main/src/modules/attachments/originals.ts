@@ -2,9 +2,38 @@ import {randomUUID} from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-/** Named by content alone, so every add of the same bytes shares it. */
-export function originalPath(dir: string, sha256: string) {
-  return path.join(dir, sha256)
+export type ShrunkMediaType = 'image/png' | 'image/jpeg'
+
+const SHRUNK_EXTENSIONS = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+} satisfies Record<ShrunkMediaType, string>
+
+/**
+ * The folder is named by content, so every add of the same bytes shares it;
+ * the file by its own name, so the path the AI gets ends in it.
+ */
+export function originalPath(dir: string, sha256: string, name: string) {
+  return path.join(dir, sha256, name)
+}
+
+export function shrunkPath(
+  dir: string,
+  sha256: string,
+  mediaType: ShrunkMediaType
+) {
+  return path.join(dir, 'shrunk', `${sha256}.${SHRUNK_EXTENSIONS[mediaType]}`)
+}
+
+/** False for a path that can't be read, which the read then reports. */
+export async function isFolder(filePath: string) {
+  try {
+    const stats = await fs.stat(filePath)
+
+    return stats.isDirectory()
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -33,23 +62,19 @@ export async function readDropped(filePath: string, limit: number) {
   }
 }
 
-/** Written under a temporary name and renamed, so no one sees half a file. */
-export async function keepOriginal(
-  dir: string,
-  sha256: string,
-  bytes: Uint8Array
-) {
-  const target = originalPath(dir, sha256)
-
+async function exists(target: string) {
   try {
     await fs.access(target)
 
-    return
+    return true
   } catch {
-    // Not kept yet.
+    return false
   }
+}
 
-  const temporary = path.join(dir, `.${sha256}.${randomUUID()}.tmp`)
+/** Written under a temporary name and renamed, so no one sees half a file. */
+async function writeWhole(dir: string, target: string, bytes: Uint8Array) {
+  const temporary = path.join(dir, `.${randomUUID()}.tmp`)
 
   try {
     await fs.writeFile(temporary, bytes, {mode: 0o600, flag: 'wx'})
@@ -57,4 +82,49 @@ export async function keepOriginal(
   } finally {
     await fs.rm(temporary, {force: true})
   }
+}
+
+/** A second name for bytes already kept, sharing them where it can. */
+async function linkToKept(folder: string, target: string) {
+  const [kept] = await fs.readdir(folder)
+
+  if (kept === undefined) return false
+
+  try {
+    await fs.link(path.join(folder, kept), target)
+
+    return true
+  } catch {
+    return exists(target)
+  }
+}
+
+export async function keepOriginal(
+  dir: string,
+  original: {sha256: string; name: string},
+  bytes: Uint8Array
+) {
+  const target = originalPath(dir, original.sha256, original.name)
+
+  if (await exists(target)) return
+
+  const folder = path.dirname(target)
+  await fs.mkdir(folder, {recursive: true, mode: 0o700})
+
+  if (await linkToKept(folder, target)) return
+
+  await writeWhole(dir, target, bytes)
+}
+
+export async function keepShrunk(
+  dir: string,
+  shrunk: {sha256: string; mediaType: ShrunkMediaType},
+  bytes: Uint8Array
+) {
+  const target = shrunkPath(dir, shrunk.sha256, shrunk.mediaType)
+
+  if (await exists(target)) return
+
+  await fs.mkdir(path.dirname(target), {recursive: true, mode: 0o700})
+  await writeWhole(dir, target, bytes)
 }

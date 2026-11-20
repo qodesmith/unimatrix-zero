@@ -1,6 +1,8 @@
 import type {AttachmentMediaType} from '@uz/contract/attachments'
 
-const SIGNATURES: [AttachmentMediaType, number[]][] = [
+export type FileMediaType = Exclude<AttachmentMediaType, 'inode/directory'>
+
+const SIGNATURES: [FileMediaType, number[]][] = [
   ['image/png', [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]],
   ['image/jpeg', [0xff, 0xd8, 0xff]],
   ['image/gif', ascii('GIF87a')],
@@ -33,12 +35,12 @@ function isText(bytes: Uint8Array) {
 }
 
 /** From the bytes alone: a name or the window can say anything. */
-export function sniffMediaType(bytes: Uint8Array): AttachmentMediaType | null {
+export function sniffMediaType(bytes: Uint8Array): FileMediaType {
   const signed = SIGNATURES.find(([, prefix]) => startsWith(bytes, prefix))
 
   if (signed) return signed[0]
 
   if (isWebp(bytes)) return 'image/webp'
 
-  return isText(bytes) ? 'text/plain' : null
+  return isText(bytes) ? 'text/plain' : 'application/octet-stream'
 }
