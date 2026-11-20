@@ -66,7 +66,10 @@ export const FakeClaudeRunSchema = z.strictObject({
   cwd: z.string(),
   /** The runs, by n, still going when this one started. */
   runningAtStart: z.array(z.number()),
-  prompts: z.array(z.string()),
+  /** Each Prompt's `content`: its text, or its blocks when files go with it. */
+  prompts: z.array(
+    z.union([z.string(), z.array(z.looseObject({type: z.string()}))])
+  ),
   /** Per Prompt, whether it came marked to be delivered as written. */
   clientComposed: z.array(z.boolean()),
   /** Empty when `claude` runs its own. */

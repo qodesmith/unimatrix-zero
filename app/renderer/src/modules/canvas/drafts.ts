@@ -1,15 +1,19 @@
 import type {WantedModel} from '#modules/models/main'
 import type {TreeIndex} from './tree'
+import type {Attachment} from '@uz/contract/attachments'
+import type {Prompt} from '@uz/contract/turns'
 
 export interface Draft {
   text: string
+  /** In the order they were attached, and sent in it. */
+  attachments: readonly Attachment[]
   model: WantedModel | null
 }
 
 /** The Reply an Input continues from; null for the root Input. */
 export type DraftKey = string | null
 
-export const EMPTY_DRAFT: Draft = {text: '', model: null}
+export const EMPTY_DRAFT: Draft = {text: '', attachments: [], model: null}
 
 /** What sending a failed Reply's Prompt back did to the Input it came from. */
 interface Restored {
@@ -26,8 +30,15 @@ export interface Drafts {
 
 export const NO_DRAFTS: Drafts = {byInput: new Map(), restored: new Map()}
 
-function isEmptyDraft({text, model}: Draft) {
-  return text === '' && model === null
+function isEmptyDraft({text, attachments, model}: Draft) {
+  return text === '' && attachments.length === 0 && model === null
+}
+
+/** It holds a Prompt to send: text past whitespace, or a file. */
+export function holdsPrompt(draft: Draft | undefined) {
+  if (!draft) return false
+
+  return draft.text.trim() !== '' || draft.attachments.length > 0
 }
 
 function sameModel(a: WantedModel | null, b: WantedModel | null) {
@@ -39,7 +50,12 @@ function sameModel(a: WantedModel | null, b: WantedModel | null) {
 function sameDraft(a: Draft | undefined, b: Draft | undefined) {
   if (a === undefined || b === undefined) return a === b
 
-  return a.text === b.text && sameModel(a.model, b.model)
+  return (
+    a.text === b.text &&
+    a.attachments.length === b.attachments.length &&
+    a.attachments.every(({id}, at) => b.attachments[at]?.id === id) &&
+    sameModel(a.model, b.model)
+  )
 }
 
 function put(
@@ -60,8 +76,15 @@ export function withDraft(drafts: Drafts, at: DraftKey, draft: Draft): Drafts {
   return {...drafts, byInput}
 }
 
-function withPromptBelow(draft: Draft | undefined, text: string) {
-  return draft?.text.trim() ? `${draft.text}\n\n${text}` : text
+/** The draft's text with the Prompt's below it, and both sets of attachments. */
+function withPromptBelow(
+  draft: Draft | undefined,
+  {text, attachments}: Prompt
+) {
+  return {
+    text: draft?.text.trim() ? `${draft.text}\n\n${text}` : text,
+    attachments: [...(draft?.attachments ?? []), ...attachments],
+  }
 }
 
 /** The restore made on top of `under`'s, while the Input still holds it. */
@@ -104,7 +127,7 @@ function takeOut(
   if (!stacked || !prompt) return
 
   const rebased: Draft = {
-    text: withPromptBelow(before, prompt.text),
+    ...withPromptBelow(before, prompt),
     model: stacked.over.after.model,
   }
 
@@ -144,7 +167,7 @@ export function reconcileDrafts(drafts: Drafts, index: TreeIndex): Drafts {
     const before = byInput.get(at)
 
     const after: Draft = {
-      text: withPromptBelow(before, prompt.text),
+      ...withPromptBelow(before, prompt),
       model: {provider: reply.provider, model: reply.model, entry: null},
     }
 

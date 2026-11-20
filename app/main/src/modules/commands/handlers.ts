@@ -1,3 +1,4 @@
+import type {Attachments} from '#modules/attachments/main'
 import type {Connections} from '#modules/connections/main'
 import type {LayoutStore} from '#modules/layout/main'
 import type {RemoteImages} from '#modules/remote-images/main'
@@ -16,6 +17,7 @@ export interface HandlerDeps {
     Connections,
     'connect' | 'openPage' | 'submitCode' | 'cancel'
   >
+  attachments: Pick<Attachments, 'add'>
   images: RemoteImages
   settings: SettingsStore
   layout: LayoutStore
@@ -143,6 +145,10 @@ export const handlers: Handlers = {
   },
 
   'image.load': async ({url}, {images}) => images.load(url),
+
+  'attachment.add': async ({file}, {attachments}) => ({
+    attachment: await attachments.add(file),
+  }),
 
   'settings.update': ({changes}, {settings, publish}) => {
     const saved = settings.update(changes)

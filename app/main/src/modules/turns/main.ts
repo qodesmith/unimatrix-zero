@@ -17,6 +17,7 @@ import type {ProviderId} from '@uz/contract/providers'
 import type {CompactionSettings} from '@uz/contract/settings'
 import type {Reply, ReplyEvent} from '@uz/contract/turns'
 
+import {conversionDir, originalsOf} from '#modules/attachments/main'
 import {schema} from '#modules/database/main'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {eq} from 'drizzle-orm'
@@ -61,6 +62,8 @@ export interface TurnsDeps {
   compactionSettingsFor: (provider: ProviderId) => CompactionSettings
   /** For telling the AI which Replies another Model wrote, and its name. */
   listedModels: ListedModels
+  /** `userData/attachments/`, where every original is kept. */
+  attachmentsDir: string
   now: () => Date
   onTurnsChanged: (treeId: string) => void
   /** Every way a Reply ends, a failure to reach its host included. */
@@ -83,6 +86,7 @@ export function createTurns({
   treeFolderFor,
   compactionSettingsFor,
   listedModels,
+  attachmentsDir,
   now,
   onTurnsChanged,
   onReplyFinished,
@@ -159,6 +163,7 @@ export function createTurns({
       treeId,
       parentReplyId,
       text,
+      attachmentIds = [],
       model: picked,
     }: NewPrompt): CommandResult<'prompt.send'> | null {
       const continued =
@@ -172,7 +177,12 @@ export function createTurns({
 
       const failed = failedToReplace(db, treeId, parentReplyId)
       const systemPrompt = ''
-      const thread = threadTo(db, treeId, parentReplyId, picked, listedModels)
+
+      const thread = threadTo(db, treeId, parentReplyId, picked, {
+        listed: listedModels,
+        attachmentsDir,
+      })
+
       // Before the Prompt is saved: once it is, the Reply it answers has a
       // Prompt after it, and its session would fork.
       const session = sessionOn(provider, {treeId, parentReplyId}, failed)
@@ -183,6 +193,7 @@ export function createTurns({
         treeId,
         parentReplyId,
         text,
+        attachmentIds,
         provider,
         model,
         systemPrompt,
@@ -195,12 +206,17 @@ export function createTurns({
         replyId: reply.id,
         model,
         systemPrompt,
-        prompt: {text, messageId: randomUUID()},
+        prompt: {
+          text,
+          attachments: originalsOf(db, attachmentsDir, prompt.id),
+          messageId: randomUUID(),
+        },
         vendorProgram: vendorProgramFor(provider),
         treeFolder,
         session,
         thread,
         compactionSettings: compactionSettingsFor(provider),
+        conversionDir: conversionDir(attachmentsDir),
       })
 
       onTurnsChanged(treeId)
@@ -222,7 +238,7 @@ export function createTurns({
 
       if (!recovered) return null
 
-      const {provider, model, systemPrompt, text, session} = recovered
+      const {provider, model, systemPrompt, text, promptId, session} = recovered
 
       if (!hosts.ready(provider)) {
         throw new Error(`Connect ${PROVIDER_NAMES[provider]} to retry.`)
@@ -233,7 +249,7 @@ export function createTurns({
         treeId,
         recovered.parentReplyId,
         {provider, model},
-        listedModels
+        {listed: listedModels, attachmentsDir}
       )
 
       const treeFolder = treeFolderFor(treeId)
@@ -245,12 +261,17 @@ export function createTurns({
         replyId,
         model,
         systemPrompt,
-        prompt: {text, messageId: randomUUID()},
+        prompt: {
+          text,
+          attachments: originalsOf(db, attachmentsDir, promptId),
+          messageId: randomUUID(),
+        },
         vendorProgram: vendorProgramFor(provider),
         treeFolder,
         session,
         thread,
         compactionSettings: compactionSettingsFor(provider),
+        conversionDir: conversionDir(attachmentsDir),
       })
     },
 

@@ -31,6 +31,8 @@ export function createDroppedFiles() {
 
   return {
     register,
+    /** Null for an id this launch never gave out. */
+    pathOf: (id: string) => paths.get(id) ?? null,
     listen(
       ipcMain: IpcMain,
       isTrusted: (event: IpcMainInvokeEvent) => boolean

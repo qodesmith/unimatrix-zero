@@ -1,6 +1,7 @@
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {Ref} from 'react'
 
+import {AttachmentList} from '#modules/attachments/main'
 import {FailedChip, ReplyView, useReply} from '#modules/turns/main'
 import {Bubble, BubbleContent} from '#shadcn/ui/bubble'
 import {Message, MessageContent} from '#shadcn/ui/message'
@@ -226,6 +227,10 @@ function ChatPrompt({prompt}: {prompt: Prompt}) {
       <MessageContent>
         <Bubble variant="prompt" align="end" className="max-w-[85%]">
           <BubbleContent className="rounded-2xl rounded-br-md px-3.5 whitespace-pre-wrap">
+            <AttachmentList
+              attachments={prompt.attachments}
+              className={cn('justify-end', prompt.text !== '' && 'mb-2')}
+            />
             {prompt.text}
           </BubbleContent>
         </Bubble>

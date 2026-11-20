@@ -8,6 +8,7 @@
  */
 import type {SpawnCodex} from './app-server'
 import type {RateLimitReachedType} from './protocol/v2/RateLimitReachedType'
+import type {HostAttachment} from '@uz/contract/attachments'
 import type {
   PromptRecorded,
   ReplyRecorded,
@@ -19,6 +20,7 @@ import type {
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 
+import {pngShowing} from '#modules/test-attachments/main'
 import {heldIdle} from '#modules/test-idle/main'
 import {listenLocally, startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -50,6 +52,8 @@ const signedIn = process.env.UZ_LIVE_CODEX_HOME
 
 /** The Model ChatGPT's `model/list` marked as its default when recorded. */
 const MODEL = 'gpt-6.1-sol'
+
+const CONVERSION_DIR = path.join(os.tmpdir(), 'uz-conversions')
 
 const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
   auto: true,
@@ -209,7 +213,7 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
         replyId: crypto.randomUUID(),
         model: MODEL,
         systemPrompt: 'You answer in as few words as you can.',
-        prompt: {text, messageId: crypto.randomUUID()},
+        prompt: {text, attachments: [], messageId: crypto.randomUUID()},
         vendorProgram: {
           program: {
             path: program,
@@ -226,6 +230,7 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
         session: session && {...session, type: 'continue'},
         thread: [],
         compactionSettings: {auto: true, threshold},
+        conversionDir: CONVERSION_DIR,
       })
     )
 
@@ -258,11 +263,13 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
 const FROM_CLAUDE: Thread = [
   {
     prompt: 'Pick a color for the boat, one word.',
+    attachments: [],
     reply: [{type: 'text', text: 'Teal.'}],
     label: '[Reply written by Haiku 5.5]',
   },
   {
     prompt: 'And an animal to paint on it, one word.',
+    attachments: [],
     reply: [{type: 'text', text: 'Otter.'}],
     label: '[Reply written by Haiku 5.5]',
   },
@@ -290,7 +297,8 @@ function threadReplies(program: string, home: string) {
   async function reply(
     text: string,
     session: ReplySession | null,
-    thread: Thread
+    thread: Thread,
+    attachments: HostAttachment[] = []
   ) {
     const events = await Array.fromAsync(
       driver.startReply({
@@ -298,7 +306,7 @@ function threadReplies(program: string, home: string) {
         replyId: crypto.randomUUID(),
         model: MODEL,
         systemPrompt: 'You answer in as few words as you can.',
-        prompt: {text, messageId: crypto.randomUUID()},
+        prompt: {text, attachments, messageId: crypto.randomUUID()},
         vendorProgram: {
           program: {
             path: program,
@@ -315,6 +323,7 @@ function threadReplies(program: string, home: string) {
         session,
         thread,
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+        conversionDir: CONVERSION_DIR,
       })
     )
 
@@ -407,7 +416,7 @@ function codedReplies(
         replyId: crypto.randomUUID(),
         model: MODEL,
         systemPrompt: 'You answer in as few words as you can.',
-        prompt: {text, messageId: crypto.randomUUID()},
+        prompt: {text, attachments: [], messageId: crypto.randomUUID()},
         vendorProgram: {
           program: {
             path: program,
@@ -424,6 +433,7 @@ function codedReplies(
         session: session && {...session, type: 'continue'},
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+        conversionDir: CONVERSION_DIR,
       })
     )
 
@@ -613,7 +623,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           replyId: crypto.randomUUID(),
           model: MODEL,
           systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text, messageId: crypto.randomUUID()},
+          prompt: {text, attachments: [], messageId: crypto.randomUUID()},
           vendorProgram: {
             program: {
               path: folder ?? '',
@@ -630,6 +640,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session: session && {...session, type: fork ? 'fork' : 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+          conversionDir: CONVERSION_DIR,
         })
       )
 
@@ -770,7 +781,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         replyId,
         model: MODEL,
         systemPrompt: 'You answer in as few words as you can.',
-        prompt: {text, messageId: crypto.randomUUID()},
+        prompt: {text, attachments: [], messageId: crypto.randomUUID()},
         vendorProgram: {
           program: {
             path: folder ?? '',
@@ -790,6 +801,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         },
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+        conversionDir: CONVERSION_DIR,
       })) {
         events.push(event)
 
@@ -943,12 +955,13 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           replyId: crypto.randomUUID(),
           model: MODEL,
           systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text, messageId: crypto.randomUUID()},
+          prompt: {text, attachments: [], messageId: crypto.randomUUID()},
           vendorProgram: vendorProgram(home),
           treeFolder: treeFolder(),
           session: session && {...session, type: 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+          conversionDir: CONVERSION_DIR,
         })
       )
 
@@ -1056,7 +1069,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           replyId: crypto.randomUUID(),
           model,
           systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text, messageId: crypto.randomUUID()},
+          prompt: {text, attachments: [], messageId: crypto.randomUUID()},
           vendorProgram: {
             program: {
               path: folder ?? '',
@@ -1073,6 +1086,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session,
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+          conversionDir: CONVERSION_DIR,
         })
       )
     }
@@ -1203,6 +1217,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         systemPrompt: 'You answer in as few words as you can.',
         prompt: {
           text: 'Make up a three-word ship name, put it on the first line, then write the numbers 1 to 50, one per line.',
+          attachments: [],
           messageId: crypto.randomUUID(),
         },
         vendorProgram: {
@@ -1221,6 +1236,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         session: null,
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+        conversionDir: CONVERSION_DIR,
       })) {
         events.push(event)
 
@@ -1500,7 +1516,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           replyId: crypto.randomUUID(),
           model: MODEL,
           systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text, messageId: crypto.randomUUID()},
+          prompt: {text, attachments: [], messageId: crypto.randomUUID()},
           vendorProgram: {
             program: {
               path: folder ?? '',
@@ -1517,6 +1533,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session: session && {...session, type: 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+          conversionDir: CONVERSION_DIR,
         })
       )
 
@@ -1679,6 +1696,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           systemPrompt: 'You answer in as few words as you can.',
           prompt: {
             text: TOOLS_PROMPT,
+            attachments: [],
             messageId: crypto.randomUUID(),
           },
           vendorProgram: {
@@ -1697,6 +1715,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session: null,
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+          conversionDir: CONVERSION_DIR,
         })
       )
 
@@ -2009,6 +2028,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
           // Two UTF-16 units each: Codex counts code points, not `length`.
           prompt: {
             text: '😀'.repeat(1_100_000),
+            attachments: [],
             messageId: crypto.randomUUID(),
           },
           vendorProgram: {
@@ -2027,6 +2047,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
           session: null,
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+          conversionDir: CONVERSION_DIR,
         })
       )
 
@@ -2076,6 +2097,51 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
       await closed()
     } finally {
       fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:codex-data-url-images] [dep:codex-injected-images] reads an image sent as a data URL with a Prompt, and one injected with a Thread Claude wrote', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const files = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-files-'))
+    const {reply, closed, threadsStarted} = threadReplies(folder, home)
+
+    try {
+      const heron = await pngShowing(files, 'HERON')
+
+      const sent = await reply(
+        'What word does the image show? Just the word.',
+        null,
+        [],
+        [heron]
+      )
+
+      expect(sent.text).toMatch(/heron/i)
+
+      const fromClaude: Thread = [
+        {
+          prompt: 'Keep this image in mind.',
+          attachments: [heron],
+          reply: [{type: 'text', text: 'Noted.'}],
+          label: '[Reply written by Haiku 5.5]',
+        },
+      ]
+
+      const injected = await reply(
+        'What word did the image I sent show? Just the word.',
+        null,
+        fromClaude
+      )
+
+      expect(injected.text).toMatch(/heron/i)
+      // One thread for each Reply: Codex took the image, so no text replay.
+      expect(threadsStarted()).toBe(2)
+
+      await closed()
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+      fs.rmSync(files, {recursive: true, force: true})
     }
   }, 300_000)
 

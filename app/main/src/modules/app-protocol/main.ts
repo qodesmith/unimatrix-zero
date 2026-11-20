@@ -1,8 +1,11 @@
+import type {OriginalLookup} from './attachment-file'
 import type {Protocol} from 'electron'
 
+import {ATTACHMENT_SCHEME} from '@uz/contract/attachments'
 import {protocol} from 'electron'
 import {readFile} from 'node:fs/promises'
 
+import {attachmentResponse} from './attachment-file'
 import {resolveBundleFile} from './bundle-file'
 import {renderCsp} from './csp'
 
@@ -26,7 +29,23 @@ export function registerAppSchemes() {
       scheme: APP_DEV_SCHEME,
       privileges: {standard: true, secure: true, supportFetchAPI: true},
     },
+    {
+      scheme: ATTACHMENT_SCHEME,
+      privileges: {
+        standard: true,
+        secure: true,
+        supportFetchAPI: true,
+        stream: true,
+      },
+    },
   ])
+}
+
+/** `uzfile://` serves attachments by id, never by path (ADR 0014). */
+export function serveAttachments(target: Protocol, lookup: OriginalLookup) {
+  target.handle(ATTACHMENT_SCHEME, async request =>
+    attachmentResponse(request, lookup)
+  )
 }
 
 function securityHeaders(csp: string) {
