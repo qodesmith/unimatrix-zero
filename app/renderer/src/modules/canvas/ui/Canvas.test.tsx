@@ -2733,7 +2733,7 @@ it('shows in a Claude Reply’s Context size details how much of Claude’s medi
   await expect
     .element(await openDetailsOf('Reply three'))
     .toMatchTextContent(
-      /Inline media12\.0 \/ 20 MiB · 1 \/ 90 files4 earlier attachments now go by path only$/
+      /Inline media12\.0 \/ 20 MiB · 1 \/ 90 files3 earlier attachments now go by path only$/
     )
 })
 
@@ -2783,14 +2783,15 @@ it('says on an earlier Prompt’s attachment that it now goes by path only, once
   await expect
     .element(thumbnailIn(two, 'second.png'))
     .toHaveAccessibleDescription('Sent by path only now')
+  // Prompt three passes the budget by itself, so third.png never went inline.
   await expect
     .element(thumbnailIn(three, 'third.png'))
-    .toHaveAccessibleDescription('Sent by path only now')
+    .toHaveAccessibleDescription('')
   await expect
     .element(thumbnailIn(three, 'fourth.png'))
     .toHaveAccessibleDescription('')
 
-  // Reply one's Thread fits, and Prompt three is no longer on the Active Thread.
+  // Reply one's Thread fits.
   await clickInputUnder('Reply one')
   await expect
     .element(one.getByRole('group', {name: 'paper.pdf'}))
@@ -2798,9 +2799,6 @@ it('says on an earlier Prompt’s attachment that it now goes by path only, once
   await expect
     .element(thumbnailIn(one, 'first.png'))
     .toHaveAccessibleDescription('')
-  await expect
-    .element(thumbnailIn(three, 'third.png'))
-    .toHaveAccessibleDescription('Sent by path only now')
 })
 
 it('says so in the slideout by the slideout’s Thread, and marks the thumbnail', async () => {

@@ -9,7 +9,7 @@ interface SentAttachmentsProps {
   prompt: Prompt
   /**
    * The Reply ending the Thread the Prompt is shown on. Left out on the
-   * canvas, where that is the Active Thread or else the Prompt's own.
+   * canvas, where that is the Active Thread when the Prompt is on it.
    */
   threadEnd?: Reply
   className?: string

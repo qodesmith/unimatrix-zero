@@ -100,6 +100,16 @@ describe('planInline', () => {
     expect(plan.budget?.pathOnly).toBe(2)
   })
 
+  it('marks and counts as by path only now a file that went inline with its own Prompt, not one its own Prompt left out', () => {
+    // 6 MiB is 8 MiB of base64: the newest Prompt alone passes 20 MiB.
+    const pdf = file('application/pdf', 6 * MIB)
+    const plan = planInline('claude', [[pdf], [pdf, pdf, pdf]])
+
+    expect(plan.forms).toEqual([[null], [null, 'pdf', 'pdf']])
+    expect(plan.pathOnlyNow).toEqual([[true], [false, false, false]])
+    expect(plan.budget?.pathOnly).toBe(1)
+  })
+
   it('sends Claude’s oldest by path only once a Thread passes 90 files', () => {
     const image = file('image/png', 3)
     const text = file('text/plain', 3)

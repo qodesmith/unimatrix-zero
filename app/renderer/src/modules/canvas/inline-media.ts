@@ -2,7 +2,7 @@ import type {TreeIndex} from './tree'
 import type {MediaBudgetUse} from '@uz/contract/attachments'
 import type {Prompt, Reply} from '@uz/contract/turns'
 
-import {inlineForm, planInline} from '@uz/contract/attachments'
+import {planInline} from '@uz/contract/attachments'
 
 import {pathTo} from './tree'
 
@@ -34,9 +34,9 @@ export function inlineMediaOf(
 const NONE: ReadonlySet<string> = new Set()
 
 /**
- * The ids of a Prompt's attachments that Claude takes inline, and that its
- * media budget now leaves out of the Thread ending at a Reply. None unless
- * the Reply is Claude's.
+ * The ids of a Prompt's attachments that went inline, and that Claude's media
+ * budget now leaves out of the Thread ending at a Reply. None unless the
+ * Reply is Claude's.
  */
 export function pathOnlyNow(
   index: TreeIndex,
@@ -49,37 +49,28 @@ export function pathOnlyNow(
 
   const prompts = promptsTo(index, threadEnd.id)
 
-  const planned = planInline(
+  const now = planInline(
     'claude',
     prompts.map(one => one.attachments)
-  ).forms[prompts.findIndex(one => one.id === prompt.id)]
+  ).pathOnlyNow[prompts.findIndex(one => one.id === prompt.id)]
 
   return new Set(
-    prompt.attachments
-      .filter((attachment, at) => {
-        const native = inlineForm('claude', attachment)
-
-        return (
-          (native === 'image' || native === 'pdf') && planned?.[at] === null
-        )
-      })
-      .map(({id}) => id)
+    prompt.attachments.filter((_, at) => now?.[at] === true).map(({id}) => id)
   )
 }
 
 /**
  * The Reply whose Thread says how a Prompt's attachments go now: the active
- * Reply when the Prompt is on its Thread, otherwise the Prompt's own Reply.
+ * Reply when the Prompt is on its Thread. Off it, the Prompt is the newest of
+ * its own Thread, where the budget has left out nothing it sent inline.
  */
 export function threadEndFor(
   index: TreeIndex,
   activeReplyId: string | null,
   prompt: Prompt
 ): Reply | null {
-  const active =
-    activeReplyId !== null && pathTo(index, activeReplyId).includes(prompt.id)
-      ? index.replyById.get(activeReplyId)
-      : undefined
-
-  return active ?? index.replyByPrompt.get(prompt.id) ?? null
+  return activeReplyId !== null &&
+    pathTo(index, activeReplyId).includes(prompt.id)
+    ? (index.replyById.get(activeReplyId) ?? null)
+    : null
 }

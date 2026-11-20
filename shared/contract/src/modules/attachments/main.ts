@@ -158,13 +158,18 @@ export function inlineImagesSize(attachments: readonly Sized[]) {
 export interface MediaBudgetUse {
   base64Bytes: number
   files: number
-  /** Images and PDFs the budget left out, which go by path only. */
+  /** How many attachments of the Thread now go by path only. */
   pathOnly: number
 }
 
 export interface InlinePlan {
   /** Per Prompt, per attachment, in the order given. */
   forms: (InlineForm | null)[][]
+  /**
+   * Per Prompt, per attachment: it went inline as part of the newest Prompt,
+   * and a media budget has since left it out.
+   */
+  pathOnlyNow: boolean[][]
   /** Null for a Provider with no media budget. */
   budget: MediaBudgetUse | null
 }
@@ -179,30 +184,26 @@ function mediaSize(form: InlineForm, attachment: Sized) {
  * Fills Claude's budget from the newest image or PDF back, and stops at the
  * first that doesn't fit: it and every older one go by path only.
  */
-function withinBudget(
+function filled(
   prompts: readonly (readonly Sized[])[],
   forms: readonly (InlineForm | null)[][]
-): InlinePlan {
-  const budget: MediaBudgetUse = {base64Bytes: 0, files: 0, pathOnly: 0}
+) {
+  const used = {base64Bytes: 0, files: 0}
   let full = false
 
   function taken(form: InlineForm | null, attachment: Sized | undefined) {
     if (form === null || form === 'text' || !attachment) return form
 
-    const bytes = budget.base64Bytes + mediaSize(form, attachment)
+    const bytes = used.base64Bytes + mediaSize(form, attachment)
 
     full ||=
       bytes > CLAUDE_MEDIA_BUDGET.base64Bytes ||
-      budget.files === CLAUDE_MEDIA_BUDGET.files
+      used.files === CLAUDE_MEDIA_BUDGET.files
 
-    if (full) {
-      budget.pathOnly += 1
+    if (full) return null
 
-      return null
-    }
-
-    budget.base64Bytes = bytes
-    budget.files += 1
+    used.base64Bytes = bytes
+    used.files += 1
 
     return form
   }
@@ -219,7 +220,31 @@ function withinBudget(
     )
     .toReversed()
 
-  return {forms: planned, budget}
+  return {forms: planned, used}
+}
+
+function withinBudget(
+  prompts: readonly (readonly Sized[])[],
+  forms: readonly (InlineForm | null)[][]
+): InlinePlan {
+  const {forms: planned, used} = filled(prompts, forms)
+
+  // The fill starts at the newest Prompt, so a Prompt filled by itself gets
+  // what it got when it was the newest.
+  const pathOnlyNow = forms.map((ofPrompt, promptAt) => {
+    const [asNewest] = filled([prompts[promptAt] ?? []], [ofPrompt]).forms
+
+    return ofPrompt.map(
+      (_, at) =>
+        (asNewest?.[at] ?? null) !== null && planned[promptAt]?.[at] === null
+    )
+  })
+
+  return {
+    forms: planned,
+    pathOnlyNow,
+    budget: {...used, pathOnly: pathOnlyNow.flat().filter(now => now).length},
+  }
 }
 
 /**
@@ -236,7 +261,11 @@ export function planInline(
 
   return provider === 'claude'
     ? withinBudget(prompts, forms)
-    : {forms, budget: null}
+    : {
+        forms,
+        pathOnlyNow: forms.map(ofPrompt => ofPrompt.map(() => false)),
+        budget: null,
+      }
 }
 
 /**

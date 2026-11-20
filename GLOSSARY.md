@@ -92,6 +92,10 @@ _Avoid_: User message, question
 A file of any type, or a folder, the user sends with a Prompt. The Tree keeps a copy of a file as it was when sent, and the AI gets its path, plus the file itself where the Model takes that type directly. A folder is never copied: the AI gets the folder's own path. Naming a path in a Prompt instead points the AI at the live file.
 _Avoid_: Upload
 
+**Media budget**:
+How much of a Thread's images and PDFs go to Claude as the files themselves, by total size and by count. Past it, the oldest Attachments go by path only: the AI can still open them. Only Claude has one.
+_Avoid_: Media cap, attachment limit
+
 **Extraction**:
 The text, and for a PDF the page images, the app takes from an Attachment when it is attached, kept beside it so a Model that can't read the original can read these.
 _Avoid_: Conversion, preview
