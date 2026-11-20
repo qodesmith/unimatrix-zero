@@ -1602,7 +1602,7 @@ describe('a Prompt with attachments', () => {
           {name: 'small.txt', inline: {type: 'text'}},
           {
             name: 'large.txt',
-            path: expect.stringMatching(/\/large\.txt$/u),
+            path: expect.stringMatching(/[/\\]large\.txt$/u),
             inline: null,
           },
         ],
@@ -1734,7 +1734,7 @@ describe('a Prompt with attachments', () => {
       [
         {
           name: 'old.png',
-          path: expect.stringMatching(/\/old\.png$/u),
+          path: expect.stringMatching(/[/\\]old\.png$/u),
           inline: null,
         },
         {name: 'new.png', inline: {type: 'image'}},

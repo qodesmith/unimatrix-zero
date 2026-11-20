@@ -183,15 +183,25 @@ describe('adding a file', () => {
     }
   )
 
-  it('keeps the copy under the file’s own name, in a folder named by its SHA-256, owner-only', async () => {
+  it('keeps the copy under the file’s own name, in a folder named by its SHA-256', async () => {
     const attachment = await paste('notes.md', bytesOf('abc'))
 
     const kept = path.join(dir, ABC_SHA256, 'notes.md')
 
     expect(originalOf(attachment.id)).toBe(kept)
     expect(fs.readFileSync(kept, 'utf8')).toBe('abc')
-    expect(fs.statSync(kept).mode.toString(8).slice(-3)).toBe('600')
   })
+
+  // Windows has no owner-only mode to read back.
+  it.skipIf(process.platform === 'win32')(
+    'keeps the copy readable by its owner alone',
+    async () => {
+      const attachment = await paste('notes.md', bytesOf('abc'))
+      const kept = originalOf(attachment.id)
+
+      expect(fs.statSync(kept).mode.toString(8).slice(-3)).toBe('600')
+    }
+  )
 
   it('gives the same bytes added under another name a second name beside the first, sharing the bytes, each add with its own id', async () => {
     const first = await paste('one.txt', bytesOf('abc'))
@@ -220,11 +230,7 @@ describe('adding a file', () => {
 
   it.each([
     ['a path', '../../etc/passwd', 'passwd'],
-    [
-      'a Windows path',
-      String.raw`C:\Users\me\photo.png`,
-      'C:_Users_me_photo.png',
-    ],
+    ['a Windows path', String.raw`C:\Users\me\photo.png`, 'photo.png'],
     ['control characters', 'a\u0000b\u001Fc\n.txt', 'abc.txt'],
     ['only dots', '..', 'Pasted text.txt'],
     ['one dot', '.', 'Pasted text.txt'],

@@ -22,8 +22,6 @@ const EXTENSION_BYTES = 32
 
 const CONTROL_CHARACTERS = /\p{Cc}/gu
 
-const SEPARATORS = /[/\\]/gu
-
 function byteLength(text: string) {
   return Buffer.byteLength(text, 'utf8')
 }
@@ -51,10 +49,10 @@ function capped(name: string) {
  * takes, that stays inside the folder it is written to.
  */
 export function safeName(raw: string, mediaType: AttachmentMediaType) {
-  const name = path
+  // Both separators on every platform: a pasted name can come from any.
+  const name = path.win32
     .basename(raw.trim())
     .replaceAll(CONTROL_CHARACTERS, '')
-    .replaceAll(SEPARATORS, '_')
     .trim()
 
   return name === '' || name === '.' || name === '..'
