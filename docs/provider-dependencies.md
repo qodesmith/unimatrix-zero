@@ -34,7 +34,7 @@ Live checks need the maintainer's signed-in account, so they never run in CI. Th
 2. Has an agent on the maintainer's own `claude` login read each entry against the current code and the pinned builds, and report the ones that no longer hold on either side.
 3. Posts both results in one comment on the open bump PR, tied to its head commit, and re-runs that PR's gate. With more than one bump PR open, pass `--pr <n>`. With none open, or when the checkout isn't a clean copy of the bump PR's head, it prints the results, posts nothing and says why.
 
-A bump PR is any PR that moves a vendor pin: a version in `app/main/src/modules/vendor-programs/dev-manifest.json`, or the Agent SDK version in `app/provider-host/package.json`. CI's "Provider checks on a vendor bump" job keeps it red until the repo owner's result for its current head commit reports passing checks and no stale entries. Every other PR passes that job.
+A bump PR is any PR that moves a vendor pin: a vendor program's version under `vendorPrograms` in `app/main/src/modules/vendor-programs/dev-manifest.json`, or the Agent SDK version in `app/provider-host/package.json`. A `git` bump under `helpers` is not one (ADR 0024). CI's "Provider checks on a vendor bump" job keeps it red until the repo owner's result for its current head commit reports passing checks and no stale entries. Every other PR passes that job.
 
 Entries the vendor's servers can change (`upgrade + drift`) are checked only when the run happens; run it by hand at any time to catch drift between releases.
 
