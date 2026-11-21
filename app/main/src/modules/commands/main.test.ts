@@ -40,7 +40,11 @@ let loaded: string[]
 let deps: Parameters<typeof dispatchCommand>[2]
 let attachmentsDir: string
 
+/** Whether the Tree's files module finds a file changed by every Reply. */
+let treeHasFiles: boolean
+
 beforeEach(() => {
+  treeHasFiles = false
   const db = openDatabase({file: ':memory:', migrationsFolder})
   attachmentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-commands-'))
   clock = new Date('2026-10-19T12:00:00.000Z')
@@ -74,6 +78,7 @@ beforeEach(() => {
       },
       vendorProgramFor: () => ({program: null, configDir: '/claude'}),
       treeFolderFor: id => `/trees/${id}`,
+      snapshotsBefore: () => null,
       compactionSettingsFor: () => ({auto: true, threshold: null}),
       listedModels: () => [],
       attachmentsDir,
@@ -81,6 +86,15 @@ beforeEach(() => {
       onTurnsChanged: rows.turnsChanged,
       onReplyFinished: rows.replyFinished,
     }),
+    treeFiles: {
+      withChangedFiles: async (treeId, replies) =>
+        treeHasFiles
+          ? replies.map(reply => ({
+              ...reply,
+              files: [{path: `${treeId}.md`, change: 'created', size: 1}],
+            }))
+          : replies,
+    },
     connections: createConnections({
       db,
       hosts: {
@@ -486,6 +500,23 @@ describe('Reply commands', () => {
     expect(await send({type: 'tree.turns', treeId: tree.id})).toEqual({
       ok: true,
       value: {prompts: [prompt], replies: [reply]},
+    })
+  })
+
+  it('lists each Reply with the files the Tree’s files say it changed', async () => {
+    const tree = await createTree()
+    await send({
+      type: 'prompt.send',
+      model: picked,
+      treeId: tree.id,
+      parentReplyId: null,
+      text: 'Write it down',
+    })
+    treeHasFiles = true
+
+    expect(await send({type: 'tree.turns', treeId: tree.id})).toMatchObject({
+      ok: true,
+      value: {replies: [{files: [{path: `${tree.id}.md`}]}]},
     })
   })
 

@@ -205,6 +205,7 @@ export function fakeMain(saved: Saved = {}) {
         failure: null,
         compacted: false,
         rebuilt: false,
+        files: [],
         createdAt: receivedAt,
       }
 

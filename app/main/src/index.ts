@@ -21,7 +21,8 @@ import {createRemoteImages} from '#modules/remote-images/main'
 import {createSessions} from '#modules/sessions/main'
 import {createSettings} from '#modules/settings/main'
 import {createTitles} from '#modules/titles/main'
-import {createTreeRows, createTrees, makeTreeFolder} from '#modules/trees/main'
+import {createTreeFiles} from '#modules/tree-files/main'
+import {createTreeRows, createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
 import {signInRequestFor} from '#modules/vendor-programs/main'
 import {
@@ -146,6 +147,15 @@ function openWindow(db: Database) {
     arch: process.arch,
   }
 
+  const treeFiles = createTreeFiles({
+    db,
+    userData: machine.userData,
+    publish: hub.publish,
+    onFailure: ({message}) => {
+      process.stderr.write(`A Snapshot failed: ${message}\n`)
+    },
+  })
+
   const titles = createTitles({
     trees,
     turnsOf: treeId => turns.list(treeId),
@@ -161,7 +171,8 @@ function openWindow(db: Database) {
     publish: hub.publish,
     hosts,
     vendorProgramFor: provider => signInRequestFor(provider, machine),
-    treeFolderFor: treeId => makeTreeFolder(machine.userData, treeId),
+    treeFolderFor: treeFiles.folderFor,
+    snapshotsBefore: treeFiles.snapshotsBefore,
     compactionSettingsFor: provider =>
       compactionSettingsFor(settings.read(), provider),
     listedModels: provider => connections.models(provider),
@@ -174,9 +185,12 @@ function openWindow(db: Database) {
       }
 
       treeRows.replyFinished(finished)
+      void treeFiles.replyFinished(finished)
       void titles.replyFinished(finished)
     },
   })
+
+  void treeFiles.takeMissedSnapshots()
 
   const connections = createConnections({
     db,
@@ -206,6 +220,7 @@ function openWindow(db: Database) {
       now: () => new Date(),
       trees,
       turns,
+      treeFiles,
       connections,
       attachments,
       images: createRemoteImages(globalThis.fetch),

@@ -9,7 +9,11 @@ import {
 } from '#modules/providers/main'
 import {SettingsSchema} from '#modules/settings/main'
 import {TreeSchema} from '#modules/trees/main'
-import {ReplyEventSchema, StreamingReplySchema} from '#modules/turns/main'
+import {
+  FilesChangedEvent,
+  ReplyEventSchema,
+  StreamingReplySchema,
+} from '#modules/turns/main'
 import {z} from 'zod'
 
 export const SnapshotEvent = z.strictObject({
@@ -70,6 +74,7 @@ export const EventSchema = z.discriminatedUnion('type', [
   LayoutChangedEvent,
   LastModelChangedEvent,
   ReplyEventSchema,
+  FilesChangedEvent,
   ProviderEventSchema,
 ])
 

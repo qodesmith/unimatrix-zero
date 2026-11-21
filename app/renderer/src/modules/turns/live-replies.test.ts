@@ -84,6 +84,7 @@ const saved: Reply = {
   failure: null,
   compacted: false,
   rebuilt: false,
+  files: [],
   createdAt: '2026-10-19T12:00:00.000Z',
 }
 
@@ -109,6 +110,30 @@ it('moves a failed Reply into the saved Turns with its text so far and why it fa
       status: 'failed',
       content: [{type: 'text', text: 'Half a'}],
       failure: {code: 'connection-lost', message: 'The stream ended early'},
+    },
+  ])
+  expect(live.store.state.replies[ids.replyId]).toBeUndefined()
+})
+
+it('gives a finished Reply the files main says it changed, and streams no Reply for them', () => {
+  const live = createReplay()
+  const key = turnsKey(ids.treeId)
+
+  live.queryClient.setQueryData<Turns>(key, {prompts: [], replies: [saved]})
+  live.replay([
+    {...ids, type: 'RUN_STARTED'},
+    {...ids, type: 'RUN_FINISHED', status: 'complete'},
+    {
+      ...ids,
+      type: 'FILES_CHANGED',
+      files: [{path: 'notes/plan.md', change: 'created', size: 6}],
+    },
+  ])
+
+  expect(live.queryClient.getQueryData<Turns>(key)?.replies).toMatchObject([
+    {
+      status: 'complete',
+      files: [{path: 'notes/plan.md', change: 'created', size: 6}],
     },
   ])
   expect(live.store.state.replies[ids.replyId]).toBeUndefined()

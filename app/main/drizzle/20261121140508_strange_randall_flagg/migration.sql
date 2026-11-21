@@ -1,0 +1,1 @@
+ALTER TABLE `replies` ADD `snapshot_commit` text;

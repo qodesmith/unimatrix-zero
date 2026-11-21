@@ -206,6 +206,16 @@ export function applyLiveEvent(
 
   if (!('replyId' in event)) return
 
+  // Main sends it after `RUN_FINISHED`, so the Reply is among the saved Turns.
+  if (event.type === 'FILES_CHANGED') {
+    updateSavedReply(queryClient, event, saved => ({
+      ...saved,
+      files: event.files,
+    }))
+
+    return
+  }
+
   const {treeId, replyId} = event
   const {replies, thinking, runs, waiting} = store.state
   const current = replies[replyId] ?? {...NEW_REPLY, treeId, replyId}

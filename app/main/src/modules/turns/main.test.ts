@@ -74,6 +74,7 @@ function launch() {
 
       return `/trees/${id}`
     },
+    snapshotsBefore: () => null,
     compactionSettingsFor: () => compactionSettings,
     listedModels: provider => listedModels[provider],
     attachmentsDir,
@@ -263,7 +264,7 @@ describe('sending the root Prompt', () => {
           treeId,
           replyId: sent.reply.id,
           model: 'claude-opus-5',
-          systemPrompt: '',
+          systemPrompt: expect.stringContaining(`/trees/${treeId}`),
           prompt: {
             text: 'Hello',
             attachments: [],
@@ -982,7 +983,7 @@ describe('a Prompt answering a Reply', () => {
           treeId,
           replyId: sent?.reply.id,
           model: 'claude-haiku-5-5',
-          systemPrompt: '',
+          systemPrompt: expect.stringContaining(`/trees/${treeId}`),
           prompt: {
             text: 'And then?',
             attachments: [],
@@ -1890,7 +1891,7 @@ describe('retrying a Reply', () => {
           treeId,
           replyId,
           model: 'fake',
-          systemPrompt: '',
+          systemPrompt: expect.stringContaining(`/trees/${treeId}`),
           prompt: {text: 'Hi', attachments: [], messageId: expect.any(String)},
           vendorProgram,
           treeFolder: `/trees/${treeId}`,

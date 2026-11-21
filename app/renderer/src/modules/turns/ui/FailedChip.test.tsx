@@ -30,6 +30,7 @@ const reply: Reply = {
   failure: null,
   compacted: false,
   rebuilt: false,
+  files: [],
   createdAt: '2026-10-19T12:00:00.000Z',
 }
 

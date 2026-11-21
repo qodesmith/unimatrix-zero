@@ -135,6 +135,7 @@ it('opens Settings in a Sheet over the Tree, and closing it with the X shows the
         failure: null,
         compacted: false,
         rebuilt: false,
+        files: [],
         createdAt: receivedAt,
       },
     ],
@@ -321,6 +322,7 @@ it('shows a streaming Reply where it was after a reload, and keeps going', async
     failure: null,
     compacted: false,
     rebuilt: false,
+    files: [],
     createdAt: receivedAt,
   }
 
