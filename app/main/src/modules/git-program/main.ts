@@ -14,8 +14,8 @@ interface GitProgramDeps {
 }
 
 /**
- * The app's own `git` (ADR 0024), downloaded beside the vendor programs. Until
- * it is in place no Snapshot is taken.
+ * The app's own `git` (ADR 0024), downloaded like the other vendor programs.
+ * Until it is in place no Snapshot is taken.
  */
 export function createGitProgram({
   target,

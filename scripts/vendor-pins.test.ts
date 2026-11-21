@@ -15,8 +15,8 @@ function files(pins: PinVersions) {
     vendorPrograms: {
       claude: {version: pins.claude, builds: {}},
       codex: {version: pins.codex, builds: {}},
+      git: {version: pins.git ?? '2.56.1', builds: {}},
     },
-    helpers: {git: {version: pins.git ?? '2.56.1', builds: {}}},
   }
 
   const hostPackage = {

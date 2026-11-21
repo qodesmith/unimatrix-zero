@@ -11,7 +11,7 @@ An AI service the user connects through their own subscription (Claude, ChatGPT)
 _Avoid_: Vendor (the company behind a Provider; only its downloaded build is a _vendor program_), backend, service, disconnect
 
 **Vendor program**:
-The exact, unmodified `claude` or `codex` build the app downloads for a Provider and runs on the user's behalf, with its own configuration folder. It owns the Provider's sign-in; the app never sees the credentials.
+The exact, unmodified build of a program the app downloads and runs on the user's behalf: `claude` or `codex` for a Provider, each with its own configuration folder, and `git` for Snapshots. `claude` and `codex` own their Provider's sign-in; the app never sees the credentials.
 _Avoid_: CLI, binary, the user's installed copy
 
 **Model**:

@@ -93,9 +93,7 @@
           }
         }
       }
-    }
-  },
-  "helpers": {
+    },
     "git": {
       "version": "2.56.1",
       "builds": {

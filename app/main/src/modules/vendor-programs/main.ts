@@ -36,7 +36,7 @@ export function gitTargetFor(
   machine: Machine,
   manifest: Manifest = DEV_MANIFEST
 ): ProgramTarget | null {
-  const {git} = manifest.helpers
+  const {git} = manifest.vendorPrograms
   const build = buildFor(git, machine)
   const folder = path.join(machine.userData, 'vendor', 'git', git.version)
 
