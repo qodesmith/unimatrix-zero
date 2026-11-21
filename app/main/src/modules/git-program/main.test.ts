@@ -36,7 +36,7 @@ it('names no git until its download is in place, then the entrypoint inside it b
   const git = createGitProgram({
     target,
     getProgramReady,
-    onWaiting: vi.fn<() => void>(),
+    onWaiting: vi.fn<() => boolean>(() => true),
   })
 
   const prepared = git.prepare()
@@ -56,20 +56,22 @@ it('downloads once however many ask while it downloads', async () => {
   const git = createGitProgram({
     target,
     getProgramReady,
-    onWaiting: vi.fn<() => void>(),
+    onWaiting: vi.fn<() => boolean>(() => true),
   })
 
   const first = git.prepare()
   git.snapshotWaited()
   const second = git.prepare()
-  downloads[0]?.resolve()
-  await Promise.all([first, second])
 
   expect(getProgramReady).toHaveBeenCalledOnce()
+
+  await expect.poll(() => downloads).toHaveLength(1)
+  downloads[0]?.resolve()
+  await Promise.all([first, second])
 })
 
 it('tells the user once that Snapshots wait, however many wait', () => {
-  const onWaiting = vi.fn<() => void>()
+  const onWaiting = vi.fn<() => boolean>(() => true)
   const {getProgramReady} = heldDownload()
   const git = createGitProgram({target, getProgramReady, onWaiting})
 
@@ -79,13 +81,25 @@ it('tells the user once that Snapshots wait, however many wait', () => {
   expect(onWaiting).toHaveBeenCalledOnce()
 })
 
+it('tells the user at the next wait when no window was there to hear it', () => {
+  const onWaiting = vi.fn<() => boolean>(() => true).mockReturnValueOnce(false)
+  const {getProgramReady} = heldDownload()
+  const git = createGitProgram({target, getProgramReady, onWaiting})
+
+  git.snapshotWaited()
+  git.snapshotWaited()
+  git.snapshotWaited()
+
+  expect(onWaiting).toHaveBeenCalledTimes(2)
+})
+
 it('downloads again when a Snapshot waits after the download failed, and never rejects', async () => {
   const {getProgramReady, downloads} = heldDownload()
 
   const git = createGitProgram({
     target,
     getProgramReady,
-    onWaiting: vi.fn<() => void>(),
+    onWaiting: vi.fn<() => boolean>(() => true),
   })
 
   const failing = git.prepare()
@@ -103,7 +117,7 @@ it('downloads again when a Snapshot waits after the download failed, and never r
 })
 
 it('never downloads, or says a download is coming, on a machine the manifest has no git for', async () => {
-  const onWaiting = vi.fn<() => void>()
+  const onWaiting = vi.fn<() => boolean>(() => true)
   const {getProgramReady} = heldDownload()
 
   const git = createGitProgram({target: null, getProgramReady, onWaiting})

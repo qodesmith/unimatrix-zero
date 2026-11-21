@@ -75,3 +75,17 @@ it('stops sending to a window once it disconnects', () => {
 
   expect(window.received.map(event => event.type)).toEqual(['SNAPSHOT'])
 })
+
+it('says whether any window was there to get what it published', () => {
+  const hub = setUp()
+
+  expect(hub.publish({type: 'TREE_CREATED', tree})).toBe(false)
+
+  hub.connect(1, recorder().send)
+
+  expect(hub.publish({type: 'TREE_CREATED', tree})).toBe(true)
+
+  hub.disconnect(1)
+
+  expect(hub.publish({type: 'TREE_CREATED', tree})).toBe(false)
+})

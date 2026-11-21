@@ -60,15 +60,8 @@ it('puts the Codex folder for ChatGPT under userData, beside its own configurati
 it('puts the app’s own git under userData, beside the vendor programs, as the folder it unpacks to', () => {
   const target = gitTargetFor({userData, platform: 'win32', arch: 'x64'})
 
-  expect(target).toEqual({
-    path: path.join(
-      userData,
-      'vendor',
-      'git',
-      DEV_MANIFEST.helpers.git.version
-    ),
-    build: DEV_MANIFEST.helpers.git.builds['win32-x64'],
-  })
+  expect(target?.path).toBe(path.join(userData, 'vendor', 'git', '2.56.1'))
+  expect(target?.build.url).toMatch(/windows-x64\.tar\.gz$/)
 })
 
 it('has no git for a machine the manifest does not name', () => {

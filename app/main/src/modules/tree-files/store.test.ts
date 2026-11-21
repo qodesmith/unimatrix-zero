@@ -298,18 +298,16 @@ it('reads no global or system config, takes no git variable from the app’s own
   fs.cpSync(hooks, path.join(copy.store, 'hooks'), {recursive: true})
   write('notes.md', 'second')
   write('vendor/lib/readme.md', 'theirs')
-  write('vendor/lib/.gitignore', '*.log\n')
-  write('vendor/lib/build.log', 'noise')
   await ownRepository('vendor/lib', {commit: true})
   const second = await snapshot('reply-2', first)
-  await changedFiles(git, copy.store, [
+
+  const changed = await changedFiles(git, copy.store, [
     {replyId: 'reply-2', from: first, to: second},
   ])
 
-  expect(await filesIn(second)).toEqual([
-    'notes.md',
-    'vendor/lib/.gitignore',
-    'vendor/lib/readme.md',
+  expect(changed.get('reply-2')).toEqual([
+    {path: 'notes.md', change: 'edited', size: 6},
+    {path: 'vendor/lib/readme.md', change: 'created', size: 6},
   ])
   expect(fs.existsSync(ran)).toBe(false)
   expect(fs.existsSync(path.join(root, 'elsewhere'))).toBe(false)

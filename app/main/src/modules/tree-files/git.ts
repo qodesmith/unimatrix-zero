@@ -1,4 +1,5 @@
 import {execFile} from 'node:child_process'
+import path from 'node:path'
 
 /**
  * Git reads this path as an empty file on every platform, Windows included,
@@ -48,6 +49,7 @@ interface GitTarget {
  */
 function isolated(
   env: NodeJS.ProcessEnv,
+  program: string,
   {store, checkout}: GitTarget
 ): NodeJS.ProcessEnv {
   const inherited = Object.fromEntries(
@@ -56,6 +58,7 @@ function isolated(
 
   return {
     ...inherited,
+    ...ownSubPrograms(program),
     GIT_DIR: store,
     ...(checkout && {
       GIT_WORK_TREE: checkout.folder,
@@ -71,6 +74,24 @@ function isolated(
   }
 }
 
+/**
+ * The Mac and Linux builds are made for `/`, so they look for their
+ * sub-programs in `/libexec/git-core` unless told; Windows `git` finds its own
+ * (ADR 0024).
+ */
+function ownSubPrograms(program: string) {
+  if (process.platform === 'win32') return {}
+
+  return {
+    GIT_EXEC_PATH: path.join(
+      path.dirname(program),
+      '..',
+      'libexec',
+      'git-core'
+    ),
+  }
+}
+
 export type Git = (
   target: GitTarget,
   args: string[],
@@ -79,7 +100,8 @@ export type Git = (
 
 /**
  * Every `git` call the app makes goes through the function this returns, and
- * runs `program`, the app's own `git` by its full path, never one on `PATH`.
+ * runs `program`, the app's own `git` by its full path, never one on `PATH`
+ * (ADR 0024).
  */
 export function createGit(program: string, env: NodeJS.ProcessEnv): Git {
   return async (target, args, input) =>
@@ -88,7 +110,7 @@ export function createGit(program: string, env: NodeJS.ProcessEnv): Git {
         program,
         [...isolation(program), ...args],
         {
-          env: isolated(env, target),
+          env: isolated(env, program, target),
           cwd: target.checkout?.folder,
           maxBuffer: MAX_OUTPUT_BYTES,
           windowsHide: true,

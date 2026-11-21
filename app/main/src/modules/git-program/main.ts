@@ -6,8 +6,11 @@ interface GitProgramDeps {
   /** The manifest's `git` for this machine, and where it goes; null if none. */
   target: ProgramTarget | null
   getProgramReady: typeof getProgramReady
-  /** Tells the user that Snapshots start once the download finishes. */
-  onWaiting: () => void
+  /**
+   * Tells the user that Snapshots start once the download finishes; false when
+   * no window was there to hear it.
+   */
+  onWaiting: () => boolean
 }
 
 /**
@@ -25,7 +28,7 @@ export function createGitProgram({
 
   async function download(got: ProgramTarget) {
     try {
-      // Progress isn't shown: the download is small and nothing waits on it.
+      // Progress isn't shown: only Snapshots wait on it, and the user is told.
       for await (const _progress of getProgramReady(got, {
         signal: new AbortController().signal,
       }));
@@ -55,10 +58,7 @@ export function createGitProgram({
     snapshotWaited() {
       if (!target) return
 
-      if (!told) {
-        told = true
-        onWaiting()
-      }
+      if (!told) told = onWaiting()
 
       void prepare()
     },
