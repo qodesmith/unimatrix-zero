@@ -7,6 +7,7 @@ import {afterEach, beforeEach, expect, it} from 'vitest'
 
 import {createGit} from './git'
 import {changedFiles, storeExists, takeSnapshot} from './store'
+import {removeFolder} from './test-cleanup'
 
 let root: string
 let copy: VersionedFolder
@@ -24,7 +25,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  fs.rmSync(root, {recursive: true, force: true})
+  removeFolder(root)
 })
 
 function write(name: string, text: string) {

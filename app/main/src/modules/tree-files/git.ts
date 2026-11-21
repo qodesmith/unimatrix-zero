@@ -66,7 +66,7 @@ export type Git = (
 
 /** Every `git` call the app makes goes through the function this returns. */
 export function createGit(env: NodeJS.ProcessEnv): Git {
-  return async (target, args, input = '') =>
+  return async (target, args, input) =>
     new Promise((resolve, reject) => {
       const child = execFile(
         'git',
@@ -83,6 +83,9 @@ export function createGit(env: NodeJS.ProcessEnv): Git {
         }
       )
 
+      // A git that ends before it reads its input breaks the pipe. Its exit,
+      // above, says why; unheard, the pipe's error would take the app down.
+      child.stdin?.on('error', () => undefined)
       child.stdin?.end(input)
     })
 }

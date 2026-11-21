@@ -14,6 +14,7 @@ import path from 'node:path'
 import {afterEach, beforeEach, expect, it} from 'vitest'
 
 import {createTreeFiles} from './main'
+import {removeFolder} from './test-cleanup'
 
 const migrationsFolder = path.resolve(import.meta.dirname, '../../../drizzle')
 
@@ -65,7 +66,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  fs.rmSync(userData, {recursive: true, force: true})
+  removeFolder(userData)
 })
 
 function send(parentReplyId: string | null, provider: ProviderId = 'claude') {
