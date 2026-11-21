@@ -1,7 +1,7 @@
 import path from 'node:path'
 import {expect, it} from 'vitest'
 
-import {DEV_MANIFEST, signInRequestFor} from './main'
+import {DEV_MANIFEST, gitTargetFor, signInRequestFor} from './main'
 
 const userData = path.join('/data', 'unimatrix-zero')
 
@@ -55,4 +55,22 @@ it('puts the Codex folder for ChatGPT under userData, beside its own configurati
     },
     configDir: path.join(userData, 'providers', 'chatgpt'),
   })
+})
+
+it('puts the app’s own git under userData, beside the vendor programs, as the folder it unpacks to', () => {
+  const target = gitTargetFor({userData, platform: 'win32', arch: 'x64'})
+
+  expect(target).toEqual({
+    path: path.join(
+      userData,
+      'vendor',
+      'git',
+      DEV_MANIFEST.helpers.git.version
+    ),
+    build: DEV_MANIFEST.helpers.git.builds['win32-x64'],
+  })
+})
+
+it('has no git for a machine the manifest does not name', () => {
+  expect(gitTargetFor({userData, platform: 'freebsd', arch: 'x64'})).toBeNull()
 })

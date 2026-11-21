@@ -4,8 +4,8 @@ import type {SpawnOptions} from '@anthropic-ai/claude-agent-sdk'
 import type {ProviderDriver} from '@uz/contract/host'
 
 import {idleFor} from '#modules/idle/main'
-import {getProgramReady} from '#modules/vendor-program/main'
 import {query} from '@anthropic-ai/claude-agent-sdk'
+import {getProgramReady} from '@uz/vendor-program'
 import {spawn} from 'node:child_process'
 
 import {readAccount} from './account'

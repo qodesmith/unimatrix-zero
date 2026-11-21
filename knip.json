@@ -13,6 +13,9 @@
       "entry": ["src/modules/*/main.ts"],
       "project": ["src/**/*.ts"]
     },
+    "shared/vendor-program": {
+      "project": ["src/**/*.ts"]
+    },
     "app/main": {
       "project": ["src/**/*.ts"]
     },

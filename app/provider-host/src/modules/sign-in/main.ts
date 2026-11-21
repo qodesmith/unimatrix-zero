@@ -1,7 +1,7 @@
 import type {Inbox} from '#modules/inbox/main'
-import type {DownloadProgress} from '#modules/vendor-program/main'
 import type {SignInRequest} from '@uz/contract/host'
 import type {SignInFinished, SignInUpdate} from '@uz/contract/providers'
+import type {DownloadProgress} from '@uz/vendor-program'
 
 import {createInbox} from '#modules/inbox/main'
 import {SIGN_IN_CANCELED, signInFailed} from '@uz/contract/providers'

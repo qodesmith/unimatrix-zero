@@ -1,11 +1,8 @@
 import type {Attempt, UserInput} from '#modules/sign-in/main'
-import type {
-  DownloadProgress,
-  ProgramTarget,
-} from '#modules/vendor-program/main'
 import type {AppServer, OpenAppServer} from './app-server'
 import type {SignInRequest} from '@uz/contract/host'
 import type {SignInFinished, SignInUpdate} from '@uz/contract/providers'
+import type {DownloadProgress, ProgramTarget} from '@uz/vendor-program'
 
 import {createSignIn, getReady} from '#modules/sign-in/main'
 import {SIGN_IN_CANCELED, signInFailed} from '@uz/contract/providers'

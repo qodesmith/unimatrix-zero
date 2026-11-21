@@ -34,11 +34,15 @@ export const VendorProgramSchema = z.strictObject({
   builds: z.record(PlatformSchema, VendorBuildSchema),
 })
 
-/** The exact vendor program builds an app bundle runs. */
+/** The exact vendor program and app-managed helper builds an app bundle runs. */
 export const ManifestSchema = z.strictObject({
   vendorPrograms: z.strictObject({
     claude: VendorProgramSchema,
     codex: VendorProgramSchema,
+  }),
+  /** Programs the app itself runs, never one from the user's `PATH`. */
+  helpers: z.strictObject({
+    git: VendorProgramSchema,
   }),
 })
 

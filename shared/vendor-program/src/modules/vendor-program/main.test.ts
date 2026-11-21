@@ -138,22 +138,27 @@ interface TarEntry {
   mode?: number
   /** `0` a file, `5` a folder, `x` a pax header, `2` a symbolic link. */
   type?: string
+  /** What a symbolic link points at. */
+  link?: string
 }
 
 function tarGz(entries: TarEntry[]) {
-  const blocks = entries.flatMap(({name, body = '', mode = 0o644, type}) => {
-    const header = Buffer.alloc(512)
-    const content = Buffer.from(body)
-    const padded = Buffer.alloc(Math.ceil(content.length / 512) * 512)
-    content.copy(padded)
-    header.write(name, 0)
-    header.write(`${mode.toString(8).padStart(7, '0')}\0`, 100)
-    header.write(`${content.length.toString(8).padStart(11, '0')}\0`, 124)
-    header.write(type ?? (name.endsWith('/') ? '5' : '0'), 156)
-    header.write('ustar\u000000', 257)
+  const blocks = entries.flatMap(
+    ({name, body = '', mode = 0o644, type, link}) => {
+      const header = Buffer.alloc(512)
+      const content = Buffer.from(body)
+      const padded = Buffer.alloc(Math.ceil(content.length / 512) * 512)
+      content.copy(padded)
+      header.write(name, 0)
+      header.write(`${mode.toString(8).padStart(7, '0')}\0`, 100)
+      header.write(`${content.length.toString(8).padStart(11, '0')}\0`, 124)
+      header.write(type ?? (name.endsWith('/') ? '5' : '0'), 156)
+      header.write(link ?? '', 157)
+      header.write('ustar\u000000', 257)
 
-    return [header, padded]
-  })
+      return [header, padded]
+    }
+  )
 
   return new Uint8Array(
     gzipSync(Buffer.concat([...blocks, Buffer.alloc(1024)]))
@@ -250,9 +255,31 @@ describe('a folder build', () => {
     ])
   })
 
+  it.skipIf(process.platform === 'win32')(
+    'unpacks a link to a file beside it as that link',
+    async () => {
+      const linked = tarGz([
+        {name: 'bin/codex-app-server', body: 'x'},
+        {name: 'bin/alias', type: '2', link: 'codex-app-server'},
+      ])
+
+      target = {path: target.path, build: folderBuild(linked)}
+      await ready(serving(linked))
+
+      const alias = path.join(target.path, 'bin', 'alias')
+      expect(await fs.readlink(alias)).toBe('codex-app-server')
+      expect(await fs.readFile(alias, 'utf8')).toBe('x')
+    }
+  )
+
   it.each([
     ['a path outside the folder', {name: '../escaped', body: 'x'}],
-    ['a link', {name: 'bin/link', type: '2'}],
+    ['a link up a folder', {name: 'bin/link', type: '2', link: '..'}],
+    ['a link outside', {name: 'bin/link', type: '2', link: '../../escaped'}],
+    ['a link into a folder', {name: 'bin/link', type: '2', link: 'sub/file'}],
+    ['a link by full path', {name: 'bin/link', type: '2', link: '/etc/hosts'}],
+    ['a link to nothing', {name: 'bin/link', type: '2'}],
+    ['a hard link', {name: 'bin/link', type: '1', link: 'codex-app-server'}],
   ])('throws and keeps nothing for %s', async (_case, entry) => {
     const bad = tarGz([{name: 'bin/codex-app-server', body: 'x'}, entry])
     target = {path: target.path, build: folderBuild(bad)}

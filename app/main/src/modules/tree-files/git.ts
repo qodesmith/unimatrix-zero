@@ -1,24 +1,31 @@
 import {execFile} from 'node:child_process'
 
-/** Git reads this path as an empty file on every platform, Windows included. */
+/**
+ * Git reads this path as an empty file on every platform, Windows included,
+ * though not as a folder: Windows reads `/dev/null/<hook>` as a real path on
+ * the drive.
+ */
 const NOTHING = '/dev/null'
 
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024
 
 /**
  * On every call: no hook runs, no fsmonitor is asked, and the user's own
- * ignore and attributes files stay out (ADR 0014).
+ * ignore and attributes files stay out (ADR 0014). Hooks are looked for in
+ * the program itself, a file, which nothing can be inside.
  */
-const ISOLATION = [
-  '-c',
-  `core.hooksPath=${NOTHING}`,
-  '-c',
-  'core.fsmonitor=false',
-  '-c',
-  `core.excludesFile=${NOTHING}`,
-  '-c',
-  `core.attributesFile=${NOTHING}`,
-]
+function isolation(program: string) {
+  return [
+    '-c',
+    `core.hooksPath=${program}`,
+    '-c',
+    'core.fsmonitor=false',
+    '-c',
+    `core.excludesFile=${NOTHING}`,
+    '-c',
+    `core.attributesFile=${NOTHING}`,
+  ]
+}
 
 export interface Checkout {
   folder: string
@@ -70,13 +77,16 @@ export type Git = (
   input?: string
 ) => Promise<string>
 
-/** Every `git` call the app makes goes through the function this returns. */
-export function createGit(env: NodeJS.ProcessEnv): Git {
+/**
+ * Every `git` call the app makes goes through the function this returns, and
+ * runs `program`, the app's own `git` by its full path, never one on `PATH`.
+ */
+export function createGit(program: string, env: NodeJS.ProcessEnv): Git {
   return async (target, args, input) =>
     new Promise((resolve, reject) => {
       const child = execFile(
-        'git',
-        [...ISOLATION, ...args],
+        program,
+        [...isolation(program), ...args],
         {
           env: isolated(env, target),
           cwd: target.checkout?.folder,

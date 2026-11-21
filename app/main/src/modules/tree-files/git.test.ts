@@ -1,11 +1,11 @@
 import os from 'node:os'
 import path from 'node:path'
-import {expect, it} from 'vitest'
+import {expect, inject, it} from 'vitest'
 
 import {createGit} from './git'
 
 it('fails with git’s own message when git ends before reading what it was handed', async () => {
-  const git = createGit(process.env)
+  const git = createGit(inject('gitProgram'), process.env)
   const missing = path.join(os.tmpdir(), 'uz-no-such-store.git')
 
   await expect(

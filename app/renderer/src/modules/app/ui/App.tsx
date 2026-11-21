@@ -24,6 +24,7 @@ import {useState} from 'react'
 
 import {useFirstLaunch} from '../first-launch/use-first-launch'
 import {AppSidebar} from './AppSidebar'
+import {SnapshotsWaiting} from './SnapshotsWaiting'
 
 export function App() {
   // oxlint-disable-next-line react/hook-use-state -- created once and never replaced
@@ -39,6 +40,7 @@ export function App() {
               <TooltipProvider>
                 <AppLayout />
               </TooltipProvider>
+              <SnapshotsWaiting />
             </LiveReplies>
           </ConnectionsProvider>
         </LayoutProvider>

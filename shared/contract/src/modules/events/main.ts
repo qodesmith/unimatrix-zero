@@ -65,6 +65,14 @@ export const TreeDeletedEvent = z.strictObject({
   treeId: z.uuid(),
 })
 
+/**
+ * A Reply finished without its Snapshot because the app's own `git` is still
+ * downloading. Sent once per launch.
+ */
+export const SnapshotsWaitingEvent = z.strictObject({
+  type: z.literal('SNAPSHOTS_WAITING'),
+})
+
 export const EventSchema = z.discriminatedUnion('type', [
   SnapshotEvent,
   TreeCreatedEvent,
@@ -75,6 +83,7 @@ export const EventSchema = z.discriminatedUnion('type', [
   LastModelChangedEvent,
   ReplyEventSchema,
   FilesChangedEvent,
+  SnapshotsWaitingEvent,
   ProviderEventSchema,
 ])
 

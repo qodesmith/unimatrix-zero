@@ -11,7 +11,7 @@ import {eq} from 'drizzle-orm'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import {afterEach, beforeEach, expect, it} from 'vitest'
+import {afterEach, beforeEach, expect, inject, it} from 'vitest'
 
 import {createTreeFiles} from './main'
 import {removeFolder} from './test-cleanup'
@@ -22,6 +22,8 @@ let db: Database
 let userData: string
 let published: AppEvent[]
 let failures: unknown[]
+let gitProgram: string | null
+let waitedForGit: number
 let hostCommands: HostCommand[]
 let snapshots: Promise<void>[]
 let treeFiles: ReturnType<typeof createTreeFiles>
@@ -35,6 +37,10 @@ function launch() {
     userData,
     publish: event => published.push(event),
     onFailure: error => failures.push(error),
+    gitProgram: () => gitProgram,
+    onWaitingForGit: () => {
+      waitedForGit += 1
+    },
   })
 
   turns = createTurns({
@@ -64,6 +70,8 @@ beforeEach(() => {
   userData = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-user-data-'))
   published = []
   failures = []
+  gitProgram = inject('gitProgram')
+  waitedForGit = 0
   hostCommands = []
   snapshots = []
 
@@ -141,12 +149,19 @@ function filesChanged() {
   return published.filter(event => event.type === 'FILES_CHANGED')
 }
 
-function snapshotOf(replyId: string) {
+function savedSnapshot(replyId: string) {
   return db
-    .select({snapshotCommit: schema.replies.snapshotCommit})
+    .select({
+      snapshotCommit: schema.replies.snapshotCommit,
+      noSnapshot: schema.replies.noSnapshot,
+    })
     .from(schema.replies)
     .where(eq(schema.replies.id, replyId))
-    .get()?.snapshotCommit
+    .get()
+}
+
+function snapshotOf(replyId: string) {
+  return savedSnapshot(replyId)?.snapshotCommit
 }
 
 async function listed() {
@@ -370,6 +385,46 @@ it('reports a Snapshot it can’t take, leaves the Reply as it finished, and tak
     [replyId]: [{path: 'a.txt', change: 'created', size: 3}],
     [next]: [{path: 'b.txt', change: 'created', size: 3}],
   })
+})
+
+it('takes no Snapshot while the app’s git isn’t in place, leaves the Reply as it finished, reports no failure, and takes it before the next Reply once git is in place', async () => {
+  const program = gitProgram
+  gitProgram = null
+  const replyId = send(null)
+  aiWrites(replyId, 'a.txt', 'one')
+
+  await finish(replyId)
+
+  expect(savedSnapshot(replyId)).toEqual({
+    snapshotCommit: null,
+    noSnapshot: 'failed',
+  })
+  expect(turns.list(treeId).replies).toMatchObject([{status: 'complete'}])
+  expect(waitedForGit).toBe(1)
+  expect(failures).toEqual([])
+
+  gitProgram = program
+  const next = send(replyId)
+  await whenStarted(next)
+  aiWrites(next, 'b.txt', 'two')
+  await finish(next)
+
+  expect(await listed()).toEqual({
+    [replyId]: [{path: 'a.txt', change: 'created', size: 3}],
+    [next]: [{path: 'b.txt', change: 'created', size: 3}],
+  })
+})
+
+it('fails the Snapshot, not the Reply, when the app’s git is gone from its path', async () => {
+  gitProgram = path.join(userData, 'vendor', 'git', 'gone', 'git')
+  const replyId = send(null)
+  aiWrites(replyId, 'a.txt', 'one')
+
+  await finish(replyId)
+
+  expect(failures).toMatchObject([{code: 'ENOENT'}])
+  expect(savedSnapshot(replyId)?.noSnapshot).toBe('failed')
+  expect(turns.list(treeId).replies).toMatchObject([{status: 'complete'}])
 })
 
 it('takes the Snapshot of a Reply the app quit on before the next Reply starts, and says which files it changed', async () => {
