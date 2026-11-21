@@ -13,13 +13,13 @@ import {cn} from 'cn'
 import {FilePenIcon, FilePlusIcon, FileXIcon} from 'lucide-react'
 
 const CHANGES = {
-  created: {verb: 'Created', Icon: FilePlusIcon, tone: 'text-success'},
-  edited: {verb: 'Edited', Icon: FilePenIcon, tone: 'text-muted-foreground'},
-  deleted: {verb: 'Deleted', Icon: FileXIcon, tone: 'text-destructive'},
+  created: {verb: 'Created', Icon: FilePlusIcon},
+  edited: {verb: 'Edited', Icon: FilePenIcon},
+  deleted: {verb: 'Deleted', Icon: FileXIcon},
 }
 
 function ChangedFileChip({file: {path, change, size}}: {file: ChangedFile}) {
-  const {verb, Icon, tone} = CHANGES[change]
+  const {verb, Icon} = CHANGES[change]
   const deleted = change === 'deleted'
 
   return (
@@ -37,7 +37,7 @@ function ChangedFileChip({file: {path, change, size}}: {file: ChangedFile}) {
         <AttachmentTitle className={cn(deleted && 'line-through')}>
           {path.split('/').at(-1)}
         </AttachmentTitle>
-        <AttachmentDescription className={tone}>
+        <AttachmentDescription>
           {size === null ? verb : `${verb} · ${formatSize(size)}`}
         </AttachmentDescription>
       </AttachmentContent>

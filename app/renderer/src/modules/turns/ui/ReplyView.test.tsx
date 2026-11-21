@@ -257,8 +257,6 @@ it('renders the tool call inline, between the text before and after it', async (
 })
 
 it('lists the files a Reply changed as chips under its text, each with what happened to it and the size it was left at', async () => {
-  onTestFinished(followColorScheme())
-
   const screen = await renderSaved({
     status: 'complete',
     content: [{type: 'text', text: 'All written down.'}],
@@ -278,10 +276,6 @@ it('lists the files a Reply changed as chips under its text, each with what happ
     .element(chips.getByRole('group', {name: 'Edited src/app.ts'}))
     .toHaveTextContent('app.tsEdited · 64 bytes')
   await expect.element(deleted).toHaveTextContent('old.txtDeleted')
-  expect(colorOf(created.getByText(/^Created ·/))).not.toBe(
-    colorOf(deleted.getByText('Deleted', {exact: true}))
-  )
-
   const article = screen.getByRole('article', {name: 'Reply'}).element()
   const order = visibleOrder(article)
 

@@ -23,11 +23,14 @@ const DEFAULT_EXCLUDES = [
 /** The tree git gives a folder with no files, in a SHA-1 store. */
 const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
-/** One Thread's files on disk, and the hidden store that keeps its Snapshots. */
-export interface WorkingCopy {
+/** The mode git gives a folder that is a git repository of its own. */
+const GITLINK = '160000'
+
+/** A Working copy's folder, with the hidden store that keeps its Snapshots. */
+export interface VersionedFolder {
   store: string
   folder: string
-  /** Its own index, kept in the store between Snapshots. */
+  /** The folder's own index, kept in the store between Snapshots. */
   index: string
 }
 
@@ -51,21 +54,20 @@ function oneLine(output: string) {
 }
 
 /**
- * The Working copy as it stands, as a commit of its own under the Reply's ref,
- * or `parent` again when nothing differs from it. The index is the copy's own
- * and persists, so git re-hashes only the files whose size or modified time
- * changed since the last Snapshot.
+ * The folder as it stands, under the Reply's own ref, or `parent` again when
+ * nothing differs. The index persists, so git re-hashes only the files whose
+ * size or modified time changed since the last Snapshot.
  */
 export async function takeSnapshot(
   git: Git,
-  {store, folder, index}: WorkingCopy,
+  {store, folder, index}: VersionedFolder,
   {replyId, parent}: {replyId: string; parent: string | null}
 ): Promise<string> {
   if (!storeExists(store)) await makeStore(git, store)
 
   fs.mkdirSync(path.dirname(index), {recursive: true})
 
-  const copy = {store, workingCopy: {folder, index}}
+  const copy = {store, checkout: {folder, index}}
 
   await git(copy, ['add', '--all', '--', '.'])
 
@@ -123,11 +125,15 @@ function parseDiffs(output: string): RawChange[][] {
 
     for (const _pair of lines) perPair.push([])
 
-    const [, , , blob, status] = record.split(' ')
+    const [modeBefore, mode, blobBefore, blob, status] = record.split(' ')
     const change = changeOf(status)
     const filePath = fields[at + 1]
 
-    if (blob && change && filePath) {
+    // A folder that is a git repository of its own is one entry with no
+    // contents, and a file whose mode alone changed has the same contents.
+    const isFile = mode !== GITLINK && modeBefore !== `:${GITLINK}`
+
+    if (blob && change && filePath && isFile && blob !== blobBefore) {
       perPair.at(-1)?.push({path: filePath, change, blob})
     }
   }

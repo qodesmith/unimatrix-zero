@@ -1,4 +1,4 @@
-import type {WorkingCopy} from './store'
+import type {VersionedFolder} from './store'
 
 import fs from 'node:fs'
 import os from 'node:os'
@@ -9,7 +9,7 @@ import {createGit} from './git'
 import {changedFiles, storeExists, takeSnapshot} from './store'
 
 let root: string
-let copy: WorkingCopy
+let copy: VersionedFolder
 let git: ReturnType<typeof createGit>
 
 beforeEach(() => {
@@ -119,6 +119,47 @@ it('lists what each Reply created, edited and deleted, with the size it left eac
     {path: 'gone.md', change: 'deleted', size: null},
     {path: 'new.txt', change: 'created', size: 5},
     {path: 'sub/é b.md', change: 'edited', size: 6},
+  ])
+})
+
+it.skipIf(process.platform === 'win32')(
+  'lists no file whose mode alone changed',
+  async () => {
+    write('run.sh', 'echo hi')
+    write('notes.md', 'first')
+    const first = await snapshot('reply-1', null)
+
+    fs.chmodSync(path.join(copy.folder, 'run.sh'), 0o755)
+    write('notes.md', 'second')
+    const second = await snapshot('reply-2', first)
+
+    const changed = await changedFiles(git, copy.store, [
+      {replyId: 'reply-2', from: first, to: second},
+    ])
+
+    expect(changed.get('reply-2')).toEqual([
+      {path: 'notes.md', change: 'edited', size: 6},
+    ])
+  }
+)
+
+it('lists the files beside a folder that is a git repository of its own, and nothing for that folder', async () => {
+  const nested = {store: path.join(copy.folder, 'vendor/lib/.git')}
+  write('vendor/lib/readme.md', 'theirs')
+  write('notes.md', 'mine')
+  await git(nested, ['init', '--quiet'])
+  const tree = await git(nested, ['write-tree'])
+  const head = await git(nested, ['commit-tree', tree.trim(), '-m', 'theirs'])
+  await git(nested, ['update-ref', 'HEAD', head.trim()])
+
+  const first = await snapshot('reply-1', null)
+
+  const changed = await changedFiles(git, copy.store, [
+    {replyId: 'reply-1', from: null, to: first},
+  ])
+
+  expect(changed.get('reply-1')).toEqual([
+    {path: 'notes.md', change: 'created', size: 4},
   ])
 })
 

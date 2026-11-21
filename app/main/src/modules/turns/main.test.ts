@@ -41,7 +41,6 @@ let compactionSettings: CompactionSettings
 let clock: Date
 let hostReachable: boolean
 let folderMade: boolean
-
 let listedModels: Record<ProviderId, Model[]>
 let turns: ReturnType<typeof createTurns>
 let treeId: string

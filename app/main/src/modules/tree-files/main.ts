@@ -1,6 +1,6 @@
 import type {Database} from '#modules/database/main'
 import type {Git} from './git'
-import type {SnapshotPair, WorkingCopy} from './store'
+import type {SnapshotPair, VersionedFolder} from './store'
 import type {AppEvent} from '@uz/contract/events'
 import type {Reply} from '@uz/contract/turns'
 
@@ -84,8 +84,8 @@ export function createTreeFiles({
     return path.join(userData, 'tree-stores', `${treeId}.git`)
   }
 
-  /** One Thread until Branches get Working copies of their own (#88). */
-  function workingCopyOf(treeId: string): WorkingCopy {
+  /** The one Working copy a Tree has: its own folder. */
+  function workingCopyOf(treeId: string): VersionedFolder {
     const store = storeOf(treeId)
 
     return {
@@ -164,7 +164,6 @@ export function createTreeFiles({
     snapshotting: (treeId: string): Promise<void> | null =>
       snapshotting.get(treeId) ?? null,
 
-    /** The Tree's Replies, each with the files it changed. */
     async withChangedFiles(treeId: string, listed: Reply[]): Promise<Reply[]> {
       const store = storeOf(treeId)
 

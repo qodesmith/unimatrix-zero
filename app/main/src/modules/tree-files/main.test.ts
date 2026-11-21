@@ -265,7 +265,7 @@ it('starts the next Reply only once the Snapshot being taken is done', async () 
   expect(snapshotOf(first)).toMatch(/^[0-9a-f]{40}$/)
 })
 
-it('never starts a Reply whose Tree was deleted while the Snapshot was taken', async () => {
+it('never starts a Reply that was stopped with every other in its Tree while the Snapshot was taken', async () => {
   const first = send(null)
   aiWrites(first, 'a.txt', 'one')
   fromHost(first, {type: 'RUN_FINISHED', status: 'complete'})
@@ -281,43 +281,12 @@ it('never starts a Reply whose Tree was deleted while the Snapshot was taken', a
   expect(hostCommands).toEqual([])
 })
 
-/**
- * The tool calls each driver shows for its recorded write (`tools.ndjson` in
- * `claude-driver` and `codex-driver`), which leaves `notes.txt` on disk.
- */
-const RECORDED_WRITES = [
-  {
-    provider: 'claude',
-    toolName: 'Write',
-    args: '{"file_path":"notes.txt","content":"HERON"}',
-    result: 'File created successfully at: notes.txt',
-  },
-  {
-    provider: 'chatgpt',
-    toolName: 'fileChange',
-    args: '[{"path":"notes.txt","kind":{"type":"add"}}]',
-    result: 'add notes.txt',
-  },
-] as const
-
-it.each(RECORDED_WRITES)(
-  'keeps the file $provider’s $toolName wrote and lists it for the Reply',
-  async ({provider, toolName, args, result}) => {
+it.each(['claude', 'chatgpt'] as const)(
+  'takes the Snapshot of a Reply written on %s from the folder its vendor program ran in',
+  async provider => {
     const replyId = send(null, provider)
-    const toolCallId = 'call-1'
 
-    fromHost(replyId, {type: 'TOOL_CALL_START', toolCallId, toolName}, provider)
-    fromHost(
-      replyId,
-      {type: 'TOOL_CALL_ARGS', toolCallId, delta: args},
-      provider
-    )
     aiWrites(replyId, 'notes.txt', 'HERON')
-    fromHost(
-      replyId,
-      {type: 'TOOL_RESULT', toolCallId, content: result, isError: false},
-      provider
-    )
     await finish(replyId, 'complete', provider)
 
     expect(filesChanged()).toEqual([

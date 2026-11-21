@@ -20,10 +20,13 @@ const ISOLATION = [
   `core.attributesFile=${NOTHING}`,
 ]
 
-/** The hidden store, alone or with one Working copy and that copy's index. */
+/**
+ * The hidden store, alone or with one folder checked out of it and that
+ * folder's index.
+ */
 interface GitTarget {
   store: string
-  workingCopy?: {folder: string; index: string}
+  checkout?: {folder: string; index: string}
 }
 
 /**
@@ -32,7 +35,7 @@ interface GitTarget {
  */
 function isolated(
   env: NodeJS.ProcessEnv,
-  {store, workingCopy}: GitTarget
+  {store, checkout}: GitTarget
 ): NodeJS.ProcessEnv {
   const inherited = Object.fromEntries(
     Object.entries(env).filter(([name]) => !name.startsWith('GIT_'))
@@ -41,9 +44,9 @@ function isolated(
   return {
     ...inherited,
     GIT_DIR: store,
-    ...(workingCopy && {
-      GIT_WORK_TREE: workingCopy.folder,
-      GIT_INDEX_FILE: workingCopy.index,
+    ...(checkout && {
+      GIT_WORK_TREE: checkout.folder,
+      GIT_INDEX_FILE: checkout.index,
     }),
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_CONFIG_GLOBAL: NOTHING,
@@ -70,7 +73,7 @@ export function createGit(env: NodeJS.ProcessEnv): Git {
         [...ISOLATION, ...args],
         {
           env: isolated(env, target),
-          cwd: target.workingCopy?.folder,
+          cwd: target.checkout?.folder,
           maxBuffer: MAX_OUTPUT_BYTES,
           windowsHide: true,
         },
