@@ -25,13 +25,14 @@ app/preload/        window.uz = { send, subscribe, registerDroppedFile }, one se
 app/renderer/       React, Tailwind and shadcn, styled only by Theme tokens
 app/provider-host/  one utility process per Provider: claude and chatgpt entries
 shared/contract/    Zod schemas for commands and events; every type derives from them. Also `machine()`, the state machine helper every process shares
+shared/vendor-program/  downloads a manifest build, checks it and unpacks it; main and the Provider hosts share it
 tooling/            the shared Vite build helper and the repo's own lint rules
 scripts/            dev loop, test runner, runtime pinning
 ```
 
 Main's SQLite schema lives in `app/main/src/modules/database/schema.ts`. After changing it, run `bun run --filter @uz/main db:generate` and commit the new folder under `app/main/drizzle/`; the app applies it on the next start, behind a backup and the foreign-key guard (ADR 0003).
 
-`tsc -b` project references keep main, the Provider hosts and the renderer from importing each other: only `@uz/contract` is shared.
+`tsc -b` project references keep main, the Provider hosts and the renderer from importing each other: only `@uz/contract` is shared, plus `@uz/vendor-program` between main and the Provider hosts, which both download programs.
 
 ### Modules
 
@@ -54,5 +55,7 @@ oxlint ships new rules most weeks. `reviewed-oxlint-version` in `package.json` n
 ## Tests
 
 Vitest runs in two projects: `node` (contract, main, hosts, shell, scripts, tooling) and `renderer` (browser mode in Chromium). `bun run test` runs both under Electron's own Node, and `scripts/runtime-match.test.ts` fails if the Node version differs from `electron-runtime.json`. After bumping Electron, run `bun run electron-runtime` to regenerate that file and `.node-version`. The Node and Chromium build targets in `tooling/vite.ts` read it, and `bun run lint` fails when it describes a different Electron than the installed one, or when `@types/node` is for a newer Node than Electron ships.
+
+Before the `node` tests, Vitest downloads the `git` the manifest names for the machine into `node_modules/.cache/uz-test` (once; later runs check it), and the Snapshot tests run that build, the one the app runs (ADR 0024).
 
 CI runs the checks on Linux and the `node` tests on Mac arm64, Mac x64, Windows x64 and Linux x64. The `renderer` tests run on Linux only, in Playwright's Chromium headless shell. There are no git hooks.

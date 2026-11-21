@@ -13,6 +13,7 @@ import {createConnections} from '#modules/connections/main'
 import {DatabaseOpenError, openDatabase} from '#modules/database/main'
 import {readDevRun} from '#modules/dev/main'
 import {createDroppedFiles} from '#modules/dropped-files/main'
+import {createGitProgram} from '#modules/git-program/main'
 import {utilityHost} from '#modules/host-process/main'
 import {createHub, registerSubscribeChannel} from '#modules/hub/main'
 import {createLayout} from '#modules/layout/main'
@@ -24,7 +25,7 @@ import {createTitles} from '#modules/titles/main'
 import {createTreeFiles} from '#modules/tree-files/main'
 import {createTreeRows, createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
-import {signInRequestFor} from '#modules/vendor-programs/main'
+import {gitTargetFor, signInRequestFor} from '#modules/vendor-programs/main'
 import {
   createWindow,
   followThemeMode,
@@ -34,6 +35,7 @@ import {
   setAppMenu,
 } from '#modules/window/main'
 import {compactionSettingsFor} from '@uz/contract/settings'
+import {getProgramReady} from '@uz/vendor-program'
 import {app, dialog, ipcMain, protocol, session} from 'electron'
 import path from 'node:path'
 
@@ -147,6 +149,12 @@ function openWindow(db: Database) {
     arch: process.arch,
   }
 
+  const gitProgram = createGitProgram({
+    target: gitTargetFor(machine),
+    getProgramReady,
+    onWaiting: () => hub.publish({type: 'SNAPSHOTS_WAITING'}),
+  })
+
   const treeFiles = createTreeFiles({
     db,
     userData: machine.userData,
@@ -154,6 +162,8 @@ function openWindow(db: Database) {
     onFailure: ({message}) => {
       process.stderr.write(`A Snapshot failed: ${message}\n`)
     },
+    gitProgram: gitProgram.program,
+    onWaitingForGit: () => gitProgram.snapshotWaited(),
   })
 
   const titles = createTitles({
@@ -190,7 +200,10 @@ function openWindow(db: Database) {
     },
   })
 
-  void treeFiles.takeMissedSnapshots()
+  // Waits until the app's git is checked on disk, or downloaded when it is
+  // missing, so the Snapshots the app quit before taking are taken with it
+  // rather than recorded as waiting.
+  void gitProgram.prepare().then(async () => treeFiles.takeMissedSnapshots())
 
   const connections = createConnections({
     db,

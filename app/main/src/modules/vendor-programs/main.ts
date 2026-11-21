@@ -1,6 +1,7 @@
 import type {SignInRequest} from '@uz/contract/host'
-import type {Manifest} from '@uz/contract/manifest'
+import type {Manifest, VendorProgram} from '@uz/contract/manifest'
 import type {ProviderId} from '@uz/contract/providers'
+import type {ProgramTarget} from '@uz/vendor-program'
 
 import {ManifestSchema, PlatformSchema} from '@uz/contract/manifest'
 import path from 'node:path'
@@ -21,16 +22,37 @@ const PROGRAMS = {
   chatgpt: 'codex',
 } as const satisfies Record<ProviderId, keyof Manifest['vendorPrograms']>
 
+function buildFor({builds}: VendorProgram, {platform, arch}: Machine) {
+  const target = PlatformSchema.safeParse(`${platform}-${arch}`)
+
+  return target.success ? builds[target.data] : undefined
+}
+
+/**
+ * The app's own `git` for this machine, as the folder its archive unpacks to;
+ * null when the manifest has none for it (ADR 0024).
+ */
+export function gitTargetFor(
+  machine: Machine,
+  manifest: Manifest = DEV_MANIFEST
+): ProgramTarget | null {
+  const {git} = manifest.vendorPrograms
+  const build = buildFor(git, machine)
+  const folder = path.join(machine.userData, 'vendor', 'git', git.version)
+
+  return build ? {path: folder, build} : null
+}
+
 export function signInRequestFor(
   provider: ProviderId,
-  {userData, platform, arch}: Machine,
+  machine: Machine,
   manifest: Manifest = DEV_MANIFEST
 ): SignInRequest {
+  const {userData, platform} = machine
   const configDir = path.join(userData, 'providers', provider)
-  const target = PlatformSchema.safeParse(`${platform}-${arch}`)
   const name = PROGRAMS[provider]
   const program = manifest.vendorPrograms[name]
-  const build = target.success ? program.builds[target.data] : undefined
+  const build = buildFor(program, machine)
 
   if (!build) return {program: null, configDir}
 

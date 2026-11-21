@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     {"path": "./shared/contract"},
+    {"path": "./shared/vendor-program"},
     {"path": "./app/main"},
     {"path": "./app/preload"},
     {"path": "./app/renderer"},

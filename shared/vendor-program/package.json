@@ -1,0 +1,14 @@
+{
+  "name": "@uz/vendor-program",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#modules/*": "./src/modules/*.ts"
+  },
+  "exports": {
+    ".": "./src/modules/vendor-program/main.ts"
+  },
+  "dependencies": {
+    "@uz/contract": "workspace:*"
+  }
+}

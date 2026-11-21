@@ -28,9 +28,10 @@ export function pinsOf(manifest: string, hostPackage: string) {
   const {dependencies} = HostPackage.parse(JSON.parse(hostPackage))
 
   return new Map([
-    ...Object.entries(vendorPrograms).map(
-      ([name, {version}]) => [name, version] as const
-    ),
+    ...Object.entries(vendorPrograms)
+      // CI's own tests run a new `git`, so its bump skips the gate (ADR 0024).
+      .filter(([name]) => name !== 'git')
+      .map(([name, {version}]) => [name, version] as const),
     [SDK, dependencies[SDK]] as const,
   ])
 }

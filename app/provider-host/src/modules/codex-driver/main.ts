@@ -4,7 +4,7 @@ import type {CodexCommand, SpawnCodex} from './app-server'
 import type {ProviderDriver, SignInRequest} from '@uz/contract/host'
 
 import {idleFor} from '#modules/idle/main'
-import {getProgramReady, programOf} from '#modules/vendor-program/main'
+import {getProgramReady, programOf} from '@uz/vendor-program'
 import {spawn} from 'node:child_process'
 import fs from 'node:fs'
 
