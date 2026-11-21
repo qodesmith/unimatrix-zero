@@ -7,7 +7,8 @@ import type {
 } from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
-import type {Opened, Restored} from './rebuild'
+import type {UserInput} from './protocol/v2/UserInput'
+import type {Restored} from './rebuild'
 import type {LoadedThread} from './threads'
 import type {Notification, ParamsOf, RateLimits} from './wire'
 import type {
@@ -22,8 +23,8 @@ import type {CompactionSettings} from '@uz/contract/settings'
 
 import {createInbox} from '#modules/inbox/main'
 import {ProgramCrashed, createReplyRuns} from '#modules/reply-runs/main'
-import {replayed} from '#modules/thread-replay/main'
 
+import {codexContent} from './input'
 import {readModels} from './models'
 import {limitLifts} from './rate-limits'
 import {openThread, settingsOf} from './rebuild'
@@ -343,7 +344,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   async function* send(
     running: Running,
     request: ReplyRequest,
-    {thread, replay}: Opened,
+    {thread, input}: {thread: LoadedThread; input: UserInput[]},
     run: ReplyRun
   ): AsyncGenerator<ContentEvent | PromptRecorded, Ending> {
     const ids = {treeId: request.treeId, replyId: request.replyId}
@@ -359,15 +360,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       // A thread loaded on another Model switches to this one from here on.
       const started = await server.request('turn/start', {
         threadId: thread.id,
-        input: [
-          {
-            type: 'text',
-            text: replay
-              ? replayed(request.thread, request.prompt.text)
-              : request.prompt.text,
-            text_elements: [],
-          },
-        ],
+        input,
         model: request.model,
         // Every turn too (ADR 0022): a deletion cut resumes its thread read-only in the config folder.
         cwd: request.treeFolder,
@@ -448,14 +441,17 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
 
     if (session) await cuts.get(session.sessionId)
 
+    const content = await codexContent(request)
+
     for (let attempt = 1; ; attempt++) {
       const running = await claim(request.vendorProgram)
       let heard = false
 
       try {
+        const {server, threads} = running
+
         const opened = await openThread(
-          running.server,
-          running.threads,
+          {server, threads},
           request,
           session && (async () => restore(running, request, session, dropFrom))
         )
@@ -467,7 +463,8 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
           yield {type: 'PROMPT_DROPPED', treeId, replyId}
         }
 
-        const sent = send(running, request, opened, run)
+        const input = await content.input(opened.replay)
+        const sent = send(running, request, {thread: opened.thread, input}, run)
 
         for (;;) {
           const step = await sent.next()

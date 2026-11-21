@@ -29,6 +29,7 @@ function exchange(
     treeId,
     parentReplyId,
     text: 'Hi',
+    attachments: [],
     createdAt,
   }
 

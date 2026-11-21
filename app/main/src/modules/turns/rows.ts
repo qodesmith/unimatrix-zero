@@ -1,9 +1,11 @@
 import type {Database} from '#modules/database/main'
 import type {Removal} from './deletion'
+import type {Attachment} from '@uz/contract/attachments'
 import type {ModelChoice, ProviderId} from '@uz/contract/providers'
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {SQL} from 'drizzle-orm'
 
+import {attachToPrompt, attachmentsOf} from '#modules/attachments/main'
 import {schema} from '#modules/database/main'
 import {NEW_REPLY, ReplyPartSchema, RunFailureSchema} from '@uz/contract/turns'
 import {and, asc, desc, eq, isNull} from 'drizzle-orm'
@@ -24,12 +26,13 @@ type PromptRow = typeof schema.prompts.$inferSelect
 
 type ReplyRow = typeof schema.replies.$inferSelect
 
-function toPrompt(row: PromptRow): Prompt {
+function toPrompt(row: PromptRow, attachments: Attachment[]): Prompt {
   return {
     id: row.id,
     treeId: row.treeId,
     parentReplyId: row.parentReplyId,
     text: row.text,
+    attachments,
     createdAt: row.createdAt.toISOString(),
   }
 }
@@ -74,14 +77,20 @@ function repliesWhere(db: Database, matches: SQL): Reply[] {
 }
 
 export function listTurns(db: Database, treeId: string) {
+  const rows = db
+    .select()
+    .from(prompts)
+    .where(eq(prompts.treeId, treeId))
+    .orderBy(asc(prompts.createdAt), asc(prompts.id))
+    .all()
+
+  const attached = attachmentsOf(
+    db,
+    rows.map(row => row.id)
+  )
+
   return {
-    prompts: db
-      .select()
-      .from(prompts)
-      .where(eq(prompts.treeId, treeId))
-      .orderBy(asc(prompts.createdAt), asc(prompts.id))
-      .all()
-      .map(toPrompt),
+    prompts: rows.map(row => toPrompt(row, attached.get(row.id) ?? [])),
     replies: repliesWhere(db, eq(replies.treeId, treeId)),
   }
 }
@@ -125,6 +134,8 @@ export interface NewExchange {
   treeId: string
   parentReplyId: string | null
   text: string
+  /** In the order the Prompt shows them. */
+  attachmentIds: string[]
   provider: ProviderId
   model: string
   systemPrompt: string
@@ -158,6 +169,8 @@ export function insertExchange(
       .returning()
       .get()
 
+    attachToPrompt(tx, prompt.id, next.attachmentIds)
+
     const reply = tx
       .insert(replies)
       .values({
@@ -172,7 +185,13 @@ export function insertExchange(
       .returning()
       .get()
 
-    return {prompt: toPrompt(prompt), reply: toReply(reply, false)}
+    return {
+      prompt: toPrompt(
+        prompt,
+        attachmentsOf(tx, [prompt.id]).get(prompt.id) ?? []
+      ),
+      reply: toReply(reply, false),
+    }
   })
 }
 

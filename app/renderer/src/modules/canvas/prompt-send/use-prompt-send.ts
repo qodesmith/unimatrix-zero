@@ -8,6 +8,8 @@ import {initialPromptSend, promptSendTransition} from './machine'
 
 interface Submission {
   text: string
+  /** In the order the Prompt shows them. */
+  attachmentIds: readonly string[]
   model: ModelChoice
   onSent: (replyId: string) => void
 }
@@ -21,12 +23,12 @@ export function usePromptSend(treeId: string, parentReplyId: string | null) {
     initial: initialPromptSend,
   })
 
-  function submit({text, model, onSent}: Submission) {
+  function submit({text, attachmentIds, model, onSent}: Submission) {
     if (promptSendTransition(state, {type: 'submitted'}) === state) return
 
     send({type: 'submitted'})
     void sendToMain({
-      runSend: async () => sendPrompt(text, model),
+      runSend: async () => sendPrompt(text, attachmentIds, model),
       send,
       onSent,
     })

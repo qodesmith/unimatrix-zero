@@ -7,6 +7,7 @@ import type {
 } from '#modules/providers/main'
 import type {ApprovalAnswer, ReplyEvent} from '#modules/turns/main'
 
+import {HostAttachmentSchema} from '#modules/attachments/main'
 import {VendorBuildSchema} from '#modules/manifest/main'
 import {ModelSchema, SignInUpdateSchema} from '#modules/providers/main'
 import {CompactionSettingsSchema} from '#modules/settings/main'
@@ -83,6 +84,8 @@ export type ReplySession = z.infer<typeof ReplySessionSchema>
 export const ThreadSchema = z.array(
   z.strictObject({
     prompt: z.string(),
+    /** Each inline or not by the rules of the Provider the Thread goes to. */
+    attachments: z.array(HostAttachmentSchema),
     reply: z.array(ReplyPartSchema),
     /**
      * Goes before the Reply's text for the AI alone, when another Model than
@@ -119,6 +122,7 @@ export const ReplyRequestSchema = z.strictObject({
   systemPrompt: z.string(),
   prompt: z.strictObject({
     text: z.string(),
+    attachments: z.array(HostAttachmentSchema),
     /** Main's name for the Prompt in the session, for a Provider that takes one. */
     messageId: z.uuid().pipe(UuidPartsSchema),
   }),

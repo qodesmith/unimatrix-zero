@@ -1,5 +1,6 @@
 // The Playwright provider gives `cdp()` its `send`.
 /// <reference types="@vitest/browser-playwright" />
+import type {Attachment} from '@uz/contract/attachments'
 import type {Bridge} from '@uz/contract/bridge'
 import type {Command} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
@@ -13,6 +14,7 @@ import {ConnectionsProvider} from '#modules/connections/main'
 import {SettingsProvider} from '#modules/settings/main'
 import {LiveReplies} from '#modules/turns/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
+import {attachmentUrl} from '@uz/contract/attachments'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import {useLayoutEffect, useState} from 'react'
@@ -47,6 +49,7 @@ function prompt(n: number, parent: number | null, text: string): Prompt {
     treeId,
     parentReplyId: parent === null ? null : uuid(parent),
     text,
+    attachments: [],
     createdAt: at(++clock),
   }
 }
@@ -102,6 +105,34 @@ const PROVIDERS: ProviderStatus[] = [
 function fakeMain(saved: Saved) {
   const prompts = [...saved.prompts]
   const replies = [...saved.replies]
+
+  const attachments = new Map(
+    saved.prompts.flatMap(one => one.attachments).map(one => [one.id, one])
+  )
+
+  const dropped = new Map<string, File>()
+
+  function keep(file: Extract<Command, {type: 'attachment.add'}>['file']) {
+    const from = file.type === 'dropped' ? dropped.get(file.fileId) : undefined
+
+    const attachment: Attachment = {
+      id: crypto.randomUUID(),
+      name: from?.name ?? 'pasted',
+      mediaType: 'text/plain',
+      size: from?.size ?? 0,
+      shrunkSize: null,
+      folderPath: null,
+    }
+
+    attachments.set(attachment.id, attachment)
+
+    return attachment
+  }
+
+  function attachmentsOf(ids: string[] = []) {
+    return ids.flatMap(id => attachments.get(id) ?? [])
+  }
+
   const settings: Settings = {...DEFAULT_SETTINGS, ...saved.settings}
   const sent: Command[] = []
   const listeners = new Set<(event: AppEvent) => void>()
@@ -185,6 +216,10 @@ function fakeMain(saved: Saved) {
         return {ok: true, value: {prompts: [...prompts], replies: [...replies]}}
       }
 
+      if (command.type === 'attachment.add') {
+        return {ok: true, value: {attachment: keep(command.file)}}
+      }
+
       if (command.type === 'settings.update') {
         Object.assign(settings, command.changes)
         publish({type: 'SETTINGS_CHANGED', settings: {...settings}})
@@ -214,6 +249,7 @@ function fakeMain(saved: Saved) {
           treeId,
           parentReplyId: command.parentReplyId,
           text: command.text,
+          attachments: attachmentsOf(command.attachmentIds),
           createdAt,
         }
 
@@ -287,7 +323,13 @@ function fakeMain(saved: Saved) {
 
       return () => listeners.delete(listener)
     },
-    registerDroppedFile: async () => ({ok: true, id: crypto.randomUUID()}),
+    registerDroppedFile: async file => {
+      const id = crypto.randomUUID()
+
+      dropped.set(id, file)
+
+      return {ok: true, id}
+    },
   }
 
   return {
@@ -526,6 +568,31 @@ it('shows the Active Thread’s Input, reveals another Reply’s on hover, and k
   await expect.poll(() => revealed('Reply five')).toBe('true')
   expect(revealed('Reply one')).toBe('true')
   expect(revealed('Reply three')).toBe('false')
+})
+
+it('keeps a hover Input holding only files revealed, with the files in it', async () => {
+  await renderCanvas(forkedTree())
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  await page.getByText('Reply three').hover()
+  await expect.poll(() => revealed('Reply three')).toBe('true')
+  await nodeOf('Reply three')
+    .getByLabelText('Files to attach')
+    .upload(new File(['Notes'], 'notes.txt', {type: 'text/plain'}))
+  await expect
+    .element(
+      nodeOf('Reply three')
+        .getByRole('group', {name: 'notes.txt'})
+        .getByText(/^5 bytes/)
+    )
+    .toBeVisible()
+
+  await hoverAway()
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+  expect(revealed('Reply three')).toBe('true')
+  await expect
+    .element(nodeOf('Reply three').getByRole('group', {name: 'notes.txt'}))
+    .toBeVisible()
 })
 
 it('keeps a draft through its Fork folding and unfolding, and through an orientation switch', async () => {
@@ -2341,6 +2408,39 @@ it('takes the failed Prompt back out of the Input once a Retry succeeds, unless 
     .toHaveValue('Prompt two, reworded')
 })
 
+it('takes a failed Prompt’s files back out of the Input once a Retry succeeds, unless the user removed one', async () => {
+  const {main} = await renderCanvas(
+    withAttachments(endingIn('failed', 'Cut off'), 2)
+  )
+
+  await chipDrawn()
+  const input = nodeOf('Reply one')
+
+  await expect
+    .element(input.getByRole('group', {name: 'shot.png'}))
+    .toBeVisible()
+  await chip().getByRole('button', {name: 'Retry'}).click()
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  finish(main, uuid(12), 'complete')
+  await expect
+    .element(input.getByRole('group', {name: 'shot.png'}))
+    .not.toBeInTheDocument()
+
+  finish(main, uuid(12), 'failed')
+  await expect
+    .element(input.getByRole('group', {name: 'shot.png'}))
+    .toBeVisible()
+  await input.getByRole('button', {name: 'Remove notes.pdf'}).click()
+  await chip().getByRole('button', {name: 'Retry'}).click()
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  finish(main, uuid(12), 'complete')
+  await expect.element(page.getByText('Writing…')).not.toBeInTheDocument()
+  await expect
+    .element(input.getByRole('group', {name: 'shot.png'}))
+    .toBeVisible()
+  await expect.element(inputUnder('Reply one')).toHaveValue('Prompt two')
+})
+
 it('takes the failed Prompt back out of the Input once another window sends in its place', async () => {
   const {main} = await renderCanvas(endingIn('failed', 'Cut off'))
   await chipDrawn()
@@ -2455,6 +2555,370 @@ it('sends the restored Prompt unchanged as Retry would, on its Model, in place o
       .getByRole('button', {name: /Branches/})
       .query()
   ).toBeNull()
+})
+
+const SHOT: Attachment = {
+  id: uuid(901),
+  name: 'shot.png',
+  mediaType: 'image/png',
+  size: 3,
+  shrunkSize: null,
+  folderPath: null,
+}
+
+const NOTES: Attachment = {
+  id: uuid(902),
+  name: 'notes.pdf',
+  mediaType: 'application/pdf',
+  size: 2048,
+  shrunkSize: null,
+  folderPath: null,
+}
+
+function withAttachments(saved: Saved, promptN: number): Saved {
+  return {
+    ...saved,
+    prompts: saved.prompts.map(one =>
+      one.id === uuid(promptN) ? {...one, attachments: [SHOT, NOTES]} : one
+    ),
+  }
+}
+
+function attachedFile(name: string) {
+  return page.getByRole('group', {name})
+}
+
+it('sends a failed Prompt back to its Input with its files, and sends them again by the same ids, shown on the new Prompt', async () => {
+  const {main} = await renderCanvas(
+    withAttachments(endingIn('failed', 'Cut off'), 2)
+  )
+
+  await chipDrawn()
+  const input = nodeOf('Reply one')
+
+  await expect
+    .element(input.getByRole('group', {name: 'shot.png'}))
+    .toBeVisible()
+  await expect
+    .element(input.getByRole('group', {name: 'notes.pdf'}))
+    .toBeVisible()
+
+  await inputUnder('Reply one').click()
+  await userEvent.keyboard('{Enter}')
+
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  expect(
+    main.sent.flatMap(command =>
+      command.type === 'prompt.send' ? [command.attachmentIds] : []
+    )
+  ).toEqual([[SHOT.id, NOTES.id]])
+
+  const sent = nodeOf('Prompt two')
+
+  await expect
+    .element(sent.getByRole('img', {name: 'shot.png'}))
+    .toHaveAttribute('src', attachmentUrl(SHOT.id))
+  await expect
+    .element(sent.getByRole('group', {name: 'notes.pdf'}).getByText('2 KiB'))
+    .toBeVisible()
+  await expect
+    .element(input.getByRole('group', {name: 'shot.png'}))
+    .not.toBeInTheDocument()
+})
+
+it('shows a Prompt’s images as thumbnails and its other files as chips, on the canvas and in the slideout', async () => {
+  await renderCanvas(withAttachments(forkedTree(), 1))
+  await expect.element(page.getByText('Reply five')).toBeVisible()
+
+  const root = nodeOf('Prompt one')
+
+  await expect
+    .element(root.getByRole('img', {name: 'shot.png'}))
+    .toHaveAttribute('src', attachmentUrl(SHOT.id))
+  await expect
+    .element(root.getByRole('group', {name: 'notes.pdf'}).getByText('2 KiB'))
+    .toBeVisible()
+
+  await openChatAt('Reply one')
+  await expect
+    .element(slideout().getByRole('img', {name: 'shot.png'}))
+    .toHaveAttribute('src', attachmentUrl(SHOT.id))
+  await expect
+    .element(
+      slideout().getByRole('group', {name: 'notes.pdf'}).getByText('2 KiB')
+    )
+    .toBeVisible()
+  expect(attachedFile('notes.pdf').elements()).toHaveLength(2)
+})
+
+const MIB = 1024 * 1024
+
+function media(
+  n: number,
+  name: string,
+  mediaType: Attachment['mediaType'],
+  size: number
+): Attachment {
+  return {
+    id: uuid(n),
+    name,
+    mediaType,
+    size,
+    shrunkSize: null,
+    folderPath: null,
+  }
+}
+
+/**
+ * Three Exchanges whose images and PDF come to more than Claude takes inline
+ * in one request: each 9 MiB image is 12 MiB of base64, the PDF 4 MiB.
+ */
+function promptWith(sent: Prompt, attachments: Attachment[]): Prompt {
+  return {...sent, attachments}
+}
+
+function mediaTree(provider: Reply['provider'] = 'claude'): Saved {
+  clock = 0
+
+  function sized(answer: Reply): Reply {
+    return {...answer, provider, contextSize: 10_000}
+  }
+
+  return {
+    prompts: [
+      promptWith(prompt(1, null, 'Prompt one'), [
+        media(911, 'first.png', 'image/png', 9 * MIB),
+        media(912, 'paper.pdf', 'application/pdf', 3 * MIB),
+        media(913, 'notes.txt', 'text/plain', 100),
+      ]),
+      promptWith(prompt(2, 11, 'Prompt two'), [
+        media(921, 'second.png', 'image/png', 9 * MIB),
+      ]),
+      promptWith(prompt(3, 12, 'Prompt three'), [
+        media(931, 'third.png', 'image/png', 9 * MIB),
+        media(932, 'fourth.png', 'image/png', 9 * MIB),
+      ]),
+    ],
+    replies: [
+      sized(reply(11, 1, 'Reply one')),
+      sized(reply(12, 2, 'Reply two')),
+      sized(reply(13, 3, 'Reply three')),
+    ],
+  }
+}
+
+async function openDetailsOf(replyText: string) {
+  const node = nodeOf(replyText)
+
+  await node.getByRole('button', {name: 'Context size details'}).click()
+
+  return node.getByRole('complementary', {name: 'Context size details'})
+}
+
+it('shows in a Claude Reply’s Context size details how much of Claude’s media budget its Thread uses, and how many earlier attachments now go by path only', async () => {
+  await renderCanvas(mediaTree())
+  await expect.element(page.getByText('Reply three')).toBeVisible()
+
+  const first = await openDetailsOf('Reply one')
+
+  await expect
+    .element(first)
+    .toMatchTextContent(/Inline media16\.0 \/ 20 MiB · 2 \/ 90 files$/)
+
+  await expect
+    .element(await openDetailsOf('Reply two'))
+    .toMatchTextContent(
+      /Inline media16\.0 \/ 20 MiB · 2 \/ 90 files1 earlier attachment now goes by path only$/
+    )
+  await expect
+    .element(await openDetailsOf('Reply three'))
+    .toMatchTextContent(
+      /Inline media12\.0 \/ 20 MiB · 1 \/ 90 files3 earlier attachments now go by path only$/
+    )
+})
+
+it('shows no media budget on a ChatGPT Reply, nor on a Claude Reply whose Thread has no attachments', async () => {
+  const saved = mediaTree('chatgpt')
+
+  await renderCanvas({
+    ...saved,
+    prompts: [...saved.prompts, prompt(4, null, 'Prompt four')],
+    replies: [
+      ...saved.replies,
+      {...reply(14, 4, 'Reply four'), contextSize: 10_000},
+    ],
+  })
+  await expect.element(page.getByText('Reply three')).toBeVisible()
+
+  for (const replyText of ['Reply three', 'Reply four']) {
+    const details = await openDetailsOf(replyText)
+
+    await expect.element(details).toMatchTextContent(/Thread up to here10\.0k/)
+    await expect.element(details).not.toMatchTextContent(/Inline media/)
+  }
+})
+
+function thumbnailIn(turn: Locator, name: string) {
+  return turn.getByRole('button', {name: `Open ${name}`})
+}
+
+it('says on an earlier Prompt’s attachment that it now goes by path only, once Claude’s media budget has left it out of the Thread the Prompt is shown on', async () => {
+  await renderCanvas(mediaTree())
+  await expect.element(page.getByText('Reply three')).toBeVisible()
+  await clickInputUnder('Reply three')
+
+  const one = nodeOf('Prompt one')
+  const two = nodeOf('Prompt two')
+  const three = nodeOf('Prompt three')
+
+  await expect
+    .element(one.getByRole('group', {name: 'paper.pdf'}))
+    .toMatchTextContent(/3 MiB · Sent by path only now$/)
+  await expect
+    .element(thumbnailIn(one, 'first.png'))
+    .toHaveAccessibleDescription('Sent by path only now')
+  await expect
+    .element(one.getByRole('group', {name: 'notes.txt'}))
+    .toMatchTextContent(/100 bytes$/)
+  await expect
+    .element(thumbnailIn(two, 'second.png'))
+    .toHaveAccessibleDescription('Sent by path only now')
+  // Prompt three passes the budget by itself, so third.png never went inline.
+  await expect
+    .element(thumbnailIn(three, 'third.png'))
+    .toHaveAccessibleDescription('')
+  await expect
+    .element(thumbnailIn(three, 'fourth.png'))
+    .toHaveAccessibleDescription('')
+
+  // Reply one's Thread fits.
+  await clickInputUnder('Reply one')
+  await expect
+    .element(one.getByRole('group', {name: 'paper.pdf'}))
+    .toMatchTextContent(/3 MiB$/)
+  await expect
+    .element(thumbnailIn(one, 'first.png'))
+    .toHaveAccessibleDescription('')
+})
+
+it('judges the canvas’s sent attachments by the Thread up to the Reply above while the Active Reply is a failed one', async () => {
+  const {prompts, replies} = mediaTree()
+  const [first, second] = replies
+
+  await renderCanvas({
+    prompts: prompts.slice(0, 2),
+    replies: [
+      ...(first ? [first] : []),
+      ...(second
+        ? [
+            {
+              ...second,
+              status: 'failed' as const,
+              failure: {
+                code: 'connection-lost' as const,
+                message: 'ECONNRESET',
+              },
+            },
+          ]
+        : []),
+    ],
+  })
+  await chipDrawn()
+
+  await expect
+    .element(thumbnailIn(nodeOf('Prompt one'), 'first.png'))
+    .toHaveAccessibleDescription('')
+})
+
+it('says so in the slideout by the slideout’s Thread, and marks the thumbnail', async () => {
+  await renderCanvas(mediaTree())
+  await expect.element(page.getByText('Reply three')).toBeVisible()
+
+  await openChatAt('Reply two')
+  await expect
+    .element(thumbnailIn(slideout(), 'first.png'))
+    .toHaveAccessibleDescription('Sent by path only now')
+  await expect
+    .element(
+      slideout()
+        .getByRole('group', {name: 'first.png'})
+        .getByRole('img', {name: 'Sent by path only now'})
+    )
+    .toBeVisible()
+  await expect
+    .element(slideout().getByRole('group', {name: 'paper.pdf'}))
+    .toMatchTextContent(/3 MiB$/)
+  await expect
+    .element(thumbnailIn(slideout(), 'second.png'))
+    .toHaveAccessibleDescription('')
+  expect(
+    slideout()
+      .getByRole('group', {name: 'second.png'})
+      .getByRole('img', {name: 'Sent by path only now'})
+      .query()
+  ).toBeNull()
+})
+
+it('keeps saying so in the slideout by the slideout’s Thread while another Branch’s Input is active', async () => {
+  const tree = mediaTree()
+
+  await renderCanvas({
+    prompts: [...tree.prompts, prompt(4, 11, 'Prompt four')],
+    replies: [
+      ...tree.replies,
+      {...reply(14, 4, 'Reply four'), provider: 'claude'},
+    ],
+  })
+  await expect.element(page.getByText('Reply four')).toBeVisible()
+
+  await openChatAt('Reply three')
+  await expect
+    .element(thumbnailIn(slideout(), 'first.png'))
+    .toHaveAccessibleDescription('Sent by path only now')
+
+  // The slideout lies over that Input here, so it takes focus without a click.
+  await canvas().getByText('Reply four').hover()
+  inputUnder('Reply four').element().focus()
+  await expect
+    .element(thumbnailIn(nodeOf('Prompt one'), 'first.png'))
+    .toHaveAccessibleDescription('')
+  await expect
+    .element(thumbnailIn(slideout(), 'first.png'))
+    .toHaveAccessibleDescription('Sent by path only now')
+})
+
+it('says nothing on a sent attachment when the Thread ends in a ChatGPT Reply', async () => {
+  await renderCanvas(mediaTree('chatgpt'))
+  await expect.element(page.getByText('Reply three')).toBeVisible()
+  await clickInputUnder('Reply three')
+
+  await expect
+    .element(nodeOf('Prompt one').getByRole('group', {name: 'paper.pdf'}))
+    .toMatchTextContent(/3 MiB$/)
+  await expect
+    .element(thumbnailIn(nodeOf('Prompt one'), 'first.png'))
+    .toHaveAccessibleDescription('')
+})
+
+it('shows a sent folder as a chip with its name and path', async () => {
+  clock = 0
+
+  await renderCanvas({
+    prompts: [
+      promptWith(prompt(1, null, 'Prompt one'), [
+        {
+          ...media(941, 'project', 'inode/directory', 0),
+          folderPath: '/Users/sam/project',
+        },
+      ]),
+    ],
+    replies: [reply(11, 1, 'Reply one')],
+  })
+  await expect.element(page.getByText('Reply one')).toBeVisible()
+
+  await expect
+    .element(nodeOf('Prompt one').getByRole('group', {name: 'project'}))
+    .toMatchTextContent(/^project\/Users\/sam\/project$/)
 })
 
 it('holds Send on a restored Model that is no longer offered, until another is picked', async () => {

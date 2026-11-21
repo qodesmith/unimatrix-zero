@@ -209,7 +209,7 @@ it('refuses an image larger than the limit', async () => {
   )
 
   await expect(images.load('https://example.com/huge.png')).rejects.toThrow(
-    'The image is larger than 20 MB.'
+    'The image is larger than 20 MiB.'
   )
 })
 
@@ -231,7 +231,7 @@ it('refuses an image the server says is too large before reading it', async () =
   )
 
   await expect(images.load('https://example.com/huge.png')).rejects.toThrow(
-    'The image is larger than 20 MB.'
+    'The image is larger than 20 MiB.'
   )
 
   expect(pulled).toBe(false)
@@ -255,7 +255,7 @@ it('stops reading a body that grows past the limit', async () => {
   const images = createRemoteImages(fakeFetch({body}).fetch)
 
   await expect(images.load('https://example.com/endless.png')).rejects.toThrow(
-    'The image is larger than 20 MB.'
+    'The image is larger than 20 MiB.'
   )
 
   expect(canceled).toBe(true)

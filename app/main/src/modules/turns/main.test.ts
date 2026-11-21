@@ -6,10 +6,13 @@ import type {Model, ProviderId} from '@uz/contract/providers'
 import type {CompactionSettings} from '@uz/contract/settings'
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {createAttachments} from '#modules/attachments/main'
 import {openDatabase, schema} from '#modules/database/main'
 import {createSessions} from '#modules/sessions/main'
 import {createTrees} from '#modules/trees/main'
 import {eq} from 'drizzle-orm'
+import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 
@@ -41,6 +44,7 @@ let folderMade: boolean
 let listedModels: Record<ProviderId, Model[]>
 let turns: ReturnType<typeof createTurns>
 let treeId: string
+let attachmentsDir: string
 
 const hosts: ReplyHosts = {
   ready: provider => hostReady && (provider === 'claude' || chatgptConnected),
@@ -72,6 +76,7 @@ function launch() {
     },
     compactionSettingsFor: () => compactionSettings,
     listedModels: provider => listedModels[provider],
+    attachmentsDir,
     now: () => clock,
     onTurnsChanged: () => undefined,
     onReplyFinished: reply => finished.push(reply),
@@ -93,12 +98,14 @@ beforeEach(() => {
   hostReachable = true
   folderMade = true
   listedModels = {claude: [], chatgpt: []}
+  attachmentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-turns-'))
   turns = launch()
   treeId = createTrees(db).create(createdAt).id
 })
 
 afterEach(() => {
   vi.useRealTimers()
+  fs.rmSync(attachmentsDir, {recursive: true, force: true})
 })
 
 /** The new Reply's id, with the host's commands and the events so far cleared. */
@@ -257,7 +264,11 @@ describe('sending the root Prompt', () => {
           replyId: sent.reply.id,
           model: 'claude-opus-5',
           systemPrompt: '',
-          prompt: {text: 'Hello', messageId: expect.any(String)},
+          prompt: {
+            text: 'Hello',
+            attachments: [],
+            messageId: expect.any(String),
+          },
           vendorProgram,
           treeFolder: `/trees/${treeId}`,
           session: null,
@@ -972,7 +983,11 @@ describe('a Prompt answering a Reply', () => {
           replyId: sent?.reply.id,
           model: 'claude-haiku-5-5',
           systemPrompt: '',
-          prompt: {text: 'And then?', messageId: expect.any(String)},
+          prompt: {
+            text: 'And then?',
+            attachments: [],
+            messageId: expect.any(String),
+          },
           vendorProgram,
           treeFolder: `/trees/${treeId}`,
           session: {
@@ -980,7 +995,7 @@ describe('a Prompt answering a Reply', () => {
             messageId: 'm1',
             type: 'continue',
           },
-          thread: [{prompt: 'Hi', reply: [], label: null}],
+          thread: [{prompt: 'Hi', attachments: [], reply: [], label: null}],
           compactionSettings: {auto: true, threshold: null},
         },
       },
@@ -1418,6 +1433,343 @@ describe('continuing from a Reply its Provider never saved', () => {
   })
 })
 
+const PDF_SHA256 =
+  '0716f9264c9fe19f5d7455276107f3ddcc1d3497f63d60689a73558ae8a1bf5e'
+
+const PNG_SHA256 =
+  '4c4b6a3be1314ab86138bef4314dde022e600960d8689a2c8f8631802d20dab6'
+
+/** Of the three bytes the shrunk-copy test sends as a JPEG. */
+const JPEG_SHA256 =
+  '6e568e1f67fba258184c78181539e5e8fdee447e49bb706fc0ea34fbf12336a5'
+
+/** Of the three bytes sent as a file of no known type. */
+const BINARY_SHA256 =
+  'ae4b3280e56e2faf83f414a6e3dabe9d5fbe18976544c05fed121accb85b53fc'
+
+function sentWithPrompts() {
+  return requests().map(request => request.prompt.attachments)
+}
+
+function keptPdf(name: string) {
+  return path.join(attachmentsDir, PDF_SHA256, name)
+}
+
+function keptPng(name: string) {
+  return path.join(attachmentsDir, PNG_SHA256, name)
+}
+
+describe('a Prompt with attachments', () => {
+  const GPT = {provider: 'chatgpt', model: 'gpt-6-sol'} as const
+  const PDF = new TextEncoder().encode('%PDF-1.7\n')
+  const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  const JPEG = Uint8Array.from([0xff, 0xd8, 0xff])
+
+  /** 9.5 MiB: under what one image goes inline at, 12.7 MiB as base64. */
+  const LARGE_PNG = new Uint8Array(9.5 * 1024 * 1024)
+  LARGE_PNG.set(PNG)
+
+  let attachments: ReturnType<typeof createAttachments>
+  let droppedPaths: Map<string, string>
+
+  beforeEach(() => {
+    chatgptConnected = true
+    listedModels = {
+      claude: [listed('fake', 'Fake')],
+      chatgpt: [listed('gpt-6-sol', 'GPT-6 Sol')],
+    }
+    droppedPaths = new Map()
+    attachments = createAttachments({
+      db,
+      dir: attachmentsDir,
+      droppedPath: fileId => droppedPaths.get(fileId) ?? null,
+    })
+  })
+
+  async function attach(
+    name: string,
+    bytes: Uint8Array<ArrayBuffer>,
+    shrunk?: Uint8Array<ArrayBuffer>
+  ) {
+    return attachments.add({type: 'pasted', name, bytes}, shrunk)
+  }
+
+  function sendWith(
+    parentReplyId: string | null,
+    attachmentIds: string[],
+    model: typeof picked | typeof GPT = picked
+  ) {
+    const sent = turns.sendPrompt({
+      model,
+      treeId,
+      parentReplyId,
+      text: 'Look.',
+      attachmentIds,
+    })
+
+    if (!sent) throw new Error('Nothing was sent')
+
+    return sent
+  }
+
+  /** A first Exchange Claude finished, for the next Prompt to continue. */
+  function answered(attachmentIds: string[]) {
+    const {reply} = sendWith(null, attachmentIds)
+    record(reply.id)
+    finish(reply.id)
+    hostCommands = []
+
+    return reply.id
+  }
+
+  it('lists them in the order sent, and gives the host each one’s path, ending in its name, with how Claude takes it inline', async () => {
+    const image = await attach('chart.png', PNG)
+    const pdf = await attach('report.pdf', PDF)
+    const binary = await attach('data.bin', Uint8Array.from([0, 1, 2]))
+
+    const sent = sendWith(null, [pdf.id, image.id, binary.id])
+
+    expect(sent.prompt.attachments).toEqual([pdf, image, binary])
+    expect(turns.list(treeId).prompts).toMatchObject([
+      {attachments: [pdf, image, binary]},
+    ])
+    expect(sentWithPrompts()).toEqual([
+      [
+        {
+          name: 'report.pdf',
+          path: keptPdf('report.pdf'),
+          folder: false,
+          inline: {type: 'pdf'},
+        },
+        {
+          name: 'chart.png',
+          path: keptPng('chart.png'),
+          folder: false,
+          inline: {
+            type: 'image',
+            mediaType: 'image/png',
+            path: keptPng('chart.png'),
+          },
+        },
+        {
+          name: 'data.bin',
+          path: path.join(attachmentsDir, BINARY_SHA256, 'data.bin'),
+          folder: false,
+          inline: null,
+        },
+      ],
+    ])
+  })
+
+  it('sends an image’s shrunk copy inline in its place, beside the original’s path', async () => {
+    const image = await attach('photo.png', PNG, JPEG)
+
+    sendWith(null, [image.id])
+
+    expect(sentWithPrompts()).toEqual([
+      [
+        {
+          name: 'photo.png',
+          path: keptPng('photo.png'),
+          folder: false,
+          inline: {
+            type: 'image',
+            mediaType: 'image/jpeg',
+            path: path.join(attachmentsDir, 'shrunk', `${JPEG_SHA256}.jpg`),
+          },
+        },
+      ],
+    ])
+  })
+
+  it.each([picked, GPT])(
+    'sends a text file of 32 KiB inline and one a byte larger by path only, on $provider',
+    async model => {
+      const small = await attach(
+        'small.txt',
+        new Uint8Array(32 * 1024).fill(0x61)
+      )
+
+      const large = await attach(
+        'large.txt',
+        new Uint8Array(32 * 1024 + 1).fill(0x61)
+      )
+
+      sendWith(null, [small.id, large.id], model)
+
+      expect(sentWithPrompts()).toMatchObject([
+        [
+          {name: 'small.txt', inline: {type: 'text'}},
+          {
+            name: 'large.txt',
+            path: expect.stringMatching(/[/\\]large\.txt$/u),
+            inline: null,
+          },
+        ],
+      ])
+    }
+  )
+
+  it('gives the host a dropped folder as its own path, never inline', async () => {
+    const fileId = crypto.randomUUID()
+    droppedPaths.set(fileId, attachmentsDir)
+    const folder = await attachments.add({type: 'dropped', fileId})
+
+    sendWith(null, [folder.id])
+
+    expect(sentWithPrompts()).toEqual([
+      [
+        {
+          name: path.basename(attachmentsDir),
+          path: attachmentsDir,
+          folder: true,
+          inline: null,
+        },
+      ],
+    ])
+  })
+
+  it('is refused for an attachment main never gave out, saving nothing', () => {
+    expect(() => sendWith(null, [crypto.randomUUID()])).toThrow(
+      'An attachment is no longer available. Attach it again.'
+    )
+    expect(turns.list(treeId)).toEqual({prompts: [], replies: []})
+    expect(hostCommands).toEqual([])
+  })
+
+  it('refuses 85.5 MiB of images, saving nothing, and sends 76 MiB', async () => {
+    const image = await attach('scan.png', LARGE_PNG)
+    const eight = Array.from({length: 8}, () => image.id)
+
+    expect(() => sendWith(null, [...eight, image.id])).toThrow(
+      'A Prompt sends up to 80 MiB of images; these come to more. Remove some and send again.'
+    )
+    expect(turns.list(treeId)).toEqual({prompts: [], replies: []})
+    expect(hostCommands).toEqual([])
+
+    sendWith(null, eight)
+
+    expect(requests()).toHaveLength(1)
+  })
+
+  it('gives the host the same attachments again on a Retry', async () => {
+    const pdf = await attach('report.pdf', PDF)
+    const {reply} = sendWith(null, [pdf.id])
+    fail(reply.id)
+    hostCommands = []
+
+    turns.retry(treeId, reply.id)
+
+    expect(sentWithPrompts()).toEqual([
+      [
+        {
+          name: 'report.pdf',
+          path: keptPdf('report.pdf'),
+          folder: false,
+          inline: {type: 'pdf'},
+        },
+      ],
+    ])
+  })
+
+  it('hands the Thread over to another Provider with each earlier attachment’s path, inline by the new Provider’s rules', async () => {
+    const pdf = await attach('report.pdf', PDF)
+    const image = await attach('chart.png', PNG)
+    const first = answered([pdf.id, image.id])
+
+    sendWith(first, [], picked)
+    sendWith(first, [], GPT)
+
+    const inlinePng = {
+      type: 'image',
+      mediaType: 'image/png',
+      path: keptPng('chart.png'),
+    }
+
+    expect(
+      requests().map(request => ({
+        resumed: request.session !== null,
+        prompt: request.prompt.attachments,
+        thread: request.thread.map(turn => turn.attachments),
+      }))
+    ).toMatchObject([
+      {
+        resumed: true,
+        prompt: [],
+        thread: [
+          [
+            {path: keptPdf('report.pdf'), inline: {type: 'pdf'}},
+            {path: keptPng('chart.png'), inline: inlinePng},
+          ],
+        ],
+      },
+      {
+        resumed: false,
+        prompt: [],
+        thread: [
+          [
+            {path: keptPdf('report.pdf'), inline: null},
+            {path: keptPng('chart.png'), inline: inlinePng},
+          ],
+        ],
+      },
+    ])
+  })
+
+  it('sends the oldest image of a Thread past Claude’s 20 MiB by path only, and every image inline to ChatGPT', async () => {
+    const old = await attach('old.png', LARGE_PNG)
+    const recent = await attach('new.png', LARGE_PNG)
+    const first = answered([old.id])
+
+    sendWith(first, [recent.id], picked)
+    sendWith(first, [recent.id], GPT)
+
+    expect(
+      requests().map(request =>
+        request.thread
+          .flatMap(turn => turn.attachments)
+          .concat(request.prompt.attachments)
+      )
+    ).toMatchObject([
+      [
+        {
+          name: 'old.png',
+          path: expect.stringMatching(/[/\\]old\.png$/u),
+          inline: null,
+        },
+        {name: 'new.png', inline: {type: 'image'}},
+      ],
+      [
+        {name: 'old.png', inline: {type: 'image'}},
+        {name: 'new.png', inline: {type: 'image'}},
+      ],
+    ])
+  })
+
+  it('sends the oldest file of a Thread past Claude’s 90 images and PDFs by path only', async () => {
+    const pdf = await attach('old.pdf', PDF)
+    const image = await attach('chart.png', PNG)
+    const first = answered([pdf.id, image.id])
+
+    sendWith(
+      first,
+      Array.from({length: 89}, () => image.id)
+    )
+
+    const [request] = requests()
+
+    expect(request?.thread.map(turn => turn.attachments)).toMatchObject([
+      [
+        {name: 'old.pdf', path: keptPdf('old.pdf'), inline: null},
+        {name: 'chart.png', inline: {type: 'image'}},
+      ],
+    ])
+    expect(
+      request?.prompt.attachments.map(attachment => attachment.inline?.type)
+    ).toEqual(Array.from({length: 89}, () => 'image'))
+  })
+})
+
 describe('stopping a Reply', () => {
   it('asks the host writing it to interrupt it', () => {
     const replyId = sendPrompt(null)
@@ -1539,7 +1891,7 @@ describe('retrying a Reply', () => {
           replyId,
           model: 'fake',
           systemPrompt: '',
-          prompt: {text: 'Hi', messageId: expect.any(String)},
+          prompt: {text: 'Hi', attachments: [], messageId: expect.any(String)},
           vendorProgram,
           treeFolder: `/trees/${treeId}`,
           session: null,

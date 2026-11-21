@@ -13,13 +13,15 @@ import {useEffect, useRef, useState} from 'react'
 
 import {useCanvas} from '../canvas-context'
 import {TURN_WIDTH} from '../canvas-layout'
-import {EMPTY_DRAFT} from '../drafts'
+import {EMPTY_DRAFT, holdsPrompt} from '../drafts'
+import {mediaBudgetUseOf} from '../media-budget'
 import {branchesOf, isFork, previousReply} from '../tree'
 import {CappedText} from './CappedText'
 import {ContextMeter, ContextSize} from './ContextSize'
 import {FoldedStack, ForkPill} from './ForkPill'
 import {PromptBox} from './PromptBox'
 import {PromptInput} from './PromptInput'
+import {SentAttachments} from './SentAttachments'
 import {StopButton} from './StopButton'
 import {TooltipButton} from './TooltipButton'
 
@@ -38,14 +40,22 @@ function PromptText({prompt}: {prompt: Prompt}) {
   const {limitTurnHeight, expandedTurnIds, toggleExpanded} = useCanvas()
 
   return (
-    <CappedText
-      limit={limitTurnHeight}
-      maxHeightClass="max-h-32"
-      expanded={expandedTurnIds.has(prompt.id)}
-      onToggle={() => toggleExpanded(prompt.id)}
-    >
-      <p className="text-sm whitespace-pre-wrap">{prompt.text}</p>
-    </CappedText>
+    <>
+      <SentAttachments
+        prompt={prompt}
+        className={cn(prompt.text !== '' && 'mb-2')}
+      />
+      {prompt.text !== '' && (
+        <CappedText
+          limit={limitTurnHeight}
+          maxHeightClass="max-h-32"
+          expanded={expandedTurnIds.has(prompt.id)}
+          onToggle={() => toggleExpanded(prompt.id)}
+        >
+          <p className="text-sm whitespace-pre-wrap">{prompt.text}</p>
+        </CappedText>
+      )}
+    </>
   )
 }
 
@@ -70,6 +80,7 @@ function ReplyBody({reply}: {reply: Reply}) {
             contextSize={contextSize}
             previousContextSize={previous ? previous.contextSize : 0}
             contextWindow={contextWindow}
+            mediaBudgetUse={mediaBudgetUseOf(index, reply)}
           />
         )}
         <OpenChatButton replyId={reply.id} className="ml-auto" />
@@ -143,9 +154,9 @@ function useInputState(reply: Reply | null, hovered: boolean): InputState {
 
   if (!live || live.status === 'failed') return 'none'
 
-  const draft = drafts.get(live.id)?.text ?? ''
-
-  return activeReplyId === live.id || draft.trim() !== '' || hovered
+  return activeReplyId === live.id ||
+    holdsPrompt(drafts.get(live.id)) ||
+    hovered
     ? 'revealed'
     : 'hidden'
 }

@@ -17,6 +17,7 @@ import type {ProviderId} from '@uz/contract/providers'
 import type {CompactionSettings} from '@uz/contract/settings'
 import type {Reply, ReplyEvent} from '@uz/contract/turns'
 
+import {refuseTooManyImages} from '#modules/attachments/main'
 import {schema} from '#modules/database/main'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {eq} from 'drizzle-orm'
@@ -38,7 +39,7 @@ import {
   resetReply,
   savedReply,
 } from './rows'
-import {threadTo} from './thread'
+import {threadTo, withAttachments} from './thread'
 
 export {PARTIAL_SAVE_MS} from './in-flight'
 
@@ -61,6 +62,8 @@ export interface TurnsDeps {
   compactionSettingsFor: (provider: ProviderId) => CompactionSettings
   /** For telling the AI which Replies another Model wrote, and its name. */
   listedModels: ListedModels
+  /** `userData/attachments/`, where every copy is kept. */
+  attachmentsDir: string
   now: () => Date
   onTurnsChanged: (treeId: string) => void
   /** Every way a Reply ends, a failure to reach its host included. */
@@ -83,6 +86,7 @@ export function createTurns({
   treeFolderFor,
   compactionSettingsFor,
   listedModels,
+  attachmentsDir,
   now,
   onTurnsChanged,
   onReplyFinished,
@@ -159,6 +163,7 @@ export function createTurns({
       treeId,
       parentReplyId,
       text,
+      attachmentIds = [],
       model: picked,
     }: NewPrompt): CommandResult<'prompt.send'> | null {
       const continued =
@@ -169,10 +174,13 @@ export function createTurns({
       const {provider, model} = picked
 
       refuseUnsendable(continued, provider)
+      refuseTooManyImages(db, attachmentIds)
 
       const failed = failedToReplace(db, treeId, parentReplyId)
       const systemPrompt = ''
-      const thread = threadTo(db, treeId, parentReplyId, picked, listedModels)
+
+      const walked = threadTo(db, treeId, parentReplyId, picked, listedModels)
+
       // Before the Prompt is saved: once it is, the Reply it answers has a
       // Prompt after it, and its session would fork.
       const session = sessionOn(provider, {treeId, parentReplyId}, failed)
@@ -183,6 +191,7 @@ export function createTurns({
         treeId,
         parentReplyId,
         text,
+        attachmentIds,
         provider,
         model,
         systemPrompt,
@@ -190,12 +199,18 @@ export function createTurns({
         replacing: failed,
       })
 
+      const {thread, attachments} = withAttachments(db, walked, {
+        provider,
+        promptId: prompt.id,
+        attachmentsDir,
+      })
+
       const started = startOnHost(provider, {
         treeId,
         replyId: reply.id,
         model,
         systemPrompt,
-        prompt: {text, messageId: randomUUID()},
+        prompt: {text, attachments, messageId: randomUUID()},
         vendorProgram: vendorProgramFor(provider),
         treeFolder,
         session,
@@ -222,18 +237,22 @@ export function createTurns({
 
       if (!recovered) return null
 
-      const {provider, model, systemPrompt, text, session} = recovered
+      const {provider, model, systemPrompt, text, promptId, session} = recovered
 
       if (!hosts.ready(provider)) {
         throw new Error(`Connect ${PROVIDER_NAMES[provider]} to retry.`)
       }
 
-      const thread = threadTo(
+      const {thread, attachments} = withAttachments(
         db,
-        treeId,
-        recovered.parentReplyId,
-        {provider, model},
-        listedModels
+        threadTo(
+          db,
+          treeId,
+          recovered.parentReplyId,
+          {provider, model},
+          listedModels
+        ),
+        {provider, promptId, attachmentsDir}
       )
 
       const treeFolder = treeFolderFor(treeId)
@@ -245,7 +264,7 @@ export function createTurns({
         replyId,
         model,
         systemPrompt,
-        prompt: {text, messageId: randomUUID()},
+        prompt: {text, attachments, messageId: randomUUID()},
         vendorProgram: vendorProgramFor(provider),
         treeFolder,
         session,

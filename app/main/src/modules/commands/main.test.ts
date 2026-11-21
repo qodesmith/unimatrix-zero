@@ -2,17 +2,24 @@ import type {Command} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {HostCommand} from '@uz/contract/host'
 
+import {createAttachments} from '#modules/attachments/main'
 import {createConnections} from '#modules/connections/main'
 import {openDatabase} from '#modules/database/main'
 import {createLayout} from '#modules/layout/main'
 import {createSettings} from '#modules/settings/main'
 import {createTreeRows, createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
-import {PromptSendResult, TreeListResult} from '@uz/contract/commands'
+import {
+  AttachmentAddResult,
+  PromptSendResult,
+  TreeListResult,
+} from '@uz/contract/commands'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {TREE_TITLE_MAX_LENGTH, TreeSchema} from '@uz/contract/trees'
+import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
-import {beforeEach, describe, expect, it} from 'vitest'
+import {afterEach, beforeEach, describe, expect, it} from 'vitest'
 
 import {dispatchCommand} from './main'
 
@@ -31,9 +38,11 @@ let hostCommands: HostCommand[]
 let hostReachable: boolean
 let loaded: string[]
 let deps: Parameters<typeof dispatchCommand>[2]
+let attachmentsDir: string
 
 beforeEach(() => {
   const db = openDatabase({file: ':memory:', migrationsFolder})
+  attachmentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-commands-'))
   clock = new Date('2026-10-19T12:00:00.000Z')
   published = []
   hostCommands = []
@@ -67,6 +76,7 @@ beforeEach(() => {
       treeFolderFor: id => `/trees/${id}`,
       compactionSettingsFor: () => ({auto: true, threshold: null}),
       listedModels: () => [],
+      attachmentsDir,
       now,
       onTurnsChanged: rows.turnsChanged,
       onReplyFinished: rows.replyFinished,
@@ -84,6 +94,11 @@ beforeEach(() => {
       openExternal: () => undefined,
       now,
     }),
+    attachments: createAttachments({
+      db,
+      dir: attachmentsDir,
+      droppedPath: () => null,
+    }),
     images: {
       load: async url => {
         loaded.push(url)
@@ -96,6 +111,14 @@ beforeEach(() => {
     publish,
   }
 })
+
+afterEach(() => {
+  fs.rmSync(attachmentsDir, {recursive: true, force: true})
+})
+
+function bytesOf(text: string) {
+  return new TextEncoder().encode(text)
+}
 
 type Sent = Command | {type: 'app.ping'; nonce: string; extra: true}
 
@@ -545,6 +568,69 @@ describe('Reply commands', () => {
     ).toMatchObject({
       ok: false,
       error: {code: 'not-found', message: 'That Prompt no longer exists.'},
+    })
+  })
+})
+
+describe('attachments', () => {
+  it('attaches a pasted file, which a Prompt with no text then sends and lists, leaving its Tree no first line', async () => {
+    const tree = await createTree()
+
+    const added = await send({
+      type: 'attachment.add',
+      file: {type: 'pasted', name: 'notes.txt', bytes: bytesOf('Hello')},
+    })
+
+    if (!added.ok) throw new Error(added.error.message)
+
+    const {attachment} = AttachmentAddResult.parse(added.value)
+
+    const sent = await send({
+      type: 'prompt.send',
+      model: picked,
+      treeId: tree.id,
+      parentReplyId: null,
+      text: '',
+      attachmentIds: [attachment.id],
+    })
+
+    expect(attachment).toEqual({
+      id: expect.any(String),
+      name: 'notes.txt',
+      mediaType: 'text/plain',
+      size: 5,
+      shrunkSize: null,
+      folderPath: null,
+    })
+    expect(sent).toMatchObject({
+      ok: true,
+      value: {prompt: {text: '', attachments: [attachment]}},
+    })
+    expect(await send({type: 'tree.turns', treeId: tree.id})).toMatchObject({
+      ok: true,
+      value: {prompts: [{attachments: [attachment]}]},
+    })
+    expect((await listed())[0]?.firstLine).toBeNull()
+  })
+})
+
+describe('attaching an image with the window’s shrunk copy', () => {
+  it('keeps the shrunk copy with the original', async () => {
+    const added = await send({
+      type: 'attachment.add',
+      file: {
+        type: 'pasted',
+        name: 'photo.png',
+        bytes: Uint8Array.from([
+          0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+        ]),
+      },
+      shrunk: Uint8Array.from([0xff, 0xd8, 0xff]),
+    })
+
+    expect(added).toMatchObject({
+      ok: true,
+      value: {attachment: {mediaType: 'image/png', size: 8, shrunkSize: 3}},
     })
   })
 })

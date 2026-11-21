@@ -54,6 +54,67 @@ export const prompts = sqliteTable('prompts', {
   createdAt: createdAt(),
 })
 
+/**
+ * One per add: the same file added twice gets two, each with its own name. A
+ * folder is its path alone: the app keeps no copy of it.
+ */
+export const attachments = sqliteTable('attachments', {
+  id: id(),
+  /**
+   * Names the folder under `userData/attachments/` that holds the copy, which
+   * adds of the same bytes share. Null for a folder.
+   */
+  sha256: text('sha256'),
+  /** The copy's file name, so the path the AI gets ends in it. */
+  name: text('name').notNull(),
+  mediaType: text('media_type', {
+    enum: [
+      'image/png',
+      'image/jpeg',
+      'image/gif',
+      'image/webp',
+      'application/pdf',
+      'text/plain',
+      'application/octet-stream',
+      'inode/directory',
+    ],
+  }).notNull(),
+  size: integer('size').notNull(),
+  /**
+   * The smaller copy sent inline in a large image's place; all three null
+   * when the image goes as it is, and for any other file.
+   */
+  shrunkSha256: text('shrunk_sha256'),
+  shrunkMediaType: text('shrunk_media_type', {
+    enum: ['image/png', 'image/jpeg'],
+  }),
+  shrunkSize: integer('shrunk_size'),
+  /** A folder's own path; null for a file. */
+  folderPath: text('folder_path'),
+  createdAt: createdAt(),
+})
+
+export const promptAttachments = sqliteTable(
+  'prompt_attachments',
+  {
+    id: id(),
+    promptId: text('prompt_id')
+      .notNull()
+      .references(() => prompts.id, {onDelete: 'cascade'}),
+    attachmentId: text('attachment_id')
+      .notNull()
+      .references(() => attachments.id),
+    /** Its place among the Prompt's attachments, from 0. */
+    position: integer('position').notNull(),
+  },
+  table => [
+    uniqueIndex('prompt_attachments_position').on(
+      table.promptId,
+      table.position
+    ),
+  ]
+)
+
 export const replies = sqliteTable(
   'replies',
   {

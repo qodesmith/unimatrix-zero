@@ -8,6 +8,7 @@
  */
 import type {SpawnCodex} from './app-server'
 import type {RateLimitReachedType} from './protocol/v2/RateLimitReachedType'
+import type {HostAttachment} from '@uz/contract/attachments'
 import type {
   PromptRecorded,
   ReplyRecorded,
@@ -19,6 +20,7 @@ import type {
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 
+import {fileHolding, pngShowing} from '#modules/test-attachments/main'
 import {heldIdle} from '#modules/test-idle/main'
 import {listenLocally, startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -209,7 +211,7 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
         replyId: crypto.randomUUID(),
         model: MODEL,
         systemPrompt: 'You answer in as few words as you can.',
-        prompt: {text, messageId: crypto.randomUUID()},
+        prompt: {text, attachments: [], messageId: crypto.randomUUID()},
         vendorProgram: {
           program: {
             path: program,
@@ -258,11 +260,13 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
 const FROM_CLAUDE: Thread = [
   {
     prompt: 'Pick a color for the boat, one word.',
+    attachments: [],
     reply: [{type: 'text', text: 'Teal.'}],
     label: '[Reply written by Haiku 5.5]',
   },
   {
     prompt: 'And an animal to paint on it, one word.',
+    attachments: [],
     reply: [{type: 'text', text: 'Otter.'}],
     label: '[Reply written by Haiku 5.5]',
   },
@@ -290,7 +294,8 @@ function threadReplies(program: string, home: string) {
   async function reply(
     text: string,
     session: ReplySession | null,
-    thread: Thread
+    thread: Thread,
+    attachments: HostAttachment[] = []
   ) {
     const events = await Array.fromAsync(
       driver.startReply({
@@ -298,7 +303,7 @@ function threadReplies(program: string, home: string) {
         replyId: crypto.randomUUID(),
         model: MODEL,
         systemPrompt: 'You answer in as few words as you can.',
-        prompt: {text, messageId: crypto.randomUUID()},
+        prompt: {text, attachments, messageId: crypto.randomUUID()},
         vendorProgram: {
           program: {
             path: program,
@@ -326,13 +331,19 @@ function threadReplies(program: string, home: string) {
 
     if (!recorded) throw new Error('The Reply was not recorded')
 
-    const shown = events
+    const {content} = events
       .filter(isReplyEvent)
       .reduce(foldReplyEvent, NEW_REPLY)
-      .content.flatMap(part => (part.type === 'text' ? [part.text] : []))
+
+    const shown = content
+      .flatMap(part => (part.type === 'text' ? [part.text] : []))
       .join('')
 
-    return {text: shown, session: recorded.session}
+    const calls = content.flatMap(part =>
+      part.type === 'tool-call' ? [part] : []
+    )
+
+    return {text: shown, calls, session: recorded.session}
   }
 
   async function closed() {
@@ -407,7 +418,7 @@ function codedReplies(
         replyId: crypto.randomUUID(),
         model: MODEL,
         systemPrompt: 'You answer in as few words as you can.',
-        prompt: {text, messageId: crypto.randomUUID()},
+        prompt: {text, attachments: [], messageId: crypto.randomUUID()},
         vendorProgram: {
           program: {
             path: program,
@@ -613,7 +624,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           replyId: crypto.randomUUID(),
           model: MODEL,
           systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text, messageId: crypto.randomUUID()},
+          prompt: {text, attachments: [], messageId: crypto.randomUUID()},
           vendorProgram: {
             program: {
               path: folder ?? '',
@@ -770,7 +781,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         replyId,
         model: MODEL,
         systemPrompt: 'You answer in as few words as you can.',
-        prompt: {text, messageId: crypto.randomUUID()},
+        prompt: {text, attachments: [], messageId: crypto.randomUUID()},
         vendorProgram: {
           program: {
             path: folder ?? '',
@@ -943,7 +954,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           replyId: crypto.randomUUID(),
           model: MODEL,
           systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text, messageId: crypto.randomUUID()},
+          prompt: {text, attachments: [], messageId: crypto.randomUUID()},
           vendorProgram: vendorProgram(home),
           treeFolder: treeFolder(),
           session: session && {...session, type: 'continue'},
@@ -1056,7 +1067,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           replyId: crypto.randomUUID(),
           model,
           systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text, messageId: crypto.randomUUID()},
+          prompt: {text, attachments: [], messageId: crypto.randomUUID()},
           vendorProgram: {
             program: {
               path: folder ?? '',
@@ -1203,6 +1214,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         systemPrompt: 'You answer in as few words as you can.',
         prompt: {
           text: 'Make up a three-word ship name, put it on the first line, then write the numbers 1 to 50, one per line.',
+          attachments: [],
           messageId: crypto.randomUUID(),
         },
         vendorProgram: {
@@ -1500,7 +1512,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           replyId: crypto.randomUUID(),
           model: MODEL,
           systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text, messageId: crypto.randomUUID()},
+          prompt: {text, attachments: [], messageId: crypto.randomUUID()},
           vendorProgram: {
             program: {
               path: folder ?? '',
@@ -1679,6 +1691,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           systemPrompt: 'You answer in as few words as you can.',
           prompt: {
             text: TOOLS_PROMPT,
+            attachments: [],
             messageId: crypto.randomUUID(),
           },
           vendorProgram: {
@@ -1771,7 +1784,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           replyId: crypto.randomUUID(),
           model: MODEL,
           systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text, messageId: crypto.randomUUID()},
+          prompt: {text, attachments: [], messageId: crypto.randomUUID()},
           vendorProgram,
           treeFolder: tree,
           session: session && {...session, type: 'continue'},
@@ -1867,7 +1880,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           replyId: crypto.randomUUID(),
           model: MODEL,
           systemPrompt: 'You answer in as few words as you can.',
-          prompt: {text, messageId: crypto.randomUUID()},
+          prompt: {text, attachments: [], messageId: crypto.randomUUID()},
           vendorProgram: {
             program: {
               path: folder ?? '',
@@ -2009,6 +2022,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
           // Two UTF-16 units each: Codex counts code points, not `length`.
           prompt: {
             text: '😀'.repeat(1_100_000),
+            attachments: [],
             messageId: crypto.randomUUID(),
           },
           vendorProgram: {
@@ -2076,6 +2090,85 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
       await closed()
     } finally {
       fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:codex-data-url-images] [dep:codex-injected-images] reads an image sent as a data URL with a Prompt, and one injected with a Thread Claude wrote, opening neither from its path', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const files = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-files-'))
+    const {reply, closed, threadsStarted} = threadReplies(folder, home)
+
+    try {
+      const heron = pngShowing(files, 'HERON')
+
+      const sent = await reply(
+        'Without using any tool: what word does the attached image show? Just the word.',
+        null,
+        [],
+        [heron]
+      )
+
+      expect(sent.text).toMatch(/heron/i)
+      // The image's path is in the Prompt too: a tool call would read it there.
+      expect(sent.calls).toEqual([])
+
+      const fromClaude: Thread = [
+        {
+          prompt: 'Keep this image in mind.',
+          attachments: [heron],
+          reply: [{type: 'text', text: 'Noted.'}],
+          label: '[Reply written by Haiku 5.5]',
+        },
+      ]
+
+      const injected = await reply(
+        'Without using any tool: what word did the image I sent show? Just the word.',
+        null,
+        fromClaude
+      )
+
+      expect(injected.text).toMatch(/heron/i)
+      expect(injected.calls).toEqual([])
+      // One thread for each Reply: Codex took the image, so no text replay.
+      expect(threadsStarted()).toBe(2)
+
+      await closed()
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+      fs.rmSync(files, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:codex-opens-attachment-path] opens a file it is given only the path line of, with a command', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const files = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-files-'))
+    const {reply, closed} = threadReplies(folder, home)
+
+    try {
+      const memo = fileHolding(
+        files,
+        'memo.txt',
+        Buffer.from('The secret word is MAPLE.\n', 'utf8')
+      )
+
+      const sent = await reply(
+        'What is the secret word in the attached file? Just the word.',
+        null,
+        [],
+        [memo]
+      )
+
+      expect(sent.text).toMatch(/maple/i)
+      expect(sent.calls.some(call => call.args.includes('memo.txt'))).toBe(true)
+
+      await closed()
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+      fs.rmSync(files, {recursive: true, force: true})
     }
   }, 300_000)
 

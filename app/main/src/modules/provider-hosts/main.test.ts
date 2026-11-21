@@ -304,7 +304,7 @@ it('sends commands to the Provider’s host', () => {
       replyId: textDelta.replyId,
       model: 'fake',
       systemPrompt: '',
-      prompt: {text: 'Hi', messageId: crypto.randomUUID()},
+      prompt: {text: 'Hi', attachments: [], messageId: crypto.randomUUID()},
       vendorProgram: {program: null, configDir: '/claude'},
       treeFolder: '/tree',
       session: null,

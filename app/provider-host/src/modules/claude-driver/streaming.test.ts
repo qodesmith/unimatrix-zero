@@ -4,6 +4,7 @@ import type {
   SDKPartialAssistantMessage,
   SDKResultSuccess,
 } from '@anthropic-ai/claude-agent-sdk'
+import type {HostAttachment} from '@uz/contract/attachments'
 import type {
   ReplyRecorded,
   ReplyRequest,
@@ -15,6 +16,13 @@ import type {
 import type {Model} from '@uz/contract/providers'
 import type {CompactionSettings} from '@uz/contract/settings'
 
+import {
+  PDF_BASE64,
+  PNG_BASE64,
+  SHRUNK_BASE64,
+  attachedFiles,
+  byPathOnly,
+} from '#modules/test-attachments/main'
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
 import {explainingLabels} from '#modules/thread-replay/main'
@@ -156,6 +164,7 @@ async function setUp(
     messageId?: ReplyRequest['prompt']['messageId']
     compactionSettings?: CompactionSettings
     thread?: Thread
+    attachments?: HostAttachment[]
   }
 
   const vendorProgram = {
@@ -176,6 +185,7 @@ async function setUp(
       messageId = crypto.randomUUID(),
       compactionSettings = DEFAULT_COMPACTION_SETTINGS,
       thread = [],
+      attachments = [],
     }: ReplyOptions = {}
   ) {
     const events: Streamed[] = []
@@ -186,7 +196,7 @@ async function setUp(
       replyId,
       model,
       systemPrompt: '',
-      prompt: {text, messageId},
+      prompt: {text, attachments, messageId},
       vendorProgram,
       treeFolder,
       session: session && {type: 'continue', ...session},
@@ -2027,11 +2037,13 @@ it('starts claude with the Compaction Settings, and with nothing for the default
 const HANDED_OVER: Thread = [
   {
     prompt: 'Name a color.',
+    attachments: [],
     reply: [{type: 'text', text: 'Teal.'}],
     label: '[Reply written by GPT-6 Sol]',
   },
   {
     prompt: 'And an animal?',
+    attachments: [],
     reply: [
       {
         type: 'tool-call',
@@ -2079,8 +2091,8 @@ it('takes over a Thread ChatGPT wrote: a new session, told the whole Thread and 
   )
   expect(started?.prompts).toHaveLength(1)
   expect(started?.prompts[0]).toContain(HANDED_OVER_TURNS)
-  expect(started?.prompts[0]?.endsWith(`</thread>\n\n${FIRST_PROMPT}`)).toBe(
-    true
+  expect(started?.prompts[0]).toMatch(
+    /<\/thread>\n\nReply with the single word TEAL\.$/u
   )
   expect(
     claude.store
@@ -2098,7 +2110,12 @@ it('keeps the line that explains the labels when a rebuilt session resumes in a 
 
   const thread: Thread = [
     ...HANDED_OVER,
-    {prompt: FIRST_PROMPT, reply: [{type: 'text', text: 'TEAL'}], label: null},
+    {
+      prompt: FIRST_PROMPT,
+      attachments: [],
+      reply: [{type: 'text', text: 'TEAL'}],
+      label: null,
+    },
   ]
 
   const events = await claude.reply(THIRD_PROMPT, recordedIn(first), {thread})
@@ -2228,4 +2245,156 @@ it('rebuilds nothing for a failure that isn’t a lost session', async () => {
     failure: {message: 'Overloaded'},
   })
   expect(claude.reports()).toHaveLength(2)
+})
+
+it('sends each attachment’s path line before the Prompt’s text, in the order attached, and right after its own line each file main marked inline: a text file under its name, an image from its inline copy and a PDF as a document', async () => {
+  const claude = await setUp(['warm.ndjson'])
+
+  const {notes, chart, report, photo, archive, project} = attachedFiles(
+    folder('uz-attachments-')
+  )
+
+  const events = await claude.reply(FIRST_PROMPT, null, {
+    attachments: [notes, chart, report, photo, archive, project],
+  })
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(claude.reports()[0]?.prompts).toEqual([
+    [
+      {
+        type: 'text',
+        text: [
+          `[Attached file "notes.txt" is saved at: ${notes.path}]`,
+          '<file name="notes.txt">\nBuy milk.\n</file>',
+          `[Attached file "chart.png" is saved at: ${chart.path}]`,
+        ].join('\n'),
+      },
+      {
+        type: 'image',
+        source: {type: 'base64', media_type: 'image/png', data: PNG_BASE64},
+      },
+      {
+        type: 'text',
+        text: `[Attached file "report.pdf" is saved at: ${report.path}]`,
+      },
+      {
+        type: 'document',
+        source: {
+          type: 'base64',
+          media_type: 'application/pdf',
+          data: PDF_BASE64,
+        },
+        title: 'report.pdf',
+      },
+      {
+        type: 'text',
+        text: `[Attached file "photo.jpg" is saved at: ${photo.path}]`,
+      },
+      {
+        type: 'image',
+        source: {type: 'base64', media_type: 'image/jpeg', data: SHRUNK_BASE64},
+      },
+      {
+        type: 'text',
+        text: [
+          `[Attached file "archive.zip" is saved at: ${archive.path}]`,
+          `[Attached folder "project" is at: ${project.path}]`,
+          FIRST_PROMPT,
+        ].join('\n'),
+      },
+    ],
+  ])
+
+  await claude.allClosed()
+})
+
+it('sends a file main marked for its path only as its path line and nothing more, whatever its type, and a Prompt of attachments alone as their lines', async () => {
+  const claude = await setUp(['warm.ndjson'])
+  const {notes, chart, report} = attachedFiles(folder('uz-attachments-'))
+
+  const events = await claude.reply('', null, {
+    attachments: [notes, chart, report].map(byPathOnly),
+  })
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(claude.reports()[0]?.prompts).toEqual([
+    [
+      `[Attached file "notes.txt" is saved at: ${notes.path}]`,
+      `[Attached file "chart.png" is saved at: ${chart.path}]`,
+      `[Attached file "report.pdf" is saved at: ${report.path}]`,
+    ].join('\n'),
+  ])
+
+  await claude.allClosed()
+})
+
+it('tells a rebuilt session each earlier Prompt’s path lines inside its <prompt>, a PDF still marked inline as a document after its line, and only the line of an image the media budget left out', async () => {
+  const claude = await setUp(['warm.ndjson'])
+  const {report, chart} = attachedFiles(folder('uz-attachments-'))
+
+  const thread: Thread = [
+    {
+      prompt: 'Sum these up.',
+      attachments: [byPathOnly(chart), report],
+      reply: [{type: 'text', text: 'Sales rose.'}],
+      label: '[Reply written by GPT-6 Sol]',
+    },
+  ]
+
+  const events = await claude.reply(FIRST_PROMPT, null, {thread})
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+  const [replay] = claude.reports()[0]?.prompts ?? []
+
+  expect(replay).toEqual([
+    {
+      type: 'text',
+      text: expect.stringContaining(
+        [
+          '',
+          '<thread>',
+          '<prompt>',
+          `[Attached file "chart.png" is saved at: ${chart.path}]`,
+          `[Attached file "report.pdf" is saved at: ${report.path}]`,
+        ].join('\n')
+      ),
+    },
+    {
+      type: 'document',
+      source: {type: 'base64', media_type: 'application/pdf', data: PDF_BASE64},
+      title: 'report.pdf',
+    },
+    {
+      type: 'text',
+      text: [
+        'Sum these up.',
+        '</prompt>',
+        '<reply>\n[Reply written by GPT-6 Sol]\n\nSales rose.\n</reply>',
+        '</thread>',
+        '',
+        FIRST_PROMPT,
+      ].join('\n'),
+    },
+  ])
+
+  await claude.allClosed()
+})
+
+it('fails the Reply, starting no claude, when a file marked inline can’t be read', async () => {
+  const claude = await setUp(['warm.ndjson'])
+  const {gone} = attachedFiles(folder('uz-attachments-'))
+
+  const events = await claude.reply(FIRST_PROMPT, null, {attachments: [gone]})
+
+  expect(events.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'failed',
+    failure: {
+      message: expect.stringMatching(
+        /^Couldn’t read the attached file “gone\.txt”/u
+      ),
+    },
+  })
+  expect(claude.reports()).toEqual([])
 })

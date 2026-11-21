@@ -114,6 +114,7 @@ it('opens Settings in a Sheet over the Tree, and closing it with the X shows the
     treeId: tree.id,
     parentReplyId: null,
     text: 'Where to?',
+    attachments: [],
     createdAt: receivedAt,
   }
 
@@ -303,6 +304,7 @@ it('shows a streaming Reply where it was after a reload, and keeps going', async
     treeId: tree.id,
     parentReplyId: null,
     text: 'Tell me',
+    attachments: [],
     createdAt: receivedAt,
   }
 
@@ -710,10 +712,15 @@ describe('connecting a Provider', () => {
       type: 'SIGN_IN_STEP',
       provider: 'claude',
       step: 'get-ready',
-      progress: {receivedBytes: 24_000_000, totalBytes: 100_000_000},
+      progress: {
+        receivedBytes: 24 * 1024 * 1024,
+        totalBytes: 100 * 1024 * 1024,
+      },
     })
     await expect
-      .element(claudeCard().getByText('Getting Claude ready… 24 of 100 MB'))
+      .element(
+        claudeCard().getByText('Getting Claude ready… 24 MiB of 100 MiB')
+      )
       .toBeVisible()
     await expect
       .element(page.getByRole('button', {name: 'Connect ChatGPT'}))

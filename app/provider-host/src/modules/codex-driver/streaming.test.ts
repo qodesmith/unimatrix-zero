@@ -1,4 +1,5 @@
 import type {FakeCodexOptions} from './replay'
+import type {HostAttachment} from '@uz/contract/attachments'
 import type {
   PromptRecorded,
   ReplyRecorded,
@@ -10,6 +11,12 @@ import type {
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 
+import {
+  PNG_BASE64,
+  SHRUNK_BASE64,
+  attachedFiles,
+  byPathOnly,
+} from '#modules/test-attachments/main'
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
 import {explainingLabels} from '#modules/thread-replay/main'
@@ -196,11 +203,13 @@ async function setUp(
       model = MODEL,
       compactionSettings = DEFAULT_COMPACTION_SETTINGS,
       thread = [],
+      attachments = [],
     }: {
       stopAfter?: number
       model?: string
       compactionSettings?: CompactionSettings
       thread?: Thread
+      attachments?: HostAttachment[]
     } = {}
   ) {
     const replyId = crypto.randomUUID()
@@ -212,7 +221,7 @@ async function setUp(
       replyId,
       model,
       systemPrompt: SYSTEM_PROMPT,
-      prompt: {text, messageId: crypto.randomUUID()},
+      prompt: {text, attachments, messageId: crypto.randomUUID()},
       vendorProgram,
       treeFolder,
       session: session && {type: 'continue', ...session},
@@ -1720,11 +1729,13 @@ it('lists the Models on the app-server a Reply already started', async () => {
 const HANDED_OVER: Thread = [
   {
     prompt: 'Name a color.',
+    attachments: [],
     reply: [{type: 'text', text: 'Teal.'}],
     label: '[Reply written by Haiku 5.5]',
   },
   {
     prompt: 'And an animal?',
+    attachments: [],
     reply: [
       {
         type: 'tool-call',
@@ -1737,7 +1748,7 @@ const HANDED_OVER: Thread = [
     ],
     label: '[Reply written by Haiku 5.5]',
   },
-  {prompt: 'Still there?', reply: [], label: null},
+  {prompt: 'Still there?', attachments: [], reply: [], label: null},
 ]
 
 /**
@@ -1857,6 +1868,7 @@ it('keeps the line that explains the labels when a rebuilt thread resumes in a n
     ...HANDED_OVER,
     {
       prompt: FIRST_PROMPT,
+      attachments: [],
       reply: [{type: 'text', text: 'Hi there, friend!'}],
       label: null,
     },
@@ -1939,4 +1951,207 @@ it('rebuilds a thread the app has no copy of from the Thread', async () => {
   )
 
   await codex.allClosed()
+})
+
+const CHART_URL = `data:image/png;base64,${PNG_BASE64}`
+const PHOTO_URL = `data:image/jpeg;base64,${SHRUNK_BASE64}`
+
+it('sends each attachment’s path line before the Prompt’s text, in the order attached, and right after its own line each file main marked inline: a text file under its name and an image, from its inline copy, as a data URL; a PDF goes by its line alone', async () => {
+  const codex = await setUp(['started.ndjson'])
+
+  const {notes, chart, report, photo, archive, project} = attachedFiles(
+    folder('uz-attachments-')
+  )
+
+  const events = await codex.reply(FIRST_PROMPT, null, {
+    attachments: [notes, chart, byPathOnly(report), photo, archive, project],
+  })
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(codex.reports()[0]?.inputs).toEqual([
+    [
+      {
+        type: 'text',
+        text: [
+          `[Attached file "notes.txt" is saved at: ${notes.path}]`,
+          '<file name="notes.txt">\nBuy milk.\n</file>',
+          `[Attached file "chart.png" is saved at: ${chart.path}]`,
+        ].join('\n'),
+        text_elements: [],
+      },
+      {type: 'image', url: CHART_URL},
+      {
+        type: 'text',
+        text: [
+          `[Attached file "report.pdf" is saved at: ${report.path}]`,
+          `[Attached file "photo.jpg" is saved at: ${photo.path}]`,
+        ].join('\n'),
+        text_elements: [],
+      },
+      {type: 'image', url: PHOTO_URL},
+      {
+        type: 'text',
+        text: [
+          `[Attached file "archive.zip" is saved at: ${archive.path}]`,
+          `[Attached folder "project" is at: ${project.path}]`,
+          FIRST_PROMPT,
+        ].join('\n'),
+        text_elements: [],
+      },
+    ],
+  ])
+
+  await codex.allClosed()
+})
+
+it('sends a Prompt of attachments alone, each marked for its path only, as their path lines', async () => {
+  const codex = await setUp(['started.ndjson'])
+  const {notes, chart} = attachedFiles(folder('uz-attachments-'))
+
+  const events = await codex.reply('', null, {
+    attachments: [notes, chart].map(byPathOnly),
+  })
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(codex.reports()[0]?.inputs).toEqual([
+    [
+      {
+        type: 'text',
+        text: [
+          `[Attached file "notes.txt" is saved at: ${notes.path}]`,
+          `[Attached file "chart.png" is saved at: ${chart.path}]`,
+        ].join('\n'),
+        text_elements: [],
+      },
+    ],
+  ])
+
+  await codex.allClosed()
+})
+
+it('fails the Reply, starting no codex, when a PDF arrives marked inline, which Codex takes none of', async () => {
+  const codex = await setUp(['started.ndjson'])
+  const {report} = attachedFiles(folder('uz-attachments-'))
+
+  const events = await codex.reply(FIRST_PROMPT, null, {attachments: [report]})
+
+  expect(events.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'failed',
+    failure: {message: 'ChatGPT takes no PDF inline: “report.pdf”.'},
+  })
+  expect(codex.reports()).toEqual([])
+})
+
+it('hands a Thread over with each earlier Prompt’s path lines in its own user message, an image as input_image and a text file under its name after their lines, and only the line of a PDF', async () => {
+  const {chart, report, notes} = attachedFiles(folder('uz-attachments-'))
+
+  const thread: Thread = [
+    {
+      prompt: 'Sum these up.',
+      attachments: [byPathOnly(report), chart, notes],
+      reply: [{type: 'text', text: 'Sales rose.'}],
+      label: '[Reply written by Haiku 5.5]',
+    },
+  ]
+
+  const codex = await setUp([injecting()])
+  const events = await codex.reply(FIRST_PROMPT, null, {thread})
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(codex.reports()[0]?.injected[0]).toEqual({
+    type: 'message',
+    role: 'user',
+    content: [
+      {
+        type: 'input_text',
+        text: [
+          `[Attached file "report.pdf" is saved at: ${report.path}]`,
+          `[Attached file "chart.png" is saved at: ${chart.path}]`,
+        ].join('\n'),
+      },
+      {type: 'input_image', image_url: CHART_URL},
+      {
+        type: 'input_text',
+        text: [
+          `[Attached file "notes.txt" is saved at: ${notes.path}]`,
+          '<file name="notes.txt">\nBuy milk.\n</file>',
+          'Sum these up.',
+        ].join('\n'),
+      },
+    ],
+  })
+  expect(codex.reports()[0]?.inputs).toEqual([
+    [{type: 'text', text: FIRST_PROMPT, text_elements: []}],
+  ])
+
+  await codex.allClosed()
+})
+
+it('replays an earlier Prompt’s path line and image inside its <prompt> in the text replay when Codex refuses the items, and the Prompt’s own after the Thread', async () => {
+  const codex = await setUp([injectRefused()])
+  const {chart, notes} = attachedFiles(folder('uz-attachments-'))
+
+  const thread: Thread = [
+    {
+      prompt: 'What is this?',
+      attachments: [chart],
+      reply: [{type: 'text', text: 'A chart.'}],
+      label: null,
+    },
+  ]
+
+  const events = await codex.reply(FIRST_PROMPT, null, {
+    thread,
+    attachments: [notes],
+  })
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+  const [input] = codex.reports()[0]?.inputs ?? []
+
+  expect(input).toEqual([
+    {
+      type: 'text',
+      text: expect.stringContaining(
+        `\n<thread>\n<prompt>\n[Attached file "chart.png" is saved at: ${chart.path}]`
+      ),
+      text_elements: [],
+    },
+    {type: 'image', url: CHART_URL},
+    {
+      type: 'text',
+      text: [
+        'What is this?',
+        '</prompt>',
+        '<reply>\nA chart.\n</reply>',
+        '</thread>',
+        '',
+        `[Attached file "notes.txt" is saved at: ${notes.path}]`,
+        '<file name="notes.txt">\nBuy milk.\n</file>',
+        FIRST_PROMPT,
+      ].join('\n'),
+      text_elements: [],
+    },
+  ])
+
+  await codex.allClosed()
+})
+
+it('fails the Reply, starting no codex, when a file marked inline can’t be read', async () => {
+  const codex = await setUp(['started.ndjson'])
+  const {gone} = attachedFiles(folder('uz-attachments-'))
+
+  const events = await codex.reply(FIRST_PROMPT, null, {attachments: [gone]})
+
+  expect(events.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'failed',
+    failure: {
+      message: expect.stringMatching(
+        /^Couldn’t read the attached file “gone\.txt”/u
+      ),
+    },
+  })
+  expect(codex.reports()).toEqual([])
 })

@@ -1,5 +1,7 @@
 import type {CommandResult} from '@uz/contract/commands'
 
+import {formatSize} from '@uz/contract/sizes'
+
 export const IMAGE_SIZE_LIMIT = 20 * 1024 * 1024
 
 const TIMEOUT_MS = 30_000
@@ -15,9 +17,7 @@ function notAnImage() {
 }
 
 function tooLarge() {
-  return new Error(
-    `The image is larger than ${IMAGE_SIZE_LIMIT / 1024 / 1024} MB.`
-  )
+  return new Error(`The image is larger than ${formatSize(IMAGE_SIZE_LIMIT)}.`)
 }
 
 function redirectTarget(from: URL, response: Response) {

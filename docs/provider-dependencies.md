@@ -554,6 +554,72 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Changed by:** upgrade + drift. The Model decides how it reads the replay.
 - **Check:** `[dep:thread-replay-as-conversation]` in `claude-driver`: a new session told a ChatGPT-written Thread recalls it, and the next Prompt goes on from it warm.
 
+### Claude takes images and PDFs as base64 blocks
+
+- **Id:** `claude-attachment-blocks`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** `claude` takes a streamed user message whose `content` is an array of `text`, base64 `image` and base64 `document` (`application/pdf`) blocks, in the order sent, and passes each to the Model. It shrinks and re-encodes an image the API would refuse (measured in [#204](https://github.com/qodesmith/unimatrix-zero/issues/204#issuecomment-6767172446)), puts a text note in place of one it can't read, and goes on with the turn.
+- **App side:** for each attachment main marked inline for Claude, `claude-driver` sends an image as an `image` block and a PDF as a `document` block titled with its name, each right after the text block that ends with the file's path line. A text file goes as text under its name, never as a text document. A rebuilt session's replay carries every earlier Prompt's blocks the same way, inside its `<prompt>` (`prompt-content`, `thread-replay`). The host checks no type, size or count: it follows main's marks.
+- **User would see:** a Reply that answers about an attached image or PDF only after opening it from its path, with a tool call and more tokens; or a Reply that fails over one.
+- **Changed by:** upgrade
+- **Check:** `[dep:claude-attachment-blocks]` in `claude-driver`: a Prompt with a PNG and a one-page PDF gets a Reply naming the word in each with no tool call, and so does a new session told a Thread whose earlier Prompt had the PDF. The shrinking has no check.
+
+### `claude` drops the oldest media past its own limits
+
+- **Id:** `claude-media-limits`
+- **Kind:** D/W
+- **Provider:** Claude
+- **Relies on:** `claude` holds the images and documents of one request, the whole session's included, under limits of its own, about 24 MiB of base64 and 100 files, and past them drops the oldest without a word ([#204](https://github.com/qodesmith/unimatrix-zero/issues/204#issuecomment-6767172446) section 3 and ADR 0022). The API's own count is 100 images or PDF pages for a 200k-token Context window, and 600 above it.
+- **App side:** main keeps a Claude request under a media budget of its own, 20 MiB of base64 and 90 images and documents over the whole Thread sent (`attachments` in the contract), and marks the oldest past it for their path only. `prompt-content` then sends only the path line of those, so the AI can still open them and the window can say which ones (ADR 0022). ChatGPT has no such budget.
+- **User would see:** if `claude`'s limits fell under the budget, an AI that has forgotten an early image or PDF the window still shows as sent inline. If they rose or went away, the budget would send files by path only for no reason.
+- **Changed by:** upgrade + drift. The limits sit in `claude`, and the API's counts follow the Model.
+- **Check:** none: a check has to send one request past 24 MiB of base64, or with more than 100 images, on the maintainer's account each run, and tell a dropped block from one the Model ignored, which isn't cheap.
+
+### Claude opens an attachment from its path
+
+- **Id:** `claude-opens-attachment-path`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** the Model opens a file whose path a Prompt line gives it, such as `[Attached file "note.pdf" is saved at: <path>]`, with `claude`'s Read tool, which asks nothing under full access and picks how to open a file by the path's extension: a `.pdf` reaches the Model as a PDF, not as bytes read as text.
+- **App side:** every attachment puts its path line in the Prompt before the user's text, a folder as `[Attached folder "<name>" is at: <path>]`, and main keeps each copy under a path that ends in the file's own name (`prompt-content`, ADR 0022). A file no Provider takes inline, one over the inline limits and one the media budget left out reach the AI by that line alone.
+- **User would see:** a Reply that says it can't see the attached file, or that reads a PDF or an image as garbage.
+- **Changed by:** upgrade + drift. Read is `claude`'s, and the Model decides whether it opens the path.
+- **Check:** `[dep:claude-opens-attachment-path]` in `claude-driver`: a Prompt with only the path line of a one-page PDF gets a Reply naming the word in it, after a Read call on that path that returns no error.
+
+### Codex takes images as `data:` URLs
+
+- **Id:** `codex-data-url-images`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** `turn/start` takes an `image` item whose `url` is a `data:` URL, and Codex fits each inline image to the Model before every request (2048 px for no `detail`). It replaces an image it can't use, an `http(s)` URL, or one with `detail: low` with a text note, and goes on with the turn (read from the pinned source in [#204](https://github.com/qodesmith/unimatrix-zero/issues/204#issuecomment-6767172446)).
+- **App side:** for each image main marked inline for ChatGPT, `codex-driver` sends a `data:` URL with no `detail` right after the text item that ends with the image's path line, in a Prompt and in a text replay after a refused inject (`prompt-content`). It sends no `localImage`, and no PDF: main marks none inline for ChatGPT, and the driver fails a Reply that brings one.
+- **User would see:** a Reply that answers about an attached image only after opening it from its path, with a tool call, or that says the image was omitted.
+- **Changed by:** upgrade
+- **Check:** `[dep:codex-data-url-images]` in `codex-driver`: a Prompt with a PNG gets a Reply naming the word in it with no tool call.
+
+### Codex takes images in injected history
+
+- **Id:** `codex-injected-images`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** `thread/inject_items` takes a user `message` whose content holds `input_image` items with `data:` URLs beside `input_text`, and Codex prepares those images as it does a Prompt's before each request.
+- **App side:** `codex-driver` gives a new thread each earlier Prompt as a user message of its own: its path lines and inline text files as `input_text`, and each image main marked inline as `input_image` after its line (`prompt-content`). A refused inject falls back to the text replay, which carries the images in `turn/start`.
+- **User would see:** after a hand-over, a ChatGPT that has to open an earlier image from its path to say what it showed; if Codex refused the items, every hand-over with an image would go by text replay.
+- **Changed by:** upgrade
+- **Check:** `[dep:codex-injected-images]` in `codex-driver`: a new thread given a Claude-written Thread whose earlier Prompt had a PNG names the word in it with no tool call, and with no second thread for a replay.
+
+### Codex opens an attachment from its path
+
+- **Id:** `codex-opens-attachment-path`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** the Model opens a file whose path a Prompt line gives it, such as `[Attached file "memo.txt" is saved at: <path>]`, with a command Codex runs under full access, which reads outside the Tree's folder without asking. What it can open that way depends on the commands the machine has (ADR 0022 measured a PDF with and without `pdftotext`).
+- **App side:** every attachment puts its path line in the Prompt before the user's text, and in each earlier Prompt's own message when a Thread is handed over (`prompt-content`). A PDF, a large text file and every other type reach ChatGPT by that line alone.
+- **User would see:** a Reply that says it can't see the attached file.
+- **Changed by:** upgrade + drift. The Model decides whether it opens the path.
+- **Check:** `[dep:codex-opens-attachment-path]` in `codex-driver`: a Prompt with only the path line of a text file gets a Reply naming the word in it, after a tool call that names the file.
+
 ### A new session's setup tokens
 
 - **Id:** `setup-tokens`

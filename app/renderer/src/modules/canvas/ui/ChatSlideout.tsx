@@ -14,6 +14,7 @@ import {useCanvas} from '../canvas-context'
 import {EMPTY_DRAFT} from '../drafts'
 import {pathTo} from '../tree'
 import {PromptInput} from './PromptInput'
+import {SentAttachments} from './SentAttachments'
 import {TooltipButton} from './TooltipButton'
 
 interface ChatSlideoutProps {
@@ -63,6 +64,9 @@ export function ChatSlideout({
   const inputAt = failed
     ? (index.promptById.get(end.promptId)?.parentReplyId ?? null)
     : end.id
+
+  // A failed Reply's Prompt is back in the Input, so it sends nothing yet.
+  const sendsFrom = inputAt === null ? undefined : index.replyById.get(inputAt)
 
   function inFieldElsewhere({target}: Event) {
     return (
@@ -190,7 +194,7 @@ export function ChatSlideout({
         >
           <div ref={content} className="mx-auto flex max-w-180 flex-col gap-3">
             {shown.map(turnId => (
-              <ChatTurn key={turnId} turnId={turnId} />
+              <ChatTurn key={turnId} turnId={turnId} threadEnd={sendsFrom} />
             ))}
             {failed && (
               <div data-chat-turn={end.id}>
@@ -210,22 +214,27 @@ export function ChatSlideout({
   )
 }
 
-function ChatTurn({turnId}: {turnId: string}) {
+function ChatTurn({turnId, threadEnd}: {turnId: string; threadEnd?: Reply}) {
   const {index} = useCanvas()
   const prompt = index.promptById.get(turnId)
   const reply = index.replyById.get(turnId)
 
-  if (prompt) return <ChatPrompt prompt={prompt} />
+  if (prompt) return <ChatPrompt prompt={prompt} threadEnd={threadEnd} />
 
   return reply ? <ChatReply reply={reply} /> : null
 }
 
-function ChatPrompt({prompt}: {prompt: Prompt}) {
+function ChatPrompt({prompt, threadEnd}: {prompt: Prompt; threadEnd?: Reply}) {
   return (
     <Message align="end" data-chat-turn={prompt.id}>
       <MessageContent>
         <Bubble variant="prompt" align="end" className="max-w-[85%]">
           <BubbleContent className="rounded-2xl rounded-br-md px-3.5 whitespace-pre-wrap">
+            <SentAttachments
+              prompt={prompt}
+              threadEnd={threadEnd}
+              className={cn('justify-end', prompt.text !== '' && 'mb-2')}
+            />
             {prompt.text}
           </BubbleContent>
         </Bubble>
