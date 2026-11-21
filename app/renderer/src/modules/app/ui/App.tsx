@@ -18,6 +18,7 @@ import {
 import {NoTreeOpen, TreeTitle, useTrees} from '#modules/trees/main'
 import {LiveReplies} from '#modules/turns/main'
 import {SidebarInset} from '#shadcn/ui/sidebar'
+import {Toaster} from '#shadcn/ui/sonner'
 import {TooltipProvider} from '#shadcn/ui/tooltip'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {useState} from 'react'
@@ -41,6 +42,7 @@ export function App() {
                 <AppLayout />
               </TooltipProvider>
               <SnapshotsWaiting />
+              <Toaster />
             </LiveReplies>
           </ConnectionsProvider>
         </LayoutProvider>

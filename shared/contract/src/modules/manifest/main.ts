@@ -34,6 +34,8 @@ export const VendorProgramSchema = z.strictObject({
   builds: z.record(PlatformSchema, VendorBuildSchema),
 })
 
+export type VendorProgram = z.infer<typeof VendorProgramSchema>
+
 /** The exact vendor program and app-managed helper builds an app bundle runs. */
 export const ManifestSchema = z.strictObject({
   vendorPrograms: z.strictObject({

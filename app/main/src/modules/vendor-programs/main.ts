@@ -1,5 +1,5 @@
 import type {SignInRequest} from '@uz/contract/host'
-import type {Manifest} from '@uz/contract/manifest'
+import type {Manifest, VendorProgram} from '@uz/contract/manifest'
 import type {ProviderId} from '@uz/contract/providers'
 import type {ProgramTarget} from '@uz/vendor-program'
 
@@ -22,10 +22,7 @@ const PROGRAMS = {
   chatgpt: 'codex',
 } as const satisfies Record<ProviderId, keyof Manifest['vendorPrograms']>
 
-function buildFor(
-  {builds}: Manifest['helpers']['git'],
-  {platform, arch}: Machine
-) {
+function buildFor({builds}: VendorProgram, {platform, arch}: Machine) {
   const target = PlatformSchema.safeParse(`${platform}-${arch}`)
 
   return target.success ? builds[target.data] : undefined

@@ -1,9 +1,8 @@
 import {bridge} from '#modules/bridge/main'
-import {Toaster} from '#shadcn/ui/sonner'
 import {useEffect} from 'react'
 import {toast} from 'sonner'
 
-/** Main says so once per launch, the first time a Snapshot waits. */
+/** Main sends it once per launch, at the first wait a window is there to hear. */
 export function SnapshotsWaiting() {
   useEffect(
     () =>
@@ -18,5 +17,5 @@ export function SnapshotsWaiting() {
     []
   )
 
-  return <Toaster />
+  return null
 }

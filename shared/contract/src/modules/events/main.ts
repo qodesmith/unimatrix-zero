@@ -66,7 +66,7 @@ export const TreeDeletedEvent = z.strictObject({
 })
 
 /**
- * A Reply finished without its Snapshot because the app's own `git` isn't in
+ * A Snapshot couldn't be taken or read because the app's own `git` isn't in
  * place: still downloading, or its download failed and is tried again. Sent
  * once per launch, at the first wait a window is there to hear.
  */

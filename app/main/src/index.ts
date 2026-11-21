@@ -200,7 +200,8 @@ function openWindow(db: Database) {
     },
   })
 
-  // Taken with the app's own git, once it is in place or its download failed.
+  // Waits for the check of the git already on disk, so the Snapshots the app
+  // quit before taking aren't recorded as waiting for a download.
   void gitProgram.prepare().then(async () => treeFiles.takeMissedSnapshots())
 
   const connections = createConnections({
