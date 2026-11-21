@@ -144,24 +144,68 @@ it.skipIf(process.platform === 'win32')(
   }
 )
 
-it('lists the files beside a folder that is a git repository of its own, and nothing for that folder', async () => {
-  const nested = {store: path.join(copy.folder, 'vendor/lib/.git')}
-  write('vendor/lib/readme.md', 'theirs')
-  write('notes.md', 'mine')
+/** Makes a folder a git repository of its own, with one commit or none. */
+async function ownRepository(name: string, {commit}: {commit: boolean}) {
+  const nested = {store: path.join(copy.folder, name, '.git')}
   await git(nested, ['init', '--quiet'])
+
+  if (!commit) return
+
   const tree = await git(nested, ['write-tree'])
   const head = await git(nested, ['commit-tree', tree.trim(), '-m', 'theirs'])
   await git(nested, ['update-ref', 'HEAD', head.trim()])
+}
+
+it('keeps the files of a folder that is a git repository of its own, with a commit or none, at any depth, and what changes in them later', async () => {
+  write('notes.md', 'mine')
+  write('vendor/lib/readme.md', 'theirs')
+  write('vendor/lib/.gitignore', '*.log\n')
+  write('vendor/lib/build.log', 'noise')
+  write('scratch/plan.md', 'draft')
+  write('scratch/inner/deep.md', 'deep')
+  await ownRepository('vendor/lib', {commit: true})
+  await ownRepository('scratch', {commit: false})
+  await ownRepository('scratch/inner', {commit: false})
 
   const first = await snapshot('reply-1', null)
 
-  const changed = await changedFiles(git, copy.store, [
-    {replyId: 'reply-1', from: null, to: first},
-  ])
+  write('vendor/lib/readme.md', 'theirs, edited')
+  write('scratch/inner/deeper.md', 'deeper')
+  fs.rmSync(path.join(copy.folder, 'scratch/plan.md'))
+  const second = await snapshot('reply-2', first)
 
-  expect(changed.get('reply-1')).toEqual([
-    {path: 'notes.md', change: 'created', size: 4},
+  expect(await filesIn(first)).toEqual([
+    'notes.md',
+    'scratch/inner/deep.md',
+    'scratch/plan.md',
+    'vendor/lib/.gitignore',
+    'vendor/lib/readme.md',
   ])
+  expect(
+    (
+      await changedFiles(git, copy.store, [
+        {replyId: 'reply-2', from: first, to: second},
+      ])
+    ).get('reply-2')
+  ).toEqual([
+    {path: 'scratch/inner/deeper.md', change: 'created', size: 6},
+    {path: 'scratch/plan.md', change: 'deleted', size: null},
+    {path: 'vendor/lib/readme.md', change: 'edited', size: 14},
+  ])
+})
+
+it('takes a Snapshot after one the app quit in the middle of, and leaves nothing of that one behind', async () => {
+  write('notes.md', 'first')
+  const first = await snapshot('reply-1', null)
+  const left = [`${copy.index}.lock`, `${copy.index}.a-nested-folder`]
+
+  for (const file of left) fs.writeFileSync(file, '')
+
+  write('notes.md', 'second')
+  const second = await snapshot('reply-2', first)
+
+  expect(await contentAt(second, 'notes.md')).toBe('second')
+  expect(left.filter(file => fs.existsSync(file))).toEqual([])
 })
 
 it('puts the store, its index and nothing of git’s in the folder the AI works in', async () => {

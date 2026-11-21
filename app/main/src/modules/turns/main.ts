@@ -60,10 +60,14 @@ export interface TurnsDeps {
   /** Made as each Reply starts, if it is missing. */
   treeFolderFor: (treeId: string) => string
   /**
-   * Settles once the Snapshot being taken of the Tree's files is done, and is
-   * null when none is: a Reply starts after it, so it writes into none.
+   * Settles once the Snapshots a Reply after `parentReplyId` waits for are
+   * taken, and is null when there are none: a Reply starts after them, so it
+   * writes into none.
    */
-  snapshotting: (treeId: string) => Promise<void> | null
+  snapshotsBefore: (
+    treeId: string,
+    parentReplyId: string | null
+  ) => Promise<void> | null
   /** Read as each Reply starts, so a change applies from the next one. */
   compactionSettingsFor: (provider: ProviderId) => CompactionSettings
   /** For telling the AI which Replies another Model wrote, and its name. */
@@ -90,7 +94,7 @@ export function createTurns({
   hosts,
   vendorProgramFor,
   treeFolderFor,
-  snapshotting,
+  snapshotsBefore,
   compactionSettingsFor,
   listedModels,
   attachmentsDir,
@@ -129,8 +133,12 @@ export function createTurns({
     }
   }
 
-  function startOnHost(provider: ProviderId, request: ReplyRequest): Reply {
-    const snapshot = snapshotting(request.treeId)
+  function startOnHost(
+    provider: ProviderId,
+    request: ReplyRequest,
+    parentReplyId: string | null
+  ): Reply {
+    const snapshot = snapshotsBefore(request.treeId, parentReplyId)
 
     inFlight.track(provider, request)
 
@@ -232,18 +240,22 @@ export function createTurns({
         attachmentsDir,
       })
 
-      const started = startOnHost(provider, {
-        treeId,
-        replyId: reply.id,
-        model,
-        systemPrompt: withFilesSection(systemPrompt, treeFolder),
-        prompt: {text, attachments, messageId: randomUUID()},
-        vendorProgram: vendorProgramFor(provider),
-        treeFolder,
-        session,
-        thread,
-        compactionSettings: compactionSettingsFor(provider),
-      })
+      const started = startOnHost(
+        provider,
+        {
+          treeId,
+          replyId: reply.id,
+          model,
+          systemPrompt: withFilesSection(systemPrompt, treeFolder),
+          prompt: {text, attachments, messageId: randomUUID()},
+          vendorProgram: vendorProgramFor(provider),
+          treeFolder,
+          session,
+          thread,
+          compactionSettings: compactionSettingsFor(provider),
+        },
+        parentReplyId
+      )
 
       onTurnsChanged(treeId)
       publish({type: 'LAST_MODEL_CHANGED', model: picked})
@@ -286,18 +298,22 @@ export function createTurns({
 
       resetReply(db, replyId)
 
-      return startOnHost(provider, {
-        treeId,
-        replyId,
-        model,
-        systemPrompt: withFilesSection(systemPrompt, treeFolder),
-        prompt: {text, attachments, messageId: randomUUID()},
-        vendorProgram: vendorProgramFor(provider),
-        treeFolder,
-        session,
-        thread,
-        compactionSettings: compactionSettingsFor(provider),
-      })
+      return startOnHost(
+        provider,
+        {
+          treeId,
+          replyId,
+          model,
+          systemPrompt: withFilesSection(systemPrompt, treeFolder),
+          prompt: {text, attachments, messageId: randomUUID()},
+          vendorProgram: vendorProgramFor(provider),
+          treeFolder,
+          session,
+          thread,
+          compactionSettings: compactionSettingsFor(provider),
+        },
+        recovered.parentReplyId
+      )
     },
 
     /** Its `RUN_FINISHED` comes from the host. */

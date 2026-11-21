@@ -28,14 +28,8 @@ let treeFiles: ReturnType<typeof createTreeFiles>
 let turns: ReturnType<typeof createTurns>
 let treeId: string
 
-beforeEach(() => {
-  db = openDatabase({file: ':memory:', migrationsFolder})
-  userData = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-user-data-'))
-  published = []
-  failures = []
-  hostCommands = []
-  snapshots = []
-
+/** What the app makes at each launch, over the same database and `userData`. */
+function launch() {
   treeFiles = createTreeFiles({
     db,
     userData,
@@ -52,7 +46,7 @@ beforeEach(() => {
     },
     vendorProgramFor: () => ({program: null, configDir: '/config'}),
     treeFolderFor: treeFiles.folderFor,
-    snapshotting: treeFiles.snapshotting,
+    snapshotsBefore: treeFiles.snapshotsBefore,
     compactionSettingsFor: () => ({auto: true, threshold: null}),
     listedModels: () => [],
     attachmentsDir: path.join(userData, 'attachments'),
@@ -61,6 +55,17 @@ beforeEach(() => {
     onReplyFinished: finished =>
       snapshots.push(treeFiles.replyFinished(finished)),
   })
+}
+
+beforeEach(() => {
+  db = openDatabase({file: ':memory:', migrationsFolder})
+  userData = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-user-data-'))
+  published = []
+  failures = []
+  hostCommands = []
+  snapshots = []
+
+  launch()
 
   treeId = createTrees(db).create(new Date()).id
 })
@@ -82,16 +87,26 @@ function send(parentReplyId: string | null, provider: ProviderId = 'claude') {
   return sent.reply.id
 }
 
-/** The folder the host was told to run the Reply's vendor program in. */
-function folderOf(replyId: string) {
+function startOf(replyId: string) {
   const started = hostCommands.find(
     command =>
       command.type === 'reply.start' && command.request.replyId === replyId
   )
 
-  if (started?.type !== 'reply.start') throw new Error('It never started')
+  return started?.type === 'reply.start' ? started : null
+}
+
+/** The folder the host was told to run the Reply's vendor program in. */
+function folderOf(replyId: string) {
+  const started = startOf(replyId)
+
+  if (!started) throw new Error('It never started')
 
   return started.request.treeFolder
+}
+
+async function whenStarted(replyId: string) {
+  await expect.poll(() => startOf(replyId)).not.toBeNull()
 }
 
 /** What the AI does on disk while it writes the Reply. */
@@ -248,7 +263,7 @@ it('takes a failed Reply’s Snapshot too, and its Retry’s in its place', asyn
   })
 })
 
-it('starts the next Reply only once the Snapshot being taken is done', async () => {
+it('starts the next Reply only once the Snapshot being taken is done, and takes that Snapshot once', async () => {
   const first = send(null)
   aiWrites(first, 'a.txt', 'one')
   fromHost(first, {type: 'RUN_FINISHED', status: 'complete'})
@@ -264,6 +279,14 @@ it('starts the next Reply only once the Snapshot being taken is done', async () 
     .poll(() => hostCommands)
     .toMatchObject([{type: 'reply.start', request: {replyId: second}}])
   expect(snapshotOf(first)).toMatch(/^[0-9a-f]{40}$/)
+  expect(filesChanged()).toEqual([
+    {
+      type: 'FILES_CHANGED',
+      treeId,
+      replyId: first,
+      files: [{path: 'a.txt', change: 'created', size: 3}],
+    },
+  ])
 })
 
 it('never starts a Reply that was stopped with every other in its Tree while the Snapshot was taken', async () => {
@@ -302,15 +325,72 @@ it.each(['claude', 'chatgpt'] as const)(
   }
 )
 
-it('reports a Snapshot it can’t take and leaves the Reply as it finished', async () => {
+it('reports a Snapshot it can’t take, leaves the Reply as it finished, and takes it before the next Reply starts', async () => {
   const replyId = send(null)
+  const store = path.join(userData, 'tree-stores', `${treeId}.git`)
   aiWrites(replyId, 'a.txt', 'one')
-  fs.mkdirSync(path.join(userData, 'tree-stores'))
-  fs.writeFileSync(path.join(userData, 'tree-stores', `${treeId}.git`), '')
+  fs.mkdirSync(path.dirname(store))
+  fs.writeFileSync(store, '')
 
   await finish(replyId)
 
   expect(failures).toHaveLength(1)
   expect(snapshotOf(replyId)).toBeNull()
   expect(turns.list(treeId).replies).toMatchObject([{status: 'complete'}])
+
+  fs.rmSync(store)
+  const next = send(replyId)
+  await whenStarted(next)
+  aiWrites(next, 'b.txt', 'two')
+  await finish(next)
+
+  expect(await listed()).toEqual({
+    [replyId]: [{path: 'a.txt', change: 'created', size: 3}],
+    [next]: [{path: 'b.txt', change: 'created', size: 3}],
+  })
+})
+
+it('takes the Snapshot of a Reply the app quit on before the next Reply starts, and says which files it changed', async () => {
+  const quit = send(null)
+  aiWrites(quit, 'a.txt', 'one')
+
+  launch()
+  const next = send(quit)
+  await whenStarted(next)
+  aiWrites(next, 'b.txt', 'two')
+  await finish(next)
+
+  expect(filesChanged()).toEqual([
+    {
+      type: 'FILES_CHANGED',
+      treeId,
+      replyId: quit,
+      files: [{path: 'a.txt', change: 'created', size: 3}],
+    },
+    {
+      type: 'FILES_CHANGED',
+      treeId,
+      replyId: next,
+      files: [{path: 'b.txt', change: 'created', size: 3}],
+    },
+  ])
+  expect(await listed()).toEqual({
+    [quit]: [{path: 'a.txt', change: 'created', size: 3}],
+    [next]: [{path: 'b.txt', change: 'created', size: 3}],
+  })
+})
+
+it('never gives a Reply that ended while the Tree had no files the files a later Reply wrote', async () => {
+  const quiet = send(null)
+  await finish(quiet)
+
+  const writer = send(quiet)
+  aiWrites(writer, 'a.txt', 'one')
+  await finish(writer)
+
+  const fork = send(quiet)
+  await whenStarted(fork)
+  await finish(fork)
+
+  expect(await listed()).toMatchObject({[quiet]: []})
 })

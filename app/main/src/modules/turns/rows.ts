@@ -211,7 +211,12 @@ export function resetReply(db: Database, replyId: string): void {
 
     const row = tx
       .update(replies)
-      .set({...NEW_REPLY_ROW, sessionMessageId: null, snapshotCommit: null})
+      .set({
+        ...NEW_REPLY_ROW,
+        sessionMessageId: null,
+        snapshotCommit: null,
+        noSnapshot: null,
+      })
       .where(eq(replies.id, replyId))
       .returning()
       .get()

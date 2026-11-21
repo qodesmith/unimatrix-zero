@@ -78,7 +78,7 @@ beforeEach(() => {
       },
       vendorProgramFor: () => ({program: null, configDir: '/claude'}),
       treeFolderFor: id => `/trees/${id}`,
-      snapshotting: () => null,
+      snapshotsBefore: () => null,
       compactionSettingsFor: () => ({auto: true, threshold: null}),
       listedModels: () => [],
       attachmentsDir,

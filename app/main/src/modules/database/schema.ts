@@ -153,6 +153,11 @@ export const replies = sqliteTable(
      * changed no file. Null while the Tree has no files, and until it finishes.
      */
     snapshotCommit: text('snapshot_commit'),
+    /**
+     * Why a finished Reply has no Snapshot: the Tree had no files yet, or
+     * taking it failed. Null too when the app quit before taking it.
+     */
+    noSnapshot: text('no_snapshot', {enum: ['no-files', 'failed']}),
     createdAt: createdAt(),
   },
   table => [uniqueIndex('replies_prompt_id').on(table.promptId)]

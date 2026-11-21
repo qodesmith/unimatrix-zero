@@ -1,6 +1,7 @@
 import type {Git} from './git'
 import type {ChangedFile} from '@uz/contract/turns'
 
+import {randomUUID} from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -22,9 +23,6 @@ const DEFAULT_EXCLUDES = [
 
 /** The tree git gives a folder with no files, in a SHA-1 store. */
 const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
-
-/** The mode git gives a folder that is a git repository of its own. */
-const GITLINK = '160000'
 
 /** A Working copy's folder, with the hidden store that keeps its Snapshots. */
 export interface VersionedFolder {
@@ -53,6 +51,68 @@ function oneLine(output: string) {
   return output.trim()
 }
 
+interface Checkout {
+  folder: string
+  index: string
+}
+
+/**
+ * The indexes a Snapshot the app quit in left beside the folder's own: its
+ * lock, which would refuse every later Snapshot, and the indexes of folders
+ * that are git repositories of their own.
+ */
+function removeLeftovers({index}: Checkout) {
+  const folder = path.dirname(index)
+  const prefix = `${path.basename(index)}.`
+
+  for (const name of fs.readdirSync(folder)) {
+    if (name.startsWith(prefix)) fs.rmSync(path.join(folder, name))
+  }
+}
+
+/**
+ * Git lists a folder that is a git repository of its own as its path and a
+ * slash, and never the files in it.
+ */
+async function ownRepositories(git: Git, store: string, checkout: Checkout) {
+  const untracked = await git({store, checkout}, [
+    'ls-files',
+    '--others',
+    '--exclude-standard',
+    '-z',
+  ])
+
+  return untracked.split('\0').filter(entry => entry.endsWith('/'))
+}
+
+/**
+ * Git stores a folder that is a git repository of its own as one entry with
+ * no files, and refuses one with no commit. Its files go into the index once,
+ * under its path; from then on `git add` keeps them like any other file.
+ */
+async function stage(git: Git, store: string, checkout: Checkout) {
+  for (const repository of await ownRepositories(git, store, checkout)) {
+    const tree = await treeOf(git, store, {
+      folder: path.join(checkout.folder, repository),
+      index: `${checkout.index}.${randomUUID()}`,
+    })
+
+    await git({store, checkout}, ['read-tree', `--prefix=${repository}`, tree])
+  }
+
+  await git({store, checkout}, ['add', '--all', '--', '.'])
+}
+
+async function treeOf(git: Git, store: string, checkout: Checkout) {
+  try {
+    await stage(git, store, checkout)
+
+    return oneLine(await git({store, checkout}, ['write-tree']))
+  } finally {
+    fs.rmSync(checkout.index, {force: true})
+  }
+}
+
 /**
  * The folder as it stands, under the Reply's own ref, or `parent` again when
  * nothing differs. The index persists, so git re-hashes only the files whose
@@ -65,13 +125,13 @@ export async function takeSnapshot(
 ): Promise<string> {
   if (!storeExists(store)) await makeStore(git, store)
 
+  const checkout = {folder, index}
+
   fs.mkdirSync(path.dirname(index), {recursive: true})
+  removeLeftovers(checkout)
+  await stage(git, store, checkout)
 
-  const copy = {store, checkout: {folder, index}}
-
-  await git(copy, ['add', '--all', '--', '.'])
-
-  const tree = oneLine(await git(copy, ['write-tree']))
+  const tree = oneLine(await git({store, checkout}, ['write-tree']))
 
   const parentTree =
     parent && oneLine(await git({store}, ['rev-parse', `${parent}^{tree}`]))
@@ -125,15 +185,12 @@ function parseDiffs(output: string): RawChange[][] {
 
     for (const _pair of lines) perPair.push([])
 
-    const [modeBefore, mode, blobBefore, blob, status] = record.split(' ')
+    const [, , blobBefore, blob, status] = record.split(' ')
     const change = changeOf(status)
     const filePath = fields[at + 1]
 
-    // A folder that is a git repository of its own is one entry with no
-    // contents, and a file whose mode alone changed has the same contents.
-    const isFile = mode !== GITLINK && modeBefore !== `:${GITLINK}`
-
-    if (blob && change && filePath && isFile && blob !== blobBefore) {
+    // A file whose mode alone changed has the same contents.
+    if (blob && change && filePath && blob !== blobBefore) {
       perPair.at(-1)?.push({path: filePath, change, blob})
     }
   }

@@ -1,0 +1,1 @@
+ALTER TABLE `replies` ADD `no_snapshot` text;

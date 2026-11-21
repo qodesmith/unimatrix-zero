@@ -74,7 +74,7 @@ function launch() {
 
       return `/trees/${id}`
     },
-    snapshotting: () => null,
+    snapshotsBefore: () => null,
     compactionSettingsFor: () => compactionSettings,
     listedModels: provider => listedModels[provider],
     attachmentsDir,

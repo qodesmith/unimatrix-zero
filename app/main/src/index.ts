@@ -172,7 +172,7 @@ function openWindow(db: Database) {
     hosts,
     vendorProgramFor: provider => signInRequestFor(provider, machine),
     treeFolderFor: treeFiles.folderFor,
-    snapshotting: treeFiles.snapshotting,
+    snapshotsBefore: treeFiles.snapshotsBefore,
     compactionSettingsFor: provider =>
       compactionSettingsFor(settings.read(), provider),
     listedModels: provider => connections.models(provider),

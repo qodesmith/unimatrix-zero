@@ -5,7 +5,7 @@ import type {AppEvent} from '@uz/contract/events'
 import type {Reply} from '@uz/contract/turns'
 
 import {schema} from '#modules/database/main'
-import {and, eq, ne} from 'drizzle-orm'
+import {and, eq, isNull, ne} from 'drizzle-orm'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -34,7 +34,7 @@ interface SnapshotRow {
 
 /**
  * Each Reply's nearest Snapshot above it. A Reply has none of its own while
- * the Tree has no files yet, or when the app quit before taking it.
+ * the Tree has no files yet, or until its Snapshot is taken.
  */
 function parentSnapshots(rows: SnapshotRow[]) {
   const byId = new Map(rows.map(row => [row.replyId, row]))
@@ -77,7 +77,7 @@ export function createTreeFiles({
   onFailure,
   git = createGit(process.env),
 }: TreeFilesDeps) {
-  /** By Tree: its Snapshots are taken one at a time, in the order asked. */
+  /** By Tree, the last Snapshot asked for. */
   const snapshotting = new Map<string, Promise<void>>()
 
   function storeOf(treeId: string) {
@@ -95,25 +95,33 @@ export function createTreeFiles({
     }
   }
 
+  /** A Retry already running writes its own once it finishes. */
+  function save(
+    replyId: string,
+    saved: Pick<typeof replies.$inferInsert, 'snapshotCommit' | 'noSnapshot'>
+  ) {
+    return db
+      .update(replies)
+      .set(saved)
+      .where(and(eq(replies.id, replyId), ne(replies.status, 'streaming')))
+      .returning({id: replies.id})
+      .get()
+  }
+
   async function snapshot(treeId: string, replyId: string) {
     const copy = workingCopyOf(treeId)
 
     // Until the AI first writes a file, the Tree has an empty folder and
     // nothing else.
     if (!storeExists(copy.store) && fs.readdirSync(copy.folder).length === 0) {
+      save(replyId, {noSnapshot: 'no-files'})
+
       return
     }
 
     const parent = parentSnapshots(snapshotRows(db, treeId))(replyId)
     const commit = await takeSnapshot(git, copy, {replyId, parent})
-
-    // A Retry already running writes its own once it finishes.
-    const saved = db
-      .update(replies)
-      .set({snapshotCommit: commit})
-      .where(and(eq(replies.id, replyId), ne(replies.status, 'streaming')))
-      .returning({id: replies.id})
-      .get()
+    const saved = save(replyId, {snapshotCommit: commit, noSnapshot: null})
 
     if (!saved || commit === parent) return
 
@@ -127,14 +135,59 @@ export function createTreeFiles({
   }
 
   /** A Snapshot that fails never fails the Reply or the Turns it belongs to. */
-  async function reporting<T>(work: () => Promise<T>, otherwise: T) {
+  async function snapshotReporting(treeId: string, replyId: string) {
     try {
-      return await work()
+      await snapshot(treeId, replyId)
     } catch (error) {
-      onFailure(error instanceof Error ? error : new Error(String(error)))
+      db.update(replies)
+        .set({noSnapshot: 'failed'})
+        .where(
+          and(
+            eq(replies.id, replyId),
+            ne(replies.status, 'streaming'),
+            isNull(replies.snapshotCommit)
+          )
+        )
+        .run()
 
-      return otherwise
+      onFailure(error instanceof Error ? error : new Error(String(error)))
     }
+  }
+
+  /**
+   * A finished Reply whose Snapshot the app quit before taking, or failed to
+   * take.
+   */
+  function missesSnapshot(replyId: string) {
+    const row = db
+      .select({
+        status: replies.status,
+        snapshotCommit: replies.snapshotCommit,
+        noSnapshot: replies.noSnapshot,
+      })
+      .from(replies)
+      .where(eq(replies.id, replyId))
+      .get()
+
+    return (
+      row !== undefined &&
+      row.status !== 'streaming' &&
+      row.snapshotCommit === null &&
+      row.noSnapshot !== 'no-files'
+    )
+  }
+
+  /** Snapshots of a Tree are taken one at a time, in the order asked. */
+  async function queue(treeId: string, work: () => Promise<void>) {
+    const before = snapshotting.get(treeId) ?? Promise.resolve()
+
+    const taken = before.then(work).finally(() => {
+      if (snapshotting.get(treeId) === taken) snapshotting.delete(treeId)
+    })
+
+    snapshotting.set(treeId, taken)
+
+    return taken
   }
 
   return {
@@ -143,26 +196,28 @@ export function createTreeFiles({
 
     /** Takes the Reply's Snapshot, however it ended. Never rejects. */
     async replyFinished({treeId, replyId}: {treeId: string; replyId: string}) {
-      const before = snapshotting.get(treeId) ?? Promise.resolve()
-
-      const taken = reporting(async () => {
-        await before
-        await snapshot(treeId, replyId)
-      }, undefined).finally(() => {
-        if (snapshotting.get(treeId) === taken) snapshotting.delete(treeId)
-      })
-
-      snapshotting.set(treeId, taken)
-
-      return taken
+      return queue(treeId, async () => snapshotReporting(treeId, replyId))
     },
 
     /**
-     * Settles once the Tree's files are no longer being read for a Snapshot;
-     * null when none is being taken.
+     * Settles once no Snapshot is being taken of the Tree's files, the one of
+     * the Reply a new Reply follows included when it has none yet; null when
+     * nothing is to wait for. Never rejects.
      */
-    snapshotting: (treeId: string): Promise<void> | null =>
-      snapshotting.get(treeId) ?? null,
+    snapshotsBefore: (
+      treeId: string,
+      parentReplyId: string | null
+    ): Promise<void> | null => {
+      if (parentReplyId !== null && missesSnapshot(parentReplyId)) {
+        return queue(treeId, async () => {
+          if (missesSnapshot(parentReplyId)) {
+            await snapshotReporting(treeId, parentReplyId)
+          }
+        })
+      }
+
+      return snapshotting.get(treeId) ?? null
+    },
 
     async withChangedFiles(treeId: string, listed: Reply[]): Promise<Reply[]> {
       const store = storeOf(treeId)
@@ -182,14 +237,18 @@ export function createTreeFiles({
         }
       )
 
-      return reporting(async () => {
+      try {
         const changed = await changedFiles(git, store, pairs)
 
         return listed.map(reply => ({
           ...reply,
           files: changed.get(reply.id) ?? [],
         }))
-      }, listed)
+      } catch (error) {
+        onFailure(error instanceof Error ? error : new Error(String(error)))
+
+        return listed
+      }
     },
   }
 }
