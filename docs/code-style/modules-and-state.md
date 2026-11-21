@@ -2,7 +2,7 @@
 
 ## Keep each module deep. Enforced by: uz/module-boundaries, uz/tsx-under-ui
 
-The layout, and why only `@uz/contract` crosses between processes, are in [README.md](../../README.md), sections Layout and Modules.
+The layout, and which packages cross between processes, are in [README.md](../../README.md), sections Layout and Modules.
 
 ## Name code after the Glossary
 

@@ -28,7 +28,6 @@ export function createGitProgram({
 
   async function download(got: ProgramTarget) {
     try {
-      // Progress isn't shown: only Snapshots wait on it, and the user is told.
       for await (const _progress of getProgramReady(got, {
         signal: new AbortController().signal,
       }));
