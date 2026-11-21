@@ -320,7 +320,6 @@ export const ReplyEventSchema = z.discriminatedUnion('type', [
   ApprovalResolvedEvent,
   SubagentStartedEvent,
   SubagentFinishedEvent,
-  FilesChangedEvent,
   TokensEvent,
   ContextCompactedEvent,
   SessionRebuiltEvent,

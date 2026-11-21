@@ -20,13 +20,19 @@ const ISOLATION = [
   `core.attributesFile=${NOTHING}`,
 ]
 
+export interface Checkout {
+  folder: string
+  /** The folder's own index, kept in the store between Snapshots. */
+  index: string
+}
+
 /**
  * The hidden store, alone or with one folder checked out of it and that
  * folder's index.
  */
 interface GitTarget {
   store: string
-  checkout?: {folder: string; index: string}
+  checkout?: Checkout
 }
 
 /**

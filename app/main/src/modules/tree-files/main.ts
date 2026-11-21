@@ -1,5 +1,4 @@
 import type {Database} from '#modules/database/main'
-import type {Git} from './git'
 import type {SnapshotPair, VersionedFolder} from './store'
 import type {AppEvent} from '@uz/contract/events'
 import type {Reply} from '@uz/contract/turns'
@@ -23,7 +22,6 @@ export interface TreeFilesDeps {
   publish: (event: AppEvent) => void
   /** A Snapshot that couldn't be taken or read; the Reply itself is unharmed. */
   onFailure: (error: Error) => void
-  git?: Git
 }
 
 interface SnapshotRow {
@@ -75,8 +73,8 @@ export function createTreeFiles({
   userData,
   publish,
   onFailure,
-  git = createGit(process.env),
 }: TreeFilesDeps) {
+  const git = createGit(process.env)
   /** By Tree, the last Snapshot asked for. */
   const snapshotting = new Map<string, Promise<void>>()
 

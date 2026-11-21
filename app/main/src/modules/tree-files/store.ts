@@ -1,4 +1,4 @@
-import type {Git} from './git'
+import type {Checkout, Git} from './git'
 import type {ChangedFile} from '@uz/contract/turns'
 
 import {randomUUID} from 'node:crypto'
@@ -6,8 +6,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 /**
- * Never in a Snapshot, whatever the folder's own `.gitignore` files say: one
- * `node_modules` is hundreds of thousands of files.
+ * Left out of every Snapshot unless a `.gitignore` in the folder un-ignores
+ * them: one `node_modules` is hundreds of thousands of files.
  */
 const DEFAULT_EXCLUDES = [
   'node_modules/',
@@ -25,11 +25,8 @@ const DEFAULT_EXCLUDES = [
 const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
 /** A Working copy's folder, with the hidden store that keeps its Snapshots. */
-export interface VersionedFolder {
+export interface VersionedFolder extends Checkout {
   store: string
-  folder: string
-  /** The folder's own index, kept in the store between Snapshots. */
-  index: string
 }
 
 export function storeExists(store: string) {
@@ -49,11 +46,6 @@ async function makeStore(git: Git, store: string) {
 
 function oneLine(output: string) {
   return output.trim()
-}
-
-interface Checkout {
-  folder: string
-  index: string
 }
 
 /**
