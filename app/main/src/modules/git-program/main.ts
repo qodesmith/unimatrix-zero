@@ -26,9 +26,9 @@ export function createGitProgram({
   let downloading: Promise<void> | null = null
   let told = false
 
-  async function download(got: ProgramTarget) {
+  async function download(git: ProgramTarget) {
     try {
-      for await (const _progress of getProgramReady(got, {
+      for await (const _progress of getProgramReady(git, {
         signal: new AbortController().signal,
       }));
       inPlace = true

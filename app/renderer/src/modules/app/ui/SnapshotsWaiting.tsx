@@ -2,7 +2,6 @@ import {bridge} from '#modules/bridge/main'
 import {useEffect} from 'react'
 import {toast} from 'sonner'
 
-/** Main sends it once per launch, at the first wait a window is there to hear. */
 export function SnapshotsWaiting() {
   useEffect(
     () =>

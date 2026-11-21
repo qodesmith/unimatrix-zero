@@ -241,10 +241,6 @@ it('leaves out the default excludes and what the folder’s own .gitignore files
   ])
 })
 
-/**
- * A home whose git config ignores Markdown and runs a hook on every ref, with
- * a `git` of its own first on `PATH`.
- */
 function hostileHome() {
   const home = path.join(root, 'home')
   const hooks = path.join(home, 'hooks')
