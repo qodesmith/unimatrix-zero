@@ -24,12 +24,6 @@ export interface TreeFilesDeps {
   onFailure: (error: Error) => void
 }
 
-interface SnapshotRow {
-  replyId: string
-  parentReplyId: string | null
-  snapshotCommit: string | null
-}
-
 /**
  * Each Reply's nearest Snapshot above it. A Reply has none of its own while
  * the Tree has no files yet, or until its Snapshot is taken.
@@ -48,7 +42,7 @@ function parentSnapshots(rows: SnapshotRow[]) {
   }
 }
 
-function snapshotRows(db: Database, treeId: string): SnapshotRow[] {
+function snapshotRows(db: Database, treeId: string) {
   return db
     .select({
       replyId: replies.id,
@@ -60,6 +54,8 @@ function snapshotRows(db: Database, treeId: string): SnapshotRow[] {
     .where(eq(replies.treeId, treeId))
     .all()
 }
+
+type SnapshotRow = ReturnType<typeof snapshotRows>[number]
 
 export type TreeFiles = ReturnType<typeof createTreeFiles>
 
@@ -218,6 +214,8 @@ export function createTreeFiles({
     },
 
     async withChangedFiles(treeId: string, listed: Reply[]): Promise<Reply[]> {
+      await snapshotting.get(treeId)
+
       const store = storeOf(treeId)
 
       if (!storeExists(store)) return listed

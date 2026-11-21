@@ -203,6 +203,26 @@ it('makes the hidden store with the AI’s first write, outside the Tree’s fol
   expect(failures).toEqual([])
 })
 
+it('lists the files a Reply changed while its Snapshot is still being taken, the Tree’s first included', async () => {
+  const first = send(null)
+  aiWrites(first, 'a.txt', 'one')
+  fromHost(first, {type: 'RUN_FINISHED', status: 'complete'})
+
+  expect(await listed()).toEqual({
+    [first]: [{path: 'a.txt', change: 'created', size: 3}],
+  })
+
+  const second = send(first)
+  await whenStarted(second)
+  aiWrites(second, 'b.txt', 'two')
+  fromHost(second, {type: 'RUN_FINISHED', status: 'complete'})
+
+  expect(await listed()).toEqual({
+    [first]: [{path: 'a.txt', change: 'created', size: 3}],
+    [second]: [{path: 'b.txt', change: 'created', size: 3}],
+  })
+})
+
 it('gives a Reply that changed nothing its parent’s Snapshot and no files, and the next Reply only what it changed itself', async () => {
   const first = send(null)
   aiWrites(first, 'a.txt', 'one')

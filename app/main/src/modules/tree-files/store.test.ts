@@ -217,22 +217,27 @@ it('puts the store, its index and nothing of git’s in the folder the AI works 
   expect(fs.existsSync(copy.index)).toBe(true)
 })
 
-it('leaves out the default excludes and what the folder’s own .gitignore files name, at any depth', async () => {
+it('leaves out the default excludes and what the folder’s own .gitignore files name, at any depth, in a folder that is a git repository of its own too', async () => {
   write('notes.md', 'kept')
   write('node_modules/left-pad/index.js', 'module.exports = 1')
   write('app/.venv/bin/python', '#!')
   write('app/dist/out.js', '1')
-  write('.gitignore', '*.log\n')
+  write('.gitignore', '*.log\ncache/\n')
   write('debug.log', 'noise')
   write('app/.gitignore', 'secret.txt\n')
   write('app/secret.txt', 'hush')
   write('app/main.py', 'print(1)')
+  write('vendor/lib/index.js', 'theirs')
+  write('vendor/lib/trace.log', 'noise')
+  write('vendor/lib/cache/entry', 'noise')
+  await ownRepository('vendor/lib', {commit: true})
 
   expect(await filesIn(await snapshot('reply-1', null))).toEqual([
     '.gitignore',
     'app/.gitignore',
     'app/main.py',
     'notes.md',
+    'vendor/lib/index.js',
   ])
 })
 

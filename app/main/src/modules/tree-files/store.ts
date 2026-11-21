@@ -78,6 +78,43 @@ async function ownRepositories(git: Git, store: string, checkout: Checkout) {
 }
 
 /**
+ * Staged alone, a repository of its own reads only the `.gitignore` files
+ * inside it, and a file once in the index stays there through `git add`.
+ */
+async function untrackIgnored(
+  git: Git,
+  store: string,
+  checkout: Checkout,
+  repository: string
+) {
+  const ignored = await git({store, checkout}, [
+    'ls-files',
+    '-z',
+    '--cached',
+    '--ignored',
+    '--exclude-standard',
+    '--',
+    repository,
+  ])
+
+  // `git rm` with no pathspec fails.
+  if (ignored === '') return
+
+  await git(
+    {store, checkout},
+    [
+      '--literal-pathspecs',
+      'rm',
+      '--cached',
+      '-q',
+      '--pathspec-from-file=-',
+      '--pathspec-file-nul',
+    ],
+    ignored
+  )
+}
+
+/**
  * Git stores a folder that is a git repository of its own as one entry with
  * no files, and refuses one with no commit. Its files go into the index once,
  * under its path; from then on `git add` keeps them like any other file.
@@ -90,6 +127,7 @@ async function stage(git: Git, store: string, checkout: Checkout) {
     })
 
     await git({store, checkout}, ['read-tree', `--prefix=${repository}`, tree])
+    await untrackIgnored(git, store, checkout, repository)
   }
 
   await git({store, checkout}, ['add', '--all', '--', '.'])
@@ -158,7 +196,6 @@ function changeOf(status: string | undefined): ChangedFile['change'] | null {
 interface RawChange {
   path: string
   change: ChangedFile['change']
-  /** The file's contents after the change. */
   blob: string
 }
 
