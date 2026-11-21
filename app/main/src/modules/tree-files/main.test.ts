@@ -55,6 +55,8 @@ function launch() {
     onReplyFinished: finished =>
       snapshots.push(treeFiles.replyFinished(finished)),
   })
+
+  snapshots.push(treeFiles.takeMissedSnapshots())
 }
 
 beforeEach(() => {
@@ -397,6 +399,25 @@ it('takes the Snapshot of a Reply the app quit on before the next Reply starts, 
   expect(await listed()).toEqual({
     [quit]: [{path: 'a.txt', change: 'created', size: 3}],
     [next]: [{path: 'b.txt', change: 'created', size: 3}],
+  })
+})
+
+it('takes the Snapshot of a Reply the app quit on when it starts again, so a Reply on another Branch adds no files to it', async () => {
+  const root = send(null)
+  await finish(root)
+
+  const quit = send(root)
+  await whenStarted(quit)
+  aiWrites(quit, 'a.txt', 'one')
+
+  launch()
+  const other = send(root)
+  await whenStarted(other)
+  aiWrites(other, 'b.txt', 'two')
+  await finish(other)
+
+  expect(await listed()).toMatchObject({
+    [quit]: [{path: 'a.txt', change: 'created', size: 3}],
   })
 })
 

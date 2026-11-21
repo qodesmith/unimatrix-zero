@@ -190,6 +190,8 @@ function openWindow(db: Database) {
     },
   })
 
+  void treeFiles.takeMissedSnapshots()
+
   const connections = createConnections({
     db,
     hosts,

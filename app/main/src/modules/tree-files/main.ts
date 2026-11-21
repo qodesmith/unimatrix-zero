@@ -213,6 +213,33 @@ export function createTreeFiles({
       return snapshotting.get(treeId) ?? null
     },
 
+    /**
+     * Takes, oldest first, every Snapshot the app quit before taking. Run at
+     * launch, after Replies left streaming are marked interrupted: a Reply on
+     * another Branch would write into the folder before its Snapshot. A failed
+     * one waits for a Reply that continues from it. Never rejects.
+     */
+    async takeMissedSnapshots() {
+      const missed = db
+        .select({treeId: replies.treeId, replyId: replies.id})
+        .from(replies)
+        .where(
+          and(
+            ne(replies.status, 'streaming'),
+            isNull(replies.snapshotCommit),
+            isNull(replies.noSnapshot)
+          )
+        )
+        .orderBy(replies.createdAt)
+        .all()
+
+      await Promise.all(
+        missed.map(async ({treeId, replyId}) =>
+          queue(treeId, async () => snapshotReporting(treeId, replyId))
+        )
+      )
+    },
+
     async withChangedFiles(treeId: string, listed: Reply[]): Promise<Reply[]> {
       await snapshotting.get(treeId)
 
