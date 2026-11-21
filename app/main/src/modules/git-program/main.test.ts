@@ -20,7 +20,6 @@ function heldDownload() {
   const downloads: PromiseWithResolvers<void>[] = []
 
   const fake = vi.fn<typeof getProgramReady>(async function* (got) {
-    expect(got).toBe(target)
     const download = Promise.withResolvers<void>()
     downloads.push(download)
     yield {receivedBytes: 0, totalBytes: got.build.size}
@@ -40,6 +39,7 @@ it('names no git until its download is in place, then the entrypoint inside it b
   })
 
   const prepared = git.prepare()
+  expect(getProgramReady).toHaveBeenCalledWith(target, expect.anything())
 
   await expect.poll(() => downloads).toHaveLength(1)
   expect(git.program()).toBeNull()
