@@ -18,12 +18,14 @@ import {
 import {NoTreeOpen, TreeTitle, useTrees} from '#modules/trees/main'
 import {LiveReplies} from '#modules/turns/main'
 import {SidebarInset} from '#shadcn/ui/sidebar'
+import {Toaster} from '#shadcn/ui/sonner'
 import {TooltipProvider} from '#shadcn/ui/tooltip'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {useState} from 'react'
 
 import {useFirstLaunch} from '../first-launch/use-first-launch'
 import {AppSidebar} from './AppSidebar'
+import {SnapshotsWaiting} from './SnapshotsWaiting'
 
 export function App() {
   // oxlint-disable-next-line react/hook-use-state -- created once and never replaced
@@ -39,6 +41,8 @@ export function App() {
               <TooltipProvider>
                 <AppLayout />
               </TooltipProvider>
+              <SnapshotsWaiting />
+              <Toaster />
             </LiveReplies>
           </ConnectionsProvider>
         </LayoutProvider>

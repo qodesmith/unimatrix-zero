@@ -4,5 +4,8 @@
     "types": ["node", "electron"]
   },
   "include": ["src"],
-  "references": [{"path": "../../shared/contract"}]
+  "references": [
+    {"path": "../../shared/contract"},
+    {"path": "../../shared/vendor-program"}
+  ]
 }

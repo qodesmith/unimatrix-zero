@@ -106,6 +106,14 @@ function inside(folder: string, name: string) {
   return target
 }
 
+/**
+ * A link to a name in its own folder, never a path: no chain of such links
+ * leads out of the folder the archive unpacks into.
+ */
+function isSibling(link: string) {
+  return link !== '' && link !== '.' && link !== '..' && !/[/\\:]/.test(link)
+}
+
 export async function untar(
   archive: string,
   folder: string,
@@ -146,6 +154,9 @@ export async function untar(
       // The permission bits, without set-user-ID and the like.
       await writeFile(reader, target, octal(header, 100, 8) % 0o1000, size)
       await reader.exactly(padding)
+    } else if (type === '2' && isSibling(text(header, 157, 100))) {
+      await fs.mkdir(path.dirname(target), {recursive: true})
+      await fs.symlink(text(header, 157, 100), target)
     } else {
       throw new Error(`The archive has an entry it can't unpack: ${name}`)
     }

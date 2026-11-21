@@ -6,6 +6,7 @@ interface PinVersions {
   claude: string
   codex: string
   sdk: string
+  git?: string
   other?: string
 }
 
@@ -14,6 +15,7 @@ function files(pins: PinVersions) {
     vendorPrograms: {
       claude: {version: pins.claude, builds: {}},
       codex: {version: pins.codex, builds: {}},
+      git: {version: pins.git ?? '2.56.1', builds: {}},
     },
   }
 
@@ -77,6 +79,12 @@ describe('a bump PR', () => {
     await expect(bumpOf(apiAt(head), 'o/r', pr)).resolves.toEqual([
       '@anthropic-ai/claude-agent-sdk 0.3.307 → 0.3.322',
     ])
+  })
+
+  it('isn’t one that moves only the app’s own git', async () => {
+    const head = {...PINNED, git: '2.57.0'}
+
+    await expect(bumpOf(apiAt(head), 'o/r', pr)).resolves.toEqual([])
   })
 
   it('isn’t one that edits the pin files without moving a pin', async () => {

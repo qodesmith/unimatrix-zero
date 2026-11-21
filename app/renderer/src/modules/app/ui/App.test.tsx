@@ -222,6 +222,23 @@ it('closes only Settings on Esc over a streaming Reply and the slideout: the Rep
   expect(main.sent.map(command => command.type)).not.toContain('reply.stop')
 })
 
+it('says, when a Reply finished without its Snapshot for want of the app’s git, that file history starts once the download finishes', async () => {
+  const main = fakeMain()
+  globalThis.window.uz = main
+  await renderApp()
+  await expect.element(sidebarNewTree()).toBeVisible()
+
+  main.publish({type: 'SNAPSHOTS_WAITING'})
+
+  await expect
+    .element(
+      page.getByText('File history starts once a download finishes', {
+        exact: true,
+      })
+    )
+    .toBeVisible()
+})
+
 it('creates a Tree and opens it', async () => {
   globalThis.window.uz = fakeMain()
   await renderApp()

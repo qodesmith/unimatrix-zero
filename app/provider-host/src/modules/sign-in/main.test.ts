@@ -1,5 +1,5 @@
-import type {DownloadProgress} from '#modules/vendor-program/main'
 import type {SignInUpdate} from '@uz/contract/providers'
+import type {DownloadProgress} from '@uz/vendor-program'
 
 import {expect, it} from 'vitest'
 

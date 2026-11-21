@@ -16,6 +16,7 @@ export default defineConfig({
           testTimeout: HANG_MS,
           hookTimeout: HANG_MS,
           expect: {poll: {timeout: HANG_MS / 2}},
+          globalSetup: ['app/main/src/modules/git-program/test-setup.ts'],
           include: [
             'scripts/**/*.test.ts',
             'tooling/**/*.test.ts',

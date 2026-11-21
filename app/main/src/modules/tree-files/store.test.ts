@@ -3,7 +3,7 @@ import type {VersionedFolder} from './store'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import {afterEach, beforeEach, expect, it} from 'vitest'
+import {afterEach, beforeEach, expect, inject, it} from 'vitest'
 
 import {createGit} from './git'
 import {changedFiles, storeExists, takeSnapshot} from './store'
@@ -21,7 +21,7 @@ beforeEach(() => {
     index: path.join(root, 'store.git', 'uz-index'),
   }
   fs.mkdirSync(copy.folder)
-  git = createGit(process.env)
+  git = createGit(inject('gitProgram'), process.env)
 })
 
 afterEach(() => {
@@ -241,12 +241,22 @@ it('leaves out the default excludes and what the folder’s own .gitignore files
   ])
 })
 
-/** A home whose git config ignores Markdown and runs a hook on every ref. */
 function hostileHome() {
   const home = path.join(root, 'home')
   const hooks = path.join(home, 'hooks')
+  const bin = path.join(home, 'bin')
   const ran = path.join(root, 'hook-ran')
+  const pathRan = path.join(root, 'path-git-ran')
   fs.mkdirSync(hooks, {recursive: true})
+  fs.mkdirSync(bin)
+  fs.writeFileSync(
+    path.join(bin, 'git'),
+    `#!/bin/sh\necho ran > "${pathRan}"\n`,
+    {
+      mode: 0o755,
+    }
+  )
+  fs.writeFileSync(path.join(bin, 'git.cmd'), `@echo ran > "${pathRan}"\r\n`)
   fs.writeFileSync(path.join(home, 'ignore'), '*.md\n')
   fs.writeFileSync(
     path.join(home, '.gitconfig'),
@@ -258,13 +268,19 @@ function hostileHome() {
     {mode: 0o755}
   )
 
-  return {home, ran, hooks}
+  return {home, ran, pathRan, bin, hooks}
 }
 
-it('reads no global or system config, takes no git variable from the app’s own environment and runs no hook, the store’s own included', async () => {
-  const {home, ran, hooks} = hostileHome()
-  git = createGit({
+it('reads no global or system config, takes no git variable from the app’s own environment, runs no hook, the store’s own included, and runs no git from PATH', async () => {
+  const {home, ran, pathRan, bin, hooks} = hostileHome()
+
+  const pathName =
+    Object.keys(process.env).find(name => name.toUpperCase() === 'PATH') ??
+    'PATH'
+
+  git = createGit(inject('gitProgram'), {
     ...process.env,
+    [pathName]: `${bin}${path.delimiter}${process.env[pathName] ?? ''}`,
     HOME: home,
     USERPROFILE: home,
     XDG_CONFIG_HOME: path.join(home, '.config'),
@@ -277,9 +293,19 @@ it('reads no global or system config, takes no git variable from the app’s own
 
   fs.cpSync(hooks, path.join(copy.store, 'hooks'), {recursive: true})
   write('notes.md', 'second')
+  write('vendor/lib/readme.md', 'theirs')
+  await ownRepository('vendor/lib', {commit: true})
   const second = await snapshot('reply-2', first)
 
-  expect(await filesIn(second)).toEqual(['notes.md'])
+  const changed = await changedFiles(git, copy.store, [
+    {replyId: 'reply-2', from: first, to: second},
+  ])
+
+  expect(changed.get('reply-2')).toEqual([
+    {path: 'notes.md', change: 'edited', size: 6},
+    {path: 'vendor/lib/readme.md', change: 'created', size: 6},
+  ])
   expect(fs.existsSync(ran)).toBe(false)
   expect(fs.existsSync(path.join(root, 'elsewhere'))).toBe(false)
+  expect(fs.existsSync(pathRan)).toBe(false)
 })

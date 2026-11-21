@@ -1,4 +1,5 @@
 import type {Database} from '#modules/database/main'
+import type {Git} from './git'
 import type {SnapshotPair, VersionedFolder} from './store'
 import type {AppEvent} from '@uz/contract/events'
 import type {Reply} from '@uz/contract/turns'
@@ -22,7 +23,13 @@ export interface TreeFilesDeps {
   publish: (event: AppEvent) => void
   /** A Snapshot that couldn't be taken or read; the Reply itself is unharmed. */
   onFailure: (error: Error) => void
+  /** The app's own `git` by its full path, or null while it isn't in place. */
+  gitProgram: () => string | null
+  /** A Snapshot that couldn't be taken or read because `gitProgram` is null. */
+  onWaitingForGit: () => void
 }
+
+class GitMissingError extends Error {}
 
 /**
  * Each Reply's nearest Snapshot above it. A Reply has none of its own while
@@ -69,8 +76,22 @@ export function createTreeFiles({
   userData,
   publish,
   onFailure,
+  gitProgram,
+  onWaitingForGit,
 }: TreeFilesDeps) {
-  const git = createGit(process.env)
+  async function git(...call: Parameters<Git>) {
+    const program = gitProgram()
+
+    if (!program) throw new GitMissingError()
+
+    return createGit(program, process.env)(...call)
+  }
+
+  function report(error: Error) {
+    if (error instanceof GitMissingError) onWaitingForGit()
+    else onFailure(error)
+  }
+
   /** By Tree, the last Snapshot asked for. */
   const snapshotting = new Map<string, Promise<void>>()
 
@@ -144,7 +165,7 @@ export function createTreeFiles({
         )
         .run()
 
-      onFailure(error instanceof Error ? error : new Error(String(error)))
+      report(error instanceof Error ? error : new Error(String(error)))
     }
   }
 
@@ -268,7 +289,7 @@ export function createTreeFiles({
           files: changed.get(reply.id) ?? [],
         }))
       } catch (error) {
-        onFailure(error instanceof Error ? error : new Error(String(error)))
+        report(error instanceof Error ? error : new Error(String(error)))
 
         return listed
       }
