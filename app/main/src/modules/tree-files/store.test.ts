@@ -170,7 +170,7 @@ function hostileHome() {
   return {home, ran, hooks}
 }
 
-it('reads no global or system config and runs no hook, the store’s own included', async () => {
+it('reads no global or system config, takes no git variable from the app’s own environment and runs no hook, the store’s own included', async () => {
   const {home, ran, hooks} = hostileHome()
   git = createGit({
     ...process.env,
@@ -178,7 +178,7 @@ it('reads no global or system config and runs no hook, the store’s own include
     USERPROFILE: home,
     XDG_CONFIG_HOME: path.join(home, '.config'),
     GIT_CONFIG_GLOBAL: path.join(home, '.gitconfig'),
-    GIT_DIR: path.join(root, 'elsewhere.git'),
+    GIT_OBJECT_DIRECTORY: path.join(root, 'elsewhere'),
   })
 
   write('notes.md', 'first')
@@ -190,5 +190,5 @@ it('reads no global or system config and runs no hook, the store’s own include
 
   expect(await filesIn(second)).toEqual(['notes.md'])
   expect(fs.existsSync(ran)).toBe(false)
-  expect(fs.existsSync(path.join(root, 'elsewhere.git'))).toBe(false)
+  expect(fs.existsSync(path.join(root, 'elsewhere'))).toBe(false)
 })
