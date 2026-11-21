@@ -68,6 +68,7 @@ function reply(n: number, promptN: number, text: string): Reply {
     failure: null,
     compacted: false,
     rebuilt: false,
+    files: [],
     createdAt: at(++clock),
   }
 }

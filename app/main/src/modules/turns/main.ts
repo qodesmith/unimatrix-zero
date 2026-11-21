@@ -19,6 +19,7 @@ import type {Reply, ReplyEvent} from '@uz/contract/turns'
 
 import {refuseTooManyImages} from '#modules/attachments/main'
 import {schema} from '#modules/database/main'
+import {withFilesSection} from '#modules/tree-files/main'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {eq} from 'drizzle-orm'
 import {randomUUID} from 'node:crypto'
@@ -58,6 +59,11 @@ export interface TurnsDeps {
   vendorProgramFor: (provider: ProviderId) => SignInRequest
   /** Made as each Reply starts, if it is missing. */
   treeFolderFor: (treeId: string) => string
+  /**
+   * Settles once the Snapshot being taken of the Tree's files is done, and is
+   * null when none is: a Reply starts after it, so it writes into none.
+   */
+  snapshotting: (treeId: string) => Promise<void> | null
   /** Read as each Reply starts, so a change applies from the next one. */
   compactionSettingsFor: (provider: ProviderId) => CompactionSettings
   /** For telling the AI which Replies another Model wrote, and its name. */
@@ -84,6 +90,7 @@ export function createTurns({
   hosts,
   vendorProgramFor,
   treeFolderFor,
+  snapshotting,
   compactionSettingsFor,
   listedModels,
   attachmentsDir,
@@ -98,9 +105,7 @@ export function createTurns({
     .where(eq(schema.replies.status, 'streaming'))
     .run()
 
-  function startOnHost(provider: ProviderId, request: ReplyRequest): Reply {
-    inFlight.track(provider, request)
-
+  function sendToHost(provider: ProviderId, request: ReplyRequest) {
     try {
       hosts.send(provider, {type: 'reply.start', request})
     } catch {
@@ -109,6 +114,28 @@ export function createTurns({
         message: `${PROVIDER_NAMES[provider]} could not be reached.`,
       })
     }
+  }
+
+  /** Its Tree may be deleted while it waits; then nothing is sent. */
+  async function sendAfter(
+    snapshot: Promise<void>,
+    provider: ProviderId,
+    request: ReplyRequest
+  ) {
+    await snapshot
+
+    if (inFlight.writer(request.treeId, request.replyId)) {
+      sendToHost(provider, request)
+    }
+  }
+
+  function startOnHost(provider: ProviderId, request: ReplyRequest): Reply {
+    const snapshot = snapshotting(request.treeId)
+
+    inFlight.track(provider, request)
+
+    if (snapshot) void sendAfter(snapshot, provider, request)
+    else sendToHost(provider, request)
 
     return savedReply(db, request.replyId)
   }
@@ -209,7 +236,7 @@ export function createTurns({
         treeId,
         replyId: reply.id,
         model,
-        systemPrompt,
+        systemPrompt: withFilesSection(systemPrompt, treeFolder),
         prompt: {text, attachments, messageId: randomUUID()},
         vendorProgram: vendorProgramFor(provider),
         treeFolder,
@@ -263,7 +290,7 @@ export function createTurns({
         treeId,
         replyId,
         model,
-        systemPrompt,
+        systemPrompt: withFilesSection(systemPrompt, treeFolder),
         prompt: {text, attachments, messageId: randomUUID()},
         vendorProgram: vendorProgramFor(provider),
         treeFolder,

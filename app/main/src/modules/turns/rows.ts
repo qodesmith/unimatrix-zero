@@ -51,6 +51,8 @@ function toReply(row: ReplyRow, compacted: boolean): Reply {
     failure: FailureSchema.parse(row.failure ?? null),
     compacted,
     rebuilt: row.rebuilt,
+    // Read from its Snapshot, which only the Tree's files module can do.
+    files: [],
     createdAt: row.createdAt.toISOString(),
   }
 }
@@ -209,7 +211,7 @@ export function resetReply(db: Database, replyId: string): void {
 
     const row = tx
       .update(replies)
-      .set({...NEW_REPLY_ROW, sessionMessageId: null})
+      .set({...NEW_REPLY_ROW, sessionMessageId: null, snapshotCommit: null})
       .where(eq(replies.id, replyId))
       .returning()
       .get()

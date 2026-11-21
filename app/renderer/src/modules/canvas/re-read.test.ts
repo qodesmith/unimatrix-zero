@@ -48,6 +48,7 @@ function exchange(
       failure: null,
       compacted: false,
       rebuilt: false,
+      files: [],
       createdAt,
     },
   }

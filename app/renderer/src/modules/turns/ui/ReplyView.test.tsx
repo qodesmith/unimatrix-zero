@@ -39,6 +39,7 @@ const reply: Reply = {
   failure: null,
   compacted: false,
   rebuilt: false,
+  files: [],
   createdAt: '2026-10-19T12:00:00.000Z',
 }
 
@@ -253,6 +254,60 @@ it('renders the tool call inline, between the text before and after it', async (
 
   expect(order.slice(0, toolAt).join(' ')).toContain('Let me look somethin')
   expect(order.slice(toolAt + 1).join(' ')).toContain('Found it.')
+})
+
+it('lists the files a Reply changed as chips under its text, each with what happened to it and the size it was left at', async () => {
+  onTestFinished(followColorScheme())
+
+  const screen = await renderSaved({
+    status: 'complete',
+    content: [{type: 'text', text: 'All written down.'}],
+    files: [
+      {path: 'notes/plan.md', change: 'created', size: 1200},
+      {path: 'src/app.ts', change: 'edited', size: 64},
+      {path: 'old.txt', change: 'deleted', size: null},
+    ],
+  })
+
+  const chips = screen.getByRole('group', {name: 'Files changed'})
+  const created = chips.getByRole('group', {name: 'Created notes/plan.md'})
+  const deleted = chips.getByRole('group', {name: 'Deleted old.txt'})
+
+  await expect.element(created).toHaveTextContent('plan.mdCreated · 1.2 KiB')
+  await expect
+    .element(chips.getByRole('group', {name: 'Edited src/app.ts'}))
+    .toHaveTextContent('app.tsEdited · 64 bytes')
+  await expect.element(deleted).toHaveTextContent('old.txtDeleted')
+  expect(colorOf(created.getByText(/^Created ·/))).not.toBe(
+    colorOf(deleted.getByText('Deleted', {exact: true}))
+  )
+
+  const article = screen.getByRole('article', {name: 'Reply'}).element()
+  const order = visibleOrder(article)
+
+  expect(order[0]).toBe('All written down.')
+  expect(order[1]).toContain('plan.md')
+})
+
+it('shows no chips on a Reply that changed no file, and adds them when main reports its files after it finishes', async () => {
+  const screen = await replay(events.length)
+  const chips = screen.getByRole('group', {name: 'Files changed'})
+
+  await expect
+    .element(screen.getByRole('article', {name: 'Reply'}))
+    .toHaveAttribute('aria-busy', 'false')
+  await expect.element(chips).not.toBeInTheDocument()
+
+  main.publish({
+    type: 'FILES_CHANGED',
+    treeId,
+    replyId,
+    files: [{path: 'notes.txt', change: 'created', size: 5}],
+  })
+
+  await expect
+    .element(chips.getByRole('group', {name: 'Created notes.txt'}))
+    .toBeVisible()
 })
 
 it('shows the tool call as running until its result arrives', async () => {

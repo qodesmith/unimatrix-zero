@@ -82,6 +82,7 @@ function attachedReply(provider: ProviderId, modelId: string): Reply {
     failure: null,
     compacted: false,
     rebuilt: false,
+    files: [],
     createdAt,
   }
 }

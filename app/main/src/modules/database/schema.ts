@@ -148,6 +148,11 @@ export const replies = sqliteTable(
     contextSize: integer('context_size'),
     contextWindow: integer('context_window'),
     rebuilt: integer('rebuilt', {mode: 'boolean'}).notNull().default(false),
+    /**
+     * Its Snapshot in the Tree's hidden store: its parent's again when it
+     * changed no file. Null while the Tree has no files, and until it finishes.
+     */
+    snapshotCommit: text('snapshot_commit'),
     createdAt: createdAt(),
   },
   table => [uniqueIndex('replies_prompt_id').on(table.promptId)]

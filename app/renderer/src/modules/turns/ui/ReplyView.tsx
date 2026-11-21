@@ -26,6 +26,7 @@ import {Fragment} from 'react'
 
 import {useReply, useThinking, useWaiting} from '../use-live-reply'
 import {useOnline} from '../use-online'
+import {ChangedFiles} from './ChangedFiles'
 
 type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 
@@ -74,6 +75,7 @@ export function ReplyView({reply}: {reply: Reply}) {
         </Fragment>
       ))}
       {thinkingBefore(content.length)}
+      {!streaming && <ChangedFiles files={reply.files} />}
       {streaming && <StreamingLine replyId={reply.id} />}
       <StatusLine status={status} />
     </article>

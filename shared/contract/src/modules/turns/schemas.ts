@@ -81,6 +81,17 @@ export const RunFailureSchema = z.strictObject({
 
 export type RunFailure = z.infer<typeof RunFailureSchema>
 
+/** A file whose contents differ between a Reply's Snapshot and its parent's. */
+export const ChangedFileSchema = z.strictObject({
+  /** Inside the Tree's files, with `/` between parts. */
+  path: z.string().min(1),
+  change: z.enum(['created', 'edited', 'deleted']),
+  /** In bytes, as the Reply left it; null once deleted. */
+  size: z.number().int().nonnegative().nullable(),
+})
+
+export type ChangedFile = z.infer<typeof ChangedFileSchema>
+
 /** The part of a Reply that changes while it streams. */
 export const ReplyProgressSchema = z.strictObject({
   status: ReplyStatusSchema,
@@ -105,6 +116,11 @@ export const ReplySchema = z.strictObject({
   promptId: z.uuid(),
   provider: ProviderIdSchema,
   model: z.string(),
+  /**
+   * What it changed in the Tree's files, computed from its Snapshot and its
+   * parent's: empty until the Reply has finished.
+   */
+  files: z.array(ChangedFileSchema),
   createdAt: z.iso.datetime(),
 })
 
@@ -230,10 +246,14 @@ export const SubagentFinishedEvent = z.strictObject({
   status: FinishedStatusSchema,
 })
 
+/**
+ * The Reply's Snapshot differs from its parent's. Main sends it after the
+ * Reply's `RUN_FINISHED`, since the Snapshot is taken then.
+ */
 export const FilesChangedEvent = z.strictObject({
-  ...replyEvent,
+  ...replyIds,
   type: z.literal('FILES_CHANGED'),
-  paths: z.array(z.string()),
+  files: z.array(ChangedFileSchema).min(1),
 })
 
 const tokenCount = z.number().int().nonnegative()

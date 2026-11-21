@@ -3,6 +3,7 @@ import type {Connections} from '#modules/connections/main'
 import type {LayoutStore} from '#modules/layout/main'
 import type {RemoteImages} from '#modules/remote-images/main'
 import type {SettingsStore} from '#modules/settings/main'
+import type {TreeFiles} from '#modules/tree-files/main'
 import type {Trees} from '#modules/trees/main'
 import type {Turns} from '#modules/turns/main'
 import type {Command, CommandResult, CommandType} from '@uz/contract/commands'
@@ -13,6 +14,7 @@ export interface HandlerDeps {
   now: () => Date
   trees: Trees
   turns: Turns
+  treeFiles: Pick<TreeFiles, 'withChangedFiles'>
   connections: Pick<
     Connections,
     'connect' | 'openPage' | 'submitCode' | 'cancel'
@@ -78,10 +80,15 @@ export const handlers: Handlers = {
     return {}
   },
 
-  'tree.turns': ({treeId}, {trees, turns}) => {
+  'tree.turns': async ({treeId}, {trees, turns, treeFiles}) => {
     found(trees.get(treeId))
 
-    return turns.list(treeId)
+    const {prompts, replies} = turns.list(treeId)
+
+    return {
+      prompts,
+      replies: await treeFiles.withChangedFiles(treeId, replies),
+    }
   },
 
   'prompt.send': (command, {trees, turns}) => {
