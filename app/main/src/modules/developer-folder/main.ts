@@ -1,9 +1,5 @@
-import fs from 'node:fs'
+import {quoted, runningBuild, writeScript} from '#modules/git-wrapper/main'
 import path from 'node:path'
-
-function quoted(text: string) {
-  return `'${text.replaceAll("'", String.raw`'\''`)}'`
-}
 
 const NOT_INSTALLED = `  *)
     echo "$tool: not installed on this Mac" >&2
@@ -11,13 +7,8 @@ const NOT_INSTALLED = `  *)
     ;;
 esac`
 
-/**
- * The build is made for `/`, so it is told where its own folders are (ADR
- * 0024), for the one call: none of the three reaches what else the AI runs.
- */
 function runningGit(gitProgram: string) {
-  const root = path.join(path.dirname(gitProgram), '..')
-  const subPrograms = quoted(path.join(root, 'libexec', 'git-core'))
+  const {subPrograms, lines} = runningBuild(gitProgram)
 
   return `  git)
     program=${quoted(gitProgram)}
@@ -27,15 +18,7 @@ function runningGit(gitProgram: string) {
     ;;
 ${NOT_INSTALLED}
 
-if [ ! -x "$program" ]; then
-  echo "$tool: not ready yet: Unimatrix Zero is still downloading it. Try again in a minute." >&2
-  exit 127
-fi
-
-GIT_EXEC_PATH=${subPrograms} \\
-GIT_TEMPLATE_DIR=${quoted(path.join(root, 'share', 'git-core', 'templates'))} \\
-GIT_CONFIG_SYSTEM=${quoted(path.join(root, 'etc', 'gitconfig'))} \\
-exec "$program" "$@"`
+${lines}`
 }
 
 /** A stub in `/usr/bin` runs this as `xcrun <tool> <args...>`. */
@@ -59,12 +42,5 @@ export function writeDeveloperFolder(
   folder: string,
   gitProgram: string | null
 ) {
-  const bin = path.join(folder, 'usr', 'bin')
-  const script = path.join(bin, 'xcrun')
-  const writing = `${script}.writing`
-
-  fs.mkdirSync(bin, {recursive: true})
-  fs.writeFileSync(writing, xcrunScript(gitProgram), {mode: 0o755})
-  // Renamed over the old one, so a stub running now reads a whole script.
-  fs.renameSync(writing, script)
+  writeScript(path.join(folder, 'usr', 'bin', 'xcrun'), xcrunScript(gitProgram))
 }

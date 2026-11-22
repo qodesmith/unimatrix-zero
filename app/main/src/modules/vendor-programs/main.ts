@@ -4,6 +4,7 @@ import type {ProviderId} from '@uz/contract/providers'
 import type {ProgramTarget} from '@uz/vendor-program'
 
 import {ManifestSchema, PlatformSchema} from '@uz/contract/manifest'
+import {programOf} from '@uz/vendor-program'
 import path from 'node:path'
 
 import devManifest from './dev-manifest.json'
@@ -51,6 +52,28 @@ export function developerFolderFor({userData, platform}: Machine) {
   return platform === 'darwin' ? path.join(userData, 'developer') : null
 }
 
+/**
+ * The folder the app puts last on the `PATH` of `claude` and Codex, where a
+ * `git` the AI runs finds the app's own when the machine has no other (ADR
+ * 0026). On Windows, the build's own `cmd` folder; on Linux, a folder for the
+ * app's wrapper script; null on a Mac (ADR 0025) and where the manifest has no
+ * `git` for the machine.
+ */
+export function gitFolderFor(
+  machine: Machine,
+  manifest: Manifest = DEV_MANIFEST
+) {
+  const target = gitTargetFor(machine, manifest)
+
+  if (!target) return null
+
+  if (machine.platform === 'win32') return path.dirname(programOf(target))
+
+  return machine.platform === 'linux'
+    ? path.join(machine.userData, 'git')
+    : null
+}
+
 export function signInRequestFor(
   provider: ProviderId,
   machine: Machine,
@@ -58,10 +81,12 @@ export function signInRequestFor(
 ): SignInRequest {
   const {userData, platform} = machine
   const developerDir = developerFolderFor(machine)
+  const gitFolder = gitFolderFor(machine, manifest)
 
   const folders = {
     configDir: path.join(userData, 'providers', provider),
     ...(developerDir && {developerDir}),
+    ...(gitFolder && {gitFolder}),
   }
 
   const name = PROGRAMS[provider]
