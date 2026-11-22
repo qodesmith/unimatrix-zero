@@ -10,7 +10,7 @@ export const BRIDGE_CHANNELS = {
   droppedFile: 'uz:dropped-file',
 } as const
 
-/** What the preload hands main for a dropped file. The page never sees the path. */
+/** The page never sees the path. */
 export const DroppedFileRegistration = z.strictObject({
   path: z.string(),
 })

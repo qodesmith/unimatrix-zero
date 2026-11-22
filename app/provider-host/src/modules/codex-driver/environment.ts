@@ -30,7 +30,6 @@ export function codexArgs(platform: NodeJS.Platform) {
     : CODEX_ARGS
 }
 
-/** The host's environment, minus anything that could outrank the subscription. */
 export function codexEnvironment(base: NodeJS.ProcessEnv, codexHome: string) {
   return {...vendorEnvironment(base), CODEX_HOME: codexHome}
 }

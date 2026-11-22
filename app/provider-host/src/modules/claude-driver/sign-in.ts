@@ -56,7 +56,6 @@ export interface ClaudeSignInDeps {
     command: ClaudeCommand,
     env: Record<string, string>
   ) => Promise<void>
-  /** The host's environment for a `claude` that starts now. */
   hostEnv: (vendorProgram: SignInRequest) => Promise<NodeJS.ProcessEnv>
   timeoutMs: number
 }

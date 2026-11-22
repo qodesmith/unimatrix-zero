@@ -54,7 +54,6 @@ interface Live extends ClaudeSession {
   compactionSettings: CompactionSettings
   restore: Restore
   store: SessionStoreClient
-  /** Where `claude` files the session in its configuration folder. */
   projectKey: string
   /** The SDK swaps in its own configuration folder on a restore. */
   activeConfigDir: () => string
@@ -68,7 +67,6 @@ interface Sending {
   content: ContentPart[]
 }
 
-/** A Reply stopped before any `claude` started has no session. */
 type Answered =
   | {session: Live; outcome: Outcome}
   | {session: null; outcome: Silent}
@@ -106,7 +104,6 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       : []
   }
 
-  /** Until `claude` starts, Stop ends the Reply with nothing to interrupt. */
   async function open(
     request: ReplyRequest,
     restore: Restore,
@@ -210,9 +207,9 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   }
 
   /**
-   * The Prompt goes out under the id main gave it, and main records it as it
-   * stores the entry. Stop interrupts `claude` once it is heard; before that,
-   * Stop gives up on `claude`, as the wait for it running out does.
+   * The Prompt goes out under main's id, which main records as it stores the
+   * entry. Until `claude` is heard, Stop gives up on it rather than
+   * interrupting.
    */
   async function* reply(
     session: Live,

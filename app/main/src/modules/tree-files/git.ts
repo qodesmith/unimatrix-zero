@@ -28,7 +28,6 @@ function isolation(program: string) {
 
 export interface Checkout {
   folder: string
-  /** The folder's own index, kept in the store between Snapshots. */
   index: string
 }
 
@@ -37,10 +36,7 @@ interface GitTarget {
   checkout?: Checkout
 }
 
-/**
- * The store is named by variables alone so no `.git` is ever written into a
- * Working copy.
- */
+/** Variables alone name the store, so no `.git` lands in a Working copy. */
 function isolated(
   env: NodeJS.ProcessEnv,
   program: string,
@@ -113,8 +109,8 @@ export function createGit(program: string, env: NodeJS.ProcessEnv): Git {
         }
       )
 
-      // A git that exits before reading its input breaks the pipe; unhandled,
-      // that error would crash the app. The exit above reports why.
+      // Unhandled, the broken pipe from a git that exits before reading its
+      // input would crash the app; the exit callback reports why.
       child.stdin?.on('error', () => undefined)
       child.stdin?.end(input)
     })

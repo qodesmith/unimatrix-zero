@@ -49,7 +49,6 @@ function withoutAccountLists(message: RecordedMessage): RecordedMessage {
   return {...message, slash_commands: [], agents: [], skills: [], plugins: []}
 }
 
-/** Replaces the account's email, name, ids and home folder with stand-ins. */
 function scrub(lines: RecordedLine[]) {
   const texts = lines.map(line =>
     JSON.stringify(

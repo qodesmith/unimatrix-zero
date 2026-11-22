@@ -28,7 +28,6 @@ export interface CanvasState {
   inputToFocus: string | null
   /** Before main is asked, so the canvas is ready the moment the Turns go. */
   onDeleteConfirmed: (promptId: string) => void
-  /** Chat mode on the Thread ending at this Reply. */
   openChat: (replyId: string) => void
   /** Kept here, not in the node, so it survives an orientation switch. */
   expandedTurnIds: ReadonlySet<string>

@@ -6,7 +6,6 @@ import {PROVIDER_NAMES} from '@uz/contract/providers'
 
 import {previousReply} from './tree'
 
-/** Below this, re-reading a Thread cold costs too little to mention. */
 export const RE_READ_NOTE_FROM = 20_000
 
 /**
@@ -24,10 +23,6 @@ export interface MeasuredContext {
   size: number
 }
 
-/**
- * The Context size the Thread ending at `reply` carries: its own, or that of
- * the nearest Reply above it that has one. Null when none does.
- */
 export function contextSizeAt(
   index: TreeIndex,
   reply: Reply | null
@@ -46,10 +41,8 @@ export function contextSizeAt(
 }
 
 interface ReReadInput {
-  /** The Reply the Input is attached to; null at the root. */
   attachedTo: Reply | null
   context: MeasuredContext | null
-  /** The Model the Input would send on. */
   to: ModelChoice | null
 }
 

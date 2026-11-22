@@ -30,7 +30,6 @@ let treeFiles: ReturnType<typeof createTreeFiles>
 let turns: ReturnType<typeof createTurns>
 let treeId: string
 
-/** What the app makes at each launch, over the same database and `userData`. */
 function launch() {
   treeFiles = createTreeFiles({
     db,

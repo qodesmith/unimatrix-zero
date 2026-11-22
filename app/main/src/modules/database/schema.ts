@@ -54,18 +54,14 @@ export const prompts = sqliteTable('prompts', {
   createdAt: createdAt(),
 })
 
-/**
- * One row per add, so a file added twice gets two. The app keeps no copy of a
- * folder.
- */
+/** One row per add, so a file added twice gets two. */
 export const attachments = sqliteTable('attachments', {
   id: id(),
   /**
    * Names the folder under `userData/attachments/` that adds of the same bytes
-   * share. Null for a folder.
+   * share; null for a folder, which the app never copies.
    */
   sha256: text('sha256'),
-  /** The copy's file name; the path the AI gets ends in it. */
   name: text('name').notNull(),
   mediaType: text('media_type', {
     enum: [
@@ -81,8 +77,8 @@ export const attachments = sqliteTable('attachments', {
   }).notNull(),
   size: integer('size').notNull(),
   /**
-   * The smaller copy sent inline in a large image's place; all three null when
-   * the original goes as it is.
+   * The smaller copy sent in a large image's place; all three null when the
+   * original goes as is.
    */
   shrunkSha256: text('shrunk_sha256'),
   shrunkMediaType: text('shrunk_media_type', {
@@ -130,7 +126,7 @@ export const replies = sqliteTable(
       enum: ['streaming', 'complete', 'stopped', 'failed', 'interrupted'],
     }).notNull(),
     content: text('content', {mode: 'json'}).notNull().$type<unknown[]>(),
-    /** Why it failed, as `RunFailureSchema`; null unless it did. */
+    /** As `RunFailureSchema`; null unless the Reply failed. */
     failure: text('failure', {mode: 'json'}),
     systemPromptId: text('system_prompt_id')
       .notNull()
@@ -152,10 +148,7 @@ export const replies = sqliteTable(
      * file. Null while the Tree has no files, and until it finishes.
      */
     snapshotCommit: text('snapshot_commit'),
-    /**
-     * Why a finished Reply has no Snapshot. Null too when the app quit before
-     * taking it.
-     */
+    /** Null too when the app quit before taking the Snapshot. */
     noSnapshot: text('no_snapshot', {enum: ['no-files', 'failed']}),
     createdAt: createdAt(),
   },
@@ -172,7 +165,6 @@ export const compactions = sqliteTable('compactions', {
   sessionId: text('session_id').notNull(),
   /** Claude's boundary entry in the session; Codex reports none. */
   boundaryId: text('boundary_id'),
-  /** The Reply the Thread marks. */
   replyId: text('reply_id').references(() => replies.id, {
     onDelete: 'set null',
   }),
@@ -196,11 +188,10 @@ export const sessionEntries = sqliteTable(
   {
     id: id(),
     ...sessionKey(),
-    /** A Subagent's transcript inside the session; '' for the session's own. */
+    /** A Subagent's transcript; '' for the session's own. */
     subpath: text('subpath').notNull(),
     /** From 0. */
     position: integer('position').notNull(),
-    /** The vendor's own entry id, which appends are deduplicated on. */
     uuid: text('uuid'),
     entry: blob('entry', {mode: 'buffer'}).notNull(),
   },
@@ -249,7 +240,7 @@ export const providers = sqliteTable(
     email: text('email').notNull(),
     plan: text('plan').notNull(),
     connectedAt: integer('connected_at', {mode: 'timestamp_ms'}).notNull(),
-    /** As the Provider last listed them, as `ModelSchema`. */
+    /** As `ModelSchema`. */
     models: text('models', {mode: 'json'}).notNull().default([]),
   },
   table => [uniqueIndex('providers_provider').on(table.provider)]

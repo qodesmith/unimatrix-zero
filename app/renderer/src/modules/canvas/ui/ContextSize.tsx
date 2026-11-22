@@ -17,10 +17,6 @@ interface ContextSizeProps {
   /** 0 at the root; null when the previous Reply never reported one. */
   previousContextSize: number | null
   contextWindow: number | null
-  /**
-   * Claude's media budget in use by the Thread; null when there is none to
-   * show.
-   */
   mediaBudgetUse: MediaBudgetUse | null
 }
 
@@ -50,7 +46,6 @@ function InlineMedia({use}: {use: MediaBudgetUse}) {
   )
 }
 
-/** Signed, since a compaction can shrink the Thread. */
 function signed(tokens: number) {
   return tokens < 0 ? `−${formatTokens(-tokens)}` : `+${formatTokens(tokens)}`
 }

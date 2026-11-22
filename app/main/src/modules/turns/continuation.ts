@@ -188,10 +188,9 @@ function planned(
 
 /**
  * Forks when the Reply has a Prompt after it other than `except`, the one being
- * run again. A Reply its Provider never saved continues from the Reply its
- * Prompt answers, or from its own Prompt in a fork it began. A session holding
- * deleted Turns is cut; one that compacted after the Reply forks from before.
- * A Prompt sent to another Provider has no session.
+ * run again. A Reply its Provider never saved continues from the Reply above,
+ * or from its own Prompt in a fork it began. A session holding deleted Turns
+ * is cut; one that compacted after the Reply forks from before.
  */
 export function continuation(
   db: Database,
@@ -327,7 +326,7 @@ function promptIn(session: SessionRef, reply: ReplyRow | undefined) {
 
 /**
  * A cut of deleted Turns already drops the failed attempt. A parent its
- * Provider never saved left only its Prompt in the session, so cut after it.
+ * Provider never saved left only its Prompt, so cut after it.
  * Always name what to keep: Claude resumes a cut that names nothing at the
  * failed attempt.
  */

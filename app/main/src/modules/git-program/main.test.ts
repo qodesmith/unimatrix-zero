@@ -15,7 +15,6 @@ const target: ProgramTarget = {
   },
 }
 
-/** A download the test finishes, or fails, when it says. */
 function heldDownload() {
   const downloads: PromiseWithResolvers<void>[] = []
 

@@ -189,7 +189,6 @@ describe.runIf(noGit && process.platform === 'linux')(
 
       const system = await git(['config', '--system', '--list'])
 
-      // A line of the build's own `etc/gitconfig`.
       expect(system.stdout).toContain(
         'credential.https://dev.azure.com.usehttppath=true'
       )

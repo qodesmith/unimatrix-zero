@@ -140,7 +140,6 @@ export function createTrees(db: Database) {
   }
 }
 
-/** Tells every window a Tree's row changed as its Turns did. */
 export function createTreeRows(
   store: Trees,
   publish: (event: AppEvent) => void

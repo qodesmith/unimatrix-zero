@@ -93,7 +93,6 @@ function stemOf(
   return outgoing.some(edge => isOnThread(edge, thread)) ? 'on-thread' : 'plain'
 }
 
-/** A Turn kept where it is on screen while the canvas layout changes. */
 interface Held {
   turnId: string
   /** Its size before its text was let out or capped, held until it changes. */

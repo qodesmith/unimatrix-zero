@@ -82,7 +82,6 @@ export function loadedMermaid() {
   return mermaid
 }
 
-/** A flowchart node drawn as a picture: `A@{ img: "https://…" }`. */
 const IMAGE_NODE = /@\{[^}]*\bimg\s*:/u
 
 /**

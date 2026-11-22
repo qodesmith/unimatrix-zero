@@ -348,9 +348,8 @@ function fakeMain(saved: Saved) {
 const probe = {render: async () => {}}
 
 /**
- * An update made outside React lands in the same lane as every other such
- * update, so the commit that renders this one commits those queued before it
- * too, and flushes every effect still pending from earlier commits.
+ * An update made outside React shares a lane with every other such update, so
+ * its commit also commits those queued before it and flushes pending effects.
  */
 function RenderProbe() {
   const [rendered, setRendered] = useState<{done: () => void} | null>(null)
@@ -367,7 +366,6 @@ function RenderProbe() {
   return null
 }
 
-/** Resolves once React has committed every update queued before the call. */
 async function reactCaughtUp() {
   await probe.render()
 }
@@ -462,7 +460,6 @@ async function hoverAway() {
   await page.getByRole('group', {name: 'Orientation'}).hover()
 }
 
-/** The canvas itself, leaving out the slideout drawn over it. */
 function canvas() {
   const flow = document.querySelector('.react-flow')
 
@@ -1130,7 +1127,6 @@ it('keeps a Fork’s card put on unfolding Branches folded since before an orien
   await expect.element(page.getByText('Reply five')).toBeVisible()
   await expect.poll(viewport).not.toContain('translate(0px, 0px)')
 
-  // Folded before the switch, its cards are measured only once they show.
   await nodeOf('Reply two').getByRole('button', {name: '2 Branches'}).click()
   await expect.element(page.getByText('Reply five')).not.toBeInTheDocument()
 
@@ -1614,7 +1610,6 @@ function chatButtonOf(replyText: string) {
     .first()
 }
 
-/** Each Turn's text, without the Provider's mark and Model pill a Reply shows. */
 function chatTurns() {
   return [...slideout().element().querySelectorAll('[data-chat-turn]')].map(
     turn => {
@@ -1805,7 +1800,6 @@ async function setPlaybackRate(playbackRate: number) {
   await cdp().send('Animation.setPlaybackRate', {playbackRate})
 }
 
-/** Holds every animation where it starts until `setPlaybackRate(1)`. */
 async function freezeAnimations() {
   await cdp().send('Animation.enable')
   await setPlaybackRate(0)
@@ -2672,10 +2666,7 @@ function promptWith(sent: Prompt, attachments: Attachment[]): Prompt {
   return {...sent, attachments}
 }
 
-/**
- * More than Claude takes inline in one request: each 9 MiB image is 12 MiB of
- * base64, the PDF 4 MiB.
- */
+/** Over Claude's inline limit: a 9 MiB image is 12 MiB of base64, the PDF 4 MiB. */
 function mediaTree(provider: Reply['provider'] = 'claude'): Saved {
   clock = 0
 

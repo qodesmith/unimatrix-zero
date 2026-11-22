@@ -97,10 +97,7 @@ function describeFailure(failure: RunFailure, provider: ProviderId) {
   return FAILURE_LINES[failure.code](failure, PROVIDER_NAMES[provider])
 }
 
-/**
- * A failed Reply in the Thread: the exchange the AI never saw, so neither its
- * Prompt nor any text it wrote shows. The caller owns its place.
- */
+/** The AI never saw a failed exchange, so neither its Prompt nor its text shows. */
 export function FailedChip({reply}: {reply: Reply}) {
   const {failure} = useReply(reply)
 

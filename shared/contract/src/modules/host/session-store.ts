@@ -1,6 +1,5 @@
 import {z} from 'zod'
 
-/** One Provider session, with every transcript and file kept for it. */
 export const SessionFolderSchema = z.strictObject({
   projectKey: z.string().min(1),
   sessionId: z.string().min(1),
@@ -8,7 +7,7 @@ export const SessionFolderSchema = z.strictObject({
 
 export type SessionFolder = z.infer<typeof SessionFolderSchema>
 
-/** One Provider session's transcript, or a Subagent's inside it. */
+/** `subpath` names a Subagent's transcript inside the session. */
 export const SessionKeySchema = SessionFolderSchema.extend({
   subpath: z.string().min(1).optional(),
 })
@@ -26,10 +25,6 @@ export const SessionEntrySchema = z.looseObject({
 
 export type SessionEntry = z.infer<typeof SessionEntrySchema>
 
-/**
- * A file the vendor program keeps beside a session, such as a large tool
- * result.
- */
 export const SessionFileSchema = z.strictObject({
   /** Relative to the session's own folder, with `/` between parts. */
   path: z.string().min(1),
@@ -38,7 +33,6 @@ export const SessionFileSchema = z.strictObject({
 
 export type SessionFile = z.infer<typeof SessionFileSchema>
 
-/** What a Provider host asks main to keep, or give back, of its sessions. */
 export const SessionStoreRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({
     op: z.literal('append'),

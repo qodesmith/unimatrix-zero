@@ -1,4 +1,3 @@
-/** Oxlint covers TS and TSX; this holds the renderer's CSS to Theme tokens. */
 import {Glob} from 'bun'
 import path from 'node:path'
 

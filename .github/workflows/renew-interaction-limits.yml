@@ -24,9 +24,8 @@ jobs:
           client-id: ${{ vars.INTERACTION_LIMITS_CLIENT_ID }}
           private-key: ${{ secrets.INTERACTION_LIMITS_PRIVATE_KEY }}
       - name: Renew the limit when under 150 days remain
-        # 150 days is about five months of the six a renewal buys, so a weekly
-        # run renews about once a month and months of failed runs pass before
-        # the limit lapses.
+        # A renewal buys six months, so weekly runs renew about monthly and
+        # months of failed runs pass before the limit lapses.
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |

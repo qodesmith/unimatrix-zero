@@ -1,7 +1,3 @@
-/**
- * Each checkout's own `bun run dev` data folder, and which of them, with their
- * Claude Keychain entries, `bun run dev-data:prune` deletes.
- */
 import {createHash} from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'

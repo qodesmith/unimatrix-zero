@@ -198,9 +198,9 @@ export function insertExchange(
 }
 
 /**
- * Back to streaming from nothing. Its Prompt stays recorded until the Provider
- * drops it, since a Retry that fails first still has to cut there. Its
- * Compactions stay recorded too, but against the session alone.
+ * Its Prompt stays recorded until the Provider drops it, since a Retry that
+ * fails first still has to cut there. Its Compactions stay, keyed to the
+ * session alone.
  */
 export function resetReply(db: Database, replyId: string): void {
   db.transaction(tx => {

@@ -30,7 +30,7 @@ export const ToolCallPartSchema = z.strictObject({
     .nullable(),
 })
 
-/** One provider-neutral piece of a Reply, in the order it happened. */
+/** In the order it happened. */
 export const ReplyPartSchema = z.discriminatedUnion('type', [
   TextPartSchema,
   ToolCallPartSchema,
@@ -92,7 +92,6 @@ export const ChangedFileSchema = z.strictObject({
 
 export type ChangedFile = z.infer<typeof ChangedFileSchema>
 
-/** The part of a Reply that changes while it streams. */
 export const ReplyProgressSchema = z.strictObject({
   status: ReplyStatusSchema,
   content: z.array(ReplyPartSchema),
@@ -120,7 +119,6 @@ export const ReplySchema = z.strictObject({
 
 export type Reply = z.infer<typeof ReplySchema>
 
-/** A Reply being written, as the window last displayed it. */
 export const StreamingReplySchema = z.strictObject({
   ...ReplyProgressSchema.shape,
   treeId: z.uuid(),
@@ -240,10 +238,7 @@ export const SubagentFinishedEvent = z.strictObject({
   status: FinishedStatusSchema,
 })
 
-/**
- * The Reply's Snapshot differs from its parent's. Main sends it after the
- * Reply's `RUN_FINISHED`, since the Snapshot is taken then.
- */
+/** Sent after the Reply's `RUN_FINISHED`, when the Snapshot is taken. */
 export const FilesChangedEvent = z.strictObject({
   ...replyIds,
   type: z.literal('FILES_CHANGED'),
@@ -270,10 +265,7 @@ export const ContextCompactedEvent = z.strictObject({
   boundaryId: z.string().nullable(),
 })
 
-/**
- * The Provider started a session for the Reply and gave it the whole Thread,
- * having none it could restore.
- */
+/** The Provider had no session to restore, so it got the whole Thread. */
 export const SessionRebuiltEvent = z.strictObject({
   ...replyIds,
   type: z.literal('SESSION_REBUILT'),

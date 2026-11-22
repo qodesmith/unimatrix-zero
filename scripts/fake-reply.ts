@@ -6,7 +6,6 @@ import path from 'node:path'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-/** The fake Reply's events, kept where the window's tests replay them. */
 export const FAKE_REPLY_RECORDING = path.join(
   root,
   'app/renderer/src/modules/turns/fake-reply.json'

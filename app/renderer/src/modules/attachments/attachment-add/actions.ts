@@ -13,7 +13,6 @@ interface AddInput {
   onAdded: (attachment: Attachment) => void
 }
 
-/** A file over the limit is refused here, before main is asked. */
 export async function addToMain({file, runAdd, send, onAdded}: AddInput) {
   if (file.size > ATTACHMENT_SIZE_LIMIT) {
     send({

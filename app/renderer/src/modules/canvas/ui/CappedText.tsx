@@ -28,8 +28,7 @@ interface Toggle {
 
 /**
  * `nowheel` makes the wheel scroll capped text instead of panning the canvas.
- * A toggle keeps the text being read where it is on screen: the canvas moves by
- * however far the box's scroll changed.
+ * A toggle moves the canvas by however far the box's scroll changed.
  */
 export function CappedText({
   limit,

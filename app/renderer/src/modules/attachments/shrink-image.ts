@@ -53,10 +53,7 @@ async function shrunk(file: File, bitmap: ImageBitmap) {
   return blob ? new Uint8Array(await blob.arrayBuffer()) : undefined
 }
 
-/**
- * A smaller copy of an oversized image, for main to send inline in its place.
- * Undefined when none is needed or the image can't be decoded or encoded.
- */
+/** Undefined when no shrink is needed or the image can't be decoded or encoded. */
 export async function shrunkImage(file: File) {
   if (!file.type.startsWith('image/') || file.size > ATTACHMENT_SIZE_LIMIT) {
     return undefined

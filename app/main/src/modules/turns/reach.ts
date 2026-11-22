@@ -7,10 +7,7 @@ import {eq} from 'drizzle-orm'
 
 const {compactions} = schema
 
-/**
- * Whether the session's own transcript compacted after the entry `uuid`. Only
- * Claude reports a Compaction's boundary entry, so only its sessions match.
- */
+/** Only Claude reports a boundary entry, so only its sessions match. */
 function compactedAfter(db: Database, sessionId: string, uuid: string) {
   const at = positionOf(db, sessionId, uuid)
 

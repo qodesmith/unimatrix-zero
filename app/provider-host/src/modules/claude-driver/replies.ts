@@ -52,7 +52,6 @@ const AbandonedStopSchema = z.looseObject({
   }),
 })
 
-/** A result's text; an image or a document in it is named, not shown. */
 function resultText(content: ToolResultContent) {
   if (!Array.isArray(content)) return content ?? ''
 
@@ -62,10 +61,8 @@ function resultText(content: ToolResultContent) {
 }
 
 /**
- * Turns one Reply's SDK messages into contract events. A message that broke
- * and was sent again is cut back, tool calls and all, as the new one starts;
- * Subagent messages are left out. The text tracked is the current text part's,
- * which a tool call ends.
+ * Turns one Reply's SDK messages, minus Subagent ones, into contract events.
+ * `shown` holds only the current text part, which a tool call ends.
  */
 export function createReplyMapper(ids: ReplyIds) {
   let shown = ''
@@ -99,7 +96,6 @@ export function createReplyMapper(ids: ReplyIds) {
     return [{...ids, type: 'TOOL_CALL_START', toolCallId: id, toolName: name}]
   }
 
-  /** From block `index` of the open message, which began with `text` shown. */
   function cutFrom(index: number, text: string): Cut {
     return {text, toolCalls: toolBlocks.slice(index).filter(Boolean)}
   }

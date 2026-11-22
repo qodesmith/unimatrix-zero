@@ -7,9 +7,8 @@ import {explainingLabels} from '#modules/thread-replay/main'
 import {claudeReplyEnvironment} from './environment'
 
 /**
- * Claude Code's tools for files, commands and the web, named one by one: its
- * preset adds tools that outlive the Reply or leave the Tree's folder, such as
- * cron jobs and worktrees.
+ * Named one by one: Claude Code's preset adds tools that outlive the Reply or
+ * leave the Tree's folder, such as cron jobs and worktrees.
  */
 const TOOLS = [
   'Bash',
@@ -39,7 +38,6 @@ function claudeSettingsOf({auto, threshold}: CompactionSettings) {
   }
 }
 
-/** What a Reply's `claude` runs with, whichever session it opens. */
 export function replyOptions(
   request: ReplyRequest,
   programPath: string,

@@ -2,7 +2,6 @@ import type {AttachmentMediaType} from '@uz/contract/attachments'
 
 import path from 'node:path'
 
-/** For a file that came with no name a file system takes. */
 const FALLBACK_NAMES = {
   'image/png': 'Pasted image.png',
   'image/jpeg': 'Pasted image.jpg',

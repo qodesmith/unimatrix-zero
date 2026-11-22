@@ -40,7 +40,6 @@ let loaded: string[]
 let deps: Parameters<typeof dispatchCommand>[2]
 let attachmentsDir: string
 
-/** Whether the Tree's files module finds a file changed by every Reply. */
 let treeHasFiles: boolean
 
 beforeEach(() => {

@@ -6,7 +6,6 @@ import zlib from 'node:zlib'
 
 export const PNG_BASE64 = 'iVBORw=='
 
-/** The shrunk copy of `photo`, in base64. */
 export const SHRUNK_BASE64 = '/9j/'
 
 export const PDF_BASE64 = 'JVBERi0x'

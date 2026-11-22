@@ -54,7 +54,6 @@ export const TreeCreatedEvent = z.strictObject({
   tree: TreeSchema,
 })
 
-/** Anything on its row changed: its title, activity or failure. */
 export const TreeChangedEvent = z.strictObject({
   type: z.literal('TREE_CHANGED'),
   tree: TreeSchema,
@@ -66,9 +65,8 @@ export const TreeDeletedEvent = z.strictObject({
 })
 
 /**
- * A Snapshot couldn't be taken or read because the app's own `git` isn't in
- * place: still downloading, or its download failed and is tried again. Sent
- * once per launch, at the first wait a window is there to hear.
+ * The app's own `git` is still downloading, or retrying, so no Snapshot can be
+ * taken or read. Sent once per launch, at the first wait a window can hear.
  */
 export const SnapshotsWaitingEvent = z.strictObject({
   type: z.literal('SNAPSHOTS_WAITING'),

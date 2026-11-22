@@ -6,7 +6,6 @@ import {planInline} from '@uz/contract/attachments'
 
 import {pathTo} from './tree'
 
-/** The Prompts of the Thread ending at a Reply, oldest first. */
 function promptsTo(index: TreeIndex, replyId: string): Prompt[] {
   return pathTo(index, replyId).flatMap(id => index.promptById.get(id) ?? [])
 }

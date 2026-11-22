@@ -11,7 +11,6 @@ import {explainingLabels, replyText} from '#modules/thread-replay/main'
 import {messageContent, read} from './input'
 import {configOf, loadThread} from './threads'
 
-/** How Codex refuses to resume or fork a thread whose rollout it can't find. */
 const SESSION_LOST = /no rollout found for thread id/
 
 /**

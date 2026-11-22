@@ -89,7 +89,6 @@ function attachedReply(provider: ProviderId, modelId: string): Reply {
 
 interface Setup {
   attachedTo?: Reply
-  /** The Prompts above the attached Reply. */
   prompts?: Prompt[]
   lastModel?: ModelChoice | null
   providers?: ProviderStatus[]
@@ -107,7 +106,6 @@ interface Sends {
 
 interface Files {
   registered: File[]
-  /** What main kept, in the order it answered. */
   added: Attachment[]
   byId: Map<string, File>
   noPath: boolean

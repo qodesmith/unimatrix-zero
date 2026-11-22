@@ -23,9 +23,9 @@ export function vendorEnvironment(base: NodeJS.ProcessEnv) {
 }
 
 /**
- * Whether a Mac has Xcode or the Command Line Tools. `xcode-select -p` fails
- * where it has neither, and unlike the stubs in `/usr/bin` opens no dialog.
- * It succeeds for any `DEVELOPER_DIR`, so it runs without one.
+ * `xcode-select -p` fails on a Mac with neither Xcode nor the Command Line
+ * Tools, and unlike the stubs in `/usr/bin` opens no dialog. It succeeds for
+ * any `DEVELOPER_DIR`, so it runs without one.
  */
 export async function macHasDeveloperTools(
   base: NodeJS.ProcessEnv,

@@ -1,12 +1,7 @@
 /**
- * Needs a real plan, connected in the app:
- *
- * UZ_LIVE_CLAUDE_PROGRAM=<userData>/vendor/claude/<version>/claude\
- * UZ_LIVE_CLAUDE_CONFIG=<userData>/providers/claude\
- * bun run test:node app/provider-host/src/modules/claude-driver/streaming.live
- *
- * `UZ_RECORD=yes` also writes `recordings/`, which the driver tests replay;
- * run one `it` with `-t` to re-record only its files.
+ * Needs a real plan, with UZ_LIVE_CLAUDE_PROGRAM and UZ_LIVE_CLAUDE_CONFIG set
+ * as `bun run provider-checks` sets them. `UZ_RECORD=yes` also writes
+ * `recordings/`, which the driver tests replay; re-record one `it` with `-t`.
  */
 import type {
   ReplyRecorded,
@@ -262,7 +257,6 @@ function liveDriver(
     request,
     reply,
     closed,
-    /** For each `claude` started from here on. */
     setEnv(env: Record<string, string>) {
       addedEnv = env
     },
@@ -270,7 +264,6 @@ function liveDriver(
     dropEnv(names: string[]) {
       droppedEnv = names
     },
-    /** For each Reply from here on. */
     setCompaction(next: CompactionSettings) {
       compactionSettings = next
     },
@@ -373,10 +366,6 @@ async function failedCompaction(
   return {failed, result}
 }
 
-/**
- * Three Exchanges, compacted inside the third. The threshold is lowered only
- * for them: every later `claude` starts without it.
- */
 async function compactedThread(live: Live) {
   live.setEnv({CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '0.2'})
 
@@ -472,10 +461,6 @@ function forward(request: http.IncomingMessage, response: http.ServerResponse) {
   request.pipe(upstream)
 }
 
-/**
- * Messages requests get the `answer` failure, or the real API for
- * `'forward'`; every other request goes to the real API.
- */
 async function startStandInApi(answer: StandInAnswer = 'five-hour') {
   // One reset for every request, so each failure names the same time.
   const resets = Math.floor(Date.now() / 1000) + 2 * HOUR_IN_SECONDS

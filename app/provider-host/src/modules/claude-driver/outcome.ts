@@ -9,9 +9,8 @@ export type Outcome =
   | Silent
 
 /**
- * How `claude` refuses a session it has no transcript of, and a point to
- * resume at that is off the session's newest chain. It writes nothing to the
- * session either time.
+ * How `claude` refuses a session it has no transcript of, or a resume point off
+ * the session's newest chain; it writes nothing to the session either time.
  */
 const SESSION_LOST =
   /No conversation found with session ID|No message found with message\.uuid of/

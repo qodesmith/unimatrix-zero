@@ -3,26 +3,23 @@ import type {ProviderId} from '#modules/providers/main'
 import {MIB} from '#modules/sizes/main'
 import {z} from 'zod'
 
-/** Larger files are refused as they are attached. */
 export const ATTACHMENT_SIZE_LIMIT = 50 * MIB
 
 export const ATTACHMENTS_PER_PROMPT = 100
 
-/** An image goes inline at most this long on its long side, in pixels. */
+/** Pixels, on the long side. */
 export const INLINE_IMAGE_PIXELS = 2000
 
-/** An image goes inline at most this large; a larger one is shrunk first. */
+/** A larger image is shrunk before it goes inline. */
 export const INLINE_IMAGE_SIZE_LIMIT = 10 * MIB
 
-/** One Prompt's inline images come to at most this. */
 export const INLINE_IMAGES_PER_PROMPT_LIMIT = 80 * MIB
 
-/** A larger text file goes by path only. */
 export const INLINE_TEXT_SIZE_LIMIT = 32 * 1024
 
 /**
- * What one Claude request carries inline, counted over the whole Thread. Below
- * `claude`'s own limits, past which it drops the oldest without a word.
+ * Counted over the whole Thread. Kept below `claude`'s own limits, past which
+ * it drops the oldest without a word.
  */
 export const CLAUDE_MEDIA_BUDGET = {base64Bytes: 20 * MIB, files: 90}
 
@@ -73,18 +70,13 @@ export function attachmentKind(mediaType: AttachmentMediaType): AttachmentKind {
   }
 }
 
-/** A file or a folder the user attached, as the window shows it. */
 export const AttachmentSchema = z.strictObject({
   id: z.uuid(),
   name: z.string().min(1),
   mediaType: AttachmentMediaTypeSchema,
   /** Of the copy the app keeps; 0 for a folder, which is never copied. */
   size: z.number().int().nonnegative(),
-  /**
-   * Of the smaller copy that goes inline in place of an image over
-   * `INLINE_IMAGE_PIXELS` or `INLINE_IMAGE_SIZE_LIMIT`; null when the image
-   * goes as it is, and for any other file.
-   */
+  /** Of an image's shrunk inline copy; null if it has none. */
   shrunkSize: z.number().int().positive().nullable(),
   /** A folder's own path; null for a file, which the AI gets a copy of. */
   folderPath: z.string().min(1).nullable(),
@@ -94,12 +86,10 @@ export type Attachment = z.infer<typeof AttachmentSchema>
 
 export const ATTACHMENT_SCHEME = 'uzfile'
 
-/** Where the window loads an attachment's original from (ADR 0014). */
 export function attachmentUrl(id: string) {
   return `${ATTACHMENT_SCHEME}://unimatrix-zero/attachments/${id}`
 }
 
-/** How a file goes inline, beside its path. */
 export type InlineForm = 'image' | 'pdf' | 'text'
 
 type Sized = Pick<Attachment, 'mediaType' | 'size' | 'shrunkSize'>
@@ -112,10 +102,7 @@ export function inlineImageSize({size, shrunkSize}: Sized) {
   return shrunkSize ?? size
 }
 
-/**
- * How a Provider takes the file natively and cheaply, before any budget:
- * images on both, PDFs on Claude, small text files on both (ADR 0022).
- */
+/** Ignores any media budget; `planInline` applies that (ADR 0022). */
 export function inlineForm(
   provider: ProviderId,
   attachment: Sized
@@ -152,11 +139,9 @@ export function inlineImagesSize(attachments: readonly Sized[]) {
     .reduce((sum, attachment) => sum + inlineImageSize(attachment), 0)
 }
 
-/** Claude's media budget in use over one Thread. */
 export interface MediaBudgetUse {
   base64Bytes: number
   files: number
-  /** How many attachments of the Thread now go by path only. */
   pathOnly: number
 }
 
@@ -164,8 +149,8 @@ export interface InlinePlan {
   /** Per Prompt, per attachment, in the order given. */
   forms: (InlineForm | null)[][]
   /**
-   * Per Prompt, per attachment: it went inline as part of the newest Prompt,
-   * and a media budget has since left it out.
+   * Per Prompt, per attachment: it went inline when its Prompt was newest, and
+   * a media budget has since left it out.
    */
   pathOnlyNow: boolean[][]
   /** Null for a Provider with no media budget. */
@@ -245,10 +230,7 @@ function withinBudget(
   }
 }
 
-/**
- * How each attachment of a Thread goes to a Provider when the whole Thread is
- * sent, oldest Prompt first. Every one also goes by its path.
- */
+/** `prompts` run oldest first. Every attachment also goes by its path. */
 export function planInline(
   provider: ProviderId,
   prompts: readonly (readonly Sized[])[]
@@ -266,10 +248,6 @@ export function planInline(
       }
 }
 
-/**
- * An attachment as a Provider host is given it: where the AI finds it, and
- * what the host reads to send it inline as well.
- */
 export const HostAttachmentSchema = z.strictObject({
   name: z.string().min(1),
   /**

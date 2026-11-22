@@ -12,7 +12,6 @@ export const PlatformSchema = z.enum([
 
 export type Platform = z.infer<typeof PlatformSchema>
 
-/** The program file itself, or an archive of the folder it runs from. */
 export const VendorBuildSchema = z.strictObject({
   url: z.url({protocol: /^https$/}),
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
@@ -36,7 +35,6 @@ export const VendorProgramSchema = z.strictObject({
 
 export type VendorProgram = z.infer<typeof VendorProgramSchema>
 
-/** The exact vendor program builds an app bundle runs. */
 export const ManifestSchema = z.strictObject({
   vendorPrograms: z.strictObject({
     claude: VendorProgramSchema,

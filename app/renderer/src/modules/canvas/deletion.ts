@@ -4,7 +4,6 @@ import {useCallback, useState} from 'react'
 
 import {branchesOf, newestReply, turnsFrom} from './tree'
 
-/** A Prompt confirmed for deletion, and what the canvas does once it's gone. */
 interface Deletion {
   promptId: string
   parentReplyId: string | null

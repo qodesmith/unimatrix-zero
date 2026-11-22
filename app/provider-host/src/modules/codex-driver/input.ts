@@ -50,7 +50,6 @@ export async function codexContent(request: ReplyRequest) {
   const prompt = await read(prompted(request.prompt))
 
   return {
-    /** After the whole Thread, when the thread holds none of it. */
     async input(replay: boolean) {
       return turnInput(
         replay ? await read(replayed(request.thread, request.prompt)) : prompt
@@ -59,7 +58,6 @@ export async function codexContent(request: ReplyRequest) {
   }
 }
 
-/** A Prompt as a user message `thread/inject_items` takes. */
 export function messageContent(parts: CodexPart[]) {
   return parts.map(part => {
     switch (part.type) {

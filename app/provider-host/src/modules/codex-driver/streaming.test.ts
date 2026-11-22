@@ -205,7 +205,6 @@ async function setUp(
     gitFolder: path.join(configDir, 'git'),
   }
 
-  /** Stops the Reply after `stopAfter` text deltas. */
   async function reply(
     text: string,
     session: SessionRef | ReplySession | null = null,
@@ -1178,7 +1177,6 @@ function refusedOverCap(counts: {max_chars: unknown; actual_chars: unknown}) {
 }
 
 it('fails the Reply as too long, with both counts, when Codex refuses a Prompt over its text cap', async () => {
-  // The refusal as `codex` 0.163.0 answered a 1,048,577-character Prompt.
   const codex = await setUp([
     refusedOverCap({max_chars: 1_048_576, actual_chars: 1_048_577}),
   ])

@@ -1,7 +1,6 @@
 /**
- * `bun run provider-checks [--pr <n>]`, by hand on the maintainer's machine:
- * runs every `[dep:<id>]` live check, has an agent review each entry of the
- * list, and posts both on the open bump PR for CI's gate.
+ * Run by hand on the maintainer's machine: posts every live check and an
+ * agent's review of each entry on the open bump PR, for CI's gate.
  */
 import type {CheckStatus, Review} from './provider-checks-result.ts'
 import type {Entry} from './provider-dependencies.ts'
@@ -94,10 +93,6 @@ function requirePinnedSdk(pins: Pins) {
   }
 }
 
-/**
- * The pinned builds and sign-ins in this checkout's own dev data, which
- * `bun run dev` downloads and the app's connect flow fills.
- */
 function liveBuilds() {
   const pins = pinsOf(readText(MANIFEST), readText(HOST_PACKAGE))
   requirePinnedSdk(pins)

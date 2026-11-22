@@ -32,7 +32,7 @@ export function storeExists(store: string) {
   return fs.existsSync(path.join(store, 'HEAD'))
 }
 
-/** A bare store with no template, so it starts with no hook of any kind. */
+/** No template, so the store starts with no hooks. */
 async function makeStore(git: Git, store: string) {
   fs.mkdirSync(store, {recursive: true, mode: 0o700})
   await git({store}, ['init', '--bare', '--quiet', '--template=', store])
@@ -47,10 +47,7 @@ function oneLine(output: string) {
   return output.trim()
 }
 
-/**
- * Index files a Snapshot the app quit in left behind. A leftover lock refuses
- * every later Snapshot.
- */
+/** A lock left by a Snapshot the app quit in refuses every later Snapshot. */
 function removeLeftovers({index}: Checkout) {
   const folder = path.dirname(index)
   const prefix = `${path.basename(index)}.`
@@ -60,10 +57,7 @@ function removeLeftovers({index}: Checkout) {
   }
 }
 
-/**
- * Git lists a folder that is a git repository of its own as its path and a
- * slash, and never the files in it.
- */
+/** Git lists a nested repository as its path and a slash, never its files. */
 async function ownRepositories(git: Git, store: string, checkout: Checkout) {
   const untracked = await git({store, checkout}, [
     'ls-files',
@@ -113,9 +107,9 @@ async function untrackIgnored(
 }
 
 /**
- * Git stores a folder that is a git repository of its own as one entry with
- * no files, and refuses one with no commit. Its files go into the index once,
- * under its path; from then on `git add` keeps them like any other file.
+ * Git stores a nested repository as one entry with no files, and refuses one
+ * with no commit, so its files go into the index once; `git add` keeps them
+ * after.
  */
 async function stage(git: Git, store: string, checkout: Checkout) {
   for (const repository of await ownRepositories(git, store, checkout)) {

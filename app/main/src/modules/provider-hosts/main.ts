@@ -65,7 +65,6 @@ interface ProviderHostsOptions {
     request: SessionStoreRequest
   ) => SessionStoreValue
   onStatus: (provider: ProviderId, status: HostStatus) => void
-  /** The host died without main asking it to. */
   onCrash: (provider: ProviderId) => void
 }
 

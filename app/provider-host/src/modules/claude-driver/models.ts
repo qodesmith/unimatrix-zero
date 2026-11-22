@@ -19,7 +19,6 @@ const ModelInfosSchema = z.array(
 /** The SDK's entry for the Model `claude` runs when given none. */
 const SDK_DEFAULT = 'default'
 
-/** Starts a `claude` to read the Models it lists. */
 export type ReadModels = (vendorProgram: SignInRequest) => Promise<ModelInfo[]>
 
 /**

@@ -1,7 +1,3 @@
-/**
- * The review half of `bun run provider-checks`: an agent on the maintainer's
- * own `claude` login reads one entry against the code and the pinned builds.
- */
 import type {Review} from './provider-checks-result.ts'
 import type {Entry} from './provider-dependencies.ts'
 import type {Pins} from './vendor-pins.ts'

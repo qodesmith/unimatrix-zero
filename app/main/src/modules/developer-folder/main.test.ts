@@ -122,7 +122,6 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
 
     const system = await stub(folder, 'git', ['config', '--system', '--list'])
 
-    // A line of the build's own `etc/gitconfig`.
     expect(system.stdout).toContain(
       'credential.https://dev.azure.com.usehttppath=true'
     )

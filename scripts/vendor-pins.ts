@@ -1,6 +1,6 @@
 /**
- * The vendor pins, and whether a PR changes them. A bump PR is known by what it
- * changes, never by its branch or labels, which a fork can copy.
+ * A bump PR is known by what it changes, never by its branch or labels, which a
+ * fork can copy.
  */
 import path from 'node:path'
 import {z} from 'zod'
@@ -48,10 +48,7 @@ function pinChanges(base: Pins, head: Pins) {
   )
 }
 
-/**
- * A GitHub REST GET: the path after `https://api.github.com/`, its JSON text
- * back.
- */
+/** GETs the path after `https://api.github.com/` and resolves its JSON text. */
 export type GitHubApi = (path: string) => Promise<string>
 
 const Compare = z.looseObject({

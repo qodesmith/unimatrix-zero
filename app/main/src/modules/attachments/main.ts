@@ -36,7 +36,6 @@ export type AttachmentFile = AttachmentAdd['file']
 
 export interface AttachmentsDeps {
   db: Database
-  /** `userData/attachments/` */
   dir: string
   droppedPath: (fileId: string) => string | null
 }

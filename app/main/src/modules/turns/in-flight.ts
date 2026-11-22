@@ -52,7 +52,6 @@ interface Entry {
   provider: ProviderId
   /** The Model asked for, until its Provider reports the one it used. */
   model: string
-  /** The id main asked the Provider to store the Prompt under. */
   promptMessageId: string
   reply: StreamingReply
   saveTimer: ReturnType<typeof setTimeout> | null

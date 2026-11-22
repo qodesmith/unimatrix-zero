@@ -21,7 +21,7 @@ export interface TreeFilesDeps {
   db: Database
   userData: string
   publish: (event: AppEvent) => void
-  /** A Snapshot that couldn't be taken or read; the Reply itself is unharmed. */
+  /** A Snapshot that couldn't be taken or read. */
   onFailure: (error: Error) => void
   /** The app's own `git` by its full path, or null while it isn't in place. */
   gitProgram: () => string | null
@@ -63,10 +63,7 @@ type SnapshotRow = ReturnType<typeof snapshotRows>[number]
 
 export type TreeFiles = ReturnType<typeof createTreeFiles>
 
-/**
- * The Tree's folder, where the AI works, and a hidden git store of Snapshots
- * beside it. The store is never named to the AI.
- */
+/** The store of Snapshots beside the Tree's folder is never named to the AI. */
 export function createTreeFiles({
   db,
   userData,
@@ -162,7 +159,6 @@ export function createTreeFiles({
     }
   }
 
-  /** A finished Reply whose Snapshot the app quit before taking, or failed. */
   function missesSnapshot(replyId: string) {
     const row = db
       .select({
@@ -199,7 +195,7 @@ export function createTreeFiles({
     /** Made empty if missing: a vendor program's `cwd` has to exist. */
     folderFor: (treeId: string) => makeTreeFolder(userData, treeId),
 
-    /** Takes the Reply's Snapshot, however it ended. Never rejects. */
+    /** However the Reply ended. Never rejects. */
     async replyFinished({treeId, replyId}: {treeId: string; replyId: string}) {
       return queue(treeId, async () => snapshotReporting(treeId, replyId))
     },
@@ -225,10 +221,9 @@ export function createTreeFiles({
     },
 
     /**
-     * Takes, oldest first, every Snapshot the app quit before taking. Run at
-     * launch, after streaming Replies are marked interrupted, before a Reply on
-     * another Branch writes into the folder. Failed ones wait for a Reply that
-     * continues from them. Never rejects.
+     * Run at launch, after streaming Replies are marked interrupted and before
+     * a Reply on another Branch writes into the folder. Failed ones wait for a
+     * Reply that continues from them. Never rejects.
      */
     async takeMissedSnapshots() {
       const missed = db

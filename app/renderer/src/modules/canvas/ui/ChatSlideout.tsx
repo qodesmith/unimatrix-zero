@@ -268,7 +268,6 @@ function ChatReply({reply}: {reply: Reply}) {
 
 interface ChatInputProps {
   ref: Ref<HTMLTextAreaElement>
-  /** Null for the root Input. */
   parentReplyId: string | null
   onFocus: () => void
   onSent: (replyId: string) => void

@@ -55,7 +55,6 @@ function RemoveButton({label, onClick}: {label: string; onClick: () => void}) {
 
 interface ShownProps {
   attachment: AttachmentData
-  /** What the Model does with it, or what became of it since it was sent. */
   note: string | null
   pathOnly: boolean
   onRemove?: () => void
@@ -199,9 +198,7 @@ function PendingAttachment({
 
 interface AttachmentListProps {
   attachments: readonly AttachmentData[]
-  /** Given, each attachment says what this Provider's Model does with it. */
   provider?: ProviderId | null
-  /** Ids of sent attachments that now go by path alone. */
   pathOnly?: ReadonlySet<string>
   pending?: readonly PendingAdd[]
   onRemove?: (id: string) => void
@@ -212,7 +209,6 @@ interface AttachmentListProps {
 const NONE: readonly PendingAdd[] = []
 const NO_IDS: ReadonlySet<string> = new Set()
 
-/** Images as thumbnails, other files as chips, in the order attached. */
 export function AttachmentList({
   attachments,
   provider = null,

@@ -12,20 +12,17 @@ import {updateSavedReply, withProgress} from './saved-turns'
 /** A run of the Model's reasoning; display only, never stored. */
 export interface ThinkingBlock {
   text: string
-  /** The count of content parts before this thinking began. */
   beforePart: number
   startedAt: number
   endedAt: number | null
 }
 
 interface LiveState {
-  /** Streaming Replies by Reply id; saved Turns live in TanStack Query. */
+  /** Saved Turns live in TanStack Query, not here. */
   replies: Record<string, StreamingReply>
-  /** By Reply id, kept after the Reply finishes; only a reload clears it. */
+  /** Kept after the Reply finishes; only a reload clears it. */
   thinking: Record<string, ThinkingBlock[]>
-  /** By Reply id, from a Stop or Retry asked until the machine is idle again. */
   runs: Record<string, ReplyRunState>
-  /** By Reply id, from a retry notice or lost connection until new content. */
   waiting: Record<string, Wait>
 }
 

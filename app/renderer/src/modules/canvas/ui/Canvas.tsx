@@ -137,7 +137,6 @@ interface HeadingProps {
 
 type CanvasProps = HeadingProps & {treeId: string}
 
-/** One Tree on the canvas: a centered Input while it is empty, then its Turns. */
 export function Canvas({treeId, ...heading}: CanvasProps) {
   const turns = useTurns(treeId)
 

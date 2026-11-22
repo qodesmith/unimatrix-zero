@@ -29,9 +29,8 @@ function remoteUrl(src: ImageProps['src']): string | null {
 }
 
 /**
- * A chip until clicked, since nothing in a Reply reaches the network on its own
- * (ADR 0014). The click fetches the image through main, without cookies or a
- * referrer.
+ * A chip until clicked: nothing in a Reply reaches the network on its own
+ * (ADR 0014).
  */
 export function RemoteImage({src, alt, title}: ImageProps) {
   const url = remoteUrl(src)

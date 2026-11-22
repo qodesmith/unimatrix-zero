@@ -58,7 +58,6 @@ interface ChoiceOptionsProps<T extends number | string> {
   inline?: boolean
 }
 
-/** A Choice's radios without its legend, for a Group that holds more. */
 export function ChoiceOptions<T extends number | string>({
   legendId,
   value,

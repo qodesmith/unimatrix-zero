@@ -3,7 +3,6 @@ declare const __UZ_DEV__: boolean
 export interface DevRun {
   vitePort: number
   scriptNonce: string
-  /** `bun run dev --fake`: every Provider is the fake driver. */
   fakeProvider: boolean
 }
 

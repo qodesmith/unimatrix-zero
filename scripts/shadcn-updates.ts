@@ -1,7 +1,3 @@
-/**
- * Diffs each shadcn file we own, or only the components named, against what
- * `shadcn add` writes today, in a throwaway worktree.
- */
 import {$, Glob} from 'bun'
 import {existsSync} from 'node:fs'
 import {mkdtemp} from 'node:fs/promises'

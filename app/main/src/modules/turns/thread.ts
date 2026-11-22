@@ -27,9 +27,8 @@ function labelFor({provider, model}: ModelChoice, listed: ListedModels) {
 }
 
 /**
- * The whole Thread ending at the Reply, as seen from `to`: each Reply another
- * Model wrote is labeled with its name. `withAttachments` adds attachments once
- * the Prompt being sent is saved.
+ * Each Reply another Model wrote is labeled with its name. `withAttachments`
+ * adds attachments once the Prompt being sent is saved.
  */
 export function threadTo(
   db: Database,

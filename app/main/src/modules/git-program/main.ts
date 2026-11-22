@@ -45,7 +45,6 @@ export function createGitProgram({
     /** Never rejects. */
     prepare,
 
-    /** A Snapshot wasn't taken for want of it. */
     snapshotWaited() {
       if (!target) return
 

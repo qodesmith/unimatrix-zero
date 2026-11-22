@@ -13,10 +13,7 @@ interface Span {
   end: number
 }
 
-/**
- * How far to shift a span to bring it inside `length`; its end wins when it
- * does not fit.
- */
+/** How far to shift a span into `length`; its end wins when it does not fit. */
 function shiftInto({start, end}: Span, length: number) {
   const last = length - MARGIN
 
@@ -122,7 +119,6 @@ export function useFollow({
     }
   }, [reveal, index])
 
-  /** Glides a measured Reply's box onto the canvas and follows it from there. */
   const follow = useCallback(
     (replyId: string) => {
       followed.current = {replyId, pinned: true}
