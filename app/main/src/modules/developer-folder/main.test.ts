@@ -214,11 +214,14 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     const folder = temporaryFolder()
     writeDeveloperFolder(folder, inject('gitProgram'))
     const work = temporaryFolder()
-    const first = path.join(work, 'first')
-    const origin = path.join(work, 'origin.git')
     const second = path.join(work, 'second')
-    await repoToServe(async (args, cwd) => stub(folder, 'git', args, cwd), work)
-    const url = `${await servedOverHttp(work)}/origin.git`
+
+    const {first, origin} = await repoToServe(
+      async (args, cwd) => stub(folder, 'git', args, cwd),
+      work
+    )
+
+    const url = `${await servedOverHttp(work)}/${path.basename(origin)}`
 
     const clone = await stub(folder, 'git', ['clone', url, second], work)
 

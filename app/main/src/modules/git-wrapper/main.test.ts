@@ -157,9 +157,9 @@ describe.runIf(noGit && process.platform === 'linux')(
     it('reads, clones and fetches a remote that needs no login over HTTPS, with the system’s libcurl and certificates', async () => {
       const git = wrapped()
       const work = temporaryFolder()
-      await repoToServe(git, work)
-      const commit = await git(['rev-parse', 'HEAD'], path.join(work, 'first'))
-      const url = `${await servedOverHttps(work)}/origin.git`
+      const {first, origin} = await repoToServe(git, work)
+      const commit = await git(['rev-parse', 'HEAD'], first)
+      const url = `${await servedOverHttps(work)}/${path.basename(origin)}`
 
       const remote = await git(['ls-remote', url, 'refs/heads/main'])
 
@@ -238,10 +238,10 @@ describe.runIf(noGit && process.platform === 'win32')(
 
     it('clones a remote that needs no login over HTTP', async () => {
       const work = temporaryFolder()
-      await repoToServe(git, work)
-      const host = await servedOverHttp(work)
+      const {origin} = await repoToServe(git, work)
+      const url = `${await servedOverHttp(work)}/${path.basename(origin)}`
 
-      const clone = await git(['clone', `${host}/origin.git`, 'second'], work)
+      const clone = await git(['clone', url, 'second'], work)
 
       expect(clone.code).toBe(0)
     })

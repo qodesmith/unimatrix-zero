@@ -857,32 +857,42 @@ it('gives claude the PowerShell tool on Windows', async () => {
   await claude.allClosed()
 })
 
-it('turns off git’s login prompts for a Reply’s claude and a one-shot’s on Windows', async () => {
-  const claude = await setUp(
-    ['warm.ndjson', 'warm.ndjson'],
-    {},
-    fakeStore(),
-    'win32'
-  )
+it('turns off git’s login prompts for a Reply’s claude and a one-shot’s on Windows, and on no other platform', async () => {
+  const prompts: Record<string, (string | undefined)[][]> = {}
 
-  await claude.reply(FIRST_PROMPT)
-  await claude.driver.runOneShot(
-    {model: 'haiku', prompt: FIRST_PROMPT, vendorProgram: claude.vendorProgram},
-    new AbortController().signal
-  )
+  for (const platform of ['linux', 'darwin', 'win32'] as const) {
+    const claude = await setUp(
+      ['warm.ndjson', 'warm.ndjson'],
+      {},
+      fakeStore(),
+      platform
+    )
 
-  const prompts = [...claude.environments, ...claude.queried].map(env => [
-    env?.GCM_INTERACTIVE,
-    env?.GIT_TERMINAL_PROMPT,
-  ])
+    await claude.reply(FIRST_PROMPT)
+    await claude.driver.runOneShot(
+      {
+        model: 'haiku',
+        prompt: FIRST_PROMPT,
+        vendorProgram: claude.vendorProgram,
+      },
+      new AbortController().signal
+    )
 
-  expect(prompts).toEqual([
-    ['never', '0'],
-    ['never', '0'],
-    ['never', '0'],
-  ])
+    prompts[platform] = [...claude.environments, ...claude.queried].map(env => [
+      env?.GCM_INTERACTIVE,
+      env?.GIT_TERMINAL_PROMPT,
+    ])
+    await claude.allClosed()
+  }
 
-  await claude.allClosed()
+  const none = [undefined, undefined]
+  const off = ['never', '0']
+
+  expect(prompts).toEqual({
+    linux: [none, none, none],
+    darwin: [none, none, none],
+    win32: [off, off, off],
+  })
 })
 
 it('names the app’s developer folder to a one-shot’s claude on a Mac with no developer tools, and to none on a Mac with them', async () => {

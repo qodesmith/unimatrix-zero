@@ -25,14 +25,14 @@ app/preload/        window.uz = { send, subscribe, registerDroppedFile }, one se
 app/renderer/       React, Tailwind and shadcn, styled only by Theme tokens
 app/provider-host/  one utility process per Provider: claude and chatgpt entries
 shared/contract/    Zod schemas for commands and events; every type derives from them. Also `machine()`, the state machine helper every process shares
-shared/vendor-program/  downloads a manifest build, checks it and unpacks it; main and the Provider hosts share it
+shared/vendor-program/  downloads a manifest build, checks it and unpacks it, and holds the settings that keep the app's `git` from asking for a login; main and the Provider hosts share it
 tooling/            the shared Vite build helper and the repo's own lint rules
 scripts/            dev loop, test runner, runtime pinning
 ```
 
 Main's SQLite schema lives in `app/main/src/modules/database/schema.ts`. After changing it, run `bun run --filter @uz/main db:generate` and commit the new folder under `app/main/drizzle/`; the app applies it on the next start, behind a backup and the foreign-key guard (ADR 0003).
 
-`tsc -b` project references keep main, the Provider hosts and the renderer from importing each other: only `@uz/contract` is shared, plus `@uz/vendor-program` between main and the Provider hosts, which both download programs.
+`tsc -b` project references keep main, the Provider hosts and the renderer from importing each other: only `@uz/contract` is shared, plus `@uz/vendor-program` between main and the Provider hosts, which both download programs and keep the app's `git` from asking for a login.
 
 ### Modules
 

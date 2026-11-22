@@ -83,6 +83,9 @@ export async function repoToServe(git: Git, work: string) {
   fs.writeFileSync(path.join(first, 'note.txt'), 'one\n')
   await git(['add', 'note.txt'], first)
   await git([...identity, 'commit', '-m', 'one'], first)
-  await git(['clone', '--bare', first, 'origin.git'], work)
-  await git(['update-server-info'], path.join(work, 'origin.git'))
+  const origin = path.join(work, 'origin.git')
+  await git(['clone', '--bare', first, origin], work)
+  await git(['update-server-info'], origin)
+
+  return {first, origin}
 }
