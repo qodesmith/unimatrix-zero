@@ -110,7 +110,17 @@ jobs:
       # xz, and git's HTTPS needs the system's libcurl (ADR 0026).
       - run: |
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates curl unzip xz-utils libcurl4t64
+          apt-get install -y --no-install-recommends ca-certificates curl unzip xz-utils libcurl4t64 openssl
+      # The HTTPS test serves on 127.0.0.1 with this certificate, and the
+      # system trusts it as it would a host's.
+      - name: Trust a certificate for 127.0.0.1
+        run: |
+          mkdir -p /tmp/uz-tls
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=127.0.0.1 \
+            -addext subjectAltName=IP:127.0.0.1 \
+            -keyout /tmp/uz-tls/key.pem -out /tmp/uz-tls/cert.pem
+          cp /tmp/uz-tls/cert.pem /usr/local/share/ca-certificates/uz-test.crt
+          update-ca-certificates
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -129,6 +139,7 @@ jobs:
       - run: node node_modules/vitest/vitest.mjs run --project node app/main/src/modules/git-wrapper
         env:
           UZ_NO_GIT: '1'
+          UZ_TLS_FOLDER: /tmp/uz-tls
 
   windows-no-git:
     name: Windows with no git

@@ -1,11 +1,14 @@
+import type {AddressInfo} from 'node:net'
+
 import {DEV_MANIFEST, gitFolderFor} from '#modules/vendor-programs/main'
 import {execFile} from 'node:child_process'
 import fs from 'node:fs'
+import https from 'node:https'
 import os from 'node:os'
 import path from 'node:path'
 import {pathToFileURL} from 'node:url'
 import {promisify} from 'node:util'
-import {describe, expect, inject, it} from 'vitest'
+import {describe, expect, inject, it, onTestFinished} from 'vitest'
 
 import {writeGitWrapper} from './main'
 
@@ -125,6 +128,43 @@ function gitIn(folder: string): Git {
     })
 }
 
+/**
+ * Serves a folder's files over HTTPS on 127.0.0.1, for git's dumb HTTP
+ * protocol. Linux's CI job makes the certificate and adds it to the system's
+ * trusted ones, so `git` checks it as it would a host's.
+ */
+async function served(root: string) {
+  const tls = process.env.UZ_TLS_FOLDER
+
+  if (!tls) {
+    throw new Error('UZ_TLS_FOLDER names no certificate for 127.0.0.1.')
+  }
+
+  const server = https.createServer(
+    {
+      cert: fs.readFileSync(path.join(tls, 'cert.pem')),
+      key: fs.readFileSync(path.join(tls, 'key.pem')),
+    },
+    (request, response) => {
+      const {pathname} = new URL(request.url ?? '/', 'https://127.0.0.1')
+
+      fs.readFile(path.join(root, pathname), (error, data) => {
+        response.writeHead(error ? 404 : 200).end(data)
+      })
+    }
+  )
+
+  onTestFinished(() => {
+    server.close()
+  })
+
+  await new Promise<void>(resolve => {
+    server.listen(0, '127.0.0.1', resolve)
+  })
+
+  return (server.address() as AddressInfo).port
+}
+
 function wrapped() {
   const folder = temporaryFolder()
   writeGitWrapper(folder, inject('gitProgram'))
@@ -157,17 +197,27 @@ describe.runIf(noGit && process.platform === 'linux')(
       )
     })
 
-    it('reads a remote over HTTPS with the system’s libcurl', async () => {
+    it('reads a remote over HTTPS with the system’s libcurl and certificates', async () => {
       const git = wrapped()
+      const work = temporaryFolder()
+      const first = path.join(work, 'first')
+      fs.mkdirSync(first)
+      await git(['init', '-b', 'main'], first)
+      fs.writeFileSync(path.join(first, 'note.txt'), 'one\n')
+      await git(['add', 'note.txt'], first)
+      await git([...identity, 'commit', '-m', 'one'], first)
+      await git(['clone', '--bare', first, 'origin.git'], work)
+      await git(['update-server-info'], path.join(work, 'origin.git'))
+      const commit = await git(['rev-parse', 'HEAD'], first)
+      const port = await served(work)
 
       const remote = await git([
         'ls-remote',
-        'https://github.com/desktop/dugite-native.git',
-        'HEAD',
+        `https://127.0.0.1:${port}/origin.git`,
+        'refs/heads/main',
       ])
 
-      expect(remote.stderr).toBe('')
-      expect(remote.stdout).toMatch(/^[0-9a-f]{40}\tHEAD\n$/)
+      expect(remote.stdout).toBe(`${commit.stdout.trim()}\trefs/heads/main\n`)
     })
 
     it('fails git with a not-ready error until the build is in place, then runs it from the same script', async () => {
