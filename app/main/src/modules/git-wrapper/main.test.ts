@@ -1,6 +1,8 @@
 import type {AddressInfo} from 'node:net'
 
+import {servedOverHttp} from '#modules/test-git-server/main'
 import {DEV_MANIFEST, gitFolderFor} from '#modules/vendor-programs/main'
+import {NO_GIT_SIGN_IN, withNoGitSignIn} from '@uz/vendor-program/git-sign-in'
 import {execFile} from 'node:child_process'
 import fs from 'node:fs'
 import https from 'node:https'
@@ -161,6 +163,21 @@ function wrapped() {
   return gitIn(folder)
 }
 
+/** A folder holding `first`, a repo, and `origin.git`, its bare copy to serve. */
+async function bareRepo(git: Git) {
+  const work = temporaryFolder()
+  const first = path.join(work, 'first')
+  fs.mkdirSync(first)
+  await git(['init', '-b', 'main'], first)
+  fs.writeFileSync(path.join(first, 'note.txt'), 'one\n')
+  await git(['add', 'note.txt'], first)
+  await git([...identity, 'commit', '-m', 'one'], first)
+  await git(['clone', '--bare', first, 'origin.git'], work)
+  await git(['update-server-info'], path.join(work, 'origin.git'))
+
+  return work
+}
+
 describe.runIf(noGit && process.platform === 'linux')(
   'on Linux with no git',
   () => {
@@ -185,27 +202,31 @@ describe.runIf(noGit && process.platform === 'linux')(
       )
     })
 
-    it('reads a remote over HTTPS with the system’s libcurl and certificates', async () => {
+    it('reads and clones a remote that needs no login over HTTPS, with the system’s libcurl and certificates', async () => {
       const git = wrapped()
-      const work = temporaryFolder()
-      const first = path.join(work, 'first')
-      fs.mkdirSync(first)
-      await git(['init', '-b', 'main'], first)
-      fs.writeFileSync(path.join(first, 'note.txt'), 'one\n')
-      await git(['add', 'note.txt'], first)
-      await git([...identity, 'commit', '-m', 'one'], first)
-      await git(['clone', '--bare', first, 'origin.git'], work)
-      await git(['update-server-info'], path.join(work, 'origin.git'))
-      const commit = await git(['rev-parse', 'HEAD'], first)
-      const port = await served(work)
+      const work = await bareRepo(git)
+      const commit = await git(['rev-parse', 'HEAD'], path.join(work, 'first'))
+      const url = `https://127.0.0.1:${await served(work)}/origin.git`
 
-      const remote = await git([
-        'ls-remote',
-        `https://127.0.0.1:${port}/origin.git`,
-        'refs/heads/main',
-      ])
+      const remote = await git(['ls-remote', url, 'refs/heads/main'])
 
       expect(remote.stdout).toBe(`${commit.stdout.trim()}\trefs/heads/main\n`)
+
+      const clone = await git(['clone', url, 'second'], work)
+
+      expect(clone.code).toBe(0)
+    })
+
+    it('fails a git that needs a login at once and says what to do', async () => {
+      const git = wrapped()
+      const host = await servedOverHttp(temporaryFolder())
+
+      const denied = await git(['ls-remote', `${host}/private/repo.git`])
+
+      expect(denied.code).toBe(128)
+      expect(denied.stderr).toBe(
+        `${NO_GIT_SIGN_IN}\nfatal: could not read Username for '${host}': terminal prompts disabled\n`
+      )
     })
 
     it('fails git with a not-ready error until the build is in place, then runs it from the same script', async () => {
@@ -245,9 +266,30 @@ describe.runIf(noGit && process.platform === 'win32')(
           '-Command',
           `git ${words.join(' ')}; exit $LASTEXITCODE`,
         ],
-        {cwd, env: withLast(folder)}
+        {cwd, env: withNoGitSignIn(withLast(folder))}
       )
     }
+
+    it('fails a git that needs a login at once and says what to do, with the build’s sign-in turned to never ask', async () => {
+      const host = await servedOverHttp(temporaryFolder())
+
+      const denied = await git(['ls-remote', `${host}/private/repo.git`])
+
+      expect(denied.code).toBe(128)
+      expect(denied.stderr).toContain(`${NO_GIT_SIGN_IN}\n`)
+      expect(denied.stderr).toContain(
+        `fatal: could not read Username for '${host}': terminal prompts disabled`
+      )
+    })
+
+    it('clones a remote that needs no login over HTTP', async () => {
+      const work = await bareRepo(git)
+      const host = await servedOverHttp(work)
+
+      const clone = await git(['clone', `${host}/origin.git`, 'second'], work)
+
+      expect(clone.code).toBe(0)
+    })
 
     it('runs the app’s own git for a git found last on PATH', async () => {
       const found = await ended('where.exe', ['git'], {

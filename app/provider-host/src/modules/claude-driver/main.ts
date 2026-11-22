@@ -83,7 +83,7 @@ export function createClaudeDriver({
 }: ClaudeDriverOptions): ProviderDriver {
   // Every `claude` runs `git` as it starts, a one-shot's with no tools too.
   async function hostEnv(vendorProgram: SignInRequest) {
-    return withAppFolders(env, vendorProgram, hasDeveloperTools)
+    return withAppFolders(env, vendorProgram, hasDeveloperTools, platform)
   }
 
   const models = createModelList(readModelsWith(hostEnv))

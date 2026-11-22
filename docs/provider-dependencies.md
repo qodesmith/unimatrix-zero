@@ -664,6 +664,17 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Changed by:** upgrade
 - **Check:** none: needs a signed-in Windows PC, which the maintainer's machine is not. The maintainer tested it by hand on Windows 11 under Full access, with `claude` 2.1.307 and Codex 0.163.0: the results are in [#278](https://github.com/qodesmith/unimatrix-zero/issues/278#issuecomment-7078343644). The other Permission modes are untested.
 
+### On Windows, the vendor program's environment reaches the AI's `git`
+
+- **Id:** `windows-environment-reaches-commands`
+- **Kind:** D
+- **Provider:** both
+- **Relies on:** on Windows, a variable in the environment `claude` or Codex starts with is in the environment of each command the AI runs through PowerShell, and so of the `git` it runs. Neither vendor documents which variables a command inherits.
+- **App side:** on Windows, `vendor-environment` adds `GCM_INTERACTIVE=never`, `GIT_TERMINAL_PROMPT=0` and a credential helper that says what to do to the environment of `claude` and Codex, so a `git` the AI runs never asks for a login (ADR 0027).
+- **User would see:** under Codex, Git Credential Manager's GitHub sign-in window, opened with no warning by a `git` the AI runs. Under both, a `git` that needs a login fails without saying what to do.
+- **Changed by:** upgrade
+- **Check:** none: needs a signed-in Windows PC, which the maintainer's machine is not. The maintainer tested it by hand on Windows 11 under Full access, with `claude` 2.1.307, Codex 0.163.0 and `git` 2.56.1: the results are in [#279](https://github.com/qodesmith/unimatrix-zero/issues/279#issuecomment-7086114640). CI's "Windows with no git" job checks that the build obeys the variables, with no vendor program. The other Permission modes are untested.
+
 ### A new session's setup tokens
 
 - **Id:** `setup-tokens`

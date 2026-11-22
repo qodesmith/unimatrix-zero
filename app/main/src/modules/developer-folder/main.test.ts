@@ -1,4 +1,6 @@
+import {servedOverHttp} from '#modules/test-git-server/main'
 import {DEV_MANIFEST} from '#modules/vendor-programs/main'
+import {NO_GIT_SIGN_IN} from '@uz/vendor-program/git-sign-in'
 import {execFile} from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -26,7 +28,8 @@ async function stub(
   developerDir: string,
   tool: string,
   args: string[],
-  cwd = os.tmpdir()
+  cwd = os.tmpdir(),
+  env: NodeJS.ProcessEnv = {}
 ): Promise<Ended> {
   const home = path.join(developerDir, 'home')
   fs.mkdirSync(home, {recursive: true})
@@ -34,7 +37,12 @@ async function stub(
   try {
     const {stdout, stderr} = await run(path.join('/usr/bin', tool), args, {
       cwd,
-      env: {PATH: '/usr/bin:/bin', HOME: home, DEVELOPER_DIR: developerDir},
+      env: {
+        ...env,
+        PATH: '/usr/bin:/bin',
+        HOME: home,
+        DEVELOPER_DIR: developerDir,
+      },
     })
 
     return {code: 0, stdout, stderr}
@@ -150,6 +158,84 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
 
     expect(shell.code).toBe(128)
     expect(shell.stderr).toMatch(/^fatal: /)
+  })
+
+  it('fails a git that needs a login at once and says what to do, asking no helper of the user’s', async () => {
+    const folder = temporaryFolder()
+    writeDeveloperFolder(folder, inject('gitProgram'))
+    const home = path.join(folder, 'home')
+    fs.mkdirSync(home, {recursive: true})
+    fs.writeFileSync(
+      path.join(home, '.gitconfig'),
+      '[credential]\n\thelper = "!echo the user’s helper >&2"\n'
+    )
+    const host = await servedOverHttp(temporaryFolder())
+
+    const denied = await stub(folder, 'git', [
+      'ls-remote',
+      `${host}/private/repo.git`,
+    ])
+
+    expect(denied.code).toBe(128)
+    expect(denied.stderr).toBe(
+      `${NO_GIT_SIGN_IN}\nfatal: could not read Username for '${host}': terminal prompts disabled\n`
+    )
+  })
+
+  it('keeps the git settings already in the environment', async () => {
+    const folder = temporaryFolder()
+    writeDeveloperFolder(folder, inject('gitProgram'))
+
+    const name = await stub(
+      folder,
+      'git',
+      ['config', 'user.name'],
+      os.tmpdir(),
+      {
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: 'user.name',
+        GIT_CONFIG_VALUE_0: 'Sam',
+      }
+    )
+
+    expect(name.stdout).toBe('Sam\n')
+  })
+
+  it('clones and fetches a repo that needs no login over HTTP', async () => {
+    const folder = temporaryFolder()
+    writeDeveloperFolder(folder, inject('gitProgram'))
+    const work = temporaryFolder()
+    const first = path.join(work, 'first')
+    const origin = path.join(work, 'origin.git')
+    const second = path.join(work, 'second')
+    fs.mkdirSync(first)
+    await stub(folder, 'git', ['init', '-b', 'main'], first)
+    fs.writeFileSync(path.join(first, 'note.txt'), 'one\n')
+    await stub(folder, 'git', ['add', 'note.txt'], first)
+    await stub(folder, 'git', [...identity, 'commit', '-m', 'one'], first)
+    await stub(folder, 'git', ['clone', '--bare', first, origin], work)
+    await stub(folder, 'git', ['update-server-info'], origin)
+    const url = `${await servedOverHttp(work)}/origin.git`
+
+    const clone = await stub(folder, 'git', ['clone', url, second], work)
+
+    expect(clone.code).toBe(0)
+
+    fs.writeFileSync(path.join(first, 'note.txt'), 'two\n')
+    await stub(folder, 'git', [...identity, 'commit', '-am', 'two'], first)
+    await stub(folder, 'git', ['push', origin, 'main'], first)
+    await stub(folder, 'git', ['update-server-info'], origin)
+    const fetch = await stub(folder, 'git', ['fetch', 'origin'], second)
+
+    const fetched = await stub(
+      folder,
+      'git',
+      ['show', 'origin/main:note.txt'],
+      second
+    )
+
+    expect(fetch.code).toBe(0)
+    expect(fetched.stdout).toBe('two\n')
   })
 
   it('fails every other stub with a one-line error and 127', async () => {

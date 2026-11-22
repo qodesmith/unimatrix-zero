@@ -857,6 +857,34 @@ it('gives claude the PowerShell tool on Windows', async () => {
   await claude.allClosed()
 })
 
+it('turns off git’s sign-in prompts for a Reply’s claude and a one-shot’s on Windows', async () => {
+  const claude = await setUp(
+    ['warm.ndjson', 'warm.ndjson'],
+    {},
+    fakeStore(),
+    'win32'
+  )
+
+  await claude.reply(FIRST_PROMPT)
+  await claude.driver.runOneShot(
+    {model: 'haiku', prompt: FIRST_PROMPT, vendorProgram: claude.vendorProgram},
+    new AbortController().signal
+  )
+
+  const prompts = [...claude.environments, ...claude.queried].map(env => [
+    env?.GCM_INTERACTIVE,
+    env?.GIT_TERMINAL_PROMPT,
+  ])
+
+  expect(prompts).toEqual([
+    ['never', '0'],
+    ['never', '0'],
+    ['never', '0'],
+  ])
+
+  await claude.allClosed()
+})
+
 it('names the app’s developer folder to a one-shot’s claude on a Mac with no developer tools, and to none on a Mac with them', async () => {
   const claude = await setUp(['warm.ndjson', 'warm.ndjson'])
   const {signal} = new AbortController()

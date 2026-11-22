@@ -1,9 +1,15 @@
+import {NO_SIGN_IN_HELPER} from '@uz/vendor-program/git-sign-in'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import {expect, it, vi} from 'vitest'
 
-import {macHasDeveloperTools, withDeveloperDir, withGitLast} from './main'
+import {
+  macHasDeveloperTools,
+  withAppFolders,
+  withDeveloperDir,
+  withGitLast,
+} from './main'
 
 const base = {PATH: '/usr/bin', HOME: '/Users/sam'}
 const folder = '/data/unimatrix-zero/developer'
@@ -132,4 +138,57 @@ it('adds to the Path a Windows environment holds, and to no second variable', ()
 
 it('leaves PATH alone where main names no folder, as on a Mac', () => {
   expect(withGitLast(base, undefined)).toBe(base)
+})
+
+const ownGitSetting = {
+  GIT_CONFIG_COUNT: '1',
+  GIT_CONFIG_KEY_0: 'user.name',
+  GIT_CONFIG_VALUE_0: 'Sam',
+}
+
+it('turns off git’s sign-in prompts on Windows and adds a helper that says what to do, after the git settings already there', async () => {
+  const windows = {Path: String.raw`C:\Windows\System32`, ...ownGitSetting}
+  const gitFolder = String.raw`C:\data\vendor\git\cmd`
+
+  const env = await withAppFolders(
+    windows,
+    {gitFolder},
+    async () => true,
+    'win32'
+  )
+
+  expect(env).toStrictEqual({
+    ...windows,
+    Path: `${windows.Path}${path.delimiter}${gitFolder}`,
+    GCM_INTERACTIVE: 'never',
+    GIT_TERMINAL_PROMPT: '0',
+    GIT_CONFIG_COUNT: '2',
+    GIT_CONFIG_KEY_1: 'credential.helper',
+    GIT_CONFIG_VALUE_1: NO_SIGN_IN_HELPER,
+  })
+})
+
+it('leaves git’s settings alone on Linux, where the wrapper sets them for the one call', async () => {
+  const linux = {...base, ...ownGitSetting}
+  const gitFolder = '/data/unimatrix-zero/git'
+
+  const env = await withAppFolders(
+    linux,
+    {gitFolder},
+    async () => true,
+    'linux'
+  )
+
+  expect(env).toStrictEqual({
+    ...linux,
+    PATH: `/usr/bin${path.delimiter}${gitFolder}`,
+  })
+})
+
+it('leaves git’s settings alone on Windows where the manifest has no git', async () => {
+  const windows = {Path: String.raw`C:\Windows\System32`}
+
+  expect(await withAppFolders(windows, {}, async () => true, 'win32')).toBe(
+    windows
+  )
 })
