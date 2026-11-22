@@ -29,10 +29,6 @@ function buildFor({builds}: VendorProgram, {platform, arch}: Machine) {
   return target.success ? builds[target.data] : undefined
 }
 
-/**
- * The app's own `git` for this machine, as the folder its archive unpacks to;
- * null when the manifest has none for it (ADR 0024).
- */
 export function gitTargetFor(
   machine: Machine,
   manifest: Manifest = DEV_MANIFEST

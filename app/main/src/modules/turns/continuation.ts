@@ -86,8 +86,7 @@ function resumed(
       ? null
       : planned(db, treeId, parentReplyId, row.promptId)
 
-  // The Reply above went on in its own Provider's session, which another's
-  // Reply was never in.
+  // Another Provider's Reply was never in the session of the Reply above.
   const session = before?.provider === row.provider ? before.session : null
 
   return (
@@ -188,12 +187,11 @@ function planned(
 }
 
 /**
- * Forks when the Reply already has a Prompt after it other than `except`, the
- * one being run again. A Reply its Provider never saved continues from the
- * Reply its Prompt answers, or from its own Prompt in a fork it began, and a
- * session still holding deleted Turns is cut. A session that compacted after
- * the Reply is forked from the part before. The session is the Reply's own
- * Provider's: a Prompt sent to another has none.
+ * Forks when the Reply has a Prompt after it other than `except`, the one being
+ * run again. A Reply its Provider never saved continues from the Reply its
+ * Prompt answers, or from its own Prompt in a fork it began. A session holding
+ * deleted Turns is cut; one that compacted after the Reply forks from before.
+ * A Prompt sent to another Provider has no session.
  */
 export function continuation(
   db: Database,
@@ -329,9 +327,9 @@ function promptIn(session: SessionRef, reply: ReplyRow | undefined) {
 
 /**
  * A cut of deleted Turns already drops the failed attempt. A parent its
- * Provider never saved left only its Prompt in the session, so the cut goes
- * after that Prompt and before the failed attempt's. It always names what to
- * keep: Claude resumes a cut that names nothing at the failed attempt.
+ * Provider never saved left only its Prompt in the session, so cut after it.
+ * Always name what to keep: Claude resumes a cut that names nothing at the
+ * failed attempt.
  */
 function rewound(
   session: ContinuedSession,

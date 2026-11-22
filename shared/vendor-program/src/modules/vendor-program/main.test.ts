@@ -138,7 +138,6 @@ interface TarEntry {
   mode?: number
   /** `0` a file, `5` a folder, `x` a pax header, `2` a symbolic link. */
   type?: string
-  /** What a symbolic link points at. */
   link?: string
 }
 

@@ -8,7 +8,6 @@ import {ImageMediaTypeSchema, planInline} from '@uz/contract/attachments'
 import {originalPath, shrunkPath} from './originals'
 import {rowsOf} from './prompts'
 
-/** Where the AI finds it: the copy the app keeps, or a folder's own path. */
 function pathOf(dir: string, row: AttachmentRow) {
   if (row.folderPath !== null) return row.folderPath
 
@@ -50,10 +49,8 @@ function toHost(
 }
 
 /**
- * What a Provider host gets for each Prompt of a Thread, oldest first with the
- * Prompt being sent last, in the order given. One plan covers the whole
- * Thread, so each file goes inline or not by the rules and the media budget
- * of the Provider the Thread goes to; every one keeps its path (ADR 0022).
+ * One plan covers the whole Thread: each file goes inline or not by the rules
+ * and media budget of the Provider it goes to, and keeps its path (ADR 0022).
  */
 export function hostAttachments(
   db: Pick<Database, 'select'>,

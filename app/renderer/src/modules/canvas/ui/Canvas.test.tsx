@@ -1,4 +1,3 @@
-// The Playwright provider gives `cdp()` its `send`.
 /// <reference types="@vitest/browser-playwright" />
 import type {Attachment} from '@uz/contract/attachments'
 import type {Bridge} from '@uz/contract/bridge'
@@ -487,7 +486,6 @@ function inputUnder(replyText: string) {
   return nodeOf(replyText).getByRole('textbox', {name: 'Prompt'})
 }
 
-/** Hovering the Reply slides its Input out. */
 async function clickInputUnder(replyText: string) {
   await canvas().getByText(replyText).hover()
   await inputUnder(replyText).click()
@@ -2670,14 +2668,14 @@ function media(
   }
 }
 
-/**
- * Three Exchanges whose images and PDF come to more than Claude takes inline
- * in one request: each 9 MiB image is 12 MiB of base64, the PDF 4 MiB.
- */
 function promptWith(sent: Prompt, attachments: Attachment[]): Prompt {
   return {...sent, attachments}
 }
 
+/**
+ * More than Claude takes inline in one request: each 9 MiB image is 12 MiB of
+ * base64, the PDF 4 MiB.
+ */
 function mediaTree(provider: Reply['provider'] = 'claude'): Saved {
   clock = 0
 
@@ -2792,7 +2790,6 @@ it('says on an earlier Prompt’s attachment that it now goes by path only, once
     .element(thumbnailIn(three, 'fourth.png'))
     .toHaveAccessibleDescription('')
 
-  // Reply one's Thread fits.
   await clickInputUnder('Reply one')
   await expect
     .element(one.getByRole('group', {name: 'paper.pdf'}))

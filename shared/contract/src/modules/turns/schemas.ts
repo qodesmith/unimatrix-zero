@@ -100,10 +100,7 @@ export const ReplyProgressSchema = z.strictObject({
   contextWindow: z.number().int().positive().nullable(),
   failure: RunFailureSchema.nullable(),
   compacted: z.boolean(),
-  /**
-   * Its Provider session was rebuilt from the Thread for it, so the AI re-read
-   * the whole Thread cold.
-   */
+  /** Its session was rebuilt from the Thread; the AI re-read it cold. */
   rebuilt: z.boolean(),
 })
 
@@ -116,10 +113,7 @@ export const ReplySchema = z.strictObject({
   promptId: z.uuid(),
   provider: ProviderIdSchema,
   model: z.string(),
-  /**
-   * What it changed in the Tree's files, computed from its Snapshot and its
-   * parent's: empty until the Reply has finished.
-   */
+  /** Empty until the Reply has finished. */
   files: z.array(ChangedFileSchema),
   createdAt: z.iso.datetime(),
 })

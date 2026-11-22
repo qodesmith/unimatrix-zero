@@ -26,7 +26,6 @@ const createdAt = new Date('2026-10-19T12:00:00.000Z')
 
 const picked = {provider: 'claude', model: 'fake'} as const
 
-/** The Model `record()` says wrote a Reply. */
 const HAIKU = {provider: 'claude', model: 'claude-haiku-5-5'} as const
 
 let db: Database
@@ -1136,7 +1135,6 @@ describe('a Prompt sent on another Provider', () => {
     }
   })
 
-  /** A Claude Reply saved in s1, then a ChatGPT Reply saved in a thread. */
   function switched() {
     const first = sendPrompt(null, 'Name a color.')
     fromHost(first, {type: 'TEXT_DELTA', delta: 'Teal.'})
@@ -1440,11 +1438,9 @@ const PDF_SHA256 =
 const PNG_SHA256 =
   '4c4b6a3be1314ab86138bef4314dde022e600960d8689a2c8f8631802d20dab6'
 
-/** Of the three bytes the shrunk-copy test sends as a JPEG. */
 const JPEG_SHA256 =
   '6e568e1f67fba258184c78181539e5e8fdee447e49bb706fc0ea34fbf12336a5'
 
-/** Of the three bytes sent as a file of no known type. */
 const BINARY_SHA256 =
   'ae4b3280e56e2faf83f414a6e3dabe9d5fbe18976544c05fed121accb85b53fc'
 
@@ -1513,7 +1509,6 @@ describe('a Prompt with attachments', () => {
     return sent
   }
 
-  /** A first Exchange Claude finished, for the next Prompt to continue. */
   function answered(attachmentIds: string[]) {
     const {reply} = sendWith(null, attachmentIds)
     record(reply.id)

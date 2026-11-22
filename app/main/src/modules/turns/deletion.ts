@@ -91,9 +91,9 @@ export function deleteBelow(db: Database, treeId: string, promptId: string) {
 }
 
 /**
- * The failed exchanges a Prompt sent from `parentReplyId`, or as the root when
- * null, takes the place of, and the session a Retry of one would resume: it
- * holds nothing of the failed attempt.
+ * The failed exchanges a Prompt sent from `parentReplyId` (null for the root)
+ * replaces, and the session a Retry of one would resume, which holds nothing of
+ * the failed attempt.
  */
 export function failedToReplace(
   db: Database,
@@ -179,10 +179,9 @@ function clearCut(db: Database, replyId: string) {
 }
 
 /**
- * The session holds the Prompt right after the Reply it answers, so any cut
- * there is made. A Prompt that went into a fork leaves the session as it was,
- * unless the fork was served only through that Reply: it holds nothing after
- * it, and so does every later one.
+ * A Prompt recorded in the session right after the Reply it answers means the
+ * cut is made. A fork leaves the session as it was, unless it was served only
+ * through that Reply: then it, and every later fork, holds nothing after it.
  */
 export function clearCutOnPrompt(
   db: Database,

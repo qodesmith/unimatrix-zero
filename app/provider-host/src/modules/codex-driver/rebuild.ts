@@ -52,7 +52,6 @@ function replied(text: string) {
   } satisfies ResponseItem
 }
 
-/** Each Prompt's path lines and inline files, the files read afresh. */
 async function itemsOf(thread: Thread) {
   const turns = await Promise.all(
     thread.map(async exchange => {
@@ -75,10 +74,7 @@ async function itemsOf(thread: Thread) {
   return turns.flat()
 }
 
-/**
- * Gives a new thread the Thread as its history, each Turn a message of its
- * own. False when Codex refuses the items, which leaves a text replay.
- */
+/** False when Codex refuses the items, which leaves a text replay. */
 async function injectThread(
   server: Opening['server'],
   threadId: string,
@@ -95,10 +91,6 @@ async function injectThread(
   }
 }
 
-/**
- * A new thread given the whole Thread: as history when Codex takes the items,
- * else in a thread of its own, with the Prompt.
- */
 async function newThread(
   {server, threads}: Opening,
   request: ReplyRequest

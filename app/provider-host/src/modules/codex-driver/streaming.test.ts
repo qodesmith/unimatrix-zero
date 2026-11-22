@@ -1794,7 +1794,6 @@ it('lists the Models on the app-server a Reply already started', async () => {
   expect(codex.reports()).toHaveLength(1)
 })
 
-/** A Thread Claude wrote, as main hands it over. */
 const HANDED_OVER: Thread = [
   {
     prompt: 'Name a color.',
@@ -1820,10 +1819,6 @@ const HANDED_OVER: Thread = [
   {prompt: 'Still there?', attachments: [], reply: [], label: null},
 ]
 
-/**
- * `started.ndjson`, with Codex answering `thread/inject_items` after
- * `thread/start`.
- */
 function injecting() {
   return edited('started.ndjson', text => {
     const lines = text.split('\n')

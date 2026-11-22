@@ -1,7 +1,6 @@
 /**
- * The data folder `bun run dev` gives each checkout, so each worktree keeps
- * its own sign-ins and vendor programs, and which of those folders, with
- * their Claude Keychain entries, `bun run dev-data:prune` deletes.
+ * Each checkout's own `bun run dev` data folder, and which of them, with their
+ * Claude Keychain entries, `bun run dev-data:prune` deletes.
  */
 import {createHash} from 'node:crypto'
 import os from 'node:os'
@@ -36,7 +35,6 @@ export function appData() {
   return process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), '.config')
 }
 
-/** This checkout's real-Provider dev data, as `bun run dev` left it. */
 export function devUserData(root: string) {
   return path.join(appData(), devDataFolderName(root, false))
 }

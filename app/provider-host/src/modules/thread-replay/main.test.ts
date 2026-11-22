@@ -125,7 +125,6 @@ const chart: HostAttachment = {
   },
 }
 
-/** An earlier Prompt's PDF that Claude's media budget left out. */
 const dropped: HostAttachment = {
   name: 'old.pdf',
   path: '/attachments/old.pdf',

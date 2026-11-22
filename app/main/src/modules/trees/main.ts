@@ -28,10 +28,6 @@ const rowFields = {
   lastActiveAt: lastActiveAt.mapWith(trees.createdAt),
 }
 
-/**
- * A Prompt is trimmed when sent, so its first line has text unless it carries
- * attachments alone.
- */
 function firstLineOf(text: string | null) {
   const line = text?.split('\n', 1)[0]?.trim()
 
@@ -138,7 +134,6 @@ export function createTrees(db: Database) {
       )
     },
 
-    /** Its Turns go with it. */
     delete(id: string): void {
       db.delete(trees).where(eq(trees.id, id)).run()
     },

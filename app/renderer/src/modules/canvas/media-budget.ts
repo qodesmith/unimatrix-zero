@@ -6,16 +6,12 @@ import {planInline} from '@uz/contract/attachments'
 
 import {pathTo} from './tree'
 
-/** The Prompts of the Thread that ends at a Reply, oldest first. */
+/** The Prompts of the Thread ending at a Reply, oldest first. */
 function promptsTo(index: TreeIndex, replyId: string): Prompt[] {
   return pathTo(index, replyId).flatMap(id => index.promptById.get(id) ?? [])
 }
 
-/**
- * Claude's media budget as the Thread up to a Claude Reply uses it. Null for
- * another Provider's Reply, which has no such budget, and for a Thread with no
- * attachments.
- */
+/** Null for another Provider's Reply, or a Thread with no attachments. */
 export function mediaBudgetUseOf(
   index: TreeIndex,
   reply: Reply
@@ -34,9 +30,8 @@ export function mediaBudgetUseOf(
 const NONE: ReadonlySet<string> = new Set()
 
 /**
- * The ids of a Prompt's attachments that went inline, and that Claude's media
- * budget now leaves out of the Thread ending at a Reply. None unless the
- * Reply is Claude's.
+ * The ids of a Prompt's inline attachments that Claude's media budget now
+ * leaves out of the Thread ending at a Reply.
  */
 export function pathOnlyNow(
   index: TreeIndex,
@@ -59,10 +54,7 @@ export function pathOnlyNow(
   )
 }
 
-/**
- * A failed Reply's Prompt is back in the Input, so its Thread ends at the Reply
- * above.
- */
+/** A failed Reply's Prompt is back in the Input, so its Thread ends above. */
 function sentEnd(index: TreeIndex, replyId: string): Reply | null {
   const reply = index.replyById.get(replyId)
 
@@ -74,8 +66,7 @@ function sentEnd(index: TreeIndex, replyId: string): Reply | null {
 }
 
 /**
- * The Reply whose Thread says how a Prompt's attachments go now: the active
- * Reply when the Prompt is on its Thread. Off it, the Prompt is the newest of
+ * The active Reply when the Prompt is on its Thread. Off it, the Prompt ends
  * its own Thread, where the budget has left out nothing it sent inline.
  */
 export function threadEndFor(

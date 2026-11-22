@@ -25,10 +25,7 @@ interface LiveState {
   thinking: Record<string, ThinkingBlock[]>
   /** By Reply id, from a Stop or Retry asked until the machine is idle again. */
   runs: Record<string, ReplyRunState>
-  /**
-   * By streaming Reply id, from the vendor program's retry notice or a lost
-   * connection to its next content.
-   */
+  /** By Reply id, from a retry notice or lost connection until new content. */
   waiting: Record<string, Wait>
 }
 

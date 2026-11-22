@@ -9,10 +9,6 @@ const SHRUNK_EXTENSIONS = {
   'image/jpeg': 'jpg',
 } satisfies Record<ShrunkMediaType, string>
 
-/**
- * The folder is named by content, so every add of the same bytes shares it;
- * the file by its own name, so the path the AI gets ends in it.
- */
 export function originalPath(dir: string, sha256: string, name: string) {
   return path.join(dir, sha256, name)
 }

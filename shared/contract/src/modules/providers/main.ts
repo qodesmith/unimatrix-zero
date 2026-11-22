@@ -51,7 +51,6 @@ export function findModel(models: Model[], id: string) {
   )
 }
 
-/** As the Provider lists it; its id when the list doesn't know it. */
 export function modelName(models: Model[], id: string) {
   return findModel(models, id)?.name ?? id
 }
@@ -60,7 +59,7 @@ export function concreteOf(model: Model) {
   return model.resolvesTo ?? model.id
 }
 
-/** The Model a listed alias or default stands for now; any other id as is. */
+/** The Model a listed alias or default stands for now. */
 export function concreteId(models: Model[], id: string) {
   const listed = models.find(model => model.id === id)
 

@@ -4,13 +4,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import zlib from 'node:zlib'
 
-/** A PNG's first four bytes, in base64. */
 export const PNG_BASE64 = 'iVBORw=='
 
-/** A JPEG's first three bytes, in base64: the shrunk copy of `photo`. */
+/** The shrunk copy of `photo`, in base64. */
 export const SHRUNK_BASE64 = '/9j/'
 
-/** `%PDF-1`, in base64. */
 export const PDF_BASE64 = 'JVBERi0x'
 
 function keep(folder: string, name: string, bytes: Uint8Array) {
@@ -20,15 +18,11 @@ function keep(folder: string, name: string, bytes: Uint8Array) {
   return file
 }
 
-/** As main marks a file the Provider doesn't take, or the budget left out. */
 export function byPathOnly(attachment: HostAttachment): HostAttachment {
   return {...attachment, inline: null}
 }
 
-/**
- * Attachments as main hands them over, each copy under its own name and
- * marked inline as main would mark it for Claude.
- */
+/** Marked inline as main would mark them for Claude. */
 export function attachedFiles(folder: string) {
   function save(name: string, ...bytes: number[]) {
     return keep(folder, name, Uint8Array.from(bytes))

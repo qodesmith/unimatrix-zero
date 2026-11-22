@@ -15,17 +15,11 @@ export type SkillsAddJsonResult =
       mode: 'symlink' | 'copy'
       security: {
         gen?: RiskLevel
-        socket?: string // e.g. "0 alerts", "1 alert"
+        socket?: string
         snyk?: RiskLevel
         details?: string
       } | null
     }
-
-  // one of the skills failed to install
   | {name: string; status: 'failed'; error: string}
-
-  // a skill named with -s doesn't exist in the repo
   | {name: string; status: 'skipped'; reason: string}
-
-  // the whole command failed, e.g. clone error or missing -y
   | {status: 'failed'; error: string}

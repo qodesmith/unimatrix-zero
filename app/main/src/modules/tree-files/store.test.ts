@@ -38,7 +38,6 @@ async function snapshot(replyId: string, parent: string | null) {
   return takeSnapshot(git, copy, {replyId, parent})
 }
 
-/** Every file a Snapshot holds, by path. */
 async function filesIn(commit: string) {
   const listed = await git({store: copy.store}, [
     'ls-tree',
@@ -144,7 +143,6 @@ it.skipIf(process.platform === 'win32')(
   }
 )
 
-/** Makes a folder a git repository of its own, with one commit or none. */
 async function ownRepository(name: string, {commit}: {commit: boolean}) {
   const nested = {store: path.join(copy.folder, name, '.git')}
   await git(nested, ['init', '--quiet'])

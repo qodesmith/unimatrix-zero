@@ -45,10 +45,6 @@ function ChangedFileChip({file: {path, change, size}}: {file: ChangedFile}) {
   )
 }
 
-/**
- * The files a Reply changed, as chips like a Prompt's attachments, in path
- * order. Nothing for a Reply that changed none.
- */
 export function ChangedFiles({files}: {files: readonly ChangedFile[]}) {
   if (files.length === 0) return null
 

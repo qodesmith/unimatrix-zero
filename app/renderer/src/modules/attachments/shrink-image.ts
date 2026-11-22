@@ -54,10 +54,8 @@ async function shrunk(file: File, bitmap: ImageBitmap) {
 }
 
 /**
- * The smaller copy of an image over `INLINE_IMAGE_PIXELS` or
- * `INLINE_IMAGE_SIZE_LIMIT`, for main to send inline in the original's place.
- * Undefined for an image that fits as it is, for any other file, and for an
- * image that can't be decoded or encoded: it attaches all the same.
+ * A smaller copy of an oversized image, for main to send inline in its place.
+ * Undefined when none is needed or the image can't be decoded or encoded.
  */
 export async function shrunkImage(file: File) {
   if (!file.type.startsWith('image/') || file.size > ATTACHMENT_SIZE_LIMIT) {

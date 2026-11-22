@@ -38,7 +38,6 @@ export interface TestFile {
   source: string
 }
 
-/** Each `### ` heading after the first `## Entries` heading is one entry. */
 export function entriesOf(list: string): Entry[] {
   const [, below = ''] = list.split(/^## Entries$/m)
 

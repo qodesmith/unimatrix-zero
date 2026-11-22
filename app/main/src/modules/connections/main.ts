@@ -28,7 +28,6 @@ interface ConnectionsOptions {
   db: Database
   hosts: Pick<ProviderHosts, 'connect' | 'send' | 'stop'>
   publish: (event: AppEvent) => void
-  /** Null when the Provider can't be connected here. */
   requestFor: (provider: ProviderId) => SignInRequest | null
   openExternal: (url: string) => void
   now: () => Date
@@ -164,7 +163,6 @@ export function createConnections({
   }
 
   return {
-    /** As the Provider last listed them; none if it never has. */
     models: modelsOf,
 
     snapshot() {

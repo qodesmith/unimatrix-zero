@@ -186,7 +186,6 @@ function expectComplete(events: Streamed[]) {
   expect(last).toMatchObject({status: 'complete'})
 }
 
-/** A Thread's Replies, each at the Compaction threshold given. */
 function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
   const treeId = crypto.randomUUID()
   const idle = heldIdle()
@@ -259,7 +258,6 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
   return {reply, closed}
 }
 
-/** A Thread Claude wrote, as main hands it over. */
 const FROM_CLAUDE: Thread = [
   {
     prompt: 'Pick a color for the boat, one word.',
@@ -275,7 +273,6 @@ const FROM_CLAUDE: Thread = [
   },
 ]
 
-/** Replies that each hand the driver the Thread they continue. */
 function threadReplies(program: string, home: string) {
   const treeId = crypto.randomUUID()
   const idle = heldIdle()
@@ -376,7 +373,6 @@ interface CodedRepliesOptions {
   onLine?: (line: z.infer<typeof WireLine>) => void
 }
 
-/** Replies on one app-server, each with the codes Codex sent over it. */
 function codedReplies(
   program: string,
   home: string,
@@ -454,7 +450,6 @@ function codedReplies(
       events,
       session: recorded?.session ?? null,
       failure: last?.type === 'RUN_FINISHED' ? last.failure : undefined,
-      /** The `codexErrorInfo` of each `error` notice Codex retried after. */
       retried: sent.flatMap(({method, params}) => {
         if (method !== 'error') return []
 
@@ -462,7 +457,6 @@ function codedReplies(
 
         return notice.willRetry ? [notice.error.codexErrorInfo] : []
       }),
-      /** Each turn's `codexErrorInfo`, null for a turn that didn't fail. */
       turnErrors: sent.flatMap(({method, params}) =>
         method === 'turn/completed'
           ? [TurnCompleted.parse(params).turn.error?.codexErrorInfo ?? null]
@@ -485,10 +479,6 @@ function notFound(response: http.ServerResponse) {
   response.writeHead(404).end()
 }
 
-/**
- * A Model API on a local port that answers each Responses request with the
- * answer last set. Every other request gets a 404.
- */
 async function startStandInApi() {
   let answer: Answer = notFound
 
@@ -525,7 +515,6 @@ async function startStandInApi() {
   }
 }
 
-/** ChatGPT's 429 at a usage limit, its five-hour window full until `resetAt`. */
 function usageLimit(reachedType: RateLimitReachedType, resetAt: number) {
   return (response: http.ServerResponse) => {
     const now = Math.floor(Date.now() / 1000)
@@ -554,7 +543,6 @@ function usageLimit(reachedType: RateLimitReachedType, resetAt: number) {
   }
 }
 
-/** A stream that starts and then fails with `code`. */
 function streamFailed(code: string, message: string) {
   return (response: http.ServerResponse) => {
     const failed = {

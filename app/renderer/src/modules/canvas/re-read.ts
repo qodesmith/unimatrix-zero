@@ -10,9 +10,8 @@ import {previousReply} from './tree'
 export const RE_READ_NOTE_FROM = 20_000
 
 /**
- * About how many tokens a new session's first turn carries before the Thread:
- * the vendor program's own instructions, as the app starts it. Measured from
- * a recorded first Reply to a one-line Prompt, rounded up.
+ * Tokens of the vendor program's own instructions a new session carries before
+ * the Thread, measured from a first Reply to a one-line Prompt, rounded up.
  */
 export const SETUP_TOKENS: Record<ProviderId, number> = {
   claude: 10_000,

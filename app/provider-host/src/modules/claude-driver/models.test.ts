@@ -21,7 +21,6 @@ const haiku: ModelInfo = {
 
 const vendorProgram: SignInRequest = {program: null, configDir: '/claude'}
 
-/** A reader that answers each read only when the test says. */
 function heldReads() {
   const reads: {
     asked: SignInRequest

@@ -31,10 +31,7 @@ export interface TreeFilesDeps {
 
 class GitMissingError extends Error {}
 
-/**
- * Each Reply's nearest Snapshot above it. A Reply has none of its own while
- * the Tree has no files yet, or until its Snapshot is taken.
- */
+/** Each Reply's nearest Snapshot above it, skipping Replies with none. */
 function parentSnapshots(rows: SnapshotRow[]) {
   const byId = new Map(rows.map(row => [row.replyId, row]))
 
@@ -67,9 +64,8 @@ type SnapshotRow = ReturnType<typeof snapshotRows>[number]
 export type TreeFiles = ReturnType<typeof createTreeFiles>
 
 /**
- * The Tree's files: its own folder in `userData`, where the AI works, and a
- * hidden git store beside it that keeps a Snapshot for every Reply. The store
- * is outside that folder and is never named to the AI.
+ * The Tree's folder, where the AI works, and a hidden git store of Snapshots
+ * beside it. The store is never named to the AI.
  */
 export function createTreeFiles({
   db,
@@ -99,7 +95,6 @@ export function createTreeFiles({
     return path.join(userData, 'tree-stores', `${treeId}.git`)
   }
 
-  /** The one Working copy a Tree has: its own folder. */
   function workingCopyOf(treeId: string): VersionedFolder {
     const store = storeOf(treeId)
 
@@ -126,8 +121,6 @@ export function createTreeFiles({
   async function snapshot(treeId: string, replyId: string) {
     const copy = workingCopyOf(treeId)
 
-    // Until the AI first writes a file, the Tree has an empty folder and
-    // nothing else.
     if (!storeExists(copy.store) && fs.readdirSync(copy.folder).length === 0) {
       save(replyId, {noSnapshot: 'no-files'})
 
@@ -169,10 +162,7 @@ export function createTreeFiles({
     }
   }
 
-  /**
-   * A finished Reply whose Snapshot the app quit before taking, or failed to
-   * take.
-   */
+  /** A finished Reply whose Snapshot the app quit before taking, or failed. */
   function missesSnapshot(replyId: string) {
     const row = db
       .select({
@@ -215,9 +205,9 @@ export function createTreeFiles({
     },
 
     /**
-     * Settles once no Snapshot is being taken of the Tree's files, the one of
-     * the Reply a new Reply follows included when it has none yet; null when
-     * nothing is to wait for. Never rejects.
+     * Settles once the Tree has no Snapshot in progress, first taking the
+     * parent Reply's if it misses one; null when there is nothing to wait for.
+     * Never rejects.
      */
     snapshotsBefore: (
       treeId: string,
@@ -236,9 +226,9 @@ export function createTreeFiles({
 
     /**
      * Takes, oldest first, every Snapshot the app quit before taking. Run at
-     * launch, after Replies left streaming are marked interrupted: a Reply on
-     * another Branch would write into the folder before its Snapshot. A failed
-     * one waits for a Reply that continues from it. Never rejects.
+     * launch, after streaming Replies are marked interrupted, before a Reply on
+     * another Branch writes into the folder. Failed ones wait for a Reply that
+     * continues from them. Never rejects.
      */
     async takeMissedSnapshots() {
       const missed = db

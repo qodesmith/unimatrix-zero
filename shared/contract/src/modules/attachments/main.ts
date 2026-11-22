@@ -108,7 +108,6 @@ function base64Size(bytes: number) {
   return Math.ceil(bytes / 3) * 4
 }
 
-/** The bytes an image puts in a request: its shrunk copy's when it has one. */
 export function inlineImageSize({size, shrunkSize}: Sized) {
   return shrunkSize ?? size
 }
@@ -143,7 +142,6 @@ export function inlineForm(
   }
 }
 
-/** What a Prompt's inline images come to, against the per-Prompt limit. */
 export function inlineImagesSize(attachments: readonly Sized[]) {
   return attachments
     .filter(

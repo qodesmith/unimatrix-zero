@@ -32,12 +32,10 @@ function folderWithXcrun(...root: string[]) {
   return theirs
 }
 
-/** A folder the user's `DEVELOPER_DIR` names, with an `xcrun` under `root`. */
 function theirsWithXcrun(...root: string[]) {
   return {...base, DEVELOPER_DIR: folderWithXcrun(...root)}
 }
 
-/** A stand-in for `xcode-select` that runs `script`. */
 function xcodeSelectThat(script: string) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-xcode-select-'))
   const file = path.join(dir, 'xcode-select')
@@ -99,11 +97,8 @@ it('looks for no developer tools where main names no folder, as off a Mac', asyn
   expect(hasDeveloperTools).not.toHaveBeenCalled()
 })
 
-/**
- * CI's "A Mac with no developer tools" job sets `UZ_NO_DEVELOPER_TOOLS` once
- * it has moved Xcode and the Command Line Tools away; every other Mac that
- * runs the tests has them.
- */
+// CI's "A Mac with no developer tools" job sets `UZ_NO_DEVELOPER_TOOLS`; every
+// other Mac that runs the tests has the tools.
 it.runIf(process.platform === 'darwin')(
   'finds a Mac’s developer tools, and finds none on a Mac without them, whatever DEVELOPER_DIR names',
   async () => {

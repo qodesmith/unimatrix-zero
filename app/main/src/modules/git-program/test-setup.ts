@@ -7,7 +7,6 @@ import path from 'node:path'
 
 declare module 'vitest' {
   export interface ProvidedContext {
-    /** The manifest's `git` for this machine, by its full path. */
     gitProgram: string
     /** The machine the tests run on, with the cache as its data folder. */
     machine: Machine
@@ -19,10 +18,7 @@ const cache = path.resolve(
   '../../../../../node_modules/.cache/uz-test'
 )
 
-/**
- * Downloads the `git` the app runs on this machine, once, so the tests run the
- * same build the app does on every CI platform.
- */
+/** Downloads the app's `git` once, so the tests run the build the app does. */
 export async function setup(project: TestProject) {
   const machine: Machine = {
     userData: cache,

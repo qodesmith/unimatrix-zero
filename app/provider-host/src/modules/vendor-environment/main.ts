@@ -10,7 +10,6 @@ import path from 'node:path'
  */
 const STRIPPED_PREFIXES = ['ANTHROPIC_', 'CLAUDE_', 'OPENAI_', 'CODEX_']
 
-/** Each driver adds its own folders to this. */
 export function vendorEnvironment(base: NodeJS.ProcessEnv) {
   const kept = Object.entries(base).filter(
     (entry): entry is [string, string] =>
@@ -69,11 +68,7 @@ async function isDeveloperFolder(folder: string | undefined) {
   return found.includes(true)
 }
 
-/**
- * Names the app's developer folder to a Mac with no developer tools right now
- * (ADR 0025): none of its own, and none in a `DEVELOPER_DIR` the user set.
- * Main names a folder on a Mac alone.
- */
+/** Main sends a `developerDir` on a Mac alone (ADR 0025). */
 export async function withDeveloperDir(
   base: NodeJS.ProcessEnv,
   developerDir: string | undefined,
@@ -87,9 +82,8 @@ export async function withDeveloperDir(
 }
 
 /**
- * Puts the folder of the app's own `git` last on `PATH` (ADR 0026), so a `git`
- * of the user's own is found first. Main names a folder on Windows and Linux
- * alone.
+ * Last, so the user's own `git` wins (ADR 0026). Main sends a `gitFolder` on
+ * Windows and Linux alone.
  */
 export function withGitLast(
   base: NodeJS.ProcessEnv,
@@ -109,7 +103,6 @@ export function withGitLast(
   }
 }
 
-/** The host's environment with the app's own folders for this machine. */
 export async function withAppFolders(
   base: NodeJS.ProcessEnv,
   {developerDir, gitFolder}: Pick<SignInRequest, 'developerDir' | 'gitFolder'>,

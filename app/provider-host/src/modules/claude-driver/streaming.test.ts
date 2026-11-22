@@ -266,7 +266,6 @@ async function setUp(
     environments,
     /** The environment each `claude` was asked for with, a one-shot's too. */
     queried,
-    /** What the Mac has when the next `claude` starts. */
     developerTools,
     allClosed,
     /** Runs out every wait for a silent `claude` begun so far. */
@@ -355,7 +354,6 @@ it('shows each tool call with its arguments and result, the text after them a pa
   expect(events.at(-1)).toMatchObject({status: 'complete'})
 })
 
-/** A line `claude` wrote that holds every one of `parts`. */
 function isOut(line: RecordedLine, ...parts: string[]) {
   return (
     line.kind === 'out' &&
@@ -944,7 +942,6 @@ it('keeps the blocks of a cut-off message that come before the first one Claude 
   await claude.allClosed()
 })
 
-/** The text "Let me write." as block 0. */
 function leadIn() {
   return [
     streamed({
@@ -973,9 +970,9 @@ function withLeadIn(message: RecordedLine[]) {
 }
 
 /**
- * `tools.ndjson` with a message before its first: the text "Let me write.",
- * then a Write cut off mid-arguments and ended by `stop`, if any. With
- * `resentInFull`, the first message is sent again with that text before it.
+ * `tools.ndjson` led by a message of "Let me write." and a Write cut off
+ * mid-arguments, ended by any `stop`. `resentInFull` resends the first message
+ * with that text before it.
  */
 function toolCallCutOff(stop: RecordedLine[], resentInFull = false) {
   return edited('tools.ndjson', lines => {
@@ -2140,7 +2137,6 @@ it('starts claude with the Compaction Settings, and with nothing for the default
   expect(changed?.args.join(' ')).toMatch(/"autoCompactWindow":150000/)
 })
 
-/** A Thread ChatGPT wrote, as main hands it over. */
 const HANDED_OVER: Thread = [
   {
     prompt: 'Name a color.',

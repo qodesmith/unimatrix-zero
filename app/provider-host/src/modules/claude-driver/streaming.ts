@@ -63,7 +63,6 @@ interface Live extends ClaudeSession {
 
 type Mapper = ReturnType<typeof createReplyMapper>
 
-/** The Prompt, with the Thread when it is told, as `claude` is sent it. */
 interface Sending {
   request: ReplyRequest
   content: ContentPart[]
@@ -301,9 +300,8 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   }
 
   /**
-   * A null session starts a new one. A warm `claude` that exited while idle is
-   * replaced; a store restore that `claude` refuses falls back to the
-   * transcript written back.
+   * A warm `claude` that exited while idle is replaced; a store restore that
+   * `claude` refuses falls back to the transcript written back.
    */
   async function* replyOnce(
     request: ReplyRequest,

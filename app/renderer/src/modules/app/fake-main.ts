@@ -51,10 +51,7 @@ interface Saved {
   layout?: Partial<Layout>
 }
 
-/**
- * By the type the window gave the File; a dropped folder looks like a file
- * here.
- */
+/** A dropped folder looks like a plain file to the window. */
 function mediaTypeOf(type = '') {
   const known = AttachmentMediaTypeSchema.safeParse(type).data
 

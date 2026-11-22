@@ -42,10 +42,6 @@ function whereKey(provider: ProviderId, key: SessionKey) {
   )
 }
 
-/**
- * Where the entry `uuid` sits in the session's own transcript, counting up, or
- * null when the app's copy doesn't hold it.
- */
 export function positionOf(db: Database, sessionId: string, uuid: string) {
   const entry = db
     .select({position: sessionEntries.position})
@@ -63,15 +59,14 @@ export function positionOf(db: Database, sessionId: string, uuid: string) {
 }
 
 /**
- * The app's own copy of every Provider session, so any can be restored exactly.
- * `onAppended` hears the entries appended to a session's own transcript, in the
- * step that stores them: if it throws, they aren't stored.
+ * The app's copy of every Provider session. `onAppended` runs in the
+ * transaction that stores a session's own entries: if it throws, they aren't
+ * stored.
  */
 export function createSessions(
   db: Database,
   onAppended: (provider: ProviderId, sessionId: string, uuids: string[]) => void
 ) {
-  /** Appends in order, skipping entries whose `uuid` is already kept. */
   function append(
     provider: ProviderId,
     key: SessionKey,
@@ -132,8 +127,8 @@ export function createSessions(
   }
 
   /**
-   * `through` gives the session as it was at that entry. Entries with no
-   * `uuid` are left out of it: one can point Claude at a later entry.
+   * `through` gives the session as it was at that entry, minus entries with no
+   * `uuid`: one can point Claude at a later entry.
    */
   function load(
     provider: ProviderId,

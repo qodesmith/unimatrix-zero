@@ -22,10 +22,9 @@ function temporaryFolder() {
 }
 
 /**
- * Runs one of Apple's stubs in `/usr/bin` the way a command the AI runs finds
- * it: by name, with only `DEVELOPER_DIR` naming the app's folder. Never
- * without `DEVELOPER_DIR`, which on a Mac with no developer tools opens the
- * install dialog.
+ * Runs an Apple stub in `/usr/bin` by name, as a command the AI runs would.
+ * Never without `DEVELOPER_DIR`: on a Mac with no developer tools, that opens
+ * the install dialog.
  */
 async function stub(
   developerDir: string,
@@ -183,7 +182,6 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     expect(waiting.stdout).toBe('')
     expect(waiting.stderr).toMatch(/^git: not ready yet: .+\n$/)
 
-    // The download unpacks elsewhere and is renamed into place.
     fs.symlinkSync(path.join(path.dirname(inject('gitProgram')), '..'), build)
 
     const ready = await stub(folder, 'git', ['--version'])

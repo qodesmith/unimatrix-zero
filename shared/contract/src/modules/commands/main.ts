@@ -91,10 +91,7 @@ export type TurnIds = z.infer<typeof TurnIdsSchema>
 export const PromptSendResult = z.strictObject({
   prompt: PromptSchema,
   reply: ReplySchema,
-  /**
-   * The failed Prompts and Replies the new Prompt took the place of, with any
-   * Turns below them.
-   */
+  /** The failed Turns the new Prompt replaced, with every Turn below them. */
   removed: TurnIdsSchema,
 })
 

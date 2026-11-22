@@ -128,10 +128,6 @@ const ICONS = {
   folder: FolderIcon,
 } satisfies Record<AttachmentKind, typeof FileIcon>
 
-/**
- * Any other file: a chip with its name, its size and its note. A folder shows
- * its path where a file shows its size, since nothing of it was copied.
- */
 function FileAttachment({
   attachment: {name, mediaType, size, folderPath},
   note,
@@ -203,16 +199,11 @@ function PendingAttachment({
 
 interface AttachmentListProps {
   attachments: readonly AttachmentData[]
-  /**
-   * The Provider of the Model these are about to go to: each one then says
-   * what that Model does with it.
-   */
+  /** Given, each attachment says what this Provider's Model does with it. */
   provider?: ProviderId | null
-  /** Those sent that now go by their path alone, by id; each says so. */
+  /** Ids of sent attachments that now go by path alone. */
   pathOnly?: ReadonlySet<string>
-  /** Files still being added, and those main refused. */
   pending?: readonly PendingAdd[]
-  /** Given, each attachment offers to be removed. */
   onRemove?: (id: string) => void
   onDismiss?: (key: string) => void
   className?: string

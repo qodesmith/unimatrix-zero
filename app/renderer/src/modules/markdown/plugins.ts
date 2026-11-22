@@ -87,8 +87,7 @@ const IMAGE_NODE = /@\{[^}]*\bimg\s*:/u
 
 /**
  * Mermaid's image shape fetches its URL as soon as the diagram draws, even in
- * strict mode, so such a diagram is an error: a Reply never reaches the network
- * on its own (ADR 0014).
+ * strict mode, so such a diagram is an error (ADR 0014).
  */
 function withoutImages(plugin: DiagramPlugin): DiagramPlugin {
   return {

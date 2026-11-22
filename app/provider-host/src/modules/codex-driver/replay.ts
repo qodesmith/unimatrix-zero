@@ -58,16 +58,12 @@ export const FakeCodexRunSchema = z.strictObject({
   methods: z.array(z.string()),
   /** The text of each `turn/start`'s first text item. */
   prompts: z.array(z.string()),
-  /** Each `turn/start`'s whole input. */
   inputs: z.array(z.array(z.looseObject({type: z.string()}))),
   threadModels: z.array(NullableStringSchema),
   threadConfigs: z.array(z.looseObject({}).nullable()),
-  /** At each `thread/start`, `thread/fork` or `thread/resume`. */
   threadInstructions: z.array(NullableStringSchema),
-  /** At each `thread/start`, `thread/fork` or `thread/resume`. */
   threadAccess: z.array(z.looseObject({})),
   turnModels: z.array(NullableStringSchema),
-  /** At each `turn/start`. */
   turnAccess: z.array(z.looseObject({})),
   modelLists: z.array(z.looseObject({})),
   resumedFrom: z.array(z.looseObject({type: z.string(), id: z.string()})),
@@ -87,10 +83,9 @@ export const FakeCodexRunSchema = z.strictObject({
 })
 
 /**
- * Matches each message by method. Like `codex`, it resumes or forks only a
- * thread whose rollout is in place under `sessions/`, and a revert writes the
- * thread a new rollout that points into the old one just before the reverted
- * turn.
+ * Like `codex`, resumes or forks only a thread whose rollout is under
+ * `sessions/`, and a revert writes the thread a new rollout that points into
+ * the old one just before the reverted turn.
  */
 const SCRIPT = `
 import fs from 'node:fs'

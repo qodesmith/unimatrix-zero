@@ -55,17 +55,17 @@ export const prompts = sqliteTable('prompts', {
 })
 
 /**
- * One per add: the same file added twice gets two, each with its own name. A
- * folder is its path alone: the app keeps no copy of it.
+ * One row per add, so a file added twice gets two. The app keeps no copy of a
+ * folder.
  */
 export const attachments = sqliteTable('attachments', {
   id: id(),
   /**
-   * Names the folder under `userData/attachments/` that holds the copy, which
-   * adds of the same bytes share. Null for a folder.
+   * Names the folder under `userData/attachments/` that adds of the same bytes
+   * share. Null for a folder.
    */
   sha256: text('sha256'),
-  /** The copy's file name, so the path the AI gets ends in it. */
+  /** The copy's file name; the path the AI gets ends in it. */
   name: text('name').notNull(),
   mediaType: text('media_type', {
     enum: [
@@ -81,15 +81,14 @@ export const attachments = sqliteTable('attachments', {
   }).notNull(),
   size: integer('size').notNull(),
   /**
-   * The smaller copy sent inline in a large image's place; all three null
-   * when the image goes as it is, and for any other file.
+   * The smaller copy sent inline in a large image's place; all three null when
+   * the original goes as it is.
    */
   shrunkSha256: text('shrunk_sha256'),
   shrunkMediaType: text('shrunk_media_type', {
     enum: ['image/png', 'image/jpeg'],
   }),
   shrunkSize: integer('shrunk_size'),
-  /** A folder's own path; null for a file. */
   folderPath: text('folder_path'),
   createdAt: createdAt(),
 })
@@ -104,7 +103,7 @@ export const promptAttachments = sqliteTable(
     attachmentId: text('attachment_id')
       .notNull()
       .references(() => attachments.id),
-    /** Its place among the Prompt's attachments, from 0. */
+    /** From 0. */
     position: integer('position').notNull(),
   },
   table => [
@@ -149,13 +148,13 @@ export const replies = sqliteTable(
     contextWindow: integer('context_window'),
     rebuilt: integer('rebuilt', {mode: 'boolean'}).notNull().default(false),
     /**
-     * Its Snapshot in the Tree's hidden store: its parent's again when it
-     * changed no file. Null while the Tree has no files, and until it finishes.
+     * Its Snapshot in the Tree's hidden store; its parent's when it changed no
+     * file. Null while the Tree has no files, and until it finishes.
      */
     snapshotCommit: text('snapshot_commit'),
     /**
-     * Why a finished Reply has no Snapshot: the Tree had no files yet, or
-     * taking it failed. Null too when the app quit before taking it.
+     * Why a finished Reply has no Snapshot. Null too when the app quit before
+     * taking it.
      */
     noSnapshot: text('no_snapshot', {enum: ['no-files', 'failed']}),
     createdAt: createdAt(),
@@ -164,8 +163,8 @@ export const replies = sqliteTable(
 )
 
 /**
- * Kept against the Provider session, which can still hold the Compaction after
- * the Reply it happened in is deleted or retried.
+ * Keyed to the Provider session, which keeps the Compaction after its Reply is
+ * deleted or retried.
  */
 export const compactions = sqliteTable('compactions', {
   id: id(),
@@ -173,7 +172,7 @@ export const compactions = sqliteTable('compactions', {
   sessionId: text('session_id').notNull(),
   /** Claude's boundary entry in the session; Codex reports none. */
   boundaryId: text('boundary_id'),
-  /** The Reply the Thread marks; null once that Reply is deleted or retried. */
+  /** The Reply the Thread marks. */
   replyId: text('reply_id').references(() => replies.id, {
     onDelete: 'set null',
   }),
@@ -189,7 +188,7 @@ function sessionKey() {
 }
 
 /**
- * Every entry as the vendor program wrote it, in order, never parsed or edited
+ * Every entry as the vendor program wrote it, never parsed or edited
  * (ADR 0004).
  */
 export const sessionEntries = sqliteTable(
@@ -199,7 +198,7 @@ export const sessionEntries = sqliteTable(
     ...sessionKey(),
     /** A Subagent's transcript inside the session; '' for the session's own. */
     subpath: text('subpath').notNull(),
-    /** Its place in the transcript, from 0. */
+    /** From 0. */
     position: integer('position').notNull(),
     /** The vendor's own entry id, which appends are deduplicated on. */
     uuid: text('uuid'),

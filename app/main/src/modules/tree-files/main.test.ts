@@ -106,7 +106,6 @@ function startOf(replyId: string) {
   return started?.type === 'reply.start' ? started : null
 }
 
-/** The folder the host was told to run the Reply's vendor program in. */
 function folderOf(replyId: string) {
   const started = startOf(replyId)
 
@@ -119,7 +118,6 @@ async function whenStarted(replyId: string) {
   await expect.poll(() => startOf(replyId)).not.toBeNull()
 }
 
-/** What the AI does on disk while it writes the Reply. */
 function aiWrites(replyId: string, name: string, text: string) {
   const file = path.join(folderOf(replyId), name)
   fs.mkdirSync(path.dirname(file), {recursive: true})

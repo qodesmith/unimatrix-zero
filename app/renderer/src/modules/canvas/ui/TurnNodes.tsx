@@ -246,10 +246,7 @@ function useHovered() {
   }
 }
 
-/**
- * `text-base` overrides Card's text-sm, so the text follows the font size
- * Setting.
- */
+/** `text-base` overrides Card's text-sm so text follows the font size Setting. */
 function replyFrame(status: Reply['status'], joined: boolean) {
   return cn(
     'relative z-10 gap-0 rounded-xl border border-border py-0 text-base shadow-sm ring-0 transition-[border-radius,border-color] duration-slide ease-slide motion-reduce:transition-none',

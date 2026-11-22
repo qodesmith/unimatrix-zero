@@ -57,9 +57,8 @@ type Git = (args: string[], cwd?: string) => Promise<Ended>
 const identity = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com']
 
 /**
- * `init` finds the templates, and a `file://` URL goes through
- * git-upload-pack and git-receive-pack, where a plain path would copy the
- * files.
+ * A `file://` URL runs git-upload-pack and git-receive-pack; a plain path would
+ * copy the files.
  */
 async function initPushCloneFetch(git: Git) {
   const work = temporaryFolder()
@@ -114,8 +113,8 @@ const PINNED_VERSION = new RegExp(
 )
 
 /**
- * CI sets `UZ_NO_GIT` where the machine has no `git` of its own, so the app's
- * folder, last on `PATH`, is the only place a command finds one.
+ * CI sets `UZ_NO_GIT` on a machine with no `git`, so only the app's folder,
+ * last on `PATH`, has one.
  */
 const noGit = process.env.UZ_NO_GIT === '1'
 
@@ -129,9 +128,8 @@ function gitIn(folder: string): Git {
 }
 
 /**
- * Serves a folder's files over HTTPS on 127.0.0.1, for git's dumb HTTP
- * protocol. Linux's CI job makes the certificate and adds it to the system's
- * trusted ones, so `git` checks it as it would a host's.
+ * Serves a folder over HTTPS for git's dumb HTTP protocol. Linux CI makes the
+ * certificate and adds it to the system's trusted ones.
  */
 async function served(root: string) {
   const tls = process.env.UZ_TLS_FOLDER
@@ -232,7 +230,6 @@ describe.runIf(noGit && process.platform === 'linux')(
       expect(waiting.stdout).toBe('')
       expect(waiting.stderr).toMatch(/^git: not ready yet: .+\n$/)
 
-      // The download unpacks elsewhere and is renamed into place.
       fs.symlinkSync(path.join(path.dirname(inject('gitProgram')), '..'), build)
 
       const ready = await git(['--version'])

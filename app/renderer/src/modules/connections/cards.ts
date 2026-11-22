@@ -51,7 +51,6 @@ function withoutFailure(state: ConnectionsState, provider: ProviderId) {
   )
 }
 
-/** Shows a failure on the Provider's card until it connects again. */
 export function withFailure(
   state: ConnectionsState,
   provider: ProviderId,

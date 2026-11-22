@@ -38,7 +38,6 @@ export function pinsOf(manifest: string, hostPackage: string) {
 
 export type Pins = ReturnType<typeof pinsOf>
 
-/** Each pin `head` moves, as `<name> <from> → <to>`. */
 function pinChanges(base: Pins, head: Pins) {
   const names = new Set([...base.keys(), ...head.keys()])
 

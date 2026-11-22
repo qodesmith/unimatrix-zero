@@ -17,7 +17,6 @@ function dataUrl(part: Extract<CodexPart, {type: 'image'}>) {
   return `data:${part.mediaType};base64,${part.base64}`
 }
 
-/** A Prompt as `turn/start` takes it. */
 function turnInput(parts: CodexPart[]): UserInput[] {
   return parts.map(part => {
     switch (part.type) {

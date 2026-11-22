@@ -57,12 +57,10 @@ export interface TurnsDeps {
   publish: (event: AppEvent) => void
   hosts: ReplyHosts
   vendorProgramFor: (provider: ProviderId) => SignInRequest
-  /** Made as each Reply starts, if it is missing. */
   treeFolderFor: (treeId: string) => string
   /**
-   * Settles once the Snapshots a Reply after `parentReplyId` waits for are
-   * taken, and is null when there are none: a Reply starts after them, so it
-   * writes into none.
+   * Null when there is nothing to wait for. A Reply starts only once it
+   * settles, so it never writes into a Snapshot being taken.
    */
   snapshotsBefore: (
     treeId: string,
@@ -70,9 +68,7 @@ export interface TurnsDeps {
   ) => Promise<void> | null
   /** Read as each Reply starts, so a change applies from the next one. */
   compactionSettingsFor: (provider: ProviderId) => CompactionSettings
-  /** For telling the AI which Replies another Model wrote, and its name. */
   listedModels: ListedModels
-  /** `userData/attachments/`, where every copy is kept. */
   attachmentsDir: string
   now: () => Date
   onTurnsChanged: (treeId: string) => void
@@ -154,9 +150,8 @@ export function createTurns({
   }
 
   /**
-   * A failed attempt on the Prompt's Provider may have left its Prompt in the
-   * session, so the session is the one its Retry would resume. A Provider the
-   * Reply being answered isn't on has no session of the Thread.
+   * A failed attempt on this Provider may have left its Prompt in the session,
+   * so reuse the session its Retry would resume.
    */
   function sessionOn(
     provider: ProviderId,

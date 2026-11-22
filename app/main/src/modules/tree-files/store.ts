@@ -7,7 +7,7 @@ import path from 'node:path'
 
 /**
  * Left out of every Snapshot unless a `.gitignore` in the folder un-ignores
- * them: one `node_modules` is hundreds of thousands of files.
+ * them.
  */
 const DEFAULT_EXCLUDES = [
   'node_modules/',
@@ -24,7 +24,6 @@ const DEFAULT_EXCLUDES = [
 /** The tree git gives a folder with no files, in a SHA-1 store. */
 const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
-/** A Working copy's folder, with the hidden store that keeps its Snapshots. */
 export interface VersionedFolder extends Checkout {
   store: string
 }
@@ -49,9 +48,8 @@ function oneLine(output: string) {
 }
 
 /**
- * The indexes a Snapshot the app quit in left beside the folder's own: its
- * lock, which would refuse every later Snapshot, and the indexes of folders
- * that are git repositories of their own.
+ * Index files a Snapshot the app quit in left behind. A leftover lock refuses
+ * every later Snapshot.
  */
 function removeLeftovers({index}: Checkout) {
   const folder = path.dirname(index)
@@ -144,9 +142,8 @@ async function treeOf(git: Git, store: string, checkout: Checkout) {
 }
 
 /**
- * The folder as it stands, under the Reply's own ref, or `parent` again when
- * nothing differs. The index persists, so git re-hashes only the files whose
- * size or modified time changed since the last Snapshot.
+ * Returns `parent` again when nothing differs. The index persists so git
+ * re-hashes only files whose size or modified time changed.
  */
 export async function takeSnapshot(
   git: Git,
@@ -177,14 +174,14 @@ export async function takeSnapshot(
   return commit
 }
 
-/** A Reply's Snapshot and its parent's; a null `from` is no files at all. */
+/** A null `from` is no files at all. */
 export interface SnapshotPair {
   replyId: string
   from: string | null
   to: string
 }
 
-/** By git's status letter; a `T` is a file that became a link, or the reverse. */
+/** A `T` is a file that became a link, or the reverse. */
 function changeOf(status: string | undefined): ChangedFile['change'] | null {
   if (status === 'A') return 'created'
 
@@ -253,10 +250,7 @@ async function sizesOf(git: Git, store: string, blobs: string[]) {
   return new Map(blobs.map((blob, at) => [blob, Number(sizes[at])]))
 }
 
-/**
- * What each Reply changed, by Reply id, in three `git` runs however many pairs
- * there are. A Reply with no changes has no entry.
- */
+/** Three `git` runs however many pairs. A Reply with no changes has no entry. */
 export async function changedFiles(
   git: Git,
   store: string,

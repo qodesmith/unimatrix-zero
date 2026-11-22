@@ -23,7 +23,6 @@ export interface CanvasState {
   activeReplyId: string | null
   /** Its Thread becomes the Active Thread and the slideout closes. */
   onInputFocus: (replyId: string) => void
-  /** A Prompt was sent into an Input and main started this Reply for it. */
   onSent: (replyId: string, parentReplyId: string | null) => void
   /** The Reply whose Input takes focus once it is drawn: the one just sent for. */
   inputToFocus: string | null

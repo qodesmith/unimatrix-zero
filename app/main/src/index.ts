@@ -222,9 +222,8 @@ function openWindow(db: Database) {
     },
   })
 
-  // Waits until the app's git is checked on disk, or downloaded when it is
-  // missing, so the Snapshots the app quit before taking are taken with it
-  // rather than recorded as waiting.
+  // Waits for git so the Snapshots the app quit before taking are taken, not
+  // recorded as waiting.
   void gitProgram.prepare().then(async () => treeFiles.takeMissedSnapshots())
 
   const connections = createConnections({

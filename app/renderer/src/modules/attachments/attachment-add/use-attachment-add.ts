@@ -7,7 +7,6 @@ import {useAddFile} from '../add-file'
 import {addToMain} from './actions'
 import {attachmentAddTransition, startedAdding} from './machine'
 
-/** A file still being added, or one main refused, by a key of its own. */
 export type PendingAdd = {key: string} & Exclude<
   AttachmentAddState,
   {status: 'added'}
@@ -16,9 +15,8 @@ export type PendingAdd = {key: string} & Exclude<
 type Adds = ReadonlyMap<string, AttachmentAddState>
 
 /**
- * Adds files one at a time, so they reach the draft in the order they were
- * attached. Each added one goes to `onAdded` and leaves the pending list; a
- * refused one stays, with main's message, until dismissed.
+ * Adds files one at a time, so they reach the draft in the order attached. A
+ * refused one stays pending, with main's message, until dismissed.
  */
 export function useAttachmentAdds(onAdded: (attachment: Attachment) => void) {
   const addFile = useAddFile()

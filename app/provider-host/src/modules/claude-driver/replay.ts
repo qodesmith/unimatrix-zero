@@ -33,8 +33,8 @@ export interface FakeClaudeOptions {
   /** Keeps it going once its input closes, until this file exists. */
   holdExit?: string
   /**
-   * Writes nothing more, as on a stalled network, from this Prompt of the nth
-   * run, both counted from 0.
+   * Goes silent, as on a stalled network, from this Prompt of the nth run, both
+   * from 0.
    */
   silentFrom?: {run: number; prompt: number}
   /**

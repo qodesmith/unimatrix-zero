@@ -18,7 +18,6 @@ import {RemoteImage} from './RemoteImage'
 const components: Components = {img: RemoteImage}
 const mermaidOptions: MermaidOptions = {errorComponent: DiagramError}
 
-/** The Mermaid plugin, loading it the first time a Reply needs it. */
 function useMermaid(needed: boolean): DiagramPlugin | null {
   const [mermaid, setMermaid] = useState(loadedMermaid)
 

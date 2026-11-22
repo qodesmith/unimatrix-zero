@@ -33,11 +33,10 @@ export const SignInRequestSchema = z.strictObject({
   program: z
     .strictObject({path: z.string().min(1), build: VendorBuildSchema})
     .nullable(),
-  /** The vendor program's own configuration folder, which holds its sign-in. */
   configDir: z.string().min(1),
   /**
-   * On a Mac, the app's own developer folder: the vendor program's
-   * `DEVELOPER_DIR` when it starts on a Mac with no developer tools.
+   * The app's own developer folder: the vendor program's `DEVELOPER_DIR` on a
+   * Mac with no developer tools.
    */
   developerDir: z.string().min(1).optional(),
   /**
@@ -107,7 +106,6 @@ export const ThreadSchema = z.array(
 
 export type Thread = z.infer<typeof ThreadSchema>
 
-/** The label a Thread gives a Reply the Model named `name` wrote. */
 export function replyLabel(name: string) {
   return `[Reply written by ${name}]`
 }
