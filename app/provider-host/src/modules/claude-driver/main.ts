@@ -1,4 +1,5 @@
 import type {ReadModels} from './models'
+import type {ClaudeSignInDeps} from './sign-in'
 import type {ClaudeRepliesDeps} from './streaming'
 import type {SpawnOptions} from '@anthropic-ai/claude-agent-sdk'
 import type {ProviderDriver} from '@uz/contract/host'
@@ -42,13 +43,13 @@ export function spawnClaude({command, args, cwd, env, signal}: SpawnOptions) {
   })
 }
 
-function readModelsWith(env: NodeJS.ProcessEnv): ReadModels {
-  return async ({program, configDir}) => {
+function readModelsWith(hostEnv: ClaudeSignInDeps['hostEnv']): ReadModels {
+  return async ({program, configDir, developerDir}) => {
     if (!program) throw new Error('The manifest names no Claude program.')
 
     const {models} = await readAccount({
       program: program.path,
-      env: claudeEnvironment(env, configDir),
+      env: claudeEnvironment(await hostEnv(developerDir), configDir),
       cwd: configDir,
     })
 
@@ -77,14 +78,18 @@ export function createClaudeDriver({
   maxWarm = MAX_WARM,
   whenSilent = idleFor(HEARD_WITHIN_MS),
 }: ClaudeDriverOptions): ProviderDriver {
-  const models = createModelList(readModelsWith(env))
+  // Every `claude` runs `git` as it starts, a one-shot's with no tools too.
+  async function hostEnv(developerDir: string | undefined) {
+    return withDeveloperDir(env, developerDir, hasDeveloperTools)
+  }
+
+  const models = createModelList(readModelsWith(hostEnv))
 
   const replies = createClaudeReplies({
     store,
     query: run,
     spawn: start,
-    replyEnv: async ({vendorProgram}) =>
-      withDeveloperDir(env, vendorProgram.developerDir, hasDeveloperTools),
+    replyEnv: async ({vendorProgram}) => hostEnv(vendorProgram.developerDir),
     whenIdle,
     maxWarm,
     whenSilent,
@@ -107,7 +112,7 @@ export function createClaudeDriver({
       readAccount,
       signOut,
       learnModels: models.learn,
-      env,
+      hostEnv,
       timeoutMs: SIGN_IN_TIMEOUT_MS,
     }),
     readConnection: notYet,
@@ -121,7 +126,11 @@ export function createClaudeDriver({
     forkSession: notYet,
     cutSession: replies.cutSession,
     runOneShot: async (request, signal) =>
-      runClaudeOneShot({query: run, env}, request, signal),
+      runClaudeOneShot(
+        {query: run, env: await hostEnv(request.vendorProgram.developerDir)},
+        request,
+        signal
+      ),
     mcpSignIn: notYet,
   }
 }

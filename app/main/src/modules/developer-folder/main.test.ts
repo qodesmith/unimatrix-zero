@@ -141,7 +141,9 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     ])
 
     expect(advertised.code).toBe(0)
-    expect(advertised.stdout).toContain('agent=git/')
+    expect(advertised.stdout).toContain(
+      `agent=git/${DEV_MANIFEST.vendorPrograms.git.version}`
+    )
 
     for (const tool of ['git-receive-pack', 'git-upload-archive']) {
       const ended = await stub(folder, tool, [path.join(work, 'missing')])
@@ -153,8 +155,8 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
 
     const shell = await stub(folder, 'git-shell', ['-c', 'git-upload-pack'])
 
-    expect(shell.stderr).not.toContain('not installed')
-    expect(shell.code).not.toBe(127)
+    expect(shell.code).toBe(128)
+    expect(shell.stderr).toMatch(/^fatal: /)
   })
 
   it('fails every other stub with a one-line error and 127', async () => {

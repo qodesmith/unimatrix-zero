@@ -171,7 +171,6 @@ function liveDriver(
   files: string[],
   firstEnv: Record<string, string> = {},
   refuses: Parameters<typeof fakeStore>[0] = {},
-  /** The host's own environment, as the driver reads it. */
   hostEnv: NodeJS.ProcessEnv = process.env
 ) {
   let addedEnv = firstEnv

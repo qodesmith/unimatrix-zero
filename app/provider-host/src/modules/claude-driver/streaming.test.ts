@@ -1,5 +1,6 @@
 import type {FakeClaudeOptions, RecordedLine} from './replay'
 import type {
+  Options,
   SDKAssistantMessageError,
   SDKPartialAssistantMessage,
   SDKResultSuccess,
@@ -26,6 +27,7 @@ import {
 import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
 import {explainingLabels} from '#modules/thread-replay/main'
+import {query} from '@anthropic-ai/claude-agent-sdk'
 import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {once} from 'node:events'
@@ -130,10 +132,16 @@ async function setUp(
   const silence = heldIdle()
   const exits: Promise<unknown>[] = []
   const environments: NodeJS.ProcessEnv[] = []
+  const queried: Options['env'][] = []
   const developerTools = {present: true}
 
   const driver = createClaudeDriver({
     store: store.client,
+    query: params => {
+      queried.push(params.options.env)
+
+      return query(params)
+    },
     spawn: options => {
       environments.push(options.env)
       const child = spawnClaude(options)
@@ -253,6 +261,8 @@ async function setUp(
     reply,
     reports: reportsSoFar,
     environments,
+    /** The environment each `claude` was asked for with, a one-shot's too. */
+    queried,
     /** What the Mac has when the next `claude` starts. */
     developerTools,
     allClosed,
@@ -813,6 +823,26 @@ it('names the app’s developer folder to a claude that starts on a Mac with no 
   ).toEqual([])
 
   await claude.allClosed()
+})
+
+it('names the app’s developer folder to a one-shot’s claude on a Mac with no developer tools, and to none on a Mac with them', async () => {
+  const claude = await setUp(['warm.ndjson', 'warm.ndjson'])
+  const {signal} = new AbortController()
+
+  const request = {
+    model: 'haiku',
+    prompt: FIRST_PROMPT,
+    vendorProgram: claude.vendorProgram,
+  }
+
+  await claude.driver.runOneShot(request, signal)
+  claude.developerTools.present = false
+  await claude.driver.runOneShot(request, signal)
+
+  expect(claude.queried.map(env => env?.DEVELOPER_DIR)).toEqual([
+    undefined,
+    claude.vendorProgram.developerDir,
+  ])
 })
 
 it('reports each retry, and shows once the message Claude starts over after cutting it off', async () => {
