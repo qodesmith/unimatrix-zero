@@ -298,10 +298,7 @@ function reaching(session: ReplyRecorded['session']): ReplySession {
 
 type Live = ReturnType<typeof liveDriver>
 
-/**
- * A developer folder whose `xcrun` prints `marker` and what it was run with,
- * as the app's own prints its errors (ADR 0025).
- */
+/** A developer folder whose `xcrun` prints `marker` and what it was run with. */
 function markedDeveloperFolder(marker: string) {
   const developerDir = fs.mkdtempSync(
     path.join(os.tmpdir(), 'uz-live-developer-')

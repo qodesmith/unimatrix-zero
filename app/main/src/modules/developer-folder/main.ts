@@ -5,67 +5,55 @@ function quoted(text: string) {
   return `'${text.replaceAll("'", String.raw`'\''`)}'`
 }
 
-const NOT_INSTALLED = `echo "$tool: not installed on this Mac" >&2
-    exit 127`
+const NOT_INSTALLED = `  *)
+    echo "$tool: not installed on this Mac" >&2
+    exit 127
+    ;;
+esac`
 
 /**
- * The build is made for `/`, so each call names its sub-programs, its
- * templates and its own system config (ADR 0024). They are set for the one
- * call, so none of the three reaches anything else the AI runs.
+ * The build is made for `/`, so it is told where its own folders are (ADR
+ * 0024), for the one call: none of the three reaches what else the AI runs.
  */
-function gitCases(gitProgram: string) {
+function runningGit(gitProgram: string) {
   const root = path.join(path.dirname(gitProgram), '..')
+  const subPrograms = quoted(path.join(root, 'libexec', 'git-core'))
 
   return `  git)
     program=${quoted(gitProgram)}
     ;;
   git-upload-pack | git-receive-pack | git-upload-archive | git-shell)
-    program=${quoted(path.join(root, 'libexec', 'git-core'))}/$tool
+    program=${subPrograms}/$tool
     ;;
-  *)
-    ${NOT_INSTALLED}
-    ;;
-esac
+${NOT_INSTALLED}
 
 if [ ! -x "$program" ]; then
   echo "$tool: not ready yet: Unimatrix Zero is still downloading it. Try again in a minute." >&2
   exit 127
 fi
 
-GIT_EXEC_PATH=${quoted(path.join(root, 'libexec', 'git-core'))} \\
+GIT_EXEC_PATH=${subPrograms} \\
 GIT_TEMPLATE_DIR=${quoted(path.join(root, 'share', 'git-core', 'templates'))} \\
 GIT_CONFIG_SYSTEM=${quoted(path.join(root, 'etc', 'gitconfig'))} \\
 exec "$program" "$@"`
 }
 
-/**
- * Apple's stubs in `/usr/bin` run this as `xcrun <tool> <args...>` when
- * `DEVELOPER_DIR` names the folder it is in. The script looks for `git` on
- * every call, so one written while the build downloads runs it once it lands.
- */
+/** A stub in `/usr/bin` runs this as `xcrun <tool> <args...>`. */
 function xcrunScript(gitProgram: string | null) {
-  const cases = gitProgram
-    ? gitCases(gitProgram)
-    : `  *)
-    ${NOT_INSTALLED}
-    ;;
-esac`
-
   return `#!/bin/sh
 # Written by Unimatrix Zero at every launch. Changes made here are lost.
 tool=$1
 [ $# -gt 0 ] && shift
 
 case $tool in
-${cases}
+${gitProgram ? runningGit(gitProgram) : NOT_INSTALLED}
 `
 }
 
 /**
- * The developer folder the app gives a Mac that has none: one script,
- * `usr/bin/xcrun`, that answers every stub in `/usr/bin` so none opens the
- * "install developer tools" dialog (ADR 0025). `gitProgram` is where the
- * app's own `git` is or will be; null when the manifest has none.
+ * One script answers every stub in `/usr/bin`, so none opens the "install
+ * developer tools" dialog (ADR 0025). `gitProgram` is where the app's own
+ * `git` is or will be: the script looks for it on every call.
  */
 export function writeDeveloperFolder(
   folder: string,

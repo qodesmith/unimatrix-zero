@@ -25,18 +25,16 @@ export function vendorEnvironment(base: NodeJS.ProcessEnv) {
  */
 export async function macHasDeveloperTools(env: NodeJS.ProcessEnv) {
   return new Promise<boolean>(resolve => {
-    execFile('/usr/bin/xcode-select', ['-p'], {env}, error => {
+    // A hang counts as none, so a session start never waits on it.
+    execFile('/usr/bin/xcode-select', ['-p'], {env, timeout: 10_000}, error => {
       resolve(!error)
     })
   })
 }
 
 /**
- * `base`, with `DEVELOPER_DIR` naming the app's developer folder where the Mac
- * has no developer tools right now, so the stubs in `/usr/bin` run the app's
- * `xcrun` and never open the install dialog (ADR 0025). A Mac with its own
- * tools gets `base` as it is, and so does every other platform, where main
- * names no folder.
+ * Names the app's developer folder to a Mac with no developer tools right now
+ * (ADR 0025). Main names a folder on a Mac alone.
  */
 export async function withDeveloperDir(
   base: NodeJS.ProcessEnv,

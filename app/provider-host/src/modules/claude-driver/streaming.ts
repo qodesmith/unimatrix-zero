@@ -38,7 +38,7 @@ export interface ClaudeRepliesDeps {
   store: SessionStoreClient
   query: QueryFn
   spawn: (options: SpawnOptions) => SpawnedProcess
-  /** The host's environment for a `claude` that starts now (ADR 0025). */
+  /** The host's environment for a `claude` that starts now. */
   replyEnv: (request: ReplyRequest) => Promise<NodeJS.ProcessEnv>
   whenIdle: WhenIdle
   maxWarm: number
