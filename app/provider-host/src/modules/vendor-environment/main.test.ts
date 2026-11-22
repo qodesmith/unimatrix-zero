@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import {expect, it, vi} from 'vitest'
 
 import {macHasDeveloperTools, withDeveloperDir} from './main'
@@ -6,16 +9,33 @@ const base = {PATH: '/usr/bin', HOME: '/Users/sam'}
 const folder = '/data/unimatrix-zero/developer'
 
 it('names the app’s developer folder on a Mac with no developer tools, and changes nothing else', async () => {
-  const hasDeveloperTools = vi.fn<(env: NodeJS.ProcessEnv) => Promise<boolean>>(
-    async () => false
-  )
-
-  const env = await withDeveloperDir(base, folder, hasDeveloperTools)
+  const env = await withDeveloperDir(base, folder, async () => false)
 
   expect(env).toStrictEqual({...base, DEVELOPER_DIR: folder})
-  // The user's own `DEVELOPER_DIR` counts as developer tools.
-  expect(hasDeveloperTools).toHaveBeenCalledWith(base)
 })
+
+it('names the app’s developer folder over one the user set that holds no xcrun', async () => {
+  const stale = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-stale-developer-'))
+  const own = {...base, DEVELOPER_DIR: stale}
+
+  const env = await withDeveloperDir(own, folder, async () => false)
+
+  expect(env).toStrictEqual({...base, DEVELOPER_DIR: folder})
+})
+
+it.skipIf(process.platform === 'win32')(
+  'leaves a developer folder the user set that holds an xcrun, on a Mac with no developer tools of its own',
+  async () => {
+    const theirs = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-own-developer-'))
+    fs.mkdirSync(path.join(theirs, 'usr', 'bin'), {recursive: true})
+    fs.writeFileSync(path.join(theirs, 'usr', 'bin', 'xcrun'), '', {
+      mode: 0o755,
+    })
+    const own = {...base, DEVELOPER_DIR: theirs}
+
+    expect(await withDeveloperDir(own, folder, async () => false)).toBe(own)
+  }
+)
 
 it('leaves the environment of a Mac with developer tools as it is', async () => {
   expect(await withDeveloperDir(base, folder, async () => true)).toBe(base)
@@ -34,21 +54,14 @@ it('looks for no developer tools where main names no folder, as off a Mac', asyn
  * runs the tests has them.
  */
 it.runIf(process.platform === 'darwin')(
-  'finds a Mac’s developer tools, and finds none on a Mac without them',
+  'finds a Mac’s developer tools, and finds none on a Mac without them, whatever DEVELOPER_DIR names',
   async () => {
     const {DEVELOPER_DIR: _own, ...env} = process.env
+    const hasTools = process.env.UZ_NO_DEVELOPER_TOOLS !== '1'
 
-    expect(await macHasDeveloperTools(env)).toBe(
-      process.env.UZ_NO_DEVELOPER_TOOLS !== '1'
-    )
-  }
-)
-
-it.runIf(process.platform === 'darwin')(
-  'takes a developer folder the user names for developer tools',
-  async () => {
+    expect(await macHasDeveloperTools(env)).toBe(hasTools)
     expect(
-      await macHasDeveloperTools({...process.env, DEVELOPER_DIR: '/tmp'})
-    ).toBe(true)
+      await macHasDeveloperTools({...env, DEVELOPER_DIR: os.tmpdir()})
+    ).toBe(hasTools)
   }
 )
