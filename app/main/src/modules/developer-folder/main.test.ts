@@ -1,4 +1,8 @@
-import {repoToServe, servedOverHttp} from '#modules/test-git-server/main'
+import {
+  identity,
+  repoToServe,
+  servedOverHttp,
+} from '#modules/test-git-server/main'
 import {DEV_MANIFEST} from '#modules/vendor-programs/main'
 import {NO_GIT_LOGIN} from '@uz/vendor-program/git-login'
 import {execFile} from 'node:child_process'
@@ -52,8 +56,6 @@ async function stub(
     return {code, stdout: stdout ?? '', stderr: stderr ?? ''}
   }
 }
-
-const identity = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com']
 
 describe.runIf(process.platform === 'darwin')('on a Mac', () => {
   it('runs the app’s own git for the git stub, from a folder with a space in its path', async () => {

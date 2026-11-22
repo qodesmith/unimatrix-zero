@@ -8,7 +8,12 @@ import {onTestFinished} from 'vitest'
 
 type Git = (args: string[], cwd: string) => Promise<object>
 
-const identity = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com']
+export const identity = [
+  '-c',
+  'user.name=Test',
+  '-c',
+  'user.email=test@example.com',
+]
 
 /**
  * Serves `root` over git's dumb HTTP protocol, and asks for a login for every

@@ -9,10 +9,9 @@ export function quoted(text: string) {
 /**
  * Needs `$program` and `$tool` set. The build is made for `/`, so it gets its
  * own folders for this call only, never in what else the AI runs (ADR 0024).
- * So do the settings that keep it from signing in: no prompt, no askpass
- * program (an empty `GIT_ASKPASS` stops git looking for `SSH_ASKPASS` and
- * `core.askPass`), and the list of credential helpers emptied, then one that
- * says what to do (ADR 0027).
+ * So do the settings that keep it from asking for a login (ADR 0027): an empty
+ * `GIT_ASKPASS` also stops git falling back to `core.askPass` and
+ * `SSH_ASKPASS`, which `GIT_TERMINAL_PROMPT=0` does not.
  */
 export function runningBuild(gitProgram: string) {
   const root = path.join(path.dirname(gitProgram), '..')

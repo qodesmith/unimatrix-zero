@@ -1,4 +1,5 @@
 import {
+  identity,
   repoToServe,
   servedOverHttp,
   servedOverHttps,
@@ -56,8 +57,6 @@ async function ended(
 }
 
 type Git = (args: string[], cwd?: string) => Promise<Ended>
-
-const identity = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com']
 
 async function initPushCloneFetch(git: Git) {
   const work = temporaryFolder()
@@ -225,7 +224,7 @@ describe.runIf(noGit && process.platform === 'win32')(
       )
     }
 
-    it('fails a git that needs a login at once and says what to do, with the build’s login prompt turned off', async () => {
+    it('fails a git that needs a login at once and says what to do', async () => {
       const host = await servedOverHttp(temporaryFolder())
 
       const denied = await git(['ls-remote', `${host}/private/repo.git`])

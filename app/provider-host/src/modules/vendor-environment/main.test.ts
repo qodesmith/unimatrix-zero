@@ -168,7 +168,7 @@ it('turns off git’s login prompts on Windows, and adds its credential helper a
   })
 })
 
-it('leaves git’s settings alone on Linux, where the wrapper sets them for the one call', async () => {
+it('leaves git’s settings alone on Linux', async () => {
   const linux = {...base, ...ownGitSetting}
   const gitFolder = '/data/unimatrix-zero/git'
 
