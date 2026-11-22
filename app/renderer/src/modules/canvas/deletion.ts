@@ -7,7 +7,6 @@ import {branchesOf, newestReply, turnsFrom} from './tree'
 interface Deletion {
   promptId: string
   parentReplyId: string | null
-  /** The Active Thread ran through the Prompt, so it moves up to the parent. */
   activeBelow: boolean
   /** The parent stops being a Fork, so its pill goes and its box shrinks. */
   resizes: boolean

@@ -21,7 +21,6 @@ export interface CanvasState {
   treeId: string
   index: TreeIndex
   activeReplyId: string | null
-  /** Its Thread becomes the Active Thread and the slideout closes. */
   onInputFocus: (replyId: string) => void
   onSent: (replyId: string, parentReplyId: string | null) => void
   /** The Reply whose Input takes focus once it is drawn: the one just sent for. */

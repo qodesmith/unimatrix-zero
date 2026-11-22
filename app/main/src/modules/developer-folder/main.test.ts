@@ -21,11 +21,7 @@ function temporaryFolder() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'uz developer folder '))
 }
 
-/**
- * Runs an Apple stub in `/usr/bin` by name, as a command the AI runs would.
- * Never without `DEVELOPER_DIR`: on a Mac with no developer tools, that opens
- * the install dialog.
- */
+/** Without `DEVELOPER_DIR`, a Mac with no developer tools opens a dialog. */
 async function stub(
   developerDir: string,
   tool: string,
@@ -93,8 +89,7 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     await stub(folder, 'git', [...identity, 'commit', '-m', 'one'], first)
     await stub(folder, 'git', ['init', '--bare', '-b', 'main', origin], work)
 
-    // A `file://` URL goes through git-upload-pack and git-receive-pack, where
-    // a plain path would copy the files.
+    // A plain path copies files, skipping git-upload-pack and git-receive-pack.
     const url = `file://${origin}`
     const push = await stub(folder, 'git', ['push', url, 'main'], first)
 

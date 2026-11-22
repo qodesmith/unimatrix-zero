@@ -56,10 +56,6 @@ type Git = (args: string[], cwd?: string) => Promise<Ended>
 
 const identity = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com']
 
-/**
- * A `file://` URL runs git-upload-pack and git-receive-pack; a plain path would
- * copy the files.
- */
 async function initPushCloneFetch(git: Git) {
   const work = temporaryFolder()
   const origin = path.join(work, 'origin.git')
@@ -77,6 +73,7 @@ async function initPushCloneFetch(git: Git) {
   await git([...identity, 'commit', '-m', 'one'], first)
   await git(['init', '--bare', '-b', 'main', origin], work)
 
+  // A plain path copies files, skipping git-upload-pack and git-receive-pack.
   const url = pathToFileURL(origin).href
   const push = await git(['push', url, 'main'], first)
   const clone = await git(['clone', url, second], work)
@@ -112,10 +109,7 @@ const PINNED_VERSION = new RegExp(
   `^git version ${DEV_MANIFEST.vendorPrograms.git.version.replaceAll('.', String.raw`\.`)}\\b`
 )
 
-/**
- * CI sets `UZ_NO_GIT` on a machine with no `git`, so only the app's folder,
- * last on `PATH`, has one.
- */
+/** CI sets it on a machine whose only `git` is the app's, last on `PATH`. */
 const noGit = process.env.UZ_NO_GIT === '1'
 
 /** Runs `git` by name, as a command the AI runs finds it. */
@@ -127,10 +121,7 @@ function gitIn(folder: string): Git {
     })
 }
 
-/**
- * Serves a folder over HTTPS for git's dumb HTTP protocol. Linux CI makes the
- * certificate and adds it to the system's trusted ones.
- */
+/** For git's dumb HTTP protocol; CI makes and trusts the certificate. */
 async function served(root: string) {
   const tls = process.env.UZ_TLS_FOLDER
 

@@ -24,8 +24,7 @@ function componentName(file: string) {
   return path.basename(file).replace(/\.tsx?$/, '')
 }
 
-// Uncommitted changes to the CSS, the config or the packages change what
-// `shadcn add` and the formatter write, so the worktree gets them too.
+// Uncommitted CSS, config and package edits change what `shadcn add` and the formatter write.
 async function copyUncommitted(tree: string) {
   const patch = await $`git diff HEAD --binary`.cwd(root).quiet()
 

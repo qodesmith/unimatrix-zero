@@ -58,15 +58,11 @@ export interface TurnsDeps {
   hosts: ReplyHosts
   vendorProgramFor: (provider: ProviderId) => SignInRequest
   treeFolderFor: (treeId: string) => string
-  /**
-   * Null when there is nothing to wait for. A Reply starts only once it
-   * settles, so it never writes into a Snapshot being taken.
-   */
+  /** A Reply waits for this, so it never writes into a Snapshot being taken. */
   snapshotsBefore: (
     treeId: string,
     parentReplyId: string | null
   ) => Promise<void> | null
-  /** Read as each Reply starts, so a change applies from the next one. */
   compactionSettingsFor: (provider: ProviderId) => CompactionSettings
   listedModels: ListedModels
   attachmentsDir: string
@@ -81,8 +77,8 @@ export type NewPrompt = Omit<Extract<Command, {type: 'prompt.send'}>, 'type'>
 export type Turns = ReturnType<typeof createTurns>
 
 /**
- * Create once per launch, before any host starts: a Reply still `streaming` was
- * left by the last quit, and becomes `interrupted` here.
+ * Create once per launch, before any host starts: it marks Replies the last
+ * quit left `streaming` as `interrupted`.
  */
 export function createTurns({
   db,
@@ -149,10 +145,7 @@ export function createTurns({
     clearCutOnPrompt(db, recorded)
   }
 
-  /**
-   * A failed attempt on this Provider may have left its Prompt in the session,
-   * so reuse the session its Retry would resume.
-   */
+  /** A failed attempt may have left its Prompt in the session, so reuse it. */
   function sessionOn(
     provider: ProviderId,
     {treeId, parentReplyId}: Pick<NewPrompt, 'treeId' | 'parentReplyId'>,
@@ -211,8 +204,7 @@ export function createTurns({
 
       const walked = threadTo(db, treeId, parentReplyId, picked, listedModels)
 
-      // Before the Prompt is saved: once it is, the Reply it answers has a
-      // Prompt after it, and its session would fork.
+      // Before insertExchange: once the Prompt is saved, the session forks.
       const session = sessionOn(provider, {treeId, parentReplyId}, failed)
 
       const treeFolder = treeFolderFor(treeId)
@@ -265,7 +257,6 @@ export function createTurns({
       }
     },
 
-    /** Runs a failed Reply's Prompt again in place; null when it's gone. */
     retry(treeId: string, replyId: string): Reply | null {
       const recovered = recovery(db, treeId, replyId)
 
@@ -334,10 +325,7 @@ export function createTurns({
     hostEvent: (provider: ProviderId, event: ReplyEvent) =>
       inFlight.apply(provider, event),
 
-    /**
-     * Refused while a Reply below streams. A Provider that can't cut now
-     * cuts with the next Prompt from the Reply the deleted Prompt answers.
-     */
+    /** Refused while a Reply below streams. */
     deletePrompt(
       treeId: string,
       promptId: string
@@ -370,8 +358,8 @@ export function createTurns({
     hostPromptRecorded: promptRecorded,
 
     /**
-     * Records a Prompt sent under main's id in the step that stores it, so a
-     * quit never leaves its Reply naming a Prompt from the attempt before.
+     * Records the Prompt in the step that stores it, so a quit never leaves its
+     * Reply naming the last attempt's Prompt.
      */
     hostSessionAppended(
       provider: ProviderId,

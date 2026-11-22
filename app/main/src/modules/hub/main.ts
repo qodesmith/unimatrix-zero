@@ -10,13 +10,12 @@ type Send = (event: AppEvent) => void
 export type Hub = ReturnType<typeof createHub>
 
 /**
- * A window gets a `SNAPSHOT` and then every later event; main is
- * single-threaded, so nothing falls between the two and nothing arrives twice.
+ * A window gets a `SNAPSHOT`, then every later event. Main is single-threaded,
+ * so no event is missed or doubled between the two.
  */
 export function createHub(snapshot: () => Snapshot) {
   const windows = new Map<number, Send>()
 
-  /** Connecting again (a reload) replaces the window's earlier connection. */
   function connect(windowId: number, send: Send) {
     windows.set(windowId, send)
     send(snapshot())

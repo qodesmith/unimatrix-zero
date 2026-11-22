@@ -34,9 +34,8 @@ export function targetOf(session: Exclude<ReplySession, {type: 'continue'}>) {
 }
 
 /**
- * Claude no longer finds an entry from before a Compaction in the whole
- * session, so a send whose `target` is one forks from the part through it. The
- * fork stands in for a rewind or a cut too (ADR 0004).
+ * Claude can't find an entry from before a Compaction in the whole session, so
+ * a send whose `target` is one forks through it, even for a rewind or a cut.
  */
 export function reaching<Session extends ReplySession>(
   db: Database,

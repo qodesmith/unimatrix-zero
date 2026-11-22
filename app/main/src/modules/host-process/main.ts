@@ -5,10 +5,7 @@ import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {utilityProcess} from 'electron'
 import path from 'node:path'
 
-/**
- * A crash shows up as the process's own `exit`, which Electron emits beside
- * `child-process-gone` and which names this exact process.
- */
+/** A crash also fires the child's own `exit`, which names this exact process. */
 export function utilityHost(hostsFolder: string, args: string[]) {
   return (provider: ProviderId): HostProcess => {
     const child = utilityProcess.fork(

@@ -9,10 +9,7 @@ const NOTHING = '/dev/null'
 
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024
 
-/**
- * No hooks, no fsmonitor, no user ignore or attributes files (ADR 0014).
- * Hooks are looked for inside the program file, which can hold none.
- */
+/** `core.hooksPath` names the program file, which holds no hooks (ADR 0014). */
 function isolation(program: string) {
   return [
     '-c',
@@ -87,10 +84,7 @@ export type Git = (
   input?: string
 ) => Promise<string>
 
-/**
- * Every app `git` call goes through this: the app's own `git`, never one on
- * `PATH` (ADR 0024).
- */
+/** Runs the app's own `git`, never one on `PATH` (ADR 0024). */
 export function createGit(program: string, env: NodeJS.ProcessEnv): Git {
   return async (target, args, input) =>
     new Promise((resolve, reject) => {

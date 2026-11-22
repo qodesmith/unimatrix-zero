@@ -49,8 +49,8 @@ function toHost(
 }
 
 /**
- * One plan covers the whole Thread: each file goes inline or not by the rules
- * and media budget of the Provider it goes to, and keeps its path (ADR 0022).
+ * Plans the whole Thread at once: each file goes inline by its Provider's rules
+ * and media budget, and keeps its path (ADR 0022).
  */
 export function hostAttachments(
   db: Pick<Database, 'select'>,

@@ -16,7 +16,7 @@ import {reaching, targetOf} from './reach'
 
 const {prompts, replies, systemPrompts} = schema
 
-/** A Reply ended early with its text kept; its Provider may not have saved it. */
+/** Ended early with its text kept; its Provider may not have saved it. */
 const CUT_SHORT = new Set<Reply['status']>(['stopped', 'interrupted'])
 
 type ContinuedSession = Extract<
@@ -188,9 +188,7 @@ function planned(
 
 /**
  * Forks when the Reply has a Prompt after it other than `except`, the one being
- * run again. A Reply its Provider never saved continues from the Reply above,
- * or from its own Prompt in a fork it began. A session holding deleted Turns
- * is cut; one that compacted after the Reply forks from before.
+ * run again. A session holding deleted Turns is cut.
  */
 export function continuation(
   db: Database,
@@ -325,10 +323,8 @@ function promptIn(session: SessionRef, reply: ReplyRow | undefined) {
 }
 
 /**
- * A cut of deleted Turns already drops the failed attempt. A parent its
- * Provider never saved left only its Prompt, so cut after it.
- * Always name what to keep: Claude resumes a cut that names nothing at the
- * failed attempt.
+ * A cut of deleted Turns already drops the failed attempt. Always name what to
+ * keep: Claude resumes a cut that names nothing at the failed attempt.
  */
 function rewound(
   session: ContinuedSession,

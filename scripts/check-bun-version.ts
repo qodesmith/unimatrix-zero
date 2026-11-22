@@ -1,7 +1,4 @@
-/**
- * Bun reads neither `.bun-version` nor `devEngines`, but CI installs
- * `.bun-version`, so a local pass on another Bun says nothing about CI.
- */
+/** Bun ignores `.bun-version` and `devEngines`, yet CI installs `.bun-version`. */
 import path from 'node:path'
 
 import {finishCheck} from './finish-check.ts'

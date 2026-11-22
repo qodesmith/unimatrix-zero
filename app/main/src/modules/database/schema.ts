@@ -57,10 +57,7 @@ export const prompts = sqliteTable('prompts', {
 /** One row per add, so a file added twice gets two. */
 export const attachments = sqliteTable('attachments', {
   id: id(),
-  /**
-   * Names the folder under `userData/attachments/` that adds of the same bytes
-   * share; null for a folder, which the app never copies.
-   */
+  /** Its shared folder under `userData/attachments/`; null for a folder. */
   sha256: text('sha256'),
   name: text('name').notNull(),
   mediaType: text('media_type', {
@@ -76,10 +73,7 @@ export const attachments = sqliteTable('attachments', {
     ],
   }).notNull(),
   size: integer('size').notNull(),
-  /**
-   * The smaller copy sent in a large image's place; all three null when the
-   * original goes as is.
-   */
+  /** A smaller copy sent in a large image's place; all three null if none. */
   shrunkSha256: text('shrunk_sha256'),
   shrunkMediaType: text('shrunk_media_type', {
     enum: ['image/png', 'image/jpeg'],
@@ -133,20 +127,17 @@ export const replies = sqliteTable(
       .references(() => systemPrompts.id),
     sessionId: text('session_id'),
     sessionMessageId: text('session_message_id'),
-    /** Its Prompt in the Provider session, kept if the Reply never finished. */
+    /** Kept even if the Reply never finished. */
     sessionPromptId: text('session_prompt_id'),
     /**
-     * The first session Prompt of Turns deleted below it that the session still
-     * holds; the next Prompt from it cuts there, unless its Provider cut first.
+     * The first Prompt of deleted Turns still in the session; the next send
+     * cuts there unless its Provider cut first.
      */
     sessionDropFrom: text('session_drop_from'),
     contextSize: integer('context_size'),
     contextWindow: integer('context_window'),
     rebuilt: integer('rebuilt', {mode: 'boolean'}).notNull().default(false),
-    /**
-     * Its Snapshot in the Tree's hidden store; its parent's when it changed no
-     * file. Null while the Tree has no files, and until it finishes.
-     */
+    /** Its parent's if no file changed; null with no files or until done. */
     snapshotCommit: text('snapshot_commit'),
     /** Null too when the app quit before taking the Snapshot. */
     noSnapshot: text('no_snapshot', {enum: ['no-files', 'failed']}),
@@ -155,10 +146,7 @@ export const replies = sqliteTable(
   table => [uniqueIndex('replies_prompt_id').on(table.promptId)]
 )
 
-/**
- * Keyed to the Provider session, which keeps the Compaction after its Reply is
- * deleted or retried.
- */
+/** Keyed to the session, which keeps the Compaction after its Reply goes. */
 export const compactions = sqliteTable('compactions', {
   id: id(),
   provider: text('provider', {enum: ['claude', 'chatgpt']}).notNull(),
@@ -179,10 +167,7 @@ function sessionKey() {
   }
 }
 
-/**
- * Every entry as the vendor program wrote it, never parsed or edited
- * (ADR 0004).
- */
+/** Each entry as the vendor program wrote it, never parsed or edited (ADR 0004). */
 export const sessionEntries = sqliteTable(
   'session_entries',
   {

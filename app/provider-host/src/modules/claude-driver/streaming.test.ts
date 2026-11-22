@@ -52,7 +52,7 @@ const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
   threshold: null,
 }
 
-/** As the recordings hold them, so a new recording changes them. */
+/** From the recordings: re-recording changes them. */
 const SESSION_ID = '6b3fb527-e561-4b5c-810d-0ef9ac53978c'
 const FIRST_MESSAGE = '62e0dab1-d770-4979-863e-4df4e2be3150'
 const SECOND_MESSAGE = '7e7158ab-59c9-4e14-9828-54466ba8084e'
@@ -264,7 +264,6 @@ async function setUp(
     queried,
     developerTools,
     allClosed,
-    /** Runs out every wait for a silent `claude` begun so far. */
     passSilence: silence.pass,
   }
 }
@@ -964,10 +963,7 @@ function withLeadIn(message: RecordedLine[]) {
   )
 }
 
-/**
- * `tools.ndjson` with a Write cut off mid-arguments and ended by `stop`;
- * `resentInFull` resends the first message in full.
- */
+/** `tools.ndjson` with a Write cut off mid-arguments and ended by `stop`. */
 function toolCallCutOff(stop: RecordedLine[], resentInFull = false) {
   return edited('tools.ndjson', lines => {
     const start = lines.findIndex(line => isOut(line, '"message_start"'))

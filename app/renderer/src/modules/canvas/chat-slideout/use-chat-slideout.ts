@@ -20,7 +20,6 @@ export function useChatSlideout(index: TreeIndex) {
     send({type: 'arrived', replyId: chat.followReplyId})
   }
 
-  /** A Prompt with no Reply yet has no Thread, so it opens nothing. */
   const openAt = useCallback(
     (turnId: string) => {
       if (replyOf(index, turnId)) send({type: 'opened', turnId})

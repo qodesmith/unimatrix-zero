@@ -10,7 +10,6 @@ function promptsTo(index: TreeIndex, replyId: string): Prompt[] {
   return pathTo(index, replyId).flatMap(id => index.promptById.get(id) ?? [])
 }
 
-/** Null for another Provider's Reply, or a Thread with no attachments. */
 export function mediaBudgetUseOf(
   index: TreeIndex,
   reply: Reply

@@ -91,9 +91,8 @@ export function deleteBelow(db: Database, treeId: string, promptId: string) {
 }
 
 /**
- * The failed exchanges a Prompt sent from `parentReplyId` (null for the root)
- * replaces, and the session a Retry of one would resume, which holds nothing of
- * the failed attempt.
+ * The failed exchanges a Prompt sent from `parentReplyId` replaces, and the
+ * session a Retry of the first would resume.
  */
 export function failedToReplace(
   db: Database,

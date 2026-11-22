@@ -19,10 +19,7 @@ export function useSettings(): Settings {
   return useSelector(useSettingsStore(), state => state)
 }
 
-/**
- * Shows the change at once; main's answer, or its refusal, settles what every
- * window shows.
- */
+/** Shows the change at once; main's answer or refusal settles it. */
 export function useUpdateSettings() {
   const store = useSettingsStore()
 

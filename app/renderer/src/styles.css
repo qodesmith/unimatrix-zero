@@ -79,7 +79,6 @@
   }
 }
 
-/* React Flow reads these variables. */
 .react-flow {
   --xy-background-color: var(--canvas-background);
   --xy-background-pattern-color: var(--canvas-dots);

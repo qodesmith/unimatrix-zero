@@ -5,10 +5,7 @@ import type {ReplyRequest} from '@uz/contract/host'
 /** As long as the SDK gives `claude` to start. */
 export const HEARD_WITHIN_MS = 60_000
 
-/**
- * Calls `giveUp` once a Reply's `claude` has said nothing for too long. What it
- * returns calls that off.
- */
+/** Calls `giveUp` once `claude` is silent too long; the return cancels it. */
 export type WhenSilent = (giveUp: () => void) => () => void
 
 /** A Reply given up on before `claude` was heard: Stop, or the wait ran out. */

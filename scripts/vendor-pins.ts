@@ -71,10 +71,7 @@ async function pinsAt(api: GitHubApi, repo: string, sha: string) {
   return pinsOf(manifest ?? '', hostPackage ?? '')
 }
 
-/**
- * The pins a PR moves from where it branched off `base`. Read whole, since
- * GitHub's list of a PR's changed files stops at 300.
- */
+/** Reads whole files, since GitHub's list of a PR's changed files stops at 300. */
 export async function bumpOf(
   api: GitHubApi,
   repo: string,

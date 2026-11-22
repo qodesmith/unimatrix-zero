@@ -36,10 +36,7 @@ export function resumption(session: ReplyRequest['session'], restore: Restore) {
   }
 }
 
-/**
- * A session started for a Thread is told all of it with its first Prompt,
- * each inline file read afresh.
- */
+/** A new session gets the Thread, files read afresh, with its first Prompt. */
 export async function contentOf({session, thread, prompt}: ReplyRequest) {
   return readContent(
     session === null && thread.length > 0

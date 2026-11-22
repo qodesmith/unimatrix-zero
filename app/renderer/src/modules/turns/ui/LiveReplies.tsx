@@ -11,7 +11,6 @@ import {
 } from '../live-replies'
 import {ReplyStoreContext} from '../use-live-reply'
 
-/** Keeps the streaming Replies in step with main for everything inside it. */
 export function LiveReplies({children}: {children: ReactNode}) {
   const queryClient = useQueryClient()
   // oxlint-disable-next-line react/hook-use-state -- created once and never replaced

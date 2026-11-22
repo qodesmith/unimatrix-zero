@@ -58,7 +58,6 @@ function sha256Of(bytes: Uint8Array) {
   return createHash('sha256').update(bytes).digest('hex')
 }
 
-/** Null means the original goes as it is. */
 function shrunkToKeep(mediaType: FileMediaType, bytes: Uint8Array | undefined) {
   if (bytes === undefined || attachmentKind(mediaType) !== 'image') return null
 
@@ -133,7 +132,6 @@ export function createAttachments({db, dir, droppedPath}: AttachmentsDeps) {
   }
 
   return {
-    /** `shrunk` is the window's smaller copy of a large image. */
     async add(file: AttachmentFile, shrunk?: Uint8Array): Promise<Attachment> {
       if (file.type === 'pasted') {
         return toAttachment(await addFile(file, shrunk))

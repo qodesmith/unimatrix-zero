@@ -18,10 +18,7 @@ export interface Attempt<Input extends object> {
   canceled: () => boolean
 }
 
-/**
- * Returns the update to end with when the download failed or the user
- * canceled; null once the program is ready.
- */
+/** The update to end with on a failed download or a cancel; null once ready. */
 export async function* getReady(
   attempt: Pick<Attempt<object>, 'canceled'>,
   download: AsyncIterable<DownloadProgress>

@@ -50,8 +50,7 @@ jobs:
       - run: bun run build
       - run: bun run test:node
       # No --with-deps: the runner has Chromium's libraries and its apt mirror
-      # stalls. Without its fonts, non-Latin text and emoji render as boxes, so
-      # add it back before a screenshot, text-measuring, or headed test.
+      # stalls. A screenshot, text-measuring or headed test needs it for fonts.
       - if: matrix.renderer
         run: bunx playwright install chromium --only-shell
         timeout-minutes: 5
@@ -70,9 +69,8 @@ jobs:
         with:
           node-version-file: .node-version
       - run: bun install --frozen-lockfile
-      # After every step that needs the runner's own tools. No later step may run
-      # a /usr/bin stub without DEVELOPER_DIR: it opens the "install developer
-      # tools" dialog (ADR 0025).
+      # After every step that needs the runner's tools: a later /usr/bin stub run
+      # without DEVELOPER_DIR opens the "install developer tools" dialog (ADR 0025).
       - name: Move Xcode and the Command Line Tools out of the way
         run: |
           set -euo pipefail
@@ -181,7 +179,6 @@ jobs:
         with:
           node-version-file: .node-version
       - run: bun install --frozen-lockfile
-      # Re-run this job once `bun run provider-checks` has posted its result.
       - run: bun run scripts/provider-checks-gate.ts
         env:
           GITHUB_TOKEN: ${{ github.token }}

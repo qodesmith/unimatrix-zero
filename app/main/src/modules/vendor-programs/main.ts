@@ -40,18 +40,11 @@ export function gitTargetFor(
   return build ? {path: folder, build} : null
 }
 
-/**
- * The developer folder the app gives a Mac with no developer tools (ADR
- * 0025); null off a Mac, where there are no stubs to answer.
- */
 export function developerFolderFor({userData, platform}: Machine) {
   return platform === 'darwin' ? path.join(userData, 'developer') : null
 }
 
-/**
- * The folder that goes last on the `PATH` of `claude` and Codex: on Windows
- * the build's own `cmd`, on Linux the one the app's wrapper script is in.
- */
+/** Goes last on the `PATH` of `claude` and Codex. */
 export function gitFolderFor(
   machine: Machine,
   manifest: Manifest = DEV_MANIFEST

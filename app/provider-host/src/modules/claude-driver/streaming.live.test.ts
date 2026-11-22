@@ -1,7 +1,6 @@
 /**
- * Needs a real plan, with UZ_LIVE_CLAUDE_PROGRAM and UZ_LIVE_CLAUDE_CONFIG set
- * as `bun run provider-checks` sets them. `UZ_RECORD=yes` also writes
- * `recordings/`, which the driver tests replay; re-record one `it` with `-t`.
+ * Needs a real plan and the env `bun run provider-checks` sets.
+ * `UZ_RECORD=yes` rewrites `recordings/`, which the driver tests replay.
  */
 import type {
   ReplyRecorded,
@@ -128,10 +127,7 @@ function linesOf(printed: string[]) {
   return printed.map(line => OutLine.parse(JSON.parse(line)))
 }
 
-/**
- * True once `claude` sends `api_retry` twice for one attempt: its watchdog
- * does so 30 s into an attempt's wait. Early attempts wait less.
- */
+/** `claude` repeats `api_retry` 30 s into an attempt; early ones wait less. */
 function waitsWithinAnAttempt(printed: string[]) {
   const attempts = linesOf(printed).flatMap(line =>
     line.subtype === 'api_retry' ? [line.attempt] : []
@@ -291,10 +287,7 @@ function reaching(session: ReplyRecorded['session']): ReplySession {
 
 type Live = ReturnType<typeof liveDriver>
 
-/**
- * Writes to `ended` whether `claude` exited or was killed. The SDK runs a
- * `.mjs` with the `node` on PATH.
- */
+/** The SDK runs a `.mjs` with the `node` on PATH. */
 function exitWatcher(ended: string) {
   return `
 import {spawn} from 'node:child_process'
@@ -1433,7 +1426,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
       proxy.letThrough()
 
-      // As main does for a stopped Reply never saved: continue from the one above.
+      // As main does for a stopped Reply never saved.
       const above =
         events.find(
           (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'

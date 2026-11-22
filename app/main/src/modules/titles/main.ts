@@ -50,8 +50,8 @@ function cleanTitle(answer: string) {
 }
 
 /**
- * Names a Tree once its first Reply finishes, and never again: a failure leaves
- * the Tree untitled, and the user's own title is final.
+ * Names a Tree after its first Reply, and never again: a failure leaves it
+ * untitled, and the user's own title is final.
  */
 export function createTitles({
   trees,

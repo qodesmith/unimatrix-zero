@@ -4,7 +4,7 @@ import {useSelector} from '@tanstack/react-store'
 
 import {useConnectionsStore} from './use-connections'
 
-/** As main reports it; null until main's `SNAPSHOT` has named it. */
+/** Null until main's `SNAPSHOT` names it. */
 export function useProviderStatus(
   provider: ProviderId
 ): ProviderStatus['status'] | null {

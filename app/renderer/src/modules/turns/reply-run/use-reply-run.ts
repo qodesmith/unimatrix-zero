@@ -24,7 +24,7 @@ function sendRun(store: ReplyStore, replyId: string, event: ReplyRunEvent) {
   return true
 }
 
-/** Stop and Retry for one Reply. Takes null so a caller's hooks stay in order. */
+/** Takes null so a caller's hooks stay in order. */
 export function useReplyRun(treeId: string, replyId: string | null) {
   const store = useReplyStore()
   const queryClient = useQueryClient()

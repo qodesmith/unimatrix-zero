@@ -62,7 +62,6 @@ function mediaTypeOf(type = '') {
 
 export type FakeMain = ReturnType<typeof fakeMain>
 
-/** Main's side of the bridge for App tests, keeping each command it was sent. */
 export function fakeMain(saved: Saved = {}) {
   const trees = [...(saved.trees ?? [])]
   const prompts = [...(saved.prompts ?? [])]

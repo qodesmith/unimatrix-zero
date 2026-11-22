@@ -14,10 +14,7 @@ export type PendingAdd = {key: string} & Exclude<
 
 type Adds = ReadonlyMap<string, AttachmentAddState>
 
-/**
- * Adds files one at a time, so they reach the draft in the order attached. A
- * refused one stays pending, with main's message, until dismissed.
- */
+/** One at a time, in order; a refused one stays until dismissed. */
 export function useAttachmentAdds(onAdded: (attachment: Attachment) => void) {
   const addFile = useAddFile()
   const [adds, setAdds] = useState<Adds>(new Map())

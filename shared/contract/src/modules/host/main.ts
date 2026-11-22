@@ -122,7 +122,6 @@ export const ReplyRequestSchema = z.strictObject({
     messageId: z.uuid().pipe(UuidPartsSchema),
   }),
   vendorProgram: SignInRequestSchema,
-  /** Already exists; the AI works there. */
   treeFolder: z.string().min(1),
   /** Null starts a session. */
   session: ReplySessionSchema.nullable(),
@@ -210,7 +209,6 @@ export interface ProviderDriver {
   signInPageOpened(): void
   submitSignInCode(code: string): void
   cancelSignIn(): void
-  /** Starts the vendor program if it must. */
   listModels(vendorProgram: SignInRequest): Promise<Model[]>
   /** Lists the driver learned on its own, such as from a session it started. */
   onModelsChanged(listener: (models: Model[]) => void): void

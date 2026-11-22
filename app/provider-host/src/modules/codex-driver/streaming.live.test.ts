@@ -1,11 +1,5 @@
-/**
- * UZ_LIVE_CODEX_PROGRAM=<userData>/vendor/chatgpt/<version>\
- * UZ_LIVE_CODEX_HOME=<userData>/providers/chatgpt\
- * bun run test:node app/provider-host/src/modules/codex-driver/streaming.live
- *
- * `UZ_RECORD=yes` rewrites `recordings/`. Record one test at a time with `-t`:
- * the ids the driver tests pin change each time.
- */
+// Record one test at a time (`-t`) with `UZ_RECORD=yes`: each run changes
+// the ids the driver tests pin.
 import type {SpawnCodex} from './app-server'
 import type {RateLimitReachedType} from './protocol/v2/RateLimitReachedType'
 import type {HostAttachment} from '@uz/contract/attachments'
@@ -53,7 +47,6 @@ import {CONTEXT_COMPACTION} from './wire'
 const folder = process.env.UZ_LIVE_CODEX_PROGRAM
 const signedIn = process.env.UZ_LIVE_CODEX_HOME
 
-/** The Model ChatGPT's `model/list` marked as its default when recorded. */
 const MODEL = 'gpt-6.1-sol'
 
 const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
@@ -76,7 +69,6 @@ function newTreeFolder() {
   )
 }
 
-/** One Tree's folder for every Reply, as a Tree's Replies share one. */
 function treeFolder() {
   sharedTreeFolder ??= newTreeFolder()
 
@@ -2208,7 +2200,6 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
 
       expect(injected.text).toMatch(/heron/i)
       expect(injected.calls).toEqual([])
-      // One thread for each Reply: Codex took the image, so no text replay.
       expect(threadsStarted()).toBe(2)
 
       await closed()
@@ -2294,7 +2285,6 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
 
     const binary = fs.readFileSync(program)
 
-    // A feature's name is held without its `features.` table.
     // Linux's arguments hold every other platform's, plus `allow_login_shell`.
     const settings = codexArgs('linux')
       .filter(arg => arg !== '-c')

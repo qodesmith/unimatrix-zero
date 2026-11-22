@@ -144,7 +144,6 @@ export function Flow({
     [index, orientation, measured, collapsed.ids]
   )
 
-  // A failed Reply shows as a chip in its Prompt's place.
   const nodeIdOf = useCallback(
     (replyId: string) => {
       const reply = index.replyById.get(replyId)

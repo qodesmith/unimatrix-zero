@@ -130,9 +130,8 @@ async function newThread(
 }
 
 /**
- * The one way a session is rebuilt from its Thread (ADR 0001): `restore`, the
- * exact restore from the app's copy, first, then a new thread for one Codex
- * no longer has. Null `restore`: the Provider has no session of the Thread.
+ * The one way a session is rebuilt from its Thread (ADR 0001): `restore` from
+ * the app's copy first, else a new thread. Null `restore`: no session exists.
  */
 export async function openThread(
   opening: Opening,

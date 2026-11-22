@@ -35,7 +35,6 @@ interface ConnectionsOptions {
 
 export type Connections = ReturnType<typeof createConnections>
 
-/** Keeps the latest sign-in step for windows that connect mid-way. */
 export function createConnections({
   db,
   hosts,
@@ -77,10 +76,7 @@ export function createConnections({
     publish({type: 'MODELS_CHANGED', provider, models})
   }
 
-  /**
-   * No list says a Model needs an app update, so a mark learned from a failed
-   * Reply outlives the Provider listing it again.
-   */
+  /** Keeps `needsAppUpdate` marks across relists: no list reports them. */
   function applyModels(provider: ProviderId, models: Model[]) {
     const gated = new Set(
       modelsOf(provider).flatMap(model =>

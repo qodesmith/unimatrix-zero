@@ -112,7 +112,6 @@ export function createRecorder(
     ]
 
     const child = spawn(options)
-    // What the SDK writes goes through here on its way to `claude`.
     const input = new PassThrough()
 
     function listen(stream: NodeJS.ReadableStream, kind: 'in' | 'out') {

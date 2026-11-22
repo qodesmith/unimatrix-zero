@@ -149,7 +149,6 @@ function fromWanted(
   }
 }
 
-/** What an Input's Model picker offers and shows, and whether it may send. */
 export function pickModel(input: ModelPickInput): ModelPick {
   const {wanted, statuses, models} = input
 

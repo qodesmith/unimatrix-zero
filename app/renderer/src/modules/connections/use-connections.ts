@@ -22,7 +22,7 @@ export function useConnectionsStore() {
   return store
 }
 
-/** As main reports them; a refused command shows on the Provider's card. */
+/** A refused command shows on the Provider's card. */
 export function useConnections() {
   const store = useConnectionsStore()
   const state = useSelector(store, current => current)

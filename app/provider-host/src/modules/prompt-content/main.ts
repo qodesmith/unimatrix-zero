@@ -45,7 +45,6 @@ export function files(attached: HostAttachment[]): Piece[] {
   })
 }
 
-/** Adjacent texts become one, a line apart. */
 export function joinLines<Part extends {type: string}>(
   parts: (Part | Text)[]
 ): (Part | Text)[] {
@@ -71,7 +70,6 @@ function isText(part: {type: string}): part is Text {
   return part.type === 'text'
 }
 
-/** A Prompt's attachments go before its text, which may be empty. */
 export function prompted({text, attachments}: Prompt): Piece[] {
   return joinLines([
     ...files(attachments),

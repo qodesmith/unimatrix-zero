@@ -18,10 +18,7 @@ function partText(part: Exchange['reply'][number]) {
   return `${call}\n[${answered}]\n${part.result.content}`
 }
 
-/**
- * A Reply as a rebuilt session gives it to the AI: its label first, and each
- * tool call as plain text. Empty when the Reply showed nothing.
- */
+/** A Reply as a rebuilt session gives it to the AI. */
 export function replyText({reply, label}: Exchange) {
   const text = reply
     .map(partText)
@@ -41,11 +38,7 @@ function promptPieces({prompt, attachments}: Exchange) {
   return [...files(attachments), ...(prompt === '' ? [] : lines(prompt))]
 }
 
-/**
- * The whole Thread and the Prompt that continues it as one user message, for a
- * Provider that takes no earlier messages as history. Each Prompt's files go
- * inside its own `<prompt>`.
- */
+/** Thread and Prompt as one message, for a Provider that takes no history. */
 export function replayed(
   thread: Thread,
   prompt: Parameters<typeof prompted>[0]
@@ -73,10 +66,7 @@ export function replayed(
 
 const LABELS_LINE = `A Reply in this conversation may begin with a label such as "${replyLabel('GPT-5')}". The app adds it to each Reply that another AI model wrote: those words are that model’s, not yours, so judge them as you would anyone else’s and disagree where they are wrong. Never write such a label yourself, and don’t mention the labels.`
 
-/**
- * The System prompt a session for the Thread gets each time it opens. The
- * Reply records only the user's own, which the line is no part of.
- */
+/** Added each time a session opens; a Reply records only the user's own. */
 export function explainingLabels(systemPrompt: string, thread: Thread) {
   if (thread.every(exchange => exchange.label === null)) return systemPrompt
 

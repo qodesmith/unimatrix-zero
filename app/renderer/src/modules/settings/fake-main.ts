@@ -6,7 +6,6 @@ import type {Settings} from '@uz/contract/settings'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 
-/** Main's side of the bridge for Settings tests, keeping each update it sent. */
 export function fakeMain(saved: Partial<Settings> = {}) {
   const settings: Settings = {...DEFAULT_SETTINGS, ...saved}
   const sent: Command[] = []

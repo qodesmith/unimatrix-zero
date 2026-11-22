@@ -9,7 +9,7 @@ export const PROVIDER_NAMES: Record<ProviderId, string> = {
   chatgpt: 'ChatGPT',
 }
 
-/** What a driver can do. The UI branches on these, never on the Provider. */
+/** The UI branches on these, never on the Provider. */
 export const CapabilitiesSchema = z.strictObject({
   pdfAttachments: z.boolean(),
   skillScriptsInPlainTrees: z.boolean(),

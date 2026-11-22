@@ -9,7 +9,7 @@ export interface Review {
 }
 
 export interface Result {
-  /** The commit the run checked, or null when there was no PR to post on. */
+  /** Null when there was no PR to post on. */
   head: string | null
   pinChanges: string[]
   checks: {id: string; status: CheckStatus}[]

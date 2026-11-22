@@ -1,5 +1,4 @@
-// Node gives custom schemes an opaque "null" origin, the same as about:blank
-// and data:, so compare scheme and host rather than `origin`.
+// Custom schemes get an opaque "null" origin, so compare protocol and host.
 export function isAppUrl(target: string, appUrl: string): boolean {
   const url = URL.parse(target)
   const app = new URL(appUrl)

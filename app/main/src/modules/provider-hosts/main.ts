@@ -59,7 +59,7 @@ interface ProviderHostsOptions {
   onReplyRecorded: (provider: ProviderId, recorded: ReplyRecorded) => void
   onSignInUpdate: (provider: ProviderId, update: SignInUpdate) => void
   onModels: (provider: ProviderId, models: Model[]) => void
-  /** Answers a host's request about its sessions; throws if it can't. */
+  /** Throws if it can't answer. */
   onSessionStore: (
     provider: ProviderId,
     request: SessionStoreRequest
@@ -221,7 +221,7 @@ export function createProviderHosts({
     }
   }
 
-  /** Stops the Provider's host on purpose, so it doesn't count as a crash. */
+  /** Marks the host stopped before killing it, so the exit isn't a crash. */
   function stop(provider: ProviderId) {
     const host = hosts.get(provider)
 
@@ -264,10 +264,7 @@ export function createProviderHosts({
       child.post(command)
     },
 
-    /**
-     * A tiny tool-free request outside any Tree, on the Provider's smallest
-     * Model; rejects when the host can't run it, exits first or takes too long.
-     */
+    /** Runs on the Provider's smallest Model, outside any Tree. */
     async runOneShot(
       provider: ProviderId,
       request: Omit<OneShotRequest, 'model'>

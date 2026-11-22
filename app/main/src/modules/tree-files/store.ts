@@ -5,10 +5,7 @@ import {randomUUID} from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
-/**
- * Left out of every Snapshot unless a `.gitignore` in the folder un-ignores
- * them.
- */
+/** Left out of every Snapshot unless a `.gitignore` un-ignores them. */
 const DEFAULT_EXCLUDES = [
   'node_modules/',
   '.venv/',
@@ -70,8 +67,8 @@ async function ownRepositories(git: Git, store: string, checkout: Checkout) {
 }
 
 /**
- * Staged alone, a repository of its own reads only the `.gitignore` files
- * inside it, and a file once in the index stays there through `git add`.
+ * A nested repository staged alone reads only its own `.gitignore` files, and
+ * `git add` never drops a file already in the index.
  */
 async function untrackIgnored(
   git: Git,
@@ -107,9 +104,8 @@ async function untrackIgnored(
 }
 
 /**
- * Git stores a nested repository as one entry with no files, and refuses one
- * with no commit, so its files go into the index once; `git add` keeps them
- * after.
+ * Git stores a nested repository as an empty entry and refuses one with no
+ * commit, so its files go into the index once; `git add` keeps them after.
  */
 async function stage(git: Git, store: string, checkout: Checkout) {
   for (const repository of await ownRepositories(git, store, checkout)) {
@@ -136,8 +132,8 @@ async function treeOf(git: Git, store: string, checkout: Checkout) {
 }
 
 /**
- * Returns `parent` again when nothing differs. The index persists so git
- * re-hashes only files whose size or modified time changed.
+ * Returns `parent` when nothing differs. The index persists so git re-hashes
+ * only files whose size or modified time changed.
  */
 export async function takeSnapshot(
   git: Git,

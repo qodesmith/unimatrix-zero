@@ -65,7 +65,6 @@ export function ChatSlideout({
     ? (index.promptById.get(end.promptId)?.parentReplyId ?? null)
     : end.id
 
-  // A failed Reply's Prompt is back in the Input, so it sends nothing yet.
   const sendsFrom = inputAt === null ? undefined : index.replyById.get(inputAt)
 
   function inFieldElsewhere({target}: Event) {
@@ -79,7 +78,7 @@ export function ChatSlideout({
   function returnFocus() {
     const {activeElement} = document
 
-    // The closing panel is inert, which drops its focus to the body, so the body counts as the slideout's.
+    // The closing panel is inert, which drops focus to the body: count the body as the slideout's.
     const elsewhere =
       activeElement !== document.body &&
       !activeElement?.closest('[data-slideout]')

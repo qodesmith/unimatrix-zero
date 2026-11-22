@@ -1,7 +1,4 @@
-/**
- * The standalone `codex-app-server` the app runs can't generate its types, so
- * this takes the full `codex`: the one on PATH, or the path given.
- */
+/** The standalone `codex-app-server` can't generate types; the full `codex` can. */
 import {spawnSync} from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'

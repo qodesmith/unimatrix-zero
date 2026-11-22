@@ -60,7 +60,6 @@ interface ShownProps {
   onRemove?: () => void
 }
 
-/** A thumbnail has no text, so its note is a description and a tooltip. */
 function ImageAttachment({
   attachment: {id, name},
   note,

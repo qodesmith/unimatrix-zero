@@ -14,7 +14,6 @@ interface Point {
   y: number
 }
 
-/** Every Turn is drawn this wide, in both orientations. */
 export const TURN_WIDTH = 768
 
 export const START_MARGIN = 24

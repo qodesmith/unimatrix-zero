@@ -43,7 +43,6 @@ export interface FinishedReply {
   treeId: string
   replyId: string
   status: Extract<ReplyEvent, {type: 'RUN_FINISHED'}>['status']
-  /** As the Reply's row records it. */
   model: string
   failure: RunFailure | null
 }
@@ -57,10 +56,7 @@ interface Entry {
   saveTimer: ReturnType<typeof setTimeout> | null
 }
 
-/**
- * A streaming Reply is saved before it is published, so a window never shows
- * what main has not saved or is not about to save.
- */
+/** Saves before it publishes, so no window shows what main won't save. */
 export function createInFlight(
   db: Database,
   publish: (event: AppEvent) => void,

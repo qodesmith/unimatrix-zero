@@ -21,7 +21,6 @@ const PNG = Uint8Array.from([
 const ABC_SHA256 =
   'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
 
-/** Of the six bytes the shrunk-copy tests send as a JPEG. */
 const JPEG_SHA256 =
   'fc16d7dcee9cae83ef3923222a81ccd8fe96c9d25fdb7f504d66f1011e0cd870'
 

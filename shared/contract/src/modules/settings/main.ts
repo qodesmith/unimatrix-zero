@@ -53,7 +53,7 @@ export const SettingsSchema = z.strictObject({
     .max(FONT_SIZE.max)
     .multipleOf(FONT_SIZE.step),
   sendKey: SendKeySchema,
-  /** The note above the Input before a step that re-reads the Thread cold. */
+  /** The note above the Input before the AI re-reads the Thread. */
   reReadNote: z.boolean(),
   escStopsReply: z.boolean(),
   /** Automatic Compaction; a Prompt of `/compact` still compacts. */

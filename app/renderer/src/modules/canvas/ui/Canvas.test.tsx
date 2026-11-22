@@ -1412,7 +1412,6 @@ it('lets long Turns take their full height when the Setting is off', async () =>
   })
 
   await expect.element(page.getByText('Short')).toBeVisible()
-  // Unscaled: opening fits the whole Tree, so the zoom follows its height.
   expect(rootPromptHeight() / zoomOf()).toBeGreaterThan(500)
   await expect
     .element(page.getByRole('button', {name: 'Show more'}))
@@ -2029,7 +2028,6 @@ it('slides the Context size drawer a short way in as it opens and out as it clos
   })
   await expect.element(page.getByText('10.0k ctx')).toBeVisible()
 
-  // Held at its start, the drawer is still invisible.
   const drawer = page.getByRole('complementary', {
     name: 'Context size details',
     includeHidden: true,

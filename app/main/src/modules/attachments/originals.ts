@@ -32,10 +32,7 @@ export async function isFolder(filePath: string) {
   }
 }
 
-/**
- * Reads one byte past the limit at most, so a file too large is refused
- * without reading it whole.
- */
+/** Reads at most `limit + 1` bytes, so a file too large is refused unread. */
 export async function readDropped(filePath: string, limit: number) {
   const name = path.basename(filePath).trim()
 
@@ -68,7 +65,6 @@ async function exists(target: string) {
   }
 }
 
-/** Written under a temporary name and renamed, so no one sees half a file. */
 async function writeWhole(dir: string, target: string, bytes: Uint8Array) {
   const temporary = path.join(dir, `.${randomUUID()}.tmp`)
 
@@ -80,7 +76,6 @@ async function writeWhole(dir: string, target: string, bytes: Uint8Array) {
   }
 }
 
-/** A second name for bytes already kept, sharing them where it can. */
 async function linkToKept(folder: string, target: string) {
   const [kept] = await fs.readdir(folder)
 

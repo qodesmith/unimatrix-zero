@@ -40,10 +40,7 @@ function refusedHop(requested: URL, next: URL) {
   return new Error('The image moved to an address that is not a web address.')
 }
 
-/**
- * Checks each hop before requesting it. Node's `redirect: 'follow'` would make
- * the request first, so a secure chip could produce a request in the clear.
- */
+/** Checks each hop first: `redirect: 'follow'` would request it unchecked. */
 async function follow(
   fetch: typeof globalThis.fetch,
   url: string,
@@ -76,10 +73,7 @@ async function follow(
   throw new Error('The image redirected too many times.')
 }
 
-/**
- * Enforces the limit while reading, since a server may send no size or lie
- * about it. Leaving the loop cancels the stream, which closes the connection.
- */
+/** Counts while reading: a server may omit or lie about the size. */
 async function readWithin(body: ReadableStream<Uint8Array>) {
   const chunks: Uint8Array[] = []
   let total = 0
@@ -124,8 +118,8 @@ async function fetchImage(
 }
 
 /**
- * Node's fetch, not the window session's, so the session's http backstop stays
- * absolute and no cookie or referrer goes along (ADR 0014).
+ * Node's fetch, not the window session's, so the session's http block has no
+ * exception and no cookie or referrer goes along (ADR 0014).
  */
 export function createRemoteImages(
   fetch: typeof globalThis.fetch,

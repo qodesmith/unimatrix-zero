@@ -27,7 +27,6 @@ export const SnapshotEvent = z.strictObject({
   models: z.record(ProviderIdSchema, z.array(ModelSchema)),
   /** The newest Reply's Model in any Tree, where a new Tree starts. */
   lastModel: ModelChoiceSchema.nullable(),
-  /** The Provider being connected, at its latest step. */
   signIn: SignInStepEvent.nullable(),
   settings: SettingsSchema,
   layout: LayoutSchema,

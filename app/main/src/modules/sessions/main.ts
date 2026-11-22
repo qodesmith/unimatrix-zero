@@ -59,9 +59,8 @@ export function positionOf(db: Database, sessionId: string, uuid: string) {
 }
 
 /**
- * The app's copy of every Provider session. `onAppended` runs in the
- * transaction that stores a session's own entries: if it throws, they aren't
- * stored.
+ * `onAppended` runs in the transaction that stores the entries: if it throws,
+ * they aren't stored.
  */
 export function createSessions(
   db: Database,
@@ -127,8 +126,8 @@ export function createSessions(
   }
 
   /**
-   * `through` gives the session as it was at that entry, minus entries with no
-   * `uuid`: one can point Claude at a later entry.
+   * `through` gives the session as of that entry, minus entries with no `uuid`:
+   * one can point Claude at a later entry.
    */
   function load(
     provider: ProviderId,

@@ -5,7 +5,7 @@ import {programOf} from '@uz/vendor-program'
 interface GitProgramDeps {
   target: ProgramTarget | null
   getProgramReady: typeof getProgramReady
-  /** Tells the user Snapshots wait on git; false if no window heard. */
+  /** False if no window heard. */
   onWaiting: () => boolean
 }
 

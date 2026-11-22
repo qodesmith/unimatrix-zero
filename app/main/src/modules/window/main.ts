@@ -28,8 +28,7 @@ export function createWindow({
     height: 820,
     minWidth: 768,
     minHeight: 480,
-    // The sizes are the page's, so the window's frame can't take it under
-    // 768 px, where shadcn's Sidebar turns into a slide-over panel.
+    // Under 768 px of page, shadcn's Sidebar turns into a slide-over panel.
     useContentSize: true,
     show: false,
     title: 'Unimatrix Zero',
@@ -84,10 +83,7 @@ export function setAppMenu() {
   )
 }
 
-/**
- * Chromium's `prefers-color-scheme` follows `themeSource`, so setting it
- * before the window opens makes the first paint right.
- */
+/** Call before the window opens: `prefers-color-scheme` follows `themeSource`. */
 export function followThemeMode(mode: ThemeMode) {
   nativeTheme.themeSource = mode
 }
@@ -96,10 +92,7 @@ export function openLink(url: string) {
   if (isOpenableExternally(url)) void shell.openExternal(url)
 }
 
-/**
- * The window's session backstop: nothing reaches the network over http or ws,
- * whatever the CSP says. The only allowance is the dev-server HMR socket.
- */
+/** Blocks http and ws except `allowedOrigins`, whatever the CSP says. */
 export function hardenSession(session: Session, allowedOrigins: string[]) {
   session.webRequest.onBeforeRequest(
     {urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*']},

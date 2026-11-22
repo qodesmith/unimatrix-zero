@@ -1,7 +1,3 @@
-/**
- * CI's gate on a bump PR: red until the repo owner's `bun run provider-checks`
- * result for the PR's head commit passes. Every other run passes.
- */
 import type {Comment} from './provider-checks-result.ts'
 
 import {z} from 'zod'

@@ -4,7 +4,6 @@ import {attachmentKind} from '@uz/contract/attachments'
 
 export const PATH_ONLY_NOW = 'Sent by path only now'
 
-/** What a Provider's Model does with the file, as its chip says it. */
 export function modelUse(form: InlineForm | null, attachment: Attachment) {
   switch (form) {
     case 'image':

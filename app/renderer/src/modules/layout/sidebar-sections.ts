@@ -53,7 +53,7 @@ export function arrange(
     : layout
 }
 
-/** The inverse of `arrange`: the sizes it lays out as `layout`. */
+/** The inverse of `arrange`. */
 export function resized(
   sections: Sections,
   layout: SectionLayout,

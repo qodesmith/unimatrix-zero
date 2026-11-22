@@ -11,7 +11,7 @@ export type SkillsAddJsonResult =
       hash: string | null
       path: string
       scope: 'project' | 'global'
-      agents: string[] // display names, e.g. "Claude Code", not ids like "claude-code"
+      agents: string[] // display names like "Claude Code", not ids
       mode: 'symlink' | 'copy'
       security: {
         gen?: RiskLevel

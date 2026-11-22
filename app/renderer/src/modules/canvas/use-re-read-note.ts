@@ -7,7 +7,6 @@ import {use} from 'react'
 import {CanvasContext} from './canvas-context'
 import {contextSizeAt, reReadNote} from './re-read'
 
-/** The re-read note for an Input, unless the Setting hides it. */
 export function useReReadNote(
   attachedTo: Reply | null,
   to: ModelChoice | null

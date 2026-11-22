@@ -9,7 +9,6 @@ function shortHash(text: string) {
   return createHash('sha256').update(text).digest('hex').slice(0, 8)
 }
 
-/** A short hash of the checkout's path, which also spreads its dev ports. */
 export function checkoutHash(root: string) {
   return shortHash(root)
 }
@@ -36,9 +35,8 @@ export function devUserData(root: string) {
 }
 
 /**
- * `claude` hashes a non-default config folder into its Keychain item's name
- * (`resume-config-swap-keychain`). The Keychain is macOS-only, so the path is
- * joined POSIX-style on every platform.
+ * `claude` names its Keychain item after a hash of a non-default config folder.
+ * The Keychain is macOS-only, so the path joins POSIX-style everywhere.
  */
 function claudeKeychainOf(appDataPath: string, folder: string) {
   const configDir = path.posix.join(appDataPath, folder, 'providers', 'claude')
@@ -53,10 +51,6 @@ interface PruneInput {
   keychainServices: string[]
 }
 
-/**
- * The dev folders of checkouts that are gone, each with its Claude Keychain
- * entry, and the Claude entries no dev folder owns, which are left alone.
- */
 export function planPrune({
   appDataPath,
   checkouts,

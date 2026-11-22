@@ -159,14 +159,14 @@ function openWindow(db: Database) {
   const gitTarget = gitTargetFor(machine)
   const developerFolder = developerFolderFor(machine)
 
-  // Before any host starts, so the first session's stubs find the script.
+  // Before any host starts, so the stubs find the script.
   if (developerFolder) {
     writeDeveloperFolder(developerFolder, gitTarget && programOf(gitTarget))
   }
 
   const gitFolder = gitFolderFor(machine)
 
-  // On Windows the folder is the build's own, which the download fills.
+  // On Windows the download fills the build's own folder.
   if (machine.platform === 'linux' && gitFolder && gitTarget) {
     writeGitWrapper(gitFolder, programOf(gitTarget))
   }
@@ -222,15 +222,13 @@ function openWindow(db: Database) {
     },
   })
 
-  // Waits for git so the Snapshots the app quit before taking are taken, not
-  // recorded as waiting.
+  // Waits for git, or missed Snapshots would be recorded as waiting.
   void gitProgram.prepare().then(async () => treeFiles.takeMissedSnapshots())
 
   const connections = createConnections({
     db,
     hosts,
     publish: hub.publish,
-    // The fake driver connects without a vendor program.
     requestFor: provider => {
       const request = signInRequestFor(provider, machine)
 
@@ -286,7 +284,7 @@ async function start() {
   }
 
   openWindow(db)
-  // After openWindow's will-quit, which saves the Replies still streaming.
+  // After openWindow's will-quit, which saves Replies still streaming.
   app.on('will-quit', () => db.$client.close())
 }
 

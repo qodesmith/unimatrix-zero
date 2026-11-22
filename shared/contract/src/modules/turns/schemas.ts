@@ -69,7 +69,7 @@ export const RunFailureSchema = z.strictObject({
     'fake-failure',
   ]),
   message: z.string(),
-  /** When the limit lifts, for `limit-reached`, when the Provider said. */
+  /** For `limit-reached`, when the limit lifts, if the Provider said. */
   resetsAt: z.iso.datetime().optional(),
   /**
    * For `too-long`, when the Provider caps one Prompt's text: the characters
@@ -99,7 +99,7 @@ export const ReplyProgressSchema = z.strictObject({
   contextWindow: z.number().int().positive().nullable(),
   failure: RunFailureSchema.nullable(),
   compacted: z.boolean(),
-  /** Its session was rebuilt from the Thread; the AI re-read it cold. */
+  /** Its session was rebuilt from the Thread. */
   rebuilt: z.boolean(),
 })
 
@@ -265,7 +265,6 @@ export const ContextCompactedEvent = z.strictObject({
   boundaryId: z.string().nullable(),
 })
 
-/** The Provider had no session to restore, so it got the whole Thread. */
 export const SessionRebuiltEvent = z.strictObject({
   ...replyIds,
   type: z.literal('SESSION_REBUILT'),

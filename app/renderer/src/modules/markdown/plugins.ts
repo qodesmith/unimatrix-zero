@@ -31,10 +31,7 @@ function codeThemes(): [BundledTheme, BundledTheme] {
   return [bundledTheme(light), bundledTheme(dark)]
 }
 
-/**
- * Streamdown's rehype plugins minus `rehype-raw`, so HTML stays text
- * (ADR 0014).
- */
+/** Drops `rehype-raw`, so HTML stays text (ADR 0014). */
 function withoutRawHtml(): NonNullable<StreamdownProps['rehypePlugins']> {
   const {sanitize, harden} = defaultRehypePlugins
 
@@ -50,8 +47,8 @@ function withoutRawHtml(): NonNullable<StreamdownProps['rehypePlugins']> {
 export const rehypePlugins = withoutRawHtml()
 
 /**
- * Streamdown runs math after the sanitizer, so `trust: false` is the only gate
- * on KaTeX's output (ADR 0014). A single `$` would make "$5 and $10" math.
+ * Math runs after the sanitizer, so `trust: false` alone guards KaTeX's output
+ * (ADR 0014). A single `$` would make "$5 and $10" math.
  */
 const math: MathPlugin = {
   name: 'katex',
@@ -70,7 +67,7 @@ export const plugins: PluginConfig = {
 
 const DIAGRAM = /^[ \t]*(?:```|~~~)[ \t]*mermaid\b/mu
 
-/** Whether the Markdown has a Mermaid fence, finished or not. */
+/** Matches an unfinished fence too. */
 export function hasDiagram(markdown: string) {
   return DIAGRAM.test(markdown)
 }
@@ -85,8 +82,8 @@ export function loadedMermaid() {
 const IMAGE_NODE = /@\{[^}]*\bimg\s*:/u
 
 /**
- * Mermaid's image shape fetches its URL as soon as the diagram draws, even in
- * strict mode, so such a diagram is an error (ADR 0014).
+ * Mermaid's image shape fetches its URL on draw, even in strict mode, so such
+ * a diagram is an error (ADR 0014).
  */
 function withoutImages(plugin: DiagramPlugin): DiagramPlugin {
   return {

@@ -97,8 +97,7 @@ it('looks for no developer tools where main names no folder, as off a Mac', asyn
   expect(hasDeveloperTools).not.toHaveBeenCalled()
 })
 
-// CI's "A Mac with no developer tools" job sets `UZ_NO_DEVELOPER_TOOLS`; every
-// other Mac that runs the tests has the tools.
+// Only CI's "A Mac with no developer tools" job sets `UZ_NO_DEVELOPER_TOOLS`.
 it.runIf(process.platform === 'darwin')(
   'finds a Mac’s developer tools, and finds none on a Mac without them, whatever DEVELOPER_DIR names',
   async () => {

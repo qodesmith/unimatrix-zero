@@ -8,7 +8,6 @@ import path from 'node:path'
 declare module 'vitest' {
   export interface ProvidedContext {
     gitProgram: string
-    /** The machine the tests run on, with the cache as its data folder. */
     machine: Machine
   }
 }
@@ -18,7 +17,6 @@ const cache = path.resolve(
   '../../../../../node_modules/.cache/uz-test'
 )
 
-/** Downloads the app's `git` once, so the tests run the build the app does. */
 export async function setup(project: TestProject) {
   const machine: Machine = {
     userData: cache,

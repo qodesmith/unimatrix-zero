@@ -10,7 +10,6 @@ export function createLayoutStore(): LayoutStore {
   return new Store<Layout>(DEFAULT_LAYOUT)
 }
 
-/** Main sends the whole Layout on any change, so each event replaces it. */
 export function applyLayoutEvent(store: LayoutStore, event: AppEvent) {
   if (event.type === 'SNAPSHOT' || event.type === 'LAYOUT_CHANGED') {
     store.setState(() => event.layout)

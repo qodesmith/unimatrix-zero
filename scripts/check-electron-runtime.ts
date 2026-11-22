@@ -1,7 +1,4 @@
-/**
- * The build targets read `electron-runtime.json`, so it must describe the
- * installed Electron, and `@types/node` no newer Node than Electron ships.
- */
+/** The build targets read `electron-runtime.json`, so it must match Electron. */
 import path from 'node:path'
 import {z} from 'zod'
 

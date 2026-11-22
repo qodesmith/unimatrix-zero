@@ -39,8 +39,7 @@ export function lintFixture(
     writeFileSync(path.join(dir, file), text)
   }
 
-  // Plain Node, not `process.execPath`: the tests run under Electron's Node,
-  // where oxlint crashes with SIGTRAP once it loads a JS plugin.
+  // Not `process.execPath`: under Electron's Node, oxlint dies with SIGTRAP once it loads a JS plugin.
   const result = spawnSync(
     'node',
     [oxlint, '-f', 'json', ...Object.keys(files)],

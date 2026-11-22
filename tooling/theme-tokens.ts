@@ -9,6 +9,5 @@ export const paletteClass = new RegExp(
   `(?:^|\\s|:)(?:${utilities})-(?:${palette})(?:-\\d{2,3})?(?:/\\d+)?(?=\\s|$)`
 )
 
-/** A color literal: hex, or an rgb/hsl/oklch/oklab function. */
 export const colorLiteral =
   /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab)\(/

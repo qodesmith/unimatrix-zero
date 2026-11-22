@@ -5,7 +5,6 @@ import {z} from 'zod'
 
 export const RECORDINGS = path.join(import.meta.dirname, 'recordings')
 
-/** What a recording says in place of the `CODEX_HOME` it ran with. */
 export const CODEX_HOME_STAND_IN = '/codex-home'
 
 export const RecordedMessageSchema = z.looseObject({})
@@ -21,23 +20,20 @@ const RecordedLineSchema = z.discriminatedUnion('kind', [
 export type RecordedLine = z.infer<typeof RecordedLineSchema>
 
 export interface FakeCodexOptions {
-  /** Exits, as a crash would, when it reads or would write this method. */
+  /** Exits like a crash on reading or writing this method. */
   exitAt?: string
   /** Only this many runs, from the first, exit at `exitAt`. */
   exits?: number
   /**
-   * Answers a resume or fork of a thread it can't find with the error alone
-   * and goes on, as `codex` does; the recording leaves that request out.
+   * Refuses a resume or fork of an unknown thread and goes on, as `codex` does.
+   * The recording leaves that request out.
    */
   keepRunningOnRefusal?: boolean
 }
 
 const OPTIONS_VARIABLE = 'FAKE_CODEX_OPTIONS'
 
-/**
- * The nth `codex app-server` started replays the nth of `recordings` and
- * records its run in `<reports>/<n>.json`.
- */
+/** The nth app-server replays the nth recording; reports `<reports>/<n>.json`. */
 export function fakeCodexEnv(
   recordings: string[],
   reports: string,
@@ -69,7 +65,6 @@ export const FakeCodexRunSchema = z.strictObject({
   resumedFrom: z.array(z.looseObject({type: z.string(), id: z.string()})),
   /** At each `turn/start`, the ids of what the thread held. */
   contexts: z.array(z.array(z.string())),
-  /** Every item `thread/inject_items` gave a thread, in order. */
   injected: z.array(z.looseObject({})),
   forkedThrough: NullableStringSchema,
   interrupted: NullableStringSchema,
@@ -83,9 +78,8 @@ export const FakeCodexRunSchema = z.strictObject({
 })
 
 /**
- * Like `codex`, resumes or forks only a thread whose rollout is under
- * `sessions/`, and a revert writes the thread a new rollout that points into
- * the old one just before the reverted turn.
+ * Like `codex`, resumes or forks only a thread with a rollout under
+ * `sessions/`, and a revert writes a new rollout pointing into the old one.
  */
 const SCRIPT = `
 import fs from 'node:fs'
@@ -255,7 +249,7 @@ process.stdin.on('end', () => {
 })
 `
 
-/** Writes the fake into a fresh folder; run it with this Node. */
+/** Run `program` with this Node. */
 export async function replayCodex() {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'uz-replay-codex-'))
   const program = path.join(folder, 'codex.mjs')

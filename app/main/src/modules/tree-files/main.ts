@@ -21,11 +21,10 @@ export interface TreeFilesDeps {
   db: Database
   userData: string
   publish: (event: AppEvent) => void
-  /** A Snapshot that couldn't be taken or read. */
   onFailure: (error: Error) => void
   /** The app's own `git` by its full path, or null while it isn't in place. */
   gitProgram: () => string | null
-  /** A Snapshot that couldn't be taken or read because `gitProgram` is null. */
+  /** A Snapshot failed because `gitProgram` is null. */
   onWaitingForGit: () => void
 }
 
@@ -85,7 +84,7 @@ export function createTreeFiles({
     else onFailure(error)
   }
 
-  /** By Tree, the last Snapshot asked for. */
+  /** The last Snapshot queued per Tree. */
   const snapshotting = new Map<string, Promise<void>>()
 
   function storeOf(treeId: string) {
@@ -178,7 +177,6 @@ export function createTreeFiles({
     )
   }
 
-  /** Snapshots of a Tree are taken one at a time, in the order asked. */
   async function queue(treeId: string, work: () => Promise<void>) {
     const before = snapshotting.get(treeId) ?? Promise.resolve()
 
@@ -192,7 +190,6 @@ export function createTreeFiles({
   }
 
   return {
-    /** Made empty if missing: a vendor program's `cwd` has to exist. */
     folderFor: (treeId: string) => makeTreeFolder(userData, treeId),
 
     /** However the Reply ended. Never rejects. */
@@ -202,8 +199,7 @@ export function createTreeFiles({
 
     /**
      * Settles once the Tree has no Snapshot in progress, first taking the
-     * parent Reply's if it misses one; null when there is nothing to wait for.
-     * Never rejects.
+     * parent Reply's if it misses one. Never rejects.
      */
     snapshotsBefore: (
       treeId: string,
@@ -222,8 +218,7 @@ export function createTreeFiles({
 
     /**
      * Run at launch, after streaming Replies are marked interrupted and before
-     * a Reply on another Branch writes into the folder. Failed ones wait for a
-     * Reply that continues from them. Never rejects.
+     * any Reply writes into the folder. Never rejects.
      */
     async takeMissedSnapshots() {
       const missed = db
