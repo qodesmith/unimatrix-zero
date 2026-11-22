@@ -12,7 +12,7 @@ import devManifest from './dev-manifest.json'
 /** Names the vendor programs until the app reads the signed manifest. */
 export const DEV_MANIFEST: Manifest = ManifestSchema.parse(devManifest)
 
-interface Machine {
+export interface Machine {
   userData: string
   platform: NodeJS.Platform
   arch: string

@@ -1,3 +1,4 @@
+import type {Machine} from '#modules/vendor-programs/main'
 import type {TestProject} from 'vitest/node'
 
 import {gitTargetFor} from '#modules/vendor-programs/main'
@@ -8,6 +9,8 @@ declare module 'vitest' {
   export interface ProvidedContext {
     /** The manifest's `git` for this machine, by its full path. */
     gitProgram: string
+    /** The machine the tests run on, with the cache as its data folder. */
+    machine: Machine
   }
 }
 
@@ -21,7 +24,7 @@ const cache = path.resolve(
  * same build the app does on every CI platform.
  */
 export async function setup(project: TestProject) {
-  const machine = {
+  const machine: Machine = {
     userData: cache,
     platform: process.platform,
     arch: process.arch,
@@ -46,4 +49,5 @@ export async function setup(project: TestProject) {
   }
 
   project.provide('gitProgram', programOf(target))
+  project.provide('machine', machine)
 }

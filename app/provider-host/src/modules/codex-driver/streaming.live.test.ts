@@ -2305,7 +2305,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
     const binary = fs.readFileSync(program)
 
     // A feature's name is held without its `features.` table.
-    // Linux's are the others' and one more.
+    // Linux's arguments hold every other platform's, plus `allow_login_shell`.
     const settings = codexArgs('linux')
       .filter(arg => arg !== '-c')
       .map(arg => arg.split('=')[0]?.replace(/^features\./, '') ?? '')

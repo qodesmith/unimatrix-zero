@@ -1,4 +1,4 @@
-import {DEV_MANIFEST} from '#modules/vendor-programs/main'
+import {DEV_MANIFEST, gitFolderFor} from '#modules/vendor-programs/main'
 import {execFile} from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -195,8 +195,7 @@ describe.runIf(noGit && process.platform === 'linux')(
 describe.runIf(noGit && process.platform === 'win32')(
   'on Windows with no git',
   () => {
-    /** The build's `cmd` folder: `gitFolderFor` names it by the same rule. */
-    const folder = path.dirname(inject('gitProgram'))
+    const folder = gitFolderFor(inject('machine')) ?? ''
 
     /** Runs `git` by name through PowerShell, as both Providers do there. */
     async function git(args: string[], cwd = os.tmpdir()) {

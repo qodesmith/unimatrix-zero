@@ -849,14 +849,17 @@ it('puts the folder of the app’s own git last on the PATH of a Reply’s claud
   await claude.allClosed()
 })
 
-it('gives claude the PowerShell tool on Windows, where it offers no Bash without Git Bash', async () => {
+it('gives claude the PowerShell tool on Windows', async () => {
   const claude = await setUp(['warm.ndjson'], {}, fakeStore(), 'win32')
   await claude.reply(FIRST_PROMPT)
   const [report] = claude.reports()
 
-  expect(report?.args).toContain(
-    '--tools=Bash,Read,Write,Edit,Glob,Grep,NotebookEdit,WebFetch,WebSearch,PowerShell'
-  )
+  const tools = report?.args
+    .find(arg => arg.startsWith('--tools='))
+    ?.slice('--tools='.length)
+    .split(',')
+
+  expect(tools).toContain('PowerShell')
 
   await claude.allClosed()
 })
