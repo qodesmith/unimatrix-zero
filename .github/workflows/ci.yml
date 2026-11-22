@@ -101,6 +101,75 @@ jobs:
         env:
           UZ_NO_DEVELOPER_TOOLS: '1'
 
+  linux-no-git:
+    name: Linux with no git
+    runs-on: ubuntu-latest
+    container: ubuntu:24.04
+    steps:
+      # The image has no git. setup-bun unpacks with unzip and setup-node with
+      # xz, and git's HTTPS needs the system's libcurl (ADR 0026).
+      - run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl unzip xz-utils libcurl4t64 openssl
+      # The HTTPS test serves on 127.0.0.1 with this certificate, and the
+      # system trusts it as it would a host's.
+      - name: Trust a certificate for 127.0.0.1
+        run: |
+          mkdir -p /tmp/uz-tls
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=127.0.0.1 \
+            -addext subjectAltName=IP:127.0.0.1 \
+            -keyout /tmp/uz-tls/key.pem -out /tmp/uz-tls/cert.pem
+          cp /tmp/uz-tls/cert.pem /usr/local/share/ca-certificates/uz-test.crt
+          update-ca-certificates
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - run: bun install --frozen-lockfile
+      - name: Find no git
+        run: |
+          if command -v git; then
+            echo "::error::This container has a git, so this job would test nothing."
+            exit 1
+          fi
+      # Under plain Node: Electron needs libraries a bare container lacks.
+      - run: node node_modules/vitest/vitest.mjs run --project node app/main/src/modules/git-wrapper
+        env:
+          UZ_NO_GIT: '1'
+          UZ_TLS_FOLDER: /tmp/uz-tls
+
+  windows-no-git:
+    name: Windows with no git
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - run: bun install --frozen-lockfile
+      # For this step alone, after every step that needs the runner's own git.
+      - name: Run the tests with Git for Windows off PATH
+        shell: pwsh
+        env:
+          UZ_NO_GIT: '1'
+        run: |
+          $env:PATH = ($env:PATH -split ';' | Where-Object {
+            $_ -and -not (Test-Path ([IO.Path]::Combine($_, 'git.exe')))
+          }) -join ';'
+
+          if (Get-Command git -ErrorAction SilentlyContinue) {
+            Write-Output "::error::PATH still holds a git, so this job would test nothing."
+            exit 1
+          }
+
+          bun run test:node app/main/src/modules/git-wrapper
+
   provider-checks:
     name: Provider checks on a vendor bump
     runs-on: ubuntu-latest
@@ -158,6 +227,8 @@ jobs:
         checks,
         unit,
         no-developer-tools,
+        linux-no-git,
+        windows-no-git,
         provider-checks,
         interaction-limits-renewal,
       ]
@@ -167,6 +238,8 @@ jobs:
           echo "checks: ${{ needs.checks.result }}"
           echo "unit: ${{ needs.unit.result }}"
           echo "no-developer-tools: ${{ needs.no-developer-tools.result }}"
+          echo "linux-no-git: ${{ needs.linux-no-git.result }}"
+          echo "windows-no-git: ${{ needs.windows-no-git.result }}"
           echo "provider-checks: ${{ needs.provider-checks.result }}"
           echo "interaction-limits-renewal: ${{ needs.interaction-limits-renewal.result }}"
-          test "${{ needs.checks.result }}" = success && test "${{ needs.unit.result }}" = success && test "${{ needs.no-developer-tools.result }}" = success && test "${{ needs.provider-checks.result }}" = success && test "${{ needs.interaction-limits-renewal.result }}" = success
+          test "${{ needs.checks.result }}" = success && test "${{ needs.unit.result }}" = success && test "${{ needs.no-developer-tools.result }}" = success && test "${{ needs.linux-no-git.result }}" = success && test "${{ needs.windows-no-git.result }}" = success && test "${{ needs.provider-checks.result }}" = success && test "${{ needs.interaction-limits-renewal.result }}" = success

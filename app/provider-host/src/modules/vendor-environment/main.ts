@@ -1,3 +1,5 @@
+import type {SignInRequest} from '@uz/contract/host'
+
 import {execFile} from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -82,4 +84,39 @@ export async function withDeveloperDir(
   if (await isDeveloperFolder(base.DEVELOPER_DIR)) return base
 
   return {...base, DEVELOPER_DIR: developerDir}
+}
+
+/**
+ * Puts the folder of the app's own `git` last on `PATH` (ADR 0026), so a `git`
+ * of the user's own is found first. Main names a folder on Windows and Linux
+ * alone.
+ */
+export function withGitLast(
+  base: NodeJS.ProcessEnv,
+  gitFolder: string | undefined
+) {
+  if (!gitFolder) return base
+
+  // A copy of a Windows environment holds it as `Path`.
+  const name =
+    Object.keys(base).find(key => key.toUpperCase() === 'PATH') ?? 'PATH'
+
+  const own = base[name]
+
+  return {
+    ...base,
+    [name]: own ? `${own}${path.delimiter}${gitFolder}` : gitFolder,
+  }
+}
+
+/** The host's environment with the app's own folders for this machine. */
+export async function withAppFolders(
+  base: NodeJS.ProcessEnv,
+  {developerDir, gitFolder}: Pick<SignInRequest, 'developerDir' | 'gitFolder'>,
+  hasDeveloperTools: typeof macHasDeveloperTools
+) {
+  return withGitLast(
+    await withDeveloperDir(base, developerDir, hasDeveloperTools),
+    gitFolder
+  )
 }

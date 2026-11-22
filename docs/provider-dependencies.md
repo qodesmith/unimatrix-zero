@@ -199,11 +199,11 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Id:** `claude-tools-full-access`
 - **Kind:** D
 - **Provider:** Claude
-- **Relies on:** `claude` offers the Model exactly the tools named in the SDK's `tools` list, `disallowedTools: ['Agent']` keeps the Subagent tool (listed as `Task`) out, and `permissionMode: 'bypassPermissions'` with `allowDangerouslySkipPermissions` runs every tool call in `cwd` without asking. The `claude_code` tool preset would add tools that outlive a Reply or leave the folder (cron jobs, worktrees, remote triggers).
-- **App side:** `claude-driver` names its tools for files, commands and the web, and runs every Reply in the Tree's folder with full access, until the Permission mode decides (ADR 0022). Its Reply mapper shows each tool call and its result.
+- **Relies on:** `claude` offers the Model exactly the tools named in the SDK's `tools` list that the machine can run, `disallowedTools: ['Agent']` keeps the Subagent tool (listed as `Task`) out, and `permissionMode: 'bypassPermissions'` with `allowDangerouslySkipPermissions` runs every tool call in `cwd` without asking. The `claude_code` tool preset would add tools that outlive a Reply or leave the folder (cron jobs, worktrees, remote triggers). On Windows with no Git Bash, `claude` offers no `Bash` though it is named.
+- **App side:** `claude-driver` names its tools for files, commands and the web, on Windows `PowerShell` among them (ADR 0026), and runs every Reply in the Tree's folder with full access, until the Permission mode decides (ADR 0022). Its Reply mapper shows each tool call and its result.
 - **User would see:** a Reply that can't open, write or run anything, that stalls on a permission request nothing answers, or that starts Subagents or background jobs the app can't show.
 - **Changed by:** upgrade
-- **Check:** `[dep:claude-tools-full-access]` in `claude-driver`: a Reply writes a file in the Tree's folder and runs a command there, `claude` lists exactly the named tools, so no `Agent` or `Task`, and sends no control request.
+- **Check:** `[dep:claude-tools-full-access]` in `claude-driver`: a Reply writes a file in the Tree's folder and runs a command there, `claude` lists exactly the named tools, so no `Agent` or `Task`, and sends no control request. On a Mac or Linux only: the tools on Windows are covered by `windows-powershell-keeps-path`.
 
 ### A session resumed in another folder
 
@@ -630,6 +630,39 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **User would see:** on a Mac with no developer tools, the "install developer tools" dialog the first time the AI runs `git`, `python3` or any other stub, and the command fails.
 - **Changed by:** upgrade
 - **Check:** `[dep:developer-dir-reaches-commands]` in `claude-driver` and `codex-driver`, on a Mac: with a developer folder named in the host's environment, `/usr/bin/git --version` run by the AI prints that folder's `xcrun` output. Full access only: the other Permission modes have no check until the app runs a Reply under them. That a stub honors `DEVELOPER_DIR` on a Mac with no developer tools at all is Apple's behavior, and CI's "A Mac with no developer tools" job checks it.
+
+### `claude` keeps a folder added last to `PATH`
+
+- **Id:** `claude-keeps-path`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** a folder added last to the `PATH` `claude` starts with is still on the `PATH` of each command the AI runs, and still last. `claude` gets it through the Agent SDK's `Options.env`. Anthropic doesn't document which `PATH` a command runs with.
+- **App side:** on Windows and Linux, `vendor-environment` puts the folder of the app's own `git` last on the `PATH` `claude-driver` starts `claude` with, so a `git` the AI runs is the app's own where the machine has no other (ADR 0026).
+- **User would see:** on a PC or a Linux machine with no `git`, the AI's `git` fails with "not recognized" or "command not found". If the folder moved ahead of the user's own, a developer's `git` would be replaced by the app's.
+- **Changed by:** upgrade
+- **Check:** `[dep:claude-keeps-path]` in `claude-driver`, on a Mac or Linux: with a folder added last to the host's `PATH`, a program the AI runs by name is found there, and prints that folder as the last on its `PATH`. Full access only: the other Permission modes have no check until the app runs a Reply under them.
+
+### Codex with no login shell keeps a folder added last to `PATH`
+
+- **Id:** `codex-no-login-shell`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** started with `-c allow_login_shell=false`, Codex runs each command in a shell that is not a login shell, so the system's and the user's profile don't run, and a folder added last to the `PATH` the app-server starts with is still last on the command's. Without the setting, Codex runs `/bin/bash -lc` on Linux, and Debian's `/etc/profile` sets `PATH` outright. Codex puts folders of its own first either way.
+- **App side:** on Linux, `codex-driver` starts the app-server with the setting, and `vendor-environment` puts the folder of the app's own `git` last on its `PATH` (ADR 0026). On a Mac the setting is left out: the login shell is how Codex finds the user's own tools.
+- **User would see:** on a Linux machine with no `git`, Debian among them, the AI's `git` fails with "command not found".
+- **Changed by:** upgrade
+- **Check:** `[dep:codex-no-login-shell]` in `codex-driver`, on a Mac or Linux: started with the setting and a folder added last to its `PATH`, Codex runs a program by name from that folder, which prints it as the last on its `PATH`, in a shell that reports it is no login shell. `[dep:self-updates-off]` checks the pinned build still holds the setting's name. Full access only: the other Permission modes have no check until the app runs a Reply under them.
+
+### On Windows, commands run through PowerShell and keep `PATH`
+
+- **Id:** `windows-powershell-keeps-path`
+- **Kind:** D
+- **Provider:** both
+- **Relies on:** on Windows, `claude` runs commands through its `PowerShell` tool once the tool is named, and offers no `Bash` on a PC with no Git Bash. Codex runs each command as `powershell.exe -Command`, with no login shell. Both keep a folder added last to the `PATH` they started with, after two folders Codex puts first.
+- **App side:** on Windows, `claude-driver` names `PowerShell` among `claude`'s tools, and `vendor-environment` puts the `cmd` folder of the app's own `git` last on the `PATH` of `claude` and Codex (ADR 0026).
+- **User would see:** on a PC with no Git Bash, a Claude Reply that can run no command at all. On a PC with no `git`, the AI's `git` fails with "not recognized".
+- **Changed by:** upgrade
+- **Check:** none: needs a signed-in Windows PC, which the maintainer's machine is not. The maintainer tested it by hand on Windows 11 under Full access, with `claude` 2.1.307 and Codex 0.163.0: the results are in [#278](https://github.com/qodesmith/unimatrix-zero/issues/278#issuecomment-7078343644). The other Permission modes are untested.
 
 ### A new session's setup tokens
 

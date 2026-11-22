@@ -40,6 +40,11 @@ export const SignInRequestSchema = z.strictObject({
    * `DEVELOPER_DIR` when it starts on a Mac with no developer tools.
    */
   developerDir: z.string().min(1).optional(),
+  /**
+   * On Windows and Linux, the folder that holds the app's own `git`: last on
+   * the vendor program's `PATH`, so a `git` of the user's own is found first.
+   */
+  gitFolder: z.string().min(1).optional(),
 })
 
 export type SignInRequest = z.infer<typeof SignInRequestSchema>

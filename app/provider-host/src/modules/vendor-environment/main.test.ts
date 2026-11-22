@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import {expect, it, vi} from 'vitest'
 
-import {macHasDeveloperTools, withDeveloperDir} from './main'
+import {macHasDeveloperTools, withDeveloperDir, withGitLast} from './main'
 
 const base = {PATH: '/usr/bin', HOME: '/Users/sam'}
 const folder = '/data/unimatrix-zero/developer'
@@ -116,3 +116,26 @@ it.runIf(process.platform === 'darwin')(
     ).toBe(hasTools)
   }
 )
+
+it('puts the folder of the app’s own git last on PATH, after every folder of the user’s', () => {
+  const gitFolder = path.join('/data', 'unimatrix-zero', 'git')
+
+  expect(withGitLast(base, gitFolder)).toStrictEqual({
+    ...base,
+    PATH: `/usr/bin${path.delimiter}${gitFolder}`,
+  })
+})
+
+it('adds to the Path a Windows environment holds, and to no second variable', () => {
+  const windows = {Path: String.raw`C:\Windows\System32`, HOME: base.HOME}
+  const gitFolder = String.raw`C:\data\vendor\git\cmd`
+
+  expect(withGitLast(windows, gitFolder)).toStrictEqual({
+    ...windows,
+    Path: `${windows.Path}${path.delimiter}${gitFolder}`,
+  })
+})
+
+it('leaves PATH alone where main names no folder, as on a Mac', () => {
+  expect(withGitLast(base, undefined)).toBe(base)
+})

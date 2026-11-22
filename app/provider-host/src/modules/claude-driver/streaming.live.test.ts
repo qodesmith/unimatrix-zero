@@ -22,8 +22,10 @@ import type {CompactionSettings} from '@uz/contract/settings'
 import {byPathOnly, pdfSaying, pngShowing} from '#modules/test-attachments/main'
 import {markedDeveloperFolder} from '#modules/test-developer-folder/main'
 import {heldIdle} from '#modules/test-idle/main'
+import {PATH_PROBE, markedPathFolder} from '#modules/test-path-folder/main'
 import {listenLocally, startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
+import {withGitLast} from '#modules/vendor-environment/main'
 import {query} from '@anthropic-ai/claude-agent-sdk'
 import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
@@ -1059,63 +1061,70 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 300_000)
 
-  it('[dep:claude-tools-full-access] writes a file in the Tree’s folder and runs a command there, asking nothing, with Claude Code’s tools but no Subagents, and shows each tool call', async () => {
-    const live = liveDriver(['tools.ndjson'])
+  // windows-powershell-keeps-path covers the tools on Windows.
+  it.skipIf(process.platform === 'win32')(
+    '[dep:claude-tools-full-access] writes a file in the Tree’s folder and runs a command there, asking nothing, with Claude Code’s tools but no Subagents, and shows each tool call',
+    async () => {
+      const live = liveDriver(['tools.ndjson'])
 
-    const tree = newTreeFolder()
+      const tree = newTreeFolder()
 
-    try {
-      const events = await Array.fromAsync(
-        live.driver.startReply({
-          ...live.request(TOOLS_PROMPT, null),
-          treeFolder: tree,
+      try {
+        const events = await Array.fromAsync(
+          live.driver.startReply({
+            ...live.request(TOOLS_PROMPT, null),
+            treeFolder: tree,
+          })
+        )
+
+        expect(events.at(-1)).toMatchObject({status: 'complete'})
+        expect(
+          fs.readFileSync(path.join(tree, 'notes.txt'), 'utf8').trim()
+        ).toBe('HERON')
+        expect(fs.readdirSync(tree)).toEqual(['notes.txt'])
+
+        const calls = events
+          .filter(isReplyEvent)
+          .reduce(foldReplyEvent, NEW_REPLY)
+          .content.flatMap(part => (part.type === 'tool-call' ? [part] : []))
+
+        expect(calls.map(call => call.toolName)).toEqual(['Write', 'Bash'])
+        expect(calls.every(call => call.result?.isError === false)).toBe(true)
+        expect(shownText(events)).toMatch(/HERON\s*$/)
+
+        const lines = live.printed.map(line => JSON.parse(line))
+
+        const [init] = lines.flatMap(line => {
+          const parsed = InitLine.safeParse(line)
+
+          return parsed.success ? [parsed.data] : []
         })
-      )
 
-      expect(events.at(-1)).toMatchObject({status: 'complete'})
-      expect(fs.readFileSync(path.join(tree, 'notes.txt'), 'utf8').trim()).toBe(
-        'HERON'
-      )
-      expect(fs.readdirSync(tree)).toEqual(['notes.txt'])
+        expect(init?.tools.toSorted()).toEqual(
+          [
+            'Bash',
+            'Read',
+            'Write',
+            'Edit',
+            'Glob',
+            'Grep',
+            'NotebookEdit',
+            'WebFetch',
+            'WebSearch',
+          ].toSorted()
+        )
+        expect(init?.permissionMode).toBe('bypassPermissions')
+        expect(lines.filter(line => line.type === 'control_request')).toEqual(
+          []
+        )
 
-      const calls = events
-        .filter(isReplyEvent)
-        .reduce(foldReplyEvent, NEW_REPLY)
-        .content.flatMap(part => (part.type === 'tool-call' ? [part] : []))
-
-      expect(calls.map(call => call.toolName)).toEqual(['Write', 'Bash'])
-      expect(calls.every(call => call.result?.isError === false)).toBe(true)
-      expect(shownText(events)).toMatch(/HERON\s*$/)
-
-      const lines = live.printed.map(line => JSON.parse(line))
-
-      const [init] = lines.flatMap(line => {
-        const parsed = InitLine.safeParse(line)
-
-        return parsed.success ? [parsed.data] : []
-      })
-
-      expect(init?.tools.toSorted()).toEqual(
-        [
-          'Bash',
-          'Read',
-          'Write',
-          'Edit',
-          'Glob',
-          'Grep',
-          'NotebookEdit',
-          'WebFetch',
-          'WebSearch',
-        ].toSorted()
-      )
-      expect(init?.permissionMode).toBe('bypassPermissions')
-      expect(lines.filter(line => line.type === 'control_request')).toEqual([])
-
-      await live.done()
-    } finally {
-      fs.rmSync(tree, {recursive: true, force: true})
-    }
-  }, 300_000)
+        await live.done()
+      } finally {
+        fs.rmSync(tree, {recursive: true, force: true})
+      }
+    },
+    300_000
+  )
 
   it('[dep:claude-resume-moved-folder] resumes a session from the app’s copy alone in a Tree folder other than the one it started in, and works there', async () => {
     const live = liveDriver([])
@@ -1180,6 +1189,32 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
         await live.done()
       } finally {
         fs.rmSync(developerDir, {recursive: true, force: true})
+      }
+    },
+    300_000
+  )
+
+  // The probe is a shell script.
+  it.skipIf(process.platform === 'win32')(
+    '[dep:claude-keeps-path] runs a program by name from a folder added last to the PATH claude starts with, where it is still last',
+    async () => {
+      const marker = `uz-path-${crypto.randomUUID()}`
+      const folder = markedPathFolder(marker)
+      const live = liveDriver([], {}, {}, withGitLast(process.env, folder))
+
+      try {
+        const {events} = await live.reply(
+          `Run \`${PATH_PROBE}\` with Bash, then reply with exactly what it printed.`,
+          null
+        )
+
+        expect(
+          toolCallsIn(events).map(call => call.result?.content.trim())
+        ).toContain(`${marker} ${folder}`)
+
+        await live.done()
+      } finally {
+        fs.rmSync(folder, {recursive: true, force: true})
       }
     },
     300_000

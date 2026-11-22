@@ -121,7 +121,8 @@ function edited(name: string, edit: (lines: RecordedLine[]) => RecordedLine[]) {
 async function setUp(
   recordings: string[],
   behavior: FakeClaudeOptions = {},
-  store = fakeStore()
+  store = fakeStore(),
+  platform: NodeJS.Platform = 'darwin'
 ) {
   const fake = await replayClaude()
   cleanUps.push(fake.cleanUp)
@@ -160,6 +161,7 @@ async function setUp(
       ),
     },
     hasDeveloperTools: async () => developerTools.present,
+    platform,
     whenIdle: idle.whenIdle,
     whenSilent: silence.whenIdle,
   })
@@ -184,6 +186,7 @@ async function setUp(
     },
     configDir,
     developerDir: path.join(configDir, 'developer'),
+    gitFolder: path.join(configDir, 'git'),
   }
 
   async function reply(
@@ -821,6 +824,42 @@ it('names the app’s developer folder to a claude that starts on a Mac with no 
       Object.keys(env).filter(name => name.startsWith('GIT_'))
     )
   ).toEqual([])
+
+  await claude.allClosed()
+})
+
+it('puts the folder of the app’s own git last on the PATH of a Reply’s claude and a one-shot’s, and names none of git’s own folders', async () => {
+  const claude = await setUp(['warm.ndjson', 'warm.ndjson'])
+  const last = `${process.env.PATH ?? ''}${path.delimiter}${claude.vendorProgram.gitFolder}`
+
+  await claude.reply(FIRST_PROMPT)
+  await claude.driver.runOneShot(
+    {model: 'haiku', prompt: FIRST_PROMPT, vendorProgram: claude.vendorProgram},
+    new AbortController().signal
+  )
+
+  expect(claude.environments.map(env => env.PATH)).toEqual([last])
+  expect(claude.queried.map(env => env?.PATH)).toEqual([last, last])
+  expect(
+    claude.environments.flatMap(env =>
+      Object.keys(env).filter(name => name.startsWith('GIT_'))
+    )
+  ).toEqual([])
+
+  await claude.allClosed()
+})
+
+it('gives claude the PowerShell tool on Windows', async () => {
+  const claude = await setUp(['warm.ndjson'], {}, fakeStore(), 'win32')
+  await claude.reply(FIRST_PROMPT)
+  const [report] = claude.reports()
+
+  const tools = report?.args
+    .find(arg => arg.startsWith('--tools='))
+    ?.slice('--tools='.length)
+    .split(',')
+
+  expect(tools).toContain('PowerShell')
 
   await claude.allClosed()
 })

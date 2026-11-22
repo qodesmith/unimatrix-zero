@@ -141,8 +141,12 @@ async function setUp(
   recordings: string[],
   {
     store = fakeStore(),
+    platform = 'darwin',
     ...behavior
-  }: {store?: ReturnType<typeof fakeStore>} & FakeCodexOptions = {}
+  }: {
+    store?: ReturnType<typeof fakeStore>
+    platform?: NodeJS.Platform
+  } & FakeCodexOptions = {}
 ) {
   const fake = await replayCodex()
   cleanUps.push(fake.cleanUp)
@@ -157,6 +161,7 @@ async function setUp(
   const driver = createCodexDriver({
     store: store.client,
     hasDeveloperTools: async () => developerTools.present,
+    platform,
     spawn: (command, options) => {
       environments.push(options.env)
       const child = spawnCodex(command, options)
@@ -197,6 +202,7 @@ async function setUp(
     },
     configDir,
     developerDir: path.join(configDir, 'developer'),
+    gitFolder: path.join(configDir, 'git'),
   }
 
   /** Stops the Reply after `stopAfter` text deltas. */
@@ -421,6 +427,39 @@ it('names the app’s developer folder to an app-server that starts on a Mac wit
   ).toEqual([])
 
   await codex.allClosed()
+})
+
+it('puts the folder of the app’s own git last on the PATH of the app-server, and names none of git’s own folders', async () => {
+  const codex = await setUp(['started.ndjson'])
+
+  await codex.reply(FIRST_PROMPT)
+
+  expect(codex.environments.map(env => env.PATH)).toEqual([
+    `${process.env.PATH ?? ''}${path.delimiter}${codex.vendorProgram.gitFolder}`,
+  ])
+  expect(
+    codex.environments.flatMap(env =>
+      Object.keys(env).filter(name => name.startsWith('GIT_'))
+    )
+  ).toEqual([])
+
+  await codex.allClosed()
+})
+
+it('tells the app-server to run commands without a login shell on Linux, and on no other platform', async () => {
+  const settings: boolean[] = []
+
+  for (const platform of ['linux', 'darwin', 'win32'] as const) {
+    const codex = await setUp(['started.ndjson'], {platform})
+    await codex.reply(FIRST_PROMPT)
+    const [report] = codex.reports()
+    settings.push(
+      report?.args.join(' ').includes('-c allow_login_shell=false') ?? false
+    )
+    await codex.allClosed()
+  }
+
+  expect(settings).toEqual([true, false, false])
 })
 
 it('continues the Provider session in the app-server that has it loaded, then closes when idle', async () => {

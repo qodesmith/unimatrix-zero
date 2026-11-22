@@ -15,6 +15,7 @@ import {readDevRun} from '#modules/dev/main'
 import {writeDeveloperFolder} from '#modules/developer-folder/main'
 import {createDroppedFiles} from '#modules/dropped-files/main'
 import {createGitProgram} from '#modules/git-program/main'
+import {writeGitWrapper} from '#modules/git-wrapper/main'
 import {utilityHost} from '#modules/host-process/main'
 import {createHub, registerSubscribeChannel} from '#modules/hub/main'
 import {createLayout} from '#modules/layout/main'
@@ -28,6 +29,7 @@ import {createTreeRows, createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
 import {
   developerFolderFor,
+  gitFolderFor,
   gitTargetFor,
   signInRequestFor,
 } from '#modules/vendor-programs/main'
@@ -160,6 +162,13 @@ function openWindow(db: Database) {
   // Before any host starts, so the first session's stubs find the script.
   if (developerFolder) {
     writeDeveloperFolder(developerFolder, gitTarget && programOf(gitTarget))
+  }
+
+  const gitFolder = gitFolderFor(machine)
+
+  // On Windows the folder is the build's own, which the download fills.
+  if (machine.platform === 'linux' && gitFolder && gitTarget) {
+    writeGitWrapper(gitFolder, programOf(gitTarget))
   }
 
   const gitProgram = createGitProgram({

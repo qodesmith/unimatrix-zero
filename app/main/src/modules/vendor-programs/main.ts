@@ -4,6 +4,7 @@ import type {ProviderId} from '@uz/contract/providers'
 import type {ProgramTarget} from '@uz/vendor-program'
 
 import {ManifestSchema, PlatformSchema} from '@uz/contract/manifest'
+import {programOf} from '@uz/vendor-program'
 import path from 'node:path'
 
 import devManifest from './dev-manifest.json'
@@ -11,7 +12,7 @@ import devManifest from './dev-manifest.json'
 /** Names the vendor programs until the app reads the signed manifest. */
 export const DEV_MANIFEST: Manifest = ManifestSchema.parse(devManifest)
 
-interface Machine {
+export interface Machine {
   userData: string
   platform: NodeJS.Platform
   arch: string
@@ -51,6 +52,25 @@ export function developerFolderFor({userData, platform}: Machine) {
   return platform === 'darwin' ? path.join(userData, 'developer') : null
 }
 
+/**
+ * The folder that goes last on the `PATH` of `claude` and Codex: on Windows
+ * the build's own `cmd`, on Linux the one the app's wrapper script is in.
+ */
+export function gitFolderFor(
+  machine: Machine,
+  manifest: Manifest = DEV_MANIFEST
+) {
+  const target = gitTargetFor(machine, manifest)
+
+  if (!target) return null
+
+  if (machine.platform === 'win32') return path.dirname(programOf(target))
+
+  return machine.platform === 'linux'
+    ? path.join(machine.userData, 'git')
+    : null
+}
+
 export function signInRequestFor(
   provider: ProviderId,
   machine: Machine,
@@ -58,10 +78,12 @@ export function signInRequestFor(
 ): SignInRequest {
   const {userData, platform} = machine
   const developerDir = developerFolderFor(machine)
+  const gitFolder = gitFolderFor(machine, manifest)
 
   const folders = {
     configDir: path.join(userData, 'providers', provider),
     ...(developerDir && {developerDir}),
+    ...(gitFolder && {gitFolder}),
   }
 
   const name = PROGRAMS[provider]
