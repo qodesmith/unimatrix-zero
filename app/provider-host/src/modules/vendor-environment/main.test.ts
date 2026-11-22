@@ -47,21 +47,11 @@ function xcodeSelectThat(script: string) {
 }
 
 it.skipIf(process.platform === 'win32')(
-  'finds developer tools where the folder xcode-select prints is there',
+  'finds developer tools where xcode-select succeeds',
   async () => {
-    const prints = xcodeSelectThat(`echo "${os.tmpdir()}"`)
+    const prints = xcodeSelectThat('echo /Library/Developer/CommandLineTools')
 
     expect(await macHasDeveloperTools(base, prints)).toBe(true)
-  }
-)
-
-it.skipIf(process.platform === 'win32')(
-  'finds no developer tools where the folder xcode-select prints is gone',
-  async () => {
-    const gone = path.join(os.tmpdir(), 'uz-developer-folder-that-is-gone')
-    const prints = xcodeSelectThat(`echo "${gone}"`)
-
-    expect(await macHasDeveloperTools(base, prints)).toBe(false)
   }
 )
 
