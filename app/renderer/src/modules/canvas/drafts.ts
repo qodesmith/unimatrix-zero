@@ -34,7 +34,6 @@ function isEmptyDraft({text, attachments, model}: Draft) {
   return text === '' && attachments.length === 0 && model === null
 }
 
-/** It holds a Prompt to send: text past whitespace, or a file. */
 export function holdsPrompt(draft: Draft | undefined) {
   if (!draft) return false
 
@@ -76,7 +75,6 @@ export function withDraft(drafts: Drafts, at: DraftKey, draft: Draft): Drafts {
   return {...drafts, byInput}
 }
 
-/** The draft's text with the Prompt's below it, and both sets of attachments. */
 function withPromptBelow(
   draft: Draft | undefined,
   {text, attachments}: Prompt

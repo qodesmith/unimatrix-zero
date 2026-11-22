@@ -8,15 +8,11 @@ export interface Text {
   text: string
 }
 
-/** An attachment main marked to go inline for the Provider, beside its path. */
 type InlineFile = HostAttachment & {
   inline: NonNullable<HostAttachment['inline']>
 }
 
-/**
- * What a Provider is sent, before its files are read: text, and each file
- * that goes inline, in place. Adjacent texts are lines.
- */
+/** A Prompt before its inline files are read. Adjacent texts are lines. */
 export type Piece = Text | {type: 'file'; file: InlineFile}
 
 /** What a Provider is sent, before a driver puts it in its own wire format. */
@@ -31,18 +27,13 @@ export function lines(...texts: string[]): Piece[] {
   return texts.map(text => ({type: 'text', text}))
 }
 
-/** Where the AI opens the attachment with its own tools (ADR 0022). */
 function pathLine({name, path, folder}: HostAttachment) {
   return folder
     ? `[Attached folder "${name}" is at: ${path}]`
     : `[Attached file "${name}" is saved at: ${path}]`
 }
 
-/**
- * Each attachment's path line, in the order attached, and right after it the
- * file itself when main marked it inline. Main decides that; nothing here
- * looks at a type or a size.
- */
+/** Main decides what goes inline; nothing here looks at a type or a size. */
 export function files(attached: HostAttachment[]): Piece[] {
   return attached.flatMap((file): Piece[] => {
     const {inline} = file
@@ -54,7 +45,6 @@ export function files(attached: HostAttachment[]): Piece[] {
   })
 }
 
-/** Adjacent texts become one, a line apart. */
 export function joinLines<Part extends {type: string}>(
   parts: (Part | Text)[]
 ): (Part | Text)[] {
@@ -80,7 +70,6 @@ function isText(part: {type: string}): part is Text {
   return part.type === 'text'
 }
 
-/** A Prompt's attachments go before its text, which may be empty. */
 export function prompted({text, attachments}: Prompt): Piece[] {
   return joinLines([
     ...files(attachments),

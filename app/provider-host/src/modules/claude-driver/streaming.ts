@@ -54,7 +54,6 @@ interface Live extends ClaudeSession {
   compactionSettings: CompactionSettings
   restore: Restore
   store: SessionStoreClient
-  /** Where `claude` files the session in its configuration folder. */
   projectKey: string
   /** The SDK swaps in its own configuration folder on a restore. */
   activeConfigDir: () => string
@@ -63,13 +62,11 @@ interface Live extends ClaudeSession {
 
 type Mapper = ReturnType<typeof createReplyMapper>
 
-/** The Prompt, with the Thread when it is told, as `claude` is sent it. */
 interface Sending {
   request: ReplyRequest
   content: ContentPart[]
 }
 
-/** A Reply stopped before any `claude` started has no session. */
 type Answered =
   | {session: Live; outcome: Outcome}
   | {session: null; outcome: Silent}
@@ -93,7 +90,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     )
   }
 
-  /** Waits for a closing `claude` in the session, which may still write to it. */
+  /** A closing `claude` may still write to the session, so wait for it. */
   async function filesOf(request: ReplyRequest, restore: Restore) {
     if (request.session) await warm.closed(request.session.sessionId)
 
@@ -107,7 +104,6 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       : []
   }
 
-  /** Until `claude` starts, Stop ends the Reply with nothing to interrupt. */
   async function open(
     request: ReplyRequest,
     restore: Restore,
@@ -133,8 +129,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
         stop.promise,
       ])
 
-      // A Stop asked before `open` loses the race to a `filesOf` with nothing
-      // to wait for, so `asked` is checked too.
+      // A Stop can lose the race to a `filesOf` with nothing to wait for.
       if ('silent' in ready || stop.asked) return {silent: 'stopped'}
 
       const [files, env] = ready
@@ -174,8 +169,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       ...(fork ? {forkSession: true} : {}),
       ...(upTo ? {resumeSessionAt: upTo} : {}),
       sessionStore: store,
-      // Each entry reaches the app as it is written, not at the result, so a
-      // Reply the app quits in keeps its Prompt.
+      // So a Reply the app quits in keeps its Prompt.
       sessionStoreFlush: 'eager',
       spawnClaudeCodeProcess: spawnOptions => {
         activeConfigDir = spawnOptions.env.CLAUDE_CONFIG_DIR ?? configDir
@@ -210,11 +204,6 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     })
   }
 
-  /**
-   * The Prompt goes out under the id main gave it, and main records it as it
-   * stores the entry. Stop interrupts `claude` once it is heard; before that,
-   * Stop gives up on `claude`, as the wait for it running out does.
-   */
   async function* reply(
     session: Live,
     mapper: Mapper,
@@ -280,10 +269,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     for (const file of files) session.saved.add(file.path)
   }
 
-  /**
-   * A rewind or a Retry's cut needs a new `claude` to resume at the cut, and
-   * `claude` takes a Model only as it starts.
-   */
+  /** A rewind or a Retry's cut needs a new `claude` that resumes at the cut. */
   function claimable(request: ReplyRequest): Live | null {
     const {session} = request
 
@@ -300,11 +286,6 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     return claimed
   }
 
-  /**
-   * A null session starts a new one. A warm `claude` that exited while idle is
-   * replaced; a store restore that `claude` refuses falls back to the
-   * transcript written back.
-   */
   async function* replyOnce(
     request: ReplyRequest,
     mapper: Mapper,
@@ -362,11 +343,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     }
   }
 
-  /**
-   * The one way a session is rebuilt from its Thread (ADR 0001): the exact
-   * restore first, then, for a session `claude` no longer has, a new one told
-   * the whole Thread.
-   */
+  /** Exact restore first, then a new session told the Thread (ADR 0001). */
   async function* answer(
     request: ReplyRequest,
     mapper: Mapper,

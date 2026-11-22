@@ -58,7 +58,6 @@ export interface AppServer {
   listen(listener: (notification: Notification) => void): () => void
   readonly exited: Promise<void>
   readonly hasExited: boolean
-  /** Ends `codex`'s input and waits for it to exit, killing it if stuck. */
   close(): Promise<void>
 }
 

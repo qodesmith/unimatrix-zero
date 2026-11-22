@@ -34,7 +34,6 @@ const EVENTS = {
   runFinished: {type: 'runFinished'},
 } satisfies Record<ReplyRunEvent['type'], ReplyRunEvent>
 
-/** The events besides `taken` that return anything but the same state. */
 function movedBy(state: ReplyRunState, taken: ReplyRunEvent['type'][]) {
   return Object.entries(EVENTS).flatMap(([type, event]) =>
     taken.some(one => one === type) ||

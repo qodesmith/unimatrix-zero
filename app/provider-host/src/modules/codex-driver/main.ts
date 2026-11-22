@@ -55,10 +55,6 @@ export function createCodexDriver({
   whenIdle = idleFor(IDLE_CLOSE_MS),
   timeoutMs = SIGN_IN_TIMEOUT_MS,
 }: CodexDriverOptions): ProviderDriver {
-  /**
-   * Every Thread shares the app-server, so the Mac's developer tools are
-   * looked for when it starts, not at each Thread.
-   */
   async function open(request: SignInRequest) {
     const {program, configDir} = request
 

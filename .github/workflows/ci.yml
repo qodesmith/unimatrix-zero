@@ -49,10 +49,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build
       - run: bun run test:node
-      # No --with-deps: the runner already has Chromium's libraries, and its apt
-      # mirror often stalls for minutes. Without its fonts,
-      # non-Latin text and emoji render as boxes, so add it back before writing a
-      # screenshot, text-measuring, or headed test.
+      # No --with-deps: the runner has Chromium's libraries and its apt mirror
+      # stalls. A screenshot, text-measuring or headed test needs it for fonts.
       - if: matrix.renderer
         run: bunx playwright install chromium --only-shell
         timeout-minutes: 5
@@ -71,9 +69,8 @@ jobs:
         with:
           node-version-file: .node-version
       - run: bun install --frozen-lockfile
-      # After every step that needs the runner's own tools. No step from here
-      # on runs a stub in /usr/bin without DEVELOPER_DIR: that asks for the
-      # "install developer tools" dialog (ADR 0025).
+      # After every step that needs the runner's tools: a later /usr/bin stub run
+      # without DEVELOPER_DIR opens the "install developer tools" dialog (ADR 0025).
       - name: Move Xcode and the Command Line Tools out of the way
         run: |
           set -euo pipefail
@@ -81,8 +78,6 @@ jobs:
           for tools in /Applications/Xcode*.app /Library/Developer/CommandLineTools; do
             if [[ -e $tools || -L $tools ]]; then sudo mv "$tools" "$tools.away"; fi
           done
-      # The tools are gone and the link that names their folder is still
-      # there: `xcode-select -p` fails for that Mac too.
       - name: Find no developer tools while the link to them is left
         run: bun run test:node app/provider-host/src/modules/vendor-environment
         env:
@@ -111,8 +106,6 @@ jobs:
       - run: |
           apt-get update
           apt-get install -y --no-install-recommends ca-certificates curl unzip xz-utils libcurl4t64 openssl
-      # The HTTPS test serves on 127.0.0.1 with this certificate, and the
-      # system trusts it as it would a host's.
       - name: Trust a certificate for 127.0.0.1
         run: |
           mkdir -p /tmp/uz-tls
@@ -186,7 +179,6 @@ jobs:
         with:
           node-version-file: .node-version
       - run: bun install --frozen-lockfile
-      # Re-run this job once `bun run provider-checks` has posted its result.
       - run: bun run scripts/provider-checks-gate.ts
         env:
           GITHUB_TOKEN: ${{ github.token }}

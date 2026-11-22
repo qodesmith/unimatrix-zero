@@ -11,9 +11,8 @@ function turnSlidesIn(pane: HTMLElement) {
 }
 
 /**
- * Calls `onArrived` once no Turn in the pane is sliding; returns a cancel.
- * React Flow restarts the slides as it measures the Turns, so it waits until a
- * frame passes with none.
+ * Calls `onArrived` once no Turn is sliding; returns a cancel. React Flow
+ * restarts slides as it measures Turns, so it waits for a frame with none.
  */
 export function whenTurnsArrive(pane: HTMLElement, onArrived: () => void) {
   let current = true

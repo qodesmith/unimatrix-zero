@@ -67,13 +67,10 @@ function SidebarProvider({
   const isMobile = useIsMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
 
-  // This is the internal state of the sidebar.
-  // We use openProp and setOpenProp for control from outside the component.
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen)
   const open = openProp ?? uncontrolledOpen
 
-  // No cookie: shadcn writes one for a server to read the next render's
-  // `defaultOpen`, and nothing here renders on a server.
+  // No cookie: shadcn's only serves server rendering, which this app lacks.
   const setOpen = React.useCallback(
     (value: boolean) => {
       if (setOpenProp) {
@@ -109,8 +106,6 @@ function SidebarProvider({
     return () => globalThis.removeEventListener('keydown', handleKeyDown)
   }, [toggleSidebar])
 
-  // We add a state so that we can do data-state="expanded" or "collapsed".
-  // This makes it easier to style the sidebar with Tailwind classes.
   const state = open ? 'expanded' : 'collapsed'
 
   const wrapperStyle: CssVariables = {
@@ -210,7 +205,6 @@ function Sidebar({
       data-side={side}
       data-slot="sidebar"
     >
-      {/* This is what handles the sidebar gap on desktop */}
       <div
         data-slot="sidebar-gap"
         className={cn(

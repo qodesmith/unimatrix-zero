@@ -9,7 +9,7 @@ export const PROVIDER_NAMES: Record<ProviderId, string> = {
   chatgpt: 'ChatGPT',
 }
 
-/** What a driver can do. The UI branches on these, never on the Provider. */
+/** The UI branches on these, never on the Provider. */
 export const CapabilitiesSchema = z.strictObject({
   pdfAttachments: z.boolean(),
   skillScriptsInPlainTrees: z.boolean(),
@@ -51,7 +51,6 @@ export function findModel(models: Model[], id: string) {
   )
 }
 
-/** As the Provider lists it; its id when the list doesn't know it. */
 export function modelName(models: Model[], id: string) {
   return findModel(models, id)?.name ?? id
 }
@@ -60,7 +59,6 @@ export function concreteOf(model: Model) {
   return model.resolvesTo ?? model.id
 }
 
-/** The Model a listed alias or default stands for now; any other id as is. */
 export function concreteId(models: Model[], id: string) {
   const listed = models.find(model => model.id === id)
 

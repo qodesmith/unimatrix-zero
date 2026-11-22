@@ -1,7 +1,3 @@
-/**
- * The result of `bun run provider-checks`: the comment it posts on a bump PR,
- * and the CI gate's reading of those comments.
- */
 import {z} from 'zod'
 
 export type CheckStatus = 'passed' | 'failed' | 'not run'
@@ -13,7 +9,7 @@ export interface Review {
 }
 
 export interface Result {
-  /** The commit the run checked, or null when there was no PR to post on. */
+  /** Null when there was no PR to post on. */
   head: string | null
   pinChanges: string[]
   checks: {id: string; status: CheckStatus}[]

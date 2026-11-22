@@ -6,14 +6,12 @@ function oldestFirst<T extends {createdAt: string; id: string}>(a: T, b: T) {
   return a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)
 }
 
-/** A Tree's Turns, indexed for walking it in either direction. */
 export interface TreeIndex {
   prompts: Prompt[]
   replies: Reply[]
   promptById: Map<string, Prompt>
   replyById: Map<string, Reply>
   replyByPrompt: Map<string, Reply>
-  /** Each Reply's Prompts, oldest first; the root Prompt is under null. */
   promptsByParent: Map<string | null, Prompt[]>
 }
 
@@ -73,7 +71,7 @@ export function pathTo(index: TreeIndex, turnId: string): string[] {
   return path
 }
 
-/** The Reply of the Thread's previous Exchange, whose Context size it grew from. */
+/** The Reply before this one on its Thread. */
 export function previousReply(index: TreeIndex, reply: Reply): Reply | null {
   const parentReplyId =
     index.promptById.get(reply.promptId)?.parentReplyId ?? null

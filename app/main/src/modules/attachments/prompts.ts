@@ -28,10 +28,7 @@ export function toAttachment(row: AttachmentRow): Attachment {
   }
 }
 
-/**
- * Before the Prompt is saved. An id main never gave out counts for nothing
- * here: `attachToPrompt` refuses it.
- */
+/** Call before the Prompt is saved; `attachToPrompt` refuses unknown ids. */
 export function refuseTooManyImages(db: Reader, ids: string[]) {
   if (ids.length === 0) return
 
@@ -51,7 +48,7 @@ export function refuseTooManyImages(db: Reader, ids: string[]) {
   }
 }
 
-/** In the transaction that saves the Prompt; refuses an id main never gave out. */
+/** Call in the transaction that saves the Prompt. */
 export function attachToPrompt(tx: Writer, promptId: string, ids: string[]) {
   if (ids.length === 0) return
 
@@ -72,7 +69,7 @@ export function attachToPrompt(tx: Writer, promptId: string, ids: string[]) {
     .run()
 }
 
-/** Each Prompt's rows, in order; a Prompt with none has no entry. */
+/** In order; a Prompt with none has no entry. */
 export function rowsOf(
   db: Reader,
   promptIds: string[]
@@ -97,7 +94,7 @@ export function rowsOf(
   return byPrompt
 }
 
-/** Each Prompt's attachments, in order; a Prompt with none has no entry. */
+/** In order; a Prompt with none has no entry. */
 export function attachmentsOf(
   db: Reader,
   promptIds: string[]

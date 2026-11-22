@@ -16,10 +16,7 @@ it.each([['Claude API'], ['Anthropic Pro'], ['Claude ']])(
   }
 )
 
-/**
- * Once its input closes, takes longer to exit than the SDK's 2 s, as one
- * finishing a token refresh would. It writes how it ended to `FAKE_ENDED`.
- */
+/** Takes longer than the SDK's 2 s to exit once its input closes. */
 const SESSION = `
 import fs from 'node:fs'
 const ended = how => fs.writeFileSync(process.env.FAKE_ENDED, how)

@@ -30,7 +30,6 @@ import {ChangedFiles} from './ChangedFiles'
 
 type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 
-/** A Reply's content, live while it streams; the caller owns its box. */
 export function ReplyView({reply}: {reply: Reply}) {
   const blocks = useThinking(reply.id)
   const {status, content, compacted, rebuilt} = useReply(reply)

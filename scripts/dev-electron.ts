@@ -7,10 +7,7 @@ export type DevElectronState =
   | {
       status: 'settling'
       bundle: string
-      /**
-       * Makes each rebuild a new state, so the runner re-arms the settle timer
-       * for the same bundle too.
-       */
+      /** A rebuild of the same bundle still re-arms the settle timer. */
       since: number
     }
   | {status: 'restarting'}

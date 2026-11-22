@@ -56,11 +56,6 @@ type Git = (args: string[], cwd?: string) => Promise<Ended>
 
 const identity = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com']
 
-/**
- * `init` finds the templates, and a `file://` URL goes through
- * git-upload-pack and git-receive-pack, where a plain path would copy the
- * files.
- */
 async function initPushCloneFetch(git: Git) {
   const work = temporaryFolder()
   const origin = path.join(work, 'origin.git')
@@ -78,6 +73,7 @@ async function initPushCloneFetch(git: Git) {
   await git([...identity, 'commit', '-m', 'one'], first)
   await git(['init', '--bare', '-b', 'main', origin], work)
 
+  // A plain path copies files, skipping git-upload-pack and git-receive-pack.
   const url = pathToFileURL(origin).href
   const push = await git(['push', url, 'main'], first)
   const clone = await git(['clone', url, second], work)
@@ -113,10 +109,7 @@ const PINNED_VERSION = new RegExp(
   `^git version ${DEV_MANIFEST.vendorPrograms.git.version.replaceAll('.', String.raw`\.`)}\\b`
 )
 
-/**
- * CI sets `UZ_NO_GIT` where the machine has no `git` of its own, so the app's
- * folder, last on `PATH`, is the only place a command finds one.
- */
+/** CI sets it on a machine whose only `git` is the app's, last on `PATH`. */
 const noGit = process.env.UZ_NO_GIT === '1'
 
 /** Runs `git` by name, as a command the AI runs finds it. */
@@ -128,11 +121,7 @@ function gitIn(folder: string): Git {
     })
 }
 
-/**
- * Serves a folder's files over HTTPS on 127.0.0.1, for git's dumb HTTP
- * protocol. Linux's CI job makes the certificate and adds it to the system's
- * trusted ones, so `git` checks it as it would a host's.
- */
+/** For git's dumb HTTP protocol; CI makes and trusts the certificate. */
 async function served(root: string) {
   const tls = process.env.UZ_TLS_FOLDER
 
@@ -191,7 +180,6 @@ describe.runIf(noGit && process.platform === 'linux')(
 
       const system = await git(['config', '--system', '--list'])
 
-      // A line of the build's own `etc/gitconfig`.
       expect(system.stdout).toContain(
         'credential.https://dev.azure.com.usehttppath=true'
       )
@@ -232,7 +220,6 @@ describe.runIf(noGit && process.platform === 'linux')(
       expect(waiting.stdout).toBe('')
       expect(waiting.stderr).toMatch(/^git: not ready yet: .+\n$/)
 
-      // The download unpacks elsewhere and is renamed into place.
       fs.symlinkSync(path.join(path.dirname(inject('gitProgram')), '..'), build)
 
       const ready = await git(['--version'])

@@ -567,7 +567,6 @@ describe('a one-shot', () => {
     finish(requestId, {ok: true, text: 'Too late'})
     vi.useRealTimers()
 
-    // Settled already, or only the test's own timer can end the race.
     await expect(
       Promise.race([
         settled,

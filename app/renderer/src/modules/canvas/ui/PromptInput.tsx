@@ -29,7 +29,6 @@ import {StopButton} from './StopButton'
 
 interface PromptInputProps {
   treeId: string
-  /** The Reply it continues from; null for an empty Tree's root Prompt. */
   parentReplyId: string | null
   onFocus?: () => void
   /** The Reply main started for the sent Prompt. */
@@ -61,7 +60,6 @@ function carriesFiles(event: DragEvent) {
   return event.dataTransfer.types.includes('Files')
 }
 
-/** What the picker says about the Model it shows, and why Send waits. */
 function PickNotes({pick}: {pick: ReturnType<typeof useModelPick>}) {
   if (!pick.notice && !pick.heldBecause) return null
 
@@ -73,7 +71,6 @@ function PickNotes({pick}: {pick: ReturnType<typeof useModelPick>}) {
   )
 }
 
-/** Why the files in the Input keep it from sending; null when they don't. */
 function attachmentsHeldBecause(attachments: readonly Attachment[]) {
   const tooMany = attachments.length - ATTACHMENTS_PER_PROMPT
 

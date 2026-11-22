@@ -160,7 +160,6 @@ async function renderSaved(...replies: Partial<Reply>[]) {
   return screen
 }
 
-/** The recording's events from main, the clock at 1000 + 100 ms per event. */
 function stream(from: number, upTo: number) {
   vi.useFakeTimers({toFake: ['Date']})
 

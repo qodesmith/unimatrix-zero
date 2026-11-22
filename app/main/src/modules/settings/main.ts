@@ -15,10 +15,6 @@ const KEYS = Object.keys(SettingsSchema.shape).filter(isSettingKey)
 
 export type SettingsStore = ReturnType<typeof createSettings>
 
-/**
- * One row per key, none for a key set to null; a missing row, or a value that
- * no longer fits its schema, reads as the default.
- */
 export function createSettings(
   db: Database,
   onSaved?: (saved: Settings) => void

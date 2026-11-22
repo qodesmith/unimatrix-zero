@@ -58,14 +58,13 @@ export function ChatSlideout({
   const failed = status === 'failed'
   const thread = pathTo(index, end.id)
 
-  // A failed Reply shows only as a chip; its Prompt went back to the Input of the Reply above, or the root Input.
+  // A failed Reply shows only as a chip, its Prompt back in an Input.
   const shown = failed ? thread.slice(0, -2) : thread
 
   const inputAt = failed
     ? (index.promptById.get(end.promptId)?.parentReplyId ?? null)
     : end.id
 
-  // A failed Reply's Prompt is back in the Input, so it sends nothing yet.
   const sendsFrom = inputAt === null ? undefined : index.replyById.get(inputAt)
 
   function inFieldElsewhere({target}: Event) {
@@ -79,7 +78,7 @@ export function ChatSlideout({
   function returnFocus() {
     const {activeElement} = document
 
-    // The closing panel is inert, which drops its focus to the body, so the body counts as the slideout's.
+    // The closing panel is inert, which drops focus to the body: count the body as the slideout's.
     const elsewhere =
       activeElement !== document.body &&
       !activeElement?.closest('[data-slideout]')
@@ -268,7 +267,6 @@ function ChatReply({reply}: {reply: Reply}) {
 
 interface ChatInputProps {
   ref: Ref<HTMLTextAreaElement>
-  /** Null for the root Input. */
   parentReplyId: string | null
   onFocus: () => void
   onSent: (replyId: string) => void

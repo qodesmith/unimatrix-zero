@@ -5,10 +5,7 @@ import {randomUUID} from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
-/**
- * Left out of every Snapshot unless a `.gitignore` in the folder un-ignores
- * them: one `node_modules` is hundreds of thousands of files.
- */
+/** Left out of every Snapshot unless a `.gitignore` un-ignores them. */
 const DEFAULT_EXCLUDES = [
   'node_modules/',
   '.venv/',
@@ -24,7 +21,6 @@ const DEFAULT_EXCLUDES = [
 /** The tree git gives a folder with no files, in a SHA-1 store. */
 const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
-/** A Working copy's folder, with the hidden store that keeps its Snapshots. */
 export interface VersionedFolder extends Checkout {
   store: string
 }
@@ -33,7 +29,7 @@ export function storeExists(store: string) {
   return fs.existsSync(path.join(store, 'HEAD'))
 }
 
-/** A bare store with no template, so it starts with no hook of any kind. */
+/** No template, so the store starts with no hooks. */
 async function makeStore(git: Git, store: string) {
   fs.mkdirSync(store, {recursive: true, mode: 0o700})
   await git({store}, ['init', '--bare', '--quiet', '--template=', store])
@@ -48,11 +44,7 @@ function oneLine(output: string) {
   return output.trim()
 }
 
-/**
- * The indexes a Snapshot the app quit in left beside the folder's own: its
- * lock, which would refuse every later Snapshot, and the indexes of folders
- * that are git repositories of their own.
- */
+/** A lock left by a Snapshot the app quit in refuses every later Snapshot. */
 function removeLeftovers({index}: Checkout) {
   const folder = path.dirname(index)
   const prefix = `${path.basename(index)}.`
@@ -62,10 +54,7 @@ function removeLeftovers({index}: Checkout) {
   }
 }
 
-/**
- * Git lists a folder that is a git repository of its own as its path and a
- * slash, and never the files in it.
- */
+/** Git lists a nested repository as its path and a slash, never its files. */
 async function ownRepositories(git: Git, store: string, checkout: Checkout) {
   const untracked = await git({store, checkout}, [
     'ls-files',
@@ -78,8 +67,8 @@ async function ownRepositories(git: Git, store: string, checkout: Checkout) {
 }
 
 /**
- * Staged alone, a repository of its own reads only the `.gitignore` files
- * inside it, and a file once in the index stays there through `git add`.
+ * A nested repository staged alone reads only its own `.gitignore` files, and
+ * `git add` never drops a file already in the index.
  */
 async function untrackIgnored(
   git: Git,
@@ -115,9 +104,8 @@ async function untrackIgnored(
 }
 
 /**
- * Git stores a folder that is a git repository of its own as one entry with
- * no files, and refuses one with no commit. Its files go into the index once,
- * under its path; from then on `git add` keeps them like any other file.
+ * Git stores a nested repository as an empty entry and refuses one with no
+ * commit, so its files go into the index once; `git add` keeps them after.
  */
 async function stage(git: Git, store: string, checkout: Checkout) {
   for (const repository of await ownRepositories(git, store, checkout)) {
@@ -144,9 +132,8 @@ async function treeOf(git: Git, store: string, checkout: Checkout) {
 }
 
 /**
- * The folder as it stands, under the Reply's own ref, or `parent` again when
- * nothing differs. The index persists, so git re-hashes only the files whose
- * size or modified time changed since the last Snapshot.
+ * Returns `parent` when nothing differs. The index persists so git re-hashes
+ * only files whose size or modified time changed.
  */
 export async function takeSnapshot(
   git: Git,
@@ -177,14 +164,14 @@ export async function takeSnapshot(
   return commit
 }
 
-/** A Reply's Snapshot and its parent's; a null `from` is no files at all. */
+/** A null `from` is no files at all. */
 export interface SnapshotPair {
   replyId: string
   from: string | null
   to: string
 }
 
-/** By git's status letter; a `T` is a file that became a link, or the reverse. */
+/** A `T` is a file that became a link, or the reverse. */
 function changeOf(status: string | undefined): ChangedFile['change'] | null {
   if (status === 'A') return 'created'
 
@@ -253,10 +240,7 @@ async function sizesOf(git: Git, store: string, blobs: string[]) {
   return new Map(blobs.map((blob, at) => [blob, Number(sizes[at])]))
 }
 
-/**
- * What each Reply changed, by Reply id, in three `git` runs however many pairs
- * there are. A Reply with no changes has no entry.
- */
+/** Three `git` runs however many pairs. A Reply with no changes has no entry. */
 export async function changedFiles(
   git: Git,
   store: string,

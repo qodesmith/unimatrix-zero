@@ -28,7 +28,6 @@ interface CardActions {
 interface ProviderCardProps extends CardActions {
   provider: ProviderId
   card: Card
-  /** Another Provider is being connected; only one connects at a time. */
   waitingFor: ProviderId | null
 }
 
@@ -85,7 +84,6 @@ export function ProviderCard({
   )
 }
 
-/** A card's connect flow without the card around it, for Settings. */
 export function Connect({
   provider,
   card,

@@ -11,7 +11,7 @@ export function sortTrees(trees: Tree[]) {
   return trees.toSorted(lastActiveFirst)
 }
 
-/** Folds a live event into the Trees list; applying one twice changes nothing. */
+/** Applying an event twice changes nothing. */
 export function applyEvent(trees: Tree[], event: AppEvent): Tree[] {
   if (event.type === 'TREE_DELETED') {
     return trees.filter(tree => tree.id !== event.treeId)

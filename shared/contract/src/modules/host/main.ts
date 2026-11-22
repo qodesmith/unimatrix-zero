@@ -33,25 +33,18 @@ export const SignInRequestSchema = z.strictObject({
   program: z
     .strictObject({path: z.string().min(1), build: VendorBuildSchema})
     .nullable(),
-  /** The vendor program's own configuration folder, which holds its sign-in. */
   configDir: z.string().min(1),
-  /**
-   * On a Mac, the app's own developer folder: the vendor program's
-   * `DEVELOPER_DIR` when it starts on a Mac with no developer tools.
-   */
+  /** The vendor program's `DEVELOPER_DIR` on a Mac with no developer tools. */
   developerDir: z.string().min(1).optional(),
-  /**
-   * On Windows and Linux, the folder that holds the app's own `git`: last on
-   * the vendor program's `PATH`, so a `git` of the user's own is found first.
-   */
+  /** Windows and Linux: goes last on `PATH`, so the user's own `git` wins. */
   gitFolder: z.string().min(1).optional(),
 })
 
 export type SignInRequest = z.infer<typeof SignInRequestSchema>
 
 /**
- * Keeps the session through `keepThrough` and drops `dropFrom` with all after
- * it. Each Provider cuts at the one it can; a null one leaves the session be.
+ * Keeps through `keepThrough`, drops `dropFrom` and all after. Each Provider
+ * cuts at the one it can; null leaves the session as it is.
  */
 export const SessionCutSchema = SessionRefSchema.extend({
   type: z.literal('cut'),
@@ -68,15 +61,15 @@ export const DeletionCutSchema = SessionCutSchema.extend({
 
 export type DeletionCut = z.infer<typeof DeletionCutSchema>
 
-/** The Provider session a Reply is written in, at the Reply being answered. */
+/** `messageId` is the Reply being answered. */
 export const ReplySessionSchema = z.discriminatedUnion('type', [
   SessionRefSchema.extend({type: z.literal('continue')}),
   /** The Reply already has a Prompt after it; forking spares that Branch. */
   SessionRefSchema.extend({
     type: z.literal('fork'),
     /**
-     * The entry the Provider is served the session through, when the session
-     * compacted after `messageId`: served whole, it no longer reaches it.
+     * Set when the session compacted after `messageId`: served whole, it no
+     * longer reaches it.
      */
     servedThrough: z.string().min(1).optional(),
   }),
@@ -87,27 +80,19 @@ export const ReplySessionSchema = z.discriminatedUnion('type', [
 
 export type ReplySession = z.infer<typeof ReplySessionSchema>
 
-/**
- * The Turns a Prompt continues, oldest first: what a Provider session is
- * rebuilt from. The whole Thread, never cut or summarized.
- */
+/** Oldest first, and the whole Thread: never cut or summarized. */
 export const ThreadSchema = z.array(
   z.strictObject({
     prompt: z.string(),
-    /** Each inline or not by the rules of the Provider the Thread goes to. */
     attachments: z.array(HostAttachmentSchema),
     reply: z.array(ReplyPartSchema),
-    /**
-     * Goes before the Reply's text for the AI alone, when another Model than
-     * the one the Prompt goes to wrote it. The System prompt explains it.
-     */
+    /** Shown to the AI alone, before a Reply another Model wrote. */
     label: z.string().min(1).nullable(),
   })
 )
 
 export type Thread = z.infer<typeof ThreadSchema>
 
-/** The label a Thread gives a Reply the Model named `name` wrote. */
 export function replyLabel(name: string) {
   return `[Reply written by ${name}]`
 }
@@ -137,13 +122,12 @@ export const ReplyRequestSchema = z.strictObject({
     messageId: z.uuid().pipe(UuidPartsSchema),
   }),
   vendorProgram: SignInRequestSchema,
-  /** The Tree's own folder, which exists: the AI works there. */
   treeFolder: z.string().min(1),
   /** Null starts a session. */
   session: ReplySessionSchema.nullable(),
   /**
-   * The driver rebuilds the session from it when `session` is null, or names
-   * one its Provider no longer has. Empty for a Tree's first Prompt.
+   * Rebuilds the session when `session` is null or names one the Provider no
+   * longer has. Empty for a Tree's first Prompt.
    */
   thread: ThreadSchema,
   compactionSettings: CompactionSettingsSchema,
@@ -225,10 +209,6 @@ export interface ProviderDriver {
   signInPageOpened(): void
   submitSignInCode(code: string): void
   cancelSignIn(): void
-  /**
-   * The Models the account may pick now, starting its vendor program if it
-   * must.
-   */
   listModels(vendorProgram: SignInRequest): Promise<Model[]>
   /** Lists the driver learned on its own, such as from a session it started. */
   onModelsChanged(listener: (models: Model[]) => void): void
@@ -236,11 +216,10 @@ export interface ProviderDriver {
   smallestModel(): Promise<string | null>
   readUsage(): Promise<Usage>
   /**
-   * Ends with `RUN_FINISHED`, including after `stop`. `PROMPT_DROPPED` comes
-   * once a Retry's cut drops `dropFrom`, `PROMPT_RECORDED`, from a driver that
-   * names the Prompt itself, once the session holds it, and `REPLY_RECORDED`,
-   * before the end, once the Provider saved it. Main records a Prompt stored
-   * under `prompt.messageId` as it stores the entry.
+   * Ends with `RUN_FINISHED`, even after `stop`. `PROMPT_DROPPED` comes once a
+   * Retry's cut drops `dropFrom`; `PROMPT_RECORDED` once the session holds a
+   * Prompt the driver named itself; `REPLY_RECORDED` before the end. Main
+   * records a Prompt stored under `prompt.messageId` as it stores the entry.
    */
   startReply(request: ReplyRequest): AsyncIterable<StartReplyEvent>
   stop(replyId: string): Promise<void>
@@ -258,9 +237,8 @@ export interface ProviderDriver {
     vendorProgram: SignInRequest
   }): Promise<boolean>
   /**
-   * A tiny tool-free request outside any Tree: titles, Summaries. `signal`
-   * aborts once main gives up on it; a driver still waiting on the answer
-   * then ends its vendor program.
+   * Tool-free, outside any Tree. Once `signal` aborts, a driver still waiting
+   * on the answer ends its vendor program.
    */
   runOneShot(input: OneShotRequest, signal: AbortSignal): Promise<string>
   mcpSignIn(serverId: string): Promise<void>

@@ -4,7 +4,6 @@ import {codesFor, lintFixture} from '../../lint-fixture'
 
 const RULE = 'uz(no-fixture-assertion)'
 
-/** Each case is one test file, so a report names the case that made it. */
 const cases = {
   'built-object': `
     it('waits', () => {

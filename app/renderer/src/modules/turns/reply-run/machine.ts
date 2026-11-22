@@ -2,7 +2,6 @@ import type {Transitions} from '#modules/state-machine/main'
 
 import {machine} from '#modules/state-machine/main'
 
-/** What the user has asked of a Reply's run, shared by its controls and Esc. */
 export type ReplyRunState =
   | {status: 'idle'}
   | {status: 'stopping'}

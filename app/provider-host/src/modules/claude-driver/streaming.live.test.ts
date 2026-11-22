@@ -1,13 +1,6 @@
 /**
- * Runs a real `claude` on a real plan, only on a machine where Claude was
- * connected in the app:
- *
- * UZ_LIVE_CLAUDE_PROGRAM=<userData>/vendor/claude/<version>/claude\
- * UZ_LIVE_CLAUDE_CONFIG=<userData>/providers/claude\
- * bun run test:node app/provider-host/src/modules/claude-driver/streaming.live
- *
- * `UZ_RECORD=yes` also writes `recordings/`, which the driver tests replay;
- * run one `it` with `-t` to re-record only its files.
+ * Needs a real plan and the env `bun run provider-checks` sets.
+ * `UZ_RECORD=yes` rewrites `recordings/`, which the driver tests replay.
  */
 import type {
   ReplyRecorded,
@@ -71,7 +64,6 @@ function newTreeFolder() {
   )
 }
 
-/** One Tree's folder for every Reply, as a Tree's Replies share one. */
 function treeFolder() {
   sharedTreeFolder ??= newTreeFolder()
 
@@ -135,10 +127,7 @@ function linesOf(printed: string[]) {
   return printed.map(line => OutLine.parse(JSON.parse(line)))
 }
 
-/**
- * True once `claude` has sent `api_retry` twice for one attempt, which the
- * watchdog does 30 s into an attempt's wait. Early attempts wait less.
- */
+/** `claude` repeats `api_retry` 30 s into an attempt; early ones wait less. */
 function waitsWithinAnAttempt(printed: string[]) {
   const attempts = linesOf(printed).flatMap(line =>
     line.subtype === 'api_retry' ? [line.attempt] : []
@@ -264,7 +253,6 @@ function liveDriver(
     request,
     reply,
     closed,
-    /** For each `claude` started from here on. */
     setEnv(env: Record<string, string>) {
       addedEnv = env
     },
@@ -272,7 +260,6 @@ function liveDriver(
     dropEnv(names: string[]) {
       droppedEnv = names
     },
-    /** For each Reply from here on, as main reads it from Settings. */
     setCompaction(next: CompactionSettings) {
       compactionSettings = next
     },
@@ -300,10 +287,7 @@ function reaching(session: ReplyRecorded['session']): ReplySession {
 
 type Live = ReturnType<typeof liveDriver>
 
-/**
- * Runs the real `claude` and writes to `ended` whether it exited by itself or
- * was killed. The SDK runs a `.mjs` with the `node` on PATH.
- */
+/** The SDK runs a `.mjs` with the `node` on PATH. */
 function exitWatcher(ended: string) {
   return `
 import {spawn} from 'node:child_process'
@@ -335,10 +319,7 @@ async function failedOn(live: Live, request: ReplyRequest) {
 
 const PADDING = 'The harbor log lists no ships today. '.repeat(300)
 
-/**
- * A Compaction that `fault` fails, so its Reply fails at the blocking limit.
- * The lowered limits stay set for every later `claude`.
- */
+/** The lowered limits stay set for every later `claude`. */
 async function failedCompaction(
   live: Live,
   env: Record<string, string>,
@@ -378,10 +359,6 @@ async function failedCompaction(
   return {failed, result}
 }
 
-/**
- * Three Exchanges, compacted inside the third. The threshold is lowered only
- * for them: every later `claude` starts without it.
- */
 async function compactedThread(live: Live) {
   live.setEnv({CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '0.2'})
 
@@ -460,7 +437,6 @@ function standInFailures(resets: number) {
 
 type StandInAnswer = keyof ReturnType<typeof standInFailures> | 'forward'
 
-/** Pipes a request to the real API and its answer back, unbuffered. */
 function forward(request: http.IncomingMessage, response: http.ServerResponse) {
   const upstream = https.request(
     `https://api.anthropic.com${request.url ?? '/'}`,
@@ -478,12 +454,6 @@ function forward(request: http.IncomingMessage, response: http.ServerResponse) {
   request.pipe(upstream)
 }
 
-/**
- * Stands in for the API at `ANTHROPIC_BASE_URL`: every Messages request gets
- * the `answer` failure, or goes on to the real API for `'forward'`, and every
- * other request goes on to it. A five-hour limit carries the headers the
- * servers send with one.
- */
 async function startStandInApi(answer: StandInAnswer = 'five-hour') {
   // One reset for every request, so each failure names the same time.
   const resets = Math.floor(Date.now() / 1000) + 2 * HOUR_IN_SECONDS
@@ -516,7 +486,6 @@ async function startStandInApi(answer: StandInAnswer = 'five-hour') {
     url: await listenLocally(server),
     /** In seconds since the epoch. */
     resets,
-    /** For each Messages request from here on. */
     answer(next: StandInAnswer) {
       current = next
     },
@@ -1457,7 +1426,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
       proxy.letThrough()
 
-      // As main continues a stopped Reply its Provider never saved: from the Reply above.
+      // As main does for a stopped Reply never saved.
       const above =
         events.find(
           (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'

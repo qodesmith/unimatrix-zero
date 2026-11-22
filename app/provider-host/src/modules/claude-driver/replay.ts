@@ -28,19 +28,12 @@ export interface FakeClaudeOptions {
   toolResult?: string
   /** Refuses to resume from the SDK's temporary folder. */
   refuseStore?: boolean
-  /** Refuses to resume at an entry, as for one off the newest chain. */
   refuseResumeAt?: boolean
   /** Keeps it going once its input closes, until this file exists. */
   holdExit?: string
-  /**
-   * Writes nothing more, as on a stalled network, from this Prompt of the nth
-   * run, both counted from 0.
-   */
+  /** Goes silent from this Prompt of this run, both counted from 0. */
   silentFrom?: {run: number; prompt: number}
-  /**
-   * Holds the rest of its answer after its first text delta, until this file
-   * exists.
-   */
+  /** Holds the rest of its answer until this file exists. */
   holdAfterFirstDelta?: string
 }
 
@@ -65,9 +58,7 @@ export const FakeClaudeRunSchema = z.strictObject({
   configDir: z.string(),
   developerDir: z.string().nullable(),
   cwd: z.string(),
-  /** The runs, by n, still going when this one started. */
   runningAtStart: z.array(z.number()),
-  /** Each Prompt's `content`: its text, or its blocks when files go with it. */
   prompts: z.array(
     z.union([z.string(), z.array(z.looseObject({type: z.string()}))])
   ),
@@ -78,7 +69,6 @@ export const FakeClaudeRunSchema = z.strictObject({
   appendedPrompt: z.string().nullable(),
   /** False when `claude` renders the System prompt afresh each request. */
   promptSnapshot: z.boolean().nullable(),
-  /** The entry uuids of the transcript it resumed. */
   resumedFrom: z.array(z.string()),
   toolResults: z.array(z.string()),
   /** The subtype of each control request it took after it went silent. */

@@ -1,10 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-/**
- * Removes a test's folder, hidden store included. Git writes its objects
- * read-only, and Windows refuses to delete a read-only file.
- */
+/** Git writes objects read-only, and Windows won't delete a read-only file. */
 export function removeFolder(folder: string) {
   const entries = fs.readdirSync(folder, {recursive: true, withFileTypes: true})
 

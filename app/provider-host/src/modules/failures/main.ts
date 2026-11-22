@@ -6,19 +6,12 @@ import type {RunFailure} from '@uz/contract/turns'
 
 import {z} from 'zod'
 
-/** The operating system's text for a full disk, whatever wrote the file. */
 const DISK_FULL = /ENOSPC|no space left|disk (?:is )?full/i
 
-/**
- * A Model the pinned vendor program is too old for (ADR 0008), in OpenAI's
- * wording, assumed the same for Claude Code. No typed code marks it.
- */
+/** OpenAI's wording, assumed the same for Claude Code; no typed code marks it. */
 const NEEDS_APP_UPDATE = /requires a newer version of (?:Codex|Claude Code)\b/i
 
-/**
- * The `data` of an error Codex refused a request with. It counts Unicode code
- * points, summed over the request's text.
- */
+/** Codex counts chars as Unicode code points, summed over the request's text. */
 export const RefusalSchema = z.looseObject({
   input_error_code: z.string().optional(),
   max_chars: z.number().int().nonnegative().optional().catch(undefined),
@@ -41,30 +34,23 @@ export function isBusyStatus(status: number | null) {
   return status === 429 || status === 529
 }
 
-/** What `claude` reported over a Reply that failed, beside its message. */
 export interface ClaudeSignals {
   terminalReason?: TerminalReason | undefined
-  /** The result's; null when no response came. */
+  /** Null when no response came. */
   apiErrorStatus?: number | null | undefined
   /** The last `api_retry`'s `error_status`; undefined when none came. */
   retryStatus?: number | null | undefined
-  /** The last assistant message's `error`. */
   assistantError?: SDKAssistantMessageError | undefined
-  /**
-   * Set when the last `rate_limit_event` was rejected; in seconds since the
-   * epoch.
-   */
+  /** Set when the last `rate_limit_event` was rejected; in epoch seconds. */
   rejectedLimit?: {resetsAt?: number | undefined} | undefined
-  /** The last Compaction `status` message said it failed. */
   compactionFailed?: boolean | undefined
 }
 
-/** What Codex reported over a turn that failed, beside its message. */
 export interface CodexSignals {
   codexErrorInfo?: unknown
   /** The `codexErrorInfo` of the last `error` notification with `willRetry`. */
   retryErrorInfo?: unknown
-  /** From the rate-limit snapshot, in seconds since the epoch. */
+  /** From the rate-limit snapshot, in epoch seconds. */
   resetsAt?: number | undefined
 }
 
@@ -96,7 +82,6 @@ function limitReached(message: string, resetsAt?: number): RunFailure {
       }
 }
 
-/** The kinds no typed field marks, else a provider error. */
 function byWording(message: string): RunFailure {
   if (NEEDS_APP_UPDATE.test(message)) return {code: 'needs-app-update', message}
 

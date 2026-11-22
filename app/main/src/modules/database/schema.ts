@@ -54,18 +54,11 @@ export const prompts = sqliteTable('prompts', {
   createdAt: createdAt(),
 })
 
-/**
- * One per add: the same file added twice gets two, each with its own name. A
- * folder is its path alone: the app keeps no copy of it.
- */
+/** One row per add, so a file added twice gets two. */
 export const attachments = sqliteTable('attachments', {
   id: id(),
-  /**
-   * Names the folder under `userData/attachments/` that holds the copy, which
-   * adds of the same bytes share. Null for a folder.
-   */
+  /** Its shared folder under `userData/attachments/`; null for a folder. */
   sha256: text('sha256'),
-  /** The copy's file name, so the path the AI gets ends in it. */
   name: text('name').notNull(),
   mediaType: text('media_type', {
     enum: [
@@ -80,16 +73,12 @@ export const attachments = sqliteTable('attachments', {
     ],
   }).notNull(),
   size: integer('size').notNull(),
-  /**
-   * The smaller copy sent inline in a large image's place; all three null
-   * when the image goes as it is, and for any other file.
-   */
+  /** A smaller copy sent in a large image's place; all three null if none. */
   shrunkSha256: text('shrunk_sha256'),
   shrunkMediaType: text('shrunk_media_type', {
     enum: ['image/png', 'image/jpeg'],
   }),
   shrunkSize: integer('shrunk_size'),
-  /** A folder's own path; null for a file. */
   folderPath: text('folder_path'),
   createdAt: createdAt(),
 })
@@ -104,7 +93,7 @@ export const promptAttachments = sqliteTable(
     attachmentId: text('attachment_id')
       .notNull()
       .references(() => attachments.id),
-    /** Its place among the Prompt's attachments, from 0. */
+    /** From 0. */
     position: integer('position').notNull(),
   },
   table => [
@@ -131,49 +120,39 @@ export const replies = sqliteTable(
       enum: ['streaming', 'complete', 'stopped', 'failed', 'interrupted'],
     }).notNull(),
     content: text('content', {mode: 'json'}).notNull().$type<unknown[]>(),
-    /** Why it failed, as `RunFailureSchema`; null unless it did. */
+    /** As `RunFailureSchema`; null unless the Reply failed. */
     failure: text('failure', {mode: 'json'}),
     systemPromptId: text('system_prompt_id')
       .notNull()
       .references(() => systemPrompts.id),
     sessionId: text('session_id'),
     sessionMessageId: text('session_message_id'),
-    /** Its Prompt in the Provider session, kept if the Reply never finished. */
+    /** Kept even if the Reply never finished. */
     sessionPromptId: text('session_prompt_id'),
     /**
-     * The first session Prompt of Turns deleted below it that the session still
-     * holds; the next Prompt from it cuts there, unless its Provider cut first.
+     * The first Prompt of deleted Turns still in the session; the next send
+     * cuts there unless its Provider cut first.
      */
     sessionDropFrom: text('session_drop_from'),
     contextSize: integer('context_size'),
     contextWindow: integer('context_window'),
     rebuilt: integer('rebuilt', {mode: 'boolean'}).notNull().default(false),
-    /**
-     * Its Snapshot in the Tree's hidden store: its parent's again when it
-     * changed no file. Null while the Tree has no files, and until it finishes.
-     */
+    /** Its parent's if no file changed; null with no files or until done. */
     snapshotCommit: text('snapshot_commit'),
-    /**
-     * Why a finished Reply has no Snapshot: the Tree had no files yet, or
-     * taking it failed. Null too when the app quit before taking it.
-     */
+    /** Null too when the app quit before taking the Snapshot. */
     noSnapshot: text('no_snapshot', {enum: ['no-files', 'failed']}),
     createdAt: createdAt(),
   },
   table => [uniqueIndex('replies_prompt_id').on(table.promptId)]
 )
 
-/**
- * Kept against the Provider session, which can still hold the Compaction after
- * the Reply it happened in is deleted or retried.
- */
+/** Keyed to the session, which keeps the Compaction after its Reply goes. */
 export const compactions = sqliteTable('compactions', {
   id: id(),
   provider: text('provider', {enum: ['claude', 'chatgpt']}).notNull(),
   sessionId: text('session_id').notNull(),
   /** Claude's boundary entry in the session; Codex reports none. */
   boundaryId: text('boundary_id'),
-  /** The Reply the Thread marks; null once that Reply is deleted or retried. */
   replyId: text('reply_id').references(() => replies.id, {
     onDelete: 'set null',
   }),
@@ -188,20 +167,16 @@ function sessionKey() {
   }
 }
 
-/**
- * Every entry as the vendor program wrote it, in order, never parsed or edited
- * (ADR 0004).
- */
+/** Each entry as the vendor program wrote it, never parsed or edited (ADR 0004). */
 export const sessionEntries = sqliteTable(
   'session_entries',
   {
     id: id(),
     ...sessionKey(),
-    /** A Subagent's transcript inside the session; '' for the session's own. */
+    /** A Subagent's transcript; '' for the session's own. */
     subpath: text('subpath').notNull(),
-    /** Its place in the transcript, from 0. */
+    /** From 0. */
     position: integer('position').notNull(),
-    /** The vendor's own entry id, which appends are deduplicated on. */
     uuid: text('uuid'),
     entry: blob('entry', {mode: 'buffer'}).notNull(),
   },
@@ -250,7 +225,7 @@ export const providers = sqliteTable(
     email: text('email').notNull(),
     plan: text('plan').notNull(),
     connectedAt: integer('connected_at', {mode: 'timestamp_ms'}).notNull(),
-    /** As the Provider last listed them, as `ModelSchema`. */
+    /** As `ModelSchema`. */
     models: text('models', {mode: 'json'}).notNull().default([]),
   },
   table => [uniqueIndex('providers_provider').on(table.provider)]

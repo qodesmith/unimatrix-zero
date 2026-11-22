@@ -85,7 +85,6 @@ function Confirmation({
 
 interface DeleteControlProps {
   label: string
-  /** Shown only while the pointer or focus is on the Prompt. */
   idle: boolean
   onClick: () => void
   children: ReactNode
@@ -153,7 +152,6 @@ interface PromptBoxProps {
   children: ReactNode
 }
 
-/** The delete control overlays its corner, shifting nothing on the canvas. */
 export function PromptBox({promptId, className, children}: PromptBoxProps) {
   const {index} = useCanvas()
   const isRoot = index.promptById.get(promptId)?.parentReplyId === null

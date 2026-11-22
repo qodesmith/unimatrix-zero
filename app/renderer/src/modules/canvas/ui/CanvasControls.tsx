@@ -16,12 +16,11 @@ import {TooltipButton} from './TooltipButton'
 interface CanvasControlsProps {
   orientation: CanvasOrientation
   onOrientation: (orientation: CanvasOrientation) => void
-  /** Replies being written, oldest first. */
+  /** Oldest first. */
   streaming: string[]
-  /** Replies that failed, oldest first. */
+  /** Oldest first. */
   failed: string[]
   onJump: (replyId: string) => void
-  /** Null while there is no Active Thread to zoom to. */
   onZoomToActive: (() => void) | null
   showMap: boolean
   onToggleMap: () => void
@@ -34,7 +33,6 @@ const LABELS: Record<CanvasOrientation, string> = {
   horizontal: 'Horizontal',
 }
 
-/** Off the canvas, so it never covers a Turn. */
 export function CanvasControls({
   orientation,
   onOrientation,

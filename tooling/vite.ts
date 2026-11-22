@@ -71,10 +71,7 @@ export function nodeBundle({
   }
 }
 
-/**
- * A sandboxed preload can only `require('electron')`, so fail the build if the
- * bundle leans on anything else.
- */
+/** A sandboxed preload can only `require('electron')`. */
 export function selfContainedPreload(): Plugin {
   return {
     name: 'uz:self-contained-preload',

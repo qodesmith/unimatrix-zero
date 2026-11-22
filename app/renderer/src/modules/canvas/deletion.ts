@@ -4,12 +4,9 @@ import {useCallback, useState} from 'react'
 
 import {branchesOf, newestReply, turnsFrom} from './tree'
 
-/** A Prompt confirmed for deletion, and what the canvas does once it's gone. */
 interface Deletion {
   promptId: string
-  /** Null for the root Prompt. */
   parentReplyId: string | null
-  /** The Active Thread ran through the Prompt, so it moves up to the parent. */
   activeBelow: boolean
   /** The parent stops being a Fork, so its pill goes and its box shrinks. */
   resizes: boolean

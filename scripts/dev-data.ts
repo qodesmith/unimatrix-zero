@@ -1,8 +1,3 @@
-/**
- * The data folder `bun run dev` gives each checkout, so each worktree keeps
- * its own sign-ins and vendor programs, and which of those folders, with
- * their Claude Keychain entries, `bun run dev-data:prune` deletes.
- */
 import {createHash} from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
@@ -14,7 +9,6 @@ function shortHash(text: string) {
   return createHash('sha256').update(text).digest('hex').slice(0, 8)
 }
 
-/** A short hash of the checkout's path, which also spreads its dev ports. */
 export function checkoutHash(root: string) {
   return shortHash(root)
 }
@@ -36,15 +30,13 @@ export function appData() {
   return process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), '.config')
 }
 
-/** This checkout's real-Provider dev data, as `bun run dev` left it. */
 export function devUserData(root: string) {
   return path.join(appData(), devDataFolderName(root, false))
 }
 
 /**
- * `claude` hashes a non-default config folder into its Keychain item's name
- * (`resume-config-swap-keychain`). The Keychain is macOS-only, so the path is
- * joined POSIX-style on every platform.
+ * `claude` names its Keychain item after a hash of a non-default config folder.
+ * The Keychain is macOS-only, so the path joins POSIX-style everywhere.
  */
 function claudeKeychainOf(appDataPath: string, folder: string) {
   const configDir = path.posix.join(appDataPath, folder, 'providers', 'claude')
@@ -59,10 +51,6 @@ interface PruneInput {
   keychainServices: string[]
 }
 
-/**
- * The dev folders of checkouts that are gone, each with its Claude Keychain
- * entry, and the Claude entries no dev folder owns, which are left alone.
- */
 export function planPrune({
   appDataPath,
   checkouts,

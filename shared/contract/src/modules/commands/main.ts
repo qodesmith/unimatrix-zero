@@ -45,7 +45,7 @@ export const TreeRenameCommand = z.strictObject({
   title: z.string().trim().min(1).max(TREE_TITLE_MAX_LENGTH),
 })
 
-/** The Tree and every Turn in it, for good, once its streaming Replies stop. */
+/** For good, once its streaming Replies stop. */
 export const TreeDeleteCommand = z.strictObject({
   type: z.literal('tree.delete'),
   treeId: z.uuid(),
@@ -91,10 +91,7 @@ export type TurnIds = z.infer<typeof TurnIdsSchema>
 export const PromptSendResult = z.strictObject({
   prompt: PromptSchema,
   reply: ReplySchema,
-  /**
-   * The failed Prompts and Replies the new Prompt took the place of, with any
-   * Turns below them.
-   */
+  /** The failed Turns the new Prompt replaced, with every Turn below them. */
   removed: TurnIdsSchema,
 })
 
@@ -107,10 +104,7 @@ export const PromptDeleteCommand = z.strictObject({
 
 export const PromptDeleteResult = TurnIdsSchema
 
-/**
- * Keeps the text so far. The Reply ends with its `RUN_FINISHED` once the
- * Provider has let go of the turn.
- */
+/** Keeps the text so far; `RUN_FINISHED` follows once the Provider lets go. */
 export const ReplyStopCommand = z.strictObject({
   type: z.literal('reply.stop'),
   treeId: z.uuid(),
@@ -134,7 +128,6 @@ export const ProviderConnectCommand = z.strictObject({
   provider: ProviderIdSchema,
 })
 
-/** Opens the connecting Provider's sign-in page again, which shows a code. */
 export const SignInOpenPageCommand = z.strictObject({
   type: z.literal('sign-in.open-page'),
   provider: ProviderIdSchema,
@@ -162,9 +155,8 @@ export const ImageLoadResult = z.strictObject({
 })
 
 /**
- * Keeps a copy of the file for good, for a Prompt to send. A dropped or picked
- * file comes by the id `registerDroppedFile` gave it; a pasted one, which has
- * no path, by its bytes. A dropped folder is kept as its path alone.
+ * A dropped or picked file comes by the id `registerDroppedFile` gave it; a
+ * pasted one, with no path, by its bytes. A folder is kept as its path alone.
  */
 export const AttachmentAddCommand = z.strictObject({
   type: z.literal('attachment.add'),
@@ -178,10 +170,7 @@ export const AttachmentAddCommand = z.strictObject({
         .refine(bytes => bytes.byteLength <= ATTACHMENT_SIZE_LIMIT),
     }),
   ]),
-  /**
-   * The window's smaller copy of an image over `INLINE_IMAGE_PIXELS` or
-   * `INLINE_IMAGE_SIZE_LIMIT`, to send inline in the original's place.
-   */
+  /** The window's shrunk copy of a too-large image, sent inline instead. */
   shrunk: z
     .instanceof(Uint8Array)
     .refine(bytes => bytes.byteLength <= INLINE_IMAGE_SIZE_LIMIT)

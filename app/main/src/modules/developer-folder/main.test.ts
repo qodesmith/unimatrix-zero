@@ -21,12 +21,7 @@ function temporaryFolder() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'uz developer folder '))
 }
 
-/**
- * Runs one of Apple's stubs in `/usr/bin` the way a command the AI runs finds
- * it: by name, with only `DEVELOPER_DIR` naming the app's folder. Never
- * without `DEVELOPER_DIR`, which on a Mac with no developer tools opens the
- * install dialog.
- */
+/** Without `DEVELOPER_DIR`, a Mac with no developer tools opens a dialog. */
 async function stub(
   developerDir: string,
   tool: string,
@@ -94,8 +89,7 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     await stub(folder, 'git', [...identity, 'commit', '-m', 'one'], first)
     await stub(folder, 'git', ['init', '--bare', '-b', 'main', origin], work)
 
-    // A `file://` URL goes through git-upload-pack and git-receive-pack, where
-    // a plain path would copy the files.
+    // A plain path copies files, skipping git-upload-pack and git-receive-pack.
     const url = `file://${origin}`
     const push = await stub(folder, 'git', ['push', url, 'main'], first)
 
@@ -123,7 +117,6 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
 
     const system = await stub(folder, 'git', ['config', '--system', '--list'])
 
-    // A line of the build's own `etc/gitconfig`.
     expect(system.stdout).toContain(
       'credential.https://dev.azure.com.usehttppath=true'
     )
@@ -183,7 +176,6 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     expect(waiting.stdout).toBe('')
     expect(waiting.stderr).toMatch(/^git: not ready yet: .+\n$/)
 
-    // The download unpacks elsewhere and is renamed into place.
     fs.symlinkSync(path.join(path.dirname(inject('gitProgram')), '..'), build)
 
     const ready = await stub(folder, 'git', ['--version'])

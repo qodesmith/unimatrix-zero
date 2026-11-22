@@ -3,20 +3,13 @@ import type {ProgramTarget, getProgramReady} from '@uz/vendor-program'
 import {programOf} from '@uz/vendor-program'
 
 interface GitProgramDeps {
-  /** The manifest's `git` for this machine, and where it goes; null if none. */
   target: ProgramTarget | null
   getProgramReady: typeof getProgramReady
-  /**
-   * Tells the user that Snapshots start once the download finishes; false when
-   * no window was there to hear it.
-   */
+  /** False if no window heard. */
   onWaiting: () => boolean
 }
 
-/**
- * The app's own `git` (ADR 0024), downloaded like the other vendor programs.
- * Until it is in place no Snapshot is taken.
- */
+/** The app's own `git`: no Snapshot is taken until it's in place (ADR 0024). */
 export function createGitProgram({
   target,
   getProgramReady,
@@ -47,13 +40,11 @@ export function createGitProgram({
   }
 
   return {
-    /** The `git` to run by its full path, or null while it isn't in place. */
     program: () => (target && inPlace ? programOf(target) : null),
 
-    /** Downloads it unless it is in place or downloading. Never rejects. */
+    /** Never rejects. */
     prepare,
 
-    /** A Snapshot wasn't taken for want of it. */
     snapshotWaited() {
       if (!target) return
 

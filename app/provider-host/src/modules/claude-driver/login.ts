@@ -17,7 +17,6 @@ export interface Login {
   kill(): void
 }
 
-/** The first whole link `claude` prints, without terminal hyperlink escapes. */
 // oxlint-disable-next-line no-control-regex -- BEL and ESC end a terminal hyperlink
 const LINK = /https:\/\/[^\s\u0007\u001b]+(?=[\s\u0007\u001b])/
 

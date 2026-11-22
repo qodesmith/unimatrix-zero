@@ -34,7 +34,6 @@ export function useReply(reply: Reply | null) {
   )
 }
 
-/** Whether a Reply in the Tree is streaming in this window now. */
 export function useTreeStreaming(treeId: string) {
   return useSelector(useReplyStore(), state =>
     Object.values(state.replies).some(reply => reply.treeId === treeId)
@@ -51,7 +50,6 @@ export function useThinking(replyId: string) {
   )
 }
 
-/** What the streaming Reply waits on, if it waits. */
 export function useWaiting(replyId: string) {
   return useSelector(useReplyStore(), state => state.waiting[replyId])
 }

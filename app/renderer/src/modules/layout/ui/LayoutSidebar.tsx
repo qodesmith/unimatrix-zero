@@ -107,8 +107,7 @@ export function LayoutSidebar({sidebar, children}: LayoutSidebarProps) {
             collapsible="none"
             role="complementary"
             inert={!open}
-            // Closed, opening or closing, it keeps its width and slides out
-            // past the Panel's left edge.
+            // Closed or toggling, it keeps its width and slides past the Panel's edge.
             className={cn(
               'w-full shrink-0 border-r border-sidebar-border in-data-toggling:w-(--sidebar-width)',
               !open && 'w-(--sidebar-width)'

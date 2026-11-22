@@ -163,8 +163,8 @@ function useInputState(reply: Reply | null, hovered: boolean): InputState {
 
 /**
  * Slid up behind the box above, not unmounted, so revealing it shifts nothing.
- * It starts a corner's radius up inside the box, so it fills the corners as
- * they square.
+ * It starts a corner's radius inside the box to fill the corners as they
+ * square.
  */
 function ReplyInput({
   reply,
@@ -246,10 +246,7 @@ function useHovered() {
   }
 }
 
-/**
- * `text-base` overrides Card's text-sm, so the text follows the font size
- * Setting.
- */
+/** `text-base` overrides Card's text-sm so text follows the font size Setting. */
 function replyFrame(status: Reply['status'], joined: boolean) {
   return cn(
     'relative z-10 gap-0 rounded-xl border border-border py-0 text-base shadow-sm ring-0 transition-[border-radius,border-color] duration-slide ease-slide motion-reduce:transition-none',
@@ -258,7 +255,6 @@ function replyFrame(status: Reply['status'], joined: boolean) {
   )
 }
 
-/** Vertical: a Prompt on its own. */
 export function PromptNode({data}: NodeProps<TurnNode>) {
   const {turn} = data
 
@@ -282,7 +278,6 @@ export function PromptNode({data}: NodeProps<TurnNode>) {
   )
 }
 
-/** Vertical: a Reply on its own. */
 export function ReplyNode({data}: NodeProps<TurnNode>) {
   const {turn} = data
   const {hovered, hoverProps} = useHovered()
@@ -327,7 +322,6 @@ function ReplyTurn({reply, joined}: {reply: Reply; joined: boolean}) {
   )
 }
 
-/** Horizontal: a Prompt and its Reply in one card. */
 export function ExchangeNode({data}: NodeProps<TurnNode>) {
   const {turn} = data
   const {hovered, hoverProps} = useHovered()
@@ -390,7 +384,6 @@ function ExchangeTurns({
   )
 }
 
-/** The Input a failed root Prompt went back to, with nothing above it. */
 function RootInput({failedReplyId}: {failedReplyId: string}) {
   const {treeId, onInputFocus, onSent, drafts, setDraft} = useCanvas()
 
@@ -408,7 +401,6 @@ function RootInput({failedReplyId}: {failedReplyId: string}) {
   )
 }
 
-/** Either orientation: a failed Reply and its Prompt as one chip. */
 export function FailedNode({data}: NodeProps<TurnNode>) {
   const {turn} = data
   const vertical = useSettings().canvasOrientation === 'vertical'

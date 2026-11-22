@@ -122,8 +122,8 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   }
 
   /**
-   * Drops `beforeTurnId` and every turn after it. The new rollout points into
-   * the old one, maybe past the app's copy, so the old one is saved again.
+   * The new rollout points into the old one, maybe past the app's copy, so
+   * save the old one again.
    */
   async function revert(
     running: Running,
@@ -236,7 +236,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       threshold
     )
 
-    // The rollout on disk was kept: it holds the Reply cut short.
     return cut(resumed)
   }
 

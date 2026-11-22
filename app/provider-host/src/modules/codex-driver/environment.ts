@@ -1,12 +1,11 @@
 import {vendorEnvironment} from '#modules/vendor-environment/main'
 
 /**
- * `project_doc_max_bytes=0` keeps `AGENTS.md` out of a Thread. A project's
- * `.codex/config.toml` loads only if `CODEX_HOME`'s `config.toml` trusts it,
- * which the app never writes. `cli_auth_credentials_store="file"` keeps the
- * sign-in in `CODEX_HOME`, inside the data folder, should Codex's default move
- * to the Keychain. `features.multi_agent=false` leaves Subagents out until the
- * app can show them.
+ * `project_doc_max_bytes=0` keeps `AGENTS.md` out. A project's
+ * `.codex/config.toml` loads only if `CODEX_HOME` trusts it, which the app
+ * never writes. The `file` store keeps the sign-in in `CODEX_HOME` should
+ * Codex's default move to the Keychain. Subagents stay off until the app can
+ * show them.
  */
 const CODEX_ARGS = [
   '-c',
@@ -20,9 +19,8 @@ const CODEX_ARGS = [
 ]
 
 /**
- * In a login shell, Debian's `/etc/profile` drops the folder of the app's own
- * `git` from `PATH` (ADR 0026). On a Mac the login shell is how Codex finds the
- * user's tools.
+ * Debian's `/etc/profile` drops the app's `git` from a login shell's `PATH`
+ * (ADR 0026). A Mac needs the login shell to find the user's tools.
  */
 export function codexArgs(platform: NodeJS.Platform) {
   return platform === 'linux'
@@ -30,7 +28,6 @@ export function codexArgs(platform: NodeJS.Platform) {
     : CODEX_ARGS
 }
 
-/** The host's environment, minus anything that could outrank the subscription. */
 export function codexEnvironment(base: NodeJS.ProcessEnv, codexHome: string) {
   return {...vendorEnvironment(base), CODEX_HOME: codexHome}
 }

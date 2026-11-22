@@ -72,9 +72,8 @@ export function turnOf(notification: Notification) {
 }
 
 /**
- * When a finished message differs from what streamed, its text replaces it.
- * Reasoning is passed on for display and never kept. The text tracked is the
- * current text part's, which a tool call ends.
+ * A finished message's text replaces what streamed. Reasoning is shown, never
+ * kept. A tool call ends the tracked text part.
  */
 export function createReplyMapper(ids: ReplyIds) {
   let shown = ''

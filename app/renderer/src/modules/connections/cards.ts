@@ -21,10 +21,7 @@ export interface ConnectionsState {
   loaded: boolean
   statuses: ProviderStatus[]
   signIn: SignInStep | null
-  /**
-   * The connect reached a page with a code, so the card lists that step.
-   * False whenever no connect is under way, so a read needn't check `signIn`.
-   */
+  /** True from the code page on; false while no connect is under way. */
   pasting: boolean
   failures: Partial<Record<ProviderId, SignInFailure>>
   models: Record<ProviderId, Model[]>
@@ -51,7 +48,6 @@ function withoutFailure(state: ConnectionsState, provider: ProviderId) {
   )
 }
 
-/** Shows a failure on the Provider's card until it connects again. */
 export function withFailure(
   state: ConnectionsState,
   provider: ProviderId,

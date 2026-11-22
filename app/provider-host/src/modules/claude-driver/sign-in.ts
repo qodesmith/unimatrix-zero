@@ -56,7 +56,6 @@ export interface ClaudeSignInDeps {
     command: ClaudeCommand,
     env: Record<string, string>
   ) => Promise<void>
-  /** The host's environment for a `claude` that starts now. */
   hostEnv: (vendorProgram: SignInRequest) => Promise<NodeJS.ProcessEnv>
   timeoutMs: number
 }
@@ -72,7 +71,6 @@ function belongsTo(code: string, url: string) {
   )
 }
 
-/** Without a link while a new login replaces one whose code Claude refused. */
 function pageStep({url, opened, refused}: Page): PageStep {
   const step: PageStep = {
     type: 'SIGN_IN_STEP',
@@ -150,8 +148,7 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
         }
       }
 
-      // This login can't take another code: a new one opens its own page,
-      // and the old page is dead, so the card loses its link until then.
+      // The page is dead and takes no more codes; a new login opens its own.
       Object.assign(page, {pasted: false, refused: true, url: null})
       login = start()
 

@@ -2,19 +2,14 @@ import {execFile} from 'node:child_process'
 import path from 'node:path'
 
 /**
- * Git reads this path as an empty file on every platform, Windows included,
- * though not as a folder: Windows reads `/dev/null/<hook>` as a real path on
- * the drive.
+ * Git reads this as an empty file on every platform, but not as a folder:
+ * Windows reads `/dev/null/<hook>` as a real path on the drive.
  */
 const NOTHING = '/dev/null'
 
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024
 
-/**
- * On every call: no hook runs, no fsmonitor is asked, and the user's own
- * ignore and attributes files stay out (ADR 0014). Hooks are looked for in
- * the program itself, a file, which nothing can be inside.
- */
+/** `core.hooksPath` names the program file, which holds no hooks (ADR 0014). */
 function isolation(program: string) {
   return [
     '-c',
@@ -30,23 +25,15 @@ function isolation(program: string) {
 
 export interface Checkout {
   folder: string
-  /** The folder's own index, kept in the store between Snapshots. */
   index: string
 }
 
-/**
- * The hidden store, alone or with one folder checked out of it and that
- * folder's index.
- */
 interface GitTarget {
   store: string
   checkout?: Checkout
 }
 
-/**
- * The store is named by variables alone, so no `.git` is ever written into a
- * Working copy, and system and global config are never read.
- */
+/** Variables alone name the store, so no `.git` lands in a Working copy. */
 function isolated(
   env: NodeJS.ProcessEnv,
   program: string,
@@ -75,9 +62,8 @@ function isolated(
 }
 
 /**
- * The Mac and Linux builds are made for `/`, so they look for their
- * sub-programs in `/libexec/git-core` unless told; Windows `git` finds its own
- * (ADR 0024).
+ * The Mac and Linux builds look for their sub-programs in `/libexec/git-core`
+ * unless told; Windows `git` finds its own (ADR 0024).
  */
 function ownSubPrograms(program: string) {
   if (process.platform === 'win32') return {}
@@ -98,11 +84,7 @@ export type Git = (
   input?: string
 ) => Promise<string>
 
-/**
- * Every `git` call the app makes goes through the function this returns, and
- * runs `program`, the app's own `git` by its full path, never one on `PATH`
- * (ADR 0024).
- */
+/** Runs the app's own `git`, never one on `PATH` (ADR 0024). */
 export function createGit(program: string, env: NodeJS.ProcessEnv): Git {
   return async (target, args, input) =>
     new Promise((resolve, reject) => {
@@ -121,8 +103,8 @@ export function createGit(program: string, env: NodeJS.ProcessEnv): Git {
         }
       )
 
-      // A git that ends before it reads its input breaks the pipe. Its exit,
-      // above, says why; unheard, the pipe's error would take the app down.
+      // Unhandled, the broken pipe from a git that exits before reading its
+      // input would crash the app; the exit callback reports why.
       child.stdin?.on('error', () => undefined)
       child.stdin?.end(input)
     })

@@ -1,11 +1,5 @@
-/**
- * UZ_LIVE_CODEX_PROGRAM=<userData>/vendor/chatgpt/<version>\
- * UZ_LIVE_CODEX_HOME=<userData>/providers/chatgpt\
- * bun run test:node app/provider-host/src/modules/codex-driver/streaming.live
- *
- * `UZ_RECORD=yes` rewrites `recordings/`. Record one test at a time with `-t`:
- * the ids the driver tests pin change each time.
- */
+// Record one test at a time (`-t`) with `UZ_RECORD=yes`: each run changes
+// the ids the driver tests pin.
 import type {SpawnCodex} from './app-server'
 import type {RateLimitReachedType} from './protocol/v2/RateLimitReachedType'
 import type {HostAttachment} from '@uz/contract/attachments'
@@ -53,7 +47,6 @@ import {CONTEXT_COMPACTION} from './wire'
 const folder = process.env.UZ_LIVE_CODEX_PROGRAM
 const signedIn = process.env.UZ_LIVE_CODEX_HOME
 
-/** The Model ChatGPT's `model/list` marked as its default when recorded. */
 const MODEL = 'gpt-6.1-sol'
 
 const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
@@ -76,7 +69,6 @@ function newTreeFolder() {
   )
 }
 
-/** One Tree's folder for every Reply, as a Tree's Replies share one. */
 function treeFolder() {
   sharedTreeFolder ??= newTreeFolder()
 
@@ -186,7 +178,6 @@ function expectComplete(events: Streamed[]) {
   expect(last).toMatchObject({status: 'complete'})
 }
 
-/** A Thread's Replies, each at the Compaction threshold given. */
 function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
   const treeId = crypto.randomUUID()
   const idle = heldIdle()
@@ -259,7 +250,6 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
   return {reply, closed}
 }
 
-/** A Thread Claude wrote, as main hands it over. */
 const FROM_CLAUDE: Thread = [
   {
     prompt: 'Pick a color for the boat, one word.',
@@ -275,7 +265,6 @@ const FROM_CLAUDE: Thread = [
   },
 ]
 
-/** Replies that each hand the driver the Thread they continue. */
 function threadReplies(program: string, home: string) {
   const treeId = crypto.randomUUID()
   const idle = heldIdle()
@@ -376,7 +365,6 @@ interface CodedRepliesOptions {
   onLine?: (line: z.infer<typeof WireLine>) => void
 }
 
-/** Replies on one app-server, each with the codes Codex sent over it. */
 function codedReplies(
   program: string,
   home: string,
@@ -454,7 +442,6 @@ function codedReplies(
       events,
       session: recorded?.session ?? null,
       failure: last?.type === 'RUN_FINISHED' ? last.failure : undefined,
-      /** The `codexErrorInfo` of each `error` notice Codex retried after. */
       retried: sent.flatMap(({method, params}) => {
         if (method !== 'error') return []
 
@@ -462,7 +449,6 @@ function codedReplies(
 
         return notice.willRetry ? [notice.error.codexErrorInfo] : []
       }),
-      /** Each turn's `codexErrorInfo`, null for a turn that didn't fail. */
       turnErrors: sent.flatMap(({method, params}) =>
         method === 'turn/completed'
           ? [TurnCompleted.parse(params).turn.error?.codexErrorInfo ?? null]
@@ -485,10 +471,6 @@ function notFound(response: http.ServerResponse) {
   response.writeHead(404).end()
 }
 
-/**
- * A Model API on a local port that answers each Responses request with the
- * answer last set. Every other request gets a 404.
- */
 async function startStandInApi() {
   let answer: Answer = notFound
 
@@ -525,7 +507,6 @@ async function startStandInApi() {
   }
 }
 
-/** ChatGPT's 429 at a usage limit, its five-hour window full until `resetAt`. */
 function usageLimit(reachedType: RateLimitReachedType, resetAt: number) {
   return (response: http.ServerResponse) => {
     const now = Math.floor(Date.now() / 1000)
@@ -554,7 +535,6 @@ function usageLimit(reachedType: RateLimitReachedType, resetAt: number) {
   }
 }
 
-/** A stream that starts and then fails with `code`. */
 function streamFailed(code: string, message: string) {
   return (response: http.ServerResponse) => {
     const failed = {
@@ -2220,7 +2200,6 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
 
       expect(injected.text).toMatch(/heron/i)
       expect(injected.calls).toEqual([])
-      // One thread for each Reply: Codex took the image, so no text replay.
       expect(threadsStarted()).toBe(2)
 
       await closed()
@@ -2306,7 +2285,6 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
 
     const binary = fs.readFileSync(program)
 
-    // A feature's name is held without its `features.` table.
     // Linux's arguments hold every other platform's, plus `allow_login_shell`.
     const settings = codexArgs('linux')
       .filter(arg => arg !== '-c')

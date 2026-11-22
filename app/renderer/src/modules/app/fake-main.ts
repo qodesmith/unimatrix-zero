@@ -51,10 +51,7 @@ interface Saved {
   layout?: Partial<Layout>
 }
 
-/**
- * By the type the window gave the File; a dropped folder looks like a file
- * here.
- */
+/** A dropped folder looks like a plain file to the window. */
 function mediaTypeOf(type = '') {
   const known = AttachmentMediaTypeSchema.safeParse(type).data
 
@@ -65,7 +62,6 @@ function mediaTypeOf(type = '') {
 
 export type FakeMain = ReturnType<typeof fakeMain>
 
-/** Main's side of the bridge for App tests, keeping each command it was sent. */
 export function fakeMain(saved: Saved = {}) {
   const trees = [...(saved.trees ?? [])]
   const prompts = [...(saved.prompts ?? [])]

@@ -43,7 +43,6 @@ export interface FinishedReply {
   treeId: string
   replyId: string
   status: Extract<ReplyEvent, {type: 'RUN_FINISHED'}>['status']
-  /** As the Reply's row records it. */
   model: string
   failure: RunFailure | null
 }
@@ -52,16 +51,12 @@ interface Entry {
   provider: ProviderId
   /** The Model asked for, until its Provider reports the one it used. */
   model: string
-  /** The id main asked the Provider to store the Prompt under. */
   promptMessageId: string
   reply: StreamingReply
   saveTimer: ReturnType<typeof setTimeout> | null
 }
 
-/**
- * A streaming Reply is saved before it is published, so a window never shows
- * what main has not saved or is not about to save.
- */
+/** Saves before it publishes, so no window shows what main won't save. */
 export function createInFlight(
   db: Database,
   publish: (event: AppEvent) => void,

@@ -18,7 +18,6 @@ interface ProviderTabsProps {
   providerSettings: ComponentType<{provider: ProviderId}>
 }
 
-/** Settings' Connections: a tab for each Provider, its account and settings. */
 export function ProviderTabs({
   connections,
   providerSettings: ProviderSettings,

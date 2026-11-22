@@ -11,7 +11,6 @@ import {explainingLabels, replyText} from '#modules/thread-replay/main'
 import {messageContent, read} from './input'
 import {configOf, loadThread} from './threads'
 
-/** How Codex refuses to resume or fork a thread whose rollout it can't find. */
 const SESSION_LOST = /no rollout found for thread id/
 
 /**
@@ -52,7 +51,6 @@ function replied(text: string) {
   } satisfies ResponseItem
 }
 
-/** Each Prompt's path lines and inline files, the files read afresh. */
 async function itemsOf(thread: Thread) {
   const turns = await Promise.all(
     thread.map(async exchange => {
@@ -75,10 +73,7 @@ async function itemsOf(thread: Thread) {
   return turns.flat()
 }
 
-/**
- * Gives a new thread the Thread as its history, each Turn a message of its
- * own. False when Codex refuses the items, which leaves a text replay.
- */
+/** False when Codex refuses the items, which leaves a text replay. */
 async function injectThread(
   server: Opening['server'],
   threadId: string,
@@ -95,10 +90,6 @@ async function injectThread(
   }
 }
 
-/**
- * A new thread given the whole Thread: as history when Codex takes the items,
- * else in a thread of its own, with the Prompt.
- */
 async function newThread(
   {server, threads}: Opening,
   request: ReplyRequest
@@ -139,9 +130,8 @@ async function newThread(
 }
 
 /**
- * The one way a session is rebuilt from its Thread (ADR 0001): `restore`, the
- * exact restore from the app's copy, first, then a new thread for one Codex
- * no longer has. Null `restore`: the Provider has no session of the Thread.
+ * The one way a session is rebuilt from its Thread (ADR 0001): `restore` from
+ * the app's copy first, else a new thread. Null `restore`: no session exists.
  */
 export async function openThread(
   opening: Opening,

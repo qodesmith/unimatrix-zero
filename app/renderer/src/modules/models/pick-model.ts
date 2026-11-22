@@ -7,10 +7,7 @@ import type {
 
 import {PROVIDER_NAMES, concreteOf, findModel} from '@uz/contract/providers'
 
-/**
- * The Model an Input wants: `entry` is the listed entry the user picked it by,
- * null when it came from a Reply.
- */
+/** `entry` is the listed entry the user picked, null when it came from a Reply. */
 export type WantedModel = ModelChoice & {entry: string | null}
 
 export interface ModelPickInput {
@@ -152,7 +149,6 @@ function fromWanted(
   }
 }
 
-/** What an Input's Model picker offers and shows, and whether it may send. */
 export function pickModel(input: ModelPickInput): ModelPick {
   const {wanted, statuses, models} = input
 

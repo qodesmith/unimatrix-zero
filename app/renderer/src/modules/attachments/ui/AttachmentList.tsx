@@ -55,13 +55,11 @@ function RemoveButton({label, onClick}: {label: string; onClick: () => void}) {
 
 interface ShownProps {
   attachment: AttachmentData
-  /** What the Model does with it, or what became of it since it was sent. */
   note: string | null
   pathOnly: boolean
   onRemove?: () => void
 }
 
-/** A thumbnail has no text, so its note is a description and a tooltip. */
 function ImageAttachment({
   attachment: {id, name},
   note,
@@ -128,10 +126,6 @@ const ICONS = {
   folder: FolderIcon,
 } satisfies Record<AttachmentKind, typeof FileIcon>
 
-/**
- * Any other file: a chip with its name, its size and its note. A folder shows
- * its path where a file shows its size, since nothing of it was copied.
- */
 function FileAttachment({
   attachment: {name, mediaType, size, folderPath},
   note,
@@ -203,16 +197,9 @@ function PendingAttachment({
 
 interface AttachmentListProps {
   attachments: readonly AttachmentData[]
-  /**
-   * The Provider of the Model these are about to go to: each one then says
-   * what that Model does with it.
-   */
   provider?: ProviderId | null
-  /** Those sent that now go by their path alone, by id; each says so. */
   pathOnly?: ReadonlySet<string>
-  /** Files still being added, and those main refused. */
   pending?: readonly PendingAdd[]
-  /** Given, each attachment offers to be removed. */
   onRemove?: (id: string) => void
   onDismiss?: (key: string) => void
   className?: string
@@ -221,7 +208,6 @@ interface AttachmentListProps {
 const NONE: readonly PendingAdd[] = []
 const NO_IDS: ReadonlySet<string> = new Set()
 
-/** Images as thumbnails, other files as chips, in the order attached. */
 export function AttachmentList({
   attachments,
   provider = null,

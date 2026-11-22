@@ -21,8 +21,7 @@ import type {TurnError} from './protocol/v2/TurnError'
 import {RefusalSchema} from '#modules/failures/main'
 import {z} from 'zod'
 
-// Each schema `satisfies` the generated type it reads from, so a Codex bump
-// that changes one of those fields fails typecheck here.
+// Each schema `satisfies` its generated type, so a Codex bump fails typecheck.
 
 const ThreadSchema = z.looseObject({
   id: z.string(),
@@ -48,10 +47,6 @@ type HttpStatusVariant = Pick<
   'httpStatusCode'
 >
 
-/**
- * The HTTP status Codex forwards on the `codexErrorInfo` variant it names,
- * null on a variant without one.
- */
 const HttpStatusSchema = z
   .record(
     z.string(),
@@ -174,7 +169,6 @@ const ToolStatusSchema = z.enum([
   'declined',
 ]) satisfies z.ZodType<ItemOf<'commandExecution'>['status']>
 
-/** `aggregatedOutput` and `exitCode` are null until the item completes. */
 const CommandExecutionItemSchema = z.looseObject({
   type: z.literal('commandExecution'),
   id: z.string(),
@@ -231,9 +225,8 @@ export type Item = z.infer<typeof ItemSchema>
 export type ToolItem = z.infer<typeof ToolItemSchema>
 
 /**
- * Codex sends no `item/completed` for a compaction that fails or that a hook
- * stops. The item is `{id}` only, so one that installed nothing can't be told
- * apart.
+ * No `item/completed` comes for a compaction that fails or a hook stops, and
+ * the `{id}`-only item can't tell one that installed nothing apart.
  */
 export const CONTEXT_COMPACTION =
   'contextCompaction' satisfies ThreadItem['type']

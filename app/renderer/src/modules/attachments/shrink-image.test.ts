@@ -59,9 +59,12 @@ const PNG_START = [0x89, 0x50, 0x4e, 0x47]
 const JPEG_START = [0xff, 0xd8, 0xff]
 
 it('shrinks an image longer than an inline image may be so its long side fits, keeping its shape and a PNG’s transparency', async () => {
-  const source = await image('image/png', INLINE_IMAGE_PIXELS * 2, 500, () => {
-    // Left clear: every pixel stays transparent.
-  })
+  const source = await image(
+    'image/png',
+    INLINE_IMAGE_PIXELS * 2,
+    500,
+    () => {}
+  )
 
   const shrunk = await shrunkImage(new File([source], 'wide.png', source))
 
@@ -103,9 +106,7 @@ it('puts white behind a transparent image that goes as a JPEG', async () => {
     'image/webp',
     INLINE_IMAGE_PIXELS + 100,
     10,
-    () => {
-      // Left clear: every pixel stays transparent.
-    }
+    () => {}
   )
 
   const shrunk = await shrunkImage(new File([source], 'clear.webp', source))

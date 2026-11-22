@@ -2,7 +2,6 @@ import type {Transitions} from '#modules/state-machine/main'
 
 import {machine} from '#modules/state-machine/main'
 
-/** One file on its way into a draft, from the moment it is attached. */
 export type AttachmentAddState =
   | {status: 'adding'; name: string}
   | {status: 'added'}

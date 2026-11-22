@@ -19,7 +19,7 @@ export type ContentEvent = Exclude<
   {type: 'RUN_STARTED' | 'RUN_FINISHED'}
 >
 
-/** How the vendor program ended the Reply; a failed one is never recorded. */
+/** A failed Reply is never recorded. */
 export interface Ending {
   finished: RunFinished
   recorded?: ReplyRecorded | null

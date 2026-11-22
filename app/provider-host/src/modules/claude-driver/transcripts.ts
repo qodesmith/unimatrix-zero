@@ -35,9 +35,8 @@ export function projectKeyOf(cwd: string) {
 }
 
 /**
- * The app's copy with every session filed under `projectKey`, whichever folder
- * `claude` ran in. Sessions from before each Tree had a folder of its own were
- * filed under the configuration folder's key, which keeps them resumable.
+ * Every session under `projectKey`, whichever folder `claude` ran in. Sessions
+ * from before each Tree had its own folder sit under the config folder's key.
  */
 export function underOneKey(
   store: SessionStoreClient,

@@ -1,4 +1,3 @@
-// The Playwright provider gives `cdp()` its `send`.
 /// <reference types="@vitest/browser-playwright" />
 import type {Attachment} from '@uz/contract/attachments'
 import type {Bridge} from '@uz/contract/bridge'
@@ -349,9 +348,8 @@ function fakeMain(saved: Saved) {
 const probe = {render: async () => {}}
 
 /**
- * An update made outside React lands in the same lane as every other such
- * update, so the commit that renders this one commits those queued before it
- * too, and flushes every effect still pending from earlier commits.
+ * An update made outside React shares a lane with every other such update, so
+ * its commit also commits those queued before it and flushes pending effects.
  */
 function RenderProbe() {
   const [rendered, setRendered] = useState<{done: () => void} | null>(null)
@@ -368,7 +366,6 @@ function RenderProbe() {
   return null
 }
 
-/** Resolves once React has committed every update queued before the call. */
 async function reactCaughtUp() {
   await probe.render()
 }
@@ -463,7 +460,6 @@ async function hoverAway() {
   await page.getByRole('group', {name: 'Orientation'}).hover()
 }
 
-/** The canvas itself, leaving out the slideout drawn over it. */
 function canvas() {
   const flow = document.querySelector('.react-flow')
 
@@ -487,7 +483,6 @@ function inputUnder(replyText: string) {
   return nodeOf(replyText).getByRole('textbox', {name: 'Prompt'})
 }
 
-/** Hovering the Reply slides its Input out. */
 async function clickInputUnder(replyText: string) {
   await canvas().getByText(replyText).hover()
   await inputUnder(replyText).click()
@@ -1132,7 +1127,6 @@ it('keeps a Fork’s card put on unfolding Branches folded since before an orien
   await expect.element(page.getByText('Reply five')).toBeVisible()
   await expect.poll(viewport).not.toContain('translate(0px, 0px)')
 
-  // Folded before the switch, its cards are measured only once they show.
   await nodeOf('Reply two').getByRole('button', {name: '2 Branches'}).click()
   await expect.element(page.getByText('Reply five')).not.toBeInTheDocument()
 
@@ -1418,7 +1412,6 @@ it('lets long Turns take their full height when the Setting is off', async () =>
   })
 
   await expect.element(page.getByText('Short')).toBeVisible()
-  // Unscaled: opening fits the whole Tree, so the zoom follows its height.
   expect(rootPromptHeight() / zoomOf()).toBeGreaterThan(500)
   await expect
     .element(page.getByRole('button', {name: 'Show more'}))
@@ -1616,7 +1609,6 @@ function chatButtonOf(replyText: string) {
     .first()
 }
 
-/** Each Turn's text, without the Provider's mark and Model pill a Reply shows. */
 function chatTurns() {
   return [...slideout().element().querySelectorAll('[data-chat-turn]')].map(
     turn => {
@@ -1807,7 +1799,6 @@ async function setPlaybackRate(playbackRate: number) {
   await cdp().send('Animation.setPlaybackRate', {playbackRate})
 }
 
-/** Holds every animation where it starts until `setPlaybackRate(1)`. */
 async function freezeAnimations() {
   await cdp().send('Animation.enable')
   await setPlaybackRate(0)
@@ -2037,7 +2028,6 @@ it('slides the Context size drawer a short way in as it opens and out as it clos
   })
   await expect.element(page.getByText('10.0k ctx')).toBeVisible()
 
-  // Held at its start, the drawer is still invisible.
   const drawer = page.getByRole('complementary', {
     name: 'Context size details',
     includeHidden: true,
@@ -2670,14 +2660,11 @@ function media(
   }
 }
 
-/**
- * Three Exchanges whose images and PDF come to more than Claude takes inline
- * in one request: each 9 MiB image is 12 MiB of base64, the PDF 4 MiB.
- */
 function promptWith(sent: Prompt, attachments: Attachment[]): Prompt {
   return {...sent, attachments}
 }
 
+/** Over Claude's inline limit: a 9 MiB image is 12 MiB of base64, the PDF 4 MiB. */
 function mediaTree(provider: Reply['provider'] = 'claude'): Saved {
   clock = 0
 
@@ -2792,7 +2779,6 @@ it('says on an earlier Prompt’s attachment that it now goes by path only, once
     .element(thumbnailIn(three, 'fourth.png'))
     .toHaveAccessibleDescription('')
 
-  // Reply one's Thread fits.
   await clickInputUnder('Reply one')
   await expect
     .element(one.getByRole('group', {name: 'paper.pdf'}))

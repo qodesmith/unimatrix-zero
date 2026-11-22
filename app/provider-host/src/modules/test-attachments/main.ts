@@ -4,13 +4,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import zlib from 'node:zlib'
 
-/** A PNG's first four bytes, in base64. */
 export const PNG_BASE64 = 'iVBORw=='
 
-/** A JPEG's first three bytes, in base64: the shrunk copy of `photo`. */
 export const SHRUNK_BASE64 = '/9j/'
 
-/** `%PDF-1`, in base64. */
 export const PDF_BASE64 = 'JVBERi0x'
 
 function keep(folder: string, name: string, bytes: Uint8Array) {
@@ -20,15 +17,11 @@ function keep(folder: string, name: string, bytes: Uint8Array) {
   return file
 }
 
-/** As main marks a file the Provider doesn't take, or the budget left out. */
 export function byPathOnly(attachment: HostAttachment): HostAttachment {
   return {...attachment, inline: null}
 }
 
-/**
- * Attachments as main hands them over, each copy under its own name and
- * marked inline as main would mark it for Claude.
- */
+/** Marked inline as main would mark them for Claude. */
 export function attachedFiles(folder: string) {
   function save(name: string, ...bytes: number[]) {
     return keep(folder, name, Uint8Array.from(bytes))
@@ -79,7 +72,6 @@ export function attachedFiles(folder: string) {
   } satisfies Record<string, HostAttachment>
 }
 
-/** 5 × 7 dots each, a row a string. */
 const GLYPHS = new Map([
   ['E', ['#####', '#....', '#....', '####.', '#....', '#....', '#####']],
   ['H', ['#...#', '#...#', '#...#', '#####', '#...#', '#...#', '#...#']],
@@ -101,7 +93,6 @@ function chunk(type: string, data: Uint8Array) {
   return framed
 }
 
-/** Black dots on white, 8-bit grayscale. */
 function wordPng(word: string) {
   const glyphs = Array.from(word, letter => {
     const glyph = GLYPHS.get(letter)
@@ -149,10 +140,7 @@ function wordPng(word: string) {
   ])
 }
 
-/**
- * For a live check: a PNG a Model can read `word` in, of the letters E, H, N,
- * O and R, sent inline. Its name says nothing of the word.
- */
+/** `word` may use only E, H, N, O and R. The file name hides the word. */
 export function pngShowing(folder: string, word: string): HostAttachment {
   const file = keep(folder, 'word.png', wordPng(word))
 
@@ -164,7 +152,6 @@ export function pngShowing(folder: string, word: string): HostAttachment {
   }
 }
 
-/** For a live check: a one-page PDF whose text says `sentence`, sent inline. */
 export function pdfSaying(folder: string, sentence: string): HostAttachment {
   const text = `BT /F1 24 Tf 72 700 Td (${sentence}) Tj ET`
 
@@ -201,7 +188,7 @@ export function pdfSaying(folder: string, sentence: string): HostAttachment {
   }
 }
 
-/** For a live check: a file of `bytes` the AI can only open from its path. */
+/** A file the AI can open only from its path. */
 export function fileHolding(
   folder: string,
   name: string,

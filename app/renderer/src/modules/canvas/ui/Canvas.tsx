@@ -53,10 +53,7 @@ function unfoldedOver(index: TreeIndex, replyId: string) {
 
 interface EmptyTreeProps {
   treeId: string
-  /**
-   * Where the Input sits on the canvas, and its width as a share of a Turn's,
-   * each time that changes.
-   */
+  /** The Input's place on the canvas and its width as a share of a Turn's. */
   onPlaced: (at: Viewport) => void
   onSent: (replyId: string) => void
 }
@@ -137,7 +134,6 @@ interface HeadingProps {
 
 type CanvasProps = HeadingProps & {treeId: string}
 
-/** One Tree on the canvas: a centered Input while it is empty, then its Turns. */
 export function Canvas({treeId, ...heading}: CanvasProps) {
   const turns = useTurns(treeId)
 

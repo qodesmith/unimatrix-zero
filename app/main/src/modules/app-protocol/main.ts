@@ -55,7 +55,6 @@ function securityHeaders(csp: string) {
   }
 }
 
-/** `app://` serves only files from the built bundle folder. */
 export function serveBundle(target: Protocol, bundleDir: string) {
   const csp = renderCsp()
   target.handle(APP_SCHEME, async request => {
@@ -88,10 +87,7 @@ interface DevServer {
   scriptNonce: string
 }
 
-/**
- * Dev keeps the packaged build's origin rules, so no check needs a localhost
- * exception. The HMR socket is the one thing the page reaches directly.
- */
+/** The packaged origin rules; the page reaches only the HMR socket directly. */
 export function proxyDevServer(target: Protocol, dev: DevServer) {
   const upstream = `http://localhost:${dev.port}`
 

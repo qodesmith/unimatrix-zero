@@ -3,7 +3,6 @@ import http from 'node:http'
 import net from 'node:net'
 import {z} from 'zod'
 
-/** Starts `server` on a free local port, and gives its URL. */
 export async function listenLocally(server: http.Server) {
   server.listen(0, '127.0.0.1')
   await once(server, 'listening')
@@ -13,15 +12,12 @@ export async function listenLocally(server: http.Server) {
 }
 
 /**
- * More than a client sends through TLS's handshake, a WebSocket upgrade and a
- * small request; less than a Model request, with its instructions, carries.
+ * More than a TLS handshake, a WebSocket upgrade and a small request send;
+ * less than a Model request.
  */
 const PROMPT_BYTES = 8000
 
-/**
- * A CONNECT proxy for a vendor program's `HTTPS_PROXY`. It stands for a
- * network with no route to the Provider without touching the machine's own.
- */
+/** A CONNECT proxy for `HTTPS_PROXY` that cuts off the Provider alone. */
 export async function startProxy() {
   const open = new Set<net.Socket>()
   let refusing = false
@@ -77,7 +73,6 @@ export async function startProxy() {
 
   return {
     url,
-    /** Resets every open connection and every new one until `ms` has passed. */
     refuseFor(ms: number) {
       refusing = true
       cutConnections()
@@ -87,16 +82,13 @@ export async function startProxy() {
       }, ms)
     },
     /**
-     * Resets every open connection, then lets new ones through but resets
-     * each once the answer to a Model request starts to flow back. Codex can
-     * miss a reset on a WebSocket it reuses until its 300 s idle timeout, so
-     * no connection opened before survives.
+     * Resets each new connection once a Model answer starts. Codex can miss a
+     * reset on a reused WebSocket for 300 s, so open ones are reset too.
      */
     resetStreams() {
       resettingStreams = true
       cutConnections()
     },
-    /** Ends a refusal before its time is up. */
     letThrough() {
       clearTimeout(lifting)
       refusing = false

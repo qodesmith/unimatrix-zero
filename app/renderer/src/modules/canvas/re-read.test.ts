@@ -79,7 +79,6 @@ it('says how much of the Thread another Provider will re-read, Context size and 
   )
 })
 
-/** The note for a ChatGPT Thread of `threadTokens` tokens going to Claude. */
 function chatgptToClaude(threadTokens: number) {
   const size = threadTokens + SETUP_TOKENS.chatgpt
 

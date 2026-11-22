@@ -113,9 +113,8 @@ function parentMap(root: Node) {
 }
 
 /**
- * Each `const` binding, and whether it starts as an object literal. Arrays
- * don't count: `const spies = [vi.spyOn(console, 'log')]` appears only inside
- * `expect`, yet the unit writes each spy's calls.
+ * Arrays don't count: `const spies = [vi.spyOn(console, 'log')]` appears only
+ * inside `expect`, yet the unit writes each spy's calls.
  */
 function literalBindings(root: Node, into: Map<string, boolean>) {
   for (const node of walk(root)) {
@@ -142,10 +141,7 @@ function isNameOnly(node: Node, parent: Node | undefined) {
   return parent.type === 'VariableDeclarator' && parent.id === node
 }
 
-/**
- * Bindings used anywhere but inside `expect(...)`: the unit may write any
- * binding it can reach, as it does a `ref`.
- */
+/** Bindings used outside `expect(...)`, which the unit may write, like a `ref`. */
 function escaping(root: Node, parents: Map<Node, Node>) {
   const names = new Set<string>()
 
@@ -220,7 +216,6 @@ function testsIn(program: ESTree.Program) {
   return tests
 }
 
-/** Built from literals and fixtures alone: nothing the unit produced. */
 function isConstant(node: Node, fixtures: Map<string, boolean>): boolean {
   // oxlint-disable-next-line typescript/switch-exhaustiveness-check -- only a handful of node kinds can be constant
   switch (node.type) {

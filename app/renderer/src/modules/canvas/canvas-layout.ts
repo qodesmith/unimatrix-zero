@@ -14,10 +14,8 @@ interface Point {
   y: number
 }
 
-/** Every Turn is drawn this wide, in both orientations. */
 export const TURN_WIDTH = 768
 
-/** The space an empty Tree's Input keeps from each edge of the canvas. */
 export const START_MARGIN = 24
 
 export function startZoom(canvasWidth: number) {
@@ -84,7 +82,7 @@ export const GAPS: Record<CanvasOrientation, Gap> = {
 interface Graph {
   nodes: Unplaced[]
   edges: CanvasLayoutEdge[]
-  /** Each node's children in reading order. */
+  /** In reading order. */
   children: Map<string, string[]>
   roots: string[]
 }

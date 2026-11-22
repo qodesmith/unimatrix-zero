@@ -52,7 +52,7 @@ const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
   threshold: null,
 }
 
-/** As `warm.ndjson`, `resumed.ndjson` and `forked.ndjson` recorded them. */
+/** From the recordings: re-recording changes them. */
 const SESSION_ID = '6b3fb527-e561-4b5c-810d-0ef9ac53978c'
 const FIRST_MESSAGE = '62e0dab1-d770-4979-863e-4df4e2be3150'
 const SECOND_MESSAGE = '7e7158ab-59c9-4e14-9828-54466ba8084e'
@@ -60,19 +60,16 @@ const RESUMED_MESSAGE = '54a838e7-618e-41c6-a747-d57b47a7908e'
 const FORKED_SESSION_ID = '830530ec-a381-4e19-98a4-d7383b717af5'
 const FORKED_MESSAGE = '1f72cfd4-d1f2-4d35-aa13-f8df39b2bdb1'
 
-/** As `stopped.ndjson` recorded them. */
 const STOPPED_SESSION_ID = '3a5d1c74-2159-4d23-a6a3-fd192b046074'
 const STOPPED_MESSAGE = '8ce30d53-0856-4a14-a476-50e3b6184868'
 const ASKED_MESSAGE = '2f4dc5fc-2bbc-434b-a571-f92d02cbda82'
 
-/** As `rewound-warm.ndjson` and `rewound.ndjson` recorded them. */
 const REWOUND_SESSION_ID = '0dcd3d7c-ebce-4799-8da8-bdf836d1cbf3'
 const TEAL_MESSAGE = '90b7a04e-36fa-4aa1-84e8-66380ab18fe0'
 const OTTER_MESSAGE = '52786f10-3dd8-4f5b-995f-c5f9c5a27a0e'
 const REWOUND_MESSAGE = '18fb8495-3399-43a8-bc37-573286cfc9ed'
 const MODEL = 'claude-haiku-5-5'
 
-/** As `compacted.ndjson` recorded them. */
 const COMPACTED_SESSION_ID = '471b5fd5-abf7-498b-9216-26c3ae547643'
 const BOUNDARY_ENTRY = '42429c6a-0cbe-4ef9-aaa6-afcc496c9bed'
 
@@ -264,12 +261,9 @@ async function setUp(
     reply,
     reports: reportsSoFar,
     environments,
-    /** The environment each `claude` was asked for with, a one-shot's too. */
     queried,
-    /** What the Mac has when the next `claude` starts. */
     developerTools,
     allClosed,
-    /** Runs out every wait for a silent `claude` begun so far. */
     passSilence: silence.pass,
   }
 }
@@ -355,7 +349,6 @@ it('shows each tool call with its arguments and result, the text after them a pa
   expect(events.at(-1)).toMatchObject({status: 'complete'})
 })
 
-/** A line `claude` wrote that holds every one of `parts`. */
 function isOut(line: RecordedLine, ...parts: string[]) {
   return (
     line.kind === 'out' &&
@@ -944,7 +937,6 @@ it('keeps the blocks of a cut-off message that come before the first one Claude 
   await claude.allClosed()
 })
 
-/** The text "Let me write." as block 0. */
 function leadIn() {
   return [
     streamed({
@@ -961,7 +953,6 @@ function leadIn() {
   ]
 }
 
-/** The recorded first message, its one block moved behind `leadIn()`. */
 function withLeadIn(message: RecordedLine[]) {
   return message.map(line =>
     isOut(line, '"index":0')
@@ -972,11 +963,7 @@ function withLeadIn(message: RecordedLine[]) {
   )
 }
 
-/**
- * `tools.ndjson` with a message before its first: the text "Let me write.",
- * then a Write cut off mid-arguments and ended by `stop`, if any. With
- * `resentInFull`, the first message is sent again with that text before it.
- */
+/** `tools.ndjson` with a Write cut off mid-arguments and ended by `stop`. */
 function toolCallCutOff(stop: RecordedLine[], resentInFull = false) {
   return edited('tools.ndjson', lines => {
     const start = lines.findIndex(line => isOut(line, '"message_start"'))
@@ -1245,7 +1232,6 @@ it('keeps a limit Claude rejected the turn for a reached limit, with no reset ti
 
 const REWORDED = 'Reworded by the vendor'
 
-/** The warm Reply failed, with `added` just before its result. */
 function failedAfter(
   added: RecordedLine[],
   result: Partial<
@@ -2140,7 +2126,6 @@ it('starts claude with the Compaction Settings, and with nothing for the default
   expect(changed?.args.join(' ')).toMatch(/"autoCompactWindow":150000/)
 })
 
-/** A Thread ChatGPT wrote, as main hands it over. */
 const HANDED_OVER: Thread = [
   {
     prompt: 'Name a color.',

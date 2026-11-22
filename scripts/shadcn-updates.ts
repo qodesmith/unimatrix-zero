@@ -1,7 +1,3 @@
-/**
- * Diffs each shadcn file we own, or only the components named, against what
- * `shadcn add` writes today, in a throwaway worktree.
- */
 import {$, Glob} from 'bun'
 import {existsSync} from 'node:fs'
 import {mkdtemp} from 'node:fs/promises'
@@ -28,8 +24,7 @@ function componentName(file: string) {
   return path.basename(file).replace(/\.tsx?$/, '')
 }
 
-// Uncommitted changes to the CSS, the config or the packages change what
-// `shadcn add` and the formatter write, so the worktree gets them too.
+// Uncommitted CSS, config and package edits change what `shadcn add` and the formatter write.
 async function copyUncommitted(tree: string) {
   const patch = await $`git diff HEAD --binary`.cwd(root).quiet()
 

@@ -15,8 +15,7 @@ jobs:
     name: Keep the repo collaborators-only
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # This job holds a token with admin access to the repo, so it checks out
-    # nothing and runs no `bun install`: no repo or dependency code runs beside it.
+    # This job holds an admin token, so no repo or dependency code runs beside it.
     steps:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
@@ -24,9 +23,7 @@ jobs:
           client-id: ${{ vars.INTERACTION_LIMITS_CLIENT_ID }}
           private-key: ${{ secrets.INTERACTION_LIMITS_PRIVATE_KEY }}
       - name: Renew the limit when under 150 days remain
-        # 150 days is about five months of the six a renewal buys, so a weekly
-        # run renews about once a month and months of failed runs pass before
-        # the limit lapses.
+        # A renewal buys six months, so months of failed runs pass before it lapses.
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |

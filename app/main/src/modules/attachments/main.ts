@@ -36,9 +36,7 @@ export type AttachmentFile = AttachmentAdd['file']
 
 export interface AttachmentsDeps {
   db: Database
-  /** `userData/attachments/`, where the copies are kept. */
   dir: string
-  /** Null for an id the dropped-files module never gave out. */
   droppedPath: (fileId: string) => string | null
 }
 
@@ -60,10 +58,6 @@ function sha256Of(bytes: Uint8Array) {
   return createHash('sha256').update(bytes).digest('hex')
 }
 
-/**
- * Null leaves the original to go as it is: the window's copy is kept only for
- * an image, and only as a PNG or JPEG small enough to go inline.
- */
 function shrunkToKeep(mediaType: FileMediaType, bytes: Uint8Array | undefined) {
   if (bytes === undefined || attachmentKind(mediaType) !== 'image') return null
 
@@ -91,7 +85,6 @@ export function createAttachments({db, dir, droppedPath}: AttachmentsDeps) {
     return filePath
   }
 
-  /** A folder is its path alone: nothing of it is read or copied. */
   function addFolder(dropped: string) {
     const folderPath = path.resolve(dropped)
 
@@ -139,11 +132,6 @@ export function createAttachments({db, dir, droppedPath}: AttachmentsDeps) {
   }
 
   return {
-    /**
-     * A file's bytes are kept once per content, under each name they were
-     * added by; each add gets its own id. `shrunk` is the window's smaller
-     * copy of a large image.
-     */
     async add(file: AttachmentFile, shrunk?: Uint8Array): Promise<Attachment> {
       if (file.type === 'pasted') {
         return toAttachment(await addFile(file, shrunk))
@@ -158,10 +146,6 @@ export function createAttachments({db, dir, droppedPath}: AttachmentsDeps) {
       return toAttachment(await addFile(read, shrunk))
     },
 
-    /**
-     * For serving by id; null for an id main never gave out, and for a folder,
-     * which has no copy.
-     */
     original(id: string) {
       const row = db
         .select()

@@ -9,10 +9,6 @@ const SHRUNK_EXTENSIONS = {
   'image/jpeg': 'jpg',
 } satisfies Record<ShrunkMediaType, string>
 
-/**
- * The folder is named by content, so every add of the same bytes shares it;
- * the file by its own name, so the path the AI gets ends in it.
- */
 export function originalPath(dir: string, sha256: string, name: string) {
   return path.join(dir, sha256, name)
 }
@@ -36,10 +32,7 @@ export async function isFolder(filePath: string) {
   }
 }
 
-/**
- * Reads one byte past the limit at most, so a file too large is refused
- * without reading it whole.
- */
+/** Reads at most `limit + 1` bytes, so a file too large is refused unread. */
 export async function readDropped(filePath: string, limit: number) {
   const name = path.basename(filePath).trim()
 
@@ -72,7 +65,6 @@ async function exists(target: string) {
   }
 }
 
-/** Written under a temporary name and renamed, so no one sees half a file. */
 async function writeWhole(dir: string, target: string, bytes: Uint8Array) {
   const temporary = path.join(dir, `.${randomUUID()}.tmp`)
 
@@ -84,7 +76,6 @@ async function writeWhole(dir: string, target: string, bytes: Uint8Array) {
   }
 }
 
-/** A second name for bytes already kept, sharing them where it can. */
 async function linkToKept(folder: string, target: string) {
   const [kept] = await fs.readdir(folder)
 

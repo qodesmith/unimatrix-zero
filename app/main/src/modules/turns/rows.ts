@@ -57,7 +57,6 @@ function toReply(row: ReplyRow, compacted: boolean): Reply {
   }
 }
 
-/** A Reply is compacted exactly when a Compaction links to it. */
 function repliesWhere(db: Database, matches: SQL): Reply[] {
   const compacted = new Set(
     db
@@ -198,9 +197,8 @@ export function insertExchange(
 }
 
 /**
- * Back to streaming from nothing. Its Prompt stays recorded until the Provider
- * drops it, since a Retry that fails first still has to cut there. Its
- * Compactions stay recorded too, but against the session alone.
+ * Keeps `sessionPromptId` until the Provider drops it: a Retry that fails first
+ * still has to cut there.
  */
 export function resetReply(db: Database, replyId: string): void {
   db.transaction(tx => {

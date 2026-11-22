@@ -24,7 +24,7 @@ import {useLayout, useUpdateLayout} from '../use-layout'
 
 export interface SectionContent {
   title: string
-  /** Buttons at the header's end, shown while collapsed too. */
+  /** Shown while collapsed too. */
   actions?: ReactNode
   children?: ReactNode
 }

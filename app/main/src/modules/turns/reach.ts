@@ -7,10 +7,7 @@ import {eq} from 'drizzle-orm'
 
 const {compactions} = schema
 
-/**
- * Whether the session's own transcript compacted after the entry `uuid`. Only
- * Claude reports a Compaction's boundary entry, so only its sessions match.
- */
+/** Only Claude reports a boundary entry, so only its sessions match. */
 function compactedAfter(db: Database, sessionId: string, uuid: string) {
   const at = positionOf(db, sessionId, uuid)
 
@@ -37,9 +34,8 @@ export function targetOf(session: Exclude<ReplySession, {type: 'continue'}>) {
 }
 
 /**
- * Claude no longer finds an entry from before a Compaction in the whole
- * session, so a send whose `target` is one forks from the part through it. The
- * fork stands in for a rewind or a cut too (ADR 0004).
+ * Claude can't find an entry from before a Compaction in the whole session, so
+ * a send whose `target` is one forks through it, even for a rewind or a cut.
  */
 export function reaching<Session extends ReplySession>(
   db: Database,

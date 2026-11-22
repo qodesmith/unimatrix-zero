@@ -71,7 +71,7 @@ function useFolded(replyId: string | null) {
 }
 
 /**
- * Needs a positioned parent, and the box it peeks out under drawn after it. It
+ * Needs a positioned parent, and the box it peeks under drawn after it. It
  * reaches no lower than the Input's -mt-3, or a hidden Input's stack shows
  * below the card.
  */

@@ -2,7 +2,7 @@ import type {SkillsAddJsonResult} from './skills-types'
 
 import {$} from 'bun'
 
-// Order matters! Skills with the same name get overwritten by later repos.
+// Order matters: a later repo overwrites a skill of the same name.
 const SKILL_REPOS = ['qodesmith/skills', 'mattpocock/skills']
 
 const installedNamesSet = new Set<string>()

@@ -49,7 +49,6 @@ function withoutAccountLists(message: RecordedMessage): RecordedMessage {
   return {...message, slash_commands: [], agents: [], skills: [], plugins: []}
 }
 
-/** Replaces the account's email, name, ids and home folder with stand-ins. */
 function scrub(lines: RecordedLine[]) {
   const texts = lines.map(line =>
     JSON.stringify(
@@ -113,7 +112,6 @@ export function createRecorder(
     ]
 
     const child = spawn(options)
-    // What the SDK writes goes through here on its way to `claude`.
     const input = new PassThrough()
 
     function listen(stream: NodeJS.ReadableStream, kind: 'in' | 'out') {

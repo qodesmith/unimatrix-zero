@@ -11,11 +11,6 @@ export type AddOutcome =
 
 type AddedFile = Extract<Command, {type: 'attachment.add'}>['file']
 
-/**
- * A picked or dropped File goes by the id main gave its path, and so does a
- * dropped folder. Only a File with no path, such as a pasted screenshot, goes
- * by its bytes.
- */
 async function fileToAdd(
   file: File
 ): Promise<{ok: true; file: AddedFile} | {ok: false; error: string}> {
@@ -52,7 +47,6 @@ async function addFile(file: File): Promise<AddOutcome> {
     : {ok: false, error: outcome.error.message}
 }
 
-/** Main keeps a copy of the file for good, for a Prompt to send. */
 export function useAddFile() {
   return addFile
 }

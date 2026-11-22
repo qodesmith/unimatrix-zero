@@ -16,7 +16,6 @@ import {ABOUT} from '../about'
 
 type Step = SignInStep['step']
 
-/** A connecting card's steps, the one under way open. */
 export function Checklist({
   provider,
   card,

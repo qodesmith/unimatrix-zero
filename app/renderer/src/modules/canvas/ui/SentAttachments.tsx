@@ -7,18 +7,11 @@ import {pathOnlyNow, threadEndFor} from '../media-budget'
 
 interface SentAttachmentsProps {
   prompt: Prompt
-  /**
-   * The Reply ending the Thread the Prompt is shown on. Left out on the
-   * canvas, where that is the Active Thread when the Prompt is on it.
-   */
+  /** Left out on the canvas, which uses the Active Thread's end. */
   threadEnd?: Reply
   className?: string
 }
 
-/**
- * A sent Prompt's attachments. One that Claude's media budget has since left
- * out of the Thread says it now goes by path only.
- */
 export function SentAttachments({
   prompt,
   threadEnd,

@@ -14,7 +14,6 @@ const KEYS = Object.keys(LayoutSchema.shape).filter(isLayoutKey)
 
 export type LayoutStore = ReturnType<typeof createLayout>
 
-/** One row per key; a value that no longer fits its schema reads as the default. */
 export function createLayout(db: Database) {
   const {layout} = schema
 

@@ -36,7 +36,6 @@ export interface AccountRead {
   models: ModelInfo[]
 }
 
-/** Waits for `claude` to exit, so it can finish a token refresh. */
 export async function readAccount({
   program,
   env,
@@ -86,8 +85,7 @@ export async function readAccount({
 
     return {account, models}
   } finally {
-    // Closing the session kills `claude` 2 s later, so it closes only once
-    // `claude` has exited on its input ending, or is stuck.
+    // Closing kills `claude` 2 s later, mid token refresh; wait for its exit.
     input.resolve()
     const stuck = new AbortController()
     await Promise.race([

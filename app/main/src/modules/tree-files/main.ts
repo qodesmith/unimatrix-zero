@@ -21,20 +21,16 @@ export interface TreeFilesDeps {
   db: Database
   userData: string
   publish: (event: AppEvent) => void
-  /** A Snapshot that couldn't be taken or read; the Reply itself is unharmed. */
   onFailure: (error: Error) => void
   /** The app's own `git` by its full path, or null while it isn't in place. */
   gitProgram: () => string | null
-  /** A Snapshot that couldn't be taken or read because `gitProgram` is null. */
+  /** A Snapshot failed because `gitProgram` is null. */
   onWaitingForGit: () => void
 }
 
 class GitMissingError extends Error {}
 
-/**
- * Each Reply's nearest Snapshot above it. A Reply has none of its own while
- * the Tree has no files yet, or until its Snapshot is taken.
- */
+/** Each Reply's nearest Snapshot above it, skipping Replies with none. */
 function parentSnapshots(rows: SnapshotRow[]) {
   const byId = new Map(rows.map(row => [row.replyId, row]))
 
@@ -66,11 +62,7 @@ type SnapshotRow = ReturnType<typeof snapshotRows>[number]
 
 export type TreeFiles = ReturnType<typeof createTreeFiles>
 
-/**
- * The Tree's files: its own folder in `userData`, where the AI works, and a
- * hidden git store beside it that keeps a Snapshot for every Reply. The store
- * is outside that folder and is never named to the AI.
- */
+/** The store of Snapshots beside the Tree's folder is never named to the AI. */
 export function createTreeFiles({
   db,
   userData,
@@ -92,14 +84,13 @@ export function createTreeFiles({
     else onFailure(error)
   }
 
-  /** By Tree, the last Snapshot asked for. */
+  /** The last Snapshot queued per Tree. */
   const snapshotting = new Map<string, Promise<void>>()
 
   function storeOf(treeId: string) {
     return path.join(userData, 'tree-stores', `${treeId}.git`)
   }
 
-  /** The one Working copy a Tree has: its own folder. */
   function workingCopyOf(treeId: string): VersionedFolder {
     const store = storeOf(treeId)
 
@@ -126,8 +117,6 @@ export function createTreeFiles({
   async function snapshot(treeId: string, replyId: string) {
     const copy = workingCopyOf(treeId)
 
-    // Until the AI first writes a file, the Tree has an empty folder and
-    // nothing else.
     if (!storeExists(copy.store) && fs.readdirSync(copy.folder).length === 0) {
       save(replyId, {noSnapshot: 'no-files'})
 
@@ -169,10 +158,6 @@ export function createTreeFiles({
     }
   }
 
-  /**
-   * A finished Reply whose Snapshot the app quit before taking, or failed to
-   * take.
-   */
   function missesSnapshot(replyId: string) {
     const row = db
       .select({
@@ -192,7 +177,6 @@ export function createTreeFiles({
     )
   }
 
-  /** Snapshots of a Tree are taken one at a time, in the order asked. */
   async function queue(treeId: string, work: () => Promise<void>) {
     const before = snapshotting.get(treeId) ?? Promise.resolve()
 
@@ -206,18 +190,16 @@ export function createTreeFiles({
   }
 
   return {
-    /** Made empty if missing: a vendor program's `cwd` has to exist. */
     folderFor: (treeId: string) => makeTreeFolder(userData, treeId),
 
-    /** Takes the Reply's Snapshot, however it ended. Never rejects. */
+    /** However the Reply ended. Never rejects. */
     async replyFinished({treeId, replyId}: {treeId: string; replyId: string}) {
       return queue(treeId, async () => snapshotReporting(treeId, replyId))
     },
 
     /**
-     * Settles once no Snapshot is being taken of the Tree's files, the one of
-     * the Reply a new Reply follows included when it has none yet; null when
-     * nothing is to wait for. Never rejects.
+     * Settles once the Tree has no Snapshot in progress, first taking the
+     * parent Reply's if it misses one. Never rejects.
      */
     snapshotsBefore: (
       treeId: string,
@@ -235,10 +217,8 @@ export function createTreeFiles({
     },
 
     /**
-     * Takes, oldest first, every Snapshot the app quit before taking. Run at
-     * launch, after Replies left streaming are marked interrupted: a Reply on
-     * another Branch would write into the folder before its Snapshot. A failed
-     * one waits for a Reply that continues from it. Never rejects.
+     * Run at launch, after streaming Replies are marked interrupted and before
+     * any Reply writes into the folder. Never rejects.
      */
     async takeMissedSnapshots() {
       const missed = db

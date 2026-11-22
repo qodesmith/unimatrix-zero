@@ -89,14 +89,12 @@ function attachedReply(provider: ProviderId, modelId: string): Reply {
 
 interface Setup {
   attachedTo?: Reply
-  /** The Prompts above the attached Reply. */
   prompts?: Prompt[]
   lastModel?: ModelChoice | null
   providers?: ProviderStatus[]
   models?: Record<ProviderId, Model[]>
   sendKey?: Settings['sendKey']
   reReadNote?: Settings['reReadNote']
-  /** What the Input already holds. */
   attachments?: Attachment[]
 }
 
@@ -108,11 +106,8 @@ interface Sends {
 
 interface Files {
   registered: File[]
-  /** What main kept, in the order it answered. */
   added: Attachment[]
-  /** Each File by the id `registerDroppedFile` gave it. */
   byId: Map<string, File>
-  /** True for a File with no path, such as a pasted screenshot. */
   noPath: boolean
   /** By name, the path of each dropped File that main finds is a folder. */
   folders: Map<string, string>

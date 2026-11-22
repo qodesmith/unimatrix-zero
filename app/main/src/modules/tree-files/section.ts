@@ -1,7 +1,4 @@
-/**
- * The app's own words about the Tree's files, never a Setting. It names the
- * folder the AI works in and nothing of the hidden store.
- */
+/** Fixed app text, never a Setting. It must not name the hidden store. */
 function filesSection(treeFolder: string) {
   return [
     '# Your files',

@@ -9,26 +9,19 @@ import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {replyRunTransition} from './reply-run/machine'
 import {updateSavedReply, withProgress} from './saved-turns'
 
-/** A run of the Model's reasoning; display only, never stored. */
+/** Display only; never stored. */
 export interface ThinkingBlock {
   text: string
-  /** The count of content parts before this thinking began. */
   beforePart: number
   startedAt: number
   endedAt: number | null
 }
 
 interface LiveState {
-  /** Streaming Replies by Reply id; saved Turns live in TanStack Query. */
   replies: Record<string, StreamingReply>
-  /** By Reply id, kept after the Reply finishes; only a reload clears it. */
+  /** Kept after the Reply finishes; only a reload clears it. */
   thinking: Record<string, ThinkingBlock[]>
-  /** By Reply id, from a Stop or Retry asked until the machine is idle again. */
   runs: Record<string, ReplyRunState>
-  /**
-   * By streaming Reply id, from the vendor program's retry notice or a lost
-   * connection to its next content.
-   */
   waiting: Record<string, Wait>
 }
 
@@ -175,10 +168,7 @@ export function markStreamingWaiting(store: ReplyStore) {
   }))
 }
 
-/**
- * A `SNAPSHOT` replaces the streaming Replies; at `RUN_FINISHED` the Reply
- * moves into the saved Turns, which main has just written the same way.
- */
+/** At `RUN_FINISHED`, main has already saved the Reply as this writes it. */
 export function applyLiveEvent(
   event: AppEvent,
   store: ReplyStore,

@@ -1,6 +1,6 @@
 /**
- * The vendor pins, and whether a PR changes them. A bump PR is known by what it
- * changes, never by its branch or labels, which a fork can copy.
+ * A bump PR is known by what it changes, never by its branch or labels, which a
+ * fork can copy.
  */
 import path from 'node:path'
 import {z} from 'zod'
@@ -38,7 +38,6 @@ export function pinsOf(manifest: string, hostPackage: string) {
 
 export type Pins = ReturnType<typeof pinsOf>
 
-/** Each pin `head` moves, as `<name> <from> → <to>`. */
 function pinChanges(base: Pins, head: Pins) {
   const names = new Set([...base.keys(), ...head.keys()])
 
@@ -49,10 +48,7 @@ function pinChanges(base: Pins, head: Pins) {
   )
 }
 
-/**
- * A GitHub REST GET: the path after `https://api.github.com/`, its JSON text
- * back.
- */
+/** GETs the path after `https://api.github.com/` and resolves its JSON text. */
 export type GitHubApi = (path: string) => Promise<string>
 
 const Compare = z.looseObject({
@@ -75,10 +71,7 @@ async function pinsAt(api: GitHubApi, repo: string, sha: string) {
   return pinsOf(manifest ?? '', hostPackage ?? '')
 }
 
-/**
- * The pins a PR moves from where it branched off `base`. Read whole, since
- * GitHub's list of a PR's changed files stops at 300.
- */
+/** Reads whole files, since GitHub's list of a PR's changed files stops at 300. */
 export async function bumpOf(
   api: GitHubApi,
   repo: string,

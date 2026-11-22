@@ -1,7 +1,3 @@
-/**
- * Reads `docs/provider-dependencies.md` and the `[dep:<id>]` tags in test
- * names, which link an entry to its live check.
- */
 export const LIST = 'docs/provider-dependencies.md'
 
 const FIELDS = [
@@ -38,7 +34,6 @@ export interface TestFile {
   source: string
 }
 
-/** Each `### ` heading after the first `## Entries` heading is one entry. */
 export function entriesOf(list: string): Entry[] {
   const [, below = ''] = list.split(/^## Entries$/m)
 
@@ -112,7 +107,6 @@ function checkProblems(entry: Entry, tagged: Map<string, string[]>) {
   return files ? [] : [`${entry.id}: no test is named [dep:${entry.id}]`]
 }
 
-/** What `bun run lint` reports about the list and the tests that tag it. */
 export function problemsOf(list: string, tests: TestFile[]) {
   const entries = entriesOf(list)
   const ids = new Set(entries.map(entry => entry.id))

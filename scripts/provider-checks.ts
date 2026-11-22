@@ -1,8 +1,4 @@
-/**
- * `bun run provider-checks [--pr <n>]`, by hand on the maintainer's machine:
- * runs every `[dep:<id>]` live check, has an agent review each entry of the
- * list, and posts both on the open bump PR for CI's gate.
- */
+/** Run by hand by the maintainer: posts results on the bump PR for CI's gate. */
 import type {CheckStatus, Review} from './provider-checks-result.ts'
 import type {Entry} from './provider-dependencies.ts'
 import type {Builds} from './provider-review.ts'
@@ -79,7 +75,6 @@ async function api(call: string) {
   return $`gh api ${call}`.text()
 }
 
-/** `node_modules` isn't in git, so a checkout can leave an older SDK installed. */
 function requirePinnedSdk(pins: Pins) {
   const installed = path.join(INSTALLED_SDK, 'package.json')
 
@@ -94,10 +89,6 @@ function requirePinnedSdk(pins: Pins) {
   }
 }
 
-/**
- * The pinned builds and sign-ins in this checkout's own dev data, which
- * `bun run dev` downloads and the app's connect flow fills.
- */
 function liveBuilds() {
   const pins = pinsOf(readText(MANIFEST), readText(HOST_PACKAGE))
   requirePinnedSdk(pins)
@@ -259,7 +250,6 @@ async function reviewAll(entries: Entry[], builds: Builds) {
   )
 }
 
-/** CI read the comments before this run posted; its gate job reads them again. */
 async function rerunGate(repo: string, bump: Bump) {
   const {
     workflow_runs: [run],
