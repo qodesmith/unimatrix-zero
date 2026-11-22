@@ -23,15 +23,62 @@ it('names the app’s developer folder over one the user set that holds no xcrun
   expect(env).toStrictEqual({...base, DEVELOPER_DIR: folder})
 })
 
-/** A folder the user's `DEVELOPER_DIR` names, with an `xcrun` under `root`. */
-function theirsWithXcrun(...root: string[]) {
+function folderWithXcrun(...root: string[]) {
   const theirs = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-own-developer-'))
   const bin = path.join(theirs, ...root, 'usr', 'bin')
   fs.mkdirSync(bin, {recursive: true})
   fs.writeFileSync(path.join(bin, 'xcrun'), '', {mode: 0o755})
 
-  return {...base, DEVELOPER_DIR: theirs}
+  return theirs
 }
+
+/** A folder the user's `DEVELOPER_DIR` names, with an `xcrun` under `root`. */
+function theirsWithXcrun(...root: string[]) {
+  return {...base, DEVELOPER_DIR: folderWithXcrun(...root)}
+}
+
+/** A stand-in for `xcode-select` that runs `script`. */
+function xcodeSelectThat(script: string) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-xcode-select-'))
+  const file = path.join(dir, 'xcode-select')
+  fs.writeFileSync(file, `#!/bin/sh\n${script}\n`, {mode: 0o755})
+
+  return file
+}
+
+it.skipIf(process.platform === 'win32')(
+  'finds developer tools where the folder xcode-select prints is there',
+  async () => {
+    const prints = xcodeSelectThat(`echo "${os.tmpdir()}"`)
+
+    expect(await macHasDeveloperTools(base, prints)).toBe(true)
+  }
+)
+
+it.skipIf(process.platform === 'win32')(
+  'finds no developer tools where the folder xcode-select prints is gone',
+  async () => {
+    const gone = path.join(os.tmpdir(), 'uz-developer-folder-that-is-gone')
+    const prints = xcodeSelectThat(`echo "${gone}"`)
+
+    expect(await macHasDeveloperTools(base, prints)).toBe(false)
+  }
+)
+
+it.skipIf(process.platform === 'win32')(
+  'finds no developer tools where xcode-select fails',
+  async () => {
+    expect(await macHasDeveloperTools(base, xcodeSelectThat('exit 2'))).toBe(
+      false
+    )
+  }
+)
+
+it('leaves a Mac alone, as one with developer tools, where xcode-select never starts', async () => {
+  const missing = path.join(os.tmpdir(), 'uz-no-such-xcode-select')
+
+  expect(await macHasDeveloperTools(base, missing)).toBe(true)
+})
 
 it.skipIf(process.platform === 'win32')(
   'leaves a developer folder the user set that holds an xcrun, on a Mac with no developer tools of its own',

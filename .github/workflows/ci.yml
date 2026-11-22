@@ -81,6 +81,18 @@ jobs:
           for tools in /Applications/Xcode*.app /Library/Developer/CommandLineTools; do
             if [[ -e $tools || -L $tools ]]; then sudo mv "$tools" "$tools.away"; fi
           done
+      # The Mac a macOS upgrade leaves: the tools gone, and the link that
+      # names their folder still there.
+      - name: Find no developer tools while the link to them is left
+        run: |
+          ls -l /var/db/xcode_select_link || true
+          /usr/bin/xcode-select -p || true
+          bun run test:node app/provider-host/src/modules/vendor-environment
+        env:
+          UZ_NO_DEVELOPER_TOOLS: '1'
+      - name: Remove the link
+        run: |
+          set -euo pipefail
 
           sudo rm -f /var/db/xcode_select_link
 

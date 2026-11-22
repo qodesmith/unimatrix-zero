@@ -22,19 +22,49 @@ export function vendorEnvironment(base: NodeJS.ProcessEnv) {
 }
 
 /**
- * Whether a Mac has Xcode or the Command Line Tools. `xcode-select -p` fails
- * where it has neither, and unlike the stubs in `/usr/bin` opens no dialog.
- * It succeeds for any `DEVELOPER_DIR`, so it runs without one.
+ * The folder `xcode-select -p` prints, `none` where it fails as it does on a
+ * Mac with no tools, and `unknown` where it never answered: a hang or a
+ * failed start. Unlike the stubs in `/usr/bin` it opens no dialog.
  */
-export async function macHasDeveloperTools(base: NodeJS.ProcessEnv) {
-  const {DEVELOPER_DIR: _named, ...env} = base
-
-  return new Promise<boolean>(resolve => {
-    // A hang counts as none, so a session start never waits on it.
-    execFile('/usr/bin/xcode-select', ['-p'], {env, timeout: 10_000}, error => {
-      resolve(!error)
+async function activeDeveloperFolder(
+  xcodeSelect: string,
+  env: NodeJS.ProcessEnv
+) {
+  return new Promise<{folder: string} | 'none' | 'unknown'>(resolve => {
+    execFile(xcodeSelect, ['-p'], {env, timeout: 10_000}, (error, stdout) => {
+      // An exit code is a number; a hang has none, a failed start a name.
+      if (error) resolve(Number.isInteger(error.code) ? 'none' : 'unknown')
+      else resolve({folder: stdout.trim()})
     })
   })
+}
+
+/**
+ * Whether a Mac has Xcode or the Command Line Tools. `xcode-select -p`
+ * succeeds for any `DEVELOPER_DIR`, so it runs without one. A folder it
+ * prints has to be there, and no more: the Command Line Tools hold no `xcrun`.
+ * A check that never answered leaves the Mac alone (ADR 0025).
+ */
+export async function macHasDeveloperTools(
+  base: NodeJS.ProcessEnv,
+  xcodeSelect = '/usr/bin/xcode-select'
+) {
+  const {DEVELOPER_DIR: _named, ...env} = base
+  const active = await activeDeveloperFolder(xcodeSelect, env)
+
+  if (active === 'unknown') return true
+
+  return active !== 'none' && isFolder(active.folder)
+}
+
+async function isFolder(folder: string) {
+  try {
+    const stats = await fs.stat(folder)
+
+    return stats.isDirectory()
+  } catch {
+    return false
+  }
 }
 
 async function isExecutable(file: string) {
