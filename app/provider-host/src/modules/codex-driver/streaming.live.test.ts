@@ -372,6 +372,7 @@ const TurnCompleted = z.looseObject({
 interface CodedRepliesOptions {
   args?: string[]
   env?: NodeJS.ProcessEnv
+  platform?: NodeJS.Platform
   onLine?: (line: z.infer<typeof WireLine>) => void
 }
 
@@ -379,7 +380,7 @@ interface CodedRepliesOptions {
 function codedReplies(
   program: string,
   home: string,
-  {args = [], env = process.env, onLine}: CodedRepliesOptions = {}
+  {args = [], env = process.env, platform, onLine}: CodedRepliesOptions = {}
 ) {
   const treeId = crypto.randomUUID()
   const idle = heldIdle()
@@ -409,6 +410,7 @@ function codedReplies(
     },
     commandFor: command => ({command, args}),
     env,
+    platform,
     whenIdle: idle.whenIdle,
   })
 
@@ -1709,7 +1711,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       const last = markedPathFolder(marker)
 
       const {reply, closed} = codedReplies(folder, home, {
-        args: ['-c', 'allow_login_shell=false'],
+        platform: 'linux',
         env: withGitLast(process.env, last),
       })
 
