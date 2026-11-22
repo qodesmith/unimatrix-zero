@@ -151,10 +151,14 @@ async function setUp(
   const reports = folder('uz-codex-reports-')
   const idle = heldIdle()
   const exits: Promise<unknown>[] = []
+  const environments: NodeJS.ProcessEnv[] = []
+  const developerTools = {present: true}
 
   const driver = createCodexDriver({
     store: store.client,
+    hasDeveloperTools: async () => developerTools.present,
     spawn: (command, options) => {
+      environments.push(options.env)
       const child = spawnCodex(command, options)
       exits.push(once(child, 'exit').catch(() => undefined))
 
@@ -192,6 +196,7 @@ async function setUp(
       },
     },
     configDir,
+    developerDir: path.join(configDir, 'developer'),
   }
 
   /** Stops the Reply after `stopAfter` text deltas. */
@@ -284,6 +289,9 @@ async function setUp(
     reply,
     cut,
     reports: reportsSoFar,
+    environments,
+    /** What the Mac has when the next app-server starts. */
+    developerTools,
     allClosed,
   }
 }
@@ -391,6 +399,28 @@ it('runs codex in its own CODEX_HOME, updater off and nothing that outranks the 
   expect(report?.home).toBe(codex.configDir)
   expect(report?.cwd).toBe(codex.configDir)
   expect(report?.vendorVariables).toEqual(['CODEX_HOME'])
+})
+
+it('names the app’s developer folder to an app-server that starts on a Mac with no developer tools, and to none that starts on a Mac with them', async () => {
+  const codex = await setUp(['started.ndjson', 'started.ndjson'])
+
+  await codex.reply(FIRST_PROMPT)
+  await codex.allClosed()
+  codex.developerTools.present = false
+  await codex.reply(FIRST_PROMPT)
+
+  expect(codex.environments.map(env => env.DEVELOPER_DIR)).toEqual([
+    undefined,
+    codex.vendorProgram.developerDir,
+  ])
+  // Git's own folders are named inside the folder's script, for one call.
+  expect(
+    codex.environments.flatMap(env =>
+      Object.keys(env).filter(name => name.startsWith('GIT_'))
+    )
+  ).toEqual([])
+
+  await codex.allClosed()
 })
 
 it('continues the Provider session in the app-server that has it loaded, then closes when idle', async () => {

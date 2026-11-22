@@ -4,6 +4,10 @@ import type {CodexCommand, SpawnCodex} from './app-server'
 import type {ProviderDriver, SignInRequest} from '@uz/contract/host'
 
 import {idleFor} from '#modules/idle/main'
+import {
+  macHasDeveloperTools,
+  withDeveloperDir,
+} from '#modules/vendor-environment/main'
 import {getProgramReady, programOf} from '@uz/vendor-program'
 import {spawn} from 'node:child_process'
 import fs from 'node:fs'
@@ -35,6 +39,7 @@ interface CodexDriverOptions {
   spawn?: SpawnCodex
   commandFor?: (path: string) => CodexCommand
   env?: NodeJS.ProcessEnv
+  hasDeveloperTools?: typeof macHasDeveloperTools
   whenIdle?: WhenIdle
   timeoutMs?: number
 }
@@ -44,20 +49,27 @@ export function createCodexDriver({
   spawn: start = spawnCodex,
   commandFor = path => ({command: path, args: []}),
   env = process.env,
+  hasDeveloperTools = macHasDeveloperTools,
   whenIdle = idleFor(IDLE_CLOSE_MS),
   timeoutMs = SIGN_IN_TIMEOUT_MS,
 }: CodexDriverOptions): ProviderDriver {
-  async function open({program, configDir}: SignInRequest) {
+  /**
+   * Every Thread shares the app-server, so the Mac's developer tools are
+   * looked for when it starts, not at each Thread.
+   */
+  async function open({program, configDir, developerDir}: SignInRequest) {
     if (!program) throw new Error('The manifest names no Codex program.')
 
     fs.mkdirSync(configDir, {recursive: true, mode: 0o700})
 
     const {command, args} = commandFor(programOf(program))
 
+    const base = await withDeveloperDir(env, developerDir, hasDeveloperTools)
+
     return startAppServer(
       start,
       {command, args: [...args, ...CODEX_ARGS]},
-      {cwd: configDir, env: codexEnvironment(env, configDir)}
+      {cwd: configDir, env: codexEnvironment(base, configDir)}
     )
   }
 

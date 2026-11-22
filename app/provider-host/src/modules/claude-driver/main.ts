@@ -4,6 +4,10 @@ import type {SpawnOptions} from '@anthropic-ai/claude-agent-sdk'
 import type {ProviderDriver} from '@uz/contract/host'
 
 import {idleFor} from '#modules/idle/main'
+import {
+  macHasDeveloperTools,
+  withDeveloperDir,
+} from '#modules/vendor-environment/main'
 import {query} from '@anthropic-ai/claude-agent-sdk'
 import {getProgramReady} from '@uz/vendor-program'
 import {spawn} from 'node:child_process'
@@ -53,13 +57,22 @@ function readModelsWith(env: NodeJS.ProcessEnv): ReadModels {
 }
 
 type ClaudeDriverOptions = Pick<ClaudeRepliesDeps, 'store'> &
-  Partial<Omit<ClaudeRepliesDeps, 'store' | 'learnModels' | 'resolveModel'>>
+  Partial<
+    Omit<
+      ClaudeRepliesDeps,
+      'store' | 'learnModels' | 'resolveModel' | 'replyEnv'
+    >
+  > & {
+    env?: NodeJS.ProcessEnv
+    hasDeveloperTools?: typeof macHasDeveloperTools
+  }
 
 export function createClaudeDriver({
   store,
   query: run = query,
   spawn: start = spawnClaude,
   env = process.env,
+  hasDeveloperTools = macHasDeveloperTools,
   whenIdle = idleFor(IDLE_CLOSE_MS),
   maxWarm = MAX_WARM,
   whenSilent = idleFor(HEARD_WITHIN_MS),
@@ -70,7 +83,8 @@ export function createClaudeDriver({
     store,
     query: run,
     spawn: start,
-    env,
+    replyEnv: async ({vendorProgram}) =>
+      withDeveloperDir(env, vendorProgram.developerDir, hasDeveloperTools),
     whenIdle,
     maxWarm,
     whenSilent,

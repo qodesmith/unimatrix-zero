@@ -1,0 +1,21 @@
+# On a Mac with no developer tools, the AI's commands get a developer folder of the app's own
+
+A Tree's AI runs commands in the Tree's folder, `git` among them, and `claude` and Codex find those programs themselves. On a Mac without Xcode or the Command Line Tools, `/usr/bin/git` is Apple's stub: it fails and opens the "install developer tools" dialog. So are `python3`, `make`, `clang` and about 110 others in `/usr/bin`, all the same program. Most of our users aren't developers, so most Mac users would see that dialog the first time the AI ran one. Every stub looks for the Mac's developer folder and runs that folder's `xcrun` with its own name, and the dialog opens only when there is no such folder. `DEVELOPER_DIR` names the folder, with no admin rights. So on such a Mac the app gives `claude` and Codex a developer folder of its own, holding one script as `xcrun`: `git` runs the app's own pinned `git` ([ADR 0024](./0024-app-runs-its-own-pinned-git.md)), and every other tool fails with one line. Findings: [#277](https://github.com/qodesmith/unimatrix-zero/issues/277).
+
+## Considered Options
+
+- **The app's `git` first on `PATH`.** Rejected: Codex rebuilds `PATH` from the user's login shell, so the app's `git` is no longer first, and it covers `git` alone while every other stub still opens the dialog.
+- **Installing the Command Line Tools for the user.** Rejected: they are over 1 GB and need the user's click in that same dialog or an admin password. Homebrew needs an admin password and installs them too.
+- **The app's folder on every Mac.** Rejected: a Mac with its own tools would lose its `git`, its config, its credential helpers and its saved logins inside the app.
+- **A `git` config of the app's own, with a name and an email.** Rejected: a name the app made up would end up in commits the user may later push. When `git commit` asks who the user is, the AI sets one for that folder or asks.
+
+## Consequences
+
+- **Only a Mac with no developer tools gets the folder**, checked each time a vendor program starts: for `claude` that is each session, and for Codex the app-server every Thread shares. A Mac with Xcode or the Command Line Tools, or a `DEVELOPER_DIR` of the user's own, is left alone. A user who installs the tools mid-session keeps the app's folder until the next start.
+- **`PATH` is not changed**, and the folder is the only variable added. The three things the `git` build needs told to it (its sub-programs, its templates, its own system config) are set inside the script for the one call, so none reaches `claude`, Codex or anything else they run. The AI's `git` reads the user's own `~/.gitconfig`, as any `git` does.
+- **The script is written at launch and downloads nothing.** It looks for the app's `git` on every call, so until the download is in place `git` fails with a "not ready yet" error, and works in the same session once it lands.
+- **No credential helper is turned on.** The build ships Git Credential Manager and has no Keychain helper. Signing in to a host over HTTPS is [#279](https://github.com/qodesmith/unimatrix-zero/issues/279). HTTPS uses macOS's own `libcurl`, so certificates come from the system, and SSH uses macOS's own `ssh`.
+- **Python or a compiler of the app's own** would be one more case in the script.
+- **A developer's Mac can't test the case that matters**, so a CI job moves Xcode and the Command Line Tools out of the way and runs the stubs against the folder. It never runs a stub without `DEVELOPER_DIR`, which would ask for the dialog.
+- **Two Provider dependencies:** that the variable reaches the commands `claude` and Codex run, and Apple's own behavior, that a stub honors `DEVELOPER_DIR` where there is no developer folder at all. The first has a live check per Provider, and the CI job holds the second.
+- **Windows and Linux have no stubs and no dialog.** A missing `git` there fails with "not found", and the fix is a different one: [#278](https://github.com/qodesmith/unimatrix-zero/issues/278).

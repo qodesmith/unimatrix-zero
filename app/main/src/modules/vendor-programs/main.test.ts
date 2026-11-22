@@ -5,7 +5,7 @@ import {DEV_MANIFEST, gitTargetFor, signInRequestFor} from './main'
 
 const userData = path.join('/data', 'unimatrix-zero')
 
-it('puts the exact Claude build under userData, beside its own configuration', () => {
+it('puts the exact Claude build under userData, beside its own configuration and, on a Mac, the app’s developer folder', () => {
   const request = signInRequestFor('claude', {
     userData,
     platform: 'darwin',
@@ -18,6 +18,7 @@ it('puts the exact Claude build under userData, beside its own configuration', (
       build: DEV_MANIFEST.vendorPrograms.claude.builds['darwin-arm64'],
     },
     configDir: path.join(userData, 'providers', 'claude'),
+    developerDir: path.join(userData, 'developer'),
   })
 })
 
@@ -41,7 +42,7 @@ it('has no program for a machine the manifest does not name', () => {
   ).toBeNull()
 })
 
-it('puts the Codex folder for ChatGPT under userData, beside its own configuration', () => {
+it('puts the Codex folder for ChatGPT under userData, beside its own configuration, with no developer folder off a Mac', () => {
   const request = signInRequestFor('chatgpt', {
     userData,
     platform: 'linux',

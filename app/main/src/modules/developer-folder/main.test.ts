@@ -110,6 +110,7 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     await stub(folder, 'git', [...identity, 'commit', '-am', 'two'], first)
     await stub(folder, 'git', ['push', url, 'main'], first)
     const fetch = await stub(folder, 'git', ['fetch', 'origin'], second)
+
     const fetched = await stub(
       folder,
       'git',
@@ -140,12 +141,11 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     expect(advertised.stdout).toContain('agent=git/')
 
     for (const tool of ['git-receive-pack', 'git-upload-archive']) {
-      // oxlint-disable-next-line no-await-in-loop -- one stub at a time
       const ended = await stub(folder, tool, [path.join(work, 'missing')])
 
       // Git's own refusal, where the script's would be 127.
-      expect(ended.code, tool).toBe(128)
-      expect(ended.stderr, tool).toMatch(/^fatal: /)
+      expect(ended.code).toBe(128)
+      expect(ended.stderr).toMatch(/^fatal: /)
     }
 
     const shell = await stub(folder, 'git-shell', ['-c', 'git-upload-pack'])
@@ -159,8 +159,7 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     writeDeveloperFolder(folder, inject('gitProgram'))
 
     for (const tool of ['python3', 'make', 'clang']) {
-      // oxlint-disable-next-line no-await-in-loop -- one stub at a time
-      expect(await stub(folder, tool, ['--version']), tool).toEqual({
+      expect(await stub(folder, tool, ['--version'])).toEqual({
         code: 127,
         stdout: '',
         stderr: `${tool}: not installed on this Mac\n`,

@@ -12,6 +12,7 @@ import {registerCommandChannel} from '#modules/commands/main'
 import {createConnections} from '#modules/connections/main'
 import {DatabaseOpenError, openDatabase} from '#modules/database/main'
 import {readDevRun} from '#modules/dev/main'
+import {writeDeveloperFolder} from '#modules/developer-folder/main'
 import {createDroppedFiles} from '#modules/dropped-files/main'
 import {createGitProgram} from '#modules/git-program/main'
 import {utilityHost} from '#modules/host-process/main'
@@ -25,7 +26,11 @@ import {createTitles} from '#modules/titles/main'
 import {createTreeFiles} from '#modules/tree-files/main'
 import {createTreeRows, createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
-import {gitTargetFor, signInRequestFor} from '#modules/vendor-programs/main'
+import {
+  developerFolderFor,
+  gitTargetFor,
+  signInRequestFor,
+} from '#modules/vendor-programs/main'
 import {
   createWindow,
   followThemeMode,
@@ -35,7 +40,7 @@ import {
   setAppMenu,
 } from '#modules/window/main'
 import {compactionSettingsFor} from '@uz/contract/settings'
-import {getProgramReady} from '@uz/vendor-program'
+import {getProgramReady, programOf} from '@uz/vendor-program'
 import {app, dialog, ipcMain, protocol, session} from 'electron'
 import path from 'node:path'
 
@@ -149,8 +154,16 @@ function openWindow(db: Database) {
     arch: process.arch,
   }
 
+  const gitTarget = gitTargetFor(machine)
+  const developerFolder = developerFolderFor(machine)
+
+  // Before any host starts, so the first session's stubs find the script.
+  if (developerFolder) {
+    writeDeveloperFolder(developerFolder, gitTarget && programOf(gitTarget))
+  }
+
   const gitProgram = createGitProgram({
-    target: gitTargetFor(machine),
+    target: gitTarget,
     getProgramReady,
     onWaiting: () => hub.publish({type: 'SNAPSHOTS_WAITING'}),
   })

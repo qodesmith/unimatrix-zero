@@ -88,7 +88,9 @@ jobs:
             echo "::error::xcode-select still finds developer tools, so this job would test nothing."
             exit 1
           fi
-      - run: bun run test:node app/main/src/modules/developer-folder
+      - run: bun run test:node app/main/src/modules/developer-folder app/provider-host/src/modules/vendor-environment
+        env:
+          UZ_NO_DEVELOPER_TOOLS: '1'
 
   provider-checks:
     name: Provider checks on a vendor bump

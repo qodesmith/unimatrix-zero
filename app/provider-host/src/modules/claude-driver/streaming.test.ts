@@ -130,6 +130,7 @@ async function setUp(
   const silence = heldIdle()
   const exits: Promise<unknown>[] = []
   const environments: NodeJS.ProcessEnv[] = []
+  const developerTools = {present: true}
 
   const driver = createClaudeDriver({
     store: store.client,
@@ -150,6 +151,7 @@ async function setUp(
         behavior
       ),
     },
+    hasDeveloperTools: async () => developerTools.present,
     whenIdle: idle.whenIdle,
     whenSilent: silence.whenIdle,
   })
@@ -173,6 +175,7 @@ async function setUp(
       build: {url: 'https://example.com/claude', sha256: '', size: 0},
     },
     configDir,
+    developerDir: path.join(configDir, 'developer'),
   }
 
   async function reply(
@@ -250,6 +253,8 @@ async function setUp(
     reply,
     reports: reportsSoFar,
     environments,
+    /** What the Mac has when the next `claude` starts. */
+    developerTools,
     allClosed,
     /** Runs out every wait for a silent `claude` begun so far. */
     passSilence: silence.pass,
@@ -784,6 +789,28 @@ it('starts claude for a Reply with the retry watchdog on, and its wait at a usag
       CLAUDE_CODE_RETRY_WATCHDOG_MAX_USAGE_LIMIT_WAIT_MS: '1',
     }),
   ])
+
+  await claude.allClosed()
+})
+
+it('names the app’s developer folder to a claude that starts on a Mac with no developer tools, and to none that starts on a Mac with them', async () => {
+  const claude = await setUp(['warm.ndjson', 'warm.ndjson'])
+
+  await claude.reply(FIRST_PROMPT)
+  await claude.allClosed()
+  claude.developerTools.present = false
+  await claude.reply(FIRST_PROMPT)
+
+  expect(claude.environments.map(env => env.DEVELOPER_DIR)).toEqual([
+    undefined,
+    claude.vendorProgram.developerDir,
+  ])
+  // Git's own folders are named inside the folder's script, for one call.
+  expect(
+    claude.environments.flatMap(env =>
+      Object.keys(env).filter(name => name.startsWith('GIT_'))
+    )
+  ).toEqual([])
 
   await claude.allClosed()
 })

@@ -38,7 +38,8 @@ export interface ClaudeRepliesDeps {
   store: SessionStoreClient
   query: QueryFn
   spawn: (options: SpawnOptions) => SpawnedProcess
-  env: NodeJS.ProcessEnv
+  /** The host's environment for a `claude` that starts now (ADR 0025). */
+  replyEnv: (request: ReplyRequest) => Promise<NodeJS.ProcessEnv>
   whenIdle: WhenIdle
   maxWarm: number
   whenSilent: WhenSilent
@@ -148,16 +149,18 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     })
 
     try {
-      const files = await Promise.race([
-        filesOf(request, restore),
+      const ready = await Promise.race([
+        Promise.all([filesOf(request, restore), deps.replyEnv(request)]),
         stop.promise,
       ])
 
       // A Stop asked before `open` loses the race to a `filesOf` with nothing
       // to wait for, so `asked` is checked too.
-      if ('silent' in files || stop.asked) return {silent: 'stopped'}
+      if ('silent' in ready || stop.asked) return {silent: 'stopped'}
 
-      return start(request, restore, files, program)
+      const [files, env] = ready
+
+      return start(request, restore, {files, env}, program)
     } finally {
       unstoppable()
     }
@@ -166,7 +169,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   function start(
     request: ReplyRequest,
     restore: Restore,
-    files: SessionFile[],
+    {files, env}: {files: SessionFile[]; env: NodeJS.ProcessEnv},
     program: NonNullable<ReplyRequest['vendorProgram']['program']>
   ): Live {
     const {configDir} = request.vendorProgram
@@ -187,7 +190,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
         : sessionStore
 
     const options: Options = {
-      ...replyOptions(request, program.path, deps.env),
+      ...replyOptions(request, program.path, env),
       ...(resume ? {resume} : {}),
       ...(fork ? {forkSession: true} : {}),
       ...(upTo ? {resumeSessionAt: upTo} : {}),

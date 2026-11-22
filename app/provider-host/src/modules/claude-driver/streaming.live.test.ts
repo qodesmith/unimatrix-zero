@@ -170,7 +170,9 @@ function forgetTranscript(sessionId: string) {
 function liveDriver(
   files: string[],
   firstEnv: Record<string, string> = {},
-  refuses: Parameters<typeof fakeStore>[0] = {}
+  refuses: Parameters<typeof fakeStore>[0] = {},
+  /** The host's own environment, as the driver reads it. */
+  hostEnv: NodeJS.ProcessEnv = process.env
 ) {
   let addedEnv = firstEnv
   let droppedEnv: string[] = []
@@ -210,6 +212,7 @@ function liveDriver(
 
       return child
     },
+    env: hostEnv,
     whenIdle: idle.whenIdle,
   })
 
@@ -294,6 +297,27 @@ function reaching(session: ReplyRecorded['session']): ReplySession {
 }
 
 type Live = ReturnType<typeof liveDriver>
+
+/**
+ * A developer folder whose `xcrun` prints `marker` and what it was run with,
+ * as the app's own prints its errors (ADR 0025).
+ */
+function markedDeveloperFolder(marker: string) {
+  const developerDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'uz-live-developer-')
+  )
+
+  const bin = path.join(developerDir, 'usr', 'bin')
+  fs.mkdirSync(bin, {recursive: true})
+
+  fs.writeFileSync(
+    path.join(bin, 'xcrun'),
+    `#!/bin/sh\necho "${marker} $*"\n`,
+    {mode: 0o755}
+  )
+
+  return developerDir
+}
 
 /**
  * Runs the real `claude` and writes to `ended` whether it exited by itself or
@@ -1147,6 +1171,40 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       fs.rmSync(moved, {recursive: true, force: true})
     }
   }, 300_000)
+
+  it.runIf(process.platform === 'darwin')(
+    '[dep:developer-dir-reaches-commands] runs the xcrun of the developer folder in the host’s environment for a stub in /usr/bin that a command names',
+    async () => {
+      const marker = `uz-xcrun-${crypto.randomUUID()}`
+      const developerDir = markedDeveloperFolder(marker)
+
+      const live = liveDriver(
+        [],
+        {},
+        {},
+        {
+          ...process.env,
+          DEVELOPER_DIR: developerDir,
+        }
+      )
+
+      try {
+        const {events} = await live.reply(
+          'Run `/usr/bin/git --version` with Bash, then reply with exactly what it printed.',
+          null
+        )
+
+        expect(
+          toolCallsIn(events).map(call => call.result?.content.trim())
+        ).toContain(`${marker} git --version`)
+
+        await live.done()
+      } finally {
+        fs.rmSync(developerDir, {recursive: true, force: true})
+      }
+    },
+    300_000
+  )
 
   it('[dep:claude-prompt-fresh] applies a changed System prompt to the session it resumes', async () => {
     const live = liveDriver([])
