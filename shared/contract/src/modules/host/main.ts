@@ -37,8 +37,7 @@ export const SignInRequestSchema = z.strictObject({
   configDir: z.string().min(1),
   /**
    * On a Mac, the app's own developer folder: the vendor program's
-   * `DEVELOPER_DIR` when it starts on a Mac with no developer tools (ADR
-   * 0025).
+   * `DEVELOPER_DIR` when it starts on a Mac with no developer tools.
    */
   developerDir: z.string().min(1).optional(),
 })

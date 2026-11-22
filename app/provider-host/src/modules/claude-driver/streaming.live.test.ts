@@ -20,6 +20,7 @@ import type {
 import type {CompactionSettings} from '@uz/contract/settings'
 
 import {byPathOnly, pdfSaying, pngShowing} from '#modules/test-attachments/main'
+import {markedDeveloperFolder} from '#modules/test-developer-folder/main'
 import {heldIdle} from '#modules/test-idle/main'
 import {listenLocally, startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -296,24 +297,6 @@ function reaching(session: ReplyRecorded['session']): ReplySession {
 }
 
 type Live = ReturnType<typeof liveDriver>
-
-/** A developer folder whose `xcrun` prints `marker` and what it was run with. */
-function markedDeveloperFolder(marker: string) {
-  const developerDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'uz-live-developer-')
-  )
-
-  const bin = path.join(developerDir, 'usr', 'bin')
-  fs.mkdirSync(bin, {recursive: true})
-
-  fs.writeFileSync(
-    path.join(bin, 'xcrun'),
-    `#!/bin/sh\necho "${marker} $*"\n`,
-    {mode: 0o755}
-  )
-
-  return developerDir
-}
 
 /**
  * Runs the real `claude` and writes to `ended` whether it exited by itself or

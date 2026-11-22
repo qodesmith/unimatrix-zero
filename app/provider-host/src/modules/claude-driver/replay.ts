@@ -63,7 +63,6 @@ export function fakeClaudeEnv(
 export const FakeClaudeRunSchema = z.strictObject({
   args: z.array(z.string()),
   configDir: z.string(),
-  /** The `DEVELOPER_DIR` it started with. */
   developerDir: z.string().nullable(),
   cwd: z.string(),
   /** The runs, by n, still going when this one started. */
