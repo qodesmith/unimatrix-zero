@@ -37,17 +37,30 @@ export async function macHasDeveloperTools(base: NodeJS.ProcessEnv) {
   })
 }
 
-/** A stub runs the folder's `xcrun`, so a folder without one is no tools. */
-async function isDeveloperFolder(folder: string | undefined) {
-  if (!folder) return false
-
+async function isExecutable(file: string) {
   try {
-    await fs.access(path.join(folder, 'usr', 'bin', 'xcrun'), fs.constants.X_OK)
+    await fs.access(file, fs.constants.X_OK)
 
     return true
   } catch {
     return false
   }
+}
+
+/**
+ * A stub runs the folder's `xcrun`, so a folder without one is no tools.
+ * `DEVELOPER_DIR` may name an Xcode app instead, whose folder is inside it.
+ */
+async function isDeveloperFolder(folder: string | undefined) {
+  if (!folder) return false
+
+  const found = await Promise.all(
+    [folder, path.join(folder, 'Contents', 'Developer')].map(async root =>
+      isExecutable(path.join(root, 'usr', 'bin', 'xcrun'))
+    )
+  )
+
+  return found.includes(true)
 }
 
 /**

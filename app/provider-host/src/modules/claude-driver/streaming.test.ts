@@ -845,6 +845,16 @@ it('names the app’s developer folder to a one-shot’s claude on a Mac with no
   ])
 })
 
+it('names the app’s developer folder to the claude that lists the Models on a Mac with no developer tools', async () => {
+  const claude = await setUp([listedOnly()])
+  claude.developerTools.present = false
+
+  await claude.driver.listModels(claude.vendorProgram)
+  const [reader] = claude.reports()
+
+  expect(reader?.developerDir).toBe(claude.vendorProgram.developerDir)
+})
+
 it('reports each retry, and shows once the message Claude starts over after cutting it off', async () => {
   const claude = await setUp([beforeFirstMessage(cutOff(['TE'], 0))])
 
@@ -2001,6 +2011,7 @@ it('lists the Models from a `claude` it starts before any Prompt, then those of 
   const [reader] = claude.reports()
 
   expect(reader?.configDir).toBe(claude.configDir)
+  expect(reader?.developerDir).toBeNull()
   expect(reader?.ended).toBe('input-closed')
 
   const first = await claude.reply(FIRST_PROMPT)

@@ -5,6 +5,7 @@ import type {SessionStoreClient} from '#modules/session-store/main'
 import type {Silent, WhenSilent} from './heard'
 import type {Restore} from './resumption'
 import type {ClaudeSession, QueryFn} from './session'
+import type {ClaudeSignInDeps} from './sign-in'
 import type {
   ModelInfo,
   Options,
@@ -38,8 +39,7 @@ export interface ClaudeRepliesDeps {
   store: SessionStoreClient
   query: QueryFn
   spawn: (options: SpawnOptions) => SpawnedProcess
-  /** The host's environment for a `claude` that starts now. */
-  replyEnv: (request: ReplyRequest) => Promise<NodeJS.ProcessEnv>
+  hostEnv: ClaudeSignInDeps['hostEnv']
   whenIdle: WhenIdle
   maxWarm: number
   whenSilent: WhenSilent
@@ -150,7 +150,10 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
 
     try {
       const ready = await Promise.race([
-        Promise.all([filesOf(request, restore), deps.replyEnv(request)]),
+        Promise.all([
+          filesOf(request, restore),
+          deps.hostEnv(request.vendorProgram.developerDir),
+        ]),
         stop.promise,
       ])
 

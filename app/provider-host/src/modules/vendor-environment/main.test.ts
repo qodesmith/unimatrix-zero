@@ -23,15 +23,29 @@ it('names the app’s developer folder over one the user set that holds no xcrun
   expect(env).toStrictEqual({...base, DEVELOPER_DIR: folder})
 })
 
+/** A folder the user's `DEVELOPER_DIR` names, with an `xcrun` under `root`. */
+function theirsWithXcrun(...root: string[]) {
+  const theirs = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-own-developer-'))
+  const bin = path.join(theirs, ...root, 'usr', 'bin')
+  fs.mkdirSync(bin, {recursive: true})
+  fs.writeFileSync(path.join(bin, 'xcrun'), '', {mode: 0o755})
+
+  return {...base, DEVELOPER_DIR: theirs}
+}
+
 it.skipIf(process.platform === 'win32')(
   'leaves a developer folder the user set that holds an xcrun, on a Mac with no developer tools of its own',
   async () => {
-    const theirs = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-own-developer-'))
-    fs.mkdirSync(path.join(theirs, 'usr', 'bin'), {recursive: true})
-    fs.writeFileSync(path.join(theirs, 'usr', 'bin', 'xcrun'), '', {
-      mode: 0o755,
-    })
-    const own = {...base, DEVELOPER_DIR: theirs}
+    const own = theirsWithXcrun()
+
+    expect(await withDeveloperDir(own, folder, async () => false)).toBe(own)
+  }
+)
+
+it.skipIf(process.platform === 'win32')(
+  'leaves an Xcode app the user set whose developer folder holds an xcrun, on a Mac with no developer tools of its own',
+  async () => {
+    const own = theirsWithXcrun('Contents', 'Developer')
 
     expect(await withDeveloperDir(own, folder, async () => false)).toBe(own)
   }

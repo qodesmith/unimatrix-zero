@@ -61,7 +61,7 @@ type ClaudeDriverOptions = Pick<ClaudeRepliesDeps, 'store'> &
   Partial<
     Omit<
       ClaudeRepliesDeps,
-      'store' | 'learnModels' | 'resolveModel' | 'replyEnv'
+      'store' | 'learnModels' | 'resolveModel' | 'hostEnv'
     >
   > & {
     env?: NodeJS.ProcessEnv
@@ -89,7 +89,7 @@ export function createClaudeDriver({
     store,
     query: run,
     spawn: start,
-    replyEnv: async ({vendorProgram}) => hostEnv(vendorProgram.developerDir),
+    hostEnv,
     whenIdle,
     maxWarm,
     whenSilent,
