@@ -21,7 +21,8 @@ const CODEX_ARGS = [
 
 /**
  * In a login shell, Debian's `/etc/profile` drops the folder of the app's own
- * `git` from `PATH` (ADR 0026). A Mac's is how Codex finds the user's tools.
+ * `git` from `PATH` (ADR 0026). On a Mac the login shell is how Codex finds the
+ * user's tools.
  */
 export function codexArgs(platform: NodeJS.Platform) {
   return platform === 'linux'

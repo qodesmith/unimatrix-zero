@@ -662,7 +662,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **App side:** on Windows, `claude-driver` names `PowerShell` among `claude`'s tools, and `vendor-environment` puts the `cmd` folder of the app's own `git` last on the `PATH` of `claude` and Codex (ADR 0026).
 - **User would see:** on a PC with no Git Bash, a Claude Reply that can run no command at all. On a PC with no `git`, the AI's `git` fails with "not recognized".
 - **Changed by:** upgrade
-- **Check:** none: needs a signed-in Windows PC, which the maintainer's machine is not. Tested by hand on Windows 11 under Full access, with `claude` 2.1.307 and Codex 0.163.0: the results are in [#278](https://github.com/qodesmith/unimatrix-zero/issues/278#issuecomment-7078343644). The other Permission modes are untested.
+- **Check:** none: needs a signed-in Windows PC, which the maintainer's machine is not. The maintainer tested it by hand on Windows 11 under Full access, with `claude` 2.1.307 and Codex 0.163.0: the results are in [#278](https://github.com/qodesmith/unimatrix-zero/issues/278#issuecomment-7078343644). The other Permission modes are untested.
 
 ### A new session's setup tokens
 
