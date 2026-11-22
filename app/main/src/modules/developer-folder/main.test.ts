@@ -1,6 +1,6 @@
-import {servedOverHttp} from '#modules/test-git-server/main'
+import {repoToServe, servedOverHttp} from '#modules/test-git-server/main'
 import {DEV_MANIFEST} from '#modules/vendor-programs/main'
-import {NO_GIT_SIGN_IN} from '@uz/vendor-program/git-sign-in'
+import {NO_GIT_LOGIN} from '@uz/vendor-program/git-login'
 import {execFile} from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -160,7 +160,7 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     expect(shell.stderr).toMatch(/^fatal: /)
   })
 
-  it('fails a git that needs a login at once and says what to do, asking no helper of the user’s', async () => {
+  it('fails a git that needs a login at once and says what to do, asking no helper or askpass program of the user’s', async () => {
     const folder = temporaryFolder()
     writeDeveloperFolder(folder, inject('gitProgram'))
     const home = path.join(folder, 'home')
@@ -169,16 +169,23 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
       path.join(home, '.gitconfig'),
       '[credential]\n\thelper = "!echo the user’s helper >&2"\n'
     )
+    const askpass = path.join(folder, 'askpass')
+    fs.writeFileSync(askpass, '#!/bin/sh\necho "askpass $1" >&2\n', {
+      mode: 0o755,
+    })
     const host = await servedOverHttp(temporaryFolder())
 
-    const denied = await stub(folder, 'git', [
-      'ls-remote',
-      `${host}/private/repo.git`,
-    ])
+    const denied = await stub(
+      folder,
+      'git',
+      ['ls-remote', `${host}/private/repo.git`],
+      os.tmpdir(),
+      {SSH_ASKPASS: askpass}
+    )
 
     expect(denied.code).toBe(128)
     expect(denied.stderr).toBe(
-      `${NO_GIT_SIGN_IN}\nfatal: could not read Username for '${host}': terminal prompts disabled\n`
+      `${NO_GIT_LOGIN}\nfatal: could not read Username for '${host}': terminal prompts disabled\n`
     )
   })
 
@@ -208,13 +215,7 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     const first = path.join(work, 'first')
     const origin = path.join(work, 'origin.git')
     const second = path.join(work, 'second')
-    fs.mkdirSync(first)
-    await stub(folder, 'git', ['init', '-b', 'main'], first)
-    fs.writeFileSync(path.join(first, 'note.txt'), 'one\n')
-    await stub(folder, 'git', ['add', 'note.txt'], first)
-    await stub(folder, 'git', [...identity, 'commit', '-m', 'one'], first)
-    await stub(folder, 'git', ['clone', '--bare', first, origin], work)
-    await stub(folder, 'git', ['update-server-info'], origin)
+    await repoToServe(async (args, cwd) => stub(folder, 'git', args, cwd), work)
     const url = `${await servedOverHttp(work)}/origin.git`
 
     const clone = await stub(folder, 'git', ['clone', url, second], work)

@@ -1,16 +1,17 @@
-import type {AddressInfo} from 'node:net'
-
-import {servedOverHttp} from '#modules/test-git-server/main'
+import {
+  repoToServe,
+  servedOverHttp,
+  servedOverHttps,
+} from '#modules/test-git-server/main'
 import {DEV_MANIFEST, gitFolderFor} from '#modules/vendor-programs/main'
-import {NO_GIT_SIGN_IN, withNoGitSignIn} from '@uz/vendor-program/git-sign-in'
+import {NO_GIT_LOGIN, withNoGitLogin} from '@uz/vendor-program/git-login'
 import {execFile} from 'node:child_process'
 import fs from 'node:fs'
-import https from 'node:https'
 import os from 'node:os'
 import path from 'node:path'
 import {pathToFileURL} from 'node:url'
 import {promisify} from 'node:util'
-import {describe, expect, inject, it, onTestFinished} from 'vitest'
+import {describe, expect, inject, it} from 'vitest'
 
 import {writeGitWrapper} from './main'
 
@@ -123,59 +124,11 @@ function gitIn(folder: string): Git {
     })
 }
 
-/** For git's dumb HTTP protocol; CI makes and trusts the certificate. */
-async function served(root: string) {
-  const tls = process.env.UZ_TLS_FOLDER
-
-  if (!tls) {
-    throw new Error('UZ_TLS_FOLDER names no certificate for 127.0.0.1.')
-  }
-
-  const server = https.createServer(
-    {
-      cert: fs.readFileSync(path.join(tls, 'cert.pem')),
-      key: fs.readFileSync(path.join(tls, 'key.pem')),
-    },
-    (request, response) => {
-      const {pathname} = new URL(request.url ?? '/', 'https://127.0.0.1')
-
-      fs.readFile(path.join(root, pathname), (error, data) => {
-        response.writeHead(error ? 404 : 200).end(data)
-      })
-    }
-  )
-
-  onTestFinished(() => {
-    server.close()
-  })
-
-  await new Promise<void>(resolve => {
-    server.listen(0, '127.0.0.1', resolve)
-  })
-
-  return (server.address() as AddressInfo).port
-}
-
 function wrapped() {
   const folder = temporaryFolder()
   writeGitWrapper(folder, inject('gitProgram'))
 
   return gitIn(folder)
-}
-
-/** A folder holding `first`, a repo, and `origin.git`, its bare copy to serve. */
-async function bareRepo(git: Git) {
-  const work = temporaryFolder()
-  const first = path.join(work, 'first')
-  fs.mkdirSync(first)
-  await git(['init', '-b', 'main'], first)
-  fs.writeFileSync(path.join(first, 'note.txt'), 'one\n')
-  await git(['add', 'note.txt'], first)
-  await git([...identity, 'commit', '-m', 'one'], first)
-  await git(['clone', '--bare', first, 'origin.git'], work)
-  await git(['update-server-info'], path.join(work, 'origin.git'))
-
-  return work
 }
 
 describe.runIf(noGit && process.platform === 'linux')(
@@ -202,19 +155,21 @@ describe.runIf(noGit && process.platform === 'linux')(
       )
     })
 
-    it('reads and clones a remote that needs no login over HTTPS, with the system’s libcurl and certificates', async () => {
+    it('reads, clones and fetches a remote that needs no login over HTTPS, with the system’s libcurl and certificates', async () => {
       const git = wrapped()
-      const work = await bareRepo(git)
+      const work = temporaryFolder()
+      await repoToServe(git, work)
       const commit = await git(['rev-parse', 'HEAD'], path.join(work, 'first'))
-      const url = `https://127.0.0.1:${await served(work)}/origin.git`
+      const url = `${await servedOverHttps(work)}/origin.git`
 
       const remote = await git(['ls-remote', url, 'refs/heads/main'])
 
       expect(remote.stdout).toBe(`${commit.stdout.trim()}\trefs/heads/main\n`)
 
       const clone = await git(['clone', url, 'second'], work)
+      const fetch = await git(['fetch', 'origin'], path.join(work, 'second'))
 
-      expect(clone.code).toBe(0)
+      expect([clone.code, fetch.code]).toEqual([0, 0])
     })
 
     it('fails a git that needs a login at once and says what to do', async () => {
@@ -225,7 +180,7 @@ describe.runIf(noGit && process.platform === 'linux')(
 
       expect(denied.code).toBe(128)
       expect(denied.stderr).toBe(
-        `${NO_GIT_SIGN_IN}\nfatal: could not read Username for '${host}': terminal prompts disabled\n`
+        `${NO_GIT_LOGIN}\nfatal: could not read Username for '${host}': terminal prompts disabled\n`
       )
     })
 
@@ -266,24 +221,25 @@ describe.runIf(noGit && process.platform === 'win32')(
           '-Command',
           `git ${words.join(' ')}; exit $LASTEXITCODE`,
         ],
-        {cwd, env: withNoGitSignIn(withLast(folder))}
+        {cwd, env: withNoGitLogin(withLast(folder))}
       )
     }
 
-    it('fails a git that needs a login at once and says what to do, with the build’s sign-in turned to never ask', async () => {
+    it('fails a git that needs a login at once and says what to do, with the build’s login prompt turned off', async () => {
       const host = await servedOverHttp(temporaryFolder())
 
       const denied = await git(['ls-remote', `${host}/private/repo.git`])
 
       expect(denied.code).toBe(128)
-      expect(denied.stderr).toContain(`${NO_GIT_SIGN_IN}\n`)
+      expect(denied.stderr).toContain(`${NO_GIT_LOGIN}\n`)
       expect(denied.stderr).toContain(
         `fatal: could not read Username for '${host}': terminal prompts disabled`
       )
     })
 
     it('clones a remote that needs no login over HTTP', async () => {
-      const work = await bareRepo(git)
+      const work = temporaryFolder()
+      await repoToServe(git, work)
       const host = await servedOverHttp(work)
 
       const clone = await git(['clone', `${host}/origin.git`, 'second'], work)

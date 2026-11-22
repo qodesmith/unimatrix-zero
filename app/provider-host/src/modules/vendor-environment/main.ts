@@ -1,6 +1,6 @@
 import type {SignInRequest} from '@uz/contract/host'
 
-import {withNoGitSignIn} from '@uz/vendor-program/git-sign-in'
+import {withNoGitLogin} from '@uz/vendor-program/git-login'
 import {execFile} from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -105,5 +105,5 @@ export async function withAppFolders(
   )
 
   // A Mac's and Linux's scripts set these for the one call (ADR 0027).
-  return platform === 'win32' && gitFolder ? withNoGitSignIn(env) : env
+  return platform === 'win32' && gitFolder ? withNoGitLogin(env) : env
 }

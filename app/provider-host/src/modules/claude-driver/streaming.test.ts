@@ -857,7 +857,7 @@ it('gives claude the PowerShell tool on Windows', async () => {
   await claude.allClosed()
 })
 
-it('turns off git’s sign-in prompts for a Reply’s claude and a one-shot’s on Windows', async () => {
+it('turns off git’s login prompts for a Reply’s claude and a one-shot’s on Windows', async () => {
   const claude = await setUp(
     ['warm.ndjson', 'warm.ndjson'],
     {},

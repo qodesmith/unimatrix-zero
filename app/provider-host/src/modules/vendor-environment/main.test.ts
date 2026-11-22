@@ -1,4 +1,4 @@
-import {NO_SIGN_IN_HELPER} from '@uz/vendor-program/git-sign-in'
+import {NO_LOGIN_HELPER} from '@uz/vendor-program/git-login'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -146,7 +146,7 @@ const ownGitSetting = {
   GIT_CONFIG_VALUE_0: 'Sam',
 }
 
-it('turns off git’s sign-in prompts on Windows and adds a helper that says what to do, after the git settings already there', async () => {
+it('turns off git’s login prompts on Windows, and adds its credential helper after the git settings already there', async () => {
   const windows = {Path: String.raw`C:\Windows\System32`, ...ownGitSetting}
   const gitFolder = String.raw`C:\data\vendor\git\cmd`
 
@@ -164,7 +164,7 @@ it('turns off git’s sign-in prompts on Windows and adds a helper that says wha
     GIT_TERMINAL_PROMPT: '0',
     GIT_CONFIG_COUNT: '2',
     GIT_CONFIG_KEY_1: 'credential.helper',
-    GIT_CONFIG_VALUE_1: NO_SIGN_IN_HELPER,
+    GIT_CONFIG_VALUE_1: NO_LOGIN_HELPER,
   })
 })
 

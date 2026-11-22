@@ -1,4 +1,4 @@
-import {NO_SIGN_IN_HELPER} from '@uz/vendor-program/git-sign-in'
+import {NO_LOGIN_HELPER} from '@uz/vendor-program/git-login'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -9,8 +9,10 @@ export function quoted(text: string) {
 /**
  * Needs `$program` and `$tool` set. The build is made for `/`, so it gets its
  * own folders for this call only, never in what else the AI runs (ADR 0024).
- * So do the settings that keep it from signing in: no prompt, and the list of
- * credential helpers emptied, then one that says what to do (ADR 0027).
+ * So do the settings that keep it from signing in: no prompt, no askpass
+ * program (an empty `GIT_ASKPASS` stops git looking for `SSH_ASKPASS` and
+ * `core.askPass`), and the list of credential helpers emptied, then one that
+ * says what to do (ADR 0027).
  */
 export function runningBuild(gitProgram: string) {
   const root = path.join(path.dirname(gitProgram), '..')
@@ -23,9 +25,9 @@ export function runningBuild(gitProgram: string) {
   exit 127
 fi
 
-helper=${quoted(NO_SIGN_IN_HELPER)}
+helper=${quoted(NO_LOGIN_HELPER)}
 n=\${GIT_CONFIG_COUNT:-0}
-export GIT_TERMINAL_PROMPT=0 GIT_CONFIG_COUNT=$((n + 2)) \\
+export GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= GIT_CONFIG_COUNT=$((n + 2)) \\
   "GIT_CONFIG_KEY_$n=credential.helper" "GIT_CONFIG_VALUE_$n=" \\
   "GIT_CONFIG_KEY_$((n + 1))=credential.helper" "GIT_CONFIG_VALUE_$((n + 1))=$helper"
 
