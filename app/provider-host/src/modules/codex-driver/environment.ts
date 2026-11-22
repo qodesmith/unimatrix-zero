@@ -8,7 +8,7 @@ import {vendorEnvironment} from '#modules/vendor-environment/main'
  * to the Keychain. `features.multi_agent=false` leaves Subagents out until the
  * app can show them.
  */
-export const CODEX_ARGS = [
+const CODEX_ARGS = [
   '-c',
   'check_for_update_on_startup=false',
   '-c',
@@ -18,6 +18,18 @@ export const CODEX_ARGS = [
   '-c',
   'features.multi_agent=false',
 ]
+
+/**
+ * On Linux Codex runs each command in a login shell unless told not to, and
+ * Debian's `/etc/profile` sets `PATH` outright, dropping the folder of the
+ * app's own `git` (ADR 0026). On a Mac the login shell is how Codex finds the
+ * user's own tools, and on Windows it uses none.
+ */
+export function codexArgs(platform: NodeJS.Platform) {
+  return platform === 'linux'
+    ? [...CODEX_ARGS, '-c', 'allow_login_shell=false']
+    : CODEX_ARGS
+}
 
 /** The host's environment, minus anything that could outrank the subscription. */
 export function codexEnvironment(base: NodeJS.ProcessEnv, codexHome: string) {

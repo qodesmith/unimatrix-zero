@@ -22,8 +22,10 @@ import type {CompactionSettings} from '@uz/contract/settings'
 import {byPathOnly, pdfSaying, pngShowing} from '#modules/test-attachments/main'
 import {markedDeveloperFolder} from '#modules/test-developer-folder/main'
 import {heldIdle} from '#modules/test-idle/main'
+import {PATH_PROBE, markedPathFolder} from '#modules/test-path-folder/main'
 import {listenLocally, startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
+import {withGitLast} from '#modules/vendor-environment/main'
 import {query} from '@anthropic-ai/claude-agent-sdk'
 import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
@@ -1180,6 +1182,32 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
         await live.done()
       } finally {
         fs.rmSync(developerDir, {recursive: true, force: true})
+      }
+    },
+    300_000
+  )
+
+  // The probe is a shell script.
+  it.skipIf(process.platform === 'win32')(
+    '[dep:claude-keeps-path] runs a program by name from a folder added last to the PATH claude starts with, where it is still last',
+    async () => {
+      const marker = `uz-path-${crypto.randomUUID()}`
+      const folder = markedPathFolder(marker)
+      const live = liveDriver([], {}, {}, withGitLast(process.env, folder))
+
+      try {
+        const {events} = await live.reply(
+          `Run \`${PATH_PROBE}\` with Bash, then reply with exactly what it printed.`,
+          null
+        )
+
+        expect(
+          toolCallsIn(events).map(call => call.result?.content.trim())
+        ).toContain(`${marker} ${folder}`)
+
+        await live.done()
+      } finally {
+        fs.rmSync(folder, {recursive: true, force: true})
       }
     },
     300_000

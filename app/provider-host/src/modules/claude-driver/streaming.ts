@@ -3,13 +3,13 @@ import type {ContentPart} from '#modules/prompt-content/main'
 import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {Silent, WhenSilent} from './heard'
+import type {Outcome} from './outcome'
 import type {Restore} from './resumption'
 import type {ClaudeSession, QueryFn} from './session'
 import type {ClaudeSignInDeps} from './sign-in'
 import type {
   ModelInfo,
   Options,
-  SDKResultMessage,
   SpawnOptions,
   SpawnedProcess,
 } from '@anthropic-ai/claude-agent-sdk'
@@ -22,6 +22,7 @@ import {createReplyRuns} from '#modules/reply-runs/main'
 
 import {firstHeard, silentEnding, startingWith} from './heard'
 import {replyOptions} from './options'
+import {sessionLost} from './outcome'
 import {createReplyMapper} from './replies'
 import {contentOf, cutAt, resumption, servedThrough} from './resumption'
 import {openSession} from './session'
@@ -43,6 +44,7 @@ export interface ClaudeRepliesDeps {
   whenIdle: WhenIdle
   maxWarm: number
   whenSilent: WhenSilent
+  platform: NodeJS.Platform
   learnModels: (models: ModelInfo[]) => void
   resolveModel: (id: string) => string
 }
@@ -72,34 +74,8 @@ type Answered =
   | {session: Live; outcome: Outcome}
   | {session: null; outcome: Silent}
 
-/** `heard` says whether `claude` sent anything back to the Prompt. */
-type Outcome =
-  | {result: SDKResultMessage}
-  | {failure: RunFailure; heard: boolean}
-  | Silent
-
 function crashed(message: string): RunFailure {
   return {code: 'program-crashed', message}
-}
-
-/**
- * How `claude` refuses a session it has no transcript of, and a point to
- * resume at that is off the session's newest chain. It writes nothing to the
- * session either time.
- */
-const SESSION_LOST =
-  /No conversation found with session ID|No message found with message\.uuid of/
-
-function sessionLost(outcome: Outcome) {
-  if ('failure' in outcome) return SESSION_LOST.test(outcome.failure.message)
-
-  if ('silent' in outcome) return false
-
-  const {result} = outcome
-
-  return (
-    result.subtype !== 'success' && SESSION_LOST.test(result.errors.join(' '))
-  )
 }
 
 /** Replies from a warm `claude`, or a new one that resumes, forks or starts. */
@@ -152,7 +128,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       const ready = await Promise.race([
         Promise.all([
           filesOf(request, restore),
-          deps.hostEnv(request.vendorProgram.developerDir),
+          deps.hostEnv(request.vendorProgram),
         ]),
         stop.promise,
       ])
@@ -193,7 +169,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
         : sessionStore
 
     const options: Options = {
-      ...replyOptions(request, program.path, env),
+      ...replyOptions(request, program.path, env, deps.platform),
       ...(resume ? {resume} : {}),
       ...(fork ? {forkSession: true} : {}),
       ...(upTo ? {resumeSessionAt: upTo} : {}),

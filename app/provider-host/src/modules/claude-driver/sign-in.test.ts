@@ -170,11 +170,13 @@ it('starts the login and the plan read in the host’s environment for the reque
     read(maxAccount)
   )
 
-  const hostEnv = vi.fn<ClaudeSignInDeps['hostEnv']>(async developerDir => ({
-    ...HOST_ENV,
-    FAKE_SIGN_IN_ANSWERS: 'yes',
-    DEVELOPER_DIR: `${developerDir}/named`,
-  }))
+  const hostEnv = vi.fn<ClaudeSignInDeps['hostEnv']>(
+    async ({developerDir}) => ({
+      ...HOST_ENV,
+      FAKE_SIGN_IN_ANSWERS: 'yes',
+      DEVELOPER_DIR: `${developerDir ?? ''}/named`,
+    })
+  )
 
   await connect(
     createClaudeSignIn(

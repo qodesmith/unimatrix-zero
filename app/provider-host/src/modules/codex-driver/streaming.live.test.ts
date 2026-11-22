@@ -23,8 +23,10 @@ import type {CompactionSettings} from '@uz/contract/settings'
 import {fileHolding, pngShowing} from '#modules/test-attachments/main'
 import {markedDeveloperFolder} from '#modules/test-developer-folder/main'
 import {heldIdle} from '#modules/test-idle/main'
+import {PATH_PROBE, markedPathFolder} from '#modules/test-path-folder/main'
 import {listenLocally, startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
+import {withGitLast} from '#modules/vendor-environment/main'
 import {isReplyEvent} from '@uz/contract/host'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {programOf} from '@uz/vendor-program'
@@ -40,7 +42,7 @@ import {afterAll, describe, expect, it} from 'vitest'
 import {z} from 'zod'
 
 import {startAppServer} from './app-server'
-import {CODEX_ARGS, codexEnvironment} from './environment'
+import {codexArgs, codexEnvironment} from './environment'
 import {createCodexDriver, spawnCodex} from './main'
 import {portFree} from './port'
 import {createRecorder} from './recording'
@@ -1696,6 +1698,51 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     300_000
   )
 
+  // The probe is a shell script, and Windows has no login shell to turn off.
+  it.skipIf(process.platform === 'win32')(
+    '[dep:codex-no-login-shell] runs a command without a login shell when told to, and finds a program by name in a folder added last to its PATH, where it is still last',
+    async () => {
+      if (!folder || !signedIn) return
+
+      const home = homeFrom(signedIn)
+      const marker = `uz-path-${crypto.randomUUID()}`
+      const last = markedPathFolder(marker)
+
+      const {reply, closed} = codedReplies(folder, home, {
+        args: ['-c', 'allow_login_shell=false'],
+        env: withGitLast(process.env, last),
+      })
+
+      // 0 in a login shell, under bash's name for it or zsh's.
+      const login =
+        'shopt -q login_shell 2>/dev/null || [[ -o login ]] 2>/dev/null; echo "login=$?"'
+
+      try {
+        const {events} = await reply(
+          `Run the command \`${PATH_PROBE}; ${login}\`, then reply with exactly what it printed.`,
+          null
+        )
+
+        expectComplete(events)
+
+        const results = events
+          .filter(isReplyEvent)
+          .reduce(foldReplyEvent, NEW_REPLY)
+          .content.flatMap(part =>
+            part.type === 'tool-call' ? [part.result?.content.trim()] : []
+          )
+
+        expect(results).toContain(`${marker} ${last}\nlogin=1`)
+
+        await closed()
+      } finally {
+        fs.rmSync(home, {recursive: true, force: true})
+        fs.rmSync(last, {recursive: true, force: true})
+      }
+    },
+    300_000
+  )
+
   it('[dep:codex-full-access] [dep:codex-server-requests-refused] writes a file in the Tree’s folder and runs a command there, asking the app nothing, and shows each tool call', async () => {
     if (!folder || !signedIn) return
 
@@ -1988,7 +2035,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     const home = homeFrom(signedIn)
     const program = programIn(folder)
 
-    const child = spawnProcess(program, CODEX_ARGS, {
+    const child = spawnProcess(program, codexArgs(process.platform), {
       cwd: home,
       env: codexEnvironment(process.env, home),
       stdio: ['pipe', 'pipe', 'ignore'],
@@ -2258,9 +2305,10 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
     const binary = fs.readFileSync(program)
 
     // A feature's name is held without its `features.` table.
-    const settings = CODEX_ARGS.filter(arg => arg !== '-c').map(
-      arg => arg.split('=')[0]?.replace(/^features\./, '') ?? ''
-    )
+    // Linux's are the others' and one more.
+    const settings = codexArgs('linux')
+      .filter(arg => arg !== '-c')
+      .map(arg => arg.split('=')[0]?.replace(/^features\./, '') ?? '')
 
     expect(settings.length).toBeGreaterThan(0)
     expect(settings.filter(name => !binary.includes(name))).toEqual([])
@@ -2277,7 +2325,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
 
     const server = await startAppServer(
       spawnCodex,
-      {command: program, args: CODEX_ARGS},
+      {command: program, args: codexArgs(process.platform)},
       {cwd: home, env: codexEnvironment(process.env, home)}
     )
 

@@ -83,3 +83,38 @@ export async function withDeveloperDir(
 
   return {...base, DEVELOPER_DIR: developerDir}
 }
+
+/**
+ * Puts the folder of the app's own `git` last on `PATH` (ADR 0026), so a `git`
+ * of the user's own is found first. Main names a folder on Windows and Linux
+ * alone.
+ */
+export function withGitLast(
+  base: NodeJS.ProcessEnv,
+  gitFolder: string | undefined
+) {
+  if (!gitFolder) return base
+
+  // A copy of a Windows environment holds it as `Path`.
+  const name =
+    Object.keys(base).find(key => key.toUpperCase() === 'PATH') ?? 'PATH'
+
+  const own = base[name]
+
+  return {
+    ...base,
+    [name]: own ? `${own}${path.delimiter}${gitFolder}` : gitFolder,
+  }
+}
+
+/** The host's environment with the app's own folders for this machine. */
+export async function withAppFolders(
+  base: NodeJS.ProcessEnv,
+  {developerDir, gitFolder}: {developerDir?: string; gitFolder?: string},
+  hasDeveloperTools: typeof macHasDeveloperTools
+) {
+  return withGitLast(
+    await withDeveloperDir(base, developerDir, hasDeveloperTools),
+    gitFolder
+  )
+}

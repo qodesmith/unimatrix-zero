@@ -2,12 +2,12 @@ import type {ReadModels} from './models'
 import type {ClaudeSignInDeps} from './sign-in'
 import type {ClaudeRepliesDeps} from './streaming'
 import type {SpawnOptions} from '@anthropic-ai/claude-agent-sdk'
-import type {ProviderDriver} from '@uz/contract/host'
+import type {ProviderDriver, SignInRequest} from '@uz/contract/host'
 
 import {idleFor} from '#modules/idle/main'
 import {
   macHasDeveloperTools,
-  withDeveloperDir,
+  withAppFolders,
 } from '#modules/vendor-environment/main'
 import {query} from '@anthropic-ai/claude-agent-sdk'
 import {getProgramReady} from '@uz/vendor-program'
@@ -44,12 +44,14 @@ export function spawnClaude({command, args, cwd, env, signal}: SpawnOptions) {
 }
 
 function readModelsWith(hostEnv: ClaudeSignInDeps['hostEnv']): ReadModels {
-  return async ({program, configDir, developerDir}) => {
+  return async request => {
+    const {program, configDir} = request
+
     if (!program) throw new Error('The manifest names no Claude program.')
 
     const {models} = await readAccount({
       program: program.path,
-      env: claudeEnvironment(await hostEnv(developerDir), configDir),
+      env: claudeEnvironment(await hostEnv(request), configDir),
       cwd: configDir,
     })
 
@@ -73,14 +75,15 @@ export function createClaudeDriver({
   query: run = query,
   spawn: start = spawnClaude,
   env = process.env,
+  platform = process.platform,
   hasDeveloperTools = macHasDeveloperTools,
   whenIdle = idleFor(IDLE_CLOSE_MS),
   maxWarm = MAX_WARM,
   whenSilent = idleFor(HEARD_WITHIN_MS),
 }: ClaudeDriverOptions): ProviderDriver {
   // Every `claude` runs `git` as it starts, a one-shot's with no tools too.
-  async function hostEnv(developerDir: string | undefined) {
-    return withDeveloperDir(env, developerDir, hasDeveloperTools)
+  async function hostEnv(vendorProgram: SignInRequest) {
+    return withAppFolders(env, vendorProgram, hasDeveloperTools)
   }
 
   const models = createModelList(readModelsWith(hostEnv))
@@ -93,6 +96,7 @@ export function createClaudeDriver({
     whenIdle,
     maxWarm,
     whenSilent,
+    platform,
     learnModels: models.learn,
     resolveModel: models.resolve,
   })
@@ -127,7 +131,7 @@ export function createClaudeDriver({
     cutSession: replies.cutSession,
     runOneShot: async (request, signal) =>
       runClaudeOneShot(
-        {query: run, env: await hostEnv(request.vendorProgram.developerDir)},
+        {query: run, env: await hostEnv(request.vendorProgram)},
         request,
         signal
       ),
