@@ -149,7 +149,7 @@ jobs:
           UZ_NO_GIT: '1'
         run: |
           $env:PATH = ($env:PATH -split ';' | Where-Object {
-            $_ -and -not (Test-Path (Join-Path $_ 'git.exe'))
+            $_ -and -not (Test-Path ([IO.Path]::Combine($_, 'git.exe')))
           }) -join ';'
 
           if (Get-Command git -ErrorAction SilentlyContinue) {

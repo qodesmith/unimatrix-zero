@@ -1,3 +1,5 @@
+import type {SignInRequest} from '@uz/contract/host'
+
 import {execFile} from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -110,7 +112,7 @@ export function withGitLast(
 /** The host's environment with the app's own folders for this machine. */
 export async function withAppFolders(
   base: NodeJS.ProcessEnv,
-  {developerDir, gitFolder}: {developerDir?: string; gitFolder?: string},
+  {developerDir, gitFolder}: Pick<SignInRequest, 'developerDir' | 'gitFolder'>,
   hasDeveloperTools: typeof macHasDeveloperTools
 ) {
   return withGitLast(

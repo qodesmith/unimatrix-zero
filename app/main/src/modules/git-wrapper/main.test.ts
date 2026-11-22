@@ -91,7 +91,8 @@ async function initPushCloneFetch(git: Git) {
     push: push.code,
     clone: clone.code,
     fetch: fetch.code,
-    fetched: fetched.stdout,
+    // PowerShell may end the line its own way.
+    fetched: fetched.stdout.trim(),
   }
 }
 
@@ -101,7 +102,7 @@ const worked = {
   push: 0,
   clone: 0,
   fetch: 0,
-  fetched: 'two\n',
+  fetched: 'two',
 }
 
 /** A build adds its own ending: `.windows.1`, or `.dirty` on Linux arm64. */
@@ -134,7 +135,7 @@ function wrapped() {
 describe.runIf(noGit && process.platform === 'linux')(
   'on Linux with no git',
   () => {
-    it('runs the app’s own git for a git found last on PATH, from a folder with a space in its path', async () => {
+    it('runs the app’s own git for a git found last on PATH', async () => {
       const git = wrapped()
 
       const version = await git(['--version'])

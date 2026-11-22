@@ -20,10 +20,8 @@ const CODEX_ARGS = [
 ]
 
 /**
- * On Linux Codex runs each command in a login shell unless told not to, and
- * Debian's `/etc/profile` sets `PATH` outright, dropping the folder of the
- * app's own `git` (ADR 0026). On a Mac the login shell is how Codex finds the
- * user's own tools, and on Windows it uses none.
+ * In a login shell, Debian's `/etc/profile` drops the folder of the app's own
+ * `git` from `PATH` (ADR 0026). A Mac's is how Codex finds the user's tools.
  */
 export function codexArgs(platform: NodeJS.Platform) {
   return platform === 'linux'

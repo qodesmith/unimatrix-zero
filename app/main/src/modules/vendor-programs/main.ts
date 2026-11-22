@@ -53,11 +53,8 @@ export function developerFolderFor({userData, platform}: Machine) {
 }
 
 /**
- * The folder the app puts last on the `PATH` of `claude` and Codex, where a
- * `git` the AI runs finds the app's own when the machine has no other (ADR
- * 0026). On Windows, the build's own `cmd` folder; on Linux, a folder for the
- * app's wrapper script; null on a Mac (ADR 0025) and where the manifest has no
- * `git` for the machine.
+ * The folder that goes last on the `PATH` of `claude` and Codex: on Windows
+ * the build's own `cmd`, on Linux the one the app's wrapper script is in.
  */
 export function gitFolderFor(
   machine: Machine,

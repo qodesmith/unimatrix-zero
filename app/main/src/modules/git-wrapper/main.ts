@@ -6,9 +6,8 @@ export function quoted(text: string) {
 }
 
 /**
- * Shell lines that run `$program`, one of the programs of the build
- * `gitProgram` is in, and name it `$tool` when it isn't there yet. The build
- * is made for `/`, so it is told where its own folders are (ADR 0024), for the
+ * Shell lines for a script that has set `$program` and `$tool`. The build is
+ * made for `/`, so it is told where its own folders are (ADR 0024), for the
  * one call: none of the three reaches what else the AI runs.
  */
 export function runningBuild(gitProgram: string) {
@@ -39,10 +38,8 @@ export function writeScript(file: string, script: string) {
 }
 
 /**
- * On Linux, `folder` is last on the `PATH` of `claude` and Codex, so its
- * script is the `git` the AI runs where the machine has no other (ADR 0026).
- * `gitProgram` is where the app's own `git` is or will be: the script looks
- * for it on every call.
+ * The `git` the AI runs on a Linux machine with no other (ADR 0026).
+ * `gitProgram` is where the app's own is or will be: looked for on every call.
  */
 export function writeGitWrapper(folder: string, gitProgram: string) {
   writeScript(
