@@ -1,6 +1,7 @@
 import type {ClaudeCommand, LoginEvents} from './login'
 import type {ClaudeSignInDeps} from './sign-in'
 import type {AccountInfo, ModelInfo} from '@anthropic-ai/claude-agent-sdk'
+import type {SignInRequest} from '@uz/contract/host'
 import type {SignInUpdate} from '@uz/contract/providers'
 
 import {afterEach, beforeEach, expect, it, vi} from 'vitest'
@@ -46,6 +47,12 @@ afterEach(async () => {
   await claude.cleanUp()
 })
 
+const HOST_ENV = {...process.env, ANTHROPIC_API_KEY: 'sk-ant-api'}
+
+function answering(answer: 'yes' | 'no'): ClaudeSignInDeps['hostEnv'] {
+  return async () => ({...HOST_ENV, FAKE_SIGN_IN_ANSWERS: answer})
+}
+
 function deps(overrides: Partial<ClaudeSignInDeps> = {}) {
   return {
     async *getProgramReady() {
@@ -58,7 +65,7 @@ function deps(overrides: Partial<ClaudeSignInDeps> = {}) {
     ),
     signOut: vi.fn<ClaudeSignInDeps['signOut']>(async () => undefined),
     learnModels: vi.fn<ClaudeSignInDeps['learnModels']>(),
-    env: {...process.env, ANTHROPIC_API_KEY: 'sk-ant-api'},
+    hostEnv: async () => HOST_ENV,
     timeoutMs: 10_000,
     ...overrides,
   } satisfies ClaudeSignInDeps
@@ -68,11 +75,12 @@ type SignIn = ReturnType<typeof createClaudeSignIn>
 
 async function connect(
   signIn: SignIn,
-  react: (update: SignInUpdate) => void = () => undefined
+  react: (update: SignInUpdate) => void = () => undefined,
+  asked: SignInRequest = request
 ) {
   const updates: SignInUpdate[] = []
 
-  for await (const update of signIn.signIn(request)) {
+  for await (const update of signIn.signIn(asked)) {
     updates.push(update)
     react(update)
   }
@@ -85,7 +93,7 @@ function isStep(update: SignInUpdate, step: string) {
 }
 
 it('downloads, signs in on Claude’s page and reads the plan', async () => {
-  const used = deps({env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'}})
+  const used = deps({hostEnv: answering('yes')})
 
   const updates = await connect(createClaudeSignIn(used))
 
@@ -108,7 +116,7 @@ it('downloads, signs in on Claude’s page and reads the plan', async () => {
 
 it('learns the Models the account read at connect listed', async () => {
   const used = deps({
-    env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
+    hostEnv: answering('yes'),
     readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () =>
       read(maxAccount, [haiku])
     ),
@@ -131,7 +139,7 @@ it('runs claude in its own folder, with no key that outranks the subscription', 
   await connect(
     createClaudeSignIn(
       deps({
-        env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
+        hostEnv: answering('yes'),
         startLogin: login,
         readAccount: account,
       })
@@ -153,6 +161,34 @@ it('runs claude in its own folder, with no key that outranks the subscription', 
     program: request.program.path,
     cwd: '/data/providers/claude',
   })
+})
+
+it('starts the login and the plan read in the host’s environment for the request’s developer folder', async () => {
+  const login = vi.fn<ClaudeSignInDeps['startLogin']>(startLogin)
+
+  const account = vi.fn<ClaudeSignInDeps['readAccount']>(async () =>
+    read(maxAccount)
+  )
+
+  const hostEnv = vi.fn<ClaudeSignInDeps['hostEnv']>(async developerDir => ({
+    ...HOST_ENV,
+    FAKE_SIGN_IN_ANSWERS: 'yes',
+    DEVELOPER_DIR: `${developerDir}/named`,
+  }))
+
+  await connect(
+    createClaudeSignIn(
+      deps({hostEnv, startLogin: login, readAccount: account})
+    ),
+    undefined,
+    {...request, developerDir: '/data/developer'}
+  )
+
+  const [, loginEnv] = login.mock.calls[0] ?? []
+  const [session] = account.mock.calls[0] ?? []
+
+  expect(loginEnv?.DEVELOPER_DIR).toBe('/data/developer/named')
+  expect(session?.env.DEVELOPER_DIR).toBe('/data/developer/named')
 })
 
 it('takes the code from the page opened again', async () => {
@@ -392,7 +428,7 @@ it('cancels on the sign-in page, ending claude auth login', async () => {
 
 it('cancels while the plan is read, even for a free account', async () => {
   const used = deps({
-    env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
+    hostEnv: answering('yes'),
     readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () =>
       read({
         email: 'sam@example.com',
@@ -416,7 +452,7 @@ it('cancels while the plan is read, even for a free account', async () => {
 })
 
 it('fails when Claude’s page is declined', async () => {
-  const used = deps({env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'no'}})
+  const used = deps({hostEnv: answering('no')})
 
   const updates = await connect(createClaudeSignIn(used))
 
@@ -446,9 +482,7 @@ it('stops waiting for Claude’s page once signed in', async () => {
 
   try {
     const updates = await connect(
-      createClaudeSignIn(
-        deps({env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'}})
-      )
+      createClaudeSignIn(deps({hostEnv: answering('yes')}))
     )
 
     expect(updates.at(-1)).toMatchObject({outcome: 'connected'})
@@ -460,7 +494,7 @@ it('stops waiting for Claude’s page once signed in', async () => {
 
 it('signs a free account out again and refuses it', async () => {
   const used = deps({
-    env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
+    hostEnv: answering('yes'),
     readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () =>
       read({email: 'sam@example.com', subscriptionType: 'Claude API'}, [haiku])
     ),
@@ -478,7 +512,7 @@ it('signs a free account out again and refuses it', async () => {
 
 it('still refuses a free account when signing it out fails', async () => {
   const used = deps({
-    env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
+    hostEnv: answering('yes'),
     readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () =>
       read({
         subscriptionType: 'Claude API',
@@ -496,7 +530,7 @@ it('still refuses a free account when signing it out fails', async () => {
 
 it('keeps an account whose plan isn’t reported, saying it wasn’t read', async () => {
   const used = deps({
-    env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
+    hostEnv: answering('yes'),
     readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () =>
       read({
         email: 'sam@example.com',
@@ -518,7 +552,7 @@ it('keeps an account whose plan isn’t reported, saying it wasn’t read', asyn
 
 it('says so in plain words when the plan can’t be read', async () => {
   const used = deps({
-    env: {...deps().env, FAKE_SIGN_IN_ANSWERS: 'yes'},
+    hostEnv: answering('yes'),
     readAccount: vi.fn<ClaudeSignInDeps['readAccount']>(async () => {
       throw new Error('Claude Code process exited with code 1')
     }),

@@ -20,6 +20,7 @@ import type {
 import type {CompactionSettings} from '@uz/contract/settings'
 
 import {byPathOnly, pdfSaying, pngShowing} from '#modules/test-attachments/main'
+import {markedDeveloperFolder} from '#modules/test-developer-folder/main'
 import {heldIdle} from '#modules/test-idle/main'
 import {listenLocally, startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -170,7 +171,8 @@ function forgetTranscript(sessionId: string) {
 function liveDriver(
   files: string[],
   firstEnv: Record<string, string> = {},
-  refuses: Parameters<typeof fakeStore>[0] = {}
+  refuses: Parameters<typeof fakeStore>[0] = {},
+  hostEnv: NodeJS.ProcessEnv = process.env
 ) {
   let addedEnv = firstEnv
   let droppedEnv: string[] = []
@@ -210,6 +212,7 @@ function liveDriver(
 
       return child
     },
+    env: hostEnv,
     whenIdle: idle.whenIdle,
   })
 
@@ -1147,6 +1150,40 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       fs.rmSync(moved, {recursive: true, force: true})
     }
   }, 300_000)
+
+  it.runIf(process.platform === 'darwin')(
+    '[dep:developer-dir-reaches-commands] runs the xcrun of the developer folder in the host’s environment for a stub in /usr/bin that a command names',
+    async () => {
+      const marker = `uz-xcrun-${crypto.randomUUID()}`
+      const developerDir = markedDeveloperFolder(marker)
+
+      const live = liveDriver(
+        [],
+        {},
+        {},
+        {
+          ...process.env,
+          DEVELOPER_DIR: developerDir,
+        }
+      )
+
+      try {
+        const {events} = await live.reply(
+          'Run `/usr/bin/git --version` with Bash, then reply with exactly what it printed.',
+          null
+        )
+
+        expect(
+          toolCallsIn(events).map(call => call.result?.content.trim())
+        ).toContain(`${marker} git --version`)
+
+        await live.done()
+      } finally {
+        fs.rmSync(developerDir, {recursive: true, force: true})
+      }
+    },
+    300_000
+  )
 
   it('[dep:claude-prompt-fresh] applies a changed System prompt to the session it resumes', async () => {
     const live = liveDriver([])

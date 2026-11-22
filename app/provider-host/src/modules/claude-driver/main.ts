@@ -1,9 +1,14 @@
 import type {ReadModels} from './models'
+import type {ClaudeSignInDeps} from './sign-in'
 import type {ClaudeRepliesDeps} from './streaming'
 import type {SpawnOptions} from '@anthropic-ai/claude-agent-sdk'
 import type {ProviderDriver} from '@uz/contract/host'
 
 import {idleFor} from '#modules/idle/main'
+import {
+  macHasDeveloperTools,
+  withDeveloperDir,
+} from '#modules/vendor-environment/main'
 import {query} from '@anthropic-ai/claude-agent-sdk'
 import {getProgramReady} from '@uz/vendor-program'
 import {spawn} from 'node:child_process'
@@ -38,13 +43,13 @@ export function spawnClaude({command, args, cwd, env, signal}: SpawnOptions) {
   })
 }
 
-function readModelsWith(env: NodeJS.ProcessEnv): ReadModels {
-  return async ({program, configDir}) => {
+function readModelsWith(hostEnv: ClaudeSignInDeps['hostEnv']): ReadModels {
+  return async ({program, configDir, developerDir}) => {
     if (!program) throw new Error('The manifest names no Claude program.')
 
     const {models} = await readAccount({
       program: program.path,
-      env: claudeEnvironment(env, configDir),
+      env: claudeEnvironment(await hostEnv(developerDir), configDir),
       cwd: configDir,
     })
 
@@ -53,24 +58,38 @@ function readModelsWith(env: NodeJS.ProcessEnv): ReadModels {
 }
 
 type ClaudeDriverOptions = Pick<ClaudeRepliesDeps, 'store'> &
-  Partial<Omit<ClaudeRepliesDeps, 'store' | 'learnModels' | 'resolveModel'>>
+  Partial<
+    Omit<
+      ClaudeRepliesDeps,
+      'store' | 'learnModels' | 'resolveModel' | 'hostEnv'
+    >
+  > & {
+    env?: NodeJS.ProcessEnv
+    hasDeveloperTools?: typeof macHasDeveloperTools
+  }
 
 export function createClaudeDriver({
   store,
   query: run = query,
   spawn: start = spawnClaude,
   env = process.env,
+  hasDeveloperTools = macHasDeveloperTools,
   whenIdle = idleFor(IDLE_CLOSE_MS),
   maxWarm = MAX_WARM,
   whenSilent = idleFor(HEARD_WITHIN_MS),
 }: ClaudeDriverOptions): ProviderDriver {
-  const models = createModelList(readModelsWith(env))
+  // Every `claude` runs `git` as it starts, a one-shot's with no tools too.
+  async function hostEnv(developerDir: string | undefined) {
+    return withDeveloperDir(env, developerDir, hasDeveloperTools)
+  }
+
+  const models = createModelList(readModelsWith(hostEnv))
 
   const replies = createClaudeReplies({
     store,
     query: run,
     spawn: start,
-    env,
+    hostEnv,
     whenIdle,
     maxWarm,
     whenSilent,
@@ -93,7 +112,7 @@ export function createClaudeDriver({
       readAccount,
       signOut,
       learnModels: models.learn,
-      env,
+      hostEnv,
       timeoutMs: SIGN_IN_TIMEOUT_MS,
     }),
     readConnection: notYet,
@@ -107,7 +126,11 @@ export function createClaudeDriver({
     forkSession: notYet,
     cutSession: replies.cutSession,
     runOneShot: async (request, signal) =>
-      runClaudeOneShot({query: run, env}, request, signal),
+      runClaudeOneShot(
+        {query: run, env: await hostEnv(request.vendorProgram.developerDir)},
+        request,
+        signal
+      ),
     mcpSignIn: notYet,
   }
 }

@@ -620,6 +620,17 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Changed by:** upgrade + drift. The Model decides whether it opens the path.
 - **Check:** `[dep:codex-opens-attachment-path]` in `codex-driver`: a Prompt with only the path line of a text file gets a Reply naming the word in it, after a tool call that names the file.
 
+### `DEVELOPER_DIR` reaches the AI's commands
+
+- **Id:** `developer-dir-reaches-commands`
+- **Kind:** D
+- **Provider:** both
+- **Relies on:** a variable in the environment the vendor program starts with is in the environment of each command the AI runs. `claude` gets it through the Agent SDK's `Options.env`, and Codex's app-server through its own process environment, which Codex keeps although it rebuilds `PATH` from the user's login shell. Neither vendor documents which variables a command inherits.
+- **App side:** on a Mac with no developer tools, `vendor-environment` adds `DEVELOPER_DIR`, naming the app's developer folder, to the environment `claude-driver` and `codex-driver` start the vendor program with. Apple's stubs in `/usr/bin` then run that folder's `xcrun`, which runs the app's own `git` and fails every other tool in one line (ADR 0025).
+- **User would see:** on a Mac with no developer tools, the "install developer tools" dialog the first time the AI runs `git`, `python3` or any other stub, and the command fails.
+- **Changed by:** upgrade
+- **Check:** `[dep:developer-dir-reaches-commands]` in `claude-driver` and `codex-driver`, on a Mac: with a developer folder named in the host's environment, `/usr/bin/git --version` run by the AI prints that folder's `xcrun` output. Full access only: the other Permission modes have no check until the app runs a Reply under them. That a stub honors `DEVELOPER_DIR` on a Mac with no developer tools at all is Apple's behavior, and CI's "A Mac with no developer tools" job checks it.
+
 ### A new session's setup tokens
 
 - **Id:** `setup-tokens`

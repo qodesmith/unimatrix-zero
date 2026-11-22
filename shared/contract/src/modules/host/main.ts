@@ -35,6 +35,11 @@ export const SignInRequestSchema = z.strictObject({
     .nullable(),
   /** The vendor program's own configuration folder, which holds its sign-in. */
   configDir: z.string().min(1),
+  /**
+   * On a Mac, the app's own developer folder: the vendor program's
+   * `DEVELOPER_DIR` when it starts on a Mac with no developer tools.
+   */
+  developerDir: z.string().min(1).optional(),
 })
 
 export type SignInRequest = z.infer<typeof SignInRequestSchema>

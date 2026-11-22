@@ -21,6 +21,7 @@ import type {
 import type {CompactionSettings} from '@uz/contract/settings'
 
 import {fileHolding, pngShowing} from '#modules/test-attachments/main'
+import {markedDeveloperFolder} from '#modules/test-developer-folder/main'
 import {heldIdle} from '#modules/test-idle/main'
 import {listenLocally, startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
@@ -1655,6 +1656,45 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       fs.rmSync(home, {recursive: true, force: true})
     }
   }, 300_000)
+
+  it.runIf(process.platform === 'darwin')(
+    '[dep:developer-dir-reaches-commands] runs the xcrun of the developer folder in the host’s environment for a stub in /usr/bin that a command names',
+    async () => {
+      if (!folder || !signedIn) return
+
+      const home = homeFrom(signedIn)
+      const marker = `uz-xcrun-${crypto.randomUUID()}`
+      const developerDir = markedDeveloperFolder(marker)
+
+      const {reply, closed} = codedReplies(folder, home, {
+        env: {...process.env, DEVELOPER_DIR: developerDir},
+      })
+
+      try {
+        const {events} = await reply(
+          'Run the command `/usr/bin/git --version`, then reply with exactly what it printed.',
+          null
+        )
+
+        expectComplete(events)
+
+        const results = events
+          .filter(isReplyEvent)
+          .reduce(foldReplyEvent, NEW_REPLY)
+          .content.flatMap(part =>
+            part.type === 'tool-call' ? [part.result?.content.trim()] : []
+          )
+
+        expect(results).toContain(`${marker} git --version`)
+
+        await closed()
+      } finally {
+        fs.rmSync(home, {recursive: true, force: true})
+        fs.rmSync(developerDir, {recursive: true, force: true})
+      }
+    },
+    300_000
+  )
 
   it('[dep:codex-full-access] [dep:codex-server-requests-refused] writes a file in the Tree’s folder and runs a command there, asking the app nothing, and shows each tool call', async () => {
     if (!folder || !signedIn) return

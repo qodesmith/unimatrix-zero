@@ -56,7 +56,8 @@ export interface ClaudeSignInDeps {
     command: ClaudeCommand,
     env: Record<string, string>
   ) => Promise<void>
-  env: NodeJS.ProcessEnv
+  /** The host's environment for a `claude` that starts now. */
+  hostEnv: (developerDir: string | undefined) => Promise<NodeJS.ProcessEnv>
   timeoutMs: number
 }
 
@@ -207,7 +208,7 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
     attempt: Attempt<Input>,
     request: SignInRequest
   ): AsyncGenerator<SignInUpdate> {
-    const {program, configDir} = request
+    const {program, configDir, developerDir} = request
 
     if (!program) throw new Error('The manifest names no Claude program.')
 
@@ -222,7 +223,7 @@ export function createClaudeSignIn(deps: ClaudeSignInDeps) {
       return
     }
 
-    const env = claudeEnvironment(deps.env, configDir)
+    const env = claudeEnvironment(await deps.hostEnv(developerDir), configDir)
     const command = deps.commandFor(program.path)
     const ended = yield* signInOnPage(attempt, command, env)
 

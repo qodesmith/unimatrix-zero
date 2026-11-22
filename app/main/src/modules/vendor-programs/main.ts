@@ -43,24 +43,38 @@ export function gitTargetFor(
   return build ? {path: folder, build} : null
 }
 
+/**
+ * The developer folder the app gives a Mac with no developer tools (ADR
+ * 0025); null off a Mac, where there are no stubs to answer.
+ */
+export function developerFolderFor({userData, platform}: Machine) {
+  return platform === 'darwin' ? path.join(userData, 'developer') : null
+}
+
 export function signInRequestFor(
   provider: ProviderId,
   machine: Machine,
   manifest: Manifest = DEV_MANIFEST
 ): SignInRequest {
   const {userData, platform} = machine
-  const configDir = path.join(userData, 'providers', provider)
+  const developerDir = developerFolderFor(machine)
+
+  const folders = {
+    configDir: path.join(userData, 'providers', provider),
+    ...(developerDir && {developerDir}),
+  }
+
   const name = PROGRAMS[provider]
   const program = manifest.vendorPrograms[name]
   const build = buildFor(program, machine)
 
-  if (!build) return {program: null, configDir}
+  if (!build) return {program: null, ...folders}
 
   const folder = path.join(userData, 'vendor', provider, program.version)
   const file = platform === 'win32' ? `${name}.exe` : name
 
   return {
     program: {path: build.archive ? folder : path.join(folder, file), build},
-    configDir,
+    ...folders,
   }
 }

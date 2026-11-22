@@ -59,6 +59,48 @@ jobs:
       - if: matrix.renderer
         run: bun run test:renderer
 
+  no-developer-tools:
+    name: A Mac with no developer tools
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - run: bun install --frozen-lockfile
+      # After every step that needs the runner's own tools. No step from here
+      # on runs a stub in /usr/bin without DEVELOPER_DIR: that asks for the
+      # "install developer tools" dialog (ADR 0025).
+      - name: Move Xcode and the Command Line Tools out of the way
+        run: |
+          set -euo pipefail
+
+          for tools in /Applications/Xcode*.app /Library/Developer/CommandLineTools; do
+            if [[ -e $tools || -L $tools ]]; then sudo mv "$tools" "$tools.away"; fi
+          done
+      # The tools are gone and the link that names their folder is still
+      # there: `xcode-select -p` fails for that Mac too.
+      - name: Find no developer tools while the link to them is left
+        run: bun run test:node app/provider-host/src/modules/vendor-environment
+        env:
+          UZ_NO_DEVELOPER_TOOLS: '1'
+      - name: Remove the link
+        run: |
+          set -euo pipefail
+
+          sudo rm -f /var/db/xcode_select_link
+
+          if /usr/bin/xcode-select -p; then
+            echo "::error::xcode-select still finds developer tools, so this job would test nothing."
+            exit 1
+          fi
+      - run: bun run test:node app/main/src/modules/developer-folder app/provider-host/src/modules/vendor-environment
+        env:
+          UZ_NO_DEVELOPER_TOOLS: '1'
+
   provider-checks:
     name: Provider checks on a vendor bump
     runs-on: ubuntu-latest
@@ -111,12 +153,20 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [checks, unit, provider-checks, interaction-limits-renewal]
+    needs:
+      [
+        checks,
+        unit,
+        no-developer-tools,
+        provider-checks,
+        interaction-limits-renewal,
+      ]
     runs-on: ubuntu-latest
     steps:
       - run: |
           echo "checks: ${{ needs.checks.result }}"
           echo "unit: ${{ needs.unit.result }}"
+          echo "no-developer-tools: ${{ needs.no-developer-tools.result }}"
           echo "provider-checks: ${{ needs.provider-checks.result }}"
           echo "interaction-limits-renewal: ${{ needs.interaction-limits-renewal.result }}"
-          test "${{ needs.checks.result }}" = success && test "${{ needs.unit.result }}" = success && test "${{ needs.provider-checks.result }}" = success && test "${{ needs.interaction-limits-renewal.result }}" = success
+          test "${{ needs.checks.result }}" = success && test "${{ needs.unit.result }}" = success && test "${{ needs.no-developer-tools.result }}" = success && test "${{ needs.provider-checks.result }}" = success && test "${{ needs.interaction-limits-renewal.result }}" = success

@@ -63,6 +63,7 @@ export function fakeClaudeEnv(
 export const FakeClaudeRunSchema = z.strictObject({
   args: z.array(z.string()),
   configDir: z.string(),
+  developerDir: z.string().nullable(),
   cwd: z.string(),
   /** The runs, by n, still going when this one started. */
   runningAtStart: z.array(z.number()),
@@ -114,7 +115,7 @@ function stillRunning(file) {
 const runningAtStart = fs.readdirSync(reports).filter(stillRunning).map(file => Number.parseInt(file, 10))
 const args = process.argv.slice(2)
 const configDir = process.env.CLAUDE_CONFIG_DIR
-const report = {args, configDir, cwd: process.cwd(), runningAtStart, prompts: [], clientComposed: [], systemPrompt: [], appendedPrompt: null, promptSnapshot: null, resumedFrom: [], toolResults: [], silentRequests: [], inputClosed: false, ended: null}
+const report = {args, configDir, developerDir: process.env.DEVELOPER_DIR ?? null, cwd: process.cwd(), runningAtStart, prompts: [], clientComposed: [], systemPrompt: [], appendedPrompt: null, promptSnapshot: null, resumedFrom: [], toolResults: [], silentRequests: [], inputClosed: false, ended: null}
 save()
 const recording = options.recordings[run]
 const lines = fs.readFileSync(recording, 'utf8')
