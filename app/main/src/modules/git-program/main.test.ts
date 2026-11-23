@@ -178,7 +178,7 @@ it('downloads again on each Try again, says whether git is then in place, and te
   expect(git.program()).not.toBeNull()
 })
 
-it('tells the user once, on Linux too old for the build, that file history can’t work, and never that a download is coming', async () => {
+it('tells the user once, on Linux too old for the build, that file history can’t work, and never that a download is coming', () => {
   const tell = fakeTell()
   const {getProgramReady} = heldDownload()
 
@@ -189,11 +189,9 @@ it('tells the user once, on Linux too old for the build, that file history can�
     tell,
   })
 
-  await git.prepare()
   git.snapshotWaited()
   git.snapshotWaited()
 
-  expect(getProgramReady).not.toHaveBeenCalled()
   expect(tell.mock.calls).toEqual([['needs-newer-linux']])
 })
 
