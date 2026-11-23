@@ -64,7 +64,7 @@ export function createCodexDriver({
 
     const {command, args} = commandFor(programOf(program))
 
-    const base = await withAppFolders(env, request, hasDeveloperTools)
+    const base = await withAppFolders(env, request, hasDeveloperTools, platform)
 
     return startAppServer(
       start,

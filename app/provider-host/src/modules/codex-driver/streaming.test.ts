@@ -453,6 +453,24 @@ it('tells the app-server to run commands without a login shell on Linux, and on 
   expect(settings).toEqual([true, false, false])
 })
 
+it('turns off git’s login prompts for the app-server on Windows, and on no other platform', async () => {
+  const prompts: (string | undefined)[][] = []
+
+  for (const platform of ['linux', 'darwin', 'win32'] as const) {
+    const codex = await setUp(['started.ndjson'], {platform})
+    await codex.reply(FIRST_PROMPT)
+    const [env] = codex.environments
+    prompts.push([env?.GCM_INTERACTIVE, env?.GIT_TERMINAL_PROMPT])
+    await codex.allClosed()
+  }
+
+  expect(prompts).toEqual([
+    [undefined, undefined],
+    [undefined, undefined],
+    ['never', '0'],
+  ])
+})
+
 it('continues the Provider session in the app-server that has it loaded, then closes when idle', async () => {
   const codex = await setUp(['started.ndjson'])
 
@@ -1829,7 +1847,6 @@ function injecting() {
   })
 }
 
-/** A second `thread/start`, as the text replay opens after a refused inject. */
 function injectRefused() {
   return edited('started.ndjson', text => {
     const lines = text.split('\n')

@@ -1,3 +1,4 @@
+import {NO_LOGIN_HELPER} from '@uz/vendor-program/git-login'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -6,8 +7,10 @@ export function quoted(text: string) {
 }
 
 /**
- * Needs `$program` and `$tool` set. The build is made for `/`, so it gets its
- * own folders for this call only, never in what else the AI runs (ADR 0024).
+ * Needs `$program` and `$tool` set. Its folders and no-login settings stay in
+ * this call, never in what else the AI runs (ADR 0024, ADR 0027). An empty
+ * `GIT_ASKPASS` blocks `core.askPass` and `SSH_ASKPASS`;
+ * `GIT_TERMINAL_PROMPT=0` does not.
  */
 export function runningBuild(gitProgram: string) {
   const root = path.join(path.dirname(gitProgram), '..')
@@ -19,6 +22,11 @@ export function runningBuild(gitProgram: string) {
   echo "$tool: not ready yet: Unimatrix Zero is still downloading it. Try again in a minute." >&2
   exit 127
 fi
+
+helper=${quoted(NO_LOGIN_HELPER)}
+n=\${GIT_CONFIG_COUNT:-0}
+export GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= GIT_CONFIG_COUNT=$((n + 1)) \\
+  "GIT_CONFIG_KEY_$n=credential.helper" "GIT_CONFIG_VALUE_$n=$helper"
 
 GIT_EXEC_PATH=${subPrograms} \\
 GIT_TEMPLATE_DIR=${quoted(path.join(root, 'share', 'git-core', 'templates'))} \\
@@ -36,7 +44,6 @@ export function writeScript(file: string, script: string) {
   fs.renameSync(writing, file)
 }
 
-/** The `git` the AI runs on a Linux machine with no other (ADR 0026). */
 export function writeGitWrapper(folder: string, gitProgram: string) {
   writeScript(
     path.join(folder, 'git'),

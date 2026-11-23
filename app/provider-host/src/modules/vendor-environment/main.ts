@@ -1,5 +1,6 @@
 import type {SignInRequest} from '@uz/contract/host'
 
+import {withNoGitLogin} from '@uz/vendor-program/git-login'
 import {execFile} from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -95,10 +96,14 @@ export function withGitLast(
 export async function withAppFolders(
   base: NodeJS.ProcessEnv,
   {developerDir, gitFolder}: Pick<SignInRequest, 'developerDir' | 'gitFolder'>,
-  hasDeveloperTools: typeof macHasDeveloperTools
+  hasDeveloperTools: typeof macHasDeveloperTools,
+  platform: NodeJS.Platform
 ) {
-  return withGitLast(
+  const env = withGitLast(
     await withDeveloperDir(base, developerDir, hasDeveloperTools),
     gitFolder
   )
+
+  // A Mac's and Linux's scripts set these for the one call (ADR 0027).
+  return platform === 'win32' && gitFolder ? withNoGitLogin(env) : env
 }

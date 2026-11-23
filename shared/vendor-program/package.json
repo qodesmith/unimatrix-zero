@@ -6,7 +6,8 @@
     "#modules/*": "./src/modules/*.ts"
   },
   "exports": {
-    ".": "./src/modules/vendor-program/main.ts"
+    ".": "./src/modules/vendor-program/main.ts",
+    "./git-login": "./src/modules/git-login/main.ts"
   },
   "dependencies": {
     "@uz/contract": "workspace:*"

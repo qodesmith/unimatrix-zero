@@ -166,7 +166,6 @@ async function setUp(
   const treeId = crypto.randomUUID()
 
   interface ReplyOptions {
-    /** 0 stops the Reply as it starts. */
     stopAfterDeltas?: number
     replyId?: string
     model?: string
@@ -469,7 +468,6 @@ it('resumes a cold session from the app’s copy alone', async () => {
   expect(resumed?.resumedFrom).toEqual(
     expect.arrayContaining([FIRST_MESSAGE, SECOND_MESSAGE])
   )
-  // The SDK's own folder, which it fills from the store.
   expect(resumed?.configDir).not.toBe(claude.configDir)
 })
 
@@ -857,6 +855,44 @@ it('gives claude the PowerShell tool on Windows', async () => {
   await claude.allClosed()
 })
 
+it('turns off git’s login prompts for a Reply’s claude and a one-shot’s on Windows, and on no other platform', async () => {
+  const prompts: Record<string, (string | undefined)[][]> = {}
+
+  for (const platform of ['linux', 'darwin', 'win32'] as const) {
+    const claude = await setUp(
+      ['warm.ndjson', 'warm.ndjson'],
+      {},
+      fakeStore(),
+      platform
+    )
+
+    await claude.reply(FIRST_PROMPT)
+    await claude.driver.runOneShot(
+      {
+        model: 'haiku',
+        prompt: FIRST_PROMPT,
+        vendorProgram: claude.vendorProgram,
+      },
+      new AbortController().signal
+    )
+
+    prompts[platform] = [...claude.environments, ...claude.queried].map(env => [
+      env?.GCM_INTERACTIVE,
+      env?.GIT_TERMINAL_PROMPT,
+    ])
+    await claude.allClosed()
+  }
+
+  const none = [undefined, undefined]
+  const off = ['never', '0']
+
+  expect(prompts).toEqual({
+    linux: [none, none, none],
+    darwin: [none, none, none],
+    win32: [off, off, off],
+  })
+})
+
 it('names the app’s developer folder to a one-shot’s claude on a Mac with no developer tools, and to none on a Mac with them', async () => {
   const claude = await setUp(['warm.ndjson', 'warm.ndjson'])
   const {signal} = new AbortController()
@@ -963,7 +999,6 @@ function withLeadIn(message: RecordedLine[]) {
   )
 }
 
-/** `tools.ndjson` with a Write cut off mid-arguments and ended by `stop`. */
 function toolCallCutOff(stop: RecordedLine[], resentInFull = false) {
   return edited('tools.ndjson', lines => {
     const start = lines.findIndex(line => isOut(line, '"message_start"'))
@@ -1259,7 +1294,6 @@ function failedAfter(
   )
 }
 
-/** The message `claude` makes up for a failed request. */
 function apiErrorMessage(error: SDKAssistantMessageError): RecordedLine {
   return {
     kind: 'out',
@@ -1814,7 +1848,6 @@ it('cuts a Retry’s session after the Prompt of the Reply cut short, which `cla
 
 const UUID = /[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}/g
 
-/** `warm.ndjson` with its second Prompt sent again, under new uuids. */
 function warmThrice() {
   return edited('warm.ndjson', lines => {
     const second = lines.findLastIndex(
@@ -2012,7 +2045,6 @@ it('continues in the warm `claude` on another name for its Model', async () => {
   expect(warm?.prompts).toEqual([FIRST_PROMPT, SECOND_PROMPT])
 })
 
-/** `warm.ndjson`'s `claude` as it starts, asked for no Prompt. */
 function listedOnly() {
   return edited('warm.ndjson', lines =>
     lines.filter(
