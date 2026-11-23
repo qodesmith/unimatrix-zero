@@ -20,7 +20,7 @@ export interface Machine {
   glibcVersion?: string
 }
 
-const ReportSchema = z.object({
+const ProcessReportSchema = z.object({
   header: z.object({glibcVersionRuntime: z.string()}),
 })
 
@@ -28,7 +28,7 @@ const ReportSchema = z.object({
 export function readGlibcVersion() {
   if (process.platform !== 'linux') return undefined
 
-  const parsed = ReportSchema.safeParse(process.report.getReport())
+  const parsed = ProcessReportSchema.safeParse(process.report.getReport())
 
   return parsed.success ? parsed.data.header.glibcVersionRuntime : undefined
 }

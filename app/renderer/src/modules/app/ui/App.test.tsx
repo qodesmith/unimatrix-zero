@@ -7,7 +7,7 @@ import type {ReactNode} from 'react'
 
 import {ABOUT} from '#modules/connections/main'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
-import {describe, expect, it, onTestFinished} from 'vitest'
+import {describe, expect, it, onTestFinished, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {cdp, page, userEvent} from 'vitest/browser'
 
@@ -244,14 +244,20 @@ it('says, when the app’s git failed to download, that file history couldn’t 
   globalThis.window.uz = main
   await renderApp()
   await expect.element(sidebarNewTree()).toBeVisible()
+  vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']})
+  onTestFinished(() => {
+    vi.useRealTimers()
+  })
 
+  // Sonner shows a toast on a zero-delay timer; time stops there, so the slow toast never closes by itself.
   main.publish({type: 'SNAPSHOTS_WAITING'})
+  vi.advanceTimersByTime(0)
   main.publish({type: 'SNAPSHOTS_DOWNLOAD_FAILED'})
+  vi.advanceTimersByTime(0)
 
   await expect
     .element(page.getByText('File history couldn’t download', {exact: true}))
     .toBeVisible()
-  // At once: the slow-download toast leaves by itself after a few seconds.
   expect(
     page
       .getByText('File history starts once a download finishes', {exact: true})

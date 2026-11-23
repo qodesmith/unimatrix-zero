@@ -159,12 +159,12 @@ it('leaves git’s settings alone, adding only the folder last on PATH', async (
 })
 
 it.skipIf(process.platform === 'win32')(
-  'reads the PATH the user’s login shell sets, past whatever their profile prints, and none from a shell that won’t start',
+  'reads the PATH the user’s login shell sets, past whatever their profile prints before it or on exit, and none from a shell that won’t start',
   async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'uz login home '))
     fs.writeFileSync(
       path.join(home, '.profile'),
-      'echo "Welcome back"\nexport PATH="/from/profile:$PATH"\n'
+      'echo "Welcome back"\nexport PATH="/from/profile:$PATH"\ntrap \'echo Bye\' EXIT\n'
     )
 
     const found = await loginShellPath({
@@ -175,6 +175,7 @@ it.skipIf(process.platform === 'win32')(
 
     expect(found).toMatch(/^\/from\/profile:/)
     expect(found).not.toContain('Welcome')
+    expect(found).not.toContain('Bye')
 
     expect(
       await loginShellPath({SHELL: path.join(home, 'no-shell'), HOME: home})
