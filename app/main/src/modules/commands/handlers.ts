@@ -24,7 +24,7 @@ export interface HandlerDeps {
   settings: SettingsStore
   layout: LayoutStore
   /** Starts the download of the app's own `git` again, and returns at once. */
-  retryGitDownload: () => void
+  downloadGitAgain: () => void
   publish: (event: AppEvent) => void
 }
 
@@ -173,8 +173,8 @@ export const handlers: Handlers = {
     return saved
   },
 
-  'snapshots.retry-download': (_command, {retryGitDownload}) => {
-    retryGitDownload()
+  'snapshots.download-again': (_command, {downloadGitAgain}) => {
+    downloadGitAgain()
 
     return {}
   },

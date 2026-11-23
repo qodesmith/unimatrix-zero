@@ -248,8 +248,8 @@ function openWindow(db: Database) {
     },
   })
 
-  async function retryGitDownload() {
-    if (await gitProgram.retry()) await treeFiles.takeMissedSnapshots()
+  async function downloadGitAgain() {
+    if (await gitProgram.tryAgain()) await treeFiles.takeMissedSnapshots()
   }
 
   // Waits for git, or missed Snapshots would be recorded as waiting.
@@ -288,8 +288,8 @@ function openWindow(db: Database) {
       images: createRemoteImages(globalThis.fetch),
       settings,
       layout,
-      retryGitDownload: () => {
-        void retryGitDownload()
+      downloadGitAgain: () => {
+        void downloadGitAgain()
       },
       publish: hub.publish,
     }

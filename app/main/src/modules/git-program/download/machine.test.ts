@@ -10,7 +10,11 @@ import {
 
 const downloading = {status: 'downloading'} satisfies GitDownloadState
 const failed = {status: 'failed'} satisfies GitDownloadState
-const retrying = {status: 'retrying'} satisfies GitDownloadState
+
+const downloadingAgain = {
+  status: 'downloading-again',
+} satisfies GitDownloadState
+
 const inPlace = {status: 'in-place'} satisfies GitDownloadState
 
 const ALL: GitDownloadEvent[] = [
@@ -61,8 +65,10 @@ describe('the git download machine', () => {
   })
 
   describe('failed', () => {
-    it('retries once started again', () => {
-      expect(gitDownloadTransition(failed, {type: 'started'})).toEqual(retrying)
+    it('downloads again once started', () => {
+      expect(gitDownloadTransition(failed, {type: 'started'})).toEqual(
+        downloadingAgain
+      )
     })
 
     it('ignores downloaded and failed', () => {
@@ -72,19 +78,23 @@ describe('the git download machine', () => {
     })
   })
 
-  describe('retrying', () => {
+  describe('downloading again', () => {
     it('is in place once downloaded', () => {
-      expect(gitDownloadTransition(retrying, {type: 'downloaded'})).toEqual(
-        inPlace
-      )
+      expect(
+        gitDownloadTransition(downloadingAgain, {type: 'downloaded'})
+      ).toEqual(inPlace)
     })
 
     it('fails again when the download fails', () => {
-      expect(gitDownloadTransition(retrying, {type: 'failed'})).toEqual(failed)
+      expect(gitDownloadTransition(downloadingAgain, {type: 'failed'})).toEqual(
+        failed
+      )
     })
 
     it('ignores started', () => {
-      expect(gitDownloadTransition(retrying, {type: 'started'})).toBe(retrying)
+      expect(gitDownloadTransition(downloadingAgain, {type: 'started'})).toBe(
+        downloadingAgain
+      )
     })
   })
 
@@ -100,7 +110,7 @@ describe('the git download machine', () => {
     expect(downloadingIsNews(initialGitDownload)).toBe(true)
     expect(downloadingIsNews(downloading)).toBe(true)
     expect(downloadingIsNews(failed)).toBe(false)
-    expect(downloadingIsNews(retrying)).toBe(false)
+    expect(downloadingIsNews(downloadingAgain)).toBe(false)
     expect(downloadingIsNews(inPlace)).toBe(false)
   })
 })

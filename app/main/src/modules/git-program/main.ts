@@ -30,8 +30,7 @@ export function createGitProgram({
 }: GitProgramDeps) {
   let state = initialGitDownload
   let downloading: Promise<void> | null = null
-  // Once a Snapshot or the user waits on it, a failed download is told.
-  let awaited = false
+  let waitedOn = false
   const told = new Set<GitNews>()
 
   function send(event: GitDownloadEvent) {
@@ -54,7 +53,7 @@ export function createGitProgram({
       send({type: 'failed'})
 
       // Each attempt follows a wait or a Try again, so at most once a Reply.
-      if (awaited) tell('download-failed')
+      if (waitedOn) tell('download-failed')
     } finally {
       downloading = null
     }
@@ -83,7 +82,7 @@ export function createGitProgram({
 
       if (!target) return
 
-      awaited = true
+      waitedOn = true
 
       if (downloadingIsNews(state)) tellOnce('downloading')
 
@@ -91,8 +90,8 @@ export function createGitProgram({
     },
 
     /** The user's Try again. Never rejects; true once `git` is in place. */
-    async retry() {
-      awaited = true
+    async tryAgain() {
+      waitedOn = true
       await prepare()
 
       return state.status === 'in-place'

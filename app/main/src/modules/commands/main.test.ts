@@ -41,11 +41,11 @@ let deps: Parameters<typeof dispatchCommand>[2]
 let attachmentsDir: string
 
 let treeHasFiles: boolean
-let retriedDownloads: number
+let downloadsAgain: number
 
 beforeEach(() => {
   treeHasFiles = false
-  retriedDownloads = 0
+  downloadsAgain = 0
   const db = openDatabase({file: ':memory:', migrationsFolder})
   attachmentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-commands-'))
   clock = new Date('2026-10-19T12:00:00.000Z')
@@ -123,8 +123,8 @@ beforeEach(() => {
     },
     settings: createSettings(db),
     layout: createLayout(db),
-    retryGitDownload: () => {
-      retriedDownloads += 1
+    downloadGitAgain: () => {
+      downloadsAgain += 1
     },
     publish,
   }
@@ -672,11 +672,11 @@ describe('attaching an image with the window’s shrunk copy', () => {
 
 describe('file history', () => {
   it('starts the download of the app’s git again on Try again', async () => {
-    expect(await send({type: 'snapshots.retry-download'})).toEqual({
+    expect(await send({type: 'snapshots.download-again'})).toEqual({
       ok: true,
       value: {},
     })
-    expect(retriedDownloads).toBe(1)
+    expect(downloadsAgain).toBe(1)
   })
 })
 

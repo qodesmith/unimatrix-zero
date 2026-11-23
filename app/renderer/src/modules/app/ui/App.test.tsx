@@ -261,7 +261,7 @@ it('says, when the app’s git failed to download, that file history couldn’t 
   await page.getByRole('button', {name: 'Try again'}).click()
 
   expect(main.sent.map(command => command.type)).toContain(
-    'snapshots.retry-download'
+    'snapshots.download-again'
   )
 })
 

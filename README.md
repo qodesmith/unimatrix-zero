@@ -20,6 +20,7 @@ A Bun-workspaces monorepo, one private package per process plus the contract:
 
 ```text
 shell/              the thin loader that becomes the installed app (placeholder for now)
+shell/git-exe/      the Windows `git.exe` that runs the app's own `git`, in Go (ADR 0028)
 app/main/           the hub: SQLite, Provider hosts, the one window
 app/preload/        window.uz = { send, subscribe, registerDroppedFile }, one self-contained CJS file
 app/renderer/       React, Tailwind and shadcn, styled only by Theme tokens
@@ -58,4 +59,4 @@ Vitest runs in two projects: `node` (contract, main, hosts, shell, scripts, tool
 
 Before the `node` tests, Vitest downloads the `git` the manifest names for the machine into `node_modules/.cache/uz-test` (once; later runs check it), and the Snapshot tests run that build, the one the app runs (ADR 0024).
 
-CI runs the checks on Linux and the `node` tests on Mac arm64, Mac x64, Windows x64 and Linux x64. Its "A Mac with no developer tools" job moves Xcode and the Command Line Tools out of the way and runs the `developer-folder` and `vendor-environment` tests there, with `UZ_NO_DEVELOPER_TOOLS=1` (ADR 0025). Its "Linux with no git" job runs the `git-wrapper` tests in a bare Ubuntu container, and its "Windows with no git" job runs them with Git for Windows taken off `PATH`, both with `UZ_NO_GIT=1` (ADR 0026). The `renderer` tests run on Linux only, in Playwright's Chromium headless shell. There are no git hooks.
+CI runs the checks on Linux and the `node` tests on Mac arm64, Mac x64, Windows x64 and Linux x64. Its "A Mac with no developer tools" job moves Xcode and the Command Line Tools out of the way and runs the `developer-folder` and `vendor-environment` tests there, with `UZ_NO_DEVELOPER_TOOLS=1` (ADR 0025). Its "Linux with no git" job runs the `git-wrapper` tests in a bare Ubuntu container, and its "Windows with no git" job runs them with Git for Windows taken off `PATH`, both with `UZ_NO_GIT=1` (ADR 0026). The Windows job first runs `go test` and `bun run build:git-exe` (ADR 0028). The `renderer` tests run on Linux only, in Playwright's Chromium headless shell. There are no git hooks.

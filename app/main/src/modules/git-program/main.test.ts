@@ -164,7 +164,7 @@ it('tells a download that fails after the user heard it was slow', async () => {
     .toEqual([['downloading'], ['download-failed']])
 })
 
-it('downloads again on Try again, says whether git is then in place, and tells a failure again', async () => {
+it('downloads again on each Try again, says whether git is then in place, and tells each failure', async () => {
   const tell = fakeTell()
   const {getProgramReady, downloads} = heldDownload()
 
@@ -175,16 +175,22 @@ it('downloads again on Try again, says whether git is then in place, and tells a
     tell,
   })
 
-  const failing = git.retry()
+  const first = git.tryAgain()
   await expect.poll(() => downloads).toHaveLength(1)
   downloads[0]?.reject(new Error('offline'))
 
-  expect(await failing).toBe(false)
-  expect(tell.mock.calls).toEqual([['download-failed']])
+  expect(await first).toBe(false)
 
-  const working = git.retry()
+  const second = git.tryAgain()
   await expect.poll(() => downloads).toHaveLength(2)
-  downloads[1]?.resolve()
+  downloads[1]?.reject(new Error('offline'))
+
+  expect(await second).toBe(false)
+  expect(tell.mock.calls).toEqual([['download-failed'], ['download-failed']])
+
+  const working = git.tryAgain()
+  await expect.poll(() => downloads).toHaveLength(3)
+  downloads[2]?.resolve()
 
   expect(await working).toBe(true)
   expect(git.program()).not.toBeNull()

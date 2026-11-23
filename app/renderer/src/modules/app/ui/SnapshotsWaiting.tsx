@@ -26,7 +26,7 @@ export function SnapshotsWaiting() {
             action: {
               label: 'Try again',
               onClick: () => {
-                void bridge().send({type: 'snapshots.retry-download'})
+                void bridge().send({type: 'snapshots.download-again'})
               },
             },
           })

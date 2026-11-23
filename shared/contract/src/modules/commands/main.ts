@@ -185,8 +185,8 @@ export const AttachmentAddResult = z.strictObject({
  * Downloads the app's own `git` again. `SNAPSHOTS_DOWNLOAD_FAILED` follows if
  * it fails again.
  */
-export const SnapshotsRetryDownloadCommand = z.strictObject({
-  type: z.literal('snapshots.retry-download'),
+export const SnapshotsDownloadAgainCommand = z.strictObject({
+  type: z.literal('snapshots.download-again'),
 })
 
 /** `SETTINGS_CHANGED` follows with every Setting. */
@@ -223,7 +223,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   AttachmentAddCommand,
   SettingsUpdateCommand,
   LayoutUpdateCommand,
-  SnapshotsRetryDownloadCommand,
+  SnapshotsDownloadAgainCommand,
 ])
 
 export type Command = z.infer<typeof CommandSchema>
@@ -250,7 +250,7 @@ const resultSchemas = {
   'attachment.add': AttachmentAddResult,
   'settings.update': SettingsSchema,
   'layout.update': LayoutSchema,
-  'snapshots.retry-download': Done,
+  'snapshots.download-again': Done,
 } as const satisfies Record<CommandType, z.ZodType>
 
 export type CommandResult<T extends CommandType> = z.infer<

@@ -14,16 +14,16 @@ const NO_LIBCURL =
 
 /**
  * Needs `$program` and `$tool` set. Its folders and no-login settings stay in
- * this call, never in what else the AI runs (ADR 0024, ADR 0027). An empty
- * `GIT_ASKPASS` blocks `core.askPass` and `SSH_ASKPASS` for `git`'s own
- * prompts; `GIT_TERMINAL_PROMPT=0` does not. `ssh` reads neither, so
- * `SSH_ASKPASS_REQUIRE=never` keeps its window shut. `beforeProgram` ends
- * mid-command, on a `\`, so the line after it must run `"$program"`.
+ * this call, never in what else the AI runs (ADR 0024, ADR 0027).
  */
 export function runningBuild(gitProgram: string) {
   const root = path.join(path.dirname(gitProgram), '..')
   const subPrograms = quoted(path.join(root, 'libexec', 'git-core'))
 
+  // An empty `GIT_ASKPASS` blocks `core.askPass` and `SSH_ASKPASS` for `git`'s
+  // own prompts; `GIT_TERMINAL_PROMPT=0` does not. `ssh` reads neither, so
+  // `SSH_ASKPASS_REQUIRE=never` keeps its window shut. The text ends
+  // mid-command, on a `\`, so the line after it must run `"$program"`.
   const beforeProgram = `if [ ! -x "$program" ]; then
   echo "$tool: ${NOT_READY}" >&2
   exit 127
@@ -68,7 +68,10 @@ export function writeScript(file: string, script: string) {
   fs.renameSync(writing, file)
 }
 
-/** Built by `bun run build:git-exe`, native code living in the shell (ADR 0028). */
+/**
+ * One folder per target, named as `scripts/build-git-exe.ts` writes them (ADR
+ * 0028).
+ */
 export function shippedGitExe(builds: string, arch: string) {
   return path.join(builds, `win32-${arch}`, 'git.exe')
 }

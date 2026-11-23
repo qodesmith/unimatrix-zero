@@ -6,7 +6,7 @@ export type GitDownloadState =
   | {status: 'idle'}
   | {status: 'downloading'}
   | {status: 'failed'}
-  | {status: 'retrying'}
+  | {status: 'downloading-again'}
   | {status: 'in-place'}
 
 export type GitDownloadEvent =
@@ -27,8 +27,8 @@ function failed(): GitDownloadState {
 const transitions = {
   idle: {started: () => ({status: 'downloading'})},
   downloading: {downloaded, failed},
-  failed: {started: () => ({status: 'retrying'})},
-  retrying: {downloaded, failed},
+  failed: {started: () => ({status: 'downloading-again'})},
+  'downloading-again': {downloaded, failed},
   'in-place': {},
 } satisfies Transitions<GitDownloadState, GitDownloadEvent>
 
@@ -44,7 +44,7 @@ export function downloadingIsNews(state: GitDownloadState) {
     case 'downloading':
       return true
     case 'failed':
-    case 'retrying':
+    case 'downloading-again':
     case 'in-place':
       return false
     default:

@@ -64,8 +64,8 @@ export const TreeDeletedEvent = z.strictObject({
 })
 
 /**
- * The app's own `git` is still downloading, or retrying, so no Snapshot can be
- * taken or read. Sent once per launch, at the first wait a window can hear.
+ * The app's own `git` is still downloading, so no Snapshot can be taken or
+ * read. Sent once per launch, at the first wait a window can hear.
  */
 export const SnapshotsWaitingEvent = z.strictObject({
   type: z.literal('SNAPSHOTS_WAITING'),
@@ -73,7 +73,7 @@ export const SnapshotsWaitingEvent = z.strictObject({
 
 /**
  * The app's own `git` failed to download while a Snapshot waited on it, or on
- * the user's Try again (`snapshots.retry-download`).
+ * the user's Try again (`snapshots.download-again`).
  */
 export const SnapshotsDownloadFailedEvent = z.strictObject({
   type: z.literal('SNAPSHOTS_DOWNLOAD_FAILED'),

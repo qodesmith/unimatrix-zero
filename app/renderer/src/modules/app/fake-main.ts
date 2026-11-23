@@ -108,7 +108,7 @@ export function fakeMain(saved: Saved = {}) {
   function answer(
     command: Exclude<
       Command,
-      {type: 'attachment.add' | 'snapshots.retry-download'}
+      {type: 'attachment.add' | 'snapshots.download-again'}
     >
   ): CommandOutcome<CommandType> {
     if ('provider' in command) return {ok: true, value: {}}
@@ -233,7 +233,7 @@ export function fakeMain(saved: Saved = {}) {
         return {ok: true, value: {attachment: keep(command)}}
       }
 
-      if (command.type === 'snapshots.retry-download') {
+      if (command.type === 'snapshots.download-again') {
         return {ok: true, value: {}}
       }
 
