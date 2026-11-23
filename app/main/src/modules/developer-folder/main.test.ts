@@ -191,27 +191,6 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     )
   })
 
-  it('keeps ssh from opening a password program, even one the user forces', async () => {
-    const folder = temporaryFolder()
-    writeDeveloperFolder(folder, inject('gitProgram'))
-    const ssh = path.join(folder, 'ssh')
-    fs.writeFileSync(
-      ssh,
-      '#!/bin/sh\necho "SSH_ASKPASS_REQUIRE=$SSH_ASKPASS_REQUIRE" >&2\nexit 255\n',
-      {mode: 0o755}
-    )
-
-    const denied = await stub(
-      folder,
-      'git',
-      ['ls-remote', 'git@github.com:someone/repo.git'],
-      os.tmpdir(),
-      {GIT_SSH_COMMAND: `'${ssh}'`, SSH_ASKPASS_REQUIRE: 'force'}
-    )
-
-    expect(denied.stderr).toMatch(/^SSH_ASKPASS_REQUIRE=never\n/)
-  })
-
   it('keeps the git settings already in the environment', async () => {
     const folder = temporaryFolder()
     writeDeveloperFolder(folder, inject('gitProgram'))

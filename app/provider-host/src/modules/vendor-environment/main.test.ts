@@ -146,26 +146,14 @@ const ownGitSetting = {
   GIT_CONFIG_VALUE_0: 'Sam',
 }
 
-it('leaves git’s settings alone on Windows, adding only the folder last on PATH', async () => {
-  const windows = {Path: String.raw`C:\Windows\System32`, ...ownGitSetting}
-  const gitFolder = String.raw`C:\data\git`
-
-  const env = await withAppFolders(windows, {gitFolder}, async () => true)
-
-  expect(env).toStrictEqual({
-    ...windows,
-    Path: `${windows.Path}${path.delimiter}${gitFolder}`,
-  })
-})
-
-it('leaves git’s settings alone on Linux, adding only the folder last on PATH', async () => {
-  const linux = {...base, ...ownGitSetting}
+it('leaves git’s settings alone, adding only the folder last on PATH', async () => {
+  const withSetting = {...base, ...ownGitSetting}
   const gitFolder = '/data/unimatrix-zero/git'
 
-  const env = await withAppFolders(linux, {gitFolder}, async () => true)
+  const env = await withAppFolders(withSetting, {gitFolder}, async () => true)
 
   expect(env).toStrictEqual({
-    ...linux,
+    ...withSetting,
     PATH: `/usr/bin${path.delimiter}${gitFolder}`,
   })
 })

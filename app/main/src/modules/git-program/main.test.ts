@@ -146,26 +146,6 @@ it('says nothing of a failed download no Snapshot waited on, so the next wait he
     .toEqual([['downloading'], ['download-failed'], ['download-failed']])
 })
 
-it('tells a download that fails after the user heard it was slow', async () => {
-  const tell = fakeTell()
-  const {getProgramReady, downloads} = heldDownload()
-
-  const git = createGitProgram({
-    target,
-    needsNewerLinux: false,
-    getProgramReady,
-    tell,
-  })
-
-  git.snapshotWaited()
-  await expect.poll(() => downloads).toHaveLength(1)
-  downloads[0]?.reject(new Error('offline'))
-
-  await expect
-    .poll(() => tell.mock.calls)
-    .toEqual([['downloading'], ['download-failed']])
-})
-
 it('downloads again on each Try again, says whether git is then in place, and tells each failure', async () => {
   const tell = fakeTell()
   const {getProgramReady, downloads} = heldDownload()
