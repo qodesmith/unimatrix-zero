@@ -26,9 +26,8 @@ fi
 
 helper=${quoted(NO_LOGIN_HELPER)}
 n=\${GIT_CONFIG_COUNT:-0}
-export GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= GIT_CONFIG_COUNT=$((n + 2)) \\
-  "GIT_CONFIG_KEY_$n=credential.helper" "GIT_CONFIG_VALUE_$n=" \\
-  "GIT_CONFIG_KEY_$((n + 1))=credential.helper" "GIT_CONFIG_VALUE_$((n + 1))=$helper"
+export GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= GIT_CONFIG_COUNT=$((n + 1)) \\
+  "GIT_CONFIG_KEY_$n=credential.helper" "GIT_CONFIG_VALUE_$n=$helper"
 
 GIT_EXEC_PATH=${subPrograms} \\
 GIT_TEMPLATE_DIR=${quoted(path.join(root, 'share', 'git-core', 'templates'))} \\

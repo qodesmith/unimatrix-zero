@@ -162,7 +162,7 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     expect(shell.stderr).toMatch(/^fatal: /)
   })
 
-  it('fails a git that needs a login at once and says what to do, asking no helper or askpass program of the user’s', async () => {
+  it('fails a git that needs a login at once and says what to do, after the user’s own helper, running no askpass program of the user’s', async () => {
     const folder = temporaryFolder()
     writeDeveloperFolder(folder, inject('gitProgram'))
     const home = path.join(folder, 'home')
@@ -187,7 +187,7 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
 
     expect(denied.code).toBe(128)
     expect(denied.stderr).toBe(
-      `${NO_GIT_LOGIN}\nfatal: could not read Username for '${host}': terminal prompts disabled\n`
+      `the user’s helper get\n${NO_GIT_LOGIN}\nfatal: could not read Username for '${host}': terminal prompts disabled\n`
     )
   })
 

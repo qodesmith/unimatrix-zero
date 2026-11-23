@@ -4,10 +4,6 @@ export const NO_GIT_LOGIN =
 /** To stderr: `git` reads a helper's stdout as the login (ADR 0027). */
 export const NO_LOGIN_HELPER = `!f() { if [ "$1" = get ]; then echo "${NO_GIT_LOGIN}" >&2; fi; }; f`
 
-/**
- * After the build's helper: Windows can't hold the empty value that clears the
- * list.
- */
 export function withNoGitLogin(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const count = Number(base.GIT_CONFIG_COUNT ?? 0)
 
