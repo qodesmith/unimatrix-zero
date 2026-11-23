@@ -6,7 +6,7 @@ export function quoted(text: string) {
   return `'${text.replaceAll("'", String.raw`'\''`)}'`
 }
 
-export const NOT_READY =
+const NOT_READY =
   'not ready yet: Unimatrix Zero is still downloading it. Try again in a minute.'
 
 const NO_LIBCURL =
@@ -65,6 +65,61 @@ export function writeScript(file: string, script: string) {
   fs.writeFileSync(writing, script, {mode: 0o755})
   // Renamed over the old one, so a call running now reads a whole script.
   fs.renameSync(writing, file)
+}
+
+/** Built by `bun run build:git-exe`, native code living in the shell (ADR 0028). */
+export function shippedGitExe(builds: string, arch: string) {
+  return path.join(builds, `win32-${arch}`, 'git.exe')
+}
+
+function sameBytes(one: string, other: string) {
+  try {
+    return fs.readFileSync(one).equals(fs.readFileSync(other))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Windows': a `git.exe` that runs the build's `cmd\git.exe` with the no-login
+ * settings for that call only, and says "not ready yet" until it's in place
+ * (ADR 0026, ADR 0027). A `.cmd`, `.bat` or `.ps1` mangles arguments or isn't
+ * found by every caller. Without a shipped copy the folder holds no `git.exe`,
+ * and the AI's `git` is "not recognized".
+ */
+export function writeWindowsGitWrapper(
+  folder: string,
+  gitProgram: string,
+  shipped: string
+) {
+  const settings = {
+    program: gitProgram,
+    notReady: `git: ${NOT_READY}`,
+    environment: {GCM_INTERACTIVE: 'never', GIT_TERMINAL_PROMPT: '0'},
+    config: [{key: 'credential.helper', value: NO_LOGIN_HELPER}],
+  }
+
+  writeScript(
+    path.join(folder, 'git-wrapper.json'),
+    `${JSON.stringify(settings, null, 2)}\n`
+  )
+
+  const exe = path.join(folder, 'git.exe')
+
+  if (!fs.existsSync(shipped) || sameBytes(shipped, exe)) return
+
+  const writing = `${exe}.writing`
+  fs.copyFileSync(shipped, writing)
+
+  try {
+    fs.renameSync(writing, exe)
+  } catch (error) {
+    // A `git` left running from the last launch holds the old one.
+    fs.rmSync(writing, {force: true})
+    process.stderr.write(
+      `The app's git.exe wasn't replaced: ${String(error)}\n`
+    )
+  }
 }
 
 /** Linux's: a Mac runs the developer folder's script instead (ADR 0025). */

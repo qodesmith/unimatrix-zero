@@ -1,4 +1,6 @@
 import type {Database} from '#modules/database/main'
+import type {GitNews} from '#modules/git-program/main'
+import type {AppEvent} from '@uz/contract/events'
 
 import {
   hmrOrigin,
@@ -15,7 +17,11 @@ import {readDevRun} from '#modules/dev/main'
 import {writeDeveloperFolder} from '#modules/developer-folder/main'
 import {createDroppedFiles} from '#modules/dropped-files/main'
 import {createGitProgram} from '#modules/git-program/main'
-import {writeGitWrapper} from '#modules/git-wrapper/main'
+import {
+  shippedGitExe,
+  writeGitWrapper,
+  writeWindowsGitWrapper,
+} from '#modules/git-wrapper/main'
 import {utilityHost} from '#modules/host-process/main'
 import {createHub, registerSubscribeChannel} from '#modules/hub/main'
 import {createLayout} from '#modules/layout/main'
@@ -31,6 +37,8 @@ import {
   developerFolderFor,
   gitFolderFor,
   gitTargetFor,
+  needsNewerLinux,
+  readGlibcVersion,
   signInRequestFor,
 } from '#modules/vendor-programs/main'
 import {
@@ -58,6 +66,15 @@ const rendererDist = path.join(import.meta.dirname, '../../renderer/dist')
 const hostsDist = path.join(import.meta.dirname, '../../provider-host/dist')
 
 const migrationsFolder = path.join(import.meta.dirname, '../drizzle')
+
+const GIT_NEWS = {
+  downloading: 'SNAPSHOTS_WAITING',
+  'download-failed': 'SNAPSHOTS_DOWNLOAD_FAILED',
+  'needs-newer-linux': 'SNAPSHOTS_NEED_NEWER_LINUX',
+} as const satisfies Record<GitNews, AppEvent['type']>
+
+/** Native code lives in the shell (ADR 0007); this is its build output. */
+const gitExes = path.join(import.meta.dirname, '../../../shell/git-exe/dist')
 
 app.setName('Unimatrix Zero')
 
@@ -154,6 +171,7 @@ function openWindow(db: Database) {
     userData: app.getPath('userData'),
     platform: process.platform,
     arch: process.arch,
+    glibcVersion: readGlibcVersion(),
   }
 
   const gitTarget = gitTargetFor(machine)
@@ -166,15 +184,23 @@ function openWindow(db: Database) {
 
   const gitFolder = gitFolderFor(machine)
 
-  // On Windows the download fills the build's own folder.
-  if (machine.platform === 'linux' && gitFolder && gitTarget) {
-    writeGitWrapper(gitFolder, programOf(gitTarget))
+  if (gitFolder && gitTarget) {
+    if (machine.platform === 'win32') {
+      writeWindowsGitWrapper(
+        gitFolder,
+        programOf(gitTarget),
+        shippedGitExe(gitExes, machine.arch)
+      )
+    } else {
+      writeGitWrapper(gitFolder, programOf(gitTarget))
+    }
   }
 
   const gitProgram = createGitProgram({
     target: gitTarget,
+    needsNewerLinux: needsNewerLinux(machine),
     getProgramReady,
-    onWaiting: () => hub.publish({type: 'SNAPSHOTS_WAITING'}),
+    tell: news => hub.publish({type: GIT_NEWS[news]}),
   })
 
   const treeFiles = createTreeFiles({
@@ -222,6 +248,10 @@ function openWindow(db: Database) {
     },
   })
 
+  async function retryGitDownload() {
+    if (await gitProgram.retry()) await treeFiles.takeMissedSnapshots()
+  }
+
   // Waits for git, or missed Snapshots would be recorded as waiting.
   void gitProgram.prepare().then(async () => treeFiles.takeMissedSnapshots())
 
@@ -258,6 +288,9 @@ function openWindow(db: Database) {
       images: createRemoteImages(globalThis.fetch),
       settings,
       layout,
+      retryGitDownload: () => {
+        void retryGitDownload()
+      },
       publish: hub.publish,
     }
   )

@@ -5,6 +5,8 @@ import {
   DEV_MANIFEST,
   gitFolderFor,
   gitTargetFor,
+  needsNewerLinux,
+  readGlibcVersion,
   signInRequestFor,
 } from './main'
 
@@ -82,13 +84,56 @@ it('has no git for a machine the manifest does not name', () => {
   expect(gitTargetFor({userData, platform: 'freebsd', arch: 'x64'})).toBeNull()
 })
 
-it('names the cmd folder of the app’s own git build to a vendor program on Windows', () => {
-  const machine = {userData, platform: 'win32', arch: 'x64'} as const
+it('names a folder in userData, not the build’s own, as the app’s git folder on Windows and Linux', () => {
+  for (const platform of ['win32', 'linux'] as const) {
+    const machine = {userData, platform, arch: 'x64'}
 
-  expect(signInRequestFor('claude', machine).gitFolder).toBe(
-    path.join(gitTargetFor(machine)?.path ?? '', 'cmd')
-  )
+    expect(signInRequestFor('claude', machine).gitFolder).toBe(
+      path.join(userData, 'git')
+    )
+  }
 })
+
+it('has no git on Linux older than glibc 2.34, which the build needs, so nothing downloads and no folder goes on PATH', () => {
+  for (const glibcVersion of ['2.31', '2.33', '1.99']) {
+    const machine = {
+      userData,
+      platform: 'linux' as const,
+      arch: 'x64',
+      glibcVersion,
+    }
+
+    expect(needsNewerLinux(machine)).toBe(true)
+    expect(gitTargetFor(machine)).toBeNull()
+    expect(signInRequestFor('chatgpt', machine)).not.toHaveProperty('gitFolder')
+  }
+
+  for (const glibcVersion of ['2.34', '2.39', '3.0', undefined]) {
+    const machine = {
+      userData,
+      platform: 'linux' as const,
+      arch: 'x64',
+      glibcVersion,
+    }
+
+    expect(needsNewerLinux(machine)).toBe(false)
+    expect(gitTargetFor(machine)).not.toBeNull()
+  }
+})
+
+it.runIf(process.platform === 'linux')(
+  'reads the C library’s version on Linux',
+  () => {
+    expect(readGlibcVersion()).toMatch(/^\d+\.\d+$/)
+  }
+)
+
+it.skipIf(process.platform === 'linux')(
+  'reads no C library version off Linux',
+  () => {
+    expect(readGlibcVersion()).toBeUndefined()
+  }
+)
 
 it('names no git folder on a Mac, or for a machine the manifest has no git for', () => {
   expect(gitFolderFor({userData, platform: 'darwin', arch: 'arm64'})).toBeNull()

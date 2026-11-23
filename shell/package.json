@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build"
+    "build": "vite build",
+    "build:git-exe": "bun run ../scripts/build-git-exe.ts"
   },
   "devDependencies": {
     "@uz/tooling": "workspace:*",

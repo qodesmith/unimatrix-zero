@@ -145,13 +145,27 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
+      # The app's git.exe is Go (ADR 0028). No go.sum, so nothing to cache.
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: shell/git-exe/go.mod
+          cache: false
       - run: bun install --frozen-lockfile
+      - name: Test the git.exe's Go code
+        working-directory: shell/git-exe
+        run: go test ./...
+      - name: Build git.exe
+        working-directory: shell
+        run: bun run build:git-exe
       # For this step alone, after every step that needs the runner's own git.
       - name: Run the tests with Git for Windows off PATH
         shell: pwsh
         env:
           UZ_NO_GIT: '1'
         run: |
+          # A test checks the app's settings stay off a git found before its own.
+          $env:UZ_USER_GIT_FOLDER = Split-Path (Get-Command git).Source
+
           $env:PATH = ($env:PATH -split ';' | Where-Object {
             $_ -and -not (Test-Path ([IO.Path]::Combine($_, 'git.exe')))
           }) -join ';'

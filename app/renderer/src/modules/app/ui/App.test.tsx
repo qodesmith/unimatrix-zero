@@ -239,6 +239,48 @@ it('says, when a Reply finished without its Snapshot for want of the app’s git
     .toBeVisible()
 })
 
+it('says, when the app’s git failed to download, that file history couldn’t download in place of the slow-download toast, and downloads again on Try again', async () => {
+  const main = fakeMain()
+  globalThis.window.uz = main
+  await renderApp()
+  await expect.element(sidebarNewTree()).toBeVisible()
+
+  main.publish({type: 'SNAPSHOTS_WAITING'})
+  main.publish({type: 'SNAPSHOTS_DOWNLOAD_FAILED'})
+
+  await expect
+    .element(page.getByText('File history couldn’t download', {exact: true}))
+    .toBeVisible()
+  // At once: the slow-download toast leaves by itself after a few seconds.
+  expect(
+    page
+      .getByText('File history starts once a download finishes', {exact: true})
+      .query()
+  ).toBeNull()
+
+  await page.getByRole('button', {name: 'Try again'}).click()
+
+  expect(main.sent.map(command => command.type)).toContain(
+    'snapshots.retry-download'
+  )
+})
+
+it('says file history can’t work on a Linux too old for the app’s git, and names a newer one', async () => {
+  const main = fakeMain()
+  globalThis.window.uz = main
+  await renderApp()
+  await expect.element(sidebarNewTree()).toBeVisible()
+
+  main.publish({type: 'SNAPSHOTS_NEED_NEWER_LINUX'})
+
+  await expect
+    .element(
+      page.getByText('File history can’t work on this computer', {exact: true})
+    )
+    .toBeVisible()
+  await expect.element(page.getByText(/newer version of Linux/)).toBeVisible()
+})
+
 it('creates a Tree and opens it', async () => {
   globalThis.window.uz = fakeMain()
   await renderApp()

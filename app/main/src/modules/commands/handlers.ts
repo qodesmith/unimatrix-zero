@@ -23,6 +23,8 @@ export interface HandlerDeps {
   images: RemoteImages
   settings: SettingsStore
   layout: LayoutStore
+  /** Starts the download of the app's own `git` again, and returns at once. */
+  retryGitDownload: () => void
   publish: (event: AppEvent) => void
 }
 
@@ -169,5 +171,11 @@ export const handlers: Handlers = {
     publish({type: 'LAYOUT_CHANGED', layout: saved})
 
     return saved
+  },
+
+  'snapshots.retry-download': (_command, {retryGitDownload}) => {
+    retryGitDownload()
+
+    return {}
   },
 }

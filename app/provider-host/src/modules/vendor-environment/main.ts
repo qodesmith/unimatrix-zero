@@ -1,6 +1,5 @@
 import type {SignInRequest} from '@uz/contract/host'
 
-import {withNoGitLogin} from '@uz/vendor-program/git-login'
 import {execFile} from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -74,6 +73,31 @@ export async function withDeveloperDir(
   return {...base, DEVELOPER_DIR: developerDir}
 }
 
+const PATH_MARK = '__UZ_LOGIN_PATH__'
+
+/**
+ * The `PATH` the user's login shell sets, with what their profile adds, or
+ * undefined if it can't be read. `printenv` joins it with colons in every
+ * shell, fish's too, and the mark skips what a profile prints.
+ */
+export async function loginShellPath(base: NodeJS.ProcessEnv) {
+  const shell = base.SHELL ?? '/bin/sh'
+
+  return new Promise<string | undefined>(resolve => {
+    execFile(
+      shell,
+      ['-l', '-c', `echo ${PATH_MARK}; printenv PATH`],
+      {env: base, timeout: 10_000},
+      (error, stdout) => {
+        const [, ...after] = stdout.split(`${PATH_MARK}\n`)
+        const found = after.at(-1)?.trim()
+
+        resolve(error || !found ? undefined : found)
+      }
+    )
+  })
+}
+
 /** Last, so the user's own `git` wins (ADR 0026). */
 export function withGitLast(
   base: NodeJS.ProcessEnv,
@@ -93,17 +117,14 @@ export function withGitLast(
   }
 }
 
+/** The no-login settings stay in the app's own `git` call (ADR 0027). */
 export async function withAppFolders(
   base: NodeJS.ProcessEnv,
   {developerDir, gitFolder}: Pick<SignInRequest, 'developerDir' | 'gitFolder'>,
-  hasDeveloperTools: typeof macHasDeveloperTools,
-  platform: NodeJS.Platform
+  hasDeveloperTools: typeof macHasDeveloperTools
 ) {
-  const env = withGitLast(
+  return withGitLast(
     await withDeveloperDir(base, developerDir, hasDeveloperTools),
     gitFolder
   )
-
-  // A Mac's and Linux's scripts set these for the one call (ADR 0027).
-  return platform === 'win32' && gitFolder ? withNoGitLogin(env) : env
 }

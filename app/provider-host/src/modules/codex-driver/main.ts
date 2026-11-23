@@ -5,6 +5,7 @@ import type {ProviderDriver, SignInRequest} from '@uz/contract/host'
 
 import {idleFor} from '#modules/idle/main'
 import {
+  loginShellPath,
   macHasDeveloperTools,
   withAppFolders,
 } from '#modules/vendor-environment/main'
@@ -41,6 +42,7 @@ interface CodexDriverOptions {
   env?: NodeJS.ProcessEnv
   platform?: NodeJS.Platform
   hasDeveloperTools?: typeof macHasDeveloperTools
+  readLoginShellPath?: typeof loginShellPath
   whenIdle?: WhenIdle
   timeoutMs?: number
 }
@@ -52,9 +54,26 @@ export function createCodexDriver({
   env = process.env,
   platform = process.platform,
   hasDeveloperTools = macHasDeveloperTools,
+  readLoginShellPath = loginShellPath,
   whenIdle = idleFor(IDLE_CLOSE_MS),
   timeoutMs = SIGN_IN_TIMEOUT_MS,
 }: CodexDriverOptions): ProviderDriver {
+  let loginPath: Promise<string | undefined> | undefined
+
+  /**
+   * Codex on Linux runs no login shell (ADR 0026), so the app reads the
+   * `PATH` one would set, once per launch, for what the user's profile adds.
+   * The app's own folder still goes last.
+   */
+  async function withLoginPath(base: NodeJS.ProcessEnv) {
+    if (platform !== 'linux') return base
+
+    loginPath ??= readLoginShellPath(base)
+    const found = await loginPath
+
+    return found === undefined ? base : {...base, PATH: found}
+  }
+
   async function open(request: SignInRequest) {
     const {program, configDir} = request
 
@@ -64,7 +83,11 @@ export function createCodexDriver({
 
     const {command, args} = commandFor(programOf(program))
 
-    const base = await withAppFolders(env, request, hasDeveloperTools, platform)
+    const base = await withAppFolders(
+      await withLoginPath(env),
+      request,
+      hasDeveloperTools
+    )
 
     return startAppServer(
       start,

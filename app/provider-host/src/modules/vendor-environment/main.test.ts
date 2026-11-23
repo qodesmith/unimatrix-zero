@@ -1,10 +1,10 @@
-import {NO_LOGIN_HELPER} from '@uz/vendor-program/git-login'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import {expect, it, vi} from 'vitest'
 
 import {
+  loginShellPath,
   macHasDeveloperTools,
   withAppFolders,
   withDeveloperDir,
@@ -146,38 +146,23 @@ const ownGitSetting = {
   GIT_CONFIG_VALUE_0: 'Sam',
 }
 
-it('turns off git’s login prompts on Windows, and adds its credential helper after the git settings already there', async () => {
+it('leaves git’s settings alone on Windows, adding only the folder last on PATH', async () => {
   const windows = {Path: String.raw`C:\Windows\System32`, ...ownGitSetting}
-  const gitFolder = String.raw`C:\data\vendor\git\cmd`
+  const gitFolder = String.raw`C:\data\git`
 
-  const env = await withAppFolders(
-    windows,
-    {gitFolder},
-    async () => true,
-    'win32'
-  )
+  const env = await withAppFolders(windows, {gitFolder}, async () => true)
 
   expect(env).toStrictEqual({
     ...windows,
     Path: `${windows.Path}${path.delimiter}${gitFolder}`,
-    GCM_INTERACTIVE: 'never',
-    GIT_TERMINAL_PROMPT: '0',
-    GIT_CONFIG_COUNT: '2',
-    GIT_CONFIG_KEY_1: 'credential.helper',
-    GIT_CONFIG_VALUE_1: NO_LOGIN_HELPER,
   })
 })
 
-it('leaves git’s settings alone on Linux', async () => {
+it('leaves git’s settings alone on Linux, adding only the folder last on PATH', async () => {
   const linux = {...base, ...ownGitSetting}
   const gitFolder = '/data/unimatrix-zero/git'
 
-  const env = await withAppFolders(
-    linux,
-    {gitFolder},
-    async () => true,
-    'linux'
-  )
+  const env = await withAppFolders(linux, {gitFolder}, async () => true)
 
   expect(env).toStrictEqual({
     ...linux,
@@ -185,10 +170,26 @@ it('leaves git’s settings alone on Linux', async () => {
   })
 })
 
-it('leaves git’s settings alone on Windows where the manifest has no git', async () => {
-  const windows = {Path: String.raw`C:\Windows\System32`}
+it.skipIf(process.platform === 'win32')(
+  'reads the PATH the user’s login shell sets, past whatever their profile prints, and none from a shell that won’t start',
+  async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'uz login home '))
+    fs.writeFileSync(
+      path.join(home, '.profile'),
+      'echo "Welcome back"\nexport PATH="/from/profile:$PATH"\n'
+    )
 
-  expect(await withAppFolders(windows, {}, async () => true, 'win32')).toBe(
-    windows
-  )
-})
+    const found = await loginShellPath({
+      SHELL: '/bin/sh',
+      HOME: home,
+      PATH: '/usr/bin:/bin',
+    })
+
+    expect(found).toMatch(/^\/from\/profile:/)
+    expect(found).not.toContain('Welcome')
+
+    expect(
+      await loginShellPath({SHELL: path.join(home, 'no-shell'), HOME: home})
+    ).toBeUndefined()
+  }
+)
