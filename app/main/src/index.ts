@@ -73,7 +73,10 @@ const GIT_NEWS = {
   'needs-newer-linux': 'SNAPSHOTS_NEED_NEWER_LINUX',
 } as const satisfies Record<GitNews, AppEvent['type']>
 
-/** Native code lives in the shell (ADR 0007); this is its build output. */
+/**
+ * Only in a checkout: once packaging is built, the shell must ship these and
+ * main must read them from its resources.
+ */
 const gitExes = path.join(import.meta.dirname, '../../../shell/git-exe/dist')
 
 app.setName('Unimatrix Zero')

@@ -130,10 +130,6 @@ function wrapped() {
   return gitIn(folder)
 }
 
-/**
- * The stand-in runs its first argument as a shell command. `ldd` comes
- * first on `PATH`, saying how it finds `libcurl.so.4`.
- */
 function standIn(libcurl: 'found' | 'not found') {
   const build = path.join(temporaryFolder(), 'git')
   const folder = temporaryFolder()
@@ -441,6 +437,9 @@ describe.runIf(noGit && process.platform === 'win32')(
         const theirs = gitThrough({
           ...withLast(folder),
           [name]: `${userGit}${path.delimiter}${withLast(folder)[name] ?? ''}`,
+          GIT_CONFIG_COUNT: '1',
+          GIT_CONFIG_KEY_0: 'credential.helper',
+          GIT_CONFIG_VALUE_0: 'theirs',
         })
 
         const helpers = await theirs([
@@ -449,7 +448,7 @@ describe.runIf(noGit && process.platform === 'win32')(
           'credential.helper',
         ])
 
-        expect(helpers.stdout).not.toContain(NO_LOGIN_HELPER)
+        expect(helpers.stdout.trim().split(/\r?\n/).at(-1)).toBe('theirs')
       }
     )
   }

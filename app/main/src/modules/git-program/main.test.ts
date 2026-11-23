@@ -111,7 +111,7 @@ it('tells the user at the next wait when no window was there to hear it', () => 
   expect(tell.mock.calls).toEqual([['downloading'], ['downloading']])
 })
 
-it('tells a failed download apart from a slow one once a Snapshot has waited on it', async () => {
+it('says nothing of a failed download no Snapshot waited on, so the next wait hears git is downloading, then each failure', async () => {
   const tell = fakeTell()
   const {getProgramReady, downloads} = heldDownload()
 
@@ -133,7 +133,9 @@ it('tells a failed download apart from a slow one once a Snapshot has waited on 
   await expect.poll(() => downloads).toHaveLength(2)
   downloads[1]?.reject(new Error('offline'))
 
-  await expect.poll(() => tell.mock.calls).toEqual([['download-failed']])
+  await expect
+    .poll(() => tell.mock.calls)
+    .toEqual([['downloading'], ['download-failed']])
 
   git.snapshotWaited()
   await expect.poll(() => downloads).toHaveLength(3)
@@ -141,7 +143,7 @@ it('tells a failed download apart from a slow one once a Snapshot has waited on 
 
   await expect
     .poll(() => tell.mock.calls)
-    .toEqual([['download-failed'], ['download-failed']])
+    .toEqual([['downloading'], ['download-failed'], ['download-failed']])
 })
 
 it('tells a download that fails after the user heard it was slow', async () => {

@@ -1,5 +1,5 @@
 import path from 'node:path'
-import {expect, it} from 'vitest'
+import {expect, it, vi} from 'vitest'
 
 import {
   DEV_MANIFEST,
@@ -129,9 +129,12 @@ it.runIf(process.platform === 'linux')(
 )
 
 it.skipIf(process.platform === 'linux')(
-  'reads no C library version off Linux',
+  'reads no C library version off Linux, and builds no report to look',
   () => {
+    const getReport = vi.spyOn(process.report, 'getReport')
+
     expect(readGlibcVersion()).toBeUndefined()
+    expect(getReport).not.toHaveBeenCalled()
   }
 )
 

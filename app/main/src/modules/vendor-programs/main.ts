@@ -26,6 +26,8 @@ const ReportSchema = z.object({
 
 /** From Node's own report, so no program runs. */
 export function readGlibcVersion() {
+  if (process.platform !== 'linux') return undefined
+
   const parsed = ReportSchema.safeParse(process.report.getReport())
 
   return parsed.success ? parsed.data.header.glibcVersionRuntime : undefined

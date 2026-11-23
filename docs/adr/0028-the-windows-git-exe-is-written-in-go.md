@@ -5,7 +5,7 @@ On Windows the AI reaches the app's own `git` through a small `git.exe` last on 
 ## Considered Options
 
 - **C**, as Git for Windows' own wrapper is written. Rejected: building for Windows from a Mac needs a MinGW or `zig cc` cross toolchain, and the process, handle and Ctrl+C code that Go's standard library gives is ours to write and get right.
-- **Rust.** Rejected: it needs a Windows linker and target libraries for each CPU, and a toolchain much larger than Go's for a hundred lines.
+- **Rust.** Rejected: it needs a Windows linker and target libraries for each CPU, and a toolchain much larger than Go's for so small a program.
 - **Git for Windows' own `git.exe`, configured.** Rejected: its configured mode adds arguments, not environment variables, and `GIT_TERMINAL_PROMPT` has no argument form.
 - **A program compiled from TypeScript by Bun or Node.** Rejected: each carries a whole runtime, near 100 MB a CPU, to start one process.
 

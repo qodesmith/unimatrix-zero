@@ -13,6 +13,7 @@ export type GitDownloadEvent =
   | {type: 'started'}
   | {type: 'downloaded'}
   | {type: 'failed'}
+  | {type: 'failed-unheard'}
 
 export const initialGitDownload: GitDownloadState = {status: 'idle'}
 
@@ -26,7 +27,7 @@ function failed(): GitDownloadState {
 
 const transitions = {
   idle: {started: () => ({status: 'downloading'})},
-  downloading: {downloaded, failed},
+  downloading: {downloaded, failed, 'failed-unheard': () => initialGitDownload},
   failed: {started: () => ({status: 'downloading-again'})},
   'downloading-again': {downloaded, failed},
   'in-place': {},
@@ -37,7 +38,10 @@ export const gitDownloadTransition = machine<
   GitDownloadEvent
 >(transitions)
 
-/** After a failure, only the outcome of the next attempt is news. */
+/**
+ * After a failure the user heard of, only the outcome of the next attempt is
+ * news.
+ */
 export function downloadingIsNews(state: GitDownloadState) {
   switch (state.status) {
     case 'idle':

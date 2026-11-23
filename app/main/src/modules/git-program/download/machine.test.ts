@@ -21,6 +21,7 @@ const ALL: GitDownloadEvent[] = [
   {type: 'started'},
   {type: 'downloaded'},
   {type: 'failed'},
+  {type: 'failed-unheard'},
 ]
 
 function except(...types: GitDownloadEvent['type'][]) {
@@ -35,7 +36,7 @@ describe('the git download machine', () => {
       ).toEqual(downloading)
     })
 
-    it('ignores downloaded and failed', () => {
+    it('ignores every event but started', () => {
       for (const event of except('started')) {
         expect(gitDownloadTransition(initialGitDownload, event)).toBe(
           initialGitDownload
@@ -57,6 +58,12 @@ describe('the git download machine', () => {
       )
     })
 
+    it('is idle again when the download fails with no one waiting on it', () => {
+      expect(
+        gitDownloadTransition(downloading, {type: 'failed-unheard'})
+      ).toEqual(initialGitDownload)
+    })
+
     it('ignores started', () => {
       expect(gitDownloadTransition(downloading, {type: 'started'})).toBe(
         downloading
@@ -71,7 +78,7 @@ describe('the git download machine', () => {
       )
     })
 
-    it('ignores downloaded and failed', () => {
+    it('ignores every event but started', () => {
       for (const event of except('started')) {
         expect(gitDownloadTransition(failed, event)).toBe(failed)
       }
@@ -91,10 +98,12 @@ describe('the git download machine', () => {
       )
     })
 
-    it('ignores started', () => {
-      expect(gitDownloadTransition(downloadingAgain, {type: 'started'})).toBe(
-        downloadingAgain
-      )
+    it('ignores started and failed-unheard', () => {
+      for (const event of except('downloaded', 'failed')) {
+        expect(gitDownloadTransition(downloadingAgain, event)).toBe(
+          downloadingAgain
+        )
+      }
     })
   })
 
@@ -106,7 +115,7 @@ describe('the git download machine', () => {
     })
   })
 
-  it('counts a wait as news only while no download has failed and git is not in place', () => {
+  it('counts a wait as news only while no download the user heard of has failed and git is not in place', () => {
     expect(downloadingIsNews(initialGitDownload)).toBe(true)
     expect(downloadingIsNews(downloading)).toBe(true)
     expect(downloadingIsNews(failed)).toBe(false)

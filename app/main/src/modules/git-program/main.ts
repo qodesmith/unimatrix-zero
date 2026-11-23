@@ -50,10 +50,13 @@ export function createGitProgram({
       }));
       send({type: 'downloaded'})
     } catch {
-      send({type: 'failed'})
-
-      // Each attempt follows a wait or a Try again, so at most once a Reply.
-      if (waitedOn) tell('download-failed')
+      if (waitedOn) {
+        send({type: 'failed'})
+        // Each attempt follows a wait or a Try again, so at most once a Reply.
+        tell('download-failed')
+      } else {
+        send({type: 'failed-unheard'})
+      }
     } finally {
       downloading = null
     }
