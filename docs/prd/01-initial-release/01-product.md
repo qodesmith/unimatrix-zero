@@ -1,6 +1,6 @@
 # 1. Product
 
-**Audience.** A software engineer, a stay-at-home parent and a child should all find it easy. Users never see or need to know about a terminal; no copy mentions a terminal, an install or a command line. Power users are never artificially limited.
+**Audience.** A software engineer, a stay-at-home parent and a child should all find it easy. Users never see or need to know about a terminal; no copy mentions a terminal, an install or a command line. Copy is what the app shows; output from a tool the AI runs, such as the line the app's `git` prints when it has no login ([ADR 0027](../../adr/0027-the-apps-git-never-asks-for-a-login.md)), is for the AI to read and isn't copy. Power users are never artificially limited.
 
 > [!IMPORTANT]
 > **The non-developer's path.** Every path a non-developer can reach ends in words they understand and a next step they can take. Spend the guards there. A setup only a developer makes, such as their own `git`, a credential helper, a password program or SSH keys, stays theirs: the app runs it as they set it up and leaves it to them. Check every feature, error and fix against this rule first.
