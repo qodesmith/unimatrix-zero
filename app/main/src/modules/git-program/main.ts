@@ -1,6 +1,13 @@
+import type {GitDownloadEvent} from './download/machine'
 import type {ProgramTarget, getProgramReady} from '@uz/vendor-program'
 
 import {programOf} from '@uz/vendor-program'
+
+import {
+  downloadingIsNews,
+  gitDownloadTransition,
+  initialGitDownload,
+} from './download/machine'
 
 /** What the user hears about Snapshots waiting on the app's own `git`. */
 export type GitNews = 'downloading' | 'download-failed' | 'needs-newer-linux'
@@ -21,26 +28,30 @@ export function createGitProgram({
   getProgramReady,
   tell,
 }: GitProgramDeps) {
-  let inPlace = false
+  let state = initialGitDownload
   let downloading: Promise<void> | null = null
-  let failed = false
   // Once a Snapshot or the user waits on it, a failed download is told.
   let awaited = false
   const told = new Set<GitNews>()
+
+  function send(event: GitDownloadEvent) {
+    state = gitDownloadTransition(state, event)
+  }
 
   function tellOnce(news: GitNews) {
     if (!told.has(news) && tell(news)) told.add(news)
   }
 
   async function download(git: ProgramTarget) {
+    send({type: 'started'})
+
     try {
       for await (const _progress of getProgramReady(git, {
         signal: new AbortController().signal,
       }));
-      inPlace = true
-      failed = false
+      send({type: 'downloaded'})
     } catch {
-      failed = true
+      send({type: 'failed'})
 
       // Each attempt follows a wait or a Try again, so at most once a Reply.
       if (awaited) tell('download-failed')
@@ -50,14 +61,15 @@ export function createGitProgram({
   }
 
   async function prepare() {
-    if (!target || inPlace) return
+    if (!target || state.status === 'in-place') return
 
     downloading ??= download(target)
     await downloading
   }
 
   return {
-    program: () => (target && inPlace ? programOf(target) : null),
+    program: () =>
+      target && state.status === 'in-place' ? programOf(target) : null,
 
     /** Never rejects. */
     prepare,
@@ -73,8 +85,7 @@ export function createGitProgram({
 
       awaited = true
 
-      // After a failure, only the outcome of the next attempt is news.
-      if (!failed) tellOnce('downloading')
+      if (downloadingIsNews(state)) tellOnce('downloading')
 
       void prepare()
     },
@@ -84,7 +95,7 @@ export function createGitProgram({
       awaited = true
       await prepare()
 
-      return inPlace
+      return state.status === 'in-place'
     },
   }
 }

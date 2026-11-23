@@ -17,13 +17,14 @@ const NO_LIBCURL =
  * this call, never in what else the AI runs (ADR 0024, ADR 0027). An empty
  * `GIT_ASKPASS` blocks `core.askPass` and `SSH_ASKPASS` for `git`'s own
  * prompts; `GIT_TERMINAL_PROMPT=0` does not. `ssh` reads neither, so
- * `SSH_ASKPASS_REQUIRE=never` keeps its window shut.
+ * `SSH_ASKPASS_REQUIRE=never` keeps its window shut. `beforeProgram` ends
+ * mid-command, on a `\`, so the line after it must run `"$program"`.
  */
 export function runningBuild(gitProgram: string) {
   const root = path.join(path.dirname(gitProgram), '..')
   const subPrograms = quoted(path.join(root, 'libexec', 'git-core'))
 
-  const settings = `if [ ! -x "$program" ]; then
+  const beforeProgram = `if [ ! -x "$program" ]; then
   echo "$tool: ${NOT_READY}" >&2
   exit 127
 fi
@@ -40,13 +41,13 @@ GIT_CONFIG_SYSTEM=${quoted(path.join(root, 'etc', 'gitconfig'))} \\`
 
   return {
     subPrograms,
-    lines: `${settings}
+    lines: `${beforeProgram}
 exec "$program" "$@"`,
     /**
      * Only `git-remote-http` needs `libcurl.so.4`, so the rest of `git` runs
      * without it (ADR 0026).
      */
-    linesTellingNoLibcurl: `${settings}
+    linesTellingNoLibcurl: `${beforeProgram}
 "$program" "$@"
 code=$?
 
