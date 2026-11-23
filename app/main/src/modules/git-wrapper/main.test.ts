@@ -130,6 +130,78 @@ function wrapped() {
   return gitIn(folder)
 }
 
+/**
+ * The stand-in runs its first argument as a shell command. `ldd` comes
+ * first on `PATH`, saying how it finds `libcurl.so.4`.
+ */
+function standIn(libcurl: 'found' | 'not found') {
+  const build = path.join(temporaryFolder(), 'git')
+  const folder = temporaryFolder()
+  const program = path.join(build, 'bin', 'git')
+  const subPrograms = path.join(build, 'libexec', 'git-core')
+  fs.mkdirSync(path.dirname(program), {recursive: true})
+  fs.mkdirSync(subPrograms, {recursive: true})
+  fs.writeFileSync(path.join(subPrograms, 'git-remote-http'), '')
+  fs.writeFileSync(program, '#!/bin/sh\neval "$1"\n', {mode: 0o755})
+  writeGitWrapper(folder, program)
+
+  const tools = temporaryFolder()
+
+  const found =
+    libcurl === 'found' ? '/usr/lib/libcurl.so.4 (0x1)' : 'not found'
+
+  fs.writeFileSync(
+    path.join(tools, 'ldd'),
+    `#!/bin/sh\n[ "$1" = '${subPrograms}/git-remote-http' ] && echo "\tlibcurl.so.4 => ${found}"\n`,
+    {mode: 0o755}
+  )
+
+  return async (args: string[], env: NodeJS.ProcessEnv = {}) =>
+    ended(path.join(folder, 'git'), args, {
+      cwd: os.tmpdir(),
+      env: {...env, PATH: `${tools}${path.delimiter}/usr/bin:/bin`},
+    })
+}
+
+describe.runIf(process.platform !== 'win32')(
+  'the Linux script, with a stand-in for the build',
+  () => {
+    it('adds one plain line to a failed git when the system lacks libcurl.so.4', async () => {
+      const git = standIn('not found')
+
+      const failed = await git(['echo failed >&2; exit 128'])
+
+      expect(failed).toEqual({
+        code: 128,
+        stdout: '',
+        stderr: `failed\ngit: can't use https:// addresses on this computer, which lacks the libcurl.so.4 library.\n`,
+      })
+
+      const succeeded = await git(['echo worked'])
+
+      expect(succeeded).toEqual({code: 0, stdout: 'worked\n', stderr: ''})
+    })
+
+    it('adds nothing to a failed git when libcurl.so.4 is found', async () => {
+      const git = standIn('found')
+
+      const failed = await git(['echo failed >&2; exit 3'])
+
+      expect(failed).toEqual({code: 3, stdout: '', stderr: 'failed\n'})
+    })
+
+    it('keeps ssh from opening a password program, even one the user forces', async () => {
+      const git = standIn('found')
+
+      const seen = await git(['echo "$SSH_ASKPASS_REQUIRE"'], {
+        SSH_ASKPASS_REQUIRE: 'force',
+      })
+
+      expect(seen.stdout).toBe('never\n')
+    })
+  }
+)
+
 describe.runIf(noGit && process.platform === 'linux')(
   'on Linux with no git',
   () => {

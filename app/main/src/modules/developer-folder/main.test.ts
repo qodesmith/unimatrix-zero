@@ -191,6 +191,27 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     )
   })
 
+  it('keeps ssh from opening a password program, even one the user forces', async () => {
+    const folder = temporaryFolder()
+    writeDeveloperFolder(folder, inject('gitProgram'))
+    const ssh = path.join(folder, 'ssh')
+    fs.writeFileSync(
+      ssh,
+      '#!/bin/sh\necho "SSH_ASKPASS_REQUIRE=$SSH_ASKPASS_REQUIRE" >&2\nexit 255\n',
+      {mode: 0o755}
+    )
+
+    const denied = await stub(
+      folder,
+      'git',
+      ['ls-remote', 'git@github.com:someone/repo.git'],
+      os.tmpdir(),
+      {GIT_SSH_COMMAND: `'${ssh}'`, SSH_ASKPASS_REQUIRE: 'force'}
+    )
+
+    expect(denied.stderr).toMatch(/^SSH_ASKPASS_REQUIRE=never\n/)
+  })
+
   it('keeps the git settings already in the environment', async () => {
     const folder = temporaryFolder()
     writeDeveloperFolder(folder, inject('gitProgram'))
@@ -244,16 +265,18 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     expect(fetched.stdout).toBe('two\n')
   })
 
-  it('fails every other stub with a one-line error and 127', async () => {
-    const folder = temporaryFolder()
-    writeDeveloperFolder(folder, inject('gitProgram'))
+  it('fails every other stub with 127 and one line that tells the AI to find another way', async () => {
+    for (const gitProgram of [inject('gitProgram'), null]) {
+      const folder = temporaryFolder()
+      writeDeveloperFolder(folder, gitProgram)
 
-    for (const tool of ['python3', 'make', 'clang']) {
-      expect(await stub(folder, tool, ['--version'])).toEqual({
-        code: 127,
-        stdout: '',
-        stderr: `${tool}: not installed on this Mac\n`,
-      })
+      for (const tool of ['python3', 'make', 'clang']) {
+        expect(await stub(folder, tool, ['--version'])).toEqual({
+          code: 127,
+          stdout: '',
+          stderr: `${tool} isn't on this Mac, and the user can't install it. Find another way that doesn't need ${tool}.\n`,
+        })
+      }
     }
   })
 

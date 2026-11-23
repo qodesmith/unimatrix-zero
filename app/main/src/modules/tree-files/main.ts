@@ -13,7 +13,7 @@ import {makeTreeFolder} from './folder'
 import {createGit} from './git'
 import {changedFiles, storeExists, takeSnapshot} from './store'
 
-export {withFilesSection} from './section'
+export {withAppSections} from './section'
 
 const {prompts, replies} = schema
 

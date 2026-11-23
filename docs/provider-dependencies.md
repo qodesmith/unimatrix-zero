@@ -696,3 +696,14 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **User would see:** a Reply that begins with a label of its own, or talks about the labels.
 - **Changed by:** upgrade + drift. The Model decides whether it copies the labels it reads.
 - **Check:** `[dep:reply-labels-unwritten]` in `claude-driver` and `codex-driver`: a Reply to a Thread another Provider wrote holds no label.
+
+### Plain words for a user with no terminal
+
+- **Id:** `plain-words-for-the-user`
+- **Kind:** D
+- **Provider:** both
+- **Relies on:** the Model follows the app's lines that the user may not be a developer and may have no terminal: it does what it can itself, and otherwise explains in plain words and gives a step the user can take without a terminal. It keeps the user's real name and email out of a commit unless they say so, and doesn't promise to finish a task once the user signs in elsewhere.
+- **App side:** `tree-files` adds these lines, under the files section, to what every Tree sends after the vendor's own prompt ([PRD §1](./prd/01-initial-release/01-product.md), the non-developer's path).
+- **User would see:** a failed task that ends in a Terminal command or a developer's term, a commit saved under their real name and email, or a promise to push that never comes true.
+- **Changed by:** upgrade + drift. The Model decides how it words a Reply.
+- **Check:** none: the Model's words vary from run to run, so one live run proves little. The maintainer tested the first line in 56 runs on a Mac with no developer tools, with `claude` 2.1.330 and Codex 0.171.0: the results are in [#285](https://github.com/qodesmith/unimatrix-zero/issues/285#issuecomment-7110866115). The lines on commits and sign-ins came from those runs and are untested.

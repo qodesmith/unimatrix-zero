@@ -7,9 +7,17 @@ function filesSection(treeFolder: string) {
   ].join('\n\n')
 }
 
-/** What a Provider is sent as the System prompt: the user's, then the app's. */
-export function withFilesSection(systemPrompt: string, treeFolder: string) {
-  const section = filesSection(treeFolder)
+/** A Provider dependency on the Model (`plain-words-for-the-user`). */
+const USER_SECTION = [
+  '# The user',
+  'The user may not be a developer: they may have no terminal and may not know developer terms. Do what you can yourself. When you can’t, explain in plain words and give a step they can take without a terminal.',
+  'When git asks who is saving a commit, don’t use the user’s real name or email unless they say so: anyone with a copy of the history can read them.',
+  'Don’t promise to do something yourself once the user signs in elsewhere, such as in GitHub Desktop: the git you run may not see that sign-in.',
+].join('\n\n')
 
-  return systemPrompt === '' ? section : `${systemPrompt}\n\n${section}`
+/** What a Provider is sent as the System prompt: the user's, then the app's. */
+export function withAppSections(systemPrompt: string, treeFolder: string) {
+  const sections = `${filesSection(treeFolder)}\n\n${USER_SECTION}`
+
+  return systemPrompt === '' ? sections : `${systemPrompt}\n\n${sections}`
 }

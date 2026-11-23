@@ -19,7 +19,7 @@ import type {Reply, ReplyEvent} from '@uz/contract/turns'
 
 import {refuseTooManyImages} from '#modules/attachments/main'
 import {schema} from '#modules/database/main'
-import {withFilesSection} from '#modules/tree-files/main'
+import {withAppSections} from '#modules/tree-files/main'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {eq} from 'drizzle-orm'
 import {randomUUID} from 'node:crypto'
@@ -233,7 +233,7 @@ export function createTurns({
           treeId,
           replyId: reply.id,
           model,
-          systemPrompt: withFilesSection(systemPrompt, treeFolder),
+          systemPrompt: withAppSections(systemPrompt, treeFolder),
           prompt: {text, attachments, messageId: randomUUID()},
           vendorProgram: vendorProgramFor(provider),
           treeFolder,
@@ -290,7 +290,7 @@ export function createTurns({
           treeId,
           replyId,
           model,
-          systemPrompt: withFilesSection(systemPrompt, treeFolder),
+          systemPrompt: withAppSections(systemPrompt, treeFolder),
           prompt: {text, attachments, messageId: randomUUID()},
           vendorProgram: vendorProgramFor(provider),
           treeFolder,
