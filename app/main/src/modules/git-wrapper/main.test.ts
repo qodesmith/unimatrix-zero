@@ -174,7 +174,7 @@ describe.runIf(process.platform !== 'win32')(
       expect(failed).toEqual({
         code: 128,
         stdout: '',
-        stderr: `failed\ngit: can't use https:// addresses on this computer, which lacks the libcurl.so.4 library.\n`,
+        stderr: `failed\ngit: if this needed an https:// address, it can't work on this computer, which lacks the libcurl.so.4 library.\n`,
       })
 
       const succeeded = await git(['echo worked'])
@@ -291,8 +291,12 @@ describe('the Windows git.exe’s folder', () => {
 
     fs.writeFileSync(shipped, 'first build')
     writeWindowsGitWrapper(folder, program, shipped)
+    const first = fs.statSync(exe).ino
+    writeWindowsGitWrapper(folder, program, shipped)
 
     expect(fs.readFileSync(exe, 'utf8')).toBe('first build')
+    // A copy renamed into place would be a new file.
+    expect(fs.statSync(exe).ino).toBe(first)
 
     fs.writeFileSync(shipped, 'second build')
     writeWindowsGitWrapper(folder, program, shipped)

@@ -117,7 +117,6 @@ export function withGitLast(
   }
 }
 
-/** The no-login settings stay in the app's own `git` call (ADR 0027). */
 export async function withAppFolders(
   base: NodeJS.ProcessEnv,
   {developerDir, gitFolder}: Pick<SignInRequest, 'developerDir' | 'gitFolder'>,

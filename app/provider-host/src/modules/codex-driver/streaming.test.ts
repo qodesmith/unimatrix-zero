@@ -488,7 +488,7 @@ it('tells the app-server to run commands without a login shell on Linux, and on 
   expect(settings).toEqual([true, false, false])
 })
 
-it('leaves git’s login prompts to the app’s own git.exe on Windows, so the app-server carries none on any platform', async () => {
+it('gives the app-server none of git’s login settings, on any platform', async () => {
   const prompts: (string | undefined)[][] = []
 
   for (const platform of ['linux', 'darwin', 'win32'] as const) {

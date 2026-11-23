@@ -10,7 +10,7 @@ const NOT_READY =
   'not ready yet: Unimatrix Zero is still downloading it. Try again in a minute.'
 
 const NO_LIBCURL =
-  "git: can't use https:// addresses on this computer, which lacks the libcurl.so.4 library."
+  "git: if this needed an https:// address, it can't work on this computer, which lacks the libcurl.so.4 library."
 
 /**
  * Needs `$program` and `$tool` set. Its folders and no-login settings stay in
@@ -81,11 +81,9 @@ function sameBytes(one: string, other: string) {
 }
 
 /**
- * Windows': a `git.exe` that runs the build's `cmd\git.exe` with the no-login
- * settings for that call only, and says "not ready yet" until it's in place
- * (ADR 0026, ADR 0027). A `.cmd`, `.bat` or `.ps1` mangles arguments or isn't
- * found by every caller. Without a shipped copy the folder holds no `git.exe`,
- * and the AI's `git` is "not recognized".
+ * Windows' `git.exe` and the settings it reads (ADR 0026, ADR 0028). Without a
+ * shipped copy the folder holds no `git.exe`, and the AI's `git` is "not
+ * recognized".
  */
 export function writeWindowsGitWrapper(
   folder: string,

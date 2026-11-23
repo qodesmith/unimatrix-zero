@@ -22,7 +22,6 @@ export function SnapshotsWaiting() {
             id: DOWNLOAD_TOAST,
             description:
               'Unimatrix Zero can’t keep your files as they stood at each Reply until it does. Check your internet connection, then try again.',
-            // Stays until the user acts on it, or a newer one replaces it.
             duration: Infinity,
             action: {
               label: 'Try again',

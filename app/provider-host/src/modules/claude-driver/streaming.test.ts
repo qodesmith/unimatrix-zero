@@ -855,7 +855,7 @@ it('gives claude the PowerShell tool on Windows', async () => {
   await claude.allClosed()
 })
 
-it('leaves git’s login prompts to the app’s own git.exe on Windows, so a Reply’s claude and a one-shot’s carry none on any platform', async () => {
+it('gives a Reply’s claude and a one-shot’s none of git’s login settings, on any platform', async () => {
   const prompts: Record<string, (string | undefined)[][]> = {}
 
   for (const platform of ['linux', 'darwin', 'win32'] as const) {

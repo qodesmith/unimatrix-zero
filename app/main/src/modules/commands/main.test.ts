@@ -671,7 +671,7 @@ describe('attaching an image with the window’s shrunk copy', () => {
 })
 
 describe('file history', () => {
-  it('starts the download of the app’s git again on Try again, without waiting for it', async () => {
+  it('starts the download of the app’s git again on Try again', async () => {
     expect(await send({type: 'snapshots.retry-download'})).toEqual({
       ok: true,
       value: {},

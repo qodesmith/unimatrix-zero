@@ -36,7 +36,7 @@ it('names no git until its download is in place, then the entrypoint inside it b
     target,
     getProgramReady,
     needsNewerLinux: false,
-    tell: vi.fn<(news: GitNews) => boolean>(() => true),
+    tell: fakeTell(),
   })
 
   const prepared = git.prepare()
@@ -58,7 +58,7 @@ it('downloads once however many ask while it downloads', async () => {
     target,
     getProgramReady,
     needsNewerLinux: false,
-    tell: vi.fn<(news: GitNews) => boolean>(() => true),
+    tell: fakeTell(),
   })
 
   const first = git.prepare()
@@ -72,12 +72,12 @@ it('downloads once however many ask while it downloads', async () => {
   await Promise.all([first, second])
 })
 
-function told() {
+function fakeTell() {
   return vi.fn<(news: GitNews) => boolean>(() => true)
 }
 
 it('tells the user once that Snapshots wait while git downloads, however many wait', () => {
-  const tell = told()
+  const tell = fakeTell()
   const {getProgramReady} = heldDownload()
 
   const git = createGitProgram({
@@ -94,7 +94,7 @@ it('tells the user once that Snapshots wait while git downloads, however many wa
 })
 
 it('tells the user at the next wait when no window was there to hear it', () => {
-  const tell = told().mockReturnValueOnce(false)
+  const tell = fakeTell().mockReturnValueOnce(false)
   const {getProgramReady} = heldDownload()
 
   const git = createGitProgram({
@@ -112,7 +112,7 @@ it('tells the user at the next wait when no window was there to hear it', () => 
 })
 
 it('tells a failed download apart from a slow one once a Snapshot has waited on it', async () => {
-  const tell = told()
+  const tell = fakeTell()
   const {getProgramReady, downloads} = heldDownload()
 
   const git = createGitProgram({
@@ -145,7 +145,7 @@ it('tells a failed download apart from a slow one once a Snapshot has waited on 
 })
 
 it('tells a download that fails after the user heard it was slow', async () => {
-  const tell = told()
+  const tell = fakeTell()
   const {getProgramReady, downloads} = heldDownload()
 
   const git = createGitProgram({
@@ -165,7 +165,7 @@ it('tells a download that fails after the user heard it was slow', async () => {
 })
 
 it('downloads again on Try again, says whether git is then in place, and tells a failure again', async () => {
-  const tell = told()
+  const tell = fakeTell()
   const {getProgramReady, downloads} = heldDownload()
 
   const git = createGitProgram({
@@ -190,8 +190,8 @@ it('downloads again on Try again, says whether git is then in place, and tells a
   expect(git.program()).not.toBeNull()
 })
 
-it('never downloads on Linux too old for the build, and tells the user once that file history can’t work', async () => {
-  const tell = told()
+it('tells the user once, on Linux too old for the build, that file history can’t work, and never that a download is coming', async () => {
+  const tell = fakeTell()
   const {getProgramReady} = heldDownload()
 
   const git = createGitProgram({
@@ -216,7 +216,7 @@ it('downloads again when a Snapshot waits after the download failed, and never r
     target,
     getProgramReady,
     needsNewerLinux: false,
-    tell: vi.fn<(news: GitNews) => boolean>(() => true),
+    tell: fakeTell(),
   })
 
   const failing = git.prepare()
@@ -234,7 +234,7 @@ it('downloads again when a Snapshot waits after the download failed, and never r
 })
 
 it('never downloads, or says a download is coming, on a machine the manifest has no git for', async () => {
-  const tell = told()
+  const tell = fakeTell()
   const {getProgramReady} = heldDownload()
 
   const git = createGitProgram({
