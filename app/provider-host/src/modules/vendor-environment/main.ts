@@ -76,10 +76,9 @@ export async function withDeveloperDir(
 const PATH_MARK = '__UZ_LOGIN_PATH__'
 
 /**
- * The `PATH` the user's login shell sets, with what their profile adds, or
- * undefined if it can't be read. `printenv` joins it with colons in every
- * shell, fish's too. The mark skips what a profile prints before it, and
- * keeping one line skips what a logout file or exit trap prints after.
+ * `printenv` joins `PATH` with colons in every shell, fish's too. The mark
+ * skips what a profile prints before it, and keeping one line skips what a
+ * logout file or exit trap prints after.
  */
 export async function loginShellPath(base: NodeJS.ProcessEnv) {
   const shell = base.SHELL ?? '/bin/sh'
