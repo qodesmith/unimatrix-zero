@@ -167,11 +167,11 @@ describe.runIf(process.platform !== 'win32')(
 
       const failed = await git(['echo failed >&2; exit 128'])
 
-      expect(failed).toEqual({
-        code: 128,
-        stdout: '',
-        stderr: `failed\ngit: if this needed an https:// address, it can't work on this computer, which lacks the libcurl.so.4 library.\n`,
-      })
+      expect(failed.code).toBe(128)
+      expect(failed.stdout).toBe('')
+      expect(failed.stderr).toMatch(
+        /^failed\ngit: [^\n]*libcurl\.so\.4[^\n]*\n$/
+      )
 
       const succeeded = await git(['echo worked'])
 

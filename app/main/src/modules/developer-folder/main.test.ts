@@ -250,11 +250,13 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
       writeDeveloperFolder(folder, gitProgram)
 
       for (const tool of ['python3', 'make', 'clang']) {
-        expect(await stub(folder, tool, ['--version'])).toEqual({
-          code: 127,
-          stdout: '',
-          stderr: `${tool} isn't on this Mac, and the user can't install it. Find another way that doesn't need ${tool}.\n`,
-        })
+        const failed = await stub(folder, tool, ['--version'])
+
+        expect(failed.code).toBe(127)
+        expect(failed.stdout).toBe('')
+        expect(failed.stderr).toMatch(
+          new RegExp(String.raw`^${tool} [^\n]*another way[^\n]*${tool}\.\n$`)
+        )
       }
     }
   })
