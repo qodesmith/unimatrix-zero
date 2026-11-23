@@ -15,10 +15,6 @@ export const identity = [
   'user.email=test@example.com',
 ]
 
-/**
- * Serves `root` over git's dumb HTTP protocol, and asks for a login for every
- * path under `/private/`, as a host does for a private repo.
- */
 function answering(root: string): http.RequestListener {
   return (request, response) => {
     const {pathname} = new URL(request.url ?? '/', 'http://127.0.0.1')
@@ -46,7 +42,7 @@ async function listening(server: Server, scheme: string) {
     server.listen(0, '127.0.0.1', resolve)
   })
 
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- it listens on a TCP port, so address() is an AddressInfo
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a TCP server's address() is an AddressInfo
   const {port} = server.address() as AddressInfo
 
   return `${scheme}://127.0.0.1:${port}`
@@ -75,7 +71,6 @@ export async function servedOverHttps(root: string) {
   return listening(server, 'https')
 }
 
-/** Makes `first`, a repo, and `origin.git`, its bare copy to serve, in `work`. */
 export async function repoToServe(git: Git, work: string) {
   const first = path.join(work, 'first')
   fs.mkdirSync(first)

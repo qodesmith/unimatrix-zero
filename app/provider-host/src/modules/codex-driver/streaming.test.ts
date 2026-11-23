@@ -1847,7 +1847,6 @@ function injecting() {
   })
 }
 
-/** A second `thread/start`, as the text replay opens after a refused inject. */
 function injectRefused() {
   return edited('started.ndjson', text => {
     const lines = text.split('\n')

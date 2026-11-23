@@ -166,7 +166,6 @@ async function setUp(
   const treeId = crypto.randomUUID()
 
   interface ReplyOptions {
-    /** 0 stops the Reply as it starts. */
     stopAfterDeltas?: number
     replyId?: string
     model?: string
@@ -469,7 +468,6 @@ it('resumes a cold session from the app’s copy alone', async () => {
   expect(resumed?.resumedFrom).toEqual(
     expect.arrayContaining([FIRST_MESSAGE, SECOND_MESSAGE])
   )
-  // The SDK's own folder, which it fills from the store.
   expect(resumed?.configDir).not.toBe(claude.configDir)
 })
 
@@ -1001,7 +999,6 @@ function withLeadIn(message: RecordedLine[]) {
   )
 }
 
-/** `tools.ndjson` with a Write cut off mid-arguments and ended by `stop`. */
 function toolCallCutOff(stop: RecordedLine[], resentInFull = false) {
   return edited('tools.ndjson', lines => {
     const start = lines.findIndex(line => isOut(line, '"message_start"'))
@@ -1297,7 +1294,6 @@ function failedAfter(
   )
 }
 
-/** The message `claude` makes up for a failed request. */
 function apiErrorMessage(error: SDKAssistantMessageError): RecordedLine {
   return {
     kind: 'out',
@@ -1852,7 +1848,6 @@ it('cuts a Retry’s session after the Prompt of the Reply cut short, which `cla
 
 const UUID = /[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}/g
 
-/** `warm.ndjson` with its second Prompt sent again, under new uuids. */
 function warmThrice() {
   return edited('warm.ndjson', lines => {
     const second = lines.findLastIndex(
@@ -2050,7 +2045,6 @@ it('continues in the warm `claude` on another name for its Model', async () => {
   expect(warm?.prompts).toEqual([FIRST_PROMPT, SECOND_PROMPT])
 })
 
-/** `warm.ndjson`'s `claude` as it starts, asked for no Prompt. */
 function listedOnly() {
   return edited('warm.ndjson', lines =>
     lines.filter(
