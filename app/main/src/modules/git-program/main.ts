@@ -10,7 +10,11 @@ import {
 } from './download/machine'
 
 /** What the user hears about Snapshots waiting on the app's own `git`. */
-export type GitNews = 'downloading' | 'download-failed' | 'needs-newer-linux'
+export type GitNews =
+  | 'downloading'
+  | 'download-failed'
+  | 'downloaded'
+  | 'needs-newer-linux'
 
 interface GitProgramDeps {
   target: ProgramTarget | null
@@ -51,12 +55,15 @@ export function createGitProgram({
       for await (const _progress of getProgramReady(git, {
         signal: new AbortController().signal,
       }));
-      send({type: 'downloaded'})
+      const afterFailure = state.status === 'downloading-again'
+
+      if (send({type: 'downloaded'}) && afterFailure) tell('downloaded')
     } catch {
       if (!waitedOn) send({type: 'failed-unheard'})
-      else if (send({type: 'failed'}))
-        // Each attempt follows a wait or a Try again, so at most once a Reply.
+      else if (send({type: 'failed'})) {
+        // Not `tellOnce`: a Snapshot or a Try again waited on this attempt, so its failure is news.
         tell('download-failed')
+      }
     } finally {
       downloading = null
     }

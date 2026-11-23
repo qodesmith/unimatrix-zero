@@ -80,6 +80,14 @@ export const SnapshotsDownloadFailedEvent = z.strictObject({
 })
 
 /**
+ * The app's own `git` is in place after a failure the user heard of
+ * (`SNAPSHOTS_DOWNLOAD_FAILED`).
+ */
+export const SnapshotsDownloadedEvent = z.strictObject({
+  type: z.literal('SNAPSHOTS_DOWNLOADED'),
+})
+
+/**
  * This Linux is too old for the app's own `git`, so no Snapshot is ever
  * taken. Sent once per launch, at the first wait a window can hear.
  */
@@ -99,6 +107,7 @@ export const EventSchema = z.discriminatedUnion('type', [
   FilesChangedEvent,
   SnapshotsWaitingEvent,
   SnapshotsDownloadFailedEvent,
+  SnapshotsDownloadedEvent,
   SnapshotsNeedNewerLinuxEvent,
   ProviderEventSchema,
 ])

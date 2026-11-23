@@ -32,6 +32,8 @@ export function SnapshotsWaiting() {
           })
         }
 
+        if (event.type === 'SNAPSHOTS_DOWNLOADED') toast.dismiss(DOWNLOAD_TOAST)
+
         if (event.type === 'SNAPSHOTS_NEED_NEWER_LINUX') {
           toast('File history can’t work on this computer', {
             description:

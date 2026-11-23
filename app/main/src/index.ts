@@ -70,6 +70,7 @@ const migrationsFolder = path.join(import.meta.dirname, '../drizzle')
 const GIT_NEWS = {
   downloading: 'SNAPSHOTS_WAITING',
   'download-failed': 'SNAPSHOTS_DOWNLOAD_FAILED',
+  downloaded: 'SNAPSHOTS_DOWNLOADED',
   'needs-newer-linux': 'SNAPSHOTS_NEED_NEWER_LINUX',
 } as const satisfies Record<GitNews, AppEvent['type']>
 

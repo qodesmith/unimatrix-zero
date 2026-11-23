@@ -197,14 +197,15 @@ it('tells the user once, on Linux too old for the build, that file history canâ€
   expect(tell.mock.calls).toEqual([['needs-newer-linux']])
 })
 
-it('downloads again when a Snapshot waits after the download failed, and never rejects', async () => {
+it('downloads again when a Snapshot waits after a failure no one heard of, never rejects, and says only that git is downloading', async () => {
+  const tell = fakeTell()
   const {getProgramReady, downloads} = heldDownload()
 
   const git = createGitProgram({
     target,
     getProgramReady,
     needsNewerLinux: false,
-    tell: fakeTell(),
+    tell,
   })
 
   const failing = git.prepare()
@@ -219,6 +220,38 @@ it('downloads again when a Snapshot waits after the download failed, and never r
   downloads[1]?.resolve()
 
   await expect.poll(() => git.program()).not.toBeNull()
+  expect(tell.mock.calls).toEqual([['downloading']])
+})
+
+it('tells the user git is in place when it downloads after a failure they heard of', async () => {
+  const tell = fakeTell()
+  const {getProgramReady, downloads} = heldDownload()
+
+  const git = createGitProgram({
+    target,
+    getProgramReady,
+    needsNewerLinux: false,
+    tell,
+  })
+
+  git.snapshotWaited()
+  await expect.poll(() => downloads).toHaveLength(1)
+  downloads[0]?.reject(new Error('offline'))
+
+  await expect
+    .poll(() => tell.mock.calls)
+    .toEqual([['downloading'], ['download-failed']])
+
+  git.snapshotWaited()
+  await expect.poll(() => downloads).toHaveLength(2)
+  downloads[1]?.resolve()
+
+  await expect.poll(() => git.program()).not.toBeNull()
+  expect(tell.mock.calls).toEqual([
+    ['downloading'],
+    ['download-failed'],
+    ['downloaded'],
+  ])
 })
 
 it('never downloads, or says a download is coming, on a machine the manifest has no git for', async () => {

@@ -271,6 +271,24 @@ it('says, when the app’s git failed to download, that file history couldn’t 
   )
 })
 
+it('takes down the failed-download toast once the app’s git downloads', async () => {
+  const main = fakeMain()
+  globalThis.window.uz = main
+  await renderApp()
+  await expect.element(sidebarNewTree()).toBeVisible()
+
+  const failed = page.getByText('File history couldn’t download', {
+    exact: true,
+  })
+
+  main.publish({type: 'SNAPSHOTS_DOWNLOAD_FAILED'})
+  await expect.element(failed).toBeVisible()
+
+  main.publish({type: 'SNAPSHOTS_DOWNLOADED'})
+
+  await expect.element(failed).not.toBeInTheDocument()
+})
+
 it('says file history can’t work on a Linux too old for the app’s git, and names a newer one', async () => {
   const main = fakeMain()
   globalThis.window.uz = main
