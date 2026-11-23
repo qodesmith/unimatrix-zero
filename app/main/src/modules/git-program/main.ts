@@ -34,7 +34,10 @@ export function createGitProgram({
   const told = new Set<GitNews>()
 
   function send(event: GitDownloadEvent) {
-    state = gitDownloadTransition(state, event)
+    const before = state
+    state = gitDownloadTransition(before, event)
+
+    return state !== before
   }
 
   function tellOnce(news: GitNews) {
@@ -50,13 +53,10 @@ export function createGitProgram({
       }));
       send({type: 'downloaded'})
     } catch {
-      if (waitedOn) {
-        send({type: 'failed'})
+      if (!waitedOn) send({type: 'failed-unheard'})
+      else if (send({type: 'failed'}))
         // Each attempt follows a wait or a Try again, so at most once a Reply.
         tell('download-failed')
-      } else {
-        send({type: 'failed-unheard'})
-      }
     } finally {
       downloading = null
     }
