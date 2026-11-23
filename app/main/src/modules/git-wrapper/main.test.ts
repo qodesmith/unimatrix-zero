@@ -369,9 +369,10 @@ describe.runIf(noGit && process.platform === 'win32')(
         env: withLast(folder),
       })
 
-      // One line: no other `git` is found. Windows paths differ in case alone.
-      expect(found.stdout.trim().toLowerCase()).toBe(
-        path.join(folder, 'git.exe').toLowerCase()
+      // One line: no other `git` is found. The temp folder may come as a
+      // short name (RUNNER~1) that `where` prints long, so compare real paths.
+      expect(fs.realpathSync.native(found.stdout.trim())).toBe(
+        fs.realpathSync.native(path.join(folder, 'git.exe'))
       )
 
       const version = await git(['--version'])
