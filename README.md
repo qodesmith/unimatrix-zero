@@ -4,7 +4,7 @@ A canvas where one collective conversation splits into individual threads.
 
 ## Working on it
 
-Needs [Bun](https://bun.sh) at the version in `.bun-version` and Node at the version in `.node-version` (the Node that the pinned Electron ships).
+Needs [Bun](https://bun.sh) at the version in `.bun-version` and Node at the version in `.node-version` (the Node that the pinned Electron ships). Building the Windows `git.exe` (`bun run build:git-exe` in `shell/`, ADR 0028) also needs [Go](https://go.dev/dl/) at the version in `shell/git-exe/go.mod`; nothing else does.
 
 ```sh
 bun install          # isolated installs: a package can import only what it declares
