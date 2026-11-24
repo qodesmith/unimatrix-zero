@@ -1,11 +1,13 @@
 import type {ExtractionResult} from './reply'
 
-import {
-  EXTRACTION_INPUT_LIMIT,
-  EXTRACTION_TIMEOUT_MS,
-} from '@uz/contract/extraction'
+import {MIB} from '@uz/contract/sizes'
 
 import {validateReply} from './reply'
+
+/** The attachment limit: a larger file is never extracted. */
+export const EXTRACTION_INPUT_LIMIT = 50 * MIB
+
+export const EXTRACTION_TIMEOUT_MS = 60_000
 
 export interface WindowEvents {
   /** The page's message, as it arrived: null for a transferred buffer. */

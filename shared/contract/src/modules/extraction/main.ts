@@ -4,27 +4,12 @@ import {z} from 'zod'
 /** Raise it when the extractor's output changes: older Extractions are redone. */
 export const EXTRACTOR_VERSION = 1
 
-/** The attachment limit: a larger file is never extracted. */
-export const EXTRACTION_INPUT_LIMIT = 50 * MIB
-
-export const EXTRACTION_TIMEOUT_MS = 60_000
-
 /** Pixels, on the long side. */
 export const PAGE_IMAGE_PIXELS = 1600
 
-export const PAGE_IMAGE_QUALITY = 0.85
-
 export const PAGE_IMAGES_PER_PDF = 100
 
-/** A page gets an image when its images cover more than this share of it. */
-export const PAGE_IMAGE_COVERAGE = 0.1
-
-export const PAGE_IMAGE_SIZE_LIMIT = 8 * MIB
-
 export const EXTRACTED_TEXT_LIMIT = 32 * MIB
-
-/** T3 Code's: `ratio` is expanded bytes over compressed bytes. */
-export const ZIP_LIMITS = {entries: 2048, expandedBytes: 32 * MIB, ratio: 200}
 
 export const ExtractionFormatSchema = z.enum([
   'pdf',

@@ -21,6 +21,7 @@ const MIME_TYPES = new Map([
   ['.bcmap', 'application/octet-stream'],
   ['.pfb', 'application/octet-stream'],
   ['.ttf', 'font/ttf'],
+  ['.icc', 'application/vnd.iccprofile'],
 ])
 
 interface ExtractorFile {

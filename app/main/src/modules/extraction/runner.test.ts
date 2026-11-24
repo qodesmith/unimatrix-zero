@@ -1,12 +1,12 @@
 import type {WindowEvents} from './runner'
 
+import {afterEach, describe, expect, it, vi} from 'vitest'
+
 import {
   EXTRACTION_INPUT_LIMIT,
   EXTRACTION_TIMEOUT_MS,
-} from '@uz/contract/extraction'
-import {afterEach, describe, expect, it, vi} from 'vitest'
-
-import {runExtraction} from './runner'
+  runExtraction,
+} from './runner'
 import {jpegBytes, pngBytes} from './test-images'
 
 const PDF = new TextEncoder().encode('%PDF-1.7\n')

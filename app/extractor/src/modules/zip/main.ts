@@ -1,5 +1,8 @@
-import {ZIP_LIMITS} from '@uz/contract/extraction'
+import {MIB} from '@uz/contract/sizes'
 import {Inflate} from 'fflate'
+
+/** `ratio` is expanded bytes over compressed bytes. */
+const ZIP_LIMITS = {entries: 2048, expandedBytes: 32 * MIB, ratio: 200}
 
 const LOCAL_HEADER = 0x04_03_4b_50
 const CENTRAL_HEADER = 0x02_01_4b_50
@@ -136,7 +139,7 @@ function entryData(bytes: Uint8Array, entry: Entry) {
 }
 
 /**
- * Opens a zip within T3 Code's caps: the directory is checked up front, and
+ * Opens a zip within `ZIP_LIMITS`: the directory is checked up front, and
  * each read counts the bytes it really inflates, so lying headers stop too.
  */
 export function openZip(bytes: Uint8Array): Zip {

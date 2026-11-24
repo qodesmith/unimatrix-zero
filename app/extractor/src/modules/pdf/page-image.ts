@@ -1,6 +1,8 @@
 import type {PDFPageProxy} from 'pdfjs-dist'
 
-import {PAGE_IMAGE_PIXELS, PAGE_IMAGE_QUALITY} from '@uz/contract/extraction'
+import {PAGE_IMAGE_PIXELS} from '@uz/contract/extraction'
+
+const PAGE_IMAGE_QUALITY = 0.85
 
 async function jpegOf(canvas: HTMLCanvasElement) {
   const blob = await new Promise<Blob | null>(resolve => {

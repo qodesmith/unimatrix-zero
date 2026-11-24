@@ -2,11 +2,10 @@ import {
   EXTRACTED_TEXT_LIMIT,
   PAGE_IMAGES_PER_PDF,
   PAGE_IMAGE_PIXELS,
-  PAGE_IMAGE_SIZE_LIMIT,
 } from '@uz/contract/extraction'
 import {describe, expect, it} from 'vitest'
 
-import {validateReply} from './reply'
+import {PAGE_IMAGE_SIZE_LIMIT, validateReply} from './reply'
 import {jpegBytes, pngBytes} from './test-images'
 
 const PDF = new TextEncoder().encode('%PDF-1.7\n')
@@ -129,6 +128,10 @@ describe('a reply from the extraction window', () => {
         }))
       ),
     ],
+    [
+      'a stop to page images before a PDF has its share',
+      {...pdfReply([{page: 1, bytes: jpegBytes(10, 10)}]), imagesStopped: true},
+    ],
   ])('fails on %s', (_case, data) => {
     expect(validateReply(data, PDF)).toEqual({type: 'failed'})
   })
@@ -142,6 +145,10 @@ describe('a reply from the extraction window', () => {
     )
 
     expect(validateReply(reply, PDF)).toMatchObject({type: 'read'})
+    expect(validateReply({...reply, imagesStopped: true}, PDF)).toMatchObject({
+      type: 'read',
+      imagesStopped: true,
+    })
   })
 
   it('fails page images, or a stop to them, on a file that is not a PDF', () => {

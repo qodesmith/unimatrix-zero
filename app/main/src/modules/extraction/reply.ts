@@ -1,31 +1,25 @@
-import type {ExtractionFormat, ExtractorReply} from '@uz/contract/extraction'
+import type {ExtractorReply} from '@uz/contract/extraction'
 
 import {
   EXTRACTED_TEXT_LIMIT,
   ExtractorReplySchema,
   PAGE_IMAGES_PER_PDF,
   PAGE_IMAGE_PIXELS,
-  PAGE_IMAGE_SIZE_LIMIT,
 } from '@uz/contract/extraction'
+import {MIB} from '@uz/contract/sizes'
 
 import {extractionCandidate, formatFits} from './candidate'
 import {jpegSize} from './jpeg'
 
-type PageImage = Extract<ExtractorReply, {type: 'read'}>['pageImages'][number]
+type ReadReply = Extract<ExtractorReply, {type: 'read'}>
 
 /** A reply that passed every check; anything else is a failure. */
 export type ExtractionResult =
-  | {
-      type: 'read'
-      format: ExtractionFormat
-      text: string
-      pageImages: PageImage[]
-      imagesStopped: boolean
-    }
+  | (Omit<ReadReply, 'text'> & {text: string})
   | {type: 'unsupported'}
   | {type: 'failed'}
 
-type ReadReply = Extract<ExtractorReply, {type: 'read'}>
+export const PAGE_IMAGE_SIZE_LIMIT = 8 * MIB
 
 const FAILED = {type: 'failed'} as const
 
@@ -51,7 +45,7 @@ function isPageImage(bytes: Uint8Array) {
   )
 }
 
-function inPageOrder(images: readonly PageImage[]) {
+function inPageOrder(images: ReadReply['pageImages']) {
   return images.every(
     (image, at) => at === 0 || image.page > (images[at - 1]?.page ?? 0)
   )
@@ -64,6 +58,7 @@ function pageImagesFit(reply: ReadReply) {
 
   return (
     reply.pageImages.length <= PAGE_IMAGES_PER_PDF &&
+    (!reply.imagesStopped || reply.pageImages.length === PAGE_IMAGES_PER_PDF) &&
     inPageOrder(reply.pageImages) &&
     reply.pageImages.every(({bytes}) => isPageImage(bytes))
   )
@@ -85,10 +80,6 @@ function validRead(reply: ReadReply, input: Uint8Array): ExtractionResult {
       }
 }
 
-/**
- * The window is hostile: anything off in its reply discards the whole of it.
- * `input` is the file the job was given.
- */
 /** Only a zip or a notebook can be a file of none of the formats. */
 function mayBeUnsupported(input: Uint8Array) {
   const candidate = extractionCandidate(input)
@@ -96,6 +87,10 @@ function mayBeUnsupported(input: Uint8Array) {
   return candidate === 'zip' || candidate === 'ipynb'
 }
 
+/**
+ * The window is hostile: anything off in its reply discards the whole of it.
+ * `input` is the file the job was given.
+ */
 export function validateReply(
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the window's message: ExtractorReplySchema parses it below
   data: unknown,

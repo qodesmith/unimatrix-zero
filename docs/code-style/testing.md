@@ -3,7 +3,7 @@
 ## Put a test beside its unit
 
 - A test sits beside the file it tests, named `<unit>.test.ts` or `<unit>.test.tsx`.
-- The two Vitest projects, the Electron Node they run under and where CI runs each are in [README.md](../../README.md), section Tests.
+- The three Vitest projects, the Electron Node they run under and where CI runs each are in [README.md](../../README.md), section Tests.
 - A renderer test runs in Chromium through `vitest-browser-react`: `render` and `renderHook` return promises, and `act` from `renderHook` is awaited too.
 
 ## Test this app's logic, never the framework or a library

@@ -21,9 +21,10 @@ A Bun-workspaces monorepo, one private package per process plus the contract:
 ```text
 shell/              the thin loader that becomes the installed app (placeholder for now)
 shell/git-exe/      the Windows `git.exe` that runs the app's own `git`, in Go (ADR 0028)
-app/main/           the hub: SQLite, Provider hosts, the one window
-app/preload/        window.uz = { send, subscribe, registerDroppedFile }, one self-contained CJS file
+app/main/           the hub: SQLite, Provider hosts, the window and the hidden extraction window
+app/preload/        two self-contained CJS files: window.uz = { send, subscribe, registerDroppedFile }, and the extraction window's port
 app/renderer/       React, Tailwind and shadcn, styled only by Theme tokens
+app/extractor/      the extraction window's page: office files and PDFs to text, PDF pages to JPEGs
 app/provider-host/  one utility process per Provider: claude and chatgpt entries
 shared/contract/    Zod schemas for commands and events; every type derives from them. Also `machine()`, the state machine helper every process shares
 shared/vendor-program/  downloads a manifest build, checks it and unpacks it, and holds the settings that keep the app's `git` from asking for a login; main and the Provider hosts share it
@@ -33,7 +34,7 @@ scripts/            dev loop, test runner, runtime pinning
 
 Main's SQLite schema lives in `app/main/src/modules/database/schema.ts`. After changing it, run `bun run --filter @uz/main db:generate` and commit the new folder under `app/main/drizzle/`; the app applies it on the next start, behind a backup and the foreign-key guard (ADR 0003).
 
-`tsc -b` project references keep main, the Provider hosts and the renderer from importing each other: only `@uz/contract` is shared, plus `@uz/vendor-program` between main and the Provider hosts, which both download programs and keep the app's `git` from asking for a login.
+`tsc -b` project references keep main, the Provider hosts, the renderer and the extractor from importing each other: only `@uz/contract` is shared, plus `@uz/vendor-program` between main and the Provider hosts, which both download programs and keep the app's `git` from asking for a login.
 
 ### Modules
 
@@ -55,8 +56,8 @@ oxlint ships new rules most weeks. `reviewed-oxlint-version` in `package.json` n
 
 ## Tests
 
-Vitest runs in two projects: `node` (contract, main, hosts, shell, scripts, tooling) and `renderer` (browser mode in Chromium). `bun run test` runs both under Electron's own Node, and `scripts/runtime-match.test.ts` fails if the Node version differs from `electron-runtime.json`. After bumping Electron, run `bun run electron-runtime` to regenerate that file and `.node-version`. The Node and Chromium build targets in `tooling/vite.ts` read it, and `bun run lint` fails when it describes a different Electron than the installed one, or when `@types/node` is for a newer Node than Electron ships.
+Vitest runs in three projects: `node` (contract, main, hosts, shell, scripts, tooling), and `renderer` and `extractor` (each in browser mode in Chromium). `bun run test` runs all three under Electron's own Node, and `scripts/runtime-match.test.ts` fails if the Node version differs from `electron-runtime.json`. After bumping Electron, run `bun run electron-runtime` to regenerate that file and `.node-version`. The Node and Chromium build targets in `tooling/vite.ts` read it, and `bun run lint` fails when it describes a different Electron than the installed one, or when `@types/node` is for a newer Node than Electron ships.
 
 Before the `node` tests, Vitest downloads the `git` the manifest names for the machine into `node_modules/.cache/uz-test` (once; later runs check it), and the Snapshot tests run that build, the one the app runs (ADR 0024).
 
-CI runs the checks on Linux and the `node` tests on Mac arm64, Mac x64, Windows x64 and Linux x64. Its "A Mac with no developer tools" job moves Xcode and the Command Line Tools out of the way and runs the `developer-folder` and `vendor-environment` tests there, with `UZ_NO_DEVELOPER_TOOLS=1` (ADR 0025). Its "Linux with no git" job runs the `git-wrapper` tests in a bare Ubuntu container, and its "Windows with no git" job runs them with Git for Windows taken off `PATH`, both with `UZ_NO_GIT=1` (ADR 0026). The Windows job first runs `go test` and `bun run build:git-exe` (ADR 0028). The `renderer` tests run on Linux only, in Playwright's Chromium headless shell. There are no git hooks.
+CI runs the checks on Linux and the `node` tests on Mac arm64, Mac x64, Windows x64 and Linux x64. Its "A Mac with no developer tools" job moves Xcode and the Command Line Tools out of the way and runs the `developer-folder` and `vendor-environment` tests there, with `UZ_NO_DEVELOPER_TOOLS=1` (ADR 0025). Its "Linux with no git" job runs the `git-wrapper` tests in a bare Ubuntu container, and its "Windows with no git" job runs them with Git for Windows taken off `PATH`, both with `UZ_NO_GIT=1` (ADR 0026). The Windows job first runs `go test` and `bun run build:git-exe` (ADR 0028). The `renderer` and `extractor` tests run on Linux only, in Playwright's Chromium headless shell. There are no git hooks.

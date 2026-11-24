@@ -1,7 +1,7 @@
 import type {ExtractorReply} from '@uz/contract/extraction'
 import type {PDFPageProxy} from 'pdfjs-dist'
 
-import {PAGE_IMAGES_PER_PDF, PAGE_IMAGE_COVERAGE} from '@uz/contract/extraction'
+import {PAGE_IMAGES_PER_PDF} from '@uz/contract/extraction'
 import {GlobalWorkerOptions, getDocument} from 'pdfjs-dist'
 // oxlint-disable-next-line import/default -- Vite's `?url` import is the URL of the worker, emitted as its own file
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
@@ -10,6 +10,9 @@ import {imageCoverage} from './coverage'
 import {renderPage} from './page-image'
 
 GlobalWorkerOptions.workerSrc = workerUrl
+
+/** A page gets an image when its images cover more than this share of it. */
+const PAGE_IMAGE_COVERAGE = 0.1
 
 /** Where pdf.js finds the files it fetches: each URL ends in a slash. */
 export interface PdfAssets {
@@ -21,10 +24,8 @@ export interface PdfAssets {
 
 type Read = Extract<ExtractorReply, {type: 'read'}>
 
-export interface PdfReading {
+export type PdfReading = Pick<Read, 'pageImages' | 'imagesStopped'> & {
   text: string
-  pageImages: Read['pageImages']
-  imagesStopped: boolean
 }
 
 /** The folders the build copies from `pdfjs-dist` into `dist/`. */

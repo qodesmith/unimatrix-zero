@@ -17,10 +17,15 @@ beforeEach(() => {
   dist = path.join(folder, 'dist')
   fs.mkdirSync(path.join(dist, 'assets'), {recursive: true})
   fs.mkdirSync(path.join(dist, 'cmaps'))
+  fs.mkdirSync(path.join(dist, 'iccs'))
   fs.writeFileSync(path.join(dist, 'index.html'), '<!doctype html>')
   fs.writeFileSync(path.join(dist, 'assets', 'pdf.worker.mjs'), 'worker')
   fs.writeFileSync(path.join(dist, 'assets', 'openjpeg.wasm'), 'wasm')
   fs.writeFileSync(path.join(dist, 'cmaps', 'UniJIS-UTF8-H.bcmap'), 'cmap')
+  fs.writeFileSync(
+    path.join(dist, 'iccs', 'CGATS001Compat-v2-micro.icc'),
+    'icc'
+  )
   fs.writeFileSync(path.join(dist, 'notes.txt'), 'not served')
   fs.writeFileSync(path.join(folder, 'secret.js'), 'outside')
 })
@@ -39,6 +44,7 @@ describe('serving the extractor', () => {
     ['assets/pdf.worker.mjs', 'text/javascript; charset=utf-8', 'worker'],
     ['assets/openjpeg.wasm', 'application/wasm', 'wasm'],
     ['cmaps/UniJIS-UTF8-H.bcmap', 'application/octet-stream', 'cmap'],
+    ['iccs/CGATS001Compat-v2-micro.icc', 'application/vnd.iccprofile', 'icc'],
   ])(
     'serves %s from its bundle with its type, the page’s CSP and nosniff',
     async (file, mimeType, body) => {
