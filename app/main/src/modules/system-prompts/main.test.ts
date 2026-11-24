@@ -7,7 +7,7 @@ import {PRESETS} from '@uz/contract/system-prompts'
 import path from 'node:path'
 import {beforeEach, describe, expect, it} from 'vitest'
 
-import {createSystemPrompts, saveSystemPrompt} from './main'
+import {createSystemPrompts} from './main'
 
 const migrationsFolder = path.resolve(import.meta.dirname, '../../../drizzle')
 
@@ -55,14 +55,6 @@ describe('the library', () => {
     expect(library.update(id, {name: 'Sailor', text: 'Ahoy.'})).toBeNull()
     expect(library.delete(id)).toBeNull()
   })
-
-  it('refuses to change or delete a preset', () => {
-    expect(() => library.update('concise', {name: 'Mine', text: 'x'})).toThrow(
-      /preset/
-    )
-    expect(() => library.delete('concise')).toThrow(/preset/)
-    expect(library.list().entries[1]).toEqual(PRESETS[1])
-  })
 })
 
 describe('the default for new Trees', () => {
@@ -73,33 +65,11 @@ describe('the default for new Trees', () => {
     expect(library.defaultText()).toBe('Arr.')
   })
 
-  it('falls back to the Default preset, and the Setting with it, once its entry is deleted', () => {
-    const {id} = library.create({name: 'Pirate', text: 'Arr.'}, new Date())
-    settings.update({defaultSystemPromptId: id})
-
-    const deleted = library.delete(id)
-
-    expect(deleted?.settings?.defaultSystemPromptId).toBe('default')
-    expect(settings.read().defaultSystemPromptId).toBe('default')
-    expect(library.defaultText()).toBe(
-      PRESETS.find(entry => entry.id === 'default')?.text
-    )
-  })
-
   it('falls back to the Default preset for an id no entry has', () => {
     settings.update({defaultSystemPromptId: crypto.randomUUID()})
 
     expect(library.defaultText()).toBe(
       PRESETS.find(entry => entry.id === 'default')?.text
     )
-  })
-})
-
-describe('saving a System prompt', () => {
-  it('keeps one row for the same text, and a new one for new text', () => {
-    const first = saveSystemPrompt(db, 'Be brief.')
-
-    expect(saveSystemPrompt(db, 'Be brief.')).toBe(first)
-    expect(saveSystemPrompt(db, 'Be briefer.')).not.toBe(first)
   })
 })

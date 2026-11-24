@@ -13,7 +13,7 @@ export interface WarmSession {
   readonly model: string
   /** Fixed as `claude` starts: it applies no later change to the threshold. */
   readonly compactionSettings: CompactionSettings
-  /** As `claude` started with it, which it keeps until a new one resumes. */
+  /** Fixed as `claude` starts: a changed System prompt needs a new `claude`. */
   readonly systemPrompt: string
   close(): Promise<void>
 }

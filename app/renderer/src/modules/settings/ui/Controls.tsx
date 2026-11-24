@@ -16,7 +16,10 @@ import {useId} from 'react'
 interface GroupProps {
   legend: string
   legendId?: string
-  /** What the group's Settings reach, when more than this window. */
+  /**
+   * How far the group's Settings reach; a look-and-behavior group has none (PRD
+   * §17).
+   */
   note?: string
   children: ReactNode
 }

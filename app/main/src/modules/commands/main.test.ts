@@ -821,7 +821,15 @@ describe('System prompts', () => {
     })
   })
 
-  it('refuses to delete a preset, telling no window anything', async () => {
+  it('refuses to change or delete a preset, telling no window anything', async () => {
+    expect(
+      await send({
+        type: 'system-prompt.update',
+        id: 'concise',
+        name: 'Mine',
+        text: 'x',
+      })
+    ).toMatchObject({ok: false, error: {code: 'handler-failed'}})
     expect(
       await send({type: 'system-prompt.delete', id: 'default'})
     ).toMatchObject({ok: false, error: {code: 'handler-failed'}})

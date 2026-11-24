@@ -215,7 +215,7 @@ export const SystemPromptCreateCommand = z.strictObject({
 /** Refused for a preset; changes no Tree. */
 export const SystemPromptUpdateCommand = z.strictObject({
   type: z.literal('system-prompt.update'),
-  id: z.uuid(),
+  id: SystemPromptEntryIdSchema,
   name: SystemPromptNameSchema,
   text: SystemPromptTextSchema,
 })
