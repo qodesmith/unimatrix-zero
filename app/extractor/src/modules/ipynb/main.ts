@@ -3,7 +3,6 @@ import {z} from 'zod'
 
 const OPENING_BRACE = 0x7b
 
-/** Notebook text: one string, or lines to join. */
 const MultilineSchema = z.union([z.string(), z.array(z.string())])
 
 const OutputSchema = z.looseObject({

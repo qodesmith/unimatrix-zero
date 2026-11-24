@@ -97,7 +97,7 @@ How much of a Thread's images and PDFs go to Claude as the files themselves, by 
 _Avoid_: Media cap, attachment limit
 
 **Extraction**:
-The text, and for a PDF the page images, the app takes from an Attachment when it is attached, kept beside it so a Model that can't read the original can read these.
+The text, and for a PDF the page images, the app takes from an Attachment when it is attached, kept beside it so a Model that can't read the original can read these. A failed one records only that the app couldn't read the file, which then goes by path alone.
 _Avoid_: Conversion, preview
 
 **Reply**:

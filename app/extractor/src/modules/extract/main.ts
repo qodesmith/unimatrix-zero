@@ -11,9 +11,11 @@ import {readPptx} from '#modules/pptx/main'
 import {isRtf, readRtf} from '#modules/rtf/main'
 import {readXlsx} from '#modules/xlsx/main'
 import {isZip, openZip} from '#modules/zip/main'
-import {EXTRACTED_TEXT_LIMIT} from '@uz/contract/extraction'
+import {
+  EXTRACTED_TEXT_LIMIT,
+  FAILURE_MESSAGE_LIMIT,
+} from '@uz/contract/extraction'
 
-const MESSAGE_LIMIT = 1000
 const PDF_SIGNATURE = '%PDF-'
 
 const MIME_TYPES = new Map<string, OdfKind>([
@@ -101,6 +103,6 @@ export async function extract(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
 
-    return {type: 'failed', message: message.slice(0, MESSAGE_LIMIT)}
+    return {type: 'failed', message: message.slice(0, FAILURE_MESSAGE_LIMIT)}
   }
 }

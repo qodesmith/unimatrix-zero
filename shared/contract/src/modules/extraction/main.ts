@@ -11,6 +11,9 @@ export const PAGE_IMAGES_PER_PDF = 100
 
 export const EXTRACTED_TEXT_LIMIT = 32 * MIB
 
+/** Characters. */
+export const FAILURE_MESSAGE_LIMIT = 1000
+
 export const ExtractionFormatSchema = z.enum([
   'pdf',
   'docx',
@@ -61,7 +64,10 @@ export const ExtractorReplySchema = z.discriminatedUnion('type', [
   }),
   /** Not one of the formats: the file goes by path only, with no word. */
   z.strictObject({type: z.literal('unsupported')}),
-  z.strictObject({type: z.literal('failed'), message: z.string().max(1000)}),
+  z.strictObject({
+    type: z.literal('failed'),
+    message: z.string().max(FAILURE_MESSAGE_LIMIT),
+  }),
 ])
 
 export type ExtractorReply = z.infer<typeof ExtractorReplySchema>

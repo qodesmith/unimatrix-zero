@@ -10,7 +10,6 @@ const JFIF = [
 
 const END_OF_IMAGE = [0xff, 0xd9]
 
-/** Three components, each its id, sampling and table. */
 const COMPONENTS = [1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]
 
 /** A JFIF JPEG's headers and a baseline frame: enough to read its size. */
