@@ -1,3 +1,18 @@
+/** The extraction window's page: its own bundle, its worker and wasm, no more. */
+export const EXTRACTOR_CSP = [
+  "default-src 'none'",
+  "script-src 'self' 'wasm-unsafe-eval'",
+  "worker-src 'self'",
+  "connect-src 'self'",
+  "img-src 'self' blob: data:",
+  "font-src 'self' data:",
+  "style-src 'self' 'unsafe-inline'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+].join('; ')
+
 interface CspOptions {
   scriptNonce?: string
   connectSources?: string[]

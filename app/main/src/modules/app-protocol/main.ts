@@ -8,6 +8,12 @@ import {readFile} from 'node:fs/promises'
 import {attachmentResponse} from './attachment-file'
 import {resolveBundleFile} from './bundle-file'
 import {renderCsp} from './csp'
+import {
+  EXTRACTOR_SCHEME,
+  EXTRACTOR_URL,
+  extractorFiles,
+  extractorResponse,
+} from './extractor-file'
 
 const APP_SCHEME = 'app'
 const APP_DEV_SCHEME = 'app-dev'
@@ -38,7 +44,24 @@ export function registerAppSchemes() {
         stream: true,
       },
     },
+    {
+      scheme: EXTRACTOR_SCHEME,
+      privileges: {standard: true, secure: true, supportFetchAPI: true},
+    },
   ])
+}
+
+/**
+ * `uzextract://` serves the extractor's bundle, and only on the extraction
+ * window's session. Returns the page's URL.
+ */
+export function serveExtractor(target: Protocol, distDir: string) {
+  const files = extractorFiles(distDir)
+  target.handle(EXTRACTOR_SCHEME, async request =>
+    extractorResponse(request, files)
+  )
+
+  return EXTRACTOR_URL
 }
 
 /** `uzfile://` serves attachments by id, never by path (ADR 0014). */

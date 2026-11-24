@@ -117,6 +117,7 @@ beforeEach(() => {
       db,
       dir: attachmentsDir,
       droppedPath: () => null,
+      extract: async () => ({type: 'unsupported'}),
     }),
     images: {
       load: async url => {
@@ -642,6 +643,7 @@ describe('attachments', () => {
       shrunkSize: null,
       folderPath: null,
       missing: false,
+      extraction: null,
     })
     expect(sent).toMatchObject({
       ok: true,

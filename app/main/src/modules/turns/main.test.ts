@@ -1535,6 +1535,7 @@ describe('a Prompt with attachments', () => {
       db,
       dir: attachmentsDir,
       droppedPath: fileId => droppedPaths.get(fileId) ?? null,
+      extract: async () => ({type: 'unsupported'}),
     })
   })
 
@@ -1591,6 +1592,7 @@ describe('a Prompt with attachments', () => {
           path: keptPdf('report.pdf'),
           folder: false,
           inline: {type: 'pdf'},
+          extraction: null,
         },
         {
           name: 'chart.png',
@@ -1601,12 +1603,14 @@ describe('a Prompt with attachments', () => {
             mediaType: 'image/png',
             path: keptPng('chart.png'),
           },
+          extraction: null,
         },
         {
           name: 'data.bin',
           path: path.join(attachmentsDir, BINARY_SHA256, 'data.bin'),
           folder: false,
           inline: null,
+          extraction: null,
         },
       ],
     ])
@@ -1628,6 +1632,7 @@ describe('a Prompt with attachments', () => {
             mediaType: 'image/jpeg',
             path: path.join(attachmentsDir, 'shrunk', `${JPEG_SHA256}.jpg`),
           },
+          extraction: null,
         },
       ],
     ])
@@ -1675,6 +1680,7 @@ describe('a Prompt with attachments', () => {
           path: attachmentsDir,
           folder: true,
           inline: null,
+          extraction: null,
         },
       ],
     ])
@@ -1718,6 +1724,7 @@ describe('a Prompt with attachments', () => {
           path: keptPdf('report.pdf'),
           folder: false,
           inline: {type: 'pdf'},
+          extraction: null,
         },
       ],
     ])

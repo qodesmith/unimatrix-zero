@@ -1,4 +1,5 @@
 import type {Database} from '#modules/database/main'
+import type {Extractor} from './extractions'
 import type {FileMediaType} from './media-type'
 import type {Attachment} from '@uz/contract/attachments'
 import type {Command} from '@uz/contract/commands'
@@ -16,6 +17,7 @@ import {eq, inArray} from 'drizzle-orm'
 import {createHash} from 'node:crypto'
 import path from 'node:path'
 
+import {extractionFor} from './extractions'
 import {sniffMediaType} from './media-type'
 import {safeName} from './names'
 import {
@@ -40,6 +42,8 @@ export interface AttachmentsDeps {
   db: Database
   dir: string
   droppedPath: (fileId: string) => string | null
+  /** Called only for bytes that could be a format the window reads. */
+  extract: Extractor
 }
 
 export type Attachments = ReturnType<typeof createAttachments>
@@ -74,7 +78,12 @@ function shrunkToKeep(mediaType: FileMediaType, bytes: Uint8Array | undefined) {
     : {sha256: sha256Of(bytes), mediaType: shrunkMediaType, bytes}
 }
 
-export function createAttachments({db, dir, droppedPath}: AttachmentsDeps) {
+export function createAttachments({
+  db,
+  dir,
+  droppedPath,
+  extract,
+}: AttachmentsDeps) {
   function droppedPathOf(fileId: string) {
     const filePath = droppedPath(fileId)
 
@@ -118,6 +127,11 @@ export function createAttachments({db, dir, droppedPath}: AttachmentsDeps) {
 
     if (shrunk) await keepShrunk(dir, shrunk, shrunk.bytes)
 
+    const extraction = await extractionFor(
+      {db, dir, extract},
+      {sha256, bytes: file.bytes}
+    )
+
     return db
       .insert(schema.attachments)
       .values({
@@ -128,6 +142,7 @@ export function createAttachments({db, dir, droppedPath}: AttachmentsDeps) {
         shrunkSha256: shrunk?.sha256,
         shrunkMediaType: shrunk?.mediaType,
         shrunkSize: shrunk?.bytes.byteLength,
+        extraction,
       })
       .returning()
       .get()
