@@ -15,17 +15,18 @@ import {
 } from '#shadcn/ui/select'
 import {Textarea} from '#shadcn/ui/textarea'
 import {
-  SYSTEM_PROMPT_MAX_LENGTH,
   SYSTEM_PROMPT_NAME_MAX_LENGTH,
   defaultEntry,
 } from '@uz/contract/system-prompts'
 import {useId, useState} from 'react'
 
 import {useDialogCommand} from '../dialog-command/use-dialog-command'
+import {isTooLong} from '../too-long'
 import {useCommand} from '../use-command'
 import {useLibrary} from '../use-library'
 import {DeleteEntryDialog} from './DeleteEntryDialog'
 import {Refusal} from './Refusal'
+import {TooLong} from './TooLong'
 
 export function SystemPromptsSection() {
   return (
@@ -160,16 +161,16 @@ function OwnEntry({entry}: {entry: SystemPromptEntry}) {
         <FieldLabel htmlFor={textId}>Text</FieldLabel>
         <Textarea
           id={textId}
-          maxLength={SYSTEM_PROMPT_MAX_LENGTH}
           className="max-h-80"
           value={text}
           onChange={event => setText(event.target.value)}
         />
+        <TooLong text={text} />
       </Field>
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
-          disabled={unchanged || name.trim() === ''}
+          disabled={unchanged || name.trim() === '' || isTooLong(text)}
           onClick={() =>
             void command.run({
               type: 'system-prompt.update',

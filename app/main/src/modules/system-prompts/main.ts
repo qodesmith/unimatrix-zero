@@ -35,10 +35,7 @@ export function saveSystemPrompt(db: Database, text: string): string {
   return row.id
 }
 
-interface NamedText {
-  name: string
-  text: string
-}
+type NamedText = Pick<SystemPromptEntry, 'name' | 'text'>
 
 type LibraryRow = typeof systemPromptLibrary.$inferSelect
 

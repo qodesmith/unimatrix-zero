@@ -5,6 +5,7 @@ import type {Command} from '@uz/contract/commands'
 import type {Tree} from '@uz/contract/trees'
 import type {ReactNode} from 'react'
 
+import {SYSTEM_PROMPT_MAX_LENGTH} from '@uz/contract/system-prompts'
 import {
   afterEach,
   beforeEach,
@@ -316,6 +317,34 @@ describe('a Tree’s panel', () => {
       },
     ])
     expect(sentOf(main, 'tree.set-system-prompt')).toEqual([])
+  })
+
+  it('says how far a System prompt runs over the limit, and holds Save and Save to library… until it fits', async () => {
+    const tree = savedTree({
+      title: 'Trip',
+      systemPrompt: {id: crypto.randomUUID(), text: TRIP_PROMPT},
+    })
+
+    await renderApp(fakeMain({trees: [tree]}))
+
+    const panel = await openTreePanel('Trip')
+    const text = panel.getByRole('textbox', {name: 'System prompt'})
+    const save = panel.getByRole('button', {name: 'Save', exact: true})
+    const toLibrary = panel.getByRole('button', {name: 'Save to library…'})
+
+    await text.fill('x'.repeat(SYSTEM_PROMPT_MAX_LENGTH + 1))
+
+    await expect
+      .element(panel.getByRole('status').getByText(/This one is 1 over\./))
+      .toBeVisible()
+    await expect.element(save).toBeDisabled()
+    await expect.element(toLibrary).toBeDisabled()
+
+    await text.fill('x'.repeat(SYSTEM_PROMPT_MAX_LENGTH))
+
+    await expect.element(panel.getByRole('status')).not.toBeInTheDocument()
+    await expect.element(save).toBeEnabled()
+    await expect.element(toLibrary).toBeEnabled()
   })
 })
 

@@ -130,13 +130,13 @@ async function setUp(
   const silence = heldIdle()
   const exits: Promise<unknown>[] = []
   const environments: NodeJS.ProcessEnv[] = []
-  const queried: Options['env'][] = []
+  const queried: Options[] = []
   const developerTools = {present: true}
 
   const driver = createClaudeDriver({
     store: store.client,
     query: params => {
-      queried.push(params.options.env)
+      queried.push(params.options)
 
       return query(params)
     },
@@ -830,12 +830,21 @@ it('puts the folder of the app’s own git last on the PATH of a Reply’s claud
   )
 
   expect(claude.environments.map(env => env.PATH)).toEqual([last])
-  expect(claude.queried.map(env => env?.PATH)).toEqual([last, last])
+  expect(claude.queried.map(options => options.env?.PATH)).toEqual([last, last])
   expect(
     claude.environments.flatMap(env =>
       Object.keys(env).filter(name => name.startsWith('GIT_'))
     )
   ).toEqual([])
+
+  await claude.allClosed()
+})
+
+it('starts a Reply’s claude with no setting sources, so neither a `CLAUDE.md` nor the user’s settings or hooks load', async () => {
+  const claude = await setUp(['warm.ndjson'])
+  await claude.reply(FIRST_PROMPT)
+
+  expect(claude.queried.map(options => options.settingSources)).toEqual([[]])
 
   await claude.allClosed()
 })
@@ -876,10 +885,10 @@ it('gives a Reply’s claude and a one-shot’s none of git’s login settings, 
       new AbortController().signal
     )
 
-    prompts[platform] = [...claude.environments, ...claude.queried].map(env => [
-      env?.GCM_INTERACTIVE,
-      env?.GIT_TERMINAL_PROMPT,
-    ])
+    prompts[platform] = [
+      ...claude.environments,
+      ...claude.queried.map(options => options.env),
+    ].map(env => [env?.GCM_INTERACTIVE, env?.GIT_TERMINAL_PROMPT])
     await claude.allClosed()
   }
 
@@ -906,7 +915,7 @@ it('names the app’s developer folder to a one-shot’s claude on a Mac with no
   claude.developerTools.present = false
   await claude.driver.runOneShot(request, signal)
 
-  expect(claude.queried.map(env => env?.DEVELOPER_DIR)).toEqual([
+  expect(claude.queried.map(options => options.env?.DEVELOPER_DIR)).toEqual([
     undefined,
     claude.vendorProgram.developerDir,
   ])

@@ -2,7 +2,11 @@ import type {Settings} from '@uz/contract/settings'
 import type {SystemPromptEntry} from '@uz/contract/system-prompts'
 
 import {SettingsProvider} from '#modules/settings/main'
-import {PRESETS, defaultEntry} from '@uz/contract/system-prompts'
+import {
+  PRESETS,
+  SYSTEM_PROMPT_MAX_LENGTH,
+  defaultEntry,
+} from '@uz/contract/system-prompts'
 import {expect, it} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {page} from 'vitest/browser'
@@ -112,6 +116,35 @@ it('saves an edit to one of the user’s own, with Save held until something cha
       text: 'Answer like a pirate, briefly.',
     },
   ])
+})
+
+it('keeps a pasted text whole when it runs over the limit, says by how much, and holds Save until it fits', async () => {
+  const main = await renderSection({own: [ownEntry()]})
+  const text = entry('Mine').getByRole('textbox', {name: 'Text'})
+  const save = entry('Mine').getByRole('button', {name: 'Save'})
+
+  await text.fill('x'.repeat(SYSTEM_PROMPT_MAX_LENGTH + 3))
+
+  await expect
+    .element(
+      entry('Mine')
+        .getByRole('status')
+        .getByText(/This one is 3 over\./)
+    )
+    .toBeVisible()
+  expect(text.element()).toHaveProperty(
+    'value.length',
+    SYSTEM_PROMPT_MAX_LENGTH + 3
+  )
+  await expect.element(save).toBeDisabled()
+
+  await text.fill('x'.repeat(SYSTEM_PROMPT_MAX_LENGTH))
+
+  await expect
+    .element(entry('Mine').getByRole('status'))
+    .not.toBeInTheDocument()
+  await save.click()
+  expect(main.sent).toHaveLength(1)
 })
 
 function deleteDialog() {

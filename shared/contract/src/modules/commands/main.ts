@@ -205,10 +205,7 @@ export const SettingsUpdateCommand = z.strictObject({
   changes: SettingsUpdateSchema,
 })
 
-/**
- * One of the user's own, as Duplicate and "Save to library…" make it;
- * `SYSTEM_PROMPTS_CHANGED` follows.
- */
+/** One of the user's own; `SYSTEM_PROMPTS_CHANGED` follows. */
 export const SystemPromptCreateCommand = z.strictObject({
   type: z.literal('system-prompt.create'),
   name: SystemPromptNameSchema,

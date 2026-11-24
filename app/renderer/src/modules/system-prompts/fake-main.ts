@@ -10,7 +10,6 @@ import {PRESETS} from '@uz/contract/system-prompts'
 
 interface Saved {
   settings?: Partial<Settings>
-  /** The user's own, after the presets. */
   own?: SystemPromptEntry[]
 }
 

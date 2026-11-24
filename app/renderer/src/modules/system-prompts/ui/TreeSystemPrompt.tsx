@@ -3,13 +3,14 @@ import type {TreeSystemPrompt as Saved} from '@uz/contract/system-prompts'
 import {bridge} from '#modules/bridge/main'
 import {Button} from '#shadcn/ui/button'
 import {Textarea} from '#shadcn/ui/textarea'
-import {SYSTEM_PROMPT_MAX_LENGTH} from '@uz/contract/system-prompts'
 import {useId, useState} from 'react'
 
 import {useDialogCommand} from '../dialog-command/use-dialog-command'
+import {isTooLong} from '../too-long'
 import {useCommand} from '../use-command'
 import {Refusal} from './Refusal'
 import {SaveToLibraryDialog} from './SaveToLibraryDialog'
+import {TooLong} from './TooLong'
 
 interface TreeSystemPromptProps {
   treeId: string
@@ -33,25 +34,30 @@ export function TreeSystemPrompt({
       </h3>
       <Textarea
         aria-labelledby={headingId}
-        maxLength={SYSTEM_PROMPT_MAX_LENGTH}
         className="max-h-96"
         value={text}
         onChange={event => setText(event.target.value)}
       />
+      <TooLong text={text} />
       <p className="text-sm text-muted-foreground">
         Applies from this Tree’s next Reply.
       </p>
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
-          disabled={text === systemPrompt.text}
+          disabled={text === systemPrompt.text || isTooLong(text)}
           onClick={() =>
             void save.run({type: 'tree.set-system-prompt', treeId, text})
           }
         >
           Save
         </Button>
-        <Button variant="outline" size="sm" onClick={naming.ask}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={isTooLong(text)}
+          onClick={naming.ask}
+        >
           Save to library…
         </Button>
       </div>

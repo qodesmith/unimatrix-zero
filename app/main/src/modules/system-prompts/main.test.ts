@@ -3,6 +3,7 @@ import type {SettingsStore} from '#modules/settings/main'
 
 import {openDatabase} from '#modules/database/main'
 import {createSettings} from '#modules/settings/main'
+import {PRESETS} from '@uz/contract/system-prompts'
 import path from 'node:path'
 import {beforeEach, describe, expect, it} from 'vitest'
 
@@ -60,10 +61,7 @@ describe('the library', () => {
       /preset/
     )
     expect(() => library.delete('concise')).toThrow(/preset/)
-    expect(library.list().entries[1]).toMatchObject({
-      name: 'Concise',
-      text: expect.stringMatching(/^Answer as briefly/),
-    })
+    expect(library.list().entries[1]).toEqual(PRESETS[1])
   })
 })
 
@@ -83,13 +81,17 @@ describe('the default for new Trees', () => {
 
     expect(deleted?.settings?.defaultSystemPromptId).toBe('default')
     expect(settings.read().defaultSystemPromptId).toBe('default')
-    expect(library.defaultText()).toMatch(/^You are a helpful assistant/)
+    expect(library.defaultText()).toBe(
+      PRESETS.find(entry => entry.id === 'default')?.text
+    )
   })
 
   it('falls back to the Default preset for an id no entry has', () => {
     settings.update({defaultSystemPromptId: crypto.randomUUID()})
 
-    expect(library.defaultText()).toMatch(/^You are a helpful assistant/)
+    expect(library.defaultText()).toBe(
+      PRESETS.find(entry => entry.id === 'default')?.text
+    )
   })
 })
 
