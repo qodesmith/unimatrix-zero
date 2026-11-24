@@ -126,6 +126,7 @@ function fakeMain(saved: Saved) {
       shrunkSize: null,
       folderPath: null,
       missing: false,
+      extraction: null,
     }
 
     attachments.set(attachment.id, attachment)
@@ -2564,6 +2565,7 @@ const SHOT: Attachment = {
   shrunkSize: null,
   folderPath: null,
   missing: false,
+  extraction: null,
 }
 
 const NOTES: Attachment = {
@@ -2574,6 +2576,7 @@ const NOTES: Attachment = {
   shrunkSize: null,
   folderPath: null,
   missing: false,
+  extraction: null,
 }
 
 function withAttachments(saved: Saved, promptN: number): Saved {
@@ -2668,6 +2671,7 @@ function media(
     shrunkSize: null,
     folderPath: null,
     missing: false,
+    extraction: null,
   }
 }
 
