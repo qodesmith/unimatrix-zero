@@ -2,7 +2,7 @@
   "name": "unimatrix-zero",
   "private": true,
   "type": "module",
-  "reviewed-oxlint-version": "1.89.0",
+  "reviewed-oxlint-version": "1.95.0",
   "workspaces": [
     "shell",
     "app/*",
