@@ -16,7 +16,7 @@ type ReadReply = Extract<ExtractorReply, {type: 'read'}>
 /** A reply that passed every check; anything else is a failure. */
 export type ExtractionResult =
   | (Omit<ReadReply, 'text'> & {text: string})
-  | {type: 'unsupported'}
+  | Extract<ExtractorReply, {type: 'unsupported'}>
   | {type: 'failed'}
 
 export const PAGE_IMAGE_SIZE_LIMIT = 8 * MIB

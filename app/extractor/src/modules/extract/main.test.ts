@@ -1,4 +1,5 @@
 import {PAGE, makeJpeg, makePdf} from '#modules/test-pdf/main'
+import {MIB} from '@uz/contract/sizes'
 import {strToU8, zipSync} from 'fflate'
 import {describe, expect, it} from 'vitest'
 
@@ -50,14 +51,12 @@ function chapter(body: string) {
   )
 }
 
-const MIB = 1024 * 1024
 const DOCUMENT = 'word/document.xml'
 
 function bareDocx(body: Uint8Array, level: 0 | 9 = 9) {
   return zipSync({[DOCUMENT]: [body, {level}]})
 }
 
-/** The offset of `name`'s central directory record. */
 function centralRecord(zip: Uint8Array, name: string) {
   const data = new DataView(zip.buffer, zip.byteOffset, zip.byteLength)
 

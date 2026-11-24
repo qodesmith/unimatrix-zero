@@ -16,7 +16,6 @@ export interface TestPage {
 /** A letter-size page, in points. */
 export const PAGE = {width: 612, height: 792}
 
-/** A JPEG of a red-and-blue picture, drawn and encoded by a canvas. */
 export async function makeJpeg(width = 64, height = 48) {
   const canvas = new OffscreenCanvas(width, height)
   const context = canvas.getContext('2d')

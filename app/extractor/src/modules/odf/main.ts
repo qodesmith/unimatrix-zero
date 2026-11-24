@@ -1,4 +1,5 @@
 import type {Zip} from '#modules/zip/main'
+import type {ExtractionFormat} from '@uz/contract/extraction'
 
 import {elements, parseXml, tidyLines} from '#modules/xml/main'
 
@@ -11,7 +12,7 @@ const PRESENTATION = 'urn:oasis:names:tc:opendocument:xmlns:presentation:1.0'
 /** Most times a repeated row or cell is written out. */
 const REPEAT_LIMIT = 100
 
-export type OdfKind = 'odt' | 'ods' | 'odp'
+export type OdfKind = Extract<ExtractionFormat, 'odt' | 'ods' | 'odp'>
 
 /** The text of a paragraph or heading, leaving out a nested one. */
 function paragraphText(node: Element): string {
