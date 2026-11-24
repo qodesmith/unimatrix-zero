@@ -41,6 +41,12 @@ export const ExtractionFormatSchema = z.enum([
 
 export type ExtractionFormat = z.infer<typeof ExtractionFormatSchema>
 
+/**
+ * The window's preload posts this to the page with the job's `MessagePort`,
+ * the page's only channel.
+ */
+export const EXTRACTION_PORT_MESSAGE = 'uz:extraction-port'
+
 /** The job main posts to the extraction window: the file's bytes alone. */
 export interface ExtractionJob {
   bytes: Uint8Array
