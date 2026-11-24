@@ -1,6 +1,7 @@
 import type {HostAttachment, ImageMediaType} from '@uz/contract/attachments'
 import type {ReplyRequest} from '@uz/contract/host'
 
+import {PAGE_IMAGES_PER_PDF} from '@uz/contract/extraction'
 import {access, constants, readFile} from 'node:fs/promises'
 
 export interface Text {
@@ -39,6 +40,26 @@ function pathLine({name, path, folder}: HostAttachment) {
     : `[Attached file "${name}" is saved at: ${path}]`
 }
 
+/** What the app took from the file when it was attached, file by file. */
+function extractionLines({name, extraction}: HostAttachment): Text[] {
+  if (!extraction) return []
+
+  const {text, pageImages, imagesStopped} = extraction
+
+  return [
+    ...(text === null ? [] : [`[The text of "${name}" is saved at: ${text}]`]),
+    ...pageImages.map(
+      ({page, path}) =>
+        `[Page ${page} of "${name}", as an image, is saved at: ${path}]`
+    ),
+    ...(imagesStopped
+      ? [
+          `[Only the first ${PAGE_IMAGES_PER_PDF} pages of "${name}" that needed a page image have one; its text covers every page]`,
+        ]
+      : []),
+  ].map(line => ({type: 'text', text: line}))
+}
+
 /** Main decides what goes inline; nothing here looks at a type or a size. */
 function files(attached: HostAttachment[]): Piece[] {
   return attached.flatMap((file): Piece[] => {
@@ -47,6 +68,7 @@ function files(attached: HostAttachment[]): Piece[] {
     return [
       ...lines(pathLine(file)),
       ...(inline ? [{type: 'file' as const, file: {...file, inline}}] : []),
+      ...extractionLines(file),
     ]
   })
 }
@@ -159,9 +181,7 @@ function goneLine(name: string): Text {
   return {type: 'text', text: `[Attached file "${name}" can no longer be read]`}
 }
 
-async function earlierParts(file: HostAttachment): Promise<ContentPart[]> {
-  if (!(await readable(file.path))) return [goneLine(file.name)]
-
+async function earlierFileParts(file: HostAttachment): Promise<ContentPart[]> {
   const line: Text = {type: 'text', text: pathLine(file)}
   const {inline} = file
 
@@ -175,6 +195,12 @@ async function earlierParts(file: HostAttachment): Promise<ContentPart[]> {
       ? [line]
       : [goneLine(file.name)]
   }
+}
+
+async function earlierParts(file: HostAttachment): Promise<ContentPart[]> {
+  if (!(await readable(file.path))) return [goneLine(file.name)]
+
+  return [...(await earlierFileParts(file)), ...extractionLines(file)]
 }
 
 async function partsOf(piece: Piece): Promise<ContentPart[]> {

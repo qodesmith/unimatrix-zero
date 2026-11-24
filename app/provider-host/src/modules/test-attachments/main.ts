@@ -42,32 +42,49 @@ export function attachedFiles(folder: string) {
       path: notes,
       folder: false,
       inline: {type: 'text'},
+      extraction: null,
     },
     chart: {
       name: 'chart.png',
       path: chart,
       folder: false,
       inline: {type: 'image', mediaType: 'image/png', path: chart},
+      extraction: null,
     },
     report: {
       name: 'report.pdf',
       path: report,
       folder: false,
       inline: {type: 'pdf'},
+      extraction: null,
     },
     photo: {
       name: 'photo.jpg',
       path: photo,
       folder: false,
       inline: {type: 'image', mediaType: 'image/jpeg', path: shrunk},
+      extraction: null,
     },
-    archive: {name: 'archive.zip', path: archive, folder: false, inline: null},
-    project: {name: 'project', path: project, folder: true, inline: null},
+    archive: {
+      name: 'archive.zip',
+      path: archive,
+      folder: false,
+      inline: null,
+      extraction: null,
+    },
+    project: {
+      name: 'project',
+      path: project,
+      folder: true,
+      inline: null,
+      extraction: null,
+    },
     gone: {
       name: 'gone.txt',
       path: path.join(folder, 'gone.txt'),
       folder: false,
       inline: {type: 'text'},
+      extraction: null,
     },
   } satisfies Record<string, HostAttachment>
 }
@@ -149,6 +166,7 @@ export function pngShowing(folder: string, word: string): HostAttachment {
     path: file,
     folder: false,
     inline: {type: 'image', mediaType: 'image/png', path: file},
+    extraction: null,
   }
 }
 
@@ -185,6 +203,7 @@ export function pdfSaying(folder: string, sentence: string): HostAttachment {
     path: keep(folder, 'note.pdf', Buffer.from(pdf, 'latin1')),
     folder: false,
     inline: {type: 'pdf'},
+    extraction: null,
   }
 }
 
@@ -194,5 +213,11 @@ export function fileHolding(
   name: string,
   bytes: Uint8Array
 ): HostAttachment {
-  return {name, path: keep(folder, name, bytes), folder: false, inline: null}
+  return {
+    name,
+    path: keep(folder, name, bytes),
+    folder: false,
+    inline: null,
+    extraction: null,
+  }
 }
