@@ -403,6 +403,17 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Changed by:** upgrade
 - **Check:** `[dep:codex-subagents-off]` in `codex-driver`: the app-server, started as the app starts it, lists `multi_agent` as on by default and off.
 
+### A Tree folder's own Codex config left out
+
+- **Id:** `codex-project-config-untrusted`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** Codex loads a folder's `.codex/config.toml`, with its hooks and exec policies, only when `config.toml` in `CODEX_HOME` marks the folder as a trusted project. Otherwise it lists the folder's layer as disabled.
+- **App side:** `codex-driver` runs every thread in the Tree's folder, and its environment never marks a folder as trusted, so a Tree's System prompt is all the instructions the app adds.
+- **User would see:** Replies shaped by settings, hooks or instructions in a Tree's folder that the app never shows.
+- **Changed by:** upgrade
+- **Check:** `[dep:codex-project-config-untrusted]` in `codex-driver`: the app-server, started as the app starts it, leaves out a setting in a Tree folder's `.codex/config.toml`, and takes it once `CODEX_HOME` trusts the folder.
+
 ### A thread resumed in another folder
 
 - **Id:** `codex-resume-moved-folder`

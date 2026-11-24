@@ -97,9 +97,14 @@ const WireLine = z.looseObject({
     .optional(),
 })
 
-const FeatureListAnswer = z.looseObject({
-  id: z.literal(2),
-  result: z.looseObject({data: z.array(z.looseObject({name: z.string()}))}),
+const SecondAnswer = z.looseObject({id: z.literal(2), result: z.unknown()})
+
+const FeatureList = z.looseObject({
+  data: z.array(z.looseObject({name: z.string()})),
+})
+
+const ConfigRead = z.looseObject({
+  config: z.looseObject({model_verbosity: z.string().nullable()}),
 })
 
 const ErrorNotice = z.looseObject({
@@ -160,6 +165,49 @@ function programIn(pinned: string) {
       archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
     },
   })
+}
+
+/** Starts the app-server as the app starts it and asks it one thing. */
+async function askAppServer(
+  pinned: string,
+  home: string,
+  request: {method: string; params: unknown}
+) {
+  const child = spawnProcess(programIn(pinned), codexArgs(process.platform), {
+    cwd: home,
+    env: codexEnvironment(process.env, home),
+    stdio: ['pipe', 'pipe', 'ignore'],
+  })
+
+  const answered = new Promise<unknown>(resolve => {
+    createInterface({input: child.stdout}).on('line', line => {
+      const message = SecondAnswer.safeParse(JSON.parse(line))
+
+      if (message.success) resolve(message.data.result)
+    })
+  })
+
+  function send(message: {id?: number; method: string; params?: unknown}) {
+    child.stdin.write(`${JSON.stringify(message)}\n`)
+  }
+
+  try {
+    send({
+      id: 1,
+      method: 'initialize',
+      params: {
+        clientInfo: {name: 'uz_live', title: 'UZ live', version: '0'},
+        capabilities: null,
+      },
+    })
+    send({method: 'initialized'})
+    send({id: 2, ...request})
+
+    return await answered
+  } finally {
+    child.stdin.end()
+    await once(child, 'exit')
+  }
 }
 
 function filesIn(root: string) {
@@ -2162,39 +2210,16 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     if (!folder || !signedIn) return
 
     const home = homeFrom(signedIn)
-    const program = programIn(folder)
-
-    const child = spawnProcess(program, codexArgs(process.platform), {
-      cwd: home,
-      env: codexEnvironment(process.env, home),
-      stdio: ['pipe', 'pipe', 'ignore'],
-    })
-
-    const answered = new Promise<unknown>(resolve => {
-      createInterface({input: child.stdout}).on('line', line => {
-        const message = FeatureListAnswer.safeParse(JSON.parse(line))
-
-        if (message.success) resolve(message.data.result.data)
-      })
-    })
-
-    function send(message: {id?: number; method: string; params?: unknown}) {
-      child.stdin.write(`${JSON.stringify(message)}\n`)
-    }
 
     try {
-      send({
-        id: 1,
-        method: 'initialize',
-        params: {
-          clientInfo: {name: 'uz_live', title: 'UZ live', version: '0'},
-          capabilities: null,
-        },
-      })
-      send({method: 'initialized'})
-      send({id: 2, method: 'experimentalFeature/list', params: {}})
+      const features = FeatureList.parse(
+        await askAppServer(folder, home, {
+          method: 'experimentalFeature/list',
+          params: {},
+        })
+      )
 
-      expect(await answered).toContainEqual(
+      expect(features.data).toContainEqual(
         expect.objectContaining({
           name: 'multi_agent',
           enabled: false,
@@ -2202,9 +2227,45 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         })
       )
     } finally {
-      child.stdin.end()
-      await once(child, 'exit')
       fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 60_000)
+
+  it('[dep:codex-project-config-untrusted] leaves out a setting in a Tree folder’s .codex/config.toml, and takes it once CODEX_HOME trusts the folder', async () => {
+    if (!folder || !signedIn) return
+
+    const tree = newTreeFolder()
+    fs.mkdirSync(path.join(tree, '.codex'))
+    fs.writeFileSync(
+      path.join(tree, '.codex', 'config.toml'),
+      'model_verbosity = "high"\n'
+    )
+
+    const home = homeFrom(signedIn)
+    // Without a home that trusts the folder, a setting Codex renamed would pass.
+    const trusting = homeFrom(signedIn)
+    fs.writeFileSync(
+      path.join(trusting, 'config.toml'),
+      `[projects.${JSON.stringify(tree)}]\ntrust_level = "trusted"\n`
+    )
+
+    async function verbosityUnder(configDir: string) {
+      const read = ConfigRead.parse(
+        await askAppServer(folder ?? '', configDir, {
+          method: 'config/read',
+          params: {cwd: tree},
+        })
+      )
+
+      return read.config.model_verbosity
+    }
+
+    try {
+      expect(await verbosityUnder(home)).toBeNull()
+      expect(await verbosityUnder(trusting)).toBe('high')
+    } finally {
+      for (const made of [tree, home, trusting])
+        fs.rmSync(made, {recursive: true, force: true})
     }
   }, 60_000)
 })
