@@ -1,6 +1,7 @@
 import type {ReplyEvent} from '@uz/contract/turns'
 
 import {isReplyEvent} from '@uz/contract/host'
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {createFakeDriver} from '@uz/provider-host/fake-driver'
 import path from 'node:path'
 
@@ -49,6 +50,7 @@ export async function recordFakeReply(): Promise<ReplyEvent[]> {
     thread: [],
     compactionSettings: {auto: true, threshold: null},
     systemPromptChanged: false,
+    tools: DEFAULT_TREE_TOOLS,
   })) {
     if (!isReplyEvent(event)) continue
 

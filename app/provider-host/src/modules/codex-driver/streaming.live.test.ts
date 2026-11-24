@@ -22,6 +22,7 @@ import {listenLocally, startProxy} from '#modules/test-proxy/main'
 import {fakeStore} from '#modules/test-store/main'
 import {withGitLast} from '#modules/vendor-environment/main'
 import {isReplyEvent} from '@uz/contract/host'
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {programOf} from '@uz/vendor-program'
 import {spawn as spawnProcess, spawnSync} from 'node:child_process'
@@ -271,6 +272,7 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
         thread: [],
         compactionSettings: {auto: true, threshold},
         systemPromptChanged: false,
+        tools: DEFAULT_TREE_TOOLS,
       })
     )
 
@@ -362,6 +364,7 @@ function threadReplies(program: string, home: string) {
         thread,
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         systemPromptChanged: false,
+        tools: DEFAULT_TREE_TOOLS,
       })
     )
 
@@ -479,6 +482,7 @@ function codedReplies(
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         systemPromptChanged: false,
+        tools: DEFAULT_TREE_TOOLS,
       })
     )
 
@@ -678,6 +682,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
+          tools: DEFAULT_TREE_TOOLS,
         })
       )
 
@@ -839,6 +844,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         systemPromptChanged: false,
+        tools: DEFAULT_TREE_TOOLS,
       })) {
         events.push(event)
 
@@ -999,6 +1005,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
+          tools: DEFAULT_TREE_TOOLS,
         })
       )
 
@@ -1124,6 +1131,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
+          tools: DEFAULT_TREE_TOOLS,
         })
       )
     }
@@ -1274,6 +1282,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         systemPromptChanged: false,
+        tools: DEFAULT_TREE_TOOLS,
       })) {
         events.push(event)
 
@@ -1571,6 +1580,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
+          tools: DEFAULT_TREE_TOOLS,
         })
       )
 
@@ -1766,6 +1776,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: changed,
+          tools: DEFAULT_TREE_TOOLS,
         })
       )
 
@@ -1972,6 +1983,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
+          tools: DEFAULT_TREE_TOOLS,
         })
       )
 
@@ -2053,6 +2065,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
+          tools: DEFAULT_TREE_TOOLS,
         })
       )
 
@@ -2161,6 +2174,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
+          tools: DEFAULT_TREE_TOOLS,
         })
       )
 
@@ -2319,6 +2333,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
+          tools: DEFAULT_TREE_TOOLS,
         })
       )
 

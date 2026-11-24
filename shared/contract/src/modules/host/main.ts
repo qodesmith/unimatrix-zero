@@ -11,6 +11,7 @@ import {HostAttachmentSchema} from '#modules/attachments/main'
 import {VendorBuildSchema} from '#modules/manifest/main'
 import {ModelSchema, SignInUpdateSchema} from '#modules/providers/main'
 import {CompactionSettingsSchema} from '#modules/settings/main'
+import {TreeToolsSchema} from '#modules/tools/main'
 import {ReplyEventSchema, ReplyPartSchema} from '#modules/turns/main'
 import {z} from 'zod'
 
@@ -137,6 +138,8 @@ export const ReplyRequestSchema = z.strictObject({
    * this.
    */
   systemPromptChanged: z.boolean(),
+  /** The Tree's Tools panel as the Reply starts. */
+  tools: TreeToolsSchema,
 })
 
 export type ReplyRequest = z.infer<typeof ReplyRequestSchema>

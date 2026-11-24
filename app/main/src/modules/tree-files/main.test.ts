@@ -7,6 +7,7 @@ import type {ReplyEvent} from '@uz/contract/turns'
 import {openDatabase, schema} from '#modules/database/main'
 import {createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {eq} from 'drizzle-orm'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -76,7 +77,7 @@ beforeEach(() => {
 
   launch()
 
-  treeId = createTrees(db).create(new Date(), '').id
+  treeId = createTrees(db).create(new Date(), '', DEFAULT_TREE_TOOLS).id
 })
 
 afterEach(() => {

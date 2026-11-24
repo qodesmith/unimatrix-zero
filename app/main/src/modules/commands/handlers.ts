@@ -59,8 +59,12 @@ function publishLibrary(
 export const handlers: Handlers = {
   'app.ping': ({nonce}, {now}) => ({nonce, receivedAt: now().toISOString()}),
 
-  'tree.create': (_command, {now, trees, systemPrompts, publish}) => {
-    const tree = trees.create(now(), systemPrompts.defaultText())
+  'tree.create': (_command, {now, trees, systemPrompts, settings, publish}) => {
+    const tree = trees.create(
+      now(),
+      systemPrompts.defaultText(),
+      settings.read().toolDefaults
+    )
     publish({type: 'TREE_CREATED', tree})
 
     return tree
@@ -94,6 +98,13 @@ export const handlers: Handlers = {
 
   'tree.set-system-prompt': ({treeId, text}, {trees, publish}) => {
     const tree = found(trees.setSystemPrompt(treeId, text))
+    publish({type: 'TREE_CHANGED', tree})
+
+    return tree
+  },
+
+  'tree.set-tools': ({treeId, changes}, {trees, publish}) => {
+    const tree = found(trees.setTools(treeId, changes))
     publish({type: 'TREE_CHANGED', tree})
 
     return tree

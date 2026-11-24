@@ -21,6 +21,7 @@ import {fakeStore} from '#modules/test-store/main'
 import {withGitLast} from '#modules/vendor-environment/main'
 import {query} from '@anthropic-ai/claude-agent-sdk'
 import {isReplyEvent} from '@uz/contract/host'
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {spawn} from 'node:child_process'
 import fs from 'node:fs'
@@ -236,6 +237,7 @@ function liveDriver(
       thread: [],
       compactionSettings,
       systemPromptChanged: false,
+      tools: DEFAULT_TREE_TOOLS,
     }
   }
 

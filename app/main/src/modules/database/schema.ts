@@ -21,6 +21,10 @@ function createdAt() {
     .$defaultFn(() => new Date())
 }
 
+function toolSwitch(name: string, before: boolean) {
+  return integer(name, {mode: 'boolean'}).notNull().default(before)
+}
+
 /** Append-only: a Tree and each Reply point at the text they run under. */
 export const systemPrompts = sqliteTable(
   'system_prompts',
@@ -42,6 +46,12 @@ export const trees = sqliteTable('trees', {
   systemPromptId: text('system_prompt_id')
     .notNull()
     .references(() => systemPrompts.id),
+  // Its Tools panel; a Tree from before it keeps what it ran with.
+  webSearch: toolSwitch('web_search', true),
+  claudeConnectors: toolSwitch('claude_connectors', false),
+  claudeBuiltInSkills: toolSwitch('claude_built_in_skills', false),
+  chatgptBuiltInSkills: toolSwitch('chatgpt_built_in_skills', false),
+  chatgptRemotePlugins: toolSwitch('chatgpt_remote_plugins', false),
   createdAt: createdAt(),
 })
 

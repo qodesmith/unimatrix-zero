@@ -16,6 +16,7 @@ import {
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import {PRESETS, defaultEntry} from '@uz/contract/system-prompts'
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 
 type AttachmentAdd = Extract<Command, {type: 'attachment.add'}>
 
@@ -40,6 +41,7 @@ export function savedTree(fields: Partial<Tree> = {}): Tree {
     lastActiveAt: receivedAt,
     unseenFailure: false,
     systemPrompt: {id: crypto.randomUUID(), text: ''},
+    tools: DEFAULT_TREE_TOOLS,
     ...fields,
   }
 }

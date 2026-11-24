@@ -10,6 +10,7 @@ import type {
   Thread,
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
+import type {TreeTools} from '@uz/contract/tools'
 
 import {
   PNG_BASE64,
@@ -21,6 +22,7 @@ import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
 import {explainingLabels} from '#modules/thread-replay/main'
 import {isReplyEvent} from '@uz/contract/host'
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {once} from 'node:events'
 import fs from 'node:fs'
@@ -211,6 +213,7 @@ async function setUp(
       thread = [],
       attachments = [],
       systemPromptChanged = false,
+      tools = DEFAULT_TREE_TOOLS,
     }: {
       stopAfter?: number
       model?: string
@@ -218,6 +221,7 @@ async function setUp(
       thread?: Thread
       attachments?: HostAttachment[]
       systemPromptChanged?: boolean
+      tools?: TreeTools
     } = {}
   ) {
     const replyId = crypto.randomUUID()
@@ -236,6 +240,7 @@ async function setUp(
       thread,
       compactionSettings,
       systemPromptChanged,
+      tools,
     })) {
       events.push(event)
 

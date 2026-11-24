@@ -1,4 +1,5 @@
 import {TreeSystemPromptSchema} from '#modules/system-prompts/main'
+import {TreeToolsSchema} from '#modules/tools/main'
 import {z} from 'zod'
 
 export const TREE_TITLE_MAX_LENGTH = 200
@@ -16,6 +17,8 @@ export const TreeSchema = z.strictObject({
   unseenFailure: z.boolean(),
   /** Its own copy, which later Replies run under. */
   systemPrompt: TreeSystemPromptSchema,
+  /** Its Tools panel, which later Replies run with. */
+  tools: TreeToolsSchema,
 })
 
 export type Tree = z.infer<typeof TreeSchema>

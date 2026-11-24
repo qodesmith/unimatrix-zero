@@ -1,5 +1,6 @@
 import type {Tree} from '@uz/contract/trees'
 
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {expect, it} from 'vitest'
 
 import {applyEvent} from './apply-event'
@@ -13,6 +14,7 @@ function tree(id: string, lastActiveAt: string): Tree {
     lastActiveAt,
     unseenFailure: false,
     systemPrompt: {id: '019ab3c0-5e1f-7000-8000-000000000001', text: ''},
+    tools: DEFAULT_TREE_TOOLS,
   }
 }
 
