@@ -5,6 +5,7 @@ import {ProviderIdSchema} from '@uz/contract/providers'
 import {cn} from 'cn'
 
 import {anyConnected, cardOf, waitingFor} from '../cards'
+import {DevConnectEach} from './DevConnectEach'
 import {ProviderCard} from './ProviderCard'
 
 interface ConnectionsProps {
@@ -56,6 +57,7 @@ export function Connections({connections, onStart}: ConnectionsProps) {
           />
         ))}
       </div>
+      {import.meta.env.DEV && <DevConnectEach connections={connections} />}
       {onStart && (
         <Button size="lg" disabled={!anyConnected(state)} onClick={onStart}>
           Start chatting →
