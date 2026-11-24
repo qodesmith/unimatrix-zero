@@ -2,9 +2,6 @@
   "name": "@uz/preload",
   "private": true,
   "type": "module",
-  "imports": {
-    "#modules/*": "./src/modules/*.ts"
-  },
   "scripts": {
     "build": "vite build"
   },
