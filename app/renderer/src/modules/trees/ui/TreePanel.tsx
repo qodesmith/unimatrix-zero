@@ -1,6 +1,7 @@
 import type {Tree} from '@uz/contract/trees'
 
 import {TreeSystemPrompt} from '#modules/system-prompts/main'
+import {TreeToolsSection} from '#modules/tools/main'
 import {
   Sheet,
   SheetContent,
@@ -34,6 +35,7 @@ export function TreePanel({tree, open, onOpenChange}: TreePanelProps) {
             treeId={tree.id}
             systemPrompt={tree.systemPrompt}
           />
+          <TreeToolsSection treeId={tree.id} tools={tree.tools} />
         </div>
       </SheetContent>
     </Sheet>

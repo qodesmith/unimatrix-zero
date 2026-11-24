@@ -114,6 +114,20 @@ export function fakeMain(saved: Saved = {}) {
     return tree
   }
 
+  function setTools({
+    treeId,
+    changes,
+  }: Extract<Command, {type: 'tree.set-tools'}>): CommandOutcome<CommandType> {
+    const index = trees.findIndex(tree => tree.id === treeId)
+    const found = trees[index]
+
+    if (!found) return {ok: false, error: {code: 'not-found', message: 'Gone'}}
+
+    const tools = {...found.tools, ...changes}
+
+    return {ok: true, value: change(index, {...found, tools})}
+  }
+
   function systemPrompts() {
     return {entries: library.map(entry => ({...entry}))}
   }
@@ -163,7 +177,13 @@ export function fakeMain(saved: Saved = {}) {
   function answer(
     command: Exclude<
       Command,
-      | {type: 'attachment.add' | 'snapshots.download-again' | 'image.load'}
+      | {
+          type:
+            | 'attachment.add'
+            | 'snapshots.download-again'
+            | 'image.load'
+            | 'tree.set-tools'
+        }
       | {type: `system-prompt.${string}`}
     >
   ): CommandOutcome<CommandType> {
@@ -197,6 +217,7 @@ export function fakeMain(saved: Saved = {}) {
           id: crypto.randomUUID(),
           text: defaultEntry(library, settings.defaultSystemPromptId).text,
         },
+        tools: {...settings.toolDefaults},
       })
 
       trees.push(tree)
@@ -300,6 +321,8 @@ export function fakeMain(saved: Saved = {}) {
       if (command.type === 'snapshots.download-again') {
         return {ok: true, value: {}}
       }
+
+      if (command.type === 'tree.set-tools') return setTools(command)
 
       if (command.type === 'image.load') {
         return {ok: true, value: {dataUrl: 'data:image/png;base64,'}}
