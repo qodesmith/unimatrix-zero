@@ -31,10 +31,7 @@ describe('the library', () => {
     library.create({name: 'Haiku', text: 'Answer in haiku.'}, new Date(1))
 
     expect(names()).toEqual([
-      'Default',
-      'Concise',
-      'Explain simply',
-      'Coding helper',
+      ...PRESETS.map(entry => entry.name),
       'Haiku',
       'Pirate',
     ])

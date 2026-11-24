@@ -88,7 +88,7 @@ export function fakeMain(saved: Saved = {}) {
     libraryChanged()
 
     if (settings.defaultSystemPromptId === command.id) {
-      settings.defaultSystemPromptId = 'default'
+      settings.defaultSystemPromptId = DEFAULT_SETTINGS.defaultSystemPromptId
       publish({type: 'SETTINGS_CHANGED', settings: {...settings}})
     }
 

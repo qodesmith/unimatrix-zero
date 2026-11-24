@@ -1,3 +1,4 @@
+import type {Command} from '@uz/contract/commands'
 import type {SystemPromptEntry} from '@uz/contract/system-prompts'
 
 import {bridge} from '#modules/bridge/main'
@@ -91,8 +92,12 @@ function Library() {
   )
 }
 
-function copyName(name: string) {
-  return `Copy of ${name}`.slice(0, SYSTEM_PROMPT_NAME_MAX_LENGTH)
+function duplicateOf(entry: SystemPromptEntry): Command {
+  return {
+    type: 'system-prompt.create',
+    name: `Copy of ${entry.name}`.slice(0, SYSTEM_PROMPT_NAME_MAX_LENGTH),
+    text: entry.text,
+  }
 }
 
 function PresetEntry({entry}: {entry: SystemPromptEntry}) {
@@ -113,13 +118,7 @@ function PresetEntry({entry}: {entry: SystemPromptEntry}) {
           variant="outline"
           size="sm"
           className="ml-auto"
-          onClick={() =>
-            void duplicate.run({
-              type: 'system-prompt.create',
-              name: copyName(entry.name),
-              text: entry.text,
-            })
-          }
+          onClick={() => void duplicate.run(duplicateOf(entry))}
         >
           Duplicate
         </Button>
@@ -185,13 +184,7 @@ function OwnEntry({entry}: {entry: SystemPromptEntry}) {
         <Button
           variant="outline"
           size="sm"
-          onClick={() =>
-            void command.run({
-              type: 'system-prompt.create',
-              name: copyName(entry.name),
-              text: entry.text,
-            })
-          }
+          onClick={() => void command.run(duplicateOf(entry))}
         >
           Duplicate
         </Button>

@@ -423,7 +423,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **App side:** `codex-driver` starts a new thread from the Thread, a cold Turn, when the System prompt differs from the one the session started under, which main reads from the session's first Reply.
 - **User would see:** a changed System prompt that a continued Thread ignores.
 - **Changed by:** upgrade
-- **Check:** `[dep:codex-instructions-on-resume]` in `codex-driver`: a Thread follows a changed System prompt from its next Reply, on a thread still loaded and on one resumed from the app's copy alone. Whether a resume still keeps the old instructions, which would make the new thread unnecessary, has no check: `codex-driver` never resumes under new ones, so the check would drive the app-server on its own.
+- **Check:** `[dep:codex-instructions-on-resume]` in `codex-driver`: a Thread follows a changed System prompt from its next Reply, on a thread still loaded and on one resumed from the app's copy alone. The same test resumes a thread from the app's copy under new instructions, with main's flag unset, and expects the old ones.
 
 ### Codex sends no server requests
 

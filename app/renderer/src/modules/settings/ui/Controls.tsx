@@ -17,8 +17,8 @@ interface GroupProps {
   legend: string
   legendId?: string
   /**
-   * How far the group's Settings reach; a look-and-behavior group has none (PRD
-   * §17).
+   * How far the group's Settings reach; a look-and-behavior group has none (ADR
+   * 0023).
    */
   note?: string
   children: ReactNode

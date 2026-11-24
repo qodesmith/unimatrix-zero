@@ -1,6 +1,3 @@
-import type {Settings} from '@uz/contract/settings'
-import type {SystemPromptEntry} from '@uz/contract/system-prompts'
-
 import {SettingsProvider} from '#modules/settings/main'
 import {
   PRESETS,
@@ -15,12 +12,7 @@ import {fakeMain, ownEntry} from '../fake-main'
 import {SystemPromptsProvider} from './SystemPromptsProvider'
 import {SystemPromptsSection} from './SystemPromptsSection'
 
-interface Saved {
-  settings?: Partial<Settings>
-  own?: SystemPromptEntry[]
-}
-
-async function renderSection(saved: Saved = {}) {
+async function renderSection(saved: Parameters<typeof fakeMain>[0] = {}) {
   const main = fakeMain(saved)
   globalThis.window.uz = main
 

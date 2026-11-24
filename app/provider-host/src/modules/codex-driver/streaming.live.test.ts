@@ -1650,12 +1650,12 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 300_000)
 
-  it('[dep:codex-instructions-on-resume] follows a changed System prompt from the next Reply, on a thread still loaded and on one resumed from the app’s copy alone', async () => {
+  it('[dep:codex-instructions-on-resume] follows a changed System prompt from the next Reply, on a thread still loaded and on one resumed from the app’s copy alone, and a thread resumed under new instructions keeps its old ones', async () => {
     if (!folder || !signedIn) return
 
     const store = fakeStore()
-    const homes = [homeFrom(signedIn), homeFrom(signedIn)]
-    const [home, otherHome] = homes as [string, string]
+    const homes = [homeFrom(signedIn), homeFrom(signedIn), homeFrom(signedIn)]
+    const [home, otherHome, thirdHome] = homes as [string, string, string]
     const treeId = crypto.randomUUID()
     const idle = heldIdle()
     const exits: Promise<unknown>[] = []
@@ -1685,11 +1685,13 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         word,
         text,
         session,
+        changed = session !== null,
       }: {
         home: string
         word: string
         text: string
         session: SessionRef | null
+        changed?: boolean
       }
     ) {
       const events = await Array.fromAsync(
@@ -1715,7 +1717,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session: session && {...session, type: 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
-          systemPromptChanged: session !== null,
+          systemPromptChanged: changed,
         })
       )
 
@@ -1762,9 +1764,20 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
 
       await closed()
 
-      expect([opened.text, loaded.text, resumed.text]).toEqual([
+      const kept = await reply(driver(), {
+        home: thirdHome,
+        word: 'MANGO',
+        text: 'Name an animal.',
+        session: resumed.session,
+        changed: false,
+      })
+
+      await closed()
+
+      expect([opened.text, loaded.text, resumed.text, kept.text]).toEqual([
         expect.stringMatching(/^\W*PINEAPPLE\W*$/),
         expect.stringMatching(/^\W*BANANA\W*$/),
+        expect.stringMatching(/^\W*CHERRY\W*$/),
         expect.stringMatching(/^\W*CHERRY\W*$/),
       ])
     } finally {
