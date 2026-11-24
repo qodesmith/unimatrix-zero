@@ -132,8 +132,9 @@ export const ReplyRequestSchema = z.strictObject({
   thread: ThreadSchema,
   compactionSettings: CompactionSettingsSchema,
   /**
-   * The System prompt differs from the one `session` started under. Claude
-   * takes the new one on resume; a Codex thread keeps its first for good.
+   * The System prompt differs from the one `session` started under, which a
+   * Codex thread keeps for good. Claude takes a new one on resume and ignores
+   * this.
    */
   systemPromptChanged: z.boolean(),
 })

@@ -404,7 +404,7 @@ it('runs codex in its own CODEX_HOME, updater off and nothing that outranks the 
   expect(report?.vendorVariables).toEqual(['CODEX_HOME'])
 })
 
-it('starts codex with no `AGENTS.md` from any folder, its own `CODEX_HOME` keeping out the user’s `config.toml`', async () => {
+it('starts codex with project docs off and in its own `CODEX_HOME`, so neither an `AGENTS.md` nor the user’s `config.toml` loads', async () => {
   const codex = await setUp(['started.ndjson'])
   await codex.reply(FIRST_PROMPT)
 

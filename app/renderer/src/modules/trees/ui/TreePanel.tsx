@@ -29,7 +29,11 @@ export function TreePanel({tree, open, onOpenChange}: TreePanelProps) {
           </SheetDescription>
         </SheetHeader>
         <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto p-4">
-          <TreeSystemPrompt treeId={tree.id} systemPrompt={tree.systemPrompt} />
+          <TreeSystemPrompt
+            key={tree.systemPrompt.id}
+            treeId={tree.id}
+            systemPrompt={tree.systemPrompt}
+          />
         </div>
       </SheetContent>
     </Sheet>
