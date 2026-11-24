@@ -2,5 +2,5 @@
   "name": "no-vendor-binary",
   "private": true,
   "version": "0.0.0",
-  "description": "Stands in for the Agent SDK's per-platform claude binaries: the app downloads its own (ADR 0008)."
+  "description": "Stands in for a native or vendor binary the app never loads: the Agent SDK's per-platform claude binaries, since the app downloads its own (ADR 0008), and pdf.js's optional @napi-rs/canvas, since pages render in Chromium (ADR 0007)."
 }

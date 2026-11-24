@@ -68,6 +68,7 @@
     "@anthropic-ai/claude-agent-sdk-linux-x64": "file:./tooling/no-vendor-binary",
     "@anthropic-ai/claude-agent-sdk-linux-x64-musl": "file:./tooling/no-vendor-binary",
     "@anthropic-ai/claude-agent-sdk-win32-arm64": "file:./tooling/no-vendor-binary",
-    "@anthropic-ai/claude-agent-sdk-win32-x64": "file:./tooling/no-vendor-binary"
+    "@anthropic-ai/claude-agent-sdk-win32-x64": "file:./tooling/no-vendor-binary",
+    "@napi-rs/canvas": "file:./tooling/no-vendor-binary"
   }
 }
