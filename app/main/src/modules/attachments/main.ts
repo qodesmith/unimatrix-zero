@@ -2,6 +2,7 @@ import type {Database} from '#modules/database/main'
 import type {FileMediaType} from './media-type'
 import type {Attachment} from '@uz/contract/attachments'
 import type {Command} from '@uz/contract/commands'
+import type {Prompt} from '@uz/contract/turns'
 
 import {schema} from '#modules/database/main'
 import {
@@ -11,13 +12,14 @@ import {
   attachmentKind,
 } from '@uz/contract/attachments'
 import {formatSize} from '@uz/contract/sizes'
-import {eq} from 'drizzle-orm'
+import {eq, inArray} from 'drizzle-orm'
 import {createHash} from 'node:crypto'
 import path from 'node:path'
 
 import {sniffMediaType} from './media-type'
 import {safeName} from './names'
 import {
+  canRead,
   isFolder,
   keepOriginal,
   keepShrunk,
@@ -131,6 +133,30 @@ export function createAttachments({db, dir, droppedPath}: AttachmentsDeps) {
       .get()
   }
 
+  async function missingIds(ids: string[]) {
+    if (ids.length === 0) return new Set<string>()
+
+    const rows = db
+      .select({
+        id: schema.attachments.id,
+        sha256: schema.attachments.sha256,
+        name: schema.attachments.name,
+      })
+      .from(schema.attachments)
+      .where(inArray(schema.attachments.id, ids))
+      .all()
+
+    const missing = await Promise.all(
+      rows.map(async ({id, sha256, name}) =>
+        sha256 !== null && !(await canRead(originalPath(dir, sha256, name)))
+          ? [id]
+          : []
+      )
+    )
+
+    return new Set(missing.flat())
+  }
+
   return {
     async add(file: AttachmentFile, shrunk?: Uint8Array): Promise<Attachment> {
       if (file.type === 'pasted') {
@@ -159,6 +185,23 @@ export function createAttachments({db, dir, droppedPath}: AttachmentsDeps) {
             mediaType: row.mediaType,
           }
         : null
+    },
+
+    async withMissingCopies(prompts: Prompt[]): Promise<Prompt[]> {
+      const missing = await missingIds([
+        ...new Set(
+          prompts.flatMap(({attachments}) => attachments.map(({id}) => id))
+        ),
+      ])
+
+      return prompts.map(prompt => ({
+        ...prompt,
+        attachments: prompt.attachments.map(attachment =>
+          missing.has(attachment.id)
+            ? {...attachment, missing: true}
+            : attachment
+        ),
+      }))
     },
   }
 }

@@ -2,6 +2,7 @@ import type {PendingAdd} from '../attachment-add/use-attachment-add'
 import type {
   Attachment as AttachmentData,
   AttachmentKind,
+  InlineForm,
 } from '@uz/contract/attachments'
 import type {ProviderId} from '@uz/contract/providers'
 
@@ -41,7 +42,7 @@ import {
 } from 'lucide-react'
 import {useId} from 'react'
 
-import {PATH_ONLY_NOW, modelUse} from '../model-use'
+import {FILE_MISSING, PATH_ONLY_NOW, modelUse} from '../model-use'
 
 function RemoveButton({label, onClick}: {label: string; onClick: () => void}) {
   return (
@@ -195,6 +196,19 @@ function PendingAttachment({
   )
 }
 
+/** `form` is undefined when no Model is picked to say what it does. */
+function noteOf(
+  attachment: AttachmentData,
+  pathOnly: boolean,
+  form: InlineForm | null | undefined
+) {
+  if (attachment.missing) return FILE_MISSING
+
+  if (pathOnly) return PATH_ONLY_NOW
+
+  return form === undefined ? null : modelUse(form, attachment)
+}
+
 interface AttachmentListProps {
   attachments: readonly AttachmentData[]
   provider?: ProviderId | null
@@ -232,7 +246,8 @@ export function AttachmentList({
         const isPathOnly = pathOnly.has(attachment.id)
 
         const Shown =
-          attachmentKind(attachment.mediaType) === 'image'
+          attachmentKind(attachment.mediaType) === 'image' &&
+          !attachment.missing
             ? ImageAttachment
             : FileAttachment
 
@@ -240,13 +255,7 @@ export function AttachmentList({
           <Shown
             key={attachment.id}
             attachment={attachment}
-            note={
-              isPathOnly
-                ? PATH_ONLY_NOW
-                : forms
-                  ? modelUse(forms[at] ?? null, attachment)
-                  : null
-            }
+            note={noteOf(attachment, isPathOnly, forms?.[at])}
             pathOnly={isPathOnly}
             onRemove={onRemove && (() => onRemove(attachment.id))}
           />

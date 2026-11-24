@@ -25,6 +25,7 @@ export function toAttachment(row: AttachmentRow): Attachment {
     size: row.size,
     shrunkSize: row.shrunkSize,
     folderPath: row.folderPath,
+    missing: false,
   }
 }
 

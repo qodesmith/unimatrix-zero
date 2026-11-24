@@ -1,7 +1,12 @@
 import type {Piece} from '#modules/prompt-content/main'
 import type {Thread} from '@uz/contract/host'
 
-import {files, joinLines, lines, prompted} from '#modules/prompt-content/main'
+import {
+  earlierFiles,
+  joinLines,
+  lines,
+  prompted,
+} from '#modules/prompt-content/main'
 import {replyLabel} from '@uz/contract/host'
 
 type Exchange = Thread[number]
@@ -35,7 +40,7 @@ function tagged(tag: string, pieces: Piece[]) {
 }
 
 function promptPieces({prompt, attachments}: Exchange) {
-  return [...files(attachments), ...(prompt === '' ? [] : lines(prompt))]
+  return [...earlierFiles(attachments), ...(prompt === '' ? [] : lines(prompt))]
 }
 
 /** Thread and Prompt as one message, for a Provider that takes no history. */

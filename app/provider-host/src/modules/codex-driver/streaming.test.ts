@@ -2194,6 +2194,49 @@ it('hands a Thread over with each earlier Prompt’s path lines in its own user 
   await codex.allClosed()
 })
 
+it('rebuilds a thread when earlier files can no longer be read: each gets a line saying so in place of its path, inline or by path only, and an image whose shrunk copy is gone goes by its path only', async () => {
+  const {notes, chart, archive, photo} = attachedFiles(
+    folder('uz-attachments-')
+  )
+
+  fs.rmSync(notes.path)
+  fs.rmSync(chart.path)
+  fs.rmSync(archive.path)
+  fs.rmSync(photo.inline.path)
+
+  const thread: Thread = [
+    {
+      prompt: 'Sum these up.',
+      attachments: [notes, chart, archive, photo],
+      reply: [{type: 'text', text: 'Sales rose.'}],
+      label: null,
+    },
+  ]
+
+  const codex = await setUp([injecting()])
+  const events = await codex.reply(FIRST_PROMPT, null, {thread})
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(codex.reports()[0]?.injected[0]).toEqual({
+    type: 'message',
+    role: 'user',
+    content: [
+      {
+        type: 'input_text',
+        text: [
+          '[Attached file "notes.txt" can no longer be read]',
+          '[Attached file "chart.png" can no longer be read]',
+          '[Attached file "archive.zip" can no longer be read]',
+          `[Attached file "photo.jpg" is saved at: ${photo.path}]`,
+          'Sum these up.',
+        ].join('\n'),
+      },
+    ],
+  })
+
+  await codex.allClosed()
+})
+
 it('replays an earlier Prompt’s path line and image inside its <prompt> in the text replay when Codex refuses the items, and the Prompt’s own after the Thread', async () => {
   const codex = await setUp([injectRefused()])
   const {chart, notes} = attachedFiles(folder('uz-attachments-'))
