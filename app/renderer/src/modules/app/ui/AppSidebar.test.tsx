@@ -204,7 +204,7 @@ describe('renaming a Tree', () => {
     expect(sentOf(main, 'tree.rename')).toEqual([])
   })
 
-  it('renames it from its ⋯ menu, which holds only Rename and Delete…', async () => {
+  it('renames it from its ⋯ menu, which holds Rename, Tree panel and Delete…', async () => {
     await renderApp(
       fakeMain({
         trees: [savedTree({title: 'Draft'}), savedTree({title: 'Other'})],
@@ -223,7 +223,7 @@ describe('renaming a Tree', () => {
         .getByRole('menuitem')
         .elements()
         .map(item => item.textContent)
-    ).toEqual(['Rename', 'Delete…'])
+    ).toEqual(['Rename', 'Tree panel', 'Delete…'])
 
     await menu.getByRole('menuitem', {name: 'Rename'}).click()
     await expect.element(menu).not.toBeInTheDocument()
@@ -233,6 +233,89 @@ describe('renaming a Tree', () => {
     await userEvent.keyboard('Trip planning{Enter}')
 
     await expect.element(treeRow('Trip planning')).toBeVisible()
+  })
+})
+
+const TRIP_PROMPT = 'Plan trips on a small budget.'
+
+async function openTreePanel(name: string) {
+  await sidebar()
+    .getByRole('button', {name: `Actions for ${name}`})
+    .click()
+  await page.getByRole('menuitem', {name: 'Tree panel'}).click()
+
+  const panel = page.getByRole('dialog', {name: 'Tree panel'})
+  await expect.element(panel).toBeVisible()
+
+  return panel
+}
+
+describe('a Tree’s panel', () => {
+  it('opens from its ⋯ menu with its own System prompt, and saves an edit from its next Reply', async () => {
+    const tree = savedTree({
+      title: 'Trip',
+      systemPrompt: {id: crypto.randomUUID(), text: TRIP_PROMPT},
+    })
+
+    const main = fakeMain({trees: [tree, savedTree({title: 'Other'})]})
+    await renderApp(main)
+
+    const panel = await openTreePanel('Trip')
+    const text = panel.getByRole('textbox', {name: 'System prompt'})
+    const save = panel.getByRole('button', {name: 'Save', exact: true})
+
+    await expect.element(panel.getByText('Trip', {exact: true})).toBeVisible()
+    await expect.element(text).toHaveValue(TRIP_PROMPT)
+    await expect
+      .element(panel.getByText('Applies from this Tree’s next Reply.'))
+      .toBeVisible()
+    await expect.element(save).toBeDisabled()
+
+    await text.fill('Plan trips by train.')
+    await save.click()
+
+    await expect.element(save).toBeDisabled()
+    expect(sentOf(main, 'tree.set-system-prompt')).toEqual([
+      {
+        type: 'tree.set-system-prompt',
+        treeId: tree.id,
+        text: 'Plan trips by train.',
+      },
+    ])
+  })
+
+  it('saves the System prompt it shows to the library under a name asked for', async () => {
+    const tree = savedTree({
+      title: 'Trip',
+      systemPrompt: {id: crypto.randomUUID(), text: TRIP_PROMPT},
+    })
+
+    const main = fakeMain({trees: [tree]})
+    await renderApp(main)
+
+    const panel = await openTreePanel('Trip')
+    await panel
+      .getByRole('textbox', {name: 'System prompt'})
+      .fill('Plan trips by train.')
+    await panel.getByRole('button', {name: 'Save to library…'}).click()
+
+    const naming = page.getByRole('dialog', {name: 'Save to library'})
+    const save = naming.getByRole('button', {name: 'Save'})
+    await expect.element(save).toBeDisabled()
+
+    await naming.getByRole('textbox', {name: 'Name'}).fill('  Train trips ')
+    await save.click()
+
+    await expect.element(naming).not.toBeInTheDocument()
+    await expect.element(panel).toBeVisible()
+    expect(sentOf(main, 'system-prompt.create')).toEqual([
+      {
+        type: 'system-prompt.create',
+        name: 'Train trips',
+        text: 'Plan trips by train.',
+      },
+    ])
+    expect(sentOf(main, 'tree.set-system-prompt')).toEqual([])
   })
 })
 

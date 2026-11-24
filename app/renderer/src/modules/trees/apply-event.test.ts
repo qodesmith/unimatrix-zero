@@ -12,6 +12,7 @@ function tree(id: string, lastActiveAt: string): Tree {
     createdAt: '2026-10-01T12:00:00.000Z',
     lastActiveAt,
     unseenFailure: false,
+    systemPrompt: {id: '019ab3c0-5e1f-7000-8000-000000000001', text: ''},
   }
 }
 

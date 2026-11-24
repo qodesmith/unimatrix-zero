@@ -132,9 +132,9 @@ interface HeadingProps {
   sidebarToggle?: ReactNode
 }
 
-type CanvasProps = HeadingProps & {treeId: string}
+type CanvasProps = HeadingProps & {treeId: string; systemPromptId: string}
 
-export function Canvas({treeId, ...heading}: CanvasProps) {
+export function Canvas({treeId, systemPromptId, ...heading}: CanvasProps) {
   const turns = useTurns(treeId)
 
   if (turns.isPending) return <CanvasFrame {...heading} />
@@ -149,16 +149,24 @@ export function Canvas({treeId, ...heading}: CanvasProps) {
     )
   }
 
-  return <TreeCanvas treeId={treeId} heading={heading} turns={turns.data} />
+  return (
+    <TreeCanvas
+      treeId={treeId}
+      systemPromptId={systemPromptId}
+      heading={heading}
+      turns={turns.data}
+    />
+  )
 }
 
 interface TreeCanvasProps {
   treeId: string
+  systemPromptId: string
   heading: HeadingProps
   turns: Turns
 }
 
-function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
+function TreeCanvas({treeId, systemPromptId, heading, turns}: TreeCanvasProps) {
   const index = useMemo(() => indexTurns(turns), [turns])
   const settings = useSettings()
   const {canvasOrientation, limitTurnHeight, contextSizeMeter} = settings
@@ -315,6 +323,7 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
   const state = useMemo<CanvasState>(
     () => ({
       treeId,
+      systemPromptId,
       index,
       activeReplyId,
       onInputFocus,
@@ -333,6 +342,7 @@ function TreeCanvas({treeId, heading, turns}: TreeCanvasProps) {
     }),
     [
       treeId,
+      systemPromptId,
       index,
       activeReplyId,
       onInputFocus,

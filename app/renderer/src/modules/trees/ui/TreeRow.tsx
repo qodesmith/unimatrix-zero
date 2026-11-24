@@ -23,10 +23,8 @@ import {useTreeDelete} from '../tree-delete/use-tree-delete'
 import {treeName} from '../tree-name'
 import {useNow} from '../use-now'
 import {DeleteTreeDialog} from './DeleteTreeDialog'
-
-export function TreeTitle({tree}: {tree: Tree}) {
-  return tree.title ?? <span className="italic">{treeName(tree)}</span>
-}
+import {TreePanel} from './TreePanel'
+import {TreeTitle} from './TreeTitle'
 
 interface TreeRowProps {
   tree: Tree
@@ -49,6 +47,7 @@ export function TreeRow({
   const detailsId = useId()
   const renameChosen = useRef(false)
   const {ask, dialog} = useTreeDelete(tree.id)
+  const [panelOpen, setPanelOpen] = useState(false)
 
   function onKeyDown(event: KeyboardEvent) {
     if (event.key === 'F2') onStartRename()
@@ -104,12 +103,16 @@ export function TreeRow({
           >
             Rename
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setPanelOpen(true)}>
+            Tree panel
+          </DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onClick={ask}>
             Delete…
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <DeleteTreeDialog {...dialog} />
+      <TreePanel tree={tree} open={panelOpen} onOpenChange={setPanelOpen} />
     </SidebarMenuItem>
   )
 }

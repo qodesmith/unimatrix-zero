@@ -2,6 +2,7 @@ import type {AppEvent} from '@uz/contract/events'
 
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
+import {PRESETS} from '@uz/contract/system-prompts'
 import {expect, it} from 'vitest'
 
 import {NOT_LOADED, applyConnectionEvent, cardOf, withFailure} from './cards'
@@ -26,6 +27,7 @@ const snapshot: AppEvent = {
   lastModel: null,
   signIn: null,
   settings: DEFAULT_SETTINGS,
+  systemPrompts: {entries: [...PRESETS]},
   layout: DEFAULT_LAYOUT,
 }
 

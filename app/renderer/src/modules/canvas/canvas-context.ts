@@ -19,6 +19,8 @@ export interface Expanded {
 /** What every Turn on the canvas needs, without carrying it in node data. */
 export interface CanvasState {
   treeId: string
+  /** The Tree's own, which its next Reply runs under. */
+  systemPromptId: string
   index: TreeIndex
   activeReplyId: string | null
   onInputFocus: (replyId: string) => void

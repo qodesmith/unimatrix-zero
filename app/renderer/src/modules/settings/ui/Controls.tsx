@@ -16,15 +16,20 @@ import {useId} from 'react'
 interface GroupProps {
   legend: string
   legendId?: string
+  /** What the group's Settings reach, when more than this window. */
+  note?: string
   children: ReactNode
 }
 
-export function Group({legend, legendId, children}: GroupProps) {
+export function Group({legend, legendId, note, children}: GroupProps) {
   return (
     <FieldSet className="gap-2">
       <FieldLegend id={legendId} variant="label" className="mb-2">
         {legend}
       </FieldLegend>
+      {note !== undefined && (
+        <FieldDescription className="-mt-2 mb-1">{note}</FieldDescription>
+      )}
       {children}
     </FieldSet>
   )
