@@ -97,23 +97,17 @@ async function newThread(
   {server, threads}: Opening,
   request: ReplyRequest
 ): Promise<Opened> {
-  const {threshold} = request.compactionSettings
-
   const settings = settingsOf(request)
+  const config = configOf(request)
   // Before the thread starts, so a failure leaves none behind.
   const items = await itemsOf(request.thread)
 
   async function open() {
     return loadThread(
       threads,
-      await server.request(
-        'thread/start',
-        threshold === null
-          ? settings
-          : {...settings, config: configOf(threshold)}
-      ),
+      await server.request('thread/start', {...settings, config}),
       [],
-      threshold
+      config
     )
   }
 
