@@ -65,7 +65,6 @@ export const SettingsSchema = z.strictObject({
   chatgptCompactionThreshold: thresholdSchema(COMPACTION_THRESHOLD.chatgpt),
   /** The library entry new Trees copy their System prompt from. */
   defaultSystemPromptId: SystemPromptEntryIdSchema,
-  /** What a new Tree's Tools panel starts with. */
   toolDefaults: TreeToolsSchema,
 })
 

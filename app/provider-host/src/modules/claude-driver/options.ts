@@ -58,7 +58,7 @@ export function replyOptions(
     // Full access, until the Permission mode decides (ADR 0022).
     permissionMode: 'bypassPermissions',
     allowDangerouslySkipPermissions: true,
-    // Loading no MCP configuration but this keeps the account's connectors out.
+    // On, `claude` loads no MCP servers but these, so the account's connectors stay out.
     strictMcpConfig: !request.tools.claudeConnectors,
     mcpServers: {},
     // Else a Prompt such as `/compact` is run as a `claude` command.

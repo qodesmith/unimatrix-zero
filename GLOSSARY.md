@@ -35,7 +35,7 @@ The standing instructions the AI follows in a Tree. Each Tree has one, filled in
 _Avoid_: Instructions, persona, custom instructions
 
 **Skill**:
-A folder of instructions (and sometimes files or scripts) the AI can load when a task calls for it. The app reads skills from folders the user adds in Settings; each Tree chooses which of them are on.
+A folder of instructions (and sometimes files or scripts) the AI can load when a task calls for it. The app reads skills from folders the user adds in Settings; each Tree chooses which of them are on. Claude Code and Codex also ship their own, the built-in Skills, which a Tree switches on or off as one group per Provider.
 _Avoid_: Command, prompt, ability
 
 **MCP server**:
@@ -43,7 +43,7 @@ An outside program or service that gives the AI extra tools, such as reading a c
 _Avoid_: Integration, extension, connector (reserved for claude.ai's own connectors)
 
 **Plugin**:
-A folder bundling Skills and MCP servers, added in Settings. The app uses only those parts: its Skills and MCP servers appear under the Plugin and can be switched on and off together or one by one, and anything else it contains is not supported.
+A folder bundling Skills and MCP servers, added in Settings. The app uses only those parts: its Skills and MCP servers appear under the Plugin and can be switched on and off together or one by one, and anything else it contains is not supported. Codex's remote plugins, which OpenAI's servers supply, are not Plugins in this sense: a Tree switches them on or off as one group, with the connectors on the user's ChatGPT account.
 _Avoid_: Extension, add-on, package
 
 **Tree's files**:

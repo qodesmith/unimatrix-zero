@@ -12,7 +12,7 @@ interface TreeToolsSectionProps {
 
 export function TreeToolsSection({treeId, tools}: TreeToolsSectionProps) {
   const headingId = useId()
-  const flip = useCommand()
+  const setTools = useCommand()
 
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-3">
@@ -22,13 +22,13 @@ export function TreeToolsSection({treeId, tools}: TreeToolsSectionProps) {
       <ToolSwitches
         tools={tools}
         onChange={changes =>
-          void flip.run({type: 'tree.set-tools', treeId, changes})
+          void setTools.run({type: 'tree.set-tools', treeId, changes})
         }
       />
       <p className="text-sm text-muted-foreground">
         Applies from this Tree’s next Reply.
       </p>
-      <Refusal error={flip.error} />
+      <Refusal error={setTools.error} />
     </section>
   )
 }

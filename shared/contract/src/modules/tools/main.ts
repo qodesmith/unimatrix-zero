@@ -8,13 +8,10 @@ import {z} from 'zod'
 export const TreeToolsSchema = z.strictObject({
   /** Claude's `WebSearch` and `WebFetch`; Codex's web search. */
   webSearch: z.boolean(),
-  /** The connectors on the user's Claude account. */
   claudeConnectors: z.boolean(),
-  /** The Skills that ship inside `claude`. */
   claudeBuiltInSkills: z.boolean(),
-  /** The Skills that ship inside Codex. */
   chatgptBuiltInSkills: z.boolean(),
-  /** The plugins OpenAI's servers offer Codex. */
+  /** OpenAI's remote plugins, and the connectors on the ChatGPT account. */
   chatgptRemotePlugins: z.boolean(),
 })
 

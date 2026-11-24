@@ -152,7 +152,6 @@ export function treeSystemPrompt(db: Database, treeId: string) {
   return row
 }
 
-/** What the Tree's next Reply runs with: its Tools panel. */
 export function treeTools(db: Database, treeId: string): TreeTools {
   const row = db
     .select({

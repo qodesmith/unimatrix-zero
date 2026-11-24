@@ -21,8 +21,8 @@ function createdAt() {
     .$defaultFn(() => new Date())
 }
 
-function toolSwitch(name: string, before: boolean) {
-  return integer(name, {mode: 'boolean'}).notNull().default(before)
+function toolSwitch(name: string, existing: boolean) {
+  return integer(name, {mode: 'boolean'}).notNull().default(existing)
 }
 
 /** Append-only: a Tree and each Reply point at the text they run under. */
@@ -46,7 +46,8 @@ export const trees = sqliteTable('trees', {
   systemPromptId: text('system_prompt_id')
     .notNull()
     .references(() => systemPrompts.id),
-  // Its Tools panel; a Tree from before it keeps what it ran with.
+  // Its Tools panel. A Tree from before it keeps web search and gets the
+  // rest off, as a new Tree does, though ChatGPT's had its built-ins on.
   webSearch: toolSwitch('web_search', true),
   claudeConnectors: toolSwitch('claude_connectors', false),
   claudeBuiltInSkills: toolSwitch('claude_built_in_skills', false),

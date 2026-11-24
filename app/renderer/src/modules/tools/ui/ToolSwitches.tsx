@@ -7,7 +7,7 @@ interface ToolSwitchesProps {
   onChange: (changes: Partial<TreeTools>) => void
 }
 
-/** The Tools panel's switches, each flip handing over its one key. */
+/** The Tools panel's switches; `onChange` gets only the key that changed. */
 export function ToolSwitches({tools, onChange}: ToolSwitchesProps) {
   return (
     <>

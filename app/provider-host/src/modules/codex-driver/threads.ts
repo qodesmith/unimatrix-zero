@@ -10,7 +10,10 @@ export interface LoadedThread {
   path: string | null
 }
 
-/** Nothing for a default Codex keeps on its own, which a resume brings back. */
+/**
+ * Leaves out a key whose default is Codex's own: a resume without it goes back
+ * to that default.
+ */
 export function configOf({
   compactionSettings: {threshold},
   tools,
