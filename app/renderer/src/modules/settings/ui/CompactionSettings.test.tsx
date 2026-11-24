@@ -117,6 +117,21 @@ it('clamps a typed threshold to the Provider’s range, the top of it saving as 
   ])
 })
 
+it.each<[ProviderId, string]>([
+  ['claude', 'Claude Compaction'],
+  ['chatgpt', 'ChatGPT Compaction'],
+])(
+  'notes the %s Compaction group’s reach once, under its legend, and under none of its controls',
+  async (provider, legend) => {
+    await renderCompaction(provider)
+
+    await expect
+      .element(page.getByRole('group', {name: legend}))
+      .toHaveAccessibleDescription('Every Thread, from its next Reply.')
+    expect(page.getByText(/next Reply/).elements()).toHaveLength(1)
+  }
+)
+
 it('puts back the saved threshold when the input is left empty', async () => {
   const main = await renderCompaction('claude', {
     claudeCompactionThreshold: 300_000,

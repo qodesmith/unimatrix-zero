@@ -16,15 +16,27 @@ import {useId} from 'react'
 interface GroupProps {
   legend: string
   legendId?: string
+  /** How far the group's controls reach. A look-and-behavior group has none. */
+  reach?: string
   children: ReactNode
 }
 
-export function Group({legend, legendId, children}: GroupProps) {
+export function Group({legend, legendId, reach, children}: GroupProps) {
+  const reachId = useId()
+
   return (
-    <FieldSet className="gap-2">
+    <FieldSet
+      className="gap-2"
+      aria-describedby={reach === undefined ? undefined : reachId}
+    >
       <FieldLegend id={legendId} variant="label" className="mb-2">
         {legend}
       </FieldLegend>
+      {reach !== undefined && (
+        <FieldDescription id={reachId} className="-mt-2 mb-2">
+          {reach}
+        </FieldDescription>
+      )}
       {children}
     </FieldSet>
   )
