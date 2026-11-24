@@ -11,7 +11,8 @@
   "dependencies": {
     "@uz/contract": "workspace:*",
     "fflate": "^0.8.3",
-    "pdfjs-dist": "6.5.438"
+    "pdfjs-dist": "6.5.438",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@uz/tooling": "workspace:*",

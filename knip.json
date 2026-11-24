@@ -27,7 +27,7 @@
       "project": ["src/**/*.{ts,tsx,css}"]
     },
     "app/extractor": {
-      "entry": ["index.html", "src/index.ts"],
+      "entry": ["index.html"],
       "project": ["src/**/*.ts"]
     },
     "app/provider-host": {
