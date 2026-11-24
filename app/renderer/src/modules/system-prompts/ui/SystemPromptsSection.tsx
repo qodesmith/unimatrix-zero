@@ -25,6 +25,7 @@ import {useDialogCommand} from '../dialog-command/use-dialog-command'
 import {useCommand} from '../use-command'
 import {useLibrary} from '../use-library'
 import {DeleteEntryDialog} from './DeleteEntryDialog'
+import {Refusal} from './Refusal'
 
 export function SystemPromptsSection() {
   return (
@@ -91,16 +92,6 @@ function Library() {
 
 function copyName(name: string) {
   return `Copy of ${name}`.slice(0, SYSTEM_PROMPT_NAME_MAX_LENGTH)
-}
-
-function Refusal({error}: {error: string | null}) {
-  if (error === null) return null
-
-  return (
-    <p role="alert" className="text-sm text-destructive">
-      {error}
-    </p>
-  )
 }
 
 function PresetEntry({entry}: {entry: SystemPromptEntry}) {

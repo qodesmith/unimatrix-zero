@@ -163,7 +163,6 @@ export function createTurns({
     return continued?.provider === provider ? continued.session : null
   }
 
-  /** A Codex thread keeps the System prompt it started under for good. */
   function systemPromptChanged(
     provider: ProviderId,
     session: ReplyRequest['session'],

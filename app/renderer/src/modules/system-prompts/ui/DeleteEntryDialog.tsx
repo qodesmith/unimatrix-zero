@@ -9,6 +9,8 @@ import {
   AlertDialogTitle,
 } from '#shadcn/ui/alert-dialog'
 
+import {Refusal} from './Refusal'
+
 interface DeleteEntryDialogProps {
   name: string
   isDefault: boolean
@@ -43,11 +45,7 @@ export function DeleteEntryDialog({
             {isDefault && <> New Trees will start with Default.</>}
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {error !== null && (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        )}
+        <Refusal error={error} />
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction

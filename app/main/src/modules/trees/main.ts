@@ -71,7 +71,6 @@ export function createTrees(db: Database) {
   }
 
   return {
-    /** It keeps its own copy of `systemPrompt`. */
     create(now: Date, systemPrompt: string): Tree {
       const {id} = db
         .insert(trees)

@@ -8,6 +8,7 @@ import {useId, useState} from 'react'
 
 import {useDialogCommand} from '../dialog-command/use-dialog-command'
 import {useCommand} from '../use-command'
+import {Refusal} from './Refusal'
 import {SaveToLibraryDialog} from './SaveToLibraryDialog'
 
 interface TreeSystemPromptProps {
@@ -54,11 +55,7 @@ export function TreeSystemPrompt({
           Save to library…
         </Button>
       </div>
-      {save.error !== null && (
-        <p role="alert" className="text-sm text-destructive">
-          {save.error}
-        </p>
-      )}
+      <Refusal error={save.error} />
       <SaveToLibraryDialog
         open={naming.open}
         running={naming.running}

@@ -13,6 +13,8 @@ import {Input} from '#shadcn/ui/input'
 import {SYSTEM_PROMPT_NAME_MAX_LENGTH} from '@uz/contract/system-prompts'
 import {useId, useState} from 'react'
 
+import {Refusal} from './Refusal'
+
 interface SaveToLibraryDialogProps {
   open: boolean
   running: boolean
@@ -75,11 +77,7 @@ function NameForm({
           onChange={event => setName(event.target.value)}
         />
       </Field>
-      {error !== null && (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
+      <Refusal error={error} />
       <DialogFooter>
         <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
         <Button type="submit" disabled={running || trimmed === ''}>
