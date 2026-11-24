@@ -21,7 +21,7 @@ function section() {
   return page.getByRole('region', {name: 'Tools'})
 }
 
-it('shows the Tree’s own Tools, and a flip sends that one switch alone, from its next Reply', async () => {
+it('shows the Tree’s own Tools and when they apply, and a flip sends that one switch alone', async () => {
   const tree = savedTree({
     tools: {
       webSearch: true,
