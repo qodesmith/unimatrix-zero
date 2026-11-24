@@ -47,7 +47,7 @@ function DefaultForNewTrees() {
   return (
     <Group
       legend="Default for new Trees"
-      note="New Trees start with a copy. Each Tree changes its own in its Tree panel."
+      reachNote="New Trees start with a copy. Each Tree changes its own in its Tree panel."
     >
       <Select
         items={entries.map(entry => ({value: entry.id, label: entry.name}))}
@@ -77,7 +77,7 @@ function Library() {
   return (
     <Group
       legend="Library"
-      note="Each Tree keeps its own copy. Editing here changes no existing Tree."
+      reachNote="Each Tree keeps its own copy. Editing here changes no existing Tree."
     >
       <div className="flex flex-col gap-3">
         {entries.map(entry =>

@@ -16,22 +16,26 @@ import {useId} from 'react'
 interface GroupProps {
   legend: string
   legendId?: string
-  /**
-   * How far the group's Settings reach; a look-and-behavior group has none (ADR
-   * 0023).
-   */
-  note?: string
+  /** A look-and-behavior group has none. */
+  reachNote?: string
   children: ReactNode
 }
 
-export function Group({legend, legendId, note, children}: GroupProps) {
+export function Group({legend, legendId, reachNote, children}: GroupProps) {
+  const reachNoteId = useId()
+
   return (
-    <FieldSet className="gap-2">
+    <FieldSet
+      className="gap-2"
+      aria-describedby={reachNote === undefined ? undefined : reachNoteId}
+    >
       <FieldLegend id={legendId} variant="label" className="mb-2">
         {legend}
       </FieldLegend>
-      {note !== undefined && (
-        <FieldDescription className="-mt-2 mb-1">{note}</FieldDescription>
+      {reachNote !== undefined && (
+        <FieldDescription id={reachNoteId} className="-mt-2! mb-2">
+          {reachNote}
+        </FieldDescription>
       )}
       {children}
     </FieldSet>

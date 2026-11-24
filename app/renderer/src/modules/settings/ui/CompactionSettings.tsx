@@ -20,8 +20,6 @@ import {Group, Toggle} from './Controls'
 
 const STEP = 1000
 
-const APPLIES = 'Applies to every Thread from its next Reply.'
-
 const tokens = new Intl.NumberFormat('en-US')
 
 type Threshold = ReturnType<typeof compactionSettingsFor>['threshold']
@@ -43,17 +41,14 @@ export function CompactionSettings({provider}: CompactionSettingsProps) {
   const {auto, threshold} = compactionSettingsFor(useSettings(), provider)
 
   return (
-    <Group legend={`${PROVIDER_NAMES[provider]} Compaction`}>
+    <Group
+      legend={`${PROVIDER_NAMES[provider]} Compaction`}
+      reachNote="Every Thread, from its next Reply."
+    >
       {provider === 'claude' ? (
         <Toggle
           label="Automatic Compaction"
-          description={
-            <>
-              A Thread that fills the Model’s Context window stops taking
-              Prompts.
-              <span className="block">{APPLIES}</span>
-            </>
-          }
+          description="A Thread that fills the Model’s Context window stops taking Prompts."
           checked={auto}
           onChange={claudeAutoCompaction => void update({claudeAutoCompaction})}
         />
@@ -159,7 +154,6 @@ function Threshold({range, saved, disabled, onCommit}: ThresholdProps) {
       </div>
       <FieldDescription>
         A Model with a smaller Context window compacts at its own limit.
-        <span className="block">{APPLIES}</span>
       </FieldDescription>
     </Field>
   )
