@@ -244,16 +244,20 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     expect(fetched.stdout).toBe('two\n')
   })
 
-  it('fails every other stub with a one-line error and 127', async () => {
-    const folder = temporaryFolder()
-    writeDeveloperFolder(folder, inject('gitProgram'))
+  it('fails every other stub with 127 and one line that tells the AI to find another way', async () => {
+    for (const gitProgram of [inject('gitProgram'), null]) {
+      const folder = temporaryFolder()
+      writeDeveloperFolder(folder, gitProgram)
 
-    for (const tool of ['python3', 'make', 'clang']) {
-      expect(await stub(folder, tool, ['--version'])).toEqual({
-        code: 127,
-        stdout: '',
-        stderr: `${tool}: not installed on this Mac\n`,
-      })
+      for (const tool of ['python3', 'make', 'clang']) {
+        const failed = await stub(folder, tool, ['--version'])
+
+        expect(failed.code).toBe(127)
+        expect(failed.stdout).toBe('')
+        expect(failed.stderr).toMatch(
+          new RegExp(String.raw`^${tool} [^\n]*another way[^\n]*${tool}\.\n$`)
+        )
+      }
     }
   })
 

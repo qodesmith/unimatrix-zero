@@ -7,7 +7,7 @@ import type {ReactNode} from 'react'
 
 import {ABOUT} from '#modules/connections/main'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
-import {describe, expect, it, onTestFinished} from 'vitest'
+import {describe, expect, it, onTestFinished, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
 import {cdp, page, userEvent} from 'vitest/browser'
 
@@ -237,6 +237,72 @@ it('says, when a Reply finished without its Snapshot for want of the app’s git
       })
     )
     .toBeVisible()
+})
+
+it('says, when the app’s git failed to download, that file history couldn’t download in place of the slow-download toast, and downloads again on Try again', async () => {
+  const main = fakeMain()
+  globalThis.window.uz = main
+  await renderApp()
+  await expect.element(sidebarNewTree()).toBeVisible()
+  vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']})
+  onTestFinished(() => {
+    vi.useRealTimers()
+  })
+
+  // Sonner shows a toast on a zero-delay timer; time stops there, so the slow toast never closes by itself.
+  main.publish({type: 'SNAPSHOTS_WAITING'})
+  vi.advanceTimersByTime(0)
+  main.publish({type: 'SNAPSHOTS_DOWNLOAD_FAILED'})
+  vi.advanceTimersByTime(0)
+
+  await expect
+    .element(page.getByText('File history couldn’t download', {exact: true}))
+    .toBeVisible()
+  expect(
+    page
+      .getByText('File history starts once a download finishes', {exact: true})
+      .query()
+  ).toBeNull()
+
+  await page.getByRole('button', {name: 'Try again'}).click()
+
+  expect(main.sent.map(command => command.type)).toContain(
+    'snapshots.download-again'
+  )
+})
+
+it('takes down the failed-download toast once the app’s git downloads', async () => {
+  const main = fakeMain()
+  globalThis.window.uz = main
+  await renderApp()
+  await expect.element(sidebarNewTree()).toBeVisible()
+
+  const failed = page.getByText('File history couldn’t download', {
+    exact: true,
+  })
+
+  main.publish({type: 'SNAPSHOTS_DOWNLOAD_FAILED'})
+  await expect.element(failed).toBeVisible()
+
+  main.publish({type: 'SNAPSHOTS_DOWNLOADED'})
+
+  await expect.element(failed).not.toBeInTheDocument()
+})
+
+it('says file history can’t work on a Linux too old for the app’s git, and names a newer one', async () => {
+  const main = fakeMain()
+  globalThis.window.uz = main
+  await renderApp()
+  await expect.element(sidebarNewTree()).toBeVisible()
+
+  main.publish({type: 'SNAPSHOTS_NEED_NEWER_LINUX'})
+
+  await expect
+    .element(
+      page.getByText('File history can’t work on this computer', {exact: true})
+    )
+    .toBeVisible()
+  await expect.element(page.getByText(/newer version of Linux/)).toBeVisible()
 })
 
 it('creates a Tree and opens it', async () => {

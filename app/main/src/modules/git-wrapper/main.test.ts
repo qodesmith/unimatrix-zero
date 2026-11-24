@@ -4,8 +4,8 @@ import {
   servedOverHttp,
   servedOverHttps,
 } from '#modules/test-git-server/main'
-import {DEV_MANIFEST, gitFolderFor} from '#modules/vendor-programs/main'
-import {NO_GIT_LOGIN, withNoGitLogin} from '@uz/vendor-program/git-login'
+import {DEV_MANIFEST} from '#modules/vendor-programs/main'
+import {NO_GIT_LOGIN, NO_LOGIN_HELPER} from '@uz/vendor-program/git-login'
 import {execFile} from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -14,7 +14,7 @@ import {pathToFileURL} from 'node:url'
 import {promisify} from 'node:util'
 import {describe, expect, inject, it} from 'vitest'
 
-import {writeGitWrapper} from './main'
+import {shippedGitExe, writeGitWrapper, writeWindowsGitWrapper} from './main'
 
 const run = promisify(execFile)
 
@@ -130,6 +130,74 @@ function wrapped() {
   return gitIn(folder)
 }
 
+function standIn(libcurl: 'found' | 'not found') {
+  const build = path.join(temporaryFolder(), 'git')
+  const folder = temporaryFolder()
+  const program = path.join(build, 'bin', 'git')
+  const subPrograms = path.join(build, 'libexec', 'git-core')
+  fs.mkdirSync(path.dirname(program), {recursive: true})
+  fs.mkdirSync(subPrograms, {recursive: true})
+  fs.writeFileSync(path.join(subPrograms, 'git-remote-http'), '')
+  fs.writeFileSync(program, '#!/bin/sh\neval "$1"\n', {mode: 0o755})
+  writeGitWrapper(folder, program)
+
+  const tools = temporaryFolder()
+
+  const found =
+    libcurl === 'found' ? '/usr/lib/libcurl.so.4 (0x1)' : 'not found'
+
+  fs.writeFileSync(
+    path.join(tools, 'ldd'),
+    `#!/bin/sh\n[ "$1" = '${subPrograms}/git-remote-http' ] && echo "\tlibcurl.so.4 => ${found}"\n`,
+    {mode: 0o755}
+  )
+
+  return async (args: string[], env: NodeJS.ProcessEnv = {}) =>
+    ended(path.join(folder, 'git'), args, {
+      cwd: os.tmpdir(),
+      env: {...env, PATH: `${tools}${path.delimiter}/usr/bin:/bin`},
+    })
+}
+
+describe.runIf(process.platform !== 'win32')(
+  'the Linux script, with a stand-in for the build',
+  () => {
+    it('adds one plain line to a failed git when the system lacks libcurl.so.4', async () => {
+      const git = standIn('not found')
+
+      const failed = await git(['echo failed >&2; exit 128'])
+
+      expect(failed.code).toBe(128)
+      expect(failed.stdout).toBe('')
+      expect(failed.stderr).toMatch(
+        /^failed\ngit: [^\n]*libcurl\.so\.4[^\n]*\n$/
+      )
+
+      const succeeded = await git(['echo worked'])
+
+      expect(succeeded).toEqual({code: 0, stdout: 'worked\n', stderr: ''})
+    })
+
+    it('adds nothing to a failed git when libcurl.so.4 is found', async () => {
+      const git = standIn('found')
+
+      const failed = await git(['echo failed >&2; exit 3'])
+
+      expect(failed).toEqual({code: 3, stdout: '', stderr: 'failed\n'})
+    })
+
+    it('keeps ssh from opening a password program, even one the user forces', async () => {
+      const git = standIn('found')
+
+      const seen = await git(['echo "$SSH_ASKPASS_REQUIRE"'], {
+        SSH_ASKPASS_REQUIRE: 'force',
+      })
+
+      expect(seen.stdout).toBe('never\n')
+    })
+  }
+)
+
 describe.runIf(noGit && process.platform === 'linux')(
   'on Linux with no git',
   () => {
@@ -204,25 +272,70 @@ describe.runIf(noGit && process.platform === 'linux')(
   }
 )
 
+/** Built by `bun run build:git-exe`, which CI runs before these tests. */
+const gitExes = path.resolve(
+  import.meta.dirname,
+  '../../../../../shell/git-exe/dist'
+)
+
+describe('the Windows git.exe’s folder', () => {
+  it('takes the shipped git.exe again only when it changed, and keeps its own when none is shipped', () => {
+    const folder = temporaryFolder()
+    const shipped = path.join(temporaryFolder(), 'git.exe')
+    const program = String.raw`C:\data\vendor\git\cmd\git.exe`
+    const exe = path.join(folder, 'git.exe')
+
+    fs.writeFileSync(shipped, 'first build')
+    writeWindowsGitWrapper(folder, program, shipped)
+    const first = fs.statSync(exe).ino
+    writeWindowsGitWrapper(folder, program, shipped)
+
+    expect(fs.readFileSync(exe, 'utf8')).toBe('first build')
+    // A copy renamed into place would be a new file.
+    expect(fs.statSync(exe).ino).toBe(first)
+
+    fs.writeFileSync(shipped, 'second build')
+    writeWindowsGitWrapper(folder, program, shipped)
+
+    expect(fs.readFileSync(exe, 'utf8')).toBe('second build')
+
+    fs.rmSync(shipped)
+    writeWindowsGitWrapper(folder, program, shipped)
+
+    expect(fs.readFileSync(exe, 'utf8')).toBe('second build')
+    expect(fs.readdirSync(folder).toSorted()).toEqual([
+      'git-wrapper.json',
+      'git.exe',
+    ])
+  })
+})
+
+function wrapperIn(program: string) {
+  const folder = temporaryFolder()
+  writeWindowsGitWrapper(folder, program, shippedGitExe(gitExes, process.arch))
+
+  return folder
+}
+
+/** Runs `git` by name through PowerShell, as both Providers do there. */
+function gitThrough(env: NodeJS.ProcessEnv): Git {
+  return async (args, cwd = os.tmpdir()) => {
+    const words = args.map(arg => `'${arg.replaceAll("'", "''")}'`)
+
+    return ended(
+      'powershell.exe',
+      ['-NoProfile', '-Command', `git ${words.join(' ')}; exit $LASTEXITCODE`],
+      {cwd, env}
+    )
+  }
+}
+
 describe.runIf(noGit && process.platform === 'win32')(
   'on Windows with no git',
   () => {
-    const folder = gitFolderFor(inject('machine')) ?? ''
+    const folder = wrapperIn(inject('gitProgram'))
 
-    /** Runs `git` by name through PowerShell, as both Providers do there. */
-    async function git(args: string[], cwd = os.tmpdir()) {
-      const words = args.map(arg => `'${arg.replaceAll("'", "''")}'`)
-
-      return ended(
-        'powershell.exe',
-        [
-          '-NoProfile',
-          '-Command',
-          `git ${words.join(' ')}; exit $LASTEXITCODE`,
-        ],
-        {cwd, env: withNoGitLogin(withLast(folder))}
-      )
-    }
+    const git = gitThrough(withLast(folder))
 
     it('fails a git that needs a login at once and says what to do', async () => {
       const host = await servedOverHttp(temporaryFolder())
@@ -246,15 +359,16 @@ describe.runIf(noGit && process.platform === 'win32')(
       expect(clone.code).toBe(0)
     })
 
-    it('runs the app’s own git for a git found last on PATH', async () => {
+    it('runs the app’s own git through its git.exe, for a git found last on PATH', async () => {
       const found = await ended('where.exe', ['git'], {
         cwd: os.tmpdir(),
         env: withLast(folder),
       })
 
-      // One line: no other `git` is found. Windows paths differ in case alone.
-      expect(found.stdout.trim().toLowerCase()).toBe(
-        inject('gitProgram').toLowerCase()
+      // One line: no other `git` is found. The temp folder may come as a
+      // short name (RUNNER~1) that `where` prints long, so compare real paths.
+      expect(fs.realpathSync.native(found.stdout.trim())).toBe(
+        fs.realpathSync.native(path.join(folder, 'git.exe'))
       )
 
       const version = await git(['--version'])
@@ -265,5 +379,77 @@ describe.runIf(noGit && process.platform === 'win32')(
     it('finds git’s templates on init and its sub-programs on clone, fetch and push', async () => {
       expect(await initPushCloneFetch(git)).toEqual(worked)
     })
+
+    it('passes ^, &, | and % through to git unchanged, and git’s exit code back', async () => {
+      const work = temporaryFolder()
+      await git(['init', '-b', 'main'], work)
+      await git([...identity, 'commit', '--allow-empty', '-m', 'one'], work)
+      await git([...identity, 'commit', '--allow-empty', '-m', 'two'], work)
+
+      const parent = await git(
+        ['log', '-1', '--format=%s a|b&c^d %%PATH%%', 'HEAD^'],
+        work
+      )
+
+      expect(parent.stdout.trim()).toBe('one a|b&c^d %PATH%')
+
+      const missing = await git(['rev-parse', '--verify', '-q', 'nope'], work)
+
+      expect(missing.code).toBe(1)
+    })
+
+    it('adds its credential helper after the git settings already there', async () => {
+      const own = gitThrough({
+        ...withLast(folder),
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: 'user.name',
+        GIT_CONFIG_VALUE_0: 'Sam',
+      })
+
+      const name = await own(['config', 'user.name'])
+      const helpers = await own(['config', '--get-all', 'credential.helper'])
+
+      expect(name.stdout.trim()).toBe('Sam')
+      expect(helpers.stdout.trim().split(/\r?\n/).at(-1)).toBe(NO_LOGIN_HELPER)
+    })
+
+    it('fails git with a not-ready error and 127 until the build is in place', async () => {
+      const waiting = gitThrough(
+        withLast(wrapperIn(path.join(temporaryFolder(), 'cmd', 'git.exe')))
+      )
+
+      const version = await waiting(['--version'])
+
+      expect(version.code).toBe(127)
+      expect(version.stderr).toMatch(/^git: not ready yet: .+\r?\n$/)
+    })
+
+    // CI names the folder of the runner's own `git`, which it takes off `PATH`.
+    const userGit = process.env.UZ_USER_GIT_FOLDER
+
+    it.runIf(userGit)(
+      'keeps its settings off a git of the user’s found earlier on PATH',
+      async () => {
+        const name =
+          Object.keys(process.env).find(key => key.toUpperCase() === 'PATH') ??
+          'PATH'
+
+        const theirs = gitThrough({
+          ...withLast(folder),
+          [name]: `${userGit}${path.delimiter}${withLast(folder)[name] ?? ''}`,
+          GIT_CONFIG_COUNT: '1',
+          GIT_CONFIG_KEY_0: 'credential.helper',
+          GIT_CONFIG_VALUE_0: 'theirs',
+        })
+
+        const helpers = await theirs([
+          'config',
+          '--get-all',
+          'credential.helper',
+        ])
+
+        expect(helpers.stdout.trim().split(/\r?\n/).at(-1)).toBe('theirs')
+      }
+    )
   }
 )

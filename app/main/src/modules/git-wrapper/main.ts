@@ -6,32 +6,56 @@ export function quoted(text: string) {
   return `'${text.replaceAll("'", String.raw`'\''`)}'`
 }
 
+const NOT_READY =
+  'not ready yet: Unimatrix Zero is still downloading it. Try again in a minute.'
+
+const NO_LIBCURL =
+  "git: if this needed an https:// address, it can't work on this computer, which lacks the libcurl.so.4 library."
+
 /**
  * Needs `$program` and `$tool` set. Its folders and no-login settings stay in
- * this call, never in what else the AI runs (ADR 0024, ADR 0027). An empty
- * `GIT_ASKPASS` blocks `core.askPass` and `SSH_ASKPASS`;
- * `GIT_TERMINAL_PROMPT=0` does not.
+ * this call, never in what else the AI runs (ADR 0024, ADR 0027).
  */
 export function runningBuild(gitProgram: string) {
   const root = path.join(path.dirname(gitProgram), '..')
   const subPrograms = quoted(path.join(root, 'libexec', 'git-core'))
 
-  return {
-    subPrograms,
-    lines: `if [ ! -x "$program" ]; then
-  echo "$tool: not ready yet: Unimatrix Zero is still downloading it. Try again in a minute." >&2
+  // An empty `GIT_ASKPASS` blocks `core.askPass` and `SSH_ASKPASS` for `git`'s
+  // own prompts; `GIT_TERMINAL_PROMPT=0` does not. `ssh` reads neither, so
+  // `SSH_ASKPASS_REQUIRE=never` keeps its window shut. The text ends
+  // mid-command, on a `\`, so the line after it must run `"$program"`.
+  const beforeProgram = `if [ ! -x "$program" ]; then
+  echo "$tool: ${NOT_READY}" >&2
   exit 127
 fi
 
 helper=${quoted(NO_LOGIN_HELPER)}
 n=\${GIT_CONFIG_COUNT:-0}
-export GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= GIT_CONFIG_COUNT=$((n + 1)) \\
+export GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= SSH_ASKPASS_REQUIRE=never \\
+  GIT_CONFIG_COUNT=$((n + 1)) \\
   "GIT_CONFIG_KEY_$n=credential.helper" "GIT_CONFIG_VALUE_$n=$helper"
 
 GIT_EXEC_PATH=${subPrograms} \\
 GIT_TEMPLATE_DIR=${quoted(path.join(root, 'share', 'git-core', 'templates'))} \\
-GIT_CONFIG_SYSTEM=${quoted(path.join(root, 'etc', 'gitconfig'))} \\
+GIT_CONFIG_SYSTEM=${quoted(path.join(root, 'etc', 'gitconfig'))} \\`
+
+  return {
+    subPrograms,
+    lines: `${beforeProgram}
 exec "$program" "$@"`,
+    /**
+     * Only `git-remote-http` needs `libcurl.so.4`, so the rest of `git` runs
+     * without it (ADR 0026).
+     */
+    linesTellingNoLibcurl: `${beforeProgram}
+"$program" "$@"
+code=$?
+
+if [ $code -ne 0 ] && ldd ${subPrograms}/git-remote-http 2>/dev/null | grep -q 'libcurl\\.so\\.4 => not found'; then
+  echo ${quoted(NO_LIBCURL)} >&2
+fi
+
+exit $code`,
   }
 }
 
@@ -44,6 +68,58 @@ export function writeScript(file: string, script: string) {
   fs.renameSync(writing, file)
 }
 
+/**
+ * One folder per target, named as `scripts/build-git-exe.ts` writes them (ADR
+ * 0028).
+ */
+export function shippedGitExe(builds: string, arch: string) {
+  return path.join(builds, `win32-${arch}`, 'git.exe')
+}
+
+function sameBytes(one: string, other: string) {
+  try {
+    return fs.readFileSync(one).equals(fs.readFileSync(other))
+  } catch {
+    return false
+  }
+}
+
+export function writeWindowsGitWrapper(
+  folder: string,
+  gitProgram: string,
+  shipped: string
+) {
+  const settings = {
+    program: gitProgram,
+    notReady: `git: ${NOT_READY}`,
+    environment: {GCM_INTERACTIVE: 'never', GIT_TERMINAL_PROMPT: '0'},
+    config: [{key: 'credential.helper', value: NO_LOGIN_HELPER}],
+  }
+
+  writeScript(
+    path.join(folder, 'git-wrapper.json'),
+    `${JSON.stringify(settings, null, 2)}\n`
+  )
+
+  const exe = path.join(folder, 'git.exe')
+
+  if (!fs.existsSync(shipped) || sameBytes(shipped, exe)) return
+
+  const writing = `${exe}.writing`
+  fs.copyFileSync(shipped, writing)
+
+  try {
+    fs.renameSync(writing, exe)
+  } catch (error) {
+    // A `git` left running from the last launch holds the old one.
+    fs.rmSync(writing, {force: true})
+    process.stderr.write(
+      `The app's git.exe wasn't replaced: ${String(error)}\n`
+    )
+  }
+}
+
+/** Linux's: a Mac runs the developer folder's script instead (ADR 0025). */
 export function writeGitWrapper(folder: string, gitProgram: string) {
   writeScript(
     path.join(folder, 'git'),
@@ -52,7 +128,7 @@ export function writeGitWrapper(folder: string, gitProgram: string) {
 tool=git
 program=${quoted(gitProgram)}
 
-${runningBuild(gitProgram).lines}
+${runningBuild(gitProgram).linesTellingNoLibcurl}
 `
   )
 }

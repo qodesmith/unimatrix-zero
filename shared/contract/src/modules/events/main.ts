@@ -19,9 +19,7 @@ import {z} from 'zod'
 export const SnapshotEvent = z.strictObject({
   type: z.literal('SNAPSHOT'),
   app: z.strictObject({version: z.string()}),
-  /** Every Reply still being written, as displayed when the window connected. */
   replies: z.array(StreamingReplySchema),
-  /** Every Provider, connected or not. */
   providers: z.array(ProviderStatusSchema),
   /** Each Provider's Models as it last listed them; empty if it never has. */
   models: z.record(ProviderIdSchema, z.array(ModelSchema)),
@@ -63,12 +61,30 @@ export const TreeDeletedEvent = z.strictObject({
   treeId: z.uuid(),
 })
 
-/**
- * The app's own `git` is still downloading, or retrying, so no Snapshot can be
- * taken or read. Sent once per launch, at the first wait a window can hear.
- */
+/** Sent once per launch, at the first wait a window can hear. */
 export const SnapshotsWaitingEvent = z.strictObject({
   type: z.literal('SNAPSHOTS_WAITING'),
+})
+
+/**
+ * The app's own `git` failed to download while a Snapshot waited on it, or on
+ * the user's Try again (`snapshots.download-again`).
+ */
+export const SnapshotsDownloadFailedEvent = z.strictObject({
+  type: z.literal('SNAPSHOTS_DOWNLOAD_FAILED'),
+})
+
+/** Sent only after a `SNAPSHOTS_DOWNLOAD_FAILED`. */
+export const SnapshotsDownloadedEvent = z.strictObject({
+  type: z.literal('SNAPSHOTS_DOWNLOADED'),
+})
+
+/**
+ * This Linux is too old for the app's own `git`, so no Snapshot is ever
+ * taken. Sent once per launch, at the first wait a window can hear.
+ */
+export const SnapshotsNeedNewerLinuxEvent = z.strictObject({
+  type: z.literal('SNAPSHOTS_NEED_NEWER_LINUX'),
 })
 
 export const EventSchema = z.discriminatedUnion('type', [
@@ -82,6 +98,9 @@ export const EventSchema = z.discriminatedUnion('type', [
   ReplyEventSchema,
   FilesChangedEvent,
   SnapshotsWaitingEvent,
+  SnapshotsDownloadFailedEvent,
+  SnapshotsDownloadedEvent,
+  SnapshotsNeedNewerLinuxEvent,
   ProviderEventSchema,
 ])
 

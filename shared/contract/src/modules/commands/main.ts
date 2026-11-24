@@ -181,6 +181,11 @@ export const AttachmentAddResult = z.strictObject({
   attachment: AttachmentSchema,
 })
 
+/** `SNAPSHOTS_DOWNLOADED` or `SNAPSHOTS_DOWNLOAD_FAILED` follows. */
+export const SnapshotsDownloadAgainCommand = z.strictObject({
+  type: z.literal('snapshots.download-again'),
+})
+
 /** `SETTINGS_CHANGED` follows with every Setting. */
 export const SettingsUpdateCommand = z.strictObject({
   type: z.literal('settings.update'),
@@ -215,6 +220,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   AttachmentAddCommand,
   SettingsUpdateCommand,
   LayoutUpdateCommand,
+  SnapshotsDownloadAgainCommand,
 ])
 
 export type Command = z.infer<typeof CommandSchema>
@@ -241,6 +247,7 @@ const resultSchemas = {
   'attachment.add': AttachmentAddResult,
   'settings.update': SettingsSchema,
   'layout.update': LayoutSchema,
+  'snapshots.download-again': Done,
 } as const satisfies Record<CommandType, z.ZodType>
 
 export type CommandResult<T extends CommandType> = z.infer<

@@ -1,3 +1,4 @@
+import type {GitNews} from './main'
 import type {ProgramTarget, getProgramReady} from '@uz/vendor-program'
 
 import path from 'node:path'
@@ -34,7 +35,8 @@ it('names no git until its download is in place, then the entrypoint inside it b
   const git = createGitProgram({
     target,
     getProgramReady,
-    onWaiting: vi.fn<() => boolean>(() => true),
+    needsNewerLinux: false,
+    tell: fakeTell(),
   })
 
   const prepared = git.prepare()
@@ -55,7 +57,8 @@ it('downloads once however many ask while it downloads', async () => {
   const git = createGitProgram({
     target,
     getProgramReady,
-    onWaiting: vi.fn<() => boolean>(() => true),
+    needsNewerLinux: false,
+    tell: fakeTell(),
   })
 
   const first = git.prepare()
@@ -69,36 +72,138 @@ it('downloads once however many ask while it downloads', async () => {
   await Promise.all([first, second])
 })
 
-it('tells the user once that Snapshots wait, however many wait', () => {
-  const onWaiting = vi.fn<() => boolean>(() => true)
+function fakeTell() {
+  return vi.fn<(news: GitNews) => boolean>(() => true)
+}
+
+it('tells the user once that Snapshots wait while git downloads, however many wait', () => {
+  const tell = fakeTell()
   const {getProgramReady} = heldDownload()
-  const git = createGitProgram({target, getProgramReady, onWaiting})
+
+  const git = createGitProgram({
+    target,
+    needsNewerLinux: false,
+    getProgramReady,
+    tell,
+  })
 
   git.snapshotWaited()
   git.snapshotWaited()
 
-  expect(onWaiting).toHaveBeenCalledOnce()
+  expect(tell.mock.calls).toEqual([['downloading']])
 })
 
 it('tells the user at the next wait when no window was there to hear it', () => {
-  const onWaiting = vi.fn<() => boolean>(() => true).mockReturnValueOnce(false)
+  const tell = fakeTell().mockReturnValueOnce(false)
   const {getProgramReady} = heldDownload()
-  const git = createGitProgram({target, getProgramReady, onWaiting})
+
+  const git = createGitProgram({
+    target,
+    needsNewerLinux: false,
+    getProgramReady,
+    tell,
+  })
 
   git.snapshotWaited()
   git.snapshotWaited()
   git.snapshotWaited()
 
-  expect(onWaiting).toHaveBeenCalledTimes(2)
+  expect(tell.mock.calls).toEqual([['downloading'], ['downloading']])
 })
 
-it('downloads again when a Snapshot waits after the download failed, and never rejects', async () => {
+it('says nothing of a failed download no Snapshot waited on, so the next wait hears git is downloading, then each failure', async () => {
+  const tell = fakeTell()
+  const {getProgramReady, downloads} = heldDownload()
+
+  const git = createGitProgram({
+    target,
+    needsNewerLinux: false,
+    getProgramReady,
+    tell,
+  })
+
+  const atLaunch = git.prepare()
+  await expect.poll(() => downloads).toHaveLength(1)
+  downloads[0]?.reject(new Error('offline'))
+  await atLaunch
+
+  expect(tell).not.toHaveBeenCalled()
+
+  git.snapshotWaited()
+  await expect.poll(() => downloads).toHaveLength(2)
+  downloads[1]?.reject(new Error('offline'))
+
+  await expect
+    .poll(() => tell.mock.calls)
+    .toEqual([['downloading'], ['download-failed']])
+
+  git.snapshotWaited()
+  await expect.poll(() => downloads).toHaveLength(3)
+  downloads[2]?.reject(new Error('offline'))
+
+  await expect
+    .poll(() => tell.mock.calls)
+    .toEqual([['downloading'], ['download-failed'], ['download-failed']])
+})
+
+it('downloads again on each Try again, says whether git is then in place, and tells each failure', async () => {
+  const tell = fakeTell()
+  const {getProgramReady, downloads} = heldDownload()
+
+  const git = createGitProgram({
+    target,
+    needsNewerLinux: false,
+    getProgramReady,
+    tell,
+  })
+
+  const first = git.tryAgain()
+  await expect.poll(() => downloads).toHaveLength(1)
+  downloads[0]?.reject(new Error('offline'))
+
+  expect(await first).toBe(false)
+
+  const second = git.tryAgain()
+  await expect.poll(() => downloads).toHaveLength(2)
+  downloads[1]?.reject(new Error('offline'))
+
+  expect(await second).toBe(false)
+  expect(tell.mock.calls).toEqual([['download-failed'], ['download-failed']])
+
+  const working = git.tryAgain()
+  await expect.poll(() => downloads).toHaveLength(3)
+  downloads[2]?.resolve()
+
+  expect(await working).toBe(true)
+  expect(git.program()).not.toBeNull()
+})
+
+it('tells the user once, on Linux too old for the build, that file history can’t work, and never that a download is coming', () => {
+  const tell = fakeTell()
+  const {getProgramReady} = heldDownload()
+
+  const git = createGitProgram({
+    target: null,
+    needsNewerLinux: true,
+    getProgramReady,
+    tell,
+  })
+
+  git.snapshotWaited()
+  git.snapshotWaited()
+
+  expect(tell.mock.calls).toEqual([['needs-newer-linux']])
+})
+
+it('downloads again when a Snapshot waits after a failure no one heard of, never rejects, and says only that git is downloading', async () => {
+  const tell = fakeTell()
   const {getProgramReady, downloads} = heldDownload()
 
   const git = createGitProgram({
     target,
     getProgramReady,
-    onWaiting: vi.fn<() => boolean>(() => true),
+    needsNewerLinux: false,
+    tell,
   })
 
   const failing = git.prepare()
@@ -113,17 +218,55 @@ it('downloads again when a Snapshot waits after the download failed, and never r
   downloads[1]?.resolve()
 
   await expect.poll(() => git.program()).not.toBeNull()
+  expect(tell.mock.calls).toEqual([['downloading']])
+})
+
+it('tells the user git is in place when it downloads after a failure they heard of', async () => {
+  const tell = fakeTell()
+  const {getProgramReady, downloads} = heldDownload()
+
+  const git = createGitProgram({
+    target,
+    getProgramReady,
+    needsNewerLinux: false,
+    tell,
+  })
+
+  git.snapshotWaited()
+  await expect.poll(() => downloads).toHaveLength(1)
+  downloads[0]?.reject(new Error('offline'))
+
+  await expect
+    .poll(() => tell.mock.calls)
+    .toEqual([['downloading'], ['download-failed']])
+
+  git.snapshotWaited()
+  await expect.poll(() => downloads).toHaveLength(2)
+  downloads[1]?.resolve()
+
+  await expect.poll(() => git.program()).not.toBeNull()
+  expect(tell.mock.calls).toEqual([
+    ['downloading'],
+    ['download-failed'],
+    ['downloaded'],
+  ])
 })
 
 it('never downloads, or says a download is coming, on a machine the manifest has no git for', async () => {
-  const onWaiting = vi.fn<() => boolean>(() => true)
+  const tell = fakeTell()
   const {getProgramReady} = heldDownload()
 
-  const git = createGitProgram({target: null, getProgramReady, onWaiting})
+  const git = createGitProgram({
+    target: null,
+    needsNewerLinux: false,
+    getProgramReady,
+    tell,
+  })
+
   await git.prepare()
   git.snapshotWaited()
 
   expect(getProgramReady).not.toHaveBeenCalled()
-  expect(onWaiting).not.toHaveBeenCalled()
+  expect(tell).not.toHaveBeenCalled()
   expect(git.program()).toBeNull()
 })

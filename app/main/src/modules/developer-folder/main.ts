@@ -1,11 +1,18 @@
 import {quoted, runningBuild, writeScript} from '#modules/git-wrapper/main'
 import path from 'node:path'
 
+/** Worded for the AI, so it finds another way rather than urge an install. */
 const NOT_INSTALLED = `  *)
-    echo "$tool: not installed on this Mac" >&2
+    echo "$tool isn't on this Mac, and the user can't install it. Find another way that doesn't need $tool." >&2
     exit 127
     ;;
 esac`
+
+const NO_GIT = `  git)
+    echo "git: not installed on this Mac" >&2
+    exit 127
+    ;;
+${NOT_INSTALLED}`
 
 function runningGit(gitProgram: string) {
   const {subPrograms, lines} = runningBuild(gitProgram)
@@ -29,7 +36,7 @@ tool=$1
 [ $# -gt 0 ] && shift
 
 case $tool in
-${gitProgram ? runningGit(gitProgram) : NOT_INSTALLED}
+${gitProgram ? runningGit(gitProgram) : NO_GIT}
 `
 }
 

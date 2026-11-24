@@ -4,8 +4,8 @@ import type {ProviderId} from '@uz/contract/providers'
 import type {ProgramTarget} from '@uz/vendor-program'
 
 import {ManifestSchema, PlatformSchema} from '@uz/contract/manifest'
-import {programOf} from '@uz/vendor-program'
 import path from 'node:path'
+import {z} from 'zod'
 
 import devManifest from './dev-manifest.json'
 
@@ -16,6 +16,30 @@ export interface Machine {
   userData: string
   platform: NodeJS.Platform
   arch: string
+  /** As `2.39`; absent off Linux, or when unknown. */
+  glibcVersion?: string
+}
+
+const ProcessReportSchema = z.object({
+  header: z.object({glibcVersionRuntime: z.string()}),
+})
+
+/** From Node's own report, so no program runs. */
+export function readGlibcVersion() {
+  if (process.platform !== 'linux') return undefined
+
+  const parsed = ProcessReportSchema.safeParse(process.report.getReport())
+
+  return parsed.success ? parsed.data.header.glibcVersionRuntime : undefined
+}
+
+/** Dugite-native's Linux builds need glibc 2.34 or newer (ADR 0024). */
+export function needsNewerLinux({platform, glibcVersion}: Machine) {
+  if (platform !== 'linux' || glibcVersion === undefined) return false
+
+  const [major = 0, minor = 0] = glibcVersion.split('.').map(Number)
+
+  return major < 2 || (major === 2 && minor < 34)
 }
 
 const PROGRAMS = {
@@ -33,6 +57,8 @@ export function gitTargetFor(
   machine: Machine,
   manifest: Manifest = DEV_MANIFEST
 ): ProgramTarget | null {
+  if (needsNewerLinux(machine)) return null
+
   const {git} = manifest.vendorPrograms
   const build = buildFor(git, machine)
   const folder = path.join(machine.userData, 'vendor', 'git', git.version)
@@ -44,18 +70,17 @@ export function developerFolderFor({userData, platform}: Machine) {
   return platform === 'darwin' ? path.join(userData, 'developer') : null
 }
 
-/** Goes last on the `PATH` of `claude` and Codex. */
+/**
+ * Goes last on the `PATH` of `claude` and Codex. It holds the app's `git`
+ * wrapper, so it's on `PATH` from the first session (ADR 0026).
+ */
 export function gitFolderFor(
   machine: Machine,
   manifest: Manifest = DEV_MANIFEST
 ) {
-  const target = gitTargetFor(machine, manifest)
+  if (!gitTargetFor(machine, manifest)) return null
 
-  if (!target) return null
-
-  if (machine.platform === 'win32') return path.dirname(programOf(target))
-
-  return machine.platform === 'linux'
+  return machine.platform === 'win32' || machine.platform === 'linux'
     ? path.join(machine.userData, 'git')
     : null
 }

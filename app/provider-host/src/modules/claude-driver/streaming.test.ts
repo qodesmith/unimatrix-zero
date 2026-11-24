@@ -696,7 +696,6 @@ function streamed(event: SDKPartialAssistantMessage['event']): RecordedLine {
   }
 }
 
-/** Text blocks only. */
 function cutOff(texts: string[], fromBlock: number): RecordedLine[] {
   const start = read('warm.ndjson').find(
     line =>
@@ -855,7 +854,7 @@ it('gives claude the PowerShell tool on Windows', async () => {
   await claude.allClosed()
 })
 
-it('turns off git’s login prompts for a Reply’s claude and a one-shot’s on Windows, and on no other platform', async () => {
+it('gives a Reply’s claude and a one-shot’s none of git’s login settings, on any platform', async () => {
   const prompts: Record<string, (string | undefined)[][]> = {}
 
   for (const platform of ['linux', 'darwin', 'win32'] as const) {
@@ -884,12 +883,11 @@ it('turns off git’s login prompts for a Reply’s claude and a one-shot’s on
   }
 
   const none = [undefined, undefined]
-  const off = ['never', '0']
 
   expect(prompts).toEqual({
     linux: [none, none, none],
     darwin: [none, none, none],
-    win32: [off, off, off],
+    win32: [none, none, none],
   })
 })
 

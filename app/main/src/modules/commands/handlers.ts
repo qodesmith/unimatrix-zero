@@ -23,6 +23,7 @@ export interface HandlerDeps {
   images: RemoteImages
   settings: SettingsStore
   layout: LayoutStore
+  downloadGitAgain: () => void
   publish: (event: AppEvent) => void
 }
 
@@ -169,5 +170,11 @@ export const handlers: Handlers = {
     publish({type: 'LAYOUT_CHANGED', layout: saved})
 
     return saved
+  },
+
+  'snapshots.download-again': (_command, {downloadGitAgain}) => {
+    downloadGitAgain()
+
+    return {}
   },
 }

@@ -648,7 +648,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Kind:** D
 - **Provider:** ChatGPT
 - **Relies on:** started with `-c allow_login_shell=false`, Codex runs each command in a shell that is not a login shell, so the system's and the user's profile don't run, and a folder added last to the `PATH` the app-server starts with is still last on the command's. Without the setting, Codex runs `/bin/bash -lc` on Linux, and Debian's `/etc/profile` sets `PATH` outright. Codex puts folders of its own first either way.
-- **App side:** on Linux, `codex-driver` starts the app-server with the setting, and `vendor-environment` puts the folder of the app's own `git` last on its `PATH` (ADR 0026). On a Mac the setting is left out: the login shell is how Codex finds the user's own tools.
+- **App side:** on Linux, `codex-driver` starts the app-server with the setting and with the `PATH` the user's login shell sets, read once per launch, and `vendor-environment` puts the folder of the app's own `git` last on it (ADR 0026). On a Mac the setting is left out: the login shell is how Codex finds the user's own tools.
 - **User would see:** on a Linux machine with no `git`, Debian among them, the AI's `git` fails with "command not found".
 - **Changed by:** upgrade
 - **Check:** `[dep:codex-no-login-shell]` in `codex-driver`, on a Mac or Linux: started with the setting and a folder added last to its `PATH`, Codex runs a program by name from that folder, which prints it as the last on its `PATH`, in a shell that reports it is no login shell. `[dep:self-updates-off]` checks the pinned build still holds the setting's name. Full access only: the other Permission modes have no check until the app runs a Reply under them.
@@ -659,21 +659,10 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Kind:** D
 - **Provider:** both
 - **Relies on:** on Windows, `claude` runs commands through its `PowerShell` tool once the tool is named, and offers no `Bash` on a PC with no Git Bash. Codex runs each command as `powershell.exe -Command`, with no login shell. Both keep a folder added last to the `PATH` they started with, after two folders Codex puts first.
-- **App side:** on Windows, `claude-driver` names `PowerShell` among `claude`'s tools, and `vendor-environment` puts the `cmd` folder of the app's own `git` last on the `PATH` of `claude` and Codex (ADR 0026).
+- **App side:** on Windows, `claude-driver` names `PowerShell` among `claude`'s tools, and `vendor-environment` puts the folder holding the app's own `git.exe` last on the `PATH` of `claude` and Codex (ADR 0026).
 - **User would see:** on a PC with no Git Bash, a Claude Reply that can run no command at all. On a PC with no `git`, the AI's `git` fails with "not recognized".
 - **Changed by:** upgrade
 - **Check:** none: needs a signed-in Windows PC, which the maintainer's machine is not. The maintainer tested it by hand on Windows 11 under Full access, with `claude` 2.1.307 and Codex 0.163.0: the results are in [#278](https://github.com/qodesmith/unimatrix-zero/issues/278#issuecomment-7078343644). The other Permission modes are untested.
-
-### On Windows, the vendor program's environment reaches the AI's `git`
-
-- **Id:** `windows-environment-reaches-commands`
-- **Kind:** D
-- **Provider:** both
-- **Relies on:** on Windows, a variable in the environment `claude` or Codex starts with is in the environment of each command the AI runs through PowerShell, and so of the `git` it runs. Neither vendor documents which variables a command inherits.
-- **App side:** on Windows, `vendor-environment` adds `GCM_INTERACTIVE=never`, `GIT_TERMINAL_PROMPT=0` and a credential helper that says what to do to the environment of `claude` and Codex, so a `git` the AI runs never asks for a login (ADR 0027).
-- **User would see:** under Codex, a `git` the AI runs opens Git Credential Manager's GitHub login window with no warning. Under both, a `git` that needs a login fails without saying what to do.
-- **Changed by:** upgrade
-- **Check:** none: needs a signed-in Windows PC, which the maintainer's machine is not. The maintainer tested it by hand on Windows 11 under Full access, with `claude` 2.1.307, Codex 0.163.0 and `git` 2.56.1: the results are in [#279](https://github.com/qodesmith/unimatrix-zero/issues/279#issuecomment-7086114640). CI's "Windows with no git" job checks that the build obeys the variables, with no vendor program. The other Permission modes are untested.
 
 ### A new session's setup tokens
 
@@ -696,3 +685,14 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **User would see:** a Reply that begins with a label of its own, or talks about the labels.
 - **Changed by:** upgrade + drift. The Model decides whether it copies the labels it reads.
 - **Check:** `[dep:reply-labels-unwritten]` in `claude-driver` and `codex-driver`: a Reply to a Thread another Provider wrote holds no label.
+
+### Plain words for a user with no terminal
+
+- **Id:** `plain-words-for-the-user`
+- **Kind:** D
+- **Provider:** both
+- **Relies on:** the Model follows the app's lines that the user may not be a developer and may have no terminal: it does what it can itself, and otherwise explains in plain words and gives a step the user can take without a terminal. It keeps the user's real name and email out of a commit unless they say so, and doesn't promise to finish a task once the user signs in elsewhere.
+- **App side:** `tree-files` adds these lines, under the files section, to what every Tree sends after the vendor's own prompt ([PRD §1](./prd/01-initial-release/01-product.md), the non-developer's path).
+- **User would see:** a failed task that ends in a Terminal command or a developer's term, a commit saved under their real name and email, or a promise to push that never comes true.
+- **Changed by:** upgrade + drift. The Model decides how it words a Reply.
+- **Check:** none: the Model's words vary from run to run, so one live run proves little. The maintainer tested the first line in 56 runs on a Mac with no developer tools, with `claude` 2.1.330 and Codex 0.171.0: the results are in [#285](https://github.com/qodesmith/unimatrix-zero/issues/285#issuecomment-7110866115). The lines on commits and sign-ins came from those runs and are untested.

@@ -136,10 +136,12 @@ async function setUp(
   {
     store = fakeStore(),
     platform = 'darwin',
+    readLoginShellPath = async () => undefined,
     ...behavior
   }: {
     store?: ReturnType<typeof fakeStore>
     platform?: NodeJS.Platform
+    readLoginShellPath?: () => Promise<string | undefined>
   } & FakeCodexOptions = {}
 ) {
   const fake = await replayCodex()
@@ -155,6 +157,7 @@ async function setUp(
   const driver = createCodexDriver({
     store: store.client,
     hasDeveloperTools: async () => developerTools.present,
+    readLoginShellPath,
     platform,
     spawn: (command, options) => {
       environments.push(options.env)
@@ -437,6 +440,38 @@ it('puts the folder of the app’s own git last on the PATH of the app-server, a
   await codex.allClosed()
 })
 
+it('gives the app-server on Linux the PATH the user’s login shell sets, read once, with the app’s own folder last, and leaves other platforms’ PATH alone', async () => {
+  const loginPath = ['/home/sam/.local/bin', '/usr/bin'].join(path.delimiter)
+  const own = process.env.PATH ?? ''
+  let reads = 0
+
+  for (const platform of ['linux', 'darwin', 'win32'] as const) {
+    const codex = await setUp(['started.ndjson', 'started.ndjson'], {
+      platform,
+      readLoginShellPath: async () => {
+        reads += 1
+
+        return loginPath
+      },
+    })
+
+    await codex.reply(FIRST_PROMPT)
+    await codex.allClosed()
+    await codex.reply(FIRST_PROMPT)
+    await codex.allClosed()
+
+    const first = platform === 'linux' ? loginPath : own
+    const expected = `${first}${path.delimiter}${codex.vendorProgram.gitFolder}`
+
+    expect(codex.environments.map(env => env.PATH)).toEqual([
+      expected,
+      expected,
+    ])
+  }
+
+  expect(reads).toBe(1)
+})
+
 it('tells the app-server to run commands without a login shell on Linux, and on no other platform', async () => {
   const settings: boolean[] = []
 
@@ -453,7 +488,7 @@ it('tells the app-server to run commands without a login shell on Linux, and on 
   expect(settings).toEqual([true, false, false])
 })
 
-it('turns off git’s login prompts for the app-server on Windows, and on no other platform', async () => {
+it('gives the app-server none of git’s login settings, on any platform', async () => {
   const prompts: (string | undefined)[][] = []
 
   for (const platform of ['linux', 'darwin', 'win32'] as const) {
@@ -467,7 +502,7 @@ it('turns off git’s login prompts for the app-server on Windows, and on no oth
   expect(prompts).toEqual([
     [undefined, undefined],
     [undefined, undefined],
-    ['never', '0'],
+    [undefined, undefined],
   ])
 })
 
