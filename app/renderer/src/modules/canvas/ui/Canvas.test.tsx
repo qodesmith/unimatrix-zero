@@ -2878,6 +2878,60 @@ it('keeps saying so in the slideout by the slideout’s Thread while another Bra
     .toHaveAccessibleDescription('Sent by path only now')
 })
 
+function missingIn(saved: Saved, ...names: string[]): Saved {
+  return {
+    ...saved,
+    prompts: saved.prompts.map(one => ({
+      ...one,
+      attachments: one.attachments.map(attachment =>
+        names.includes(attachment.name)
+          ? {...attachment, missing: true}
+          : attachment
+      ),
+    })),
+  }
+}
+
+it('says “File missing” on a sent attachment whose copy can’t be read, in place of its usual words, and draws a missing image as a file, on the canvas and in the slideout', async () => {
+  await renderCanvas(
+    missingIn(mediaTree(), 'first.png', 'paper.pdf', 'notes.txt')
+  )
+  await expect.element(page.getByText('Reply three')).toBeVisible()
+  await clickInputUnder('Reply three')
+  await openChatAt('Reply three')
+
+  for (const surface of [nodeOf('Prompt one'), slideout()]) {
+    await expect
+      .element(surface.getByRole('group', {name: 'paper.pdf'}))
+      .toMatchTextContent(/3 MiB · File missing$/)
+    await expect
+      .element(surface.getByRole('group', {name: 'notes.txt'}))
+      .toMatchTextContent(/100 bytes · File missing$/)
+
+    const image = surface.getByRole('group', {name: 'first.png'})
+
+    await expect.element(image).toMatchTextContent(/9 MiB · File missing$/)
+    expect(image.getByRole('img').query()).toBeNull()
+  }
+})
+
+it('says “File missing” on a failed Prompt’s attachment back in the Input, in place of what the Model does with it', async () => {
+  const saved = withAttachments(endingIn('failed', 'Cut off'), 2)
+
+  await renderCanvas(missingIn(saved, 'shot.png', 'notes.pdf'))
+  await chipDrawn()
+  const input = nodeOf('Reply one')
+
+  await expect
+    .element(input.getByRole('group', {name: 'notes.pdf'}))
+    .toMatchTextContent(/2 KiB · File missing$/)
+
+  const image = input.getByRole('group', {name: 'shot.png'})
+
+  await expect.element(image).toMatchTextContent(/3 bytes · File missing$/)
+  expect(image.getByRole('img').query()).toBeNull()
+})
+
 it('says nothing on a sent attachment when the Thread ends in a ChatGPT Reply', async () => {
   await renderCanvas(mediaTree('chatgpt'))
   await expect.element(page.getByText('Reply three')).toBeVisible()

@@ -41,7 +41,7 @@ import {
 } from 'lucide-react'
 import {useId} from 'react'
 
-import {PATH_ONLY_NOW, modelUse} from '../model-use'
+import {FILE_MISSING, PATH_ONLY_NOW, modelUse} from '../model-use'
 
 function RemoveButton({label, onClick}: {label: string; onClick: () => void}) {
   return (
@@ -232,7 +232,8 @@ export function AttachmentList({
         const isPathOnly = pathOnly.has(attachment.id)
 
         const Shown =
-          attachmentKind(attachment.mediaType) === 'image'
+          attachmentKind(attachment.mediaType) === 'image' &&
+          !attachment.missing
             ? ImageAttachment
             : FileAttachment
 
@@ -241,11 +242,13 @@ export function AttachmentList({
             key={attachment.id}
             attachment={attachment}
             note={
-              isPathOnly
-                ? PATH_ONLY_NOW
-                : forms
-                  ? modelUse(forms[at] ?? null, attachment)
-                  : null
+              attachment.missing
+                ? FILE_MISSING
+                : isPathOnly
+                  ? PATH_ONLY_NOW
+                  : forms
+                    ? modelUse(forms[at] ?? null, attachment)
+                    : null
             }
             pathOnly={isPathOnly}
             onRemove={onRemove && (() => onRemove(attachment.id))}
