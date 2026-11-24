@@ -1,6 +1,9 @@
 /**
- * The app downloads its own `claude` binaries, so each per-platform one the
- * Agent SDK lists as optional must be overridden to the stub (ADR 0008).
+ * Each optional dependency these packages list is a binary the app never
+ * loads, so it must be overridden to the stub. The Agent SDK's are `claude`
+ * binaries the app downloads itself (ADR 0008). pdf.js's are native canvases
+ * for Node, and pages render in Chromium (ADR 0007), so pdf.js may gain no
+ * other dependency unchecked either.
  */
 import path from 'node:path'
 import {z} from 'zod'
@@ -8,11 +11,27 @@ import {z} from 'zod'
 import {finishCheck} from './finish-check.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-const sdk = '@anthropic-ai/claude-agent-sdk'
 const stub = 'file:./tooling/no-vendor-binary'
 
-const Sdk = z.looseObject({
+interface Watched {
+  name: string
+  workspace: string
+  /** Regular dependencies checked for native code, or `'any'`. */
+  allowed: 'any' | string[]
+}
+
+const WATCHED: Watched[] = [
+  {
+    name: '@anthropic-ai/claude-agent-sdk',
+    workspace: 'app/provider-host',
+    allowed: 'any',
+  },
+  {name: 'pdfjs-dist', workspace: 'app/extractor', allowed: []},
+]
+
+const Package = z.looseObject({
   version: z.string(),
+  dependencies: z.record(z.string(), z.string()).default({}),
   optionalDependencies: z.record(z.string(), z.string()).default({}),
 })
 
@@ -20,40 +39,50 @@ const Root = z.looseObject({
   overrides: z.record(z.string(), z.string()).default({}),
 })
 
-const installed = Sdk.parse(
-  await Bun.file(
-    path.join(root, 'app/provider-host/node_modules', sdk, 'package.json')
-  ).json()
-)
-
 const {overrides} = Root.parse(
   await Bun.file(path.join(root, 'package.json')).json()
 )
 
-const listed = Object.keys(installed.optionalDependencies)
-
-const overridden = Object.keys(overrides).filter(name =>
-  name.startsWith(`${sdk}-`)
-)
-
 const problems: string[] = []
+const stubbed = new Set<string>()
+const checked: string[] = []
 
-for (const name of listed) {
-  if (overrides[name] !== stub) {
-    problems.push(`  add "${name}": "${stub}"`)
+for (const {name, workspace, allowed} of WATCHED) {
+  const installed = Package.parse(
+    await Bun.file(
+      path.join(root, workspace, 'node_modules', name, 'package.json')
+    ).json()
+  )
+
+  checked.push(`${name} ${installed.version}`)
+
+  for (const optional of Object.keys(installed.optionalDependencies)) {
+    stubbed.add(optional)
+
+    if (overrides[optional] !== stub) {
+      problems.push(`  add "${optional}": "${stub}" (${name} lists it)`)
+    }
+  }
+
+  if (allowed !== 'any') {
+    for (const dependency of Object.keys(installed.dependencies)) {
+      if (!allowed.includes(dependency)) {
+        problems.push(
+          `  ${name} ${installed.version} now depends on "${dependency}": check it has no native code, then add it to ${name}'s \`allowed\` in this script`
+        )
+      }
+    }
   }
 }
 
-for (const name of overridden) {
-  if (!listed.includes(name)) {
-    problems.push(
-      `  remove "${name}" (${sdk} ${installed.version} no longer lists it)`
-    )
+for (const [name, target] of Object.entries(overrides)) {
+  if (target === stub && !stubbed.has(name)) {
+    problems.push(`  remove "${name}" (no checked package lists it)`)
   }
 }
 
 finishCheck(
   problems,
-  `package.json overrides don't match ${sdk} ${installed.version}'s optionalDependencies (fix them, then bun install):`,
-  `All ${listed.length} ${sdk} platform binaries are overridden.`
+  `package.json overrides don't match the binaries ${checked.join(' and ')} list (fix them, then bun install):`,
+  `All ${stubbed.size} binaries that ${checked.join(' and ')} list are overridden.`
 )
