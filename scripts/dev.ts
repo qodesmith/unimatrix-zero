@@ -87,6 +87,7 @@ const bundles = {
   shell: await watchBundle(fromRoot('shell')),
   main: await watchBundle(fromRoot('app/main')),
   preload: await watchBundle(fromRoot('app/preload')),
+  extractor: await watchBundle(fromRoot('app/extractor')),
   hosts: await watchBundle(fromRoot('app/provider-host')),
 }
 

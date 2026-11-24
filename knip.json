@@ -26,6 +26,10 @@
       "entry": ["src/shadcn/**/*.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx,css}"]
     },
+    "app/extractor": {
+      "entry": ["index.html", "src/index.ts"],
+      "project": ["src/**/*.ts"]
+    },
     "app/provider-host": {
       "ignore": ["src/modules/codex-driver/protocol/**"],
       "project": ["src/**/*.ts"]
