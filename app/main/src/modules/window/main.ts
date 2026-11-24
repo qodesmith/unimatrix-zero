@@ -1,5 +1,5 @@
 import type {ThemeMode} from '@uz/contract/settings'
-import type {Session, WebContents} from 'electron'
+import type {Session, WebContents, WebPreferences} from 'electron'
 
 import {BrowserWindow, Menu, nativeTheme, shell} from 'electron'
 
@@ -16,7 +16,27 @@ interface WindowOptions {
   packaged: boolean
 }
 
-/** Every `webPreferences` value is explicit, not left to Electron's defaults. */
+/**
+ * What every window of the app sets, the hidden extraction window too:
+ * explicit values, never Electron's defaults (ADR 0014).
+ */
+export const LOCKED_DOWN_PREFERENCES = {
+  contextIsolation: true,
+  sandbox: true,
+  nodeIntegration: false,
+  nodeIntegrationInWorker: false,
+  nodeIntegrationInSubFrames: false,
+  webSecurity: true,
+  webviewTag: false,
+  plugins: false,
+  allowRunningInsecureContent: false,
+  experimentalFeatures: false,
+  enableBlinkFeatures: '',
+  navigateOnDragDrop: false,
+  spellcheck: false,
+  zoomFactor: 1,
+} as const satisfies WebPreferences
+
 export function createWindow({
   session,
   preloadPath,
@@ -33,23 +53,10 @@ export function createWindow({
     show: false,
     title: 'Unimatrix Zero',
     webPreferences: {
+      ...LOCKED_DOWN_PREFERENCES,
       session,
       preload: preloadPath,
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-      nodeIntegrationInWorker: false,
-      nodeIntegrationInSubFrames: false,
-      webSecurity: true,
-      webviewTag: false,
-      plugins: false,
-      allowRunningInsecureContent: false,
-      experimentalFeatures: false,
-      enableBlinkFeatures: '',
-      navigateOnDragDrop: false,
       devTools: !packaged,
-      spellcheck: false,
-      zoomFactor: 1,
     },
   })
 

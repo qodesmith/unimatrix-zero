@@ -70,6 +70,7 @@ export async function readPdf(
   try {
     const document = await task.promise
     const pages: string[] = []
+    let anyText = false
     const reading: PdfReading = {text: '', pageImages: [], imagesStopped: false}
 
     for (let number = 1; number <= document.numPages; number++) {
@@ -78,6 +79,7 @@ export async function readPdf(
       const heading = `--- Page ${number} ---`
 
       pages.push(text ? `${heading}\n${text}` : heading)
+      anyText ||= text !== ''
 
       if (!reading.imagesStopped && (await wantsImage(page, text)))
         if (reading.pageImages.length < PAGE_IMAGES_PER_PDF)
@@ -86,7 +88,8 @@ export async function readPdf(
       page.cleanup()
     }
 
-    return {...reading, text: pages.join('\n\n')}
+    // Headings alone would pass for text the AI could read.
+    return {...reading, text: anyText ? pages.join('\n\n') : ''}
   } finally {
     await task.destroy()
   }

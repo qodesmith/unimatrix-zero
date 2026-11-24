@@ -55,11 +55,20 @@ describe('a reply from the extraction window', () => {
     ).toMatchObject({type: 'read', format: 'docx', text: 'Grüße'})
   })
 
-  it('passes “unsupported” and turns a “failed” into a failure', () => {
+  it('passes “unsupported” for a zip, and turns a “failed” into a failure', () => {
     expect(validateReply({type: 'unsupported'}, DOCX)).toEqual({
       type: 'unsupported',
     })
     expect(validateReply({type: 'failed', message: 'Bad'}, PDF)).toEqual({
+      type: 'failed',
+    })
+  })
+
+  it('refuses “unsupported” for a PDF or an RTF file, whose format the bytes alone settle', () => {
+    expect(validateReply({type: 'unsupported'}, PDF)).toEqual({
+      type: 'failed',
+    })
+    expect(validateReply({type: 'unsupported'}, text('{\\rtf1 Hi}'))).toEqual({
       type: 'failed',
     })
   })

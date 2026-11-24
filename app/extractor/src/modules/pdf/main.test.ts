@@ -41,6 +41,14 @@ describe('readPdf', () => {
     expect(result.text).toBe('--- Page 1 ---\n\n--- Page 2 ---\nJust text')
   })
 
+  it('gives a PDF with no text on any page no text at all, not a heading per page', async () => {
+    const page = {images: [{x: 0, y: 0, ...PAGE}]}
+    const result = await readPdf(makePdf([page, page], jpeg))
+
+    expect(result.text).toBe('')
+    expect(result.pageImages.map(({page: number}) => number)).toEqual([1, 2])
+  })
+
   it('gives a page an image when its images cover more than a tenth of it, counting only what lies on the page', async () => {
     const pdf = makePdf(
       [

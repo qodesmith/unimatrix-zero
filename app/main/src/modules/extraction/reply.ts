@@ -8,13 +8,10 @@ import {
   PAGE_IMAGE_SIZE_LIMIT,
 } from '@uz/contract/extraction'
 
-import {formatFits} from './candidate'
+import {extractionCandidate, formatFits} from './candidate'
 import {jpegSize} from './jpeg'
 
-interface PageImage {
-  page: number
-  bytes: Uint8Array
-}
+type PageImage = Extract<ExtractorReply, {type: 'read'}>['pageImages'][number]
 
 /** A reply that passed every check; anything else is a failure. */
 export type ExtractionResult =
@@ -92,6 +89,13 @@ function validRead(reply: ReadReply, input: Uint8Array): ExtractionResult {
  * The window is hostile: anything off in its reply discards the whole of it.
  * `input` is the file the job was given.
  */
+/** Only a zip or a notebook can be a file of none of the formats. */
+function mayBeUnsupported(input: Uint8Array) {
+  const candidate = extractionCandidate(input)
+
+  return candidate === 'zip' || candidate === 'ipynb'
+}
+
 export function validateReply(
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the window's message: ExtractorReplySchema parses it below
   data: unknown,
@@ -107,7 +111,7 @@ export function validateReply(
     case 'read':
       return validRead(reply, input)
     case 'unsupported':
-      return {type: 'unsupported'}
+      return mayBeUnsupported(input) ? {type: 'unsupported'} : FAILED
     case 'failed':
       return FAILED
     default:

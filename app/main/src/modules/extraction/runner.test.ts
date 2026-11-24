@@ -120,12 +120,12 @@ describe('an extraction job', () => {
 
   it('keeps the first message and destroys the window once', async () => {
     const fake = fakeWindow(events => {
-      events.message({type: 'unsupported'})
       events.message(goodReply())
+      events.message({type: 'failed', message: 'Late'})
       events.failed()
     })
 
-    expect(await runExtraction(PDF, fake.open)).toEqual({type: 'unsupported'})
+    expect(await runExtraction(PDF, fake.open)).toMatchObject({type: 'read'})
     expect(fake.destroyed).toBe(1)
   })
 

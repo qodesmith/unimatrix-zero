@@ -45,7 +45,6 @@ describe('serveJob', () => {
 
     if (reply?.type !== 'read') throw new Error('expected a read reply')
     expect(new TextDecoder().decode(reply.text)).toBe('First')
-    expect(reply.text.byteLength).toBeGreaterThan(0)
   })
 
   it('fails a job that holds no bytes', async () => {

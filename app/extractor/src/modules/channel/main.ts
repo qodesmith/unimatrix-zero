@@ -2,8 +2,10 @@ import type {PdfAssets} from '#modules/pdf/main'
 import type {ExtractorReply} from '@uz/contract/extraction'
 
 import {extract} from '#modules/extract/main'
-import {EXTRACTION_PORT_MESSAGE} from '@uz/contract/extraction'
-import {z} from 'zod'
+import {
+  EXTRACTION_PORT_MESSAGE,
+  ExtractionJobSchema,
+} from '@uz/contract/extraction'
 
 /** A `MessagePort` as the page uses it: a reply takes no transfer list. */
 export interface JobPort {
@@ -15,14 +17,12 @@ export interface JobPort {
   start: () => void
 }
 
-const JobSchema = z.object({bytes: z.instanceof(Uint8Array)})
-
 async function answer(
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the job crosses from main: JobSchema parses it here
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the job crosses from main: ExtractionJobSchema parses it here
   data: unknown,
   assets: PdfAssets | undefined
 ): Promise<ExtractorReply> {
-  const job = JobSchema.safeParse(data)
+  const job = ExtractionJobSchema.safeParse(data)
 
   if (!job.success) return {type: 'failed', message: 'The job held no file.'}
 
@@ -48,7 +48,6 @@ export async function serveJob(port: JobPort, assets?: PdfAssets) {
   return reply
 }
 
-/** Takes the port the preload hands over, and serves its job. */
 export function listenForPort(
   target: Pick<Window, 'addEventListener' | 'removeEventListener'>,
   assets: PdfAssets

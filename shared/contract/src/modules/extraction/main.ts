@@ -47,10 +47,12 @@ export type ExtractionFormat = z.infer<typeof ExtractionFormatSchema>
  */
 export const EXTRACTION_PORT_MESSAGE = 'uz:extraction-port'
 
-/** The job main posts to the extraction window: the file's bytes alone. */
-export interface ExtractionJob {
-  bytes: Uint8Array
-}
+/** Main posts the window the file's bytes, and nothing else. */
+export const ExtractionJobSchema = z.strictObject({
+  bytes: z.instanceof(Uint8Array),
+})
+
+export type ExtractionJob = z.infer<typeof ExtractionJobSchema>
 
 /**
  * What the extraction window posts back. It is hostile: main parses it with

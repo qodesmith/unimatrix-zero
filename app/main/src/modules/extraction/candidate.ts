@@ -28,6 +28,9 @@ const NBFORMAT = Buffer.from('"nbformat"')
 
 const OPEN_BRACE = 0x7b
 
+/** UTF-8's byte order mark, which the window's decoder drops. */
+const BOM = Uint8Array.from([0xef, 0xbb, 0xbf])
+
 const WHITESPACE = new Set([0x20, 0x09, 0x0a, 0x0d])
 
 function startsWith(bytes: Uint8Array, prefix: Uint8Array) {
@@ -47,7 +50,8 @@ function isText(bytes: Uint8Array) {
 }
 
 function isNotebook(bytes: Uint8Array) {
-  const first = bytes.find(byte => !WHITESPACE.has(byte))
+  const from = startsWith(bytes, BOM) ? BOM.length : 0
+  const first = bytes.subarray(from).find(byte => !WHITESPACE.has(byte))
 
   return (
     first === OPEN_BRACE &&

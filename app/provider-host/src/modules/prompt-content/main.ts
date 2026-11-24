@@ -40,7 +40,6 @@ function pathLine({name, path, folder}: HostAttachment) {
     : `[Attached file "${name}" is saved at: ${path}]`
 }
 
-/** What the app took from the file when it was attached, file by file. */
 function extractionLines({name, extraction}: HostAttachment): Text[] {
   if (!extraction) return []
 

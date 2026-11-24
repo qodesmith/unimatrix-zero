@@ -635,6 +635,10 @@ describe('an Extraction', () => {
     ['a zip', bytesOf('PK\u0003\u0004rest')],
     ['an RTF', bytesOf(String.raw`{\rtf1\ansi Hello}`)],
     ['a notebook', bytesOf(' \n{"cells": [], "nbformat": 4}')],
+    [
+      'a notebook that starts with a byte order mark',
+      bytesOf('\uFEFF{"cells": [], "nbformat": 4}'),
+    ],
   ])('is tried for %s', async (_case, bytes) => {
     await paste('file', bytes)
 

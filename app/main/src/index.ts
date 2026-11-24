@@ -93,7 +93,7 @@ const GIT_NEWS = {
  */
 const gitExes = path.join(import.meta.dirname, '../../../shell/git-exe/dist')
 
-// Electron's default opens a modal dialog that main waits behind (#262).
+// Electron's default opens a modal dialog that main waits behind.
 process.on('uncaughtException', error => {
   process.stderr.write(`Uncaught: ${error.stack ?? String(error)}\n`)
 })

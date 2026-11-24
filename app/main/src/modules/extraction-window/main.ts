@@ -3,6 +3,7 @@ import type {ExtractionJob} from '@uz/contract/extraction'
 import type {MessagePortMain, Session, WebContents} from 'electron'
 
 import {serveExtractor} from '#modules/app-protocol/main'
+import {LOCKED_DOWN_PREFERENCES} from '#modules/window/main'
 import {EXTRACTION_PORT_MESSAGE} from '@uz/contract/extraction'
 import {BrowserWindow, MessageChannelMain, session} from 'electron'
 
@@ -72,30 +73,16 @@ function hiddenWindow(extraction: Session, preloadPath: string) {
     width: 800,
     height: 600,
     webPreferences: {
+      ...LOCKED_DOWN_PREFERENCES,
       session: extraction,
       preload: preloadPath,
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-      nodeIntegrationInWorker: false,
-      nodeIntegrationInSubFrames: false,
-      webSecurity: true,
-      webviewTag: false,
-      plugins: false,
-      allowRunningInsecureContent: false,
-      experimentalFeatures: false,
-      enableBlinkFeatures: '',
-      navigateOnDragDrop: false,
       devTools: false,
-      spellcheck: false,
       backgroundThrottling: false,
       disableDialogs: true,
-      zoomFactor: 1,
     },
   })
 }
 
-/** Hands the page its port and posts it the job. */
 function startJob(
   contents: WebContents,
   bytes: Uint8Array,
