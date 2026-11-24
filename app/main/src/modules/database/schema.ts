@@ -46,8 +46,8 @@ export const trees = sqliteTable('trees', {
   systemPromptId: text('system_prompt_id')
     .notNull()
     .references(() => systemPrompts.id),
-  // Its Tools panel. A Tree from before it keeps web search and gets the
-  // rest off, as a new Tree does, though ChatGPT's had its built-ins on.
+  // A Tree from before these columns keeps web search and gets the rest off,
+  // as a new Tree does.
   webSearch: toolSwitch('web_search', true),
   claudeConnectors: toolSwitch('claude_connectors', false),
   claudeBuiltInSkills: toolSwitch('claude_built_in_skills', false),

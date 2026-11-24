@@ -142,7 +142,6 @@ export function createTrees(db: Database) {
       )
     },
 
-    /** From its next Reply on. */
     setTools(id: string, changes: Partial<TreeTools>): Tree | null {
       if (Object.keys(changes).length === 0) return get(id)
 
