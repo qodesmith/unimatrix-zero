@@ -83,6 +83,7 @@ export function fakeMain(saved: Saved = {}) {
       size: from?.size ?? (file.type === 'pasted' ? file.bytes.byteLength : 0),
       shrunkSize: shrunk?.byteLength ?? null,
       folderPath: null,
+      missing: false,
     }
 
     attachments.set(attachment.id, attachment)

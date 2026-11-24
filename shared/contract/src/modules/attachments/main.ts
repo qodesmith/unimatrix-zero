@@ -80,6 +80,11 @@ export const AttachmentSchema = z.strictObject({
   shrunkSize: z.number().int().positive().nullable(),
   /** A folder's own path; null for a file, which the AI gets a copy of. */
   folderPath: z.string().min(1).nullable(),
+  /**
+   * The copy can't be read. Main checks only when it lists a Tree's Turns;
+   * everywhere else, and for a folder, it is false.
+   */
+  missing: z.boolean(),
 })
 
 export type Attachment = z.infer<typeof AttachmentSchema>
