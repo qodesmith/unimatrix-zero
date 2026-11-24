@@ -164,10 +164,9 @@ export function openSession(query: QueryFn, options: Options): ClaudeSession {
       const stuck = new AbortController()
 
       const finished = await Promise.race([
-        drain().then(
-          () => true,
-          () => true
-        ),
+        drain()
+          .then(() => true)
+          .catch(() => true),
         delay(CLOSE_TIMEOUT_MS, false, {signal: stuck.signal}),
       ])
 

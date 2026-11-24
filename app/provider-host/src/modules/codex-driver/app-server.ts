@@ -79,16 +79,14 @@ export async function startAppServer(
   let nextId = 1
   let hasExited = false
 
-  const exited = once(child, 'exit').then(
-    () => undefined,
-    () => undefined
-  )
+  const exited = once(child, 'exit')
+    .then(() => undefined)
+    .catch(() => undefined)
 
   // A program that can't start reports an error and never exits.
-  const failed = once(child, 'error').then(
-    () => undefined,
-    () => undefined
-  )
+  const failed = once(child, 'error')
+    .then(() => undefined)
+    .catch(() => undefined)
 
   async function end() {
     await Promise.race([exited, failed])

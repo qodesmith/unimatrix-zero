@@ -7,7 +7,7 @@
     "./oxlint-plugin": "./oxlint/uz/index.ts"
   },
   "devDependencies": {
-    "@oxlint/plugins": "1.89.0",
+    "@oxlint/plugins": "1.95.0",
     "vite": "^8.3.5",
     "zod": "^4.6.7"
   }

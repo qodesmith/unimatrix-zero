@@ -2,9 +2,6 @@
   "name": "@uz/vendor-program",
   "private": true,
   "type": "module",
-  "imports": {
-    "#modules/*": "./src/modules/*.ts"
-  },
   "exports": {
     ".": "./src/modules/vendor-program/main.ts",
     "./git-login": "./src/modules/git-login/main.ts"

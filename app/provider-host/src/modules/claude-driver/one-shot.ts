@@ -41,10 +41,9 @@ async function closeOnExit(running: Running) {
   const exited = await Promise.race([
     (async () => {
       for await (const _ of running);
-    })().then(
-      () => true,
-      () => true
-    ),
+    })()
+      .then(() => true)
+      .catch(() => true),
     delay(CLOSE_TIMEOUT_MS, false, {signal: stuck.signal}),
   ])
 

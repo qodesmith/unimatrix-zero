@@ -34,5 +34,8 @@
       "project": ["src/**/*.ts"]
     }
   },
-  "ignoreDependencies": ["electron"]
+  "ignoreDependencies": ["electron"],
+  "ignoreIssues": {
+    "app/renderer/package.json": ["subpaths"]
+  }
 }

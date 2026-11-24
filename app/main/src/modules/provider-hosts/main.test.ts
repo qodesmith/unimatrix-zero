@@ -557,10 +557,7 @@ describe('a one-shot', () => {
 
     const {requestId} = asked()
 
-    const settled = pending.then(
-      () => 'resolved',
-      () => 'rejected'
-    )
+    const settled = pending.then(() => 'resolved').catch(() => 'rejected')
 
     vi.advanceTimersByTime(ONE_SHOT_TIMEOUT_MS - 1)
     interrupt(hosts)
