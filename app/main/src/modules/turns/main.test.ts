@@ -1122,18 +1122,18 @@ function requests() {
   )
 }
 
-describe('a changed System prompt', () => {
-  function recordIn(replyId: string, sessionId: string) {
-    turns.hostRecorded('claude', {
-      type: 'REPLY_RECORDED',
-      treeId,
-      replyId,
-      model: 'claude-haiku-5-5',
-      session: {sessionId, messageId: `m-${replyId}`},
-    })
-    finish(replyId)
-  }
+function recordIn(replyId: string, sessionId: string) {
+  turns.hostRecorded('claude', {
+    type: 'REPLY_RECORDED',
+    treeId,
+    replyId,
+    model: 'claude-haiku-5-5',
+    session: {sessionId, messageId: `m-${replyId}`},
+  })
+  finish(replyId)
+}
 
+describe('a changed System prompt', () => {
   it('tells the host the session started under another one, until a Reply runs in a new session', () => {
     const root = savedRoot()
     createTrees(db).setSystemPrompt(treeId, 'Answer in French.')

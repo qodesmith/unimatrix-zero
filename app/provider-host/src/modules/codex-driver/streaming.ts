@@ -50,6 +50,11 @@ interface Running {
   wake: (() => void) | undefined
 }
 
+/** A thread keeps the instructions it started with through any resume. */
+function resumable(request: ReplyRequest) {
+  return request.systemPromptChanged ? null : request.session
+}
+
 /** ChatGPT's Replies through one `codex app-server` that every Thread shares. */
 export function createCodexReplies(deps: CodexRepliesDeps) {
   let current: Running | null = null
@@ -436,8 +441,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     run: ReplyRun
   ): AsyncGenerator<WriteReplyEvent, Ending> {
     const {treeId, replyId} = request
-    // A thread keeps the instructions it started with through any resume.
-    const session = request.systemPromptChanged ? null : request.session
+    const session = resumable(request)
     let dropFrom = session?.type === 'cut' ? session.dropFrom : null
 
     if (session) await cuts.get(session.sessionId)
