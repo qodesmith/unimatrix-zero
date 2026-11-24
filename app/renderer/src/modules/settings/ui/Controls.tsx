@@ -33,7 +33,7 @@ export function Group({legend, legendId, reachNote, children}: GroupProps) {
         {legend}
       </FieldLegend>
       {reachNote !== undefined && (
-        <FieldDescription id={reachNoteId} className="-mt-2 mb-2">
+        <FieldDescription id={reachNoteId} className="-mt-2! mb-2">
           {reachNote}
         </FieldDescription>
       )}
