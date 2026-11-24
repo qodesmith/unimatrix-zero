@@ -18,6 +18,7 @@ const request = {
   session: null,
   thread: [],
   compactionSettings: {auto: true, threshold: null},
+  systemPromptChanged: false,
 }
 
 function fakeMain() {

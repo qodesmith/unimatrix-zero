@@ -435,7 +435,9 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     request: ReplyRequest,
     run: ReplyRun
   ): AsyncGenerator<WriteReplyEvent, Ending> {
-    const {session, treeId, replyId} = request
+    const {treeId, replyId} = request
+    // A thread keeps the instructions it started with through any resume.
+    const session = request.systemPromptChanged ? null : request.session
     let dropFrom = session?.type === 'cut' ? session.dropFrom : null
 
     if (session) await cuts.get(session.sessionId)

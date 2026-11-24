@@ -48,6 +48,7 @@ export async function recordFakeReply(): Promise<ReplyEvent[]> {
     session: null,
     thread: [],
     compactionSettings: {auto: true, threshold: null},
+    systemPromptChanged: false,
   })) {
     if (!isReplyEvent(event)) continue
 

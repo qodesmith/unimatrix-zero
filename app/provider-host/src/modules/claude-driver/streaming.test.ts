@@ -212,6 +212,7 @@ async function setUp(
       session: session && {type: 'continue', ...session},
       thread,
       compactionSettings,
+      systemPromptChanged: false,
     })) {
       events.push(event)
 

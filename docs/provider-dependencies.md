@@ -414,6 +414,17 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Changed by:** upgrade
 - **Check:** `[dep:codex-resume-moved-folder]` in `codex-driver`: a thread started in one folder resumes from the app's copy alone in another, remembers what it was told, and runs `pwd` there.
 
+### A thread keeps the instructions it started with
+
+- **Id:** `codex-instructions-on-resume`
+- **Kind:** D/W
+- **Provider:** ChatGPT
+- **Relies on:** Codex writes `developerInstructions` into a thread's history when the thread starts, and a new thread follows them. No later `thread/resume` or `thread/fork` changes them: not on a loaded thread, not after `thread/unsubscribe`, and not on an app-server that loads the thread fresh (Codex 0.163.0, checked in [#79](https://github.com/qodesmith/unimatrix-zero/issues/79)).
+- **App side:** `codex-driver` starts a new thread from the Thread, a cold Turn, when the System prompt differs from the one the session last ran under.
+- **User would see:** a changed System prompt that a continued Thread ignores.
+- **Changed by:** upgrade
+- **Check:** `[dep:codex-instructions-on-resume]` in `codex-driver`: a Thread follows a changed System prompt from its next Reply, on a thread still loaded and on one resumed from the app's copy alone. Whether a resume still keeps the old instructions, which would make the new thread unnecessary, has no check: `codex-driver` never resumes under new ones, so the check would drive the app-server on its own.
+
 ### Codex sends no server requests
 
 - **Id:** `codex-server-requests-refused`

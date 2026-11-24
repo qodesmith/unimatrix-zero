@@ -210,12 +210,14 @@ async function setUp(
       compactionSettings = DEFAULT_COMPACTION_SETTINGS,
       thread = [],
       attachments = [],
+      systemPromptChanged = false,
     }: {
       stopAfter?: number
       model?: string
       compactionSettings?: CompactionSettings
       thread?: Thread
       attachments?: HostAttachment[]
+      systemPromptChanged?: boolean
     } = {}
   ) {
     const replyId = crypto.randomUUID()
@@ -233,6 +235,7 @@ async function setUp(
       session: session && {type: 'continue', ...session},
       thread,
       compactionSettings,
+      systemPromptChanged,
     })) {
       events.push(event)
 
@@ -2062,6 +2065,34 @@ it('rebuilds a thread the app has no copy of from the Thread', async () => {
   ).toEqual(['thread/resume', 'thread/start', 'thread/inject_items'])
   expect(run?.injected).toHaveLength(5)
   expect(run?.prompts).toEqual([FIRST_PROMPT])
+  expect(events.filter(event => event.type === 'SESSION_REBUILT')).toHaveLength(
+    1
+  )
+
+  await codex.allClosed()
+})
+
+it('starts a new thread from the Thread under a changed System prompt, which a resumed thread would ignore', async () => {
+  const codex = await setUp([injecting()])
+
+  const events = await codex.reply(
+    FIRST_PROMPT,
+    {sessionId: THREAD_ID, messageId: FIRST_TURN},
+    {thread: HANDED_OVER, systemPromptChanged: true}
+  )
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+  const [run] = codex.reports()
+
+  expect(run?.methods).not.toContain('thread/resume')
+  expect(
+    run?.methods.filter(method => method.startsWith('thread/')).slice(0, 2)
+  ).toEqual(['thread/start', 'thread/inject_items'])
+  expect(run?.threadInstructions).toEqual([
+    explainingLabels(SYSTEM_PROMPT, HANDED_OVER),
+  ])
+  expect(run?.injected).toHaveLength(5)
   expect(events.filter(event => event.type === 'SESSION_REBUILT')).toHaveLength(
     1
   )

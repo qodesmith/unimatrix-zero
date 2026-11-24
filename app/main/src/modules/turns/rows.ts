@@ -115,6 +115,28 @@ export function savedReply(db: Database, replyId: string): Reply {
   return reply
 }
 
+/**
+ * The System prompt a Provider session started under, as its first Reply ran
+ * under it; null when no Reply names the session.
+ */
+export function startedUnder(
+  db: Database,
+  provider: ProviderId,
+  sessionId: string
+): string | null {
+  const row = db
+    .select({systemPromptId: replies.systemPromptId})
+    .from(replies)
+    .where(
+      and(eq(replies.provider, provider), eq(replies.sessionId, sessionId))
+    )
+    .orderBy(asc(replies.createdAt), asc(replies.id))
+    .limit(1)
+    .get()
+
+  return row?.systemPromptId ?? null
+}
+
 /** What the Tree's next Reply runs under. */
 export function treeSystemPrompt(db: Database, treeId: string) {
   const row = db

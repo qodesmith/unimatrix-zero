@@ -39,6 +39,7 @@ import {
   listTurns,
   resetReply,
   savedReply,
+  startedUnder,
   treeSystemPrompt,
 } from './rows'
 import {threadTo, withAttachments} from './thread'
@@ -162,6 +163,17 @@ export function createTurns({
     return continued?.provider === provider ? continued.session : null
   }
 
+  /** A Codex thread keeps the System prompt it started under for good. */
+  function systemPromptChanged(
+    provider: ProviderId,
+    session: ReplyRequest['session'],
+    systemPromptId: string
+  ) {
+    const started = session && startedUnder(db, provider, session.sessionId)
+
+    return started !== null && started !== systemPromptId
+  }
+
   function refuseUnsendable(
     continued: Continuation | null,
     provider: ProviderId
@@ -241,6 +253,11 @@ export function createTurns({
           session,
           thread,
           compactionSettings: compactionSettingsFor(provider),
+          systemPromptChanged: systemPromptChanged(
+            provider,
+            session,
+            systemPrompt.id
+          ),
         },
         parentReplyId
       )
@@ -291,13 +308,18 @@ export function createTurns({
           treeId,
           replyId,
           model,
-          systemPrompt: withAppSections(systemPrompt, treeFolder),
+          systemPrompt: withAppSections(systemPrompt.text, treeFolder),
           prompt: {text, attachments, messageId: randomUUID()},
           vendorProgram: vendorProgramFor(provider),
           treeFolder,
           session,
           thread,
           compactionSettings: compactionSettingsFor(provider),
+          systemPromptChanged: systemPromptChanged(
+            provider,
+            session,
+            systemPrompt.id
+          ),
         },
         recovered.parentReplyId
       )

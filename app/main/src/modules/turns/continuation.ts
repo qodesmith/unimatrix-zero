@@ -35,7 +35,7 @@ export interface Continuation {
 export interface Recovery {
   provider: ProviderId
   model: string
-  systemPrompt: string
+  systemPrompt: {id: string; text: string}
   text: string
   promptId: string
   parentReplyId: string | null
@@ -305,7 +305,7 @@ export function recovery(
   return {
     provider: row.provider,
     model: row.model,
-    systemPrompt: systemPrompt.text,
+    systemPrompt: {id: row.systemPromptId, text: systemPrompt.text},
     text: prompt.text,
     promptId: prompt.id,
     parentReplyId: prompt.parentReplyId,
