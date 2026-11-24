@@ -2503,6 +2503,41 @@ it('tells a rebuilt session each earlier Prompt’s path lines inside its <promp
   await claude.allClosed()
 })
 
+it('hands a Thread over when earlier files can no longer be read: each gets a line saying so in place of its path, inline or by path only, and an image whose shrunk copy is gone goes by its path only', async () => {
+  const claude = await setUp(['warm.ndjson'])
+  const {report, archive, photo} = attachedFiles(folder('uz-attachments-'))
+  fs.rmSync(report.path)
+  fs.rmSync(archive.path)
+  fs.rmSync(photo.inline.path)
+
+  const thread: Thread = [
+    {
+      prompt: 'Sum these up.',
+      attachments: [report, archive, photo],
+      reply: [{type: 'text', text: 'Sales rose.'}],
+      label: '[Reply written by GPT-6 Sol]',
+    },
+  ]
+
+  const events = await claude.reply(FIRST_PROMPT, null, {thread})
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+  expect(claude.reports()[0]?.prompts).toEqual([
+    expect.stringContaining(
+      [
+        '<prompt>',
+        '[Attached file "report.pdf" can no longer be read]',
+        '[Attached file "archive.zip" can no longer be read]',
+        `[Attached file "photo.jpg" is saved at: ${photo.path}]`,
+        'Sum these up.',
+        '</prompt>',
+      ].join('\n')
+    ),
+  ])
+
+  await claude.allClosed()
+})
+
 it('fails the Reply, starting no claude, when a file marked inline can’t be read', async () => {
   const claude = await setUp(['warm.ndjson'])
   const {gone} = attachedFiles(folder('uz-attachments-'))

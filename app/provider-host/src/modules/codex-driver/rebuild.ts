@@ -5,7 +5,7 @@ import type {ParamsOf} from './wire'
 import type {ReplyRequest, Thread} from '@uz/contract/host'
 
 import {RequestRefused} from '#modules/failures/main'
-import {prompted} from '#modules/prompt-content/main'
+import {earlierPrompted} from '#modules/prompt-content/main'
 import {explainingLabels, replyText} from '#modules/thread-replay/main'
 
 import {messageContent, read} from './input'
@@ -61,7 +61,10 @@ async function itemsOf(thread: Thread) {
         role: 'user',
         content: messageContent(
           await read(
-            prompted({text: exchange.prompt, attachments: exchange.attachments})
+            earlierPrompted({
+              text: exchange.prompt,
+              attachments: exchange.attachments,
+            })
           )
         ),
       } satisfies ResponseItem
@@ -97,7 +100,7 @@ async function newThread(
   const {threshold} = request.compactionSettings
 
   const settings = settingsOf(request)
-  // Before the thread starts, so an unreadable file leaves none behind.
+  // Before the thread starts, so a failure leaves none behind.
   const items = await itemsOf(request.thread)
 
   async function open() {
