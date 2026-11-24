@@ -138,7 +138,6 @@ export const ReplyRequestSchema = z.strictObject({
    * this.
    */
   systemPromptChanged: z.boolean(),
-  /** The Tree's Tools panel as the Reply starts. */
   tools: TreeToolsSchema,
 })
 
