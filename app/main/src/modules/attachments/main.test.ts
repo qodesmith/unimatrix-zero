@@ -1,4 +1,6 @@
 import type {Database} from '#modules/database/main'
+import type {Attachment} from '@uz/contract/attachments'
+import type {Prompt} from '@uz/contract/turns'
 
 import {openDatabase} from '#modules/database/main'
 import {
@@ -70,6 +72,23 @@ function drop(name: string, bytes: Uint8Array) {
   dropped.set(fileId, file)
 
   return fileId
+}
+
+function promptWith(attached: Attachment[]): Prompt {
+  return {
+    id: crypto.randomUUID(),
+    treeId: crypto.randomUUID(),
+    parentReplyId: null,
+    text: '',
+    attachments: attached,
+    createdAt: '2026-11-24T12:00:00.000Z',
+  }
+}
+
+async function missingOf(prompts: Prompt[]) {
+  const checked = await attachments.withMissingCopies(prompts)
+
+  return checked.map(prompt => prompt.attachments.map(a => a.missing))
 }
 
 describe('the media type', () => {
@@ -164,6 +183,7 @@ describe('adding a file', () => {
       size: PNG.byteLength,
       shrunkSize: null,
       folderPath: null,
+      missing: false,
     })
     expect(fs.readFileSync(originalOf(attachment.id))).toEqual(Buffer.from(PNG))
   })
@@ -316,8 +336,51 @@ describe('a dropped folder', () => {
       size: 0,
       shrunkSize: null,
       folderPath: project,
+      missing: false,
     })
     expect(fs.existsSync(dir)).toBe(false)
     expect(attachments.original(attachment.id)).toBeNull()
   })
+})
+
+describe('checking the copies of Prompts’ files', () => {
+  it('marks a file whose copy is gone missing, and a file that reads, an image whose shrunk copy alone is gone, and a folder not', async () => {
+    const gone = await paste('gone.txt', bytesOf('gone'))
+    const kept = await paste('kept.txt', bytesOf('kept'))
+
+    const image = await attachments.add(
+      {type: 'pasted', name: 'photo.png', bytes: PNG},
+      Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10])
+    )
+
+    const project = path.join(folder, 'project')
+    fs.mkdirSync(project)
+    const fileId = crypto.randomUUID()
+    dropped.set(fileId, project)
+
+    const folderAttachment = await attachments.add({type: 'dropped', fileId})
+    fs.rmSync(originalOf(gone.id))
+    fs.rmSync(path.join(dir, 'shrunk'), {recursive: true})
+
+    expect(
+      await missingOf([
+        promptWith([kept, gone]),
+        promptWith([image, folderAttachment]),
+      ])
+    ).toEqual([
+      [false, true],
+      [false, false],
+    ])
+  })
+
+  // Windows has no owner-only mode to take away.
+  it.skipIf(process.platform === 'win32')(
+    'marks a file whose copy its owner can’t read missing',
+    async () => {
+      const locked = await paste('locked.txt', bytesOf('locked'))
+      fs.chmodSync(originalOf(locked.id), 0o200)
+
+      expect(await missingOf([promptWith([locked])])).toEqual([[true]])
+    }
+  )
 })
