@@ -43,7 +43,7 @@ export function CompactionSettings({provider}: CompactionSettingsProps) {
   return (
     <Group
       legend={`${PROVIDER_NAMES[provider]} Compaction`}
-      reach="Every Thread, from its next Reply."
+      reachNote="Every Thread, from its next Reply."
     >
       {provider === 'claude' ? (
         <Toggle
