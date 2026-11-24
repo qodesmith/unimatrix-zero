@@ -1,4 +1,4 @@
-import type {ExtractorReply} from '@uz/contract/extraction'
+import type {ExtractorOutput} from '@uz/contract/extraction'
 
 import {strToU8} from 'fflate'
 import {describe, expect, it, vi} from 'vitest'
@@ -6,7 +6,7 @@ import {describe, expect, it, vi} from 'vitest'
 import {serveJob} from './main'
 
 class FakePort {
-  postMessage = vi.fn<(reply: ExtractorReply, ...rest: unknown[]) => void>()
+  postMessage = vi.fn<(output: ExtractorOutput, ...rest: unknown[]) => void>()
   start = vi.fn<() => void>()
   listeners: ((event: MessageEvent) => void)[] = []
 
@@ -27,7 +27,7 @@ async function nextTask() {
 }
 
 describe('serveJob', () => {
-  it('replies to the first job once, posting a copy with no transfer list', async () => {
+  it('posts output for the first job once, as a copy with no transfer list', async () => {
     const port = new FakePort()
     const served = serveJob(port)
 
@@ -41,10 +41,10 @@ describe('serveJob', () => {
     const [call] = port.postMessage.mock.calls
 
     expect(call).toHaveLength(1)
-    const reply = call?.[0]
+    const output = call?.[0]
 
-    if (reply?.type !== 'read') throw new Error('expected a read reply')
-    expect(new TextDecoder().decode(reply.text)).toBe('First')
+    if (output?.type !== 'read') throw new Error('expected read output')
+    expect(new TextDecoder().decode(output.text)).toBe('First')
   })
 
   it('fails a job that holds no bytes', async () => {

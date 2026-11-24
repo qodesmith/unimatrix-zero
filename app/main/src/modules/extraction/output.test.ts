@@ -5,7 +5,7 @@ import {
 } from '@uz/contract/extraction'
 import {describe, expect, it} from 'vitest'
 
-import {PAGE_IMAGE_SIZE_LIMIT, validateReply} from './reply'
+import {PAGE_IMAGE_SIZE_LIMIT, validateOutput} from './output'
 import {jpegBytes, pngBytes} from './test-images'
 
 const PDF = new TextEncoder().encode('%PDF-1.7\n')
@@ -16,7 +16,7 @@ function text(value: string) {
   return new TextEncoder().encode(value)
 }
 
-function pdfReply(pageImages: {page: number; bytes: Uint8Array}[]) {
+function pdfOutput(pageImages: {page: number; bytes: Uint8Array}[]) {
   return {
     type: 'read',
     format: 'pdf',
@@ -26,11 +26,11 @@ function pdfReply(pageImages: {page: number; bytes: Uint8Array}[]) {
   }
 }
 
-describe('a reply from the extraction window', () => {
+describe('output from the extraction window', () => {
   it('passes when it is a PDF’s text and JPEG page images within the limits', () => {
     const page = jpegBytes(PAGE_IMAGE_PIXELS, 900)
 
-    expect(validateReply(pdfReply([{page: 1, bytes: page}]), PDF)).toEqual({
+    expect(validateOutput(pdfOutput([{page: 1, bytes: page}]), PDF)).toEqual({
       type: 'read',
       format: 'pdf',
       text: '# Page 1\nHello',
@@ -41,7 +41,7 @@ describe('a reply from the extraction window', () => {
 
   it('passes an office file’s text with no page images', () => {
     expect(
-      validateReply(
+      validateOutput(
         {
           type: 'read',
           format: 'docx',
@@ -55,19 +55,19 @@ describe('a reply from the extraction window', () => {
   })
 
   it('passes “unsupported” for a zip, and turns a “failed” into a failure', () => {
-    expect(validateReply({type: 'unsupported'}, DOCX)).toEqual({
+    expect(validateOutput({type: 'unsupported'}, DOCX)).toEqual({
       type: 'unsupported',
     })
-    expect(validateReply({type: 'failed', message: 'Bad'}, PDF)).toEqual({
+    expect(validateOutput({type: 'failed', message: 'Bad'}, PDF)).toEqual({
       type: 'failed',
     })
   })
 
   it('refuses “unsupported” for a PDF or an RTF file, whose format the bytes alone settle', () => {
-    expect(validateReply({type: 'unsupported'}, PDF)).toEqual({
+    expect(validateOutput({type: 'unsupported'}, PDF)).toEqual({
       type: 'failed',
     })
-    expect(validateReply({type: 'unsupported'}, text('{\\rtf1 Hi}'))).toEqual({
+    expect(validateOutput({type: 'unsupported'}, text('{\\rtf1 Hi}'))).toEqual({
       type: 'failed',
     })
   })
@@ -76,52 +76,52 @@ describe('a reply from the extraction window', () => {
     ['null, as a transferred buffer arrives', null],
     ['a message of the wrong shape', {type: 'read', format: 'pdf'}],
     ['an unknown field', {type: 'unsupported', extra: true}],
-    ['text as a string', {...pdfReply([]), text: 'Hello'}],
+    ['text as a string', {...pdfOutput([]), text: 'Hello'}],
     [
       'text that is not UTF-8',
-      {...pdfReply([]), text: Uint8Array.from([0x41, 0xc3, 0x28])},
+      {...pdfOutput([]), text: Uint8Array.from([0x41, 0xc3, 0x28])},
     ],
     [
       'text over the cap',
-      {...pdfReply([]), text: new Uint8Array(EXTRACTED_TEXT_LIMIT + 1)},
+      {...pdfOutput([]), text: new Uint8Array(EXTRACTED_TEXT_LIMIT + 1)},
     ],
-    ['a PNG as a page image', pdfReply([{page: 1, bytes: pngBytes()}])],
+    ['a PNG as a page image', pdfOutput([{page: 1, bytes: pngBytes()}])],
     [
       'a JPEG wider than a page image',
-      pdfReply([{page: 1, bytes: jpegBytes(PAGE_IMAGE_PIXELS + 1, 900)}]),
+      pdfOutput([{page: 1, bytes: jpegBytes(PAGE_IMAGE_PIXELS + 1, 900)}]),
     ],
     [
       'a JPEG taller than a page image',
-      pdfReply([{page: 1, bytes: jpegBytes(900, PAGE_IMAGE_PIXELS + 1)}]),
+      pdfOutput([{page: 1, bytes: jpegBytes(900, PAGE_IMAGE_PIXELS + 1)}]),
     ],
-    ['a JPEG with no height', pdfReply([{page: 1, bytes: jpegBytes(900, 0)}])],
+    ['a JPEG with no height', pdfOutput([{page: 1, bytes: jpegBytes(900, 0)}])],
     [
       'a JPEG over the size limit',
-      pdfReply([
+      pdfOutput([
         {page: 1, bytes: jpegBytes(900, 900, PAGE_IMAGE_SIZE_LIMIT + 1)},
       ]),
     ],
     [
       'a JPEG whose header stops short',
-      pdfReply([{page: 1, bytes: jpegBytes(900, 900).subarray(0, 24)}]),
+      pdfOutput([{page: 1, bytes: jpegBytes(900, 900).subarray(0, 24)}]),
     ],
     [
       'pages out of order',
-      pdfReply([
+      pdfOutput([
         {page: 2, bytes: jpegBytes(900, 900)},
         {page: 1, bytes: jpegBytes(900, 900)},
       ]),
     ],
     [
       'a page twice',
-      pdfReply([
+      pdfOutput([
         {page: 1, bytes: jpegBytes(900, 900)},
         {page: 1, bytes: jpegBytes(900, 900)},
       ]),
     ],
     [
       'more page images than a PDF gets',
-      pdfReply(
+      pdfOutput(
         Array.from({length: PAGE_IMAGES_PER_PDF + 1}, (_, at) => ({
           page: at + 1,
           bytes: jpegBytes(10, 10),
@@ -130,25 +130,30 @@ describe('a reply from the extraction window', () => {
     ],
     [
       'a stop to page images before a PDF has its share',
-      {...pdfReply([{page: 1, bytes: jpegBytes(10, 10)}]), imagesStopped: true},
+      {
+        ...pdfOutput([{page: 1, bytes: jpegBytes(10, 10)}]),
+        imagesStopped: true,
+      },
     ],
   ])('fails on %s', (_case, data) => {
-    expect(validateReply(data, PDF)).toEqual({type: 'failed'})
+    expect(validateOutput(data, PDF)).toEqual({type: 'failed'})
   })
 
   it('takes as many page images as a PDF gets', () => {
-    const reply = pdfReply(
+    const output = pdfOutput(
       Array.from({length: PAGE_IMAGES_PER_PDF}, (_, at) => ({
         page: at + 1,
         bytes: jpegBytes(10, 10),
       }))
     )
 
-    expect(validateReply(reply, PDF)).toMatchObject({type: 'read'})
-    expect(validateReply({...reply, imagesStopped: true}, PDF)).toMatchObject({
-      type: 'read',
-      imagesStopped: true,
-    })
+    expect(validateOutput(output, PDF)).toMatchObject({type: 'read'})
+    expect(validateOutput({...output, imagesStopped: true}, PDF)).toMatchObject(
+      {
+        type: 'read',
+        imagesStopped: true,
+      }
+    )
   })
 
   it('fails page images, or a stop to them, on a file that is not a PDF', () => {
@@ -161,12 +166,12 @@ describe('a reply from the extraction window', () => {
     }
 
     expect(
-      validateReply(
+      validateOutput(
         {...docx, pageImages: [{page: 1, bytes: jpegBytes(10, 10)}]},
         DOCX
       )
     ).toEqual({type: 'failed'})
-    expect(validateReply({...docx, imagesStopped: true}, DOCX)).toEqual({
+    expect(validateOutput({...docx, imagesStopped: true}, DOCX)).toEqual({
       type: 'failed',
     })
   })
@@ -177,10 +182,10 @@ describe('a reply from the extraction window', () => {
     ['an RTF', 'rtf', PDF],
     ['a notebook', 'ipynb', DOCX],
   ])(
-    'fails a reply that says %s when the bytes are something else',
+    'fails output that says %s when the bytes are something else',
     (_case, format, bytes) => {
       expect(
-        validateReply(
+        validateOutput(
           {
             type: 'read',
             format,

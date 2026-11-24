@@ -1,8 +1,8 @@
-import type {ExtractionResult} from './reply'
+import type {ExtractionResult} from './output'
 
 import {MIB} from '@uz/contract/sizes'
 
-import {validateReply} from './reply'
+import {validateOutput} from './output'
 
 /** The attachment limit: a larger file is never extracted. */
 export const EXTRACTION_INPUT_LIMIT = 50 * MIB
@@ -11,7 +11,7 @@ export const EXTRACTION_TIMEOUT_MS = 60_000
 
 export interface WindowEvents {
   /** The page's message, as it arrived: null for a transferred buffer. */
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the window's message: validateReply parses it
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the window's message: validateOutput parses it
   message: (data: unknown) => void
   /** The window's process went, its page failed to load, or it hung. */
   failed: () => void
@@ -70,7 +70,7 @@ export async function runExtraction(
       window = open(bytes, {
         message: data => {
           try {
-            finish(validateReply(data, bytes))
+            finish(validateOutput(data, bytes))
           } catch {
             finish(FAILED)
           }

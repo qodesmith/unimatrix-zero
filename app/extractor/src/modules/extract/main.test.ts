@@ -95,20 +95,21 @@ function compressedSize(zip: Uint8Array, name: string) {
 }
 
 async function failure(bytes: Uint8Array) {
-  const reply = await extract(bytes)
+  const output = await extract(bytes)
 
-  if (reply.type !== 'failed')
-    throw new Error(`expected failed, got ${reply.type}`)
+  if (output.type !== 'failed')
+    throw new Error(`expected failed, got ${output.type}`)
 
-  return reply.message
+  return output.message
 }
 
 async function readText(bytes: Uint8Array) {
-  const reply = await extract(bytes)
+  const output = await extract(bytes)
 
-  if (reply.type !== 'read') throw new Error(`expected read, got ${reply.type}`)
+  if (output.type !== 'read')
+    throw new Error(`expected read, got ${output.type}`)
 
-  return {...reply, text: new TextDecoder().decode(reply.text)}
+  return {...output, text: new TextDecoder().decode(output.text)}
 }
 
 describe('extract', () => {
@@ -124,14 +125,14 @@ describe('extract', () => {
       ),
     })
 
-    const reply = await readText(docx)
+    const output = await readText(docx)
 
-    expect(reply).toMatchObject({
+    expect(output).toMatchObject({
       format: 'docx',
       pageImages: [],
       imagesStopped: false,
     })
-    expect(reply.text).toBe('Hello\tbig world\none\ntwo')
+    expect(output.text).toBe('Hello\tbig world\none\ntwo')
   })
 
   it('reads an xlsx: each sheet by its name, cells tab-separated in their columns', async () => {
@@ -162,10 +163,10 @@ describe('extract', () => {
       ),
     })
 
-    const reply = await readText(xlsx)
+    const output = await readText(xlsx)
 
-    expect(reply.format).toBe('xlsx')
-    expect(reply.text).toBe(
+    expect(output.format).toBe('xlsx')
+    expect(output.text).toBe(
       '--- Sheet: Totals ---\n\t42\n\n--- Sheet: Data ---\nName\t\tBorn\nAda Lovelace\t36\t1815'
     )
   })
@@ -182,10 +183,10 @@ describe('extract', () => {
       'ppt/slides/_rels/slide1.xml.rels': strToU8('<Relationships/>'),
     })
 
-    const reply = await readText(pptx)
+    const output = await readText(pptx)
 
-    expect(reply.format).toBe('pptx')
-    expect(reply.text).toBe(
+    expect(output.format).toBe('pptx')
+    expect(output.text).toBe(
       '--- Slide 1 ---\nTitle\n\n--- Slide 2 ---\nSecond slide\nup\ndown\n\n--- Slide 3 ---\nLast'
     )
   })
@@ -200,10 +201,10 @@ describe('extract', () => {
       </office:text>`
     )
 
-    const reply = await readText(odt)
+    const output = await readText(odt)
 
-    expect(reply.format).toBe('odt')
-    expect(reply.text).toBe('Heading\nOne  two\tthree\nitem\nnext')
+    expect(output.format).toBe('odt')
+    expect(output.text).toBe('Heading\nOne  two\tthree\nitem\nnext')
   })
 
   it('reads an epub: its spine in order, block elements on their own lines', async () => {
@@ -225,10 +226,10 @@ describe('extract', () => {
       ),
     })
 
-    const reply = await readText(epub)
+    const output = await readText(epub)
 
-    expect(reply.format).toBe('epub')
-    expect(reply.text).toBe(
+    expect(output.format).toBe('epub')
+    expect(output.text).toBe(
       'Preface\u00a0text\nnext line\n\nChapter one\nIt was a dark night.\nfirst\nsecond'
     )
   })
@@ -243,10 +244,10 @@ describe('extract', () => {
       </office:presentation>`
     )
 
-    const reply = await readText(odp)
+    const output = await readText(odp)
 
-    expect(reply.format).toBe('odp')
-    expect(reply.text).toBe('--- Slide 1 ---\nWelcome\n\n--- Slide 2 ---\nBye')
+    expect(output.format).toBe('odp')
+    expect(output.text).toBe('--- Slide 1 ---\nWelcome\n\n--- Slide 2 ---\nBye')
   })
 
   it('reads an ods: each table as a sheet, repeats capped and empty repeats free', async () => {
@@ -264,10 +265,10 @@ describe('extract', () => {
       </office:spreadsheet>`
     )
 
-    const reply = await readText(ods)
-    const lines = reply.text.split('\n')
+    const output = await readText(ods)
+    const lines = output.text.split('\n')
 
-    expect(reply.format).toBe('ods')
+    expect(output.format).toBe('ods')
     expect(lines.slice(0, 5)).toEqual([
       '--- Sheet: Budget ---',
       'Item\t\t\t3',
@@ -295,10 +296,10 @@ describe('extract', () => {
         .replaceAll('|', '\\')
     )
 
-    const reply = await readText(rtf)
+    const output = await readText(rtf)
 
-    expect(reply.format).toBe('rtf')
-    expect(reply.text).toBe(
+    expect(output.format).toBe('rtf')
+    expect(output.text).toBe(
       'Café costs €5 or € 6.\nTab\there\nnext {braces} and \\ slash\nBold end'
     )
   })
@@ -326,16 +327,16 @@ describe('extract', () => {
       ],
     }
 
-    const reply = await readText(strToU8(` ${JSON.stringify(notebook)}`))
+    const output = await readText(strToU8(` ${JSON.stringify(notebook)}`))
 
-    expect(reply.format).toBe('ipynb')
-    expect(reply.text).toBe(
+    expect(output.format).toBe('ipynb')
+    expect(output.text).toBe(
       '# Title\nSome *text*\n\n```python\nprint(1)\n1 + 1\n```\n1\n2\n\nraw text'
     )
   })
 
   it('leaves out JSON that is not a notebook, and files that are none of the formats', async () => {
-    const replies = await Promise.all(
+    const outputs = await Promise.all(
       [
         strToU8(JSON.stringify({cells: [], nbformat: '4'})),
         strToU8(JSON.stringify({cells: 'none', nbformat: 4})),
@@ -346,7 +347,7 @@ describe('extract', () => {
       ].map(async bytes => extract(bytes))
     )
 
-    expect(replies).toEqual(
+    expect(outputs).toEqual(
       Array.from({length: 6}, () => ({type: 'unsupported'}))
     )
   })
@@ -357,18 +358,18 @@ describe('extract', () => {
       await makeJpeg()
     )
 
-    const reply = await readText(pdf)
+    const output = await readText(pdf)
 
-    expect(reply.format).toBe('pdf')
-    expect(reply.text).toBe('--- Page 1 ---\nText only\n\n--- Page 2 ---')
-    expect(reply.pageImages.map(({page}) => page)).toEqual([2])
-    expect(reply.imagesStopped).toBe(false)
+    expect(output.format).toBe('pdf')
+    expect(output.text).toBe('--- Page 1 ---\nText only\n\n--- Page 2 ---')
+    expect(output.pageImages.map(({page}) => page)).toEqual([2])
+    expect(output.imagesStopped).toBe(false)
   })
 
   it('fails a file that starts like a PDF but is not one', async () => {
-    const reply = await extract(strToU8('%PDF-1.7\nnothing else'))
+    const output = await extract(strToU8('%PDF-1.7\nnothing else'))
 
-    expect(reply.type).toBe('failed')
+    expect(output.type).toBe('failed')
   })
 })
 

@@ -1,4 +1,4 @@
-import type {ExtractorReply} from '@uz/contract/extraction'
+import type {ExtractorOutput} from '@uz/contract/extraction'
 import type {PDFPageProxy} from 'pdfjs-dist'
 
 import {PAGE_IMAGES_PER_PDF} from '@uz/contract/extraction'
@@ -22,7 +22,7 @@ export interface PdfAssets {
   wasmUrl: string
 }
 
-type Read = Extract<ExtractorReply, {type: 'read'}>
+type Read = Extract<ExtractorOutput, {type: 'read'}>
 
 export type PdfReading = Pick<Read, 'pageImages' | 'imagesStopped'> & {
   text: string

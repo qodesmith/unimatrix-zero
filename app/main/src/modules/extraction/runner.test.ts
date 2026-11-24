@@ -11,7 +11,7 @@ import {jpegBytes, pngBytes} from './test-images'
 
 const PDF = new TextEncoder().encode('%PDF-1.7\n')
 
-function goodReply() {
+function goodOutput() {
   return {
     type: 'read',
     format: 'pdf',
@@ -53,8 +53,8 @@ afterEach(() => {
 })
 
 describe('an extraction job', () => {
-  it('opens one window with the file’s bytes, passes a good reply and destroys the window', async () => {
-    const fake = fakeWindow(events => events.message(goodReply()))
+  it('opens one window with the file’s bytes, passes good output and destroys the window', async () => {
+    const fake = fakeWindow(events => events.message(goodOutput()))
 
     const result = await runExtraction(PDF, fake.open)
 
@@ -83,8 +83,8 @@ describe('an extraction job', () => {
   it.each([
     ['a null message, as a transferred buffer arrives', null],
     [
-      'a malformed reply',
-      {...goodReply(), pageImages: [{page: 1, bytes: pngBytes()}]},
+      'malformed output',
+      {...goodOutput(), pageImages: [{page: 1, bytes: pngBytes()}]},
     ],
   ])('fails on %s and destroys the window', async (_case, data) => {
     const fake = fakeWindow(events => events.message(data))
@@ -120,7 +120,7 @@ describe('an extraction job', () => {
 
   it('keeps the first message and destroys the window once', async () => {
     const fake = fakeWindow(events => {
-      events.message(goodReply())
+      events.message(goodOutput())
       events.message({type: 'failed', message: 'Late'})
       events.failed()
     })

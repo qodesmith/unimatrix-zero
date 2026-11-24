@@ -46,7 +46,7 @@ export type ExtractionJob = z.infer<typeof ExtractionJobSchema>
  * What the extraction window posts back. It is hostile: main parses it with
  * this schema and then checks each image's bytes and the text's encoding.
  */
-export const ExtractorReplySchema = z.discriminatedUnion('type', [
+export const ExtractorOutputSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('read'),
     format: ExtractionFormatSchema,
@@ -70,7 +70,7 @@ export const ExtractorReplySchema = z.discriminatedUnion('type', [
   }),
 ])
 
-export type ExtractorReply = z.infer<typeof ExtractorReplySchema>
+export type ExtractorOutput = z.infer<typeof ExtractorOutputSchema>
 
 /** What main keeps of an Extraction, and what the renderer sees of it. */
 export const ExtractionSchema = z.discriminatedUnion('status', [

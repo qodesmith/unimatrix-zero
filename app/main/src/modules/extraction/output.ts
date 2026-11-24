@@ -1,8 +1,8 @@
-import type {ExtractorReply} from '@uz/contract/extraction'
+import type {ExtractorOutput} from '@uz/contract/extraction'
 
 import {
   EXTRACTED_TEXT_LIMIT,
-  ExtractorReplySchema,
+  ExtractorOutputSchema,
   PAGE_IMAGES_PER_PDF,
   PAGE_IMAGE_PIXELS,
 } from '@uz/contract/extraction'
@@ -11,12 +11,12 @@ import {MIB} from '@uz/contract/sizes'
 import {extractionCandidate, formatFits} from './candidate'
 import {jpegSize} from './jpeg'
 
-type ReadReply = Extract<ExtractorReply, {type: 'read'}>
+type ReadOutput = Extract<ExtractorOutput, {type: 'read'}>
 
-/** A reply that passed every check; anything else is a failure. */
+/** Output that passed every check; anything else is a failure. */
 export type ExtractionResult =
-  | (Omit<ReadReply, 'text'> & {text: string})
-  | Extract<ExtractorReply, {type: 'unsupported'}>
+  | (Omit<ReadOutput, 'text'> & {text: string})
+  | Extract<ExtractorOutput, {type: 'unsupported'}>
   | {type: 'failed'}
 
 export const PAGE_IMAGE_SIZE_LIMIT = 8 * MIB
@@ -45,38 +45,39 @@ function isPageImage(bytes: Uint8Array) {
   )
 }
 
-function inPageOrder(images: ReadReply['pageImages']) {
+function inPageOrder(images: ReadOutput['pageImages']) {
   return images.every(
     (image, at) => at === 0 || image.page > (images[at - 1]?.page ?? 0)
   )
 }
 
-function pageImagesFit(reply: ReadReply) {
-  if (reply.format !== 'pdf') {
-    return reply.pageImages.length === 0 && !reply.imagesStopped
+function pageImagesFit(output: ReadOutput) {
+  if (output.format !== 'pdf') {
+    return output.pageImages.length === 0 && !output.imagesStopped
   }
 
   return (
-    reply.pageImages.length <= PAGE_IMAGES_PER_PDF &&
-    (!reply.imagesStopped || reply.pageImages.length === PAGE_IMAGES_PER_PDF) &&
-    inPageOrder(reply.pageImages) &&
-    reply.pageImages.every(({bytes}) => isPageImage(bytes))
+    output.pageImages.length <= PAGE_IMAGES_PER_PDF &&
+    (!output.imagesStopped ||
+      output.pageImages.length === PAGE_IMAGES_PER_PDF) &&
+    inPageOrder(output.pageImages) &&
+    output.pageImages.every(({bytes}) => isPageImage(bytes))
   )
 }
 
-function validRead(reply: ReadReply, input: Uint8Array): ExtractionResult {
-  if (!formatFits(reply.format, input) || !pageImagesFit(reply)) return FAILED
+function validRead(output: ReadOutput, input: Uint8Array): ExtractionResult {
+  if (!formatFits(output.format, input) || !pageImagesFit(output)) return FAILED
 
-  const text = decodedText(reply.text)
+  const text = decodedText(output.text)
 
   return text === null
     ? FAILED
     : {
         type: 'read',
-        format: reply.format,
+        format: output.format,
         text,
-        pageImages: reply.pageImages,
-        imagesStopped: reply.imagesStopped,
+        pageImages: output.pageImages,
+        imagesStopped: output.imagesStopped,
       }
 }
 
@@ -88,28 +89,28 @@ function mayBeUnsupported(input: Uint8Array) {
 }
 
 /**
- * The window is hostile: anything off in its reply discards the whole of it.
+ * The window is hostile: anything off in its output discards all of it.
  * `input` is the file the job was given.
  */
-export function validateReply(
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the window's message: ExtractorReplySchema parses it below
+export function validateOutput(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the window's message: ExtractorOutputSchema parses it below
   data: unknown,
   input: Uint8Array
 ): ExtractionResult {
-  const parsed = ExtractorReplySchema.safeParse(data)
+  const parsed = ExtractorOutputSchema.safeParse(data)
 
   if (!parsed.success) return FAILED
 
-  const reply = parsed.data
+  const output = parsed.data
 
-  switch (reply.type) {
+  switch (output.type) {
     case 'read':
-      return validRead(reply, input)
+      return validRead(output, input)
     case 'unsupported':
       return mayBeUnsupported(input) ? {type: 'unsupported'} : FAILED
     case 'failed':
       return FAILED
     default:
-      throw new Error('Unknown extractor reply.')
+      throw new Error('Unknown extractor output.')
   }
 }

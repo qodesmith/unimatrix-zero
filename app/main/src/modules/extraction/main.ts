@@ -1,4 +1,4 @@
-export type {ExtractionResult} from './reply'
+export type {ExtractionResult} from './output'
 
 export type {OpenExtractionWindow, WindowEvents} from './runner'
 

@@ -1,6 +1,6 @@
 import type {OdfKind} from '#modules/odf/main'
 import type {PdfAssets, PdfReading} from '#modules/pdf/main'
-import type {ExtractionFormat, ExtractorReply} from '@uz/contract/extraction'
+import type {ExtractionFormat, ExtractorOutput} from '@uz/contract/extraction'
 
 import {readDocx} from '#modules/docx/main'
 import {readEpub} from '#modules/epub/main'
@@ -35,7 +35,7 @@ function readText(
   format: ExtractionFormat,
   text: string,
   pdf?: Omit<PdfReading, 'text'>
-): ExtractorReply {
+): ExtractorOutput {
   const encoded = new TextEncoder().encode(text)
 
   if (encoded.length > EXTRACTED_TEXT_LIMIT)
@@ -50,7 +50,7 @@ function readText(
   }
 }
 
-function extractZip(bytes: Uint8Array): ExtractorReply {
+function extractZip(bytes: Uint8Array): ExtractorOutput {
   const zip = openZip(bytes)
   const mimetype = zip.read('mimetype')
   const declared = mimetype && new TextDecoder().decode(mimetype).trim()
@@ -73,7 +73,7 @@ function extractZip(bytes: Uint8Array): ExtractorReply {
 async function extractAny(
   bytes: Uint8Array,
   assets: PdfAssets | undefined
-): Promise<ExtractorReply> {
+): Promise<ExtractorOutput> {
   if (isPdf(bytes)) {
     const {text, ...images} = await readPdf(bytes, assets)
 
@@ -92,12 +92,12 @@ async function extractAny(
 
 /**
  * Tells the format apart by its bytes alone, never a name, and reads it.
- * It never throws: an error is a `failed` reply.
+ * It never throws: an error is `failed` output.
  */
 export async function extract(
   bytes: Uint8Array,
   assets?: PdfAssets
-): Promise<ExtractorReply> {
+): Promise<ExtractorOutput> {
   try {
     return await extractAny(bytes, assets)
   } catch (error) {

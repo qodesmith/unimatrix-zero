@@ -35,7 +35,7 @@ let db: Database
 let dropped: Map<string, string>
 let attachments: ReturnType<typeof createAttachments>
 let extracted: Uint8Array[]
-let extractorReply: () => Promise<ExtractionResult>
+let extractorOutput: () => Promise<ExtractionResult>
 
 beforeEach(() => {
   folder = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-attachments-'))
@@ -43,7 +43,7 @@ beforeEach(() => {
   db = openDatabase({file: ':memory:', migrationsFolder})
   dropped = new Map()
   extracted = []
-  extractorReply = async () => ({type: 'unsupported'})
+  extractorOutput = async () => ({type: 'unsupported'})
   attachments = createAttachments({
     db,
     dir,
@@ -51,7 +51,7 @@ beforeEach(() => {
     extract: async bytes => {
       extracted.push(bytes)
 
-      return extractorReply()
+      return extractorOutput()
     },
   })
 })
@@ -461,7 +461,7 @@ describe('an Extraction', () => {
   }
 
   it('is made when a PDF is added, its text and page images kept under its SHA-256 and the extractor’s version', async () => {
-    extractorReply = async () => readPdf('# Page 1\nHello')
+    extractorOutput = async () => readPdf('# Page 1\nHello')
 
     const attachment = await paste('report.pdf', PDF)
 
@@ -485,7 +485,7 @@ describe('an Extraction', () => {
   it.skipIf(process.platform === 'win32')(
     'is readable by its owner alone',
     async () => {
-      extractorReply = async () => readPdf('Hello')
+      extractorOutput = async () => readPdf('Hello')
 
       await paste('report.pdf', PDF)
 
@@ -498,7 +498,7 @@ describe('an Extraction', () => {
   )
 
   it('keeps no text file when the text is only whitespace', async () => {
-    extractorReply = async () => readPdf(' \n\t')
+    extractorOutput = async () => readPdf(' \n\t')
 
     const attachment = await paste('scan.pdf', PDF)
 
@@ -510,7 +510,7 @@ describe('an Extraction', () => {
   })
 
   it('is reused for the same bytes added again, with no second job', async () => {
-    extractorReply = async () => readPdf('Hello')
+    extractorOutput = async () => readPdf('Hello')
     await paste('report.pdf', PDF)
 
     const again = await paste('copy.pdf', PDF)
@@ -520,7 +520,7 @@ describe('an Extraction', () => {
   })
 
   it('is made again when the kept one is gone from disk', async () => {
-    extractorReply = async () => readPdf('Hello')
+    extractorOutput = async () => readPdf('Hello')
     await paste('report.pdf', PDF)
     fs.rmSync(extractedFolder(), {recursive: true})
 
@@ -532,7 +532,7 @@ describe('an Extraction', () => {
   })
 
   it('is made again when the one kept is another version’s', async () => {
-    extractorReply = async () => readPdf('Hello')
+    extractorOutput = async () => readPdf('Hello')
     const first = await paste('report.pdf', PDF)
     const other = EXTRACTOR_VERSION + 1
     fs.cpSync(extractedFolder(), extractedFolder(other), {recursive: true})
@@ -549,13 +549,13 @@ describe('an Extraction', () => {
   })
 
   it('takes the files an identical job put in place first', async () => {
-    extractorReply = async () => readPdf('Hello')
+    extractorOutput = async () => readPdf('Hello')
     const first = await paste('report.pdf', PDF)
     db.update(schema.attachments)
       .set({extraction: null})
       .where(eq(schema.attachments.id, first.id))
       .run()
-    extractorReply = async () => readPdf('Hello again')
+    extractorOutput = async () => readPdf('Hello again')
 
     const again = await paste('copy.pdf', PDF)
 
@@ -568,9 +568,9 @@ describe('an Extraction', () => {
   })
 
   it('is made again when the first one failed', async () => {
-    extractorReply = async () => ({type: 'failed'})
+    extractorOutput = async () => ({type: 'failed'})
     await paste('report.pdf', PDF)
-    extractorReply = async () => readPdf('Hello')
+    extractorOutput = async () => readPdf('Hello')
 
     const again = await paste('copy.pdf', PDF)
 
@@ -591,8 +591,8 @@ describe('an Extraction', () => {
     ],
   ])(
     'is marked failed when %s, and the file still attaches with nothing extracted',
-    async (_case, reply) => {
-      extractorReply = reply
+    async (_case, output) => {
+      extractorOutput = output
 
       const attachment = await paste('report.pdf', PDF)
 
@@ -610,7 +610,7 @@ describe('an Extraction', () => {
   )
 
   it('is marked failed when its files can’t be written, and the file still attaches', async () => {
-    extractorReply = async () => readPdf('Hello')
+    extractorOutput = async () => readPdf('Hello')
     fs.mkdirSync(dir, {recursive: true})
     fs.writeFileSync(path.join(dir, 'extractions'), 'in the way')
 
@@ -683,7 +683,7 @@ describe('an Extraction', () => {
 
   describe('for a Provider host', () => {
     it('gives the extracted files’ paths beside the original’s', async () => {
-      extractorReply = async () => readPdf('Hello')
+      extractorOutput = async () => readPdf('Hello')
 
       expect(await hostOf('chatgpt')).toEqual({
         name: 'report.pdf',
@@ -702,7 +702,7 @@ describe('an Extraction', () => {
     })
 
     it('gives no text path for an Extraction with no text', async () => {
-      extractorReply = async () => readPdf('')
+      extractorOutput = async () => readPdf('')
 
       expect((await hostOf('chatgpt'))?.extraction).toMatchObject({
         text: null,
@@ -710,7 +710,7 @@ describe('an Extraction', () => {
     })
 
     it('gives none for a PDF that goes inline whole', async () => {
-      extractorReply = async () => readPdf('Hello')
+      extractorOutput = async () => readPdf('Hello')
 
       expect(await hostOf('claude')).toMatchObject({
         inline: {type: 'pdf'},
@@ -719,7 +719,7 @@ describe('an Extraction', () => {
     })
 
     it('gives none for a failed Extraction', async () => {
-      extractorReply = async () => ({type: 'failed'})
+      extractorOutput = async () => ({type: 'failed'})
 
       expect((await hostOf('chatgpt'))?.extraction).toBeNull()
     })
