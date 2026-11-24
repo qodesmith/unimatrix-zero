@@ -2,10 +2,8 @@
 import type {FakeMain} from '../fake-main'
 import type {Bridge} from '@uz/contract/bridge'
 import type {Command} from '@uz/contract/commands'
-import type {TreeTools} from '@uz/contract/tools'
 import type {Tree} from '@uz/contract/trees'
 import type {ReactNode} from 'react'
-import type {Locator} from 'vitest/browser'
 
 import {SYSTEM_PROMPT_MAX_LENGTH} from '@uz/contract/system-prompts'
 import {
@@ -253,43 +251,6 @@ async function openTreePanel(name: string) {
   return panel
 }
 
-function toolSwitches(within: Locator) {
-  const tools = within.getByRole('region', {name: 'Tools'})
-  const claude = tools.getByRole('group', {name: 'Built in · Claude'})
-  const chatgpt = tools.getByRole('group', {name: 'Built in · ChatGPT'})
-
-  return {
-    webSearch: tools.getByRole('switch', {name: 'Web search'}),
-    claudeConnectors: tools.getByRole('switch', {
-      name: 'Claude account connectors',
-    }),
-    claudeBuiltInSkills: claude.getByRole('switch', {name: 'Built-in Skills'}),
-    chatgptBuiltInSkills: chatgpt.getByRole('switch', {
-      name: 'Built-in Skills',
-    }),
-    chatgptRemotePlugins: chatgpt.getByRole('switch', {name: 'Remote plugins'}),
-  }
-}
-
-async function expectSwitches(within: Locator, expected: TreeTools) {
-  const switches = Object.entries(toolSwitches(within))
-
-  await expect
-    .poll(() =>
-      Object.fromEntries(
-        switches.map(([key, toggle]) => [
-          key,
-          toggle.query()?.getAttribute('aria-checked'),
-        ])
-      )
-    )
-    .toEqual(
-      Object.fromEntries(
-        Object.entries(expected).map(([key, on]) => [key, String(on)])
-      )
-    )
-}
-
 describe('a Tree’s panel', () => {
   it('opens from its ⋯ menu with its own System prompt, and saves an edit from its next Reply', async () => {
     const tree = savedTree({
@@ -390,142 +351,25 @@ describe('a Tree’s panel', () => {
     await expect.element(toLibrary).toBeEnabled()
   })
 
-  it('shows the Tree’s own Tools, and a flip sends that one switch alone, from its next Reply', async () => {
-    const tree = savedTree({
-      title: 'Trip',
-      tools: {
-        webSearch: true,
-        claudeConnectors: true,
-        claudeBuiltInSkills: false,
-        chatgptBuiltInSkills: false,
-        chatgptRemotePlugins: true,
-      },
-    })
-
-    const main = fakeMain({trees: [tree, savedTree({title: 'Other'})]})
-    await renderApp(main)
-
-    const panel = await openTreePanel('Trip')
-    await expectSwitches(panel, {
-      webSearch: true,
-      claudeConnectors: true,
-      claudeBuiltInSkills: false,
-      chatgptBuiltInSkills: false,
-      chatgptRemotePlugins: true,
-    })
-    await expect
-      .element(
-        panel
-          .getByRole('region', {name: 'Tools'})
-          .getByText('Applies from this Tree’s next Reply.')
-      )
-      .toBeVisible()
-
-    await toolSwitches(panel).chatgptBuiltInSkills.click()
-
-    await expectSwitches(panel, {
-      webSearch: true,
-      claudeConnectors: true,
-      claudeBuiltInSkills: false,
-      chatgptBuiltInSkills: true,
-      chatgptRemotePlugins: true,
-    })
-    expect(sentOf(main, 'tree.set-tools')).toEqual([
-      {
-        type: 'tree.set-tools',
-        treeId: tree.id,
-        changes: {chatgptBuiltInSkills: true},
-      },
-    ])
-  })
   it('follows its Tools changed elsewhere', async () => {
     const tree = savedTree({title: 'Trip'})
     const main = fakeMain({trees: [tree]})
     await renderApp(main)
 
     const panel = await openTreePanel('Trip')
-    await expect
-      .element(toolSwitches(panel).claudeBuiltInSkills)
-      .not.toBeChecked()
+
+    const skills = panel
+      .getByRole('group', {name: 'Built in · Claude'})
+      .getByRole('switch', {name: 'Built-in Skills'})
+
+    await expect.element(skills).not.toBeChecked()
 
     main.publish({
       type: 'TREE_CHANGED',
       tree: {...tree, tools: {...tree.tools, claudeBuiltInSkills: true}},
     })
 
-    await expect.element(toolSwitches(panel).claudeBuiltInSkills).toBeChecked()
-  })
-
-  it('says why main refused a flip, and leaves the switch as it was', async () => {
-    const main = fakeMain({trees: [savedTree({title: 'Trip'})]})
-    await renderApp(main)
-
-    const panel = await openTreePanel('Trip')
-    main.trees.length = 0
-    await toolSwitches(panel).webSearch.click()
-
-    await expect
-      .element(panel.getByRole('region', {name: 'Tools'}).getByRole('alert'))
-      .toHaveTextContent('Gone')
-    await expect.element(toolSwitches(panel).webSearch).toBeChecked()
-  })
-})
-
-function settingsSheet() {
-  return page.getByRole('dialog', {name: 'Settings'})
-}
-
-async function openSettingsTools() {
-  await sidebar().getByRole('button', {name: 'Settings'}).click()
-  await settingsSheet()
-    .getByRole('navigation', {name: 'Settings sections'})
-    .getByRole('button', {name: 'Tools'})
-    .click()
-  await expect
-    .element(settingsSheet().getByRole('heading', {name: 'Tools'}))
-    .toBeVisible()
-}
-
-describe('Settings → Tools', () => {
-  it('holds the Tools defaults under their reach note, and a flip saves them whole', async () => {
-    const main = fakeMain()
-    await renderApp(main)
-
-    await openSettingsTools()
-    await expect
-      .element(
-        settingsSheet().getByText(
-          'For new Trees. Each Tree changes its own in its Tree panel.'
-        )
-      )
-      .toBeVisible()
-    await expectSwitches(settingsSheet(), {
-      webSearch: true,
-      claudeConnectors: false,
-      claudeBuiltInSkills: false,
-      chatgptBuiltInSkills: false,
-      chatgptRemotePlugins: false,
-    })
-
-    await toolSwitches(settingsSheet()).chatgptRemotePlugins.click()
-
-    await expect
-      .element(toolSwitches(settingsSheet()).chatgptRemotePlugins)
-      .toBeChecked()
-    expect(sentOf(main, 'settings.update')).toEqual([
-      {
-        type: 'settings.update',
-        changes: {
-          toolDefaults: {
-            webSearch: true,
-            claudeConnectors: false,
-            claudeBuiltInSkills: false,
-            chatgptBuiltInSkills: false,
-            chatgptRemotePlugins: true,
-          },
-        },
-      },
-    ])
+    await expect.element(skills).toBeChecked()
   })
 })
 

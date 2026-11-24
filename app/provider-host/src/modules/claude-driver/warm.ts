@@ -3,15 +3,27 @@ import type {ReplyRequest, SessionRef} from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 import type {TreeTools} from '@uz/contract/tools'
 
+import {TreeToolsSchema} from '@uz/contract/tools'
+
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
 
 export const MAX_WARM = 6
 
-const CLAUDE_TOOLS = [
-  'webSearch',
-  'claudeConnectors',
-  'claudeBuiltInSkills',
-] as const satisfies readonly (keyof TreeTools)[]
+/**
+ * Whether `claude` reads each switch. A flip of one it doesn't read keeps a
+ * warm session.
+ */
+const CLAUDE_READS: Record<keyof TreeTools, boolean> = {
+  webSearch: true,
+  claudeConnectors: true,
+  claudeBuiltInSkills: true,
+  chatgptBuiltInSkills: false,
+  chatgptRemotePlugins: false,
+}
+
+const CLAUDE_TOOLS = TreeToolsSchema.keyof().options.filter(
+  key => CLAUDE_READS[key]
+)
 
 export interface WarmSession {
   readonly sessionId: string | null

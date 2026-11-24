@@ -17,7 +17,6 @@ export const TreeSchema = z.strictObject({
   unseenFailure: z.boolean(),
   /** Its own copy, which later Replies run under. */
   systemPrompt: TreeSystemPromptSchema,
-  /** Its Tools panel, which later Replies run with. */
   tools: TreeToolsSchema,
 })
 

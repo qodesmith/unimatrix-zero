@@ -1681,7 +1681,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 180_000)
 
-  it('[dep:codex-tool-switches] offers the Model web search and the built-in Skills in a thread started with them on, and neither in a Reply on the same loaded thread once both switches are off, while the Skills listed before stay in its history', async () => {
+  it('[dep:codex-tool-switches] offers the Model web search and the built-in Skills in a thread started with them on, and neither in a Reply on the same loaded thread once both switches are off, while the Skills listed before stay in its history, and web search again once its switch is back on', async () => {
     if (!folder || !signedIn) return
 
     const api = await startRecordingApi(signedIn)
@@ -1705,7 +1705,15 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
 
       const second = api.bodies.at(-1)
 
-      if (!first || !second || first === second) {
+      const back = await reply('Say hi once more.', off.session, {
+        ...DEFAULT_TREE_TOOLS,
+        webSearch: true,
+        chatgptBuiltInSkills: false,
+      })
+
+      const third = api.bodies.at(-1)
+
+      if (!first || !second || !third || first === second || second === third) {
         throw new Error('A Reply sent the Model nothing')
       }
 
@@ -1714,7 +1722,9 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
 
       expectComplete(on.events)
       expectComplete(off.events)
+      expectComplete(back.events)
       expect(off.session?.sessionId).toBe(on.session?.sessionId)
+      expect(back.session?.sessionId).toBe(on.session?.sessionId)
       expect(offersWebSearch(first)).toBe(true)
       expect(skillListings(first.input)).toEqual([
         expect.stringContaining(BUNDLED_SKILL),
@@ -1726,6 +1736,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       expect(skillListings(history)).toEqual([
         expect.stringContaining(BUNDLED_SKILL),
       ])
+      expect(offersWebSearch(third)).toBe(true)
 
       await closed()
     } finally {
@@ -1851,7 +1862,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       recording ? recorder.spawn : spawnCodex
     )
 
-    const padding = 'The harbor log lists no ships today. '.repeat(800)
+    const padding = 'The harbor log lists no ships today. '.repeat(1200)
 
     try {
       // Codex checks the limit as a turn starts, so the padded turn can't compact.

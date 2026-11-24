@@ -1,9 +1,8 @@
 import {z} from 'zod'
 
 /**
- * What a Tree's Tools panel switches on, read by every Reply from the Tree's
- * next one. Reading, writing files and running commands are not here: every
- * Tree has them (ADR 0022).
+ * What a Tree's Tools panel switches on, from its next Reply. Reading, writing
+ * files and running commands are not here: every Tree has them (ADR 0022).
  */
 export const TreeToolsSchema = z.strictObject({
   /** Claude's `WebSearch` and `WebFetch`; Codex's web search. */
