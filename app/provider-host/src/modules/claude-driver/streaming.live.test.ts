@@ -2,6 +2,7 @@
  * Needs a real plan and the env `bun run provider-checks` sets.
  * `UZ_RECORD=yes` rewrites `recordings/`, which the driver tests replay.
  */
+import type {Query} from '@anthropic-ai/claude-agent-sdk'
 import type {
   ReplyRecorded,
   ReplyRequest,
@@ -55,10 +56,6 @@ const InitLine = z.looseObject({
   subtype: z.literal('init'),
   tools: z.array(z.string()),
   permissionMode: z.string(),
-})
-
-const InitWithServers = InitLine.extend({
-  mcp_servers: z.array(z.looseObject({name: z.string()})),
 })
 
 let sharedTreeFolder: string | null = null
@@ -175,6 +172,7 @@ function liveDriver(
   let compactionSettings: CompactionSettings = {auto: true, threshold: null}
   const store = fakeStore(refuses)
   const printed: string[] = []
+  const queries: Query[] = []
 
   const recorder = createRecorder(
     ({command, args, cwd, env, signal}) =>
@@ -210,6 +208,12 @@ function liveDriver(
     },
     env: hostEnv,
     whenIdle: idle.whenIdle,
+    query: params => {
+      const running = query(params)
+      queries.push(running)
+
+      return running
+    },
   })
 
   async function closed() {
@@ -271,6 +275,7 @@ function liveDriver(
       compactionSettings = next
     },
     printed,
+    queries,
     entriesOf: (sessionId: string) =>
       store.entriesOf(projectKeyOf(configDir), sessionId),
     entryCount: (sessionId: string) =>
@@ -1242,6 +1247,8 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     const first = await live.reply('Say hi.', null)
 
+    expect(await live.queries[0]?.mcpServerStatus()).toEqual([])
+
     await live.closed()
 
     const second = await Array.fromAsync(
@@ -1262,7 +1269,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     )
 
     const inits = live.printed.flatMap(line => {
-      const parsed = InitWithServers.safeParse(JSON.parse(line))
+      const parsed = InitLine.safeParse(JSON.parse(line))
 
       return parsed.success ? [parsed.data] : []
     })
@@ -1275,12 +1282,14 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       expect.arrayContaining(['WebFetch', 'WebSearch'])
     )
     expect(before?.tools).not.toContain('Skill')
-    expect(before?.mcp_servers).toEqual([])
     expect(after?.tools).not.toContain('WebFetch')
     expect(after?.tools).not.toContain('WebSearch')
     expect(after?.tools).toContain('Skill')
-    // Holds only for an account with a connector: the maintainer's has some.
-    expect(after?.mcp_servers.length).toBeGreaterThan(0)
+    // `claude` fetches them after it starts. Only an account with a
+    // connector has any: the maintainer's has some.
+    await expect
+      .poll(async () => (await live.queries[1]?.mcpServerStatus())?.length)
+      .toBeGreaterThan(0)
 
     await live.done()
   }, 300_000)

@@ -65,6 +65,7 @@ export const handlers: Handlers = {
       systemPrompts.defaultText(),
       settings.read().toolDefaults
     )
+
     publish({type: 'TREE_CREATED', tree})
 
     return tree

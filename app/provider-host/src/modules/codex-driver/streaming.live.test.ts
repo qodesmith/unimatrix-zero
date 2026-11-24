@@ -13,6 +13,7 @@ import type {
   Thread,
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
+import type {TreeTools} from '@uz/contract/tools'
 
 import {fileHolding, pngShowing} from '#modules/test-attachments/main'
 import {markedDeveloperFolder} from '#modules/test-developer-folder/main'
@@ -32,7 +33,9 @@ import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import {createInterface} from 'node:readline'
+import {buffer} from 'node:stream/consumers'
 import {StringDecoder} from 'node:string_decoder'
+import zlib from 'node:zlib'
 import {afterAll, describe, expect, it} from 'vitest'
 import {z} from 'zod'
 
@@ -455,7 +458,11 @@ function codedReplies(
     whenIdle: idle.whenIdle,
   })
 
-  async function reply(text: string, session: SessionRef | null) {
+  async function reply(
+    text: string,
+    session: SessionRef | null,
+    tools: TreeTools = DEFAULT_TREE_TOOLS
+  ) {
     const from = lines.length
 
     const events = await Array.fromAsync(
@@ -482,7 +489,7 @@ function codedReplies(
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         systemPromptChanged: false,
-        tools: DEFAULT_TREE_TOOLS,
+        tools,
       })
     )
 
@@ -607,6 +614,134 @@ const NO_RESPONSE = {responseStreamDisconnected: {httpStatusCode: null}}
 function expectRetriedWithNoResponse(retried: unknown[]) {
   expect(retried.length).toBeGreaterThan(0)
   expect(retried).toEqual(retried.map(() => NO_RESPONSE))
+}
+
+const ModelsCache = z.looseObject({
+  etag: z.string().optional(),
+  models: z.array(z.unknown()),
+})
+
+const ResponsesBody = z.looseObject({
+  input: z.array(z.looseObject({type: z.string()})),
+})
+
+type ResponsesBody = z.infer<typeof ResponsesBody>
+
+function decoded(request: http.IncomingMessage, body: Buffer) {
+  return request.headers['content-encoding'] === 'zstd'
+    ? zlib.zstdDecompressSync(body)
+    : body
+}
+
+function answeredOk(response: http.ServerResponse, count: number) {
+  const id = `resp_stand_in_${count}`
+
+  const events = [
+    {type: 'response.created', response: {id}},
+    {
+      type: 'response.output_item.done',
+      item: {
+        type: 'message',
+        role: 'assistant',
+        id: `msg_stand_in_${count}`,
+        content: [{type: 'output_text', text: 'ok'}],
+      },
+    },
+    {
+      type: 'response.completed',
+      response: {
+        id,
+        usage: {
+          input_tokens: 0,
+          input_tokens_details: null,
+          output_tokens: 0,
+          output_tokens_details: null,
+          total_tokens: 0,
+        },
+      },
+    },
+  ]
+
+  response.writeHead(200, {'content-type': 'text/event-stream'})
+  response.end(
+    events
+      .map(event => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
+      .join('')
+  )
+}
+
+/**
+ * Answers every Model request with `ok` and keeps its body. Codex learns the
+ * Model's tools from `/models`, so it gets the signed-in home's cached list.
+ */
+async function startRecordingApi(source: string) {
+  const {etag = 'stand-in', models} = ModelsCache.parse(
+    JSON.parse(fs.readFileSync(path.join(source, 'models_cache.json'), 'utf8'))
+  )
+
+  const bodies: ResponsesBody[] = []
+
+  async function handle(
+    request: http.IncomingMessage,
+    response: http.ServerResponse
+  ) {
+    const body = decoded(request, await buffer(request))
+
+    if (request.method === 'POST' && request.url?.endsWith('/responses')) {
+      bodies.push(ResponsesBody.parse(JSON.parse(body.toString('utf8'))))
+      answeredOk(response, bodies.length)
+
+      return
+    }
+
+    if (request.method === 'GET' && request.url?.includes('/models')) {
+      response.writeHead(200, {'content-type': 'application/json', etag})
+      response.end(JSON.stringify({models}))
+
+      return
+    }
+
+    notFound(response)
+  }
+
+  const api = http.createServer((request, response) => {
+    void handle(request, response)
+  })
+
+  api.on('upgrade', (_request, socket) =>
+    socket.end('HTTP/1.1 426 Upgrade Required\r\n\r\n')
+  )
+
+  const url = await listenLocally(api)
+
+  return {
+    args: [
+      '-c',
+      `openai_base_url="${url}/v1"`,
+      '-c',
+      `chatgpt_base_url="${url}/backend-api/"`,
+    ],
+    bodies,
+    close() {
+      api.close()
+    },
+  }
+}
+
+const BUNDLED_SKILL = 'skill-creator'
+
+/** Codex offers web search inside its `exec` tool, as `web__run`. */
+function offersWebSearch(body: ResponsesBody) {
+  return JSON.stringify(
+    body.input.filter(item => item.type === 'additional_tools')
+  ).includes('web__run')
+}
+
+/** Codex lists the Skills again in a turn whose list changed. */
+function skillListings(items: ResponsesBody['input']) {
+  return items
+    .map(item => JSON.stringify(item))
+    .filter(text => text.includes('<skills_instructions>'))
 }
 
 describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
@@ -1518,6 +1653,59 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       expectRetriedWithNoResponse(usageStreamed.retried)
       expect(usageStreamed.turnErrors).toEqual(['other'])
       expect(usageStreamed.failure).toMatchObject({code: 'connection-lost'})
+
+      await closed()
+    } finally {
+      api.close()
+      fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 180_000)
+
+  it('[dep:codex-tool-switches] offers the Model web search and the built-in Skills in a thread started with them on, and neither in a Reply on the same loaded thread once both switches are off, while the Skills listed before stay in its history', async () => {
+    if (!folder || !signedIn) return
+
+    const api = await startRecordingApi(signedIn)
+    const home = homeFrom(signedIn)
+    const {reply, closed} = codedReplies(folder, home, {args: api.args})
+
+    try {
+      const on = await reply('Say hi.', null, {
+        ...DEFAULT_TREE_TOOLS,
+        webSearch: true,
+        chatgptBuiltInSkills: true,
+      })
+
+      const first = api.bodies.at(-1)
+
+      const off = await reply('Say hi again.', on.session, {
+        ...DEFAULT_TREE_TOOLS,
+        webSearch: false,
+        chatgptBuiltInSkills: false,
+      })
+
+      const second = api.bodies.at(-1)
+
+      if (!first || !second || first === second) {
+        throw new Error('A Reply sent the Model nothing')
+      }
+
+      const history = second.input.slice(0, first.input.length)
+      const added = second.input.slice(first.input.length)
+
+      expectComplete(on.events)
+      expectComplete(off.events)
+      expect(off.session?.sessionId).toBe(on.session?.sessionId)
+      expect(offersWebSearch(first)).toBe(true)
+      expect(skillListings(first.input)).toEqual([
+        expect.stringContaining(BUNDLED_SKILL),
+      ])
+      expect(offersWebSearch(second)).toBe(false)
+      expect(skillListings(added)).toEqual([
+        expect.not.stringContaining(BUNDLED_SKILL),
+      ])
+      expect(skillListings(history)).toEqual([
+        expect.stringContaining(BUNDLED_SKILL),
+      ])
 
       await closed()
     } finally {

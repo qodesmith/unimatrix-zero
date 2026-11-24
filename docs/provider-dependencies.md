@@ -200,10 +200,21 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Kind:** D
 - **Provider:** Claude
 - **Relies on:** `claude` offers the Model exactly the tools named in the SDK's `tools` list that the machine can run, `disallowedTools: ['Agent']` keeps the Subagent tool (listed as `Task`) out, and `permissionMode: 'bypassPermissions'` with `allowDangerouslySkipPermissions` runs every tool call in `cwd` without asking. The `claude_code` tool preset would add tools that outlive a Reply or leave the folder (cron jobs, worktrees, remote triggers). On Windows with no Git Bash, `claude` offers no `Bash` though it is named.
-- **App side:** `claude-driver` names its tools for files, commands and the web, on Windows `PowerShell` among them (ADR 0026), and runs every Reply in the Tree's folder with full access, until the Permission mode decides (ADR 0022). Its Reply mapper shows each tool call and its result.
+- **App side:** `claude-driver` names its tools for files and commands, on Windows `PowerShell` among them (ADR 0026), and the web's as the Tools panel says (`claude-tool-switches`), and runs every Reply in the Tree's folder with full access, until the Permission mode decides (ADR 0022). Its Reply mapper shows each tool call and its result.
 - **User would see:** a Reply that can't open, write or run anything, that stalls on a permission request nothing answers, or that starts Subagents or background jobs the app can't show.
 - **Changed by:** upgrade
 - **Check:** `[dep:claude-tools-full-access]` in `claude-driver`: a Reply writes a file in the Tree's folder and runs a command there, `claude` lists exactly the named tools, so no `Agent` or `Task`, and sends no control request. On a Mac or Linux only: the tools on Windows are covered by `windows-powershell-keeps-path`.
+
+### Claude's tools follow the Tools panel
+
+- **Id:** `claude-tool-switches`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** `claude` offers `WebFetch`, `WebSearch` and `Skill`, through which its built-in Skills reach the Model, only when the SDK's `tools` list names them. `strictMcpConfig: true` keeps out the connectors on the signed-in Claude account, and `false` loads them, with `settingSources: []`. None of it changes in a running session, and a session resumed with other options takes them.
+- **App side:** `claude-driver` builds a Reply's tools and `strictMcpConfig` from the Tree's Tools panel. A warm session started with other switches is closed, and the next Reply resumes the same session.
+- **User would see:** a switch in the Tools panel that changes nothing: web search, the account's connectors or the built-in Skills offered while off, or missing while on.
+- **Changed by:** upgrade
+- **Check:** `[dep:claude-tool-switches]` in `claude-driver`: a session resumed after the switches flip offers no web tools and offers `Skill`, which its first Reply did the other way round, and reports the account's connectors, which the first did not. The connectors half needs an account with a connector, as the maintainer's has.
 
 ### A session resumed in another folder
 
@@ -391,6 +402,17 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **User would see:** a Reply that can't write or run anything, or that works in the config folder.
 - **Changed by:** upgrade
 - **Check:** `[dep:codex-full-access]` in `codex-driver`: a Reply writes a file in the Tree's folder and runs a command there, and a Reply on a thread a cut loaded read-only writes a file there too.
+
+### Codex's tools follow the Tools panel
+
+- **Id:** `codex-tool-switches`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** in a thread's `config`, `web_search: 'disabled'` takes away Codex's web search, which is on by default; `skills.bundled.enabled` decides whether the Skills that ship with Codex are listed; `features.plugins` and `features.apps` decide whether OpenAI's remote plugins and their connectors load. A resume brings a new `config` only once the thread is unsubscribed, and a resume with none of a key goes back to Codex's default for it. `turn/start` takes no `config`.
+- **App side:** `codex-driver` builds every thread's `config` from the Tree's Tools panel, and unsubscribes and resumes a loaded thread whose `config` differs from the next Reply's, so no new thread starts.
+- **User would see:** a switch in the Tools panel that changes nothing: web search, the built-in Skills or the remote plugins offered while off, or missing while on.
+- **Changed by:** upgrade + drift. OpenAI's servers decide which remote plugins and connectors there are.
+- **Check:** `[dep:codex-tool-switches]` in `codex-driver`: through a stand-in for OpenAI's API, a thread offers the Model web search and the built-in Skills, and after both switches go off, a turn on the same thread adds neither, while the Skills listed before stay in its history. Remote plugins have no check: their list comes from chatgpt.com, which the stand-in can't serve. The check looks for Codex's own names for the web tool (`web__run`) and the Skills list (`<skills_instructions>`), which an upgrade may rename.
 
 ### Codex's Subagents turned off
 

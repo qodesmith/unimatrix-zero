@@ -1016,12 +1016,15 @@ function sentTools() {
 describe('the Tools panel', () => {
   it('gives a new Tree a copy of the Tools defaults, which no later change to the defaults touches', async () => {
     const before = await createTree()
+
     const defaults = {
       ...DEFAULT_TREE_TOOLS,
       webSearch: false,
       chatgptRemotePlugins: true,
     }
+
     await send({type: 'settings.update', changes: {toolDefaults: defaults}})
+
     clock = new Date('2026-10-20T12:00:00.000Z')
 
     const after = await createTree()

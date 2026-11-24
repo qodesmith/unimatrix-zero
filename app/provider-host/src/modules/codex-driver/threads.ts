@@ -1,12 +1,10 @@
 import type {ReplyRequest} from '@uz/contract/host'
 
-export type ThreadConfig = Record<string, boolean | number | string>
-
 export interface LoadedThread {
   id: string
   model: string
-  /** The `config` Codex loaded it with, which it keeps. */
-  config: ThreadConfig
+  /** The `config` Codex loaded it with, which it keeps; null for none. */
+  config: ThreadConfig | null
   /** Oldest first: the turn it was opened at, then each one started here. */
   turns: string[]
   path: string | null
@@ -16,7 +14,7 @@ export interface LoadedThread {
 export function configOf({
   compactionSettings: {threshold},
   tools,
-}: Pick<ReplyRequest, 'compactionSettings' | 'tools'>): ThreadConfig {
+}: Pick<ReplyRequest, 'compactionSettings' | 'tools'>) {
   return {
     ...(threshold === null ? {} : {model_auto_compact_token_limit: threshold}),
     ...(tools.webSearch ? {} : {web_search: 'disabled'}),
@@ -27,11 +25,13 @@ export function configOf({
   }
 }
 
+export type ThreadConfig = ReturnType<typeof configOf>
+
 export function loadThread(
   threads: Map<string, LoadedThread>,
   opened: {thread: {id: string; path: string | null}; model: string},
   turns: string[],
-  config: ThreadConfig
+  config: ThreadConfig | null
 ): LoadedThread {
   const thread = {
     id: opened.thread.id,

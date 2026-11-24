@@ -199,7 +199,7 @@ async function setUp(
       compactionSettings = DEFAULT_COMPACTION_SETTINGS,
       thread = [],
       attachments = [],
-      tools = DEFAULT_TREE_TOOLS,
+      ...given
     }: ReplyOptions = {}
   ) {
     const events: Streamed[] = []
@@ -217,7 +217,8 @@ async function setUp(
       thread,
       compactionSettings,
       systemPromptChanged: false,
-      tools,
+      tools: DEFAULT_TREE_TOOLS,
+      ...given,
     })) {
       events.push(event)
 
@@ -2171,6 +2172,10 @@ it('starts claude with the Compaction Settings, and with nothing for the default
   expect(changed?.args.join(' ')).toMatch(/"autoCompactWindow":150000/)
 })
 
+function toolsOf(args: string[] = []) {
+  return args.find(arg => arg.startsWith('--tools='))
+}
+
 it('runs claude with the web, account connectors and built-in Skills only as the Tree’s Tools panel says, from the Reply after a switch flips', async () => {
   const claude = await setUp(['warm.ndjson', 'resumed.ndjson'])
   const first = await claude.reply(FIRST_PROMPT)
@@ -2189,8 +2194,6 @@ it('runs claude with the web, account connectors and built-in Skills only as the
 
   await claude.allClosed()
   const [warm, changed] = claude.reports()
-  const toolsOf = (args: string[] = []) =>
-    args.find(arg => arg.startsWith('--tools='))
 
   expect(warm?.prompts).toEqual([FIRST_PROMPT, SECOND_PROMPT])
   expect(toolsOf(warm?.args)).toBe(

@@ -285,7 +285,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       running.threads,
       opened,
       messageId === null ? [] : [messageId],
-      {}
+      null
     )
   }
 
