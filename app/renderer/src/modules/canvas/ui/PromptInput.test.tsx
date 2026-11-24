@@ -136,6 +136,7 @@ function kept(
     size,
     shrunkSize: null,
     folderPath: null,
+    missing: false,
     ...fields,
   }
 }

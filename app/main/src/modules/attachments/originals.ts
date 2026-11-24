@@ -55,6 +55,16 @@ export async function readDropped(filePath: string, limit: number) {
   }
 }
 
+export async function canRead(target: string) {
+  try {
+    await fs.access(target, fs.constants.R_OK)
+
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function exists(target: string) {
   try {
     await fs.access(target)

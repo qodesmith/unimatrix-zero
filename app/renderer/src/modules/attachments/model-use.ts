@@ -4,6 +4,8 @@ import {attachmentKind} from '@uz/contract/attachments'
 
 export const PATH_ONLY_NOW = 'Sent by path only now'
 
+export const FILE_MISSING = 'File missing'
+
 export function modelUse(form: InlineForm | null, attachment: Attachment) {
   switch (form) {
     case 'image':

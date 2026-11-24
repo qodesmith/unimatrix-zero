@@ -1,7 +1,7 @@
 import type {HostAttachment, ImageMediaType} from '@uz/contract/attachments'
 import type {ReplyRequest} from '@uz/contract/host'
 
-import {readFile} from 'node:fs/promises'
+import {access, constants, readFile} from 'node:fs/promises'
 
 export interface Text {
   type: 'text'
@@ -12,8 +12,14 @@ type InlineFile = HostAttachment & {
   inline: NonNullable<HostAttachment['inline']>
 }
 
-/** A Prompt before its inline files are read. Adjacent texts are lines. */
-export type Piece = Text | {type: 'file'; file: InlineFile}
+/**
+ * A Prompt before its files are read. Adjacent texts are lines. An earlier
+ * Prompt's file gets its line on reading: its path, or that it is gone.
+ */
+export type Piece =
+  | Text
+  | {type: 'file'; file: InlineFile}
+  | {type: 'earlier-file'; file: HostAttachment}
 
 /** What a Provider is sent, before a driver puts it in its own wire format. */
 export type ContentPart =
@@ -34,7 +40,7 @@ function pathLine({name, path, folder}: HostAttachment) {
 }
 
 /** Main decides what goes inline; nothing here looks at a type or a size. */
-export function files(attached: HostAttachment[]): Piece[] {
+function files(attached: HostAttachment[]): Piece[] {
   return attached.flatMap((file): Piece[] => {
     const {inline} = file
 
@@ -43,6 +49,15 @@ export function files(attached: HostAttachment[]): Piece[] {
       ...(inline ? [{type: 'file' as const, file: {...file, inline}}] : []),
     ]
   })
+}
+
+/** An earlier Prompt's files: one that can't be read fails nothing. */
+export function earlierFiles(attached: HostAttachment[]): Piece[] {
+  return attached.map(file =>
+    file.folder
+      ? {type: 'text', text: pathLine(file)}
+      : {type: 'earlier-file', file}
+  )
 }
 
 export function joinLines<Part extends {type: string}>(
@@ -70,11 +85,20 @@ function isText(part: {type: string}): part is Text {
   return part.type === 'text'
 }
 
-export function prompted({text, attachments}: Prompt): Piece[] {
+function withPromptText(attached: Piece[], {text, attachments}: Prompt) {
   return joinLines([
-    ...files(attachments),
+    ...attached,
     ...(text === '' && attachments.length > 0 ? [] : lines(text)),
   ])
+}
+
+/** The Prompt being sent: a file of its own that can't be read fails it. */
+export function prompted(prompt: Prompt): Piece[] {
+  return withPromptText(files(prompt.attachments), prompt)
+}
+
+export function earlierPrompted(prompt: Prompt): Piece[] {
+  return withPromptText(earlierFiles(prompt.attachments), prompt)
 }
 
 function fileText(name: string, text: string) {
@@ -121,16 +145,57 @@ async function inlinePart({
   }
 }
 
+async function readable(file: string) {
+  try {
+    await access(file, constants.R_OK)
+
+    return true
+  } catch {
+    return false
+  }
+}
+
+function goneLine(name: string): Text {
+  return {type: 'text', text: `[Attached file "${name}" can no longer be read]`}
+}
+
+async function earlierParts(file: HostAttachment): Promise<ContentPart[]> {
+  if (!(await readable(file.path))) return [goneLine(file.name)]
+
+  const line: Text = {type: 'text', text: pathLine(file)}
+  const {inline} = file
+
+  if (!inline) return [line]
+
+  try {
+    return [line, await inlinePart({...file, inline})]
+  } catch {
+    // An image's shrunk copy may be gone while its original reads.
+    return inline.type === 'image' && inline.path !== file.path
+      ? [line]
+      : [goneLine(file.name)]
+  }
+}
+
+async function partsOf(piece: Piece): Promise<ContentPart[]> {
+  switch (piece.type) {
+    case 'text':
+      return [piece]
+    case 'file':
+      return [await inlinePart(piece.file)]
+    case 'earlier-file':
+      return earlierParts(piece.file)
+    default:
+      throw new Error('Unknown piece.')
+  }
+}
+
 /**
  * Reads each inline file afresh. Never empty, and no text in it is empty
  * unless it is the only part.
  */
 export async function readContent(pieces: Piece[]): Promise<ContentPart[]> {
-  const parts = await Promise.all(
-    pieces.map(async piece =>
-      piece.type === 'text' ? piece : inlinePart(piece.file)
-    )
-  )
+  const parts = (await Promise.all(pieces.map(partsOf))).flat()
 
   const shown = joinLines(parts).filter(
     part => part.type !== 'text' || part.text !== ''

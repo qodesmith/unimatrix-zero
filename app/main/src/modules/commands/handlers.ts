@@ -20,7 +20,7 @@ export interface HandlerDeps {
     Connections,
     'connect' | 'openPage' | 'submitCode' | 'cancel'
   >
-  attachments: Pick<Attachments, 'add'>
+  attachments: Pick<Attachments, 'add' | 'withMissingCopies'>
   images: RemoteImages
   settings: SettingsStore
   systemPrompts: SystemPrompts
@@ -99,25 +99,30 @@ export const handlers: Handlers = {
     return tree
   },
 
-  'tree.turns': async ({treeId}, {trees, turns, treeFiles}) => {
+  'tree.turns': async ({treeId}, {trees, turns, treeFiles, attachments}) => {
     found(trees.get(treeId))
 
     const {prompts, replies} = turns.list(treeId)
 
     return {
-      prompts,
+      prompts: await attachments.withMissingCopies(prompts),
       replies: await treeFiles.withChangedFiles(treeId, replies),
     }
   },
 
-  'prompt.send': (command, {trees, turns}) => {
+  'prompt.send': async (command, {trees, turns, attachments}) => {
     found(trees.get(command.treeId))
 
     const sent = turns.sendPrompt(command)
 
     if (!sent) throw new NotFoundError('That Reply no longer exists.')
 
-    return sent
+    // Its Reply can fail before the Turns are fetched again.
+    const [prompt = sent.prompt] = await attachments.withMissingCopies([
+      sent.prompt,
+    ])
+
+    return {...sent, prompt}
   },
 
   'prompt.delete': ({treeId, promptId}, {trees, turns}) => {

@@ -1,7 +1,12 @@
 import type {HostAttachment} from '@uz/contract/attachments'
 import type {Thread} from '@uz/contract/host'
 
-import {expect, it} from 'vitest'
+import {readContent} from '#modules/prompt-content/main'
+import {PNG_BASE64, attachedFiles} from '#modules/test-attachments/main'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import {expect, it, onTestFinished} from 'vitest'
 
 import {explainingLabels, replayed, replyText} from './main'
 
@@ -139,7 +144,7 @@ const project: HostAttachment = {
   inline: null,
 }
 
-it('puts each Prompt’s path lines inside its own <prompt>, in order and before its text, each inline file right after its own line, and keeps the line of a file that goes by path only', () => {
+it('puts each earlier Prompt’s files inside its own <prompt>, in order and before its text, to be read when the content is, and the Prompt’s own path lines after the Thread, each inline file right after its own line', () => {
   const pieces = replayed(
     [
       {
@@ -148,7 +153,7 @@ it('puts each Prompt’s path lines inside its own <prompt>, in order and before
         reply: [{type: 'text', text: 'Done.'}],
         label: null,
       },
-      {prompt: '', attachments: [dropped], reply: [], label: null},
+      {prompt: '', attachments: [dropped, project], reply: [], label: null},
     ],
     {text: 'And these?', attachments: [chart, project]}
   )
@@ -156,16 +161,10 @@ it('puts each Prompt’s path lines inside its own <prompt>, in order and before
   expect(pieces).toEqual([
     {
       type: 'text',
-      text: expect.stringMatching(
-        /\n\n<thread>\n<prompt>\n\[Attached file "report\.pdf" is saved at: \/attachments\/report\.pdf\]$/u
-      ),
+      text: expect.stringMatching(/\n\n<thread>\n<prompt>$/u),
     },
-    {type: 'file', file: report},
-    {
-      type: 'text',
-      text: '[Attached file "chart.png" is saved at: /attachments/chart.png]',
-    },
-    {type: 'file', file: chart},
+    {type: 'earlier-file', file: report},
+    {type: 'earlier-file', file: chart},
     {
       type: 'text',
       text: [
@@ -173,7 +172,13 @@ it('puts each Prompt’s path lines inside its own <prompt>, in order and before
         '</prompt>',
         '<reply>\nDone.\n</reply>',
         '<prompt>',
-        '[Attached file "old.pdf" is saved at: /attachments/old.pdf]',
+      ].join('\n'),
+    },
+    {type: 'earlier-file', file: dropped},
+    {
+      type: 'text',
+      text: [
+        '[Attached folder "project" is at: /work/project]',
         '</prompt>',
         '</thread>',
         '',
@@ -216,4 +221,48 @@ it('adds one line explaining the labels after the user’s System prompt, only w
   expect(rest).toEqual([])
   expect(explainingLabels('', labeled)).toBe(line)
   expect(explainingLabels('Be brief.', unlabeled)).toBe('Be brief.')
+})
+
+it('reads each earlier file afresh, and tells the AI of each it can no longer read in place of its path, inline or by path only; an earlier image whose shrunk copy is gone goes by its path only', async () => {
+  const made = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-replay-'))
+  onTestFinished(() => fs.rmSync(made, {recursive: true, force: true}))
+  const {gone, chart: kept, photo, archive} = attachedFiles(made)
+  fs.rmSync(photo.inline.path)
+  fs.rmSync(archive.path)
+
+  const content = await readContent(
+    replayed(
+      [
+        {
+          prompt: 'Look.',
+          attachments: [gone, kept, photo, archive],
+          reply: [],
+          label: null,
+        },
+      ],
+      {text: 'Next.', attachments: []}
+    )
+  )
+
+  expect(content).toEqual([
+    {
+      type: 'text',
+      text: expect.stringMatching(
+        /<prompt>\n\[Attached file "gone\.txt" can no longer be read\]\n\[Attached file "chart\.png" is saved at: .+\]$/u
+      ),
+    },
+    {type: 'image', mediaType: 'image/png', base64: PNG_BASE64},
+    {
+      type: 'text',
+      text: [
+        `[Attached file "photo.jpg" is saved at: ${photo.path}]`,
+        '[Attached file "archive.zip" can no longer be read]',
+        'Look.',
+        '</prompt>',
+        '</thread>',
+        '',
+        'Next.',
+      ].join('\n'),
+    },
+  ])
 })

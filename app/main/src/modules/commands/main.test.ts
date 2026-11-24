@@ -641,6 +641,7 @@ describe('attachments', () => {
       size: 5,
       shrunkSize: null,
       folderPath: null,
+      missing: false,
     })
     expect(sent).toMatchObject({
       ok: true,
@@ -651,6 +652,62 @@ describe('attachments', () => {
       value: {prompts: [{attachments: [attachment]}]},
     })
     expect((await listed())[0]?.firstLine).toBeNull()
+  })
+
+  it('lists a sent file whose copy is gone as missing', async () => {
+    const tree = await createTree()
+
+    const added = await send({
+      type: 'attachment.add',
+      file: {type: 'pasted', name: 'notes.txt', bytes: bytesOf('Hello')},
+    })
+
+    if (!added.ok) throw new Error(added.error.message)
+
+    const {attachment} = AttachmentAddResult.parse(added.value)
+
+    await send({
+      type: 'prompt.send',
+      model: picked,
+      treeId: tree.id,
+      parentReplyId: null,
+      text: '',
+      attachmentIds: [attachment.id],
+    })
+    fs.rmSync(attachmentsDir, {recursive: true})
+
+    expect(await send({type: 'tree.turns', treeId: tree.id})).toMatchObject({
+      ok: true,
+      value: {prompts: [{attachments: [{id: attachment.id, missing: true}]}]},
+    })
+  })
+
+  it('answers a send with each file whose copy is gone marked missing, so a Reply that fails at once still shows why', async () => {
+    const tree = await createTree()
+
+    const added = await send({
+      type: 'attachment.add',
+      file: {type: 'pasted', name: 'notes.txt', bytes: bytesOf('Hello')},
+    })
+
+    if (!added.ok) throw new Error(added.error.message)
+
+    const {attachment} = AttachmentAddResult.parse(added.value)
+    fs.rmSync(attachmentsDir, {recursive: true})
+
+    expect(
+      await send({
+        type: 'prompt.send',
+        model: picked,
+        treeId: tree.id,
+        parentReplyId: null,
+        text: '',
+        attachmentIds: [attachment.id],
+      })
+    ).toMatchObject({
+      ok: true,
+      value: {prompt: {attachments: [{id: attachment.id, missing: true}]}},
+    })
   })
 })
 
