@@ -419,11 +419,11 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Id:** `codex-subagents-off`
 - **Kind:** D
 - **Provider:** ChatGPT
-- **Relies on:** Codex turns its `multi_agent` feature on by default, which lets the Model start Subagents, and `features.multi_agent=false` turns it off.
-- **App side:** `codex-driver`'s environment turns it off, as `claude-driver` leaves out Claude's `Agent` tool, until the app can show Subagents. Under full access a Subagent could write and run anything, with nothing in the Reply to show it.
+- **Relies on:** Codex offers the Model Subagents (`spawn_agent` and its other agent tools) by default, and `agents.enabled=false` takes them away. `features.multi_agent=false` alone does not: Models that Codex's list marks `multi_agent_version: v2` override it (Codex 0.163.0, found in [#80](https://github.com/qodesmith/unimatrix-zero/issues/80)).
+- **App side:** `codex-driver`'s environment sets both, as `claude-driver` leaves out Claude's `Agent` tool, until the app can show Subagents. Under full access a Subagent could write and run anything, with nothing in the Reply to show it.
 - **User would see:** a Reply that hands work to Subagents the Reply never shows.
 - **Changed by:** upgrade
-- **Check:** `[dep:codex-subagents-off]` in `codex-driver`: the app-server, started as the app starts it, lists `multi_agent` as on by default and off.
+- **Check:** `[dep:codex-subagents-off]` in `codex-driver`: through a stand-in for OpenAI's API, a Reply offers the Model no `spawn_agent`, and one from an app-server started without `agents.enabled=false` still offers it, so a renamed tool can't pass.
 
 ### A Tree folder's own Codex config left out
 

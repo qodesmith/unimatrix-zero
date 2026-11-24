@@ -5,7 +5,8 @@ import {vendorEnvironment} from '#modules/vendor-environment/main'
  * `.codex/config.toml` loads only if `CODEX_HOME` trusts it, which the app
  * never writes. The `file` store keeps the sign-in in `CODEX_HOME` should
  * Codex's default move to the Keychain. Subagents stay off until the app can
- * show them.
+ * show them: Models marked `multi_agent_version: v2` ignore the feature flag,
+ * so `agents.enabled` turns them off too.
  */
 const CODEX_ARGS = [
   '-c',
@@ -16,6 +17,8 @@ const CODEX_ARGS = [
   'cli_auth_credentials_store="file"',
   '-c',
   'features.multi_agent=false',
+  '-c',
+  'agents.enabled=false',
 ]
 
 /**

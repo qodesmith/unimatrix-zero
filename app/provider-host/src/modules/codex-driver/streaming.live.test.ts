@@ -103,10 +103,6 @@ const WireLine = z.looseObject({
 
 const SecondAnswer = z.looseObject({id: z.literal(2), result: z.unknown()})
 
-const FeatureList = z.looseObject({
-  data: z.array(z.looseObject({name: z.string()})),
-})
-
 const ConfigRead = z.looseObject({
   config: z.looseObject({model_verbosity: z.string().nullable()}),
 })
@@ -416,15 +412,31 @@ const TurnCompleted = z.looseObject({
 
 interface CodedRepliesOptions {
   args?: string[]
+  /** `-c` values of the app's own to leave out. */
+  dropArgs?: string[]
   env?: NodeJS.ProcessEnv
   platform?: NodeJS.Platform
   onLine?: (line: z.infer<typeof WireLine>) => void
 }
 
+function withoutConfig(args: string[], dropped: string[]) {
+  return args.filter(
+    (arg, at) =>
+      !dropped.includes(arg) &&
+      !(arg === '-c' && dropped.includes(args[at + 1] ?? ''))
+  )
+}
+
 function codedReplies(
   program: string,
   home: string,
-  {args = [], env = process.env, platform, onLine}: CodedRepliesOptions = {}
+  {
+    args = [],
+    dropArgs = [],
+    env = process.env,
+    platform,
+    onLine,
+  }: CodedRepliesOptions = {}
 ) {
   const treeId = crypto.randomUUID()
   const idle = heldIdle()
@@ -434,7 +446,11 @@ function codedReplies(
   const driver = createCodexDriver({
     store: fakeStore().client,
     spawn: (command, options) => {
-      const child = spawnCodex(command, options)
+      const child = spawnCodex(
+        {...command, args: withoutConfig(command.args, dropArgs)},
+        options
+      )
+
       const decoder = new StringDecoder('utf8')
       let partial = ''
 
@@ -729,6 +745,10 @@ async function startRecordingApi(source: string) {
 }
 
 const BUNDLED_SKILL = 'skill-creator'
+
+function offersSubagents(body: ResponsesBody) {
+  return JSON.stringify(body).includes('spawn_agent')
+}
 
 /** Codex offers web search inside its `exec` tool, as `web__run`. */
 function offersWebSearch(body: ResponsesBody) {
@@ -2408,30 +2428,40 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 300_000)
 
-  it('[dep:codex-subagents-off] turns off the Subagents Codex turns on by default', async () => {
+  it('[dep:codex-subagents-off] offers the Model no Subagents, which the feature flag alone would leave on', async () => {
     if (!folder || !signedIn) return
 
-    const home = homeFrom(signedIn)
+    const api = await startRecordingApi(signedIn)
+    const homes = [homeFrom(signedIn), homeFrom(signedIn)]
+
+    async function requestUnder(at: number, dropArgs: string[]) {
+      const {reply, closed} = codedReplies(folder ?? '', homes[at] ?? '', {
+        args: api.args,
+        dropArgs,
+      })
+
+      expectComplete((await reply('Say hi.', null)).events)
+      await closed()
+
+      const body = api.bodies.at(-1)
+
+      if (!body) throw new Error('The Reply sent the Model nothing')
+
+      return body
+    }
 
     try {
-      const features = FeatureList.parse(
-        await askAppServer(folder, home, {
-          method: 'experimentalFeature/list',
-          params: {},
-        })
-      )
+      const app = await requestUnder(0, [])
+      const flagOnly = await requestUnder(1, ['agents.enabled=false'])
 
-      expect(features.data).toContainEqual(
-        expect.objectContaining({
-          name: 'multi_agent',
-          enabled: false,
-          defaultEnabled: true,
-        })
-      )
+      expect(offersSubagents(app)).toBe(false)
+      expect(offersSubagents(flagOnly)).toBe(true)
     } finally {
-      fs.rmSync(home, {recursive: true, force: true})
+      api.close()
+
+      for (const home of homes) fs.rmSync(home, {recursive: true, force: true})
     }
-  }, 60_000)
+  }, 180_000)
 
   it('[dep:codex-project-config-untrusted] leaves out a setting in a Tree folder’s .codex/config.toml, and takes it once CODEX_HOME trusts the folder', async () => {
     if (!folder || !signedIn) return

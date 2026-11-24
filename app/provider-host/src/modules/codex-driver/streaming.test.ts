@@ -426,6 +426,16 @@ it('starts codex with project docs off and in its own `CODEX_HOME`, so neither a
   expect(report?.home).toBe(codex.configDir)
 })
 
+it('starts codex with Subagents off, which current Models take only from `agents.enabled`', async () => {
+  const codex = await setUp(['started.ndjson'])
+  await codex.reply(FIRST_PROMPT)
+
+  const args = codex.reports()[0]?.args.join(' ')
+
+  expect(args).toContain('-c features.multi_agent=false')
+  expect(args).toContain('-c agents.enabled=false')
+})
+
 it('names the app’s developer folder to an app-server that starts on a Mac with no developer tools, and to none that starts on a Mac with them', async () => {
   const codex = await setUp(['started.ndjson', 'started.ndjson'])
 
