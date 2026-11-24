@@ -1,3 +1,4 @@
+import {Refusal} from '#modules/bridge/main'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -8,8 +9,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '#shadcn/ui/alert-dialog'
-
-import {Refusal} from './Refusal'
 
 interface DeleteEntryDialogProps {
   name: string

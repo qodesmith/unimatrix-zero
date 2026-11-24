@@ -1,7 +1,7 @@
 import type {Command} from '@uz/contract/commands'
 import type {SystemPromptEntry} from '@uz/contract/system-prompts'
 
-import {bridge} from '#modules/bridge/main'
+import {Refusal, bridge, useCommand} from '#modules/bridge/main'
 import {Group, useSettings, useUpdateSettings} from '#modules/settings/main'
 import {Badge} from '#shadcn/ui/badge'
 import {Button} from '#shadcn/ui/button'
@@ -23,10 +23,8 @@ import {useId, useState} from 'react'
 
 import {useDialogCommand} from '../dialog-command/use-dialog-command'
 import {isTooLong} from '../too-long'
-import {useCommand} from '../use-command'
 import {useLibrary} from '../use-library'
 import {DeleteEntryDialog} from './DeleteEntryDialog'
-import {Refusal} from './Refusal'
 import {TooLong} from './TooLong'
 
 export function SystemPromptsSection() {

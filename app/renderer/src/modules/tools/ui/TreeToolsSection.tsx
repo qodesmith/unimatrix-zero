@@ -1,6 +1,6 @@
 import type {TreeTools} from '@uz/contract/tools'
 
-import {Refusal, useCommand} from '#modules/system-prompts/main'
+import {Refusal, useCommand} from '#modules/bridge/main'
 import {useId} from 'react'
 
 import {ToolSwitches} from './ToolSwitches'

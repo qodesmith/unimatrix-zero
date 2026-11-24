@@ -426,7 +426,7 @@ it('starts codex with project docs off and in its own `CODEX_HOME`, so neither a
   expect(report?.home).toBe(codex.configDir)
 })
 
-it('starts codex with Subagents off, which current Models take only from `agents.enabled`', async () => {
+it('starts codex with Subagents off', async () => {
   const codex = await setUp(['started.ndjson'])
   await codex.reply(FIRST_PROMPT)
 

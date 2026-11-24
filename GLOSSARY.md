@@ -40,7 +40,7 @@ _Avoid_: Command, prompt, ability
 
 **MCP server**:
 An outside program or service that gives the AI extra tools, such as reading a calendar. The app keeps one list of them in Settings; each Tree chooses which are on. Some need the user to sign in to the service first.
-_Avoid_: Integration, extension, connector (reserved for claude.ai's own connectors)
+_Avoid_: Integration, extension, connector (reserved for the connectors on the user's Claude or ChatGPT account)
 
 **Plugin**:
 A folder bundling Skills and MCP servers, added in Settings. The app uses only those parts: its Skills and MCP servers appear under the Plugin and can be switched on and off together or one by one, and anything else it contains is not supported. Codex's remote plugins, which OpenAI's servers supply, are not Plugins in this sense: a Tree switches them on or off as one group, with the connectors on the user's ChatGPT account.

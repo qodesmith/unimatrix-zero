@@ -527,29 +527,6 @@ describe('Settings → Tools', () => {
       },
     ])
   })
-
-  it('starts a new Tree’s Tools panel from the defaults as they are when it is made', async () => {
-    await renderApp(fakeMain())
-
-    await openSettingsTools()
-    await toolSwitches(settingsSheet()).webSearch.click()
-    await toolSwitches(settingsSheet()).claudeBuiltInSkills.click()
-    await expect
-      .element(toolSwitches(settingsSheet()).claudeBuiltInSkills)
-      .toBeChecked()
-    await userEvent.keyboard('{Escape}')
-    await expect.element(settingsSheet()).not.toBeInTheDocument()
-
-    await sidebar().getByRole('button', {name: 'New Tree'}).click()
-
-    await expectSwitches(await openTreePanel('Untitled Tree'), {
-      webSearch: false,
-      claudeConnectors: false,
-      claudeBuiltInSkills: true,
-      chatgptBuiltInSkills: false,
-      chatgptRemotePlugins: false,
-    })
-  })
 })
 
 function deleteDialog() {

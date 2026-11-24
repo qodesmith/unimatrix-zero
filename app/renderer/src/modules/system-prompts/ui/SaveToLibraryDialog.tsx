@@ -1,3 +1,4 @@
+import {Refusal} from '#modules/bridge/main'
 import {Button} from '#shadcn/ui/button'
 import {
   Dialog,
@@ -12,8 +13,6 @@ import {Field, FieldLabel} from '#shadcn/ui/field'
 import {Input} from '#shadcn/ui/input'
 import {SYSTEM_PROMPT_NAME_MAX_LENGTH} from '@uz/contract/system-prompts'
 import {useId, useState} from 'react'
-
-import {Refusal} from './Refusal'
 
 interface SaveToLibraryDialogProps {
   open: boolean

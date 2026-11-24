@@ -3,11 +3,15 @@ import type {ReplyRequest, SessionRef} from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
 import type {TreeTools} from '@uz/contract/tools'
 
-import {isDeepStrictEqual} from 'node:util'
-
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
 
 export const MAX_WARM = 6
+
+const CLAUDE_TOOLS = [
+  'webSearch',
+  'claudeConnectors',
+  'claudeBuiltInSkills',
+] as const satisfies readonly (keyof TreeTools)[]
 
 export interface WarmSession {
   readonly sessionId: string | null
@@ -113,7 +117,7 @@ export function createWarmSessions<Session extends WarmSession>({
           session.compactionSettings.threshold ===
             compactionSettings.threshold &&
           session.systemPrompt === systemPrompt &&
-          isDeepStrictEqual(session.tools, tools)
+          CLAUDE_TOOLS.every(key => session.tools[key] === tools[key])
         ) {
           wake(session)
 
