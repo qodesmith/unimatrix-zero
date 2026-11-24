@@ -21,15 +21,7 @@ function createdAt() {
     .$defaultFn(() => new Date())
 }
 
-export const trees = sqliteTable('trees', {
-  id: id(),
-  title: text('title'),
-  unseenFailure: integer('unseen_failure', {mode: 'boolean'})
-    .notNull()
-    .default(false),
-  createdAt: createdAt(),
-})
-
+/** Append-only: a Tree and each Reply point at the text they run under. */
 export const systemPrompts = sqliteTable(
   'system_prompts',
   {
@@ -40,6 +32,26 @@ export const systemPrompts = sqliteTable(
   },
   table => [uniqueIndex('system_prompts_hash').on(table.hash)]
 )
+
+export const trees = sqliteTable('trees', {
+  id: id(),
+  title: text('title'),
+  unseenFailure: integer('unseen_failure', {mode: 'boolean'})
+    .notNull()
+    .default(false),
+  systemPromptId: text('system_prompt_id')
+    .notNull()
+    .references(() => systemPrompts.id),
+  createdAt: createdAt(),
+})
+
+/** The user's own; the presets live in code. */
+export const systemPromptLibrary = sqliteTable('system_prompt_library', {
+  id: id(),
+  name: text('name').notNull(),
+  text: text('text').notNull(),
+  createdAt: createdAt(),
+})
 
 export const prompts = sqliteTable('prompts', {
   id: id(),

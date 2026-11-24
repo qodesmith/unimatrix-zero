@@ -112,6 +112,8 @@ export const ReplySchema = z.strictObject({
   promptId: z.uuid(),
   provider: ProviderIdSchema,
   model: z.string(),
+  /** The System prompt it ran under, as `TreeSystemPromptSchema`'s id. */
+  systemPromptId: z.uuid(),
   /** Empty until the Reply has finished. */
   files: z.array(ChangedFileSchema),
   createdAt: z.iso.datetime(),
