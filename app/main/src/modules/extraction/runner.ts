@@ -1,11 +1,11 @@
 import type {ExtractionResult} from './output'
 
-import {MIB} from '@uz/contract/sizes'
+import {ATTACHMENT_SIZE_LIMIT} from '@uz/contract/attachments'
 
 import {validateOutput} from './output'
 
-/** The attachment limit: a larger file is never extracted. */
-export const EXTRACTION_INPUT_LIMIT = 50 * MIB
+/** A larger file is never extracted. */
+export const EXTRACTION_INPUT_LIMIT = ATTACHMENT_SIZE_LIMIT
 
 export const EXTRACTION_TIMEOUT_MS = 60_000
 
