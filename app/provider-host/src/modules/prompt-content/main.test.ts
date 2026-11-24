@@ -93,6 +93,27 @@ describe('an Extraction’s path lines', () => {
     ])
   })
 
+  it('say when page images stopped at 100 for a scan with no text, without promising text', async () => {
+    const longScan: HostAttachment = {
+      ...extracted,
+      extraction: {text: null, pageImages: [], imagesStopped: true},
+    }
+
+    const content = await readContent(
+      prompted({text: '', attachments: [longScan]})
+    )
+
+    expect(content).toEqual([
+      {
+        type: 'text',
+        text: [
+          EXTRACTED_LINES[0],
+          '[Only the first 100 pages of "scan.pdf" that needed a page image have one]',
+        ].join('\n'),
+      },
+    ])
+  })
+
   it('come after a file sent inline, which stays right after its own line', async () => {
     const {notes} = attachedFiles(tempFolder())
 

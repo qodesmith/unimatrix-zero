@@ -1048,6 +1048,9 @@ it('says what the AI reads of a file the app read, that page images stopped at 1
       kept('book.pdf', 'application/pdf', 2048, {
         extraction: readByApp(true, hundred, true),
       }),
+      kept('long-scan.pdf', 'application/pdf', 2048, {
+        extraction: readByApp(false, hundred, true),
+      }),
       kept('broken.xlsx', 'application/octet-stream', 2048, {
         extraction: {status: 'failed', version: 1},
       }),
@@ -1067,6 +1070,11 @@ it('says what the AI reads of a file the app read, that page images stopped at 1
     .element(description('book.pdf'))
     .toHaveTextContent(
       '2 KiB · The AI reads its text and 100 page images; later pages as text only'
+    )
+  await expect
+    .element(description('long-scan.pdf'))
+    .toHaveTextContent(
+      '2 KiB · The AI reads 100 page images; later pages not read'
     )
   await expect
     .element(description('broken.xlsx'))

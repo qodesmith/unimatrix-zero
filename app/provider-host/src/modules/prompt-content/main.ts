@@ -53,7 +53,7 @@ function extractionLines({name, extraction}: HostAttachment): Text[] {
     ),
     ...(imagesStopped
       ? [
-          `[Only the first ${PAGE_IMAGES_PER_PDF} pages of "${name}" that needed a page image have one; its text covers every page]`,
+          `[Only the first ${PAGE_IMAGES_PER_PDF} pages of "${name}" that needed a page image have one${text === null ? '' : '; its text covers every page'}]`,
         ]
       : []),
   ].map(line => ({type: 'text', text: line}))

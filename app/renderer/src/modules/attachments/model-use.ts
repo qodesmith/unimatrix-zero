@@ -26,7 +26,8 @@ function extractedUse({extraction}: Attachment) {
 
   if (read.length === 0) return null
 
-  const stopped = imagesStopped ? '; later pages as text only' : ''
+  const later = text ? 'as text only' : 'not read'
+  const stopped = imagesStopped ? `; later pages ${later}` : ''
 
   return `The AI reads ${read.join(' and ')}${stopped}`
 }
