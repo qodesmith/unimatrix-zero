@@ -2,6 +2,7 @@ import type {PendingAdd} from '../attachment-add/use-attachment-add'
 import type {
   Attachment as AttachmentData,
   AttachmentKind,
+  InlineForm,
 } from '@uz/contract/attachments'
 import type {ProviderId} from '@uz/contract/providers'
 
@@ -195,6 +196,19 @@ function PendingAttachment({
   )
 }
 
+/** `form` is undefined when no Model is picked to say what it does. */
+function noteOf(
+  attachment: AttachmentData,
+  pathOnly: boolean,
+  form: InlineForm | null | undefined
+) {
+  if (attachment.missing) return FILE_MISSING
+
+  if (pathOnly) return PATH_ONLY_NOW
+
+  return form === undefined ? null : modelUse(form, attachment)
+}
+
 interface AttachmentListProps {
   attachments: readonly AttachmentData[]
   provider?: ProviderId | null
@@ -241,15 +255,7 @@ export function AttachmentList({
           <Shown
             key={attachment.id}
             attachment={attachment}
-            note={
-              attachment.missing
-                ? FILE_MISSING
-                : isPathOnly
-                  ? PATH_ONLY_NOW
-                  : forms
-                    ? modelUse(forms[at] ?? null, attachment)
-                    : null
-            }
+            note={noteOf(attachment, isPathOnly, forms?.[at])}
             pathOnly={isPathOnly}
             onRemove={onRemove && (() => onRemove(attachment.id))}
           />

@@ -92,14 +92,19 @@ export const handlers: Handlers = {
     }
   },
 
-  'prompt.send': (command, {trees, turns}) => {
+  'prompt.send': async (command, {trees, turns, attachments}) => {
     found(trees.get(command.treeId))
 
     const sent = turns.sendPrompt(command)
 
     if (!sent) throw new NotFoundError('That Reply no longer exists.')
 
-    return sent
+    // Its Reply can fail before the Turns are fetched again.
+    const [prompt = sent.prompt] = await attachments.withMissingCopies([
+      sent.prompt,
+    ])
+
+    return {...sent, prompt}
   },
 
   'prompt.delete': ({treeId, promptId}, {trees, turns}) => {

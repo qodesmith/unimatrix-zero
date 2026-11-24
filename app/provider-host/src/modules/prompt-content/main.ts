@@ -51,7 +51,7 @@ function files(attached: HostAttachment[]): Piece[] {
   })
 }
 
-/** An earlier Prompt's: a file that can no longer be read fails nothing. */
+/** An earlier Prompt's files: one that can't be read fails nothing. */
 export function earlierFiles(attached: HostAttachment[]): Piece[] {
   return attached.map(file =>
     file.folder
@@ -85,7 +85,7 @@ function isText(part: {type: string}): part is Text {
   return part.type === 'text'
 }
 
-function withText(attached: Piece[], {text, attachments}: Prompt) {
+function withPromptText(attached: Piece[], {text, attachments}: Prompt) {
   return joinLines([
     ...attached,
     ...(text === '' && attachments.length > 0 ? [] : lines(text)),
@@ -94,11 +94,11 @@ function withText(attached: Piece[], {text, attachments}: Prompt) {
 
 /** The Prompt being sent: a file of its own that can't be read fails it. */
 export function prompted(prompt: Prompt): Piece[] {
-  return withText(files(prompt.attachments), prompt)
+  return withPromptText(files(prompt.attachments), prompt)
 }
 
 export function earlierPrompted(prompt: Prompt): Piece[] {
-  return withText(earlierFiles(prompt.attachments), prompt)
+  return withPromptText(earlierFiles(prompt.attachments), prompt)
 }
 
 function fileText(name: string, text: string) {
@@ -170,7 +170,7 @@ async function earlierParts(file: HostAttachment): Promise<ContentPart[]> {
   try {
     return [line, await inlinePart({...file, inline})]
   } catch {
-    // The copy read a moment ago, so only an image's shrunk copy can be gone.
+    // An image's shrunk copy may be gone while its original reads.
     return inline.type === 'image' && inline.path !== file.path
       ? [line]
       : [goneLine(file.name)]

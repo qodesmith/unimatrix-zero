@@ -676,6 +676,34 @@ describe('attachments', () => {
       value: {prompts: [{attachments: [{id: attachment.id, missing: true}]}]},
     })
   })
+
+  it('answers a send with each file whose copy is gone marked missing, so a Reply that fails at once still shows why', async () => {
+    const tree = await createTree()
+
+    const added = await send({
+      type: 'attachment.add',
+      file: {type: 'pasted', name: 'notes.txt', bytes: bytesOf('Hello')},
+    })
+
+    if (!added.ok) throw new Error(added.error.message)
+
+    const {attachment} = AttachmentAddResult.parse(added.value)
+    fs.rmSync(attachmentsDir, {recursive: true})
+
+    expect(
+      await send({
+        type: 'prompt.send',
+        model: picked,
+        treeId: tree.id,
+        parentReplyId: null,
+        text: '',
+        attachmentIds: [attachment.id],
+      })
+    ).toMatchObject({
+      ok: true,
+      value: {prompt: {attachments: [{id: attachment.id, missing: true}]}},
+    })
+  })
 })
 
 describe('attaching an image with the window’s shrunk copy', () => {
