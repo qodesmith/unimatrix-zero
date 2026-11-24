@@ -52,6 +52,7 @@ export interface ClaudeRepliesDeps {
 interface Live extends ClaudeSession {
   model: string
   compactionSettings: CompactionSettings
+  systemPrompt: string
   restore: Restore
   store: SessionStoreClient
   projectKey: string
@@ -195,6 +196,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     return Object.assign(session, {
       model: request.model,
       compactionSettings: request.compactionSettings,
+      systemPrompt: request.systemPrompt,
       restore,
       store: appCopy,
       projectKey,

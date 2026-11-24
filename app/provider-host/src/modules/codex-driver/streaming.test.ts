@@ -401,6 +401,16 @@ it('runs codex in its own CODEX_HOME, updater off and nothing that outranks the 
   expect(report?.vendorVariables).toEqual(['CODEX_HOME'])
 })
 
+it('starts codex with no `AGENTS.md` from any folder, its own `CODEX_HOME` keeping out the user’s `config.toml`', async () => {
+  const codex = await setUp(['started.ndjson'])
+  await codex.reply(FIRST_PROMPT)
+
+  const [report] = codex.reports()
+
+  expect(report?.args.join(' ')).toContain('-c project_doc_max_bytes=0')
+  expect(report?.home).toBe(codex.configDir)
+})
+
 it('names the app’s developer folder to an app-server that starts on a Mac with no developer tools, and to none that starts on a Mac with them', async () => {
   const codex = await setUp(['started.ndjson', 'started.ndjson'])
 
