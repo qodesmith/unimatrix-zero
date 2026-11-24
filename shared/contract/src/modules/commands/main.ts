@@ -181,10 +181,7 @@ export const AttachmentAddResult = z.strictObject({
   attachment: AttachmentSchema,
 })
 
-/**
- * Downloads the app's own `git` again. `SNAPSHOTS_DOWNLOADED` follows if it
- * works, `SNAPSHOTS_DOWNLOAD_FAILED` if it fails again.
- */
+/** `SNAPSHOTS_DOWNLOADED` or `SNAPSHOTS_DOWNLOAD_FAILED` follows. */
 export const SnapshotsDownloadAgainCommand = z.strictObject({
   type: z.literal('snapshots.download-again'),
 })

@@ -61,9 +61,8 @@ export function createCodexDriver({
   let loginPath: Promise<string | undefined> | undefined
 
   /**
-   * Codex on Linux runs no login shell (ADR 0026), so the app reads the `PATH`
-   * one would set, once per host process, for what the user's profile adds. The
-   * app's own folder still goes last.
+   * Codex on Linux runs no login shell (ADR 0026), so read the `PATH` one
+   * would set, once per host process. The app's own folder still goes last.
    */
   async function withLoginPath(base: NodeJS.ProcessEnv) {
     if (platform !== 'linux') return base

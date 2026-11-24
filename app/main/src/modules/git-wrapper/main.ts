@@ -84,11 +84,6 @@ function sameBytes(one: string, other: string) {
   }
 }
 
-/**
- * Windows' `git.exe` and the settings it reads (ADR 0026, ADR 0028). Without a
- * shipped copy the folder holds no `git.exe`, and the AI's `git` is "not
- * recognized".
- */
 export function writeWindowsGitWrapper(
   folder: string,
   gitProgram: string,

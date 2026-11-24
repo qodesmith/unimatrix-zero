@@ -22,7 +22,6 @@ export interface TreeFilesDeps {
   userData: string
   publish: (event: AppEvent) => void
   onFailure: (error: Error) => void
-  /** The app's own `git` by its full path, or null while it isn't in place. */
   gitProgram: () => string | null
   /** A Snapshot failed because `gitProgram` is null. */
   onWaitingForGit: () => void
@@ -30,7 +29,6 @@ export interface TreeFilesDeps {
 
 class GitMissingError extends Error {}
 
-/** Each Reply's nearest Snapshot above it, skipping Replies with none. */
 function parentSnapshots(rows: SnapshotRow[]) {
   const byId = new Map(rows.map(row => [row.replyId, row]))
 
@@ -84,7 +82,6 @@ export function createTreeFiles({
     else onFailure(error)
   }
 
-  /** The last Snapshot queued per Tree. */
   const snapshotting = new Map<string, Promise<void>>()
 
   function storeOf(treeId: string) {

@@ -696,7 +696,6 @@ function streamed(event: SDKPartialAssistantMessage['event']): RecordedLine {
   }
 }
 
-/** Text blocks only. */
 function cutOff(texts: string[], fromBlock: number): RecordedLine[] {
   const start = read('warm.ndjson').find(
     line =>

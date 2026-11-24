@@ -16,7 +16,7 @@ export interface Machine {
   userData: string
   platform: NodeJS.Platform
   arch: string
-  /** Linux's C library version, as `2.39`. Absent elsewhere, or unknown. */
+  /** As `2.39`; absent off Linux, or when unknown. */
   glibcVersion?: string
 }
 

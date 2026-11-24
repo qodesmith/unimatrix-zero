@@ -23,7 +23,6 @@ export interface HandlerDeps {
   images: RemoteImages
   settings: SettingsStore
   layout: LayoutStore
-  /** Starts the download of the app's own `git` again, and returns at once. */
   downloadGitAgain: () => void
   publish: (event: AppEvent) => void
 }

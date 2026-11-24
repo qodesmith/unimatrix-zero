@@ -9,7 +9,6 @@ import {
   initialGitDownload,
 } from './download/machine'
 
-/** What the user hears about Snapshots waiting on the app's own `git`. */
 export type GitNews =
   | 'downloading'
   | 'download-failed'
