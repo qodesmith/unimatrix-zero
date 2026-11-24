@@ -40,7 +40,7 @@ export function ToolSwitches({tools, onChange}: ToolSwitchesProps) {
         />
         <Toggle
           label="Remote plugins"
-          description="Plugins from OpenAI, and the connectors on your ChatGPT account."
+          description="OpenAI's remote plugins, and the connectors on your ChatGPT account."
           checked={tools.chatgptRemotePlugins}
           onChange={chatgptRemotePlugins => onChange({chatgptRemotePlugins})}
         />
