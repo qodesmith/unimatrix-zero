@@ -57,6 +57,10 @@ const InitLine = z.looseObject({
   permissionMode: z.string(),
 })
 
+const InitWithServers = InitLine.extend({
+  mcp_servers: z.array(z.looseObject({name: z.string()})),
+})
+
 let sharedTreeFolder: string | null = null
 
 function newTreeFolder() {
@@ -1229,6 +1233,54 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       first.recorded.session.sessionId
     )
     expect(shownText(second.events)).toMatch(/MANGO\W*$/)
+
+    await live.done()
+  }, 300_000)
+
+  it('[dep:claude-tool-switches] offers the web, the account’s connectors and the built-in Skills only as the Tools panel says, in the session it resumes', async () => {
+    const live = liveDriver([])
+
+    const first = await live.reply('Say hi.', null)
+
+    await live.closed()
+
+    const second = await Array.fromAsync(
+      live.driver.startReply({
+        ...live.request('Say hi.', continuing(first.recorded.session)),
+        tools: {
+          ...DEFAULT_TREE_TOOLS,
+          webSearch: false,
+          claudeConnectors: true,
+          claudeBuiltInSkills: true,
+        },
+      })
+    )
+
+    expect(second.at(-1)).toMatchObject({status: 'complete'})
+    expect(recordedIn(second).session.sessionId).toBe(
+      first.recorded.session.sessionId
+    )
+
+    const inits = live.printed.flatMap(line => {
+      const parsed = InitWithServers.safeParse(JSON.parse(line))
+
+      return parsed.success ? [parsed.data] : []
+    })
+
+    expect(inits).toHaveLength(2)
+
+    const [before, after] = inits
+
+    expect(before?.tools).toEqual(
+      expect.arrayContaining(['WebFetch', 'WebSearch'])
+    )
+    expect(before?.tools).not.toContain('Skill')
+    expect(before?.mcp_servers).toEqual([])
+    expect(after?.tools).not.toContain('WebFetch')
+    expect(after?.tools).not.toContain('WebSearch')
+    expect(after?.tools).toContain('Skill')
+    // Holds only for an account with a connector: the maintainer's has some.
+    expect(after?.mcp_servers.length).toBeGreaterThan(0)
 
     await live.done()
   }, 300_000)

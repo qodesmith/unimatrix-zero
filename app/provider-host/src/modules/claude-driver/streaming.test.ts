@@ -16,6 +16,7 @@ import type {
 } from '@uz/contract/host'
 import type {Model} from '@uz/contract/providers'
 import type {CompactionSettings} from '@uz/contract/settings'
+import type {TreeTools} from '@uz/contract/tools'
 
 import {
   PDF_BASE64,
@@ -174,6 +175,7 @@ async function setUp(
     compactionSettings?: CompactionSettings
     thread?: Thread
     attachments?: HostAttachment[]
+    tools?: TreeTools
   }
 
   const vendorProgram = {
@@ -197,6 +199,7 @@ async function setUp(
       compactionSettings = DEFAULT_COMPACTION_SETTINGS,
       thread = [],
       attachments = [],
+      tools = DEFAULT_TREE_TOOLS,
     }: ReplyOptions = {}
   ) {
     const events: Streamed[] = []
@@ -214,7 +217,7 @@ async function setUp(
       thread,
       compactionSettings,
       systemPromptChanged: false,
-      tools: DEFAULT_TREE_TOOLS,
+      tools,
     })) {
       events.push(event)
 
@@ -2166,6 +2169,39 @@ it('starts claude with the Compaction Settings, and with nothing for the default
   expect(changed?.args).toContain(`--resume=${SESSION_ID}`)
   expect(changed?.args.join(' ')).toMatch(/"autoCompactEnabled":false/)
   expect(changed?.args.join(' ')).toMatch(/"autoCompactWindow":150000/)
+})
+
+it('runs claude with the web, account connectors and built-in Skills only as the Tree’s Tools panel says, from the Reply after a switch flips', async () => {
+  const claude = await setUp(['warm.ndjson', 'resumed.ndjson'])
+  const first = await claude.reply(FIRST_PROMPT)
+  const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
+
+  const third = await claude.reply(THIRD_PROMPT, recordedIn(second), {
+    tools: {
+      ...DEFAULT_TREE_TOOLS,
+      webSearch: false,
+      claudeConnectors: true,
+      claudeBuiltInSkills: true,
+    },
+  })
+
+  expect(textOf(third)).toBe('TEAL OTTER')
+
+  await claude.allClosed()
+  const [warm, changed] = claude.reports()
+  const toolsOf = (args: string[] = []) =>
+    args.find(arg => arg.startsWith('--tools='))
+
+  expect(warm?.prompts).toEqual([FIRST_PROMPT, SECOND_PROMPT])
+  expect(toolsOf(warm?.args)).toBe(
+    '--tools=Bash,Read,Write,Edit,Glob,Grep,NotebookEdit,WebFetch,WebSearch'
+  )
+  expect(warm?.args).toContain('--strict-mcp-config')
+  expect(changed?.args).toContain(`--resume=${SESSION_ID}`)
+  expect(toolsOf(changed?.args)).toBe(
+    '--tools=Bash,Read,Write,Edit,Glob,Grep,NotebookEdit,Skill'
+  )
+  expect(changed?.args).not.toContain('--strict-mcp-config')
 })
 
 const HANDED_OVER: Thread = [
