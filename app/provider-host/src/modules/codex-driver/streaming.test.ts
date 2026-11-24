@@ -2198,6 +2198,7 @@ it('rebuilds a thread when earlier files can no longer be read: each gets a line
   const {notes, chart, archive, photo} = attachedFiles(
     folder('uz-attachments-')
   )
+
   fs.rmSync(notes.path)
   fs.rmSync(chart.path)
   fs.rmSync(archive.path)

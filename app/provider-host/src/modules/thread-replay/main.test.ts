@@ -226,7 +226,7 @@ it('adds one line explaining the labels after the user’s System prompt, only w
 it('reads each earlier file afresh, and tells the AI of each it can no longer read in place of its path, inline or by path only; an earlier image whose shrunk copy is gone goes by its path only', async () => {
   const made = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-replay-'))
   onTestFinished(() => fs.rmSync(made, {recursive: true, force: true}))
-  const {gone, chart, photo, archive} = attachedFiles(made)
+  const {gone, chart: kept, photo, archive} = attachedFiles(made)
   fs.rmSync(photo.inline.path)
   fs.rmSync(archive.path)
 
@@ -235,7 +235,7 @@ it('reads each earlier file afresh, and tells the AI of each it can no longer re
       [
         {
           prompt: 'Look.',
-          attachments: [gone, chart, photo, archive],
+          attachments: [gone, kept, photo, archive],
           reply: [],
           label: null,
         },

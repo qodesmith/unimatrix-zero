@@ -19,7 +19,7 @@ export interface HandlerDeps {
     Connections,
     'connect' | 'openPage' | 'submitCode' | 'cancel'
   >
-  attachments: Pick<Attachments, 'add'>
+  attachments: Pick<Attachments, 'add' | 'withMissingCopies'>
   images: RemoteImages
   settings: SettingsStore
   layout: LayoutStore
@@ -81,13 +81,13 @@ export const handlers: Handlers = {
     return {}
   },
 
-  'tree.turns': async ({treeId}, {trees, turns, treeFiles}) => {
+  'tree.turns': async ({treeId}, {trees, turns, treeFiles, attachments}) => {
     found(trees.get(treeId))
 
     const {prompts, replies} = turns.list(treeId)
 
     return {
-      prompts,
+      prompts: await attachments.withMissingCopies(prompts),
       replies: await treeFiles.withChangedFiles(treeId, replies),
     }
   },
