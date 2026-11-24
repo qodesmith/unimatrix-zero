@@ -69,7 +69,7 @@ beforeEach(() => {
     onReplyFinished: finished => pending.push(titles.replyFinished(finished)),
   })
 
-  treeId = trees.create(new Date('2026-10-19T12:00:00.000Z')).id
+  treeId = trees.create(new Date('2026-10-19T12:00:00.000Z'), '').id
 })
 
 function sendPrompt(parentReplyId: string | null, text = 'Hi') {

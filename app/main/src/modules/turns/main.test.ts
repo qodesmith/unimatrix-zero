@@ -100,7 +100,7 @@ beforeEach(() => {
   listedModels = {claude: [], chatgpt: []}
   attachmentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-turns-'))
   turns = launch()
-  treeId = createTrees(db).create(createdAt).id
+  treeId = createTrees(db).create(createdAt, '').id
 })
 
 afterEach(() => {
@@ -208,7 +208,7 @@ function sessionsStarted() {
 function inAnotherTree() {
   const sent = turns.sendPrompt({
     model: picked,
-    treeId: createTrees(db).create(createdAt).id,
+    treeId: createTrees(db).create(createdAt, '').id,
     parentReplyId: null,
     text: 'Elsewhere',
   })
@@ -292,7 +292,7 @@ describe('sending the root Prompt', () => {
 
     turns.sendPrompt({
       model: opus,
-      treeId: createTrees(db).create(clock).id,
+      treeId: createTrees(db).create(clock, '').id,
       parentReplyId: null,
       text: 'Hi',
     })
@@ -1815,7 +1815,7 @@ describe('stopping every Reply in a Tree', () => {
 
     const elsewhere = turns.sendPrompt({
       model: picked,
-      treeId: createTrees(db).create(createdAt).id,
+      treeId: createTrees(db).create(createdAt, '').id,
       parentReplyId: null,
       text: 'Hi',
     })

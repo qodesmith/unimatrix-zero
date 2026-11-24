@@ -27,6 +27,7 @@ it('keeps a change across reopening and leaves the other Settings alone', () => 
     claudeAutoCompaction: false,
     claudeCompactionThreshold: 150_000,
     chatgptCompactionThreshold: 50_000,
+    defaultSystemPromptId: '01a16096-00ad-7d3b-8205-6b76ddc26ce0',
   } as const
 
   createSettings(db).update(others)

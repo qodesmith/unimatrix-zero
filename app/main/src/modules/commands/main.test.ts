@@ -7,14 +7,17 @@ import {createConnections} from '#modules/connections/main'
 import {openDatabase} from '#modules/database/main'
 import {createLayout} from '#modules/layout/main'
 import {createSettings} from '#modules/settings/main'
+import {createSystemPrompts} from '#modules/system-prompts/main'
 import {createTreeRows, createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
 import {
   AttachmentAddResult,
   PromptSendResult,
   TreeListResult,
+  TreeTurnsResult,
 } from '@uz/contract/commands'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
+import {PRESETS, SystemPromptEntrySchema} from '@uz/contract/system-prompts'
 import {TREE_TITLE_MAX_LENGTH, TreeSchema} from '@uz/contract/trees'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -66,6 +69,7 @@ beforeEach(() => {
 
   const trees = createTrees(db)
   const rows = createTreeRows(trees, publish)
+  const settings = createSettings(db)
 
   deps = {
     now,
@@ -121,7 +125,8 @@ beforeEach(() => {
         return {dataUrl: 'data:image/png;base64,iVBORw0KGgo='}
       },
     },
-    settings: createSettings(db),
+    settings,
+    systemPrompts: createSystemPrompts(db, settings),
     layout: createLayout(db),
     downloadGitAgain: () => {
       downloadsAgain += 1
@@ -739,5 +744,190 @@ describe('the Layout', () => {
 
     expect(outcome).toEqual({ok: true, value: saved})
     expect(published).toEqual([{type: 'LAYOUT_CHANGED', layout: saved}])
+  })
+})
+
+const DEFAULT_PRESET = /^You are a helpful assistant/
+
+async function ownEntry(text: string) {
+  const outcome = await send({type: 'system-prompt.create', name: 'Mine', text})
+
+  if (!outcome.ok) throw new Error(outcome.error.message)
+
+  return SystemPromptEntrySchema.parse(outcome.value)
+}
+
+async function setDefault(id: string) {
+  await send({type: 'settings.update', changes: {defaultSystemPromptId: id}})
+}
+
+async function setSystemPrompt(treeId: string, text: string) {
+  const outcome = await send({type: 'tree.set-system-prompt', treeId, text})
+
+  if (!outcome.ok) throw new Error(outcome.error.message)
+
+  return TreeSchema.parse(outcome.value)
+}
+
+function sentSystemPrompts() {
+  return hostCommands.flatMap(command =>
+    command.type === 'reply.start' ? [command.request.systemPrompt] : []
+  )
+}
+
+async function repliesOf(treeId: string) {
+  const outcome = await send({type: 'tree.turns', treeId})
+
+  if (!outcome.ok) throw new Error(outcome.error.message)
+
+  return TreeTurnsResult.parse(outcome.value).replies
+}
+
+describe('System prompts', () => {
+  it('saves the user’s own after the presets and tells every window the library', async () => {
+    const entry = await ownEntry('Talk like a pirate.')
+
+    const updated = await send({
+      type: 'system-prompt.update',
+      id: entry.id,
+      name: 'Pirate',
+      text: 'Talk like a sailor.',
+    })
+
+    expect(updated).toEqual({
+      ok: true,
+      value: {...entry, name: 'Pirate', text: 'Talk like a sailor.'},
+    })
+    expect(
+      published.map(event =>
+        event.type === 'SYSTEM_PROMPTS_CHANGED'
+          ? event.systemPrompts.entries
+              .slice(PRESETS.length)
+              .map(one => one.text)
+          : event.type
+      )
+    ).toEqual([['Talk like a pirate.'], ['Talk like a sailor.']])
+  })
+
+  it('answers not-found for an entry the library doesn’t have', async () => {
+    const id = crypto.randomUUID()
+
+    expect(
+      await send({type: 'system-prompt.update', id, name: 'Gone', text: ''})
+    ).toMatchObject({ok: false, error: {code: 'not-found'}})
+    expect(await send({type: 'system-prompt.delete', id})).toMatchObject({
+      ok: false,
+      error: {code: 'not-found'},
+    })
+  })
+
+  it('refuses to delete a preset, telling no window anything', async () => {
+    expect(
+      await send({type: 'system-prompt.delete', id: 'default'})
+    ).toMatchObject({ok: false, error: {code: 'handler-failed'}})
+    expect(published).toEqual([])
+  })
+
+  it('gives a new Tree a copy of the default, which no later change to the library or the default touches', async () => {
+    const entry = await ownEntry('Talk like a pirate.')
+    await setDefault(entry.id)
+    const tree = await createTree()
+
+    await send({
+      type: 'system-prompt.update',
+      id: entry.id,
+      name: 'Pirate',
+      text: 'Talk like a sailor.',
+    })
+    await setDefault('concise')
+    await send({type: 'system-prompt.delete', id: entry.id})
+
+    expect(tree.systemPrompt.text).toBe('Talk like a pirate.')
+    expect(await listed()).toEqual([tree])
+  })
+
+  it('falls back to the Default preset once the default is deleted, and tells every window the library and the Setting', async () => {
+    const entry = await ownEntry('Talk like a pirate.')
+    await setDefault(entry.id)
+    published = []
+
+    await send({type: 'system-prompt.delete', id: entry.id})
+
+    expect(published).toEqual([
+      {type: 'SYSTEM_PROMPTS_CHANGED', systemPrompts: {entries: PRESETS}},
+      {
+        type: 'SETTINGS_CHANGED',
+        settings: expect.objectContaining({defaultSystemPromptId: 'default'}),
+      },
+    ])
+    expect((await createTree()).systemPrompt.text).toMatch(DEFAULT_PRESET)
+  })
+
+  it('sends a changed System prompt with the Tree’s later Replies, while each earlier one keeps what it ran under', async () => {
+    const tree = await createTree()
+    const first = await sendPrompt(tree.id, null)
+    answer(tree.id, first.reply.id)
+
+    const changedTree = await setSystemPrompt(tree.id, 'Answer in French.')
+
+    expect(changedTree.systemPrompt.text).toBe('Answer in French.')
+    expect(published.at(-1)).toEqual({type: 'TREE_CHANGED', tree: changedTree})
+
+    await sendPrompt(tree.id, first.reply.id)
+
+    expect(sentSystemPrompts()).toEqual([
+      expect.stringMatching(DEFAULT_PRESET),
+      expect.stringMatching(/^Answer in French\.\n\n# Your files/),
+    ])
+    expect((await repliesOf(tree.id)).map(one => one.systemPromptId)).toEqual([
+      tree.systemPrompt.id,
+      changedTree.systemPrompt.id,
+    ])
+    expect(changedTree.systemPrompt.id).not.toBe(tree.systemPrompt.id)
+  })
+
+  it('keeps one record of the same text, which Trees and Replies under it share', async () => {
+    const tree = await createTree()
+    const other = await createTree()
+    const french = await setSystemPrompt(other.id, 'Answer in French.')
+    const back = await setSystemPrompt(other.id, tree.systemPrompt.text)
+    const {reply} = await sendPrompt(tree.id, null)
+
+    expect(french.systemPrompt.id).not.toBe(tree.systemPrompt.id)
+    expect(back.systemPrompt).toEqual(tree.systemPrompt)
+    expect(reply.systemPromptId).toBe(tree.systemPrompt.id)
+  })
+
+  it('retries a Reply under the System prompt it first ran under', async () => {
+    const tree = await createTree()
+    const {reply} = await sendPrompt(tree.id, null)
+    deps.turns.hostEvent('claude', {
+      type: 'RUN_FINISHED',
+      treeId: tree.id,
+      replyId: reply.id,
+      status: 'failed',
+      failure: {code: 'host-crashed', message: 'Claude stopped unexpectedly.'},
+    })
+    await setSystemPrompt(tree.id, 'Answer in French.')
+
+    await send({type: 'reply.retry', treeId: tree.id, replyId: reply.id})
+
+    expect(sentSystemPrompts()).toEqual([
+      expect.stringMatching(DEFAULT_PRESET),
+      expect.stringMatching(DEFAULT_PRESET),
+    ])
+    expect((await repliesOf(tree.id))[0]?.systemPromptId).toBe(
+      tree.systemPrompt.id
+    )
+  })
+
+  it('answers not-found for changing a Tree that does not exist', async () => {
+    expect(
+      await send({
+        type: 'tree.set-system-prompt',
+        treeId: crypto.randomUUID(),
+        text: '',
+      })
+    ).toMatchObject({ok: false, error: {code: 'not-found'}})
   })
 })

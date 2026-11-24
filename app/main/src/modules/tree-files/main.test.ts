@@ -76,7 +76,7 @@ beforeEach(() => {
 
   launch()
 
-  treeId = createTrees(db).create(new Date()).id
+  treeId = createTrees(db).create(new Date(), '').id
 })
 
 afterEach(() => {

@@ -39,6 +39,7 @@ import {
   listTurns,
   resetReply,
   savedReply,
+  treeSystemPrompt,
 } from './rows'
 import {threadTo, withAttachments} from './thread'
 
@@ -200,7 +201,7 @@ export function createTurns({
       refuseTooManyImages(db, attachmentIds)
 
       const failed = failedToReplace(db, treeId, parentReplyId)
-      const systemPrompt = ''
+      const systemPrompt = treeSystemPrompt(db, treeId)
 
       const walked = threadTo(db, treeId, parentReplyId, picked, listedModels)
 
@@ -216,7 +217,7 @@ export function createTurns({
         attachmentIds,
         provider,
         model,
-        systemPrompt,
+        systemPromptId: systemPrompt.id,
         now: now(),
         replacing: failed,
       })
@@ -233,7 +234,7 @@ export function createTurns({
           treeId,
           replyId: reply.id,
           model,
-          systemPrompt: withAppSections(systemPrompt, treeFolder),
+          systemPrompt: withAppSections(systemPrompt.text, treeFolder),
           prompt: {text, attachments, messageId: randomUUID()},
           vendorProgram: vendorProgramFor(provider),
           treeFolder,

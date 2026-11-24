@@ -13,6 +13,7 @@ const tree = {
   createdAt: '2026-10-19T12:00:00.000Z',
   lastActiveAt: '2026-10-19T12:00:00.000Z',
   unseenFailure: false,
+  systemPrompt: {id: '01a16096-00ad-7d3b-8205-6b76ddc26ce1', text: ''},
 }
 
 function setUp() {
@@ -25,6 +26,7 @@ function setUp() {
     lastModel: null,
     signIn: null,
     settings: DEFAULT_SETTINGS,
+    systemPrompts: {entries: []},
     layout: DEFAULT_LAYOUT,
   }))
 }
