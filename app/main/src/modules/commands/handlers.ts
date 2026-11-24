@@ -3,6 +3,7 @@ import type {Connections} from '#modules/connections/main'
 import type {LayoutStore} from '#modules/layout/main'
 import type {RemoteImages} from '#modules/remote-images/main'
 import type {SettingsStore} from '#modules/settings/main'
+import type {SystemPrompts} from '#modules/system-prompts/main'
 import type {TreeFiles} from '#modules/tree-files/main'
 import type {Trees} from '#modules/trees/main'
 import type {Turns} from '#modules/turns/main'
@@ -22,6 +23,7 @@ export interface HandlerDeps {
   attachments: Pick<Attachments, 'add' | 'withMissingCopies'>
   images: RemoteImages
   settings: SettingsStore
+  systemPrompts: SystemPrompts
   layout: LayoutStore
   downloadGitAgain: () => void
   publish: (event: AppEvent) => void
@@ -45,11 +47,20 @@ function found(tree: Tree | null): Tree {
   return tree
 }
 
+const GONE_FROM_LIBRARY = 'That System prompt is no longer in the library.'
+
+function publishLibrary(
+  systemPrompts: SystemPrompts,
+  publish: HandlerDeps['publish']
+) {
+  publish({type: 'SYSTEM_PROMPTS_CHANGED', systemPrompts: systemPrompts.list()})
+}
+
 export const handlers: Handlers = {
   'app.ping': ({nonce}, {now}) => ({nonce, receivedAt: now().toISOString()}),
 
-  'tree.create': (_command, {now, trees, publish}) => {
-    const tree = trees.create(now())
+  'tree.create': (_command, {now, trees, systemPrompts, publish}) => {
+    const tree = trees.create(now(), systemPrompts.defaultText())
     publish({type: 'TREE_CREATED', tree})
 
     return tree
@@ -79,6 +90,13 @@ export const handlers: Handlers = {
     publish({type: 'TREE_DELETED', treeId})
 
     return {}
+  },
+
+  'tree.set-system-prompt': ({treeId, text}, {trees, publish}) => {
+    const tree = found(trees.setSystemPrompt(treeId, text))
+    publish({type: 'TREE_CHANGED', tree})
+
+    return tree
   },
 
   'tree.turns': async ({treeId}, {trees, turns, treeFiles, attachments}) => {
@@ -168,6 +186,37 @@ export const handlers: Handlers = {
     publish({type: 'SETTINGS_CHANGED', settings: saved})
 
     return saved
+  },
+
+  'system-prompt.create': ({name, text}, {now, systemPrompts, publish}) => {
+    const entry = systemPrompts.create({name, text}, now())
+    publishLibrary(systemPrompts, publish)
+
+    return entry
+  },
+
+  'system-prompt.update': ({id, name, text}, {systemPrompts, publish}) => {
+    const entry = systemPrompts.update(id, {name, text})
+
+    if (!entry) throw new NotFoundError(GONE_FROM_LIBRARY)
+
+    publishLibrary(systemPrompts, publish)
+
+    return entry
+  },
+
+  'system-prompt.delete': ({id}, {systemPrompts, publish}) => {
+    const deleted = systemPrompts.delete(id)
+
+    if (!deleted) throw new NotFoundError(GONE_FROM_LIBRARY)
+
+    publishLibrary(systemPrompts, publish)
+
+    if (deleted.settings) {
+      publish({type: 'SETTINGS_CHANGED', settings: deleted.settings})
+    }
+
+    return {}
   },
 
   'layout.update': ({changes}, {layout, publish}) => {

@@ -13,6 +13,8 @@ export interface WarmSession {
   readonly model: string
   /** Fixed as `claude` starts: it applies no later change to the threshold. */
   readonly compactionSettings: CompactionSettings
+  /** Fixed as `claude` starts: a changed System prompt needs a new `claude`. */
+  readonly systemPrompt: string
   close(): Promise<void>
 }
 
@@ -78,16 +80,17 @@ export function createWarmSessions<Session extends WarmSession>({
 
   return {
     /**
-     * Closes it at any other point, on another Model or with other Compaction
-     * Settings, so `claude` never runs a session twice. Another name for its
-     * Model keeps it.
+     * Closes it at any other point, on another Model, with other Compaction
+     * Settings or under another System prompt, so `claude` never runs a
+     * session twice. Another name for its Model keeps it.
      */
     claim(
       ref: SessionRef,
       {
         model,
         compactionSettings,
-      }: Pick<ReplyRequest, 'model' | 'compactionSettings'>
+        systemPrompt,
+      }: Pick<ReplyRequest, 'model' | 'compactionSettings' | 'systemPrompt'>
     ): Session | null {
       const wanted = resolveModel(model)
 
@@ -98,7 +101,9 @@ export function createWarmSessions<Session extends WarmSession>({
           session.messageId === ref.messageId &&
           resolveModel(session.model) === wanted &&
           session.compactionSettings.auto === compactionSettings.auto &&
-          session.compactionSettings.threshold === compactionSettings.threshold
+          session.compactionSettings.threshold ===
+            compactionSettings.threshold &&
+          session.systemPrompt === systemPrompt
         ) {
           wake(session)
 

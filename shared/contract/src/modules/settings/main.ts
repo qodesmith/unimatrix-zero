@@ -1,5 +1,6 @@
 import type {ProviderId} from '#modules/providers/main'
 
+import {SystemPromptEntryIdSchema} from '#modules/system-prompts/main'
 import {z} from 'zod'
 
 export const CanvasOrientationSchema = z.enum(['vertical', 'horizontal'])
@@ -40,7 +41,8 @@ function thresholdSchema({min, max}: CompactionThresholdRange) {
 
 /**
  * The Compaction Settings reach every Thread from its next Reply, and no Tree
- * has its own; every other key never reaches the AI (ADR 0023).
+ * has its own; the default System prompt reaches only Trees created later;
+ * every other key never reaches the AI (ADR 0023).
  */
 export const SettingsSchema = z.strictObject({
   themeMode: ThemeModeSchema,
@@ -60,6 +62,8 @@ export const SettingsSchema = z.strictObject({
   claudeAutoCompaction: z.boolean(),
   claudeCompactionThreshold: thresholdSchema(COMPACTION_THRESHOLD.claude),
   chatgptCompactionThreshold: thresholdSchema(COMPACTION_THRESHOLD.chatgpt),
+  /** The library entry new Trees copy their System prompt from. */
+  defaultSystemPromptId: SystemPromptEntryIdSchema,
 })
 
 export type Settings = z.infer<typeof SettingsSchema>
@@ -76,6 +80,7 @@ export const DEFAULT_SETTINGS: Settings = {
   claudeAutoCompaction: true,
   claudeCompactionThreshold: null,
   chatgptCompactionThreshold: null,
+  defaultSystemPromptId: 'default',
 }
 
 export const SettingsUpdateSchema = SettingsSchema.partial()

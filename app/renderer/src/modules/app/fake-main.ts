@@ -5,6 +5,7 @@ import type {AppEvent} from '@uz/contract/events'
 import type {Layout} from '@uz/contract/layout'
 import type {Model} from '@uz/contract/providers'
 import type {Settings} from '@uz/contract/settings'
+import type {SystemPromptEntry} from '@uz/contract/system-prompts'
 import type {Tree} from '@uz/contract/trees'
 import type {Prompt, Reply, StreamingReply} from '@uz/contract/turns'
 
@@ -14,6 +15,7 @@ import {
 } from '@uz/contract/attachments'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
+import {PRESETS, defaultEntry} from '@uz/contract/system-prompts'
 
 type AttachmentAdd = Extract<Command, {type: 'attachment.add'}>
 
@@ -37,6 +39,7 @@ export function savedTree(fields: Partial<Tree> = {}): Tree {
     createdAt: receivedAt,
     lastActiveAt: receivedAt,
     unseenFailure: false,
+    systemPrompt: {id: crypto.randomUUID(), text: ''},
     ...fields,
   }
 }
@@ -48,6 +51,8 @@ interface Saved {
   streaming?: StreamingReply[]
   firstLaunch?: boolean
   settings?: Partial<Settings>
+  /** The user's own System prompts, after the presets. */
+  systemPrompts?: SystemPromptEntry[]
   layout?: Partial<Layout>
 }
 
@@ -68,6 +73,7 @@ export function fakeMain(saved: Saved = {}) {
   const replies = [...(saved.replies ?? [])]
   const settings: Settings = {...DEFAULT_SETTINGS, ...saved.settings}
   const layout: Layout = {...DEFAULT_LAYOUT, ...saved.layout}
+  const library = [...PRESETS, ...(saved.systemPrompts ?? [])]
   const sent: Command[] = []
   const listeners = new Set<(event: AppEvent) => void>()
   const attachments = new Map<string, Attachment>()
@@ -106,10 +112,57 @@ export function fakeMain(saved: Saved = {}) {
     return tree
   }
 
+  function systemPrompts() {
+    return {entries: library.map(entry => ({...entry}))}
+  }
+
+  function changeLibrary(
+    command: Extract<Command, {type: `system-prompt.${string}`}>
+  ): CommandOutcome<CommandType> {
+    const index = library.findIndex(
+      entry => 'id' in command && entry.id === command.id && !entry.preset
+    )
+
+    if (command.type === 'system-prompt.create') {
+      const {name, text} = command
+      const entry = {id: crypto.randomUUID(), name, text, preset: false}
+
+      library.push(entry)
+      publish({type: 'SYSTEM_PROMPTS_CHANGED', systemPrompts: systemPrompts()})
+
+      return {ok: true, value: entry}
+    }
+
+    if (index === -1) {
+      return {ok: false, error: {code: 'not-found', message: 'Gone'}}
+    }
+
+    if (command.type === 'system-prompt.update') {
+      const {id, name, text} = command
+      const entry = {id, name, text, preset: false}
+
+      library[index] = entry
+      publish({type: 'SYSTEM_PROMPTS_CHANGED', systemPrompts: systemPrompts()})
+
+      return {ok: true, value: entry}
+    }
+
+    library.splice(index, 1)
+    publish({type: 'SYSTEM_PROMPTS_CHANGED', systemPrompts: systemPrompts()})
+
+    if (settings.defaultSystemPromptId === command.id) {
+      settings.defaultSystemPromptId = DEFAULT_SETTINGS.defaultSystemPromptId
+      publish({type: 'SETTINGS_CHANGED', settings: {...settings}})
+    }
+
+    return {ok: true, value: {}}
+  }
+
   function answer(
     command: Exclude<
       Command,
-      {type: 'attachment.add' | 'snapshots.download-again'}
+      | {type: 'attachment.add' | 'snapshots.download-again' | 'image.load'}
+      | {type: `system-prompt.${string}`}
     >
   ): CommandOutcome<CommandType> {
     if ('provider' in command) return {ok: true, value: {}}
@@ -120,10 +173,6 @@ export function fakeMain(saved: Saved = {}) {
 
     if (command.type === 'tree.list') {
       return {ok: true, value: {trees: trees.toReversed()}}
-    }
-
-    if (command.type === 'image.load') {
-      return {ok: true, value: {dataUrl: 'data:image/png;base64,'}}
     }
 
     if (command.type === 'settings.update') {
@@ -141,7 +190,12 @@ export function fakeMain(saved: Saved = {}) {
     }
 
     if (command.type === 'tree.create') {
-      const tree = savedTree()
+      const tree = savedTree({
+        systemPrompt: {
+          id: crypto.randomUUID(),
+          text: defaultEntry(library, settings.defaultSystemPromptId).text,
+        },
+      })
 
       trees.push(tree)
       publish({type: 'TREE_CREATED', tree})
@@ -198,6 +252,7 @@ export function fakeMain(saved: Saved = {}) {
         promptId: prompt.id,
         provider: command.model.provider,
         model: command.model.model,
+        systemPromptId: found.systemPrompt.id,
         status: 'streaming',
         content: [],
         contextSize: null,
@@ -216,6 +271,12 @@ export function fakeMain(saved: Saved = {}) {
         ok: true,
         value: {prompt, reply, removed: {promptIds: [], replyIds: []}},
       }
+    }
+
+    if (command.type === 'tree.set-system-prompt') {
+      const systemPrompt = {id: crypto.randomUUID(), text: command.text}
+
+      return {ok: true, value: change(index, {...found, systemPrompt})}
     }
 
     if (command.type === 'tree.rename') {
@@ -238,6 +299,18 @@ export function fakeMain(saved: Saved = {}) {
         return {ok: true, value: {}}
       }
 
+      if (command.type === 'image.load') {
+        return {ok: true, value: {dataUrl: 'data:image/png;base64,'}}
+      }
+
+      if (
+        command.type === 'system-prompt.create' ||
+        command.type === 'system-prompt.update' ||
+        command.type === 'system-prompt.delete'
+      ) {
+        return changeLibrary(command)
+      }
+
       return answer(command)
     }) as Bridge['send'],
     subscribe: listener => {
@@ -256,6 +329,7 @@ export function fakeMain(saved: Saved = {}) {
         lastModel: null,
         signIn: null,
         settings: {...settings},
+        systemPrompts: systemPrompts(),
         layout: {...layout},
       })
 

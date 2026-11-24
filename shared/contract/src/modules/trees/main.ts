@@ -1,3 +1,4 @@
+import {TreeSystemPromptSchema} from '#modules/system-prompts/main'
 import {z} from 'zod'
 
 export const TREE_TITLE_MAX_LENGTH = 200
@@ -13,6 +14,8 @@ export const TreeSchema = z.strictObject({
   lastActiveAt: z.iso.datetime(),
   /** A Reply in it failed since the Tree was last opened. */
   unseenFailure: z.boolean(),
+  /** Its own copy, which later Replies run under. */
+  systemPrompt: TreeSystemPromptSchema,
 })
 
 export type Tree = z.infer<typeof TreeSchema>

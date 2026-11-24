@@ -38,6 +38,7 @@ function reply(id: string, promptId: string): Reply {
     failure: null,
     compacted: false,
     rebuilt: false,
+    systemPromptId: '019ab3c0-5e1f-7000-8000-000000000001',
     files: [],
     createdAt: at(++clock),
   }

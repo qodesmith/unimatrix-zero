@@ -29,6 +29,7 @@ import {
 } from '@uz/contract/attachments'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
+import {PRESETS} from '@uz/contract/system-prompts'
 import {useState} from 'react'
 import {expect, it, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
@@ -41,6 +42,7 @@ import {PromptInput} from './PromptInput'
 
 const treeId = '01a16096-00ad-7d3b-8205-6b76ddc26ce0'
 const createdAt = '2026-10-19T12:00:00.000Z'
+const SYSTEM_PROMPT_ID = '019ab3c0-5e1f-7000-8000-000000000001'
 const account = {email: 'sam@example.com', plan: 'Max'}
 
 function model(id: string, name: string, fields: Partial<Model> = {}): Model {
@@ -82,6 +84,7 @@ function attachedReply(provider: ProviderId, modelId: string): Reply {
     failure: null,
     compacted: false,
     rebuilt: false,
+    systemPromptId: SYSTEM_PROMPT_ID,
     files: [],
     createdAt,
   }
@@ -96,6 +99,8 @@ interface Setup {
   sendKey?: Settings['sendKey']
   reReadNote?: Settings['reReadNote']
   attachments?: Attachment[]
+  /** The Tree's System prompt now. */
+  systemPromptId?: string
 }
 
 interface Sends {
@@ -250,6 +255,7 @@ function fakeMain({
         lastModel,
         signIn: null,
         settings: {...DEFAULT_SETTINGS, sendKey, reReadNote},
+        systemPrompts: {entries: [...PRESETS]},
         layout: DEFAULT_LAYOUT,
       })
 
@@ -282,10 +288,17 @@ function fakeMain({
 async function renderInput(setup: Setup = {}) {
   const main = fakeMain(setup)
   globalThis.window.uz = main
-  const {attachedTo, prompts = [], attachments = []} = setup
+
+  const {
+    attachedTo,
+    prompts = [],
+    attachments = [],
+    systemPromptId = SYSTEM_PROMPT_ID,
+  } = setup
 
   const canvas = fromPartial<CanvasState>({
     index: indexTurns({prompts, replies: attachedTo ? [attachedTo] : []}),
+    systemPromptId,
   })
 
   function Providers({children}: {children: ReactNode}) {
@@ -438,6 +451,19 @@ it('says above the Input how much of a long Thread another Provider will re-read
   await page.getByRole('option', {name: 'GPT-5'}).click()
 
   await expect.element(page.getByRole('note')).toHaveTextContent(SWITCH_NOTE)
+})
+
+it('says above the Input how much of a long Thread the Tree’s new System prompt will re-read', async () => {
+  await renderInput({
+    attachedTo: sized(49_000),
+    systemPromptId: '019ab3c0-5e1f-7000-8000-000000000002',
+  })
+
+  await expect
+    .element(page.getByRole('note'))
+    .toHaveTextContent(
+      'The new System prompt will re-read ~49k tokens of this conversation (uses more of your limit).'
+    )
 })
 
 it('says nothing when the Thread is short', async () => {

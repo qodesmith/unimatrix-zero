@@ -20,5 +20,6 @@ export function useReReadNote(
     attachedTo,
     context: contextSizeAt(canvas.index, attachedTo),
     to,
+    systemPromptId: canvas.systemPromptId,
   })
 }

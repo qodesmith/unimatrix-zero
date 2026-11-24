@@ -235,6 +235,7 @@ function liveDriver(
       session,
       thread: [],
       compactionSettings,
+      systemPromptChanged: false,
     }
   }
 

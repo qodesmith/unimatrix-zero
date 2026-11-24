@@ -6,6 +6,7 @@ import type {
   SessionRef,
 } from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
+import type {TreeSystemPrompt} from '@uz/contract/system-prompts'
 import type {Reply} from '@uz/contract/turns'
 
 import {schema} from '#modules/database/main'
@@ -35,7 +36,7 @@ export interface Continuation {
 export interface Recovery {
   provider: ProviderId
   model: string
-  systemPrompt: string
+  systemPrompt: TreeSystemPrompt
   text: string
   promptId: string
   parentReplyId: string | null
@@ -305,7 +306,7 @@ export function recovery(
   return {
     provider: row.provider,
     model: row.model,
-    systemPrompt: systemPrompt.text,
+    systemPrompt: {id: row.systemPromptId, text: systemPrompt.text},
     text: prompt.text,
     promptId: prompt.id,
     parentReplyId: prompt.parentReplyId,

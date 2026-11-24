@@ -4,6 +4,7 @@ import type {Reply} from '@uz/contract/turns'
 
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
+import {PRESETS} from '@uz/contract/system-prompts'
 import {expect, it} from 'vitest'
 
 import {markStreamingWaiting} from './live-replies'
@@ -84,6 +85,7 @@ const saved: Reply = {
   failure: null,
   compacted: false,
   rebuilt: false,
+  systemPromptId: '019ab3c0-5e1f-7000-8000-000000000001',
   files: [],
   createdAt: '2026-10-19T12:00:00.000Z',
 }
@@ -270,6 +272,7 @@ it('keeps a Reply waiting across a snapshot only while the snapshot still stream
       lastModel: null,
       signIn: null,
       settings: DEFAULT_SETTINGS,
+      systemPrompts: {entries: [...PRESETS]},
       layout: DEFAULT_LAYOUT,
     },
   ])

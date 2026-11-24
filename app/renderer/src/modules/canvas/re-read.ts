@@ -44,16 +44,26 @@ interface ReReadInput {
   attachedTo: Reply | null
   context: MeasuredContext | null
   to: ModelChoice | null
+  /** The Tree's System prompt, which the next Reply runs under. */
+  systemPromptId: string
 }
 
 /**
  * What the Input says before a Prompt that re-reads the Thread cold, or null:
- * a Thread going to another Provider rebuilds its session from the Thread.
+ * a Thread going to another Provider, or under another System prompt, rebuilds
+ * its session from the Thread.
  */
-export function reReadNote({attachedTo, context, to}: ReReadInput) {
+export function reReadNote({
+  attachedTo,
+  context,
+  to,
+  systemPromptId,
+}: ReReadInput) {
   if (!attachedTo || !to || !context) return null
 
-  if (to.provider === attachedTo.provider) return null
+  const switching = to.provider !== attachedTo.provider
+
+  if (!switching && systemPromptId === attachedTo.systemPromptId) return null
 
   const tokens =
     context.size - SETUP_TOKENS[context.provider] + SETUP_TOKENS[to.provider]
@@ -62,5 +72,9 @@ export function reReadNote({attachedTo, context, to}: ReReadInput) {
 
   const thousands = Math.round(tokens / 1000)
 
-  return `Switching to ${PROVIDER_NAMES[to.provider]} will re-read ~${thousands}k tokens of this conversation (uses more of your limit).`
+  const cause = switching
+    ? `Switching to ${PROVIDER_NAMES[to.provider]}`
+    : 'The new System prompt'
+
+  return `${cause} will re-read ~${thousands}k tokens of this conversation (uses more of your limit).`
 }

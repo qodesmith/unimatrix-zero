@@ -15,6 +15,7 @@ import {
   FollowFontSize,
   SettingsProvider,
 } from '#modules/settings/main'
+import {SystemPromptsProvider} from '#modules/system-prompts/main'
 import {NoTreeOpen, TreeTitle, useTrees} from '#modules/trees/main'
 import {LiveReplies} from '#modules/turns/main'
 import {SidebarInset} from '#shadcn/ui/sidebar'
@@ -35,17 +36,19 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
         <FollowFontSize />
-        <LayoutProvider>
-          <ConnectionsProvider>
-            <LiveReplies>
-              <TooltipProvider>
-                <AppLayout />
-              </TooltipProvider>
-              <SnapshotsWaiting />
-              <Toaster />
-            </LiveReplies>
-          </ConnectionsProvider>
-        </LayoutProvider>
+        <SystemPromptsProvider>
+          <LayoutProvider>
+            <ConnectionsProvider>
+              <LiveReplies>
+                <TooltipProvider>
+                  <AppLayout />
+                </TooltipProvider>
+                <SnapshotsWaiting />
+                <Toaster />
+              </LiveReplies>
+            </ConnectionsProvider>
+          </LayoutProvider>
+        </SystemPromptsProvider>
       </SettingsProvider>
     </QueryClientProvider>
   )
@@ -94,6 +97,7 @@ function AppLayout() {
             <Canvas
               key={openTree.id}
               treeId={openTree.id}
+              systemPromptId={openTree.systemPrompt.id}
               title={<TreeTitle tree={openTree} />}
               sidebarToggle={<SidebarToggle />}
             />

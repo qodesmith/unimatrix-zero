@@ -16,6 +16,7 @@ import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {attachmentUrl} from '@uz/contract/attachments'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
+import {PRESETS} from '@uz/contract/system-prompts'
 import {useLayoutEffect, useState} from 'react'
 import {expect, it, onTestFinished, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
@@ -24,6 +25,7 @@ import {cdp, page, userEvent} from 'vitest/browser'
 import {Canvas} from './Canvas'
 
 const treeId = '01a16096-00ad-7d3b-8205-6b76ddc26ce0'
+const SYSTEM_PROMPT_ID = '019ab3c0-5e1f-7000-8000-000000000001'
 const createdAt = '2026-10-19T12:00:00.000Z'
 
 let clock = 0
@@ -67,6 +69,7 @@ function reply(n: number, promptN: number, text: string): Reply {
     failure: null,
     compacted: false,
     rebuilt: false,
+    systemPromptId: SYSTEM_PROMPT_ID,
     files: [],
     createdAt: at(++clock),
   }
@@ -203,6 +206,7 @@ function fakeMain(saved: Saved) {
       lastModel: null,
       signIn: null,
       settings: {...settings},
+      systemPrompts: {entries: [...PRESETS]},
       layout: DEFAULT_LAYOUT,
     }
   }
@@ -390,9 +394,12 @@ async function renderCanvas(saved: Saved) {
   const main = fakeMain(saved)
   globalThis.window.uz = main
 
-  const screen = await render(<Canvas treeId={treeId} title="Tree" />, {
-    wrapper: Providers,
-  })
+  const screen = await render(
+    <Canvas treeId={treeId} systemPromptId={SYSTEM_PROMPT_ID} title="Tree" />,
+    {
+      wrapper: Providers,
+    }
+  )
 
   return {main, screen}
 }

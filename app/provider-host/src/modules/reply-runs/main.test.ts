@@ -20,6 +20,7 @@ const request: ReplyRequest = {
   session: null,
   thread: [],
   compactionSettings: {auto: true, threshold: null},
+  systemPromptChanged: false,
 }
 
 const delta: ContentEvent = {...ids, type: 'TEXT_DELTA', delta: 'Hi'}

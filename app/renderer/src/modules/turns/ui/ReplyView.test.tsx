@@ -11,6 +11,7 @@ import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {EventSchema} from '@uz/contract/events'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
+import {PRESETS} from '@uz/contract/system-prompts'
 import {afterEach, beforeEach, expect, it, onTestFinished, vi} from 'vitest'
 import {render} from 'vitest-browser-react'
 
@@ -39,6 +40,7 @@ const reply: Reply = {
   failure: null,
   compacted: false,
   rebuilt: false,
+  systemPromptId: '019ab3c0-5e1f-7000-8000-000000000001',
   files: [],
   createdAt: '2026-10-19T12:00:00.000Z',
 }
@@ -98,6 +100,7 @@ function fakeMain() {
         lastModel: null,
         signIn: null,
         settings: DEFAULT_SETTINGS,
+        systemPrompts: {entries: [...PRESETS]},
         layout: DEFAULT_LAYOUT,
       })
 

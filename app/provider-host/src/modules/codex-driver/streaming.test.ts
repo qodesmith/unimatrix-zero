@@ -210,12 +210,14 @@ async function setUp(
       compactionSettings = DEFAULT_COMPACTION_SETTINGS,
       thread = [],
       attachments = [],
+      systemPromptChanged = false,
     }: {
       stopAfter?: number
       model?: string
       compactionSettings?: CompactionSettings
       thread?: Thread
       attachments?: HostAttachment[]
+      systemPromptChanged?: boolean
     } = {}
   ) {
     const replyId = crypto.randomUUID()
@@ -233,6 +235,7 @@ async function setUp(
       session: session && {type: 'continue', ...session},
       thread,
       compactionSettings,
+      systemPromptChanged,
     })) {
       events.push(event)
 
@@ -399,6 +402,16 @@ it('runs codex in its own CODEX_HOME, updater off and nothing that outranks the 
   expect(report?.home).toBe(codex.configDir)
   expect(report?.cwd).toBe(codex.configDir)
   expect(report?.vendorVariables).toEqual(['CODEX_HOME'])
+})
+
+it('starts codex with project docs off and in its own `CODEX_HOME`, so neither an `AGENTS.md` nor the user’s `config.toml` loads', async () => {
+  const codex = await setUp(['started.ndjson'])
+  await codex.reply(FIRST_PROMPT)
+
+  const [report] = codex.reports()
+
+  expect(report?.args.join(' ')).toContain('-c project_doc_max_bytes=0')
+  expect(report?.home).toBe(codex.configDir)
 })
 
 it('names the app’s developer folder to an app-server that starts on a Mac with no developer tools, and to none that starts on a Mac with them', async () => {
@@ -2052,6 +2065,34 @@ it('rebuilds a thread the app has no copy of from the Thread', async () => {
   ).toEqual(['thread/resume', 'thread/start', 'thread/inject_items'])
   expect(run?.injected).toHaveLength(5)
   expect(run?.prompts).toEqual([FIRST_PROMPT])
+  expect(events.filter(event => event.type === 'SESSION_REBUILT')).toHaveLength(
+    1
+  )
+
+  await codex.allClosed()
+})
+
+it('starts a new thread from the Thread under a changed System prompt, which a resumed thread would ignore', async () => {
+  const codex = await setUp([injecting()])
+
+  const events = await codex.reply(
+    FIRST_PROMPT,
+    {sessionId: THREAD_ID, messageId: FIRST_TURN},
+    {thread: HANDED_OVER, systemPromptChanged: true}
+  )
+
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+  const [run] = codex.reports()
+
+  expect(run?.methods).not.toContain('thread/resume')
+  expect(
+    run?.methods.filter(method => method.startsWith('thread/')).slice(0, 2)
+  ).toEqual(['thread/start', 'thread/inject_items'])
+  expect(run?.threadInstructions).toEqual([
+    explainingLabels(SYSTEM_PROMPT, HANDED_OVER),
+  ])
+  expect(run?.injected).toHaveLength(5)
   expect(events.filter(event => event.type === 'SESSION_REBUILT')).toHaveLength(
     1
   )

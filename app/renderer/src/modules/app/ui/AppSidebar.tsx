@@ -3,6 +3,7 @@ import type {ReactNode} from 'react'
 
 import {SidebarSections} from '#modules/layout/main'
 import {SettingsPage} from '#modules/settings/main'
+import {SystemPromptsSection} from '#modules/system-prompts/main'
 import {NewTreeButton, TreeList} from '#modules/trees/main'
 import {Alert, AlertDescription} from '#shadcn/ui/alert'
 import {Sheet, SheetContent, SheetTrigger} from '#shadcn/ui/sheet'
@@ -65,7 +66,10 @@ export function AppSidebar({trees, connections}: AppSidebarProps) {
                 aria-label="Settings"
                 className="w-full gap-0 p-0 data-[side=right]:sm:max-w-4xl"
               >
-                <SettingsPage connections={connections} />
+                <SettingsPage
+                  connections={connections}
+                  systemPrompts={<SystemPromptsSection />}
+                />
               </SheetContent>
             </Sheet>
           </SidebarMenuItem>

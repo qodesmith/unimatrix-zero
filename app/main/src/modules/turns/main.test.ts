@@ -100,7 +100,7 @@ beforeEach(() => {
   listedModels = {claude: [], chatgpt: []}
   attachmentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-turns-'))
   turns = launch()
-  treeId = createTrees(db).create(createdAt).id
+  treeId = createTrees(db).create(createdAt, '').id
 })
 
 afterEach(() => {
@@ -208,7 +208,7 @@ function sessionsStarted() {
 function inAnotherTree() {
   const sent = turns.sendPrompt({
     model: picked,
-    treeId: createTrees(db).create(createdAt).id,
+    treeId: createTrees(db).create(createdAt, '').id,
     parentReplyId: null,
     text: 'Elsewhere',
   })
@@ -274,6 +274,7 @@ describe('sending the root Prompt', () => {
           session: null,
           thread: [],
           compactionSettings: {auto: true, threshold: null},
+          systemPromptChanged: false,
         },
       },
     ])
@@ -292,7 +293,7 @@ describe('sending the root Prompt', () => {
 
     turns.sendPrompt({
       model: opus,
-      treeId: createTrees(db).create(clock).id,
+      treeId: createTrees(db).create(clock, '').id,
       parentReplyId: null,
       text: 'Hi',
     })
@@ -997,6 +998,7 @@ describe('a Prompt answering a Reply', () => {
           },
           thread: [{prompt: 'Hi', attachments: [], reply: [], label: null}],
           compactionSettings: {auto: true, threshold: null},
+          systemPromptChanged: false,
         },
       },
     ])
@@ -1119,6 +1121,59 @@ function requests() {
     command.type === 'reply.start' ? [command.request] : []
   )
 }
+
+function recordIn(replyId: string, sessionId: string) {
+  turns.hostRecorded('claude', {
+    type: 'REPLY_RECORDED',
+    treeId,
+    replyId,
+    model: 'claude-haiku-5-5',
+    session: {sessionId, messageId: `m-${replyId}`},
+  })
+  finish(replyId)
+}
+
+describe('a changed System prompt', () => {
+  it('tells the host the session started under another one, until a Reply runs in a new session', () => {
+    const root = savedRoot()
+    createTrees(db).setSystemPrompt(treeId, 'Answer in French.')
+
+    const changed = turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: root,
+      text: 'And now?',
+    })
+
+    if (!changed) throw new Error('The Reply it answers is gone')
+
+    const flags = requests().map(request => request.systemPromptChanged)
+    recordIn(changed.reply.id, 's2')
+    hostCommands = []
+    turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: changed.reply.id,
+      text: 'In the new session',
+    })
+    flags.push(...requests().map(request => request.systemPromptChanged))
+
+    expect(flags).toEqual([true, false])
+  })
+
+  it('tells the host nothing changed for a Retry, which runs under what its Reply first ran under', () => {
+    const root = savedRoot()
+    const retried = sendPrompt(root, 'And then?')
+    fail(retried)
+    createTrees(db).setSystemPrompt(treeId, 'Answer in French.')
+
+    turns.retry(treeId, retried)
+
+    expect(requests().map(request => request.systemPromptChanged)).toEqual([
+      false,
+    ])
+  })
+})
 
 describe('a Prompt sent on another Provider', () => {
   const GPT = {provider: 'chatgpt', model: 'gpt-6-sol'} as const
@@ -1815,7 +1870,7 @@ describe('stopping every Reply in a Tree', () => {
 
     const elsewhere = turns.sendPrompt({
       model: picked,
-      treeId: createTrees(db).create(createdAt).id,
+      treeId: createTrees(db).create(createdAt, '').id,
       parentReplyId: null,
       text: 'Hi',
     })
@@ -1893,6 +1948,7 @@ describe('retrying a Reply', () => {
           session: null,
           thread: [],
           compactionSettings: {auto: true, threshold: null},
+          systemPromptChanged: false,
         },
       },
     ])

@@ -4,10 +4,11 @@ import type {Tree} from '@uz/contract/trees'
 import type {ReplyStatus} from '@uz/contract/turns'
 
 import {schema} from '#modules/database/main'
+import {saveSystemPrompt} from '#modules/system-prompts/main'
 import {TREE_TITLE_MAX_LENGTH} from '@uz/contract/trees'
 import {and, desc, eq, getColumns, isNull, sql} from 'drizzle-orm'
 
-const {trees, prompts} = schema
+const {trees, prompts, systemPrompts} = schema
 
 const rootText = sql<string | null>`(
   select ${prompts.text} from ${prompts}
@@ -25,6 +26,7 @@ const lastActiveAt = sql`coalesce(
 const rowFields = {
   ...getColumns(trees),
   rootText,
+  systemPromptText: systemPrompts.text,
   lastActiveAt: lastActiveAt.mapWith(trees.createdAt),
 }
 
@@ -37,7 +39,10 @@ function firstLineOf(text: string | null) {
 type TreeRow = NonNullable<ReturnType<ReturnType<typeof selectRows>['get']>>
 
 function selectRows(db: Database) {
-  return db.select(rowFields).from(trees)
+  return db
+    .select(rowFields)
+    .from(trees)
+    .innerJoin(systemPrompts, eq(systemPrompts.id, trees.systemPromptId))
 }
 
 function toTree(row: TreeRow): Tree {
@@ -48,6 +53,7 @@ function toTree(row: TreeRow): Tree {
     createdAt: row.createdAt.toISOString(),
     lastActiveAt: row.lastActiveAt.toISOString(),
     unseenFailure: row.unseenFailure,
+    systemPrompt: {id: row.systemPromptId, text: row.systemPromptText},
   }
 }
 
@@ -65,10 +71,13 @@ export function createTrees(db: Database) {
   }
 
   return {
-    create(now: Date): Tree {
+    create(now: Date, systemPrompt: string): Tree {
       const {id} = db
         .insert(trees)
-        .values({createdAt: now})
+        .values({
+          systemPromptId: saveSystemPrompt(db, systemPrompt),
+          createdAt: now,
+        })
         .returning({id: trees.id})
         .get()
 
@@ -105,6 +114,20 @@ export function createTrees(db: Database) {
           .update(trees)
           .set({title})
           .where(and(eq(trees.id, id), isNull(trees.title)))
+          .returning({id: trees.id})
+          .get()
+      )
+    },
+
+    /** From its next Reply on; earlier Replies keep what they ran under. */
+    setSystemPrompt(id: string, text: string): Tree | null {
+      if (!get(id)) return null
+
+      return updated(
+        db
+          .update(trees)
+          .set({systemPromptId: saveSystemPrompt(db, text)})
+          .where(eq(trees.id, id))
           .returning({id: trees.id})
           .get()
       )

@@ -39,6 +39,8 @@ import {
   listTurns,
   resetReply,
   savedReply,
+  startedUnder,
+  treeSystemPrompt,
 } from './rows'
 import {threadTo, withAttachments} from './thread'
 
@@ -161,6 +163,16 @@ export function createTurns({
     return continued?.provider === provider ? continued.session : null
   }
 
+  function systemPromptChanged(
+    provider: ProviderId,
+    session: ReplyRequest['session'],
+    systemPromptId: string
+  ) {
+    const started = session && startedUnder(db, provider, session.sessionId)
+
+    return started !== null && started !== systemPromptId
+  }
+
   function refuseUnsendable(
     continued: Continuation | null,
     provider: ProviderId
@@ -200,7 +212,7 @@ export function createTurns({
       refuseTooManyImages(db, attachmentIds)
 
       const failed = failedToReplace(db, treeId, parentReplyId)
-      const systemPrompt = ''
+      const systemPrompt = treeSystemPrompt(db, treeId)
 
       const walked = threadTo(db, treeId, parentReplyId, picked, listedModels)
 
@@ -216,7 +228,7 @@ export function createTurns({
         attachmentIds,
         provider,
         model,
-        systemPrompt,
+        systemPromptId: systemPrompt.id,
         now: now(),
         replacing: failed,
       })
@@ -233,13 +245,18 @@ export function createTurns({
           treeId,
           replyId: reply.id,
           model,
-          systemPrompt: withAppSections(systemPrompt, treeFolder),
+          systemPrompt: withAppSections(systemPrompt.text, treeFolder),
           prompt: {text, attachments, messageId: randomUUID()},
           vendorProgram: vendorProgramFor(provider),
           treeFolder,
           session,
           thread,
           compactionSettings: compactionSettingsFor(provider),
+          systemPromptChanged: systemPromptChanged(
+            provider,
+            session,
+            systemPrompt.id
+          ),
         },
         parentReplyId
       )
@@ -290,13 +307,18 @@ export function createTurns({
           treeId,
           replyId,
           model,
-          systemPrompt: withAppSections(systemPrompt, treeFolder),
+          systemPrompt: withAppSections(systemPrompt.text, treeFolder),
           prompt: {text, attachments, messageId: randomUUID()},
           vendorProgram: vendorProgramFor(provider),
           treeFolder,
           session,
           thread,
           compactionSettings: compactionSettingsFor(provider),
+          systemPromptChanged: systemPromptChanged(
+            provider,
+            session,
+            systemPrompt.id
+          ),
         },
         recovered.parentReplyId
       )

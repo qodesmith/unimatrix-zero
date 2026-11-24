@@ -135,6 +135,7 @@ it('opens Settings in a Sheet over the Tree, and closing it with the X shows the
         failure: null,
         compacted: false,
         rebuilt: false,
+        systemPromptId: '019ab3c0-5e1f-7000-8000-000000000001',
         files: [],
         createdAt: receivedAt,
       },
@@ -405,6 +406,7 @@ it('shows a streaming Reply where it was after a reload, and keeps going', async
     failure: null,
     compacted: false,
     rebuilt: false,
+    systemPromptId: '019ab3c0-5e1f-7000-8000-000000000001',
     files: [],
     createdAt: receivedAt,
   }

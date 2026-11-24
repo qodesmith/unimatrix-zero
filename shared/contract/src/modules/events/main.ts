@@ -8,6 +8,7 @@ import {
   SignInStepEvent,
 } from '#modules/providers/main'
 import {SettingsSchema} from '#modules/settings/main'
+import {SystemPromptLibrarySchema} from '#modules/system-prompts/main'
 import {TreeSchema} from '#modules/trees/main'
 import {
   FilesChangedEvent,
@@ -27,12 +28,18 @@ export const SnapshotEvent = z.strictObject({
   lastModel: ModelChoiceSchema.nullable(),
   signIn: SignInStepEvent.nullable(),
   settings: SettingsSchema,
+  systemPrompts: SystemPromptLibrarySchema,
   layout: LayoutSchema,
 })
 
 export const SettingsChangedEvent = z.strictObject({
   type: z.literal('SETTINGS_CHANGED'),
   settings: SettingsSchema,
+})
+
+export const SystemPromptsChangedEvent = z.strictObject({
+  type: z.literal('SYSTEM_PROMPTS_CHANGED'),
+  systemPrompts: SystemPromptLibrarySchema,
 })
 
 export const LayoutChangedEvent = z.strictObject({
@@ -93,6 +100,7 @@ export const EventSchema = z.discriminatedUnion('type', [
   TreeChangedEvent,
   TreeDeletedEvent,
   SettingsChangedEvent,
+  SystemPromptsChangedEvent,
   LayoutChangedEvent,
   LastModelChangedEvent,
   ReplyEventSchema,

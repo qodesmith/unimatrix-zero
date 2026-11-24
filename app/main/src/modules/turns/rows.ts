@@ -9,12 +9,11 @@ import {attachToPrompt, attachmentsOf} from '#modules/attachments/main'
 import {schema} from '#modules/database/main'
 import {NEW_REPLY, ReplyPartSchema, RunFailureSchema} from '@uz/contract/turns'
 import {and, asc, desc, eq, isNull} from 'drizzle-orm'
-import {createHash} from 'node:crypto'
 import {z} from 'zod'
 
 import {removeTurns} from './deletion'
 
-const {compactions, prompts, replies, systemPrompts} = schema
+const {compactions, prompts, replies, systemPrompts, trees} = schema
 
 const {compacted: _, ...NEW_REPLY_ROW} = NEW_REPLY
 
@@ -44,6 +43,7 @@ function toReply(row: ReplyRow, compacted: boolean): Reply {
     promptId: row.promptId,
     provider: row.provider,
     model: row.model,
+    systemPromptId: row.systemPromptId,
     status: row.status,
     content: ContentSchema.parse(row.content),
     contextSize: row.contextSize,
@@ -115,20 +115,40 @@ export function savedReply(db: Database, replyId: string): Reply {
   return reply
 }
 
-function saveSystemPrompt(db: Database, text: string) {
-  const hash = createHash('sha256').update(text).digest('hex')
-
-  db.insert(systemPrompts).values({hash, text}).onConflictDoNothing().run()
-
+/**
+ * The System prompt a Provider session started under, as its first Reply ran
+ * under it; null when no Reply names the session.
+ */
+export function startedUnder(
+  db: Database,
+  provider: ProviderId,
+  sessionId: string
+): string | null {
   const row = db
-    .select({id: systemPrompts.id})
-    .from(systemPrompts)
-    .where(eq(systemPrompts.hash, hash))
+    .select({systemPromptId: replies.systemPromptId})
+    .from(replies)
+    .where(
+      and(eq(replies.provider, provider), eq(replies.sessionId, sessionId))
+    )
+    .orderBy(asc(replies.createdAt), asc(replies.id))
+    .limit(1)
     .get()
 
-  if (!row) throw new Error('The System prompt was not saved.')
+  return row?.systemPromptId ?? null
+}
 
-  return row.id
+/** What the Tree's next Reply runs under. */
+export function treeSystemPrompt(db: Database, treeId: string) {
+  const row = db
+    .select({id: systemPrompts.id, text: systemPrompts.text})
+    .from(trees)
+    .innerJoin(systemPrompts, eq(systemPrompts.id, trees.systemPromptId))
+    .where(eq(trees.id, treeId))
+    .get()
+
+  if (!row) throw new Error('That Tree no longer exists.')
+
+  return row
 }
 
 export interface NewExchange {
@@ -139,7 +159,7 @@ export interface NewExchange {
   attachmentIds: string[]
   provider: ProviderId
   model: string
-  systemPrompt: string
+  systemPromptId: string
   now: Date
   replacing: Removal | null
 }
@@ -148,8 +168,7 @@ export function insertExchange(
   db: Database,
   next: NewExchange
 ): {prompt: Prompt; reply: Reply} {
-  const systemPromptId = saveSystemPrompt(db, next.systemPrompt)
-  const {treeId, parentReplyId} = next
+  const {treeId, parentReplyId, systemPromptId} = next
 
   return db.transaction(tx => {
     if (next.replacing) removeTurns(tx, next.replacing)

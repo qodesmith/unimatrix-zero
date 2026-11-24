@@ -5,6 +5,7 @@ import type {Settings} from '@uz/contract/settings'
 
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
+import {PRESETS} from '@uz/contract/system-prompts'
 
 export function fakeMain(saved: Partial<Settings> = {}) {
   const settings: Settings = {...DEFAULT_SETTINGS, ...saved}
@@ -31,6 +32,7 @@ export function fakeMain(saved: Partial<Settings> = {}) {
         lastModel: null,
         signIn: null,
         settings: {...settings},
+        systemPrompts: {entries: [...PRESETS]},
         layout: DEFAULT_LAYOUT,
       })
 

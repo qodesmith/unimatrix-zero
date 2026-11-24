@@ -13,6 +13,8 @@ import {indexTurns} from './tree'
 
 const treeId = '01a16096-00ad-7d3b-8205-6b76ddc26ce0'
 const createdAt = '2026-10-19T12:00:00.000Z'
+const TREE_PROMPT = '019ab3c0-5e1f-7000-8000-000000000001'
+const EDITED_PROMPT = '019ab3c0-5e1f-7000-8000-000000000002'
 
 interface Exchange {
   prompt: Prompt
@@ -48,6 +50,7 @@ function exchange(
       failure: null,
       compacted: false,
       rebuilt: false,
+      systemPromptId: TREE_PROMPT,
       files: [],
       createdAt,
     },
@@ -73,6 +76,7 @@ it('says how much of the Thread another Provider will re-read, Context size and 
       attachedTo: claudeReply(size),
       context: onClaude(size),
       to: GPT,
+      systemPromptId: TREE_PROMPT,
     })
   ).toBe(
     'Switching to ChatGPT will re-read ~48k tokens of this conversation (uses more of your limit).'
@@ -86,6 +90,7 @@ function chatgptToClaude(threadTokens: number) {
     attachedTo: exchange(null, size, 'chatgpt').reply,
     context: {provider: 'chatgpt', size},
     to: CLAUDE,
+    systemPromptId: TREE_PROMPT,
   })
 }
 
@@ -107,6 +112,7 @@ it('shows from about 20k tokens, setup included, and not below', () => {
       attachedTo: claudeReply(below),
       context: onClaude(below),
       to: GPT,
+      systemPromptId: TREE_PROMPT,
     })
   ).toBeNull()
   expect(
@@ -114,18 +120,70 @@ it('shows from about 20k tokens, setup included, and not below', () => {
       attachedTo: claudeReply(from),
       context: onClaude(from),
       to: GPT,
+      systemPromptId: TREE_PROMPT,
     })
   ).not.toBeNull()
 })
 
-it('says nothing on the Thread’s own Provider, at the root, or with no Context size to go by', () => {
+it('says nothing on the Thread’s own Provider and System prompt, at the root, or with no Context size to go by', () => {
   const reply = claudeReply(100_000)
   const context = onClaude(100_000)
+  const unchanged = {systemPromptId: TREE_PROMPT}
 
-  expect(reReadNote({attachedTo: reply, context, to: CLAUDE})).toBeNull()
-  expect(reReadNote({attachedTo: null, context, to: GPT})).toBeNull()
-  expect(reReadNote({attachedTo: reply, context: null, to: GPT})).toBeNull()
-  expect(reReadNote({attachedTo: reply, context, to: null})).toBeNull()
+  expect(
+    reReadNote({attachedTo: reply, context, to: CLAUDE, ...unchanged})
+  ).toBeNull()
+  expect(
+    reReadNote({attachedTo: null, context, to: GPT, ...unchanged})
+  ).toBeNull()
+  expect(
+    reReadNote({attachedTo: reply, context: null, to: GPT, ...unchanged})
+  ).toBeNull()
+  expect(
+    reReadNote({attachedTo: reply, context, to: null, ...unchanged})
+  ).toBeNull()
+})
+
+it('says how much of the Thread a changed System prompt will re-read, the Context size alone on the same Provider', () => {
+  expect(
+    reReadNote({
+      attachedTo: claudeReply(47_600),
+      context: onClaude(47_600),
+      to: CLAUDE,
+      systemPromptId: EDITED_PROMPT,
+    })
+  ).toBe(
+    'The new System prompt will re-read ~48k tokens of this conversation (uses more of your limit).'
+  )
+})
+
+function onEdited(size: number) {
+  return reReadNote({
+    attachedTo: claudeReply(size),
+    context: onClaude(size),
+    to: CLAUDE,
+    systemPromptId: EDITED_PROMPT,
+  })
+}
+
+it('shows the changed System prompt’s note from about 20k tokens, and not below', () => {
+  expect(onEdited(RE_READ_NOTE_FROM - 1)).toBeNull()
+  expect(onEdited(RE_READ_NOTE_FROM)).not.toBeNull()
+})
+
+it('names the switch of Provider when the System prompt changed too', () => {
+  const size = 47_600 - SETUP_TOKENS.chatgpt + SETUP_TOKENS.claude
+
+  expect(
+    reReadNote({
+      attachedTo: claudeReply(size),
+      context: onClaude(size),
+      to: GPT,
+      systemPromptId: EDITED_PROMPT,
+    })
+  ).toBe(
+    'Switching to ChatGPT will re-read ~48k tokens of this conversation (uses more of your limit).'
+  )
 })
 
 it('takes the Context size of the nearest Reply above that has one, with that Reply’s Provider', () => {

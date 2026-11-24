@@ -41,9 +41,23 @@ function open() {
   return db
 }
 
+function insertTree(db: Database) {
+  const systemPrompt = db
+    .insert(schema.systemPrompts)
+    .values({hash: 'hash-of-empty', text: ''})
+    .returning()
+    .get()
+
+  return db
+    .insert(schema.trees)
+    .values({systemPromptId: systemPrompt.id})
+    .returning()
+    .get()
+}
+
 function withTreeAndPrompt() {
   const db = open()
-  const tree = db.insert(schema.trees).values({}).returning().get()
+  const tree = insertTree(db)
   db.insert(schema.prompts).values({treeId: tree.id, text: 'Hello'}).run()
   db.$client.close()
 }
@@ -79,6 +93,47 @@ function backups() {
   return fs.existsSync(backupsFolder) ? fs.readdirSync(backupsFolder) : []
 }
 
+/** Opens it as the app left it before `migration`, which `migrate` applies. */
+function openBefore(migration: string) {
+  const held = fs
+    .readdirSync(migrationsFolder)
+    .filter(name => name >= migration)
+
+  for (const name of held) {
+    fs.rmSync(path.join(migrationsFolder, name), {recursive: true})
+  }
+
+  open().$client.close()
+
+  return {
+    client: new DatabaseSync(file),
+    migrate() {
+      for (const name of held) {
+        fs.cpSync(
+          path.join(shippedMigrations, name),
+          path.join(migrationsFolder, name),
+          {recursive: true}
+        )
+      }
+
+      return open().$client
+    },
+  }
+}
+
+function treeSystemPrompts(client: DatabaseSync) {
+  return client
+    .prepare(
+      'SELECT system_prompts.text FROM trees JOIN system_prompts ON system_prompts.id = trees.system_prompt_id'
+    )
+    .all()
+}
+
+const TREE_SYSTEM_PROMPT_MIGRATION = '20261124125258_plain_the_fallen'
+
+const EMPTY_HASH =
+  'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+
 describe('opening', () => {
   it('turns foreign keys on', () => {
     const db = openDatabase({
@@ -107,7 +162,7 @@ describe('opening', () => {
   })
 
   it('gives every row a UUIDv7 id', () => {
-    const tree = open().insert(schema.trees).values({}).returning().get()
+    const tree = insertTree(open())
 
     expect(tree.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-/)
   })
@@ -256,6 +311,36 @@ describe('migrating', () => {
     open().$client.close()
 
     expect(count('prompts')).toBe(1)
+  })
+
+  describe('giving each Tree its own System prompt', () => {
+    it('points a Tree at the empty System prompt its Replies ran under, keeping its Turns', () => {
+      const {client, migrate} = openBefore(TREE_SYSTEM_PROMPT_MIGRATION)
+      client.exec(`
+        INSERT INTO system_prompts VALUES ('sp-1', '${EMPTY_HASH}', '', 0);
+        INSERT INTO trees (id, created_at) VALUES ('t-1', 0);
+        INSERT INTO prompts (id, tree_id, text, created_at) VALUES ('p-1', 't-1', 'Hi', 0);
+        INSERT INTO replies (id, tree_id, prompt_id, provider, model, status, content, system_prompt_id, created_at)
+          VALUES ('r-1', 't-1', 'p-1', 'claude', 'fake', 'complete', '[]', 'sp-1', 0);
+      `)
+      client.close()
+
+      const migrated = migrate()
+
+      expect(
+        migrated.prepare('SELECT id, system_prompt_id FROM trees').all()
+      ).toEqual([{id: 't-1', system_prompt_id: 'sp-1'}])
+      expect(count('prompts')).toBe(1)
+      expect(count('replies')).toBe(1)
+    })
+
+    it('points a Tree with no Reply at a new empty System prompt', () => {
+      const {client, migrate} = openBefore(TREE_SYSTEM_PROMPT_MIGRATION)
+      client.exec("INSERT INTO trees (id, created_at) VALUES ('t-1', 0);")
+      client.close()
+
+      expect(treeSystemPrompts(migrate())).toEqual([{text: ''}])
+    })
   })
 
   it('restores the backup when the foreign-key check fails', () => {

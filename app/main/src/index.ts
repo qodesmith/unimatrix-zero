@@ -29,6 +29,7 @@ import {createProviderHosts} from '#modules/provider-hosts/main'
 import {createRemoteImages} from '#modules/remote-images/main'
 import {createSessions} from '#modules/sessions/main'
 import {createSettings} from '#modules/settings/main'
+import {createSystemPrompts} from '#modules/system-prompts/main'
 import {createTitles} from '#modules/titles/main'
 import {createTreeFiles} from '#modules/tree-files/main'
 import {createTreeRows, createTrees} from '#modules/trees/main'
@@ -119,6 +120,7 @@ function openWindow(db: Database) {
 
   const settings = createSettings(db, saved => followThemeMode(saved.themeMode))
   followThemeMode(settings.read().themeMode)
+  const systemPrompts = createSystemPrompts(db, settings)
   const layout = createLayout(db)
 
   const hub = createHub(() => ({
@@ -128,6 +130,7 @@ function openWindow(db: Database) {
     ...connections.snapshot(),
     lastModel: turns.lastModel(),
     settings: settings.read(),
+    systemPrompts: systemPrompts.list(),
     layout: layout.read(),
   }))
 
@@ -291,6 +294,7 @@ function openWindow(db: Database) {
       attachments,
       images: createRemoteImages(globalThis.fetch),
       settings,
+      systemPrompts,
       layout,
       downloadGitAgain: () => {
         void downloadGitAgain()

@@ -7,6 +7,12 @@ import {
 import {LayoutSchema, LayoutUpdateSchema} from '#modules/layout/main'
 import {ModelChoiceSchema, ProviderIdSchema} from '#modules/providers/main'
 import {SettingsSchema, SettingsUpdateSchema} from '#modules/settings/main'
+import {
+  SystemPromptEntryIdSchema,
+  SystemPromptEntrySchema,
+  SystemPromptNameSchema,
+  SystemPromptTextSchema,
+} from '#modules/system-prompts/main'
 import {TREE_TITLE_MAX_LENGTH, TreeSchema} from '#modules/trees/main'
 import {PromptSchema, ReplySchema} from '#modules/turns/main'
 import {z} from 'zod'
@@ -49,6 +55,13 @@ export const TreeRenameCommand = z.strictObject({
 export const TreeDeleteCommand = z.strictObject({
   type: z.literal('tree.delete'),
   treeId: z.uuid(),
+})
+
+/** From the Tree's next Reply; `TREE_CHANGED` follows. */
+export const TreeSetSystemPromptCommand = z.strictObject({
+  type: z.literal('tree.set-system-prompt'),
+  treeId: z.uuid(),
+  text: SystemPromptTextSchema,
 })
 
 export const TreeTurnsCommand = z.strictObject({
@@ -192,6 +205,27 @@ export const SettingsUpdateCommand = z.strictObject({
   changes: SettingsUpdateSchema,
 })
 
+/** One of the user's own; `SYSTEM_PROMPTS_CHANGED` follows. */
+export const SystemPromptCreateCommand = z.strictObject({
+  type: z.literal('system-prompt.create'),
+  name: SystemPromptNameSchema,
+  text: SystemPromptTextSchema,
+})
+
+/** Refused for a preset; changes no Tree. */
+export const SystemPromptUpdateCommand = z.strictObject({
+  type: z.literal('system-prompt.update'),
+  id: SystemPromptEntryIdSchema,
+  name: SystemPromptNameSchema,
+  text: SystemPromptTextSchema,
+})
+
+/** Refused for a preset; the default for new Trees falls back to Default. */
+export const SystemPromptDeleteCommand = z.strictObject({
+  type: z.literal('system-prompt.delete'),
+  id: SystemPromptEntryIdSchema,
+})
+
 /** `LAYOUT_CHANGED` follows with the whole Layout. */
 export const LayoutUpdateCommand = z.strictObject({
   type: z.literal('layout.update'),
@@ -208,6 +242,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   TreeRenameCommand,
   TreeDeleteCommand,
   TreeTurnsCommand,
+  TreeSetSystemPromptCommand,
   PromptSendCommand,
   PromptDeleteCommand,
   ReplyStopCommand,
@@ -219,6 +254,9 @@ export const CommandSchema = z.discriminatedUnion('type', [
   ImageLoadCommand,
   AttachmentAddCommand,
   SettingsUpdateCommand,
+  SystemPromptCreateCommand,
+  SystemPromptUpdateCommand,
+  SystemPromptDeleteCommand,
   LayoutUpdateCommand,
   SnapshotsDownloadAgainCommand,
 ])
@@ -235,6 +273,7 @@ const resultSchemas = {
   'tree.rename': TreeSchema,
   'tree.delete': Done,
   'tree.turns': TreeTurnsResult,
+  'tree.set-system-prompt': TreeSchema,
   'prompt.send': PromptSendResult,
   'prompt.delete': PromptDeleteResult,
   'reply.stop': Done,
@@ -246,6 +285,9 @@ const resultSchemas = {
   'image.load': ImageLoadResult,
   'attachment.add': AttachmentAddResult,
   'settings.update': SettingsSchema,
+  'system-prompt.create': SystemPromptEntrySchema,
+  'system-prompt.update': SystemPromptEntrySchema,
+  'system-prompt.delete': Done,
   'layout.update': LayoutSchema,
   'snapshots.download-again': Done,
 } as const satisfies Record<CommandType, z.ZodType>

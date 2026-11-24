@@ -97,9 +97,14 @@ const WireLine = z.looseObject({
     .optional(),
 })
 
-const FeatureListAnswer = z.looseObject({
-  id: z.literal(2),
-  result: z.looseObject({data: z.array(z.looseObject({name: z.string()}))}),
+const SecondAnswer = z.looseObject({id: z.literal(2), result: z.unknown()})
+
+const FeatureList = z.looseObject({
+  data: z.array(z.looseObject({name: z.string()})),
+})
+
+const ConfigRead = z.looseObject({
+  config: z.looseObject({model_verbosity: z.string().nullable()}),
 })
 
 const ErrorNotice = z.looseObject({
@@ -162,6 +167,49 @@ function programIn(pinned: string) {
   })
 }
 
+/** Starts the app-server as the app starts it and asks it one thing. */
+async function askAppServer(
+  pinned: string,
+  home: string,
+  request: {method: string; params: unknown}
+) {
+  const child = spawnProcess(programIn(pinned), codexArgs(process.platform), {
+    cwd: home,
+    env: codexEnvironment(process.env, home),
+    stdio: ['pipe', 'pipe', 'ignore'],
+  })
+
+  const answered = new Promise<unknown>(resolve => {
+    createInterface({input: child.stdout}).on('line', line => {
+      const message = SecondAnswer.safeParse(JSON.parse(line))
+
+      if (message.success) resolve(message.data.result)
+    })
+  })
+
+  function send(message: {id?: number; method: string; params?: unknown}) {
+    child.stdin.write(`${JSON.stringify(message)}\n`)
+  }
+
+  try {
+    send({
+      id: 1,
+      method: 'initialize',
+      params: {
+        clientInfo: {name: 'uz_live', title: 'UZ live', version: '0'},
+        capabilities: null,
+      },
+    })
+    send({method: 'initialized'})
+    send({id: 2, ...request})
+
+    return await answered
+  } finally {
+    child.stdin.end()
+    await once(child, 'exit')
+  }
+}
+
 function filesIn(root: string) {
   return new Map(
     fs
@@ -222,6 +270,7 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
         session: session && {...session, type: 'continue'},
         thread: [],
         compactionSettings: {auto: true, threshold},
+        systemPromptChanged: false,
       })
     )
 
@@ -312,6 +361,7 @@ function threadReplies(program: string, home: string) {
         session,
         thread,
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+        systemPromptChanged: false,
       })
     )
 
@@ -428,6 +478,7 @@ function codedReplies(
         session: session && {...session, type: 'continue'},
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+        systemPromptChanged: false,
       })
     )
 
@@ -626,6 +677,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session: session && {...session, type: fork ? 'fork' : 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+          systemPromptChanged: false,
         })
       )
 
@@ -786,6 +838,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         },
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+        systemPromptChanged: false,
       })) {
         events.push(event)
 
@@ -945,6 +998,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session: session && {...session, type: 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+          systemPromptChanged: false,
         })
       )
 
@@ -1069,6 +1123,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session,
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+          systemPromptChanged: false,
         })
       )
     }
@@ -1218,6 +1273,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         session: null,
         thread: [],
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+        systemPromptChanged: false,
       })) {
         events.push(event)
 
@@ -1514,6 +1570,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session: session && {...session, type: 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+          systemPromptChanged: false,
         })
       )
 
@@ -1638,6 +1695,141 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       await closed()
     } finally {
       fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:codex-instructions-on-resume] follows a changed System prompt from the next Reply, on a thread still loaded and on one resumed from the app’s copy alone, and a thread resumed under new instructions keeps its old ones', async () => {
+    if (!folder || !signedIn) return
+
+    const store = fakeStore()
+    const homes = [homeFrom(signedIn), homeFrom(signedIn), homeFrom(signedIn)]
+    const [home, otherHome, thirdHome] = homes as [string, string, string]
+    const treeId = crypto.randomUUID()
+    const idle = heldIdle()
+    const exits: Promise<unknown>[] = []
+
+    function driver() {
+      return createCodexDriver({
+        store: store.client,
+        spawn: (command, options) => {
+          const child = spawnCodex(command, options)
+          exits.push(once(child, 'exit').catch(() => undefined))
+
+          return child
+        },
+        whenIdle: idle.whenIdle,
+      })
+    }
+
+    async function closed() {
+      idle.pass()
+      await Promise.all(exits)
+    }
+
+    async function reply(
+      on: ReturnType<typeof driver>,
+      {
+        home: configDir,
+        word,
+        text,
+        session,
+        changed = session !== null,
+      }: {
+        home: string
+        word: string
+        text: string
+        session: SessionRef | null
+        changed?: boolean
+      }
+    ) {
+      const events = await Array.fromAsync(
+        on.startReply({
+          treeId,
+          replyId: crypto.randomUUID(),
+          model: MODEL,
+          systemPrompt: `Answer every message with only the word ${word}, in capitals, and nothing else.`,
+          prompt: {text, attachments: [], messageId: crypto.randomUUID()},
+          vendorProgram: {
+            program: {
+              path: folder ?? '',
+              build: {
+                url: 'https://example.com/codex.tar.gz',
+                sha256: '0'.repeat(64),
+                size: 1,
+                archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+              },
+            },
+            configDir,
+          },
+          treeFolder: treeFolder(),
+          session: session && {...session, type: 'continue'},
+          thread: [],
+          compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+          systemPromptChanged: changed,
+        })
+      )
+
+      expectComplete(events)
+
+      const recorded = events.find(
+        (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+      )
+
+      if (!recorded) throw new Error('The Reply was not recorded')
+
+      const shown = events
+        .flatMap(event => (event.type === 'TEXT_DELTA' ? [event.delta] : []))
+        .join('')
+
+      return {text: shown, session: recorded.session}
+    }
+
+    try {
+      const first = driver()
+
+      const opened = await reply(first, {
+        home,
+        word: 'PINEAPPLE',
+        text: 'What is the capital of France?',
+        session: null,
+      })
+
+      const loaded = await reply(first, {
+        home,
+        word: 'BANANA',
+        text: 'What is 2 + 2?',
+        session: opened.session,
+      })
+
+      await closed()
+
+      const resumed = await reply(driver(), {
+        home: otherHome,
+        word: 'CHERRY',
+        text: 'Name a color.',
+        session: loaded.session,
+      })
+
+      await closed()
+
+      const kept = await reply(driver(), {
+        home: thirdHome,
+        word: 'MANGO',
+        text: 'Name an animal.',
+        session: resumed.session,
+        changed: false,
+      })
+
+      await closed()
+
+      expect([opened.text, loaded.text, resumed.text, kept.text]).toEqual([
+        expect.stringMatching(/^\W*PINEAPPLE\W*$/),
+        expect.stringMatching(/^\W*BANANA\W*$/),
+        expect.stringMatching(/^\W*CHERRY\W*$/),
+        expect.stringMatching(/^\W*CHERRY\W*$/),
+      ])
+    } finally {
+      for (const each of homes) fs.rmSync(each, {recursive: true, force: true})
     }
   }, 300_000)
 
@@ -1779,6 +1971,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session: null,
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+          systemPromptChanged: false,
         })
       )
 
@@ -1859,6 +2052,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session: session && {...session, type: 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+          systemPromptChanged: false,
         })
       )
 
@@ -1966,6 +2160,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           session: session && {...session, type: 'continue'},
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+          systemPromptChanged: false,
         })
       )
 
@@ -2015,39 +2210,16 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     if (!folder || !signedIn) return
 
     const home = homeFrom(signedIn)
-    const program = programIn(folder)
-
-    const child = spawnProcess(program, codexArgs(process.platform), {
-      cwd: home,
-      env: codexEnvironment(process.env, home),
-      stdio: ['pipe', 'pipe', 'ignore'],
-    })
-
-    const answered = new Promise<unknown>(resolve => {
-      createInterface({input: child.stdout}).on('line', line => {
-        const message = FeatureListAnswer.safeParse(JSON.parse(line))
-
-        if (message.success) resolve(message.data.result.data)
-      })
-    })
-
-    function send(message: {id?: number; method: string; params?: unknown}) {
-      child.stdin.write(`${JSON.stringify(message)}\n`)
-    }
 
     try {
-      send({
-        id: 1,
-        method: 'initialize',
-        params: {
-          clientInfo: {name: 'uz_live', title: 'UZ live', version: '0'},
-          capabilities: null,
-        },
-      })
-      send({method: 'initialized'})
-      send({id: 2, method: 'experimentalFeature/list', params: {}})
+      const features = FeatureList.parse(
+        await askAppServer(folder, home, {
+          method: 'experimentalFeature/list',
+          params: {},
+        })
+      )
 
-      expect(await answered).toContainEqual(
+      expect(features.data).toContainEqual(
         expect.objectContaining({
           name: 'multi_agent',
           enabled: false,
@@ -2055,9 +2227,45 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         })
       )
     } finally {
-      child.stdin.end()
-      await once(child, 'exit')
       fs.rmSync(home, {recursive: true, force: true})
+    }
+  }, 60_000)
+
+  it('[dep:codex-project-config-untrusted] leaves out a setting in a Tree folder’s .codex/config.toml, and takes it once CODEX_HOME trusts the folder', async () => {
+    if (!folder || !signedIn) return
+
+    const tree = newTreeFolder()
+    fs.mkdirSync(path.join(tree, '.codex'))
+    fs.writeFileSync(
+      path.join(tree, '.codex', 'config.toml'),
+      'model_verbosity = "high"\n'
+    )
+
+    const home = homeFrom(signedIn)
+    // Without a home that trusts the folder, a setting Codex renamed would pass.
+    const trusting = homeFrom(signedIn)
+    fs.writeFileSync(
+      path.join(trusting, 'config.toml'),
+      `[projects.${JSON.stringify(tree)}]\ntrust_level = "trusted"\n`
+    )
+
+    async function verbosityUnder(configDir: string) {
+      const read = ConfigRead.parse(
+        await askAppServer(folder ?? '', configDir, {
+          method: 'config/read',
+          params: {cwd: tree},
+        })
+      )
+
+      return read.config.model_verbosity
+    }
+
+    try {
+      expect(await verbosityUnder(home)).toBeNull()
+      expect(await verbosityUnder(trusting)).toBe('high')
+    } finally {
+      for (const made of [tree, home, trusting])
+        fs.rmSync(made, {recursive: true, force: true})
     }
   }, 60_000)
 })
@@ -2110,6 +2318,7 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
           session: null,
           thread: [],
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+          systemPromptChanged: false,
         })
       )
 
