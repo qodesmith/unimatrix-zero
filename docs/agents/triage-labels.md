@@ -23,6 +23,6 @@ Decide it for every ticket you create or triage, beside its triage label. Apply 
 - adds or changes a `*.live.test.ts` or a `[dep:<id>]` check
 - changes behavior an entry in `docs/provider-dependencies.md` describes
 - asks a question only a live Reply in the running app can answer
-- moves a vendor pin, so its PR needs `bun run provider-checks` (both Providers)
+- is a bump PR (`docs/provider-dependencies.md`): it moves the `claude`, `codex` or Agent SDK pin, so its PR needs `bun run provider-checks` (both Providers)
 
 When you apply it, name the Provider it needs (Claude, ChatGPT or both) and why: in the body when you write the ticket, or in a comment when you label one that already exists.
