@@ -272,6 +272,8 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
         compactionSettings: {auto: true, threshold},
         systemPromptChanged: false,
         tools: DEFAULT_TREE_TOOLS,
+        permissionMode: 'full-access',
+        grants: [],
       })
     )
 
@@ -364,6 +366,8 @@ function threadReplies(program: string, home: string) {
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         systemPromptChanged: false,
         tools: DEFAULT_TREE_TOOLS,
+        permissionMode: 'full-access',
+        grants: [],
       })
     )
 
@@ -506,6 +510,8 @@ function codedReplies(
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         systemPromptChanged: false,
         tools,
+        permissionMode: 'full-access',
+        grants: [],
       })
     )
 
@@ -838,6 +844,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
 
@@ -1000,6 +1008,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         systemPromptChanged: false,
         tools: DEFAULT_TREE_TOOLS,
+        permissionMode: 'full-access',
+        grants: [],
       })) {
         events.push(event)
 
@@ -1161,6 +1171,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
 
@@ -1287,6 +1299,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
     }
@@ -1438,6 +1452,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         systemPromptChanged: false,
         tools: DEFAULT_TREE_TOOLS,
+        permissionMode: 'full-access',
+        grants: [],
       })) {
         events.push(event)
 
@@ -1800,6 +1816,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
 
@@ -1996,6 +2014,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: changed,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
 
@@ -2203,6 +2223,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
 
@@ -2285,6 +2307,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
 
@@ -2394,6 +2418,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
 
@@ -2563,6 +2589,8 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
 

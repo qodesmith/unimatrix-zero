@@ -126,6 +126,11 @@ export async function runHost(
       case 'reply.stop':
         void driver.stop(command.replyId).catch(() => undefined)
         break
+      case 'approval.answer':
+        void driver
+          .answerApproval(command.approvalId, command.answer)
+          .catch(() => undefined)
+        break
       case 'session.cut':
         void cut(command)
         break

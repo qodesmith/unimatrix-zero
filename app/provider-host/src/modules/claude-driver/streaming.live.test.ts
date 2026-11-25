@@ -246,6 +246,8 @@ function liveDriver(
       compactionSettings,
       systemPromptChanged: false,
       tools: DEFAULT_TREE_TOOLS,
+      permissionMode: 'full-access',
+      grants: [],
     }
   }
 

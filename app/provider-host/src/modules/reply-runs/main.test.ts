@@ -23,6 +23,8 @@ const request: ReplyRequest = {
   compactionSettings: {auto: true, threshold: null},
   systemPromptChanged: false,
   tools: DEFAULT_TREE_TOOLS,
+  permissionMode: 'full-access',
+  grants: [],
 }
 
 const delta: ContentEvent = {...ids, type: 'TEXT_DELTA', delta: 'Hi'}

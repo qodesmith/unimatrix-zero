@@ -218,6 +218,8 @@ async function setUp(
       compactionSettings,
       systemPromptChanged: false,
       tools: DEFAULT_TREE_TOOLS,
+      permissionMode: 'full-access',
+      grants: [],
       ...given,
     })) {
       events.push(event)

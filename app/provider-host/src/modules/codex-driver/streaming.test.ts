@@ -248,6 +248,8 @@ async function setUp(
       compactionSettings,
       systemPromptChanged,
       tools,
+      permissionMode: 'full-access',
+      grants: [],
     })) {
       events.push(event)
 

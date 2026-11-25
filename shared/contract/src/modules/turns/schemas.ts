@@ -1,4 +1,5 @@
 import {AttachmentSchema} from '#modules/attachments/main'
+import {ApprovalActionSchema} from '#modules/permissions/main'
 import {ProviderIdSchema} from '#modules/providers/main'
 import {z} from 'zod'
 
@@ -211,12 +212,14 @@ export const ApprovalAnswerSchema = z.enum([
 
 export type ApprovalAnswer = z.infer<typeof ApprovalAnswerSchema>
 
+/** The Reply waits on the user's answer; display only, as is the answer. */
 export const ApprovalRequestedEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('APPROVAL_REQUESTED'),
   approvalId: z.string(),
+  /** The tool call it sits at, when the Provider streamed one first. */
   toolCallId: z.string().optional(),
-  summary: z.string(),
+  action: ApprovalActionSchema,
 })
 
 export const ApprovalResolvedEvent = z.strictObject({
@@ -224,6 +227,24 @@ export const ApprovalResolvedEvent = z.strictObject({
   type: z.literal('APPROVAL_RESOLVED'),
   approvalId: z.string(),
   answer: ApprovalAnswerSchema,
+})
+
+/** Under Auto the vendor's reviewer decides instead of the user. */
+export const ReviewStartedEvent = z.strictObject({
+  ...replyEvent,
+  type: z.literal('REVIEW_STARTED'),
+  reviewId: z.string(),
+  toolCallId: z.string().optional(),
+  action: ApprovalActionSchema,
+})
+
+/** `unanswered`: it timed out or failed, which counts as declined. */
+export const ReviewFinishedEvent = z.strictObject({
+  ...replyEvent,
+  type: z.literal('REVIEW_FINISHED'),
+  reviewId: z.string(),
+  decision: z.enum(['approved', 'declined', 'unanswered']),
+  reason: z.string().nullable(),
 })
 
 export const SubagentStartedEvent = z.strictObject({
@@ -305,6 +326,8 @@ export const ReplyEventSchema = z.discriminatedUnion('type', [
   ToolResultEvent,
   ApprovalRequestedEvent,
   ApprovalResolvedEvent,
+  ReviewStartedEvent,
+  ReviewFinishedEvent,
   SubagentStartedEvent,
   SubagentFinishedEvent,
   TokensEvent,

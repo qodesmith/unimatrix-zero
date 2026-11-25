@@ -15,7 +15,11 @@ import {
 } from '#modules/system-prompts/main'
 import {TreeToolsSchema} from '#modules/tools/main'
 import {TREE_TITLE_MAX_LENGTH, TreeSchema} from '#modules/trees/main'
-import {PromptSchema, ReplySchema} from '#modules/turns/main'
+import {
+  ApprovalAnswerSchema,
+  PromptSchema,
+  ReplySchema,
+} from '#modules/turns/main'
 import {z} from 'zod'
 
 export const AppPingCommand = z.strictObject({
@@ -130,6 +134,15 @@ export const ReplyStopCommand = z.strictObject({
   type: z.literal('reply.stop'),
   treeId: z.uuid(),
   replyId: z.uuid(),
+})
+
+/** Always allow also keeps the grant for the Tree's later Replies. */
+export const ReplyAnswerApprovalCommand = z.strictObject({
+  type: z.literal('reply.answer-approval'),
+  treeId: z.uuid(),
+  replyId: z.uuid(),
+  approvalId: z.string(),
+  answer: ApprovalAnswerSchema,
 })
 
 /** In place: the Reply streams afresh in the session rewound to before it. */
@@ -256,6 +269,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   PromptDeleteCommand,
   ReplyStopCommand,
   ReplyRetryCommand,
+  ReplyAnswerApprovalCommand,
   ProviderConnectCommand,
   SignInOpenPageCommand,
   SignInCodeCommand,
@@ -288,6 +302,7 @@ const resultSchemas = {
   'prompt.delete': PromptDeleteResult,
   'reply.stop': Done,
   'reply.retry': ReplyRetryResult,
+  'reply.answer-approval': Done,
   'provider.connect': Done,
   'sign-in.open-page': Done,
   'sign-in.code': Done,
