@@ -263,6 +263,7 @@ function openWindow(db: Database) {
     snapshotsBefore: treeFiles.snapshotsBefore,
     compactionSettingsFor: provider =>
       compactionSettingsFor(settings.read(), provider),
+    permissionMode: () => (dev?.supervised ? 'supervised' : 'full-access'),
     listedModels: provider => connections.models(provider),
     attachmentsDir,
     now: () => new Date(),

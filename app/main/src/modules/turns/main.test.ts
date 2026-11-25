@@ -2,9 +2,10 @@ import type {Database} from '#modules/database/main'
 import type {FinishedReply, ReplyHosts} from './main'
 import type {AppEvent} from '@uz/contract/events'
 import type {HostCommand} from '@uz/contract/host'
+import type {ApprovalAction, PermissionMode} from '@uz/contract/permissions'
 import type {Model, ProviderId} from '@uz/contract/providers'
 import type {CompactionSettings} from '@uz/contract/settings'
-import type {ReplyEvent} from '@uz/contract/turns'
+import type {ApprovalAnswer, ReplyEvent} from '@uz/contract/turns'
 
 import {createAttachments} from '#modules/attachments/main'
 import {openDatabase, schema} from '#modules/database/main'
@@ -34,6 +35,8 @@ let published: AppEvent[]
 let whenPublished: (event: AppEvent) => void
 let finished: FinishedReply[]
 let hostCommands: HostCommand[]
+let hostsSentTo: ProviderId[]
+let permissionMode: PermissionMode
 let sentPromptIds: Map<string, string>
 let hostReady: boolean
 let chatgptConnected: boolean
@@ -48,10 +51,11 @@ let attachmentsDir: string
 
 const hosts: ReplyHosts = {
   ready: provider => hostReady && (provider === 'claude' || chatgptConnected),
-  send: (_provider, command) => {
+  send: (provider, command) => {
     if (!hostReachable) throw new Error('The claude host is not running.')
 
     hostCommands.push(command)
+    hostsSentTo.push(provider)
 
     if (command.type === 'reply.start') {
       const {replyId, prompt} = command.request
@@ -76,6 +80,7 @@ function launch() {
     },
     snapshotsBefore: () => null,
     compactionSettingsFor: () => compactionSettings,
+    permissionMode: () => permissionMode,
     listedModels: provider => listedModels[provider],
     attachmentsDir,
     now: () => clock,
@@ -91,6 +96,8 @@ beforeEach(() => {
   whenPublished = () => undefined
   finished = []
   hostCommands = []
+  hostsSentTo = []
+  permissionMode = 'full-access'
   sentPromptIds = new Map()
   hostReady = true
   chatgptConnected = false
@@ -277,6 +284,8 @@ describe('sending the root Prompt', () => {
           compactionSettings: {auto: true, threshold: null},
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         },
       },
     ])
@@ -449,6 +458,37 @@ describe('a streaming Reply', () => {
       content: [{type: 'text', text: 'Half'}],
       failure: {code: 'connection-lost', message: 'Connection lost.'},
     })
+  })
+
+  it('publishes approval and review events without saving any of them', () => {
+    fromHost(replyId, {type: 'TEXT_DELTA', delta: 'Writing.'})
+    vi.advanceTimersByTime(PARTIAL_SAVE_MS)
+    const before = saved(replyId)
+    const action = {kind: 'command', command: 'ls'} as const
+    published = []
+
+    fromHost(replyId, {type: 'APPROVAL_REQUESTED', approvalId: 'a1', action})
+    fromHost(replyId, {
+      type: 'APPROVAL_RESOLVED',
+      approvalId: 'a1',
+      answer: 'allow-once',
+    })
+    fromHost(replyId, {type: 'REVIEW_STARTED', reviewId: 'r1', action})
+    fromHost(replyId, {
+      type: 'REVIEW_FINISHED',
+      reviewId: 'r1',
+      decision: 'declined',
+      reason: 'Too broad.',
+    })
+    vi.advanceTimersByTime(PARTIAL_SAVE_MS)
+
+    expect(published.map(event => event.type)).toEqual([
+      'APPROVAL_REQUESTED',
+      'APPROVAL_RESOLVED',
+      'REVIEW_STARTED',
+      'REVIEW_FINISHED',
+    ])
+    expect(saved(replyId)).toEqual(before)
   })
 
   it('publishes each event after saving what it needed to', () => {
@@ -1002,6 +1042,8 @@ describe('a Prompt answering a Reply', () => {
           compactionSettings: {auto: true, threshold: null},
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         },
       },
     ])
@@ -1960,6 +2002,8 @@ describe('retrying a Reply', () => {
           compactionSettings: {auto: true, threshold: null},
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         },
       },
     ])
@@ -2759,5 +2803,176 @@ describe('sending a Prompt where one failed', () => {
     }
 
     expect(sessionsStarted()).toEqual([cut, cut])
+  })
+})
+
+function answer(replyId: string, approvalId: string, reply: ApprovalAnswer) {
+  return turns.answerApproval({treeId, replyId, approvalId, answer: reply})
+}
+
+function sentGrants() {
+  return hostCommands.flatMap(command =>
+    command.type === 'reply.start' ? [command.request.grants] : []
+  )
+}
+
+describe('approvals', () => {
+  const write: ApprovalAction = {
+    kind: 'edit',
+    paths: ['/trees/t/notes.md'],
+    inTreeFiles: true,
+  }
+
+  function ask(replyId: string, approvalId: string, action = write) {
+    fromHost(replyId, {type: 'APPROVAL_REQUESTED', approvalId, action})
+  }
+
+  it('runs each Reply under the Permission mode of the moment it starts', () => {
+    permissionMode = 'supervised'
+
+    const sent = turns.sendPrompt({
+      model: picked,
+      treeId,
+      parentReplyId: null,
+      text: 'Hi',
+    })
+
+    if (!sent) throw new Error('Nothing was sent')
+
+    fail(sent.reply.id)
+    permissionMode = 'full-access'
+    turns.retry(treeId, sent.reply.id)
+
+    expect(
+      hostCommands.flatMap(command =>
+        command.type === 'reply.start' ? [command.request.permissionMode] : []
+      )
+    ).toEqual(['supervised', 'full-access'])
+  })
+
+  it('sends an answer to the host that asked, and keeps nothing for Allow once or Deny', () => {
+    chatgptConnected = true
+
+    const sent = turns.sendPrompt({
+      model: {provider: 'chatgpt', model: 'gpt'},
+      treeId,
+      parentReplyId: null,
+      text: 'Hi',
+    })
+
+    if (!sent) throw new Error('Nothing was sent')
+
+    const replyId = sent.reply.id
+    hostCommands = []
+    hostsSentTo = []
+    turns.hostEvent('chatgpt', {
+      type: 'APPROVAL_REQUESTED',
+      treeId,
+      replyId,
+      approvalId: 'a1',
+      action: write,
+    })
+    turns.hostEvent('chatgpt', {
+      type: 'APPROVAL_REQUESTED',
+      treeId,
+      replyId,
+      approvalId: 'a2',
+      action: {kind: 'command', command: 'ls'},
+    })
+
+    expect(answer(replyId, 'a1', 'allow-once')).toBe(true)
+    expect(answer(replyId, 'a2', 'deny')).toBe(true)
+    expect(hostCommands).toEqual([
+      {type: 'approval.answer', approvalId: 'a1', answer: 'allow-once'},
+      {type: 'approval.answer', approvalId: 'a2', answer: 'deny'},
+    ])
+    expect(hostsSentTo).toEqual(['chatgpt', 'chatgpt'])
+
+    hostCommands = []
+    turns.hostEvent('chatgpt', {
+      type: 'RUN_FINISHED',
+      treeId,
+      replyId,
+      status: 'failed',
+      failure: {code: 'host-crashed', message: 'ChatGPT stopped unexpectedly.'},
+    })
+    turns.retry(treeId, replyId)
+
+    expect(sentGrants()).toEqual([[]])
+  })
+
+  it('keeps Always allow for the Tree, so every later Reply on any of its Branches carries it, and no other Tree’s', () => {
+    const first = savedRoot()
+    const asking = sendPrompt(first, 'Write it')
+    ask(asking, 'a1')
+    ask(asking, 'a2', {kind: 'command', command: 'ls'})
+
+    expect(answer(asking, 'a1', 'always-allow')).toBe(true)
+    expect(answer(asking, 'a2', 'always-allow')).toBe(true)
+    expect(hostCommands).toEqual([
+      {type: 'approval.answer', approvalId: 'a1', answer: 'always-allow'},
+      {type: 'approval.answer', approvalId: 'a2', answer: 'always-allow'},
+    ])
+
+    finish(asking)
+    hostCommands = []
+    turns.sendPrompt({model: picked, treeId, parentReplyId: asking, text: 'On'})
+    turns.sendPrompt({model: picked, treeId, parentReplyId: first, text: 'Or'})
+    turns.sendPrompt({
+      model: picked,
+      treeId: createTrees(db).create(createdAt, '', DEFAULT_TREE_TOOLS).id,
+      parentReplyId: null,
+      text: 'Elsewhere',
+    })
+
+    const granted = [{kind: 'edits-in-tree'}, {kind: 'command', command: 'ls'}]
+
+    expect(sentGrants()).toEqual([granted, granted, []])
+  })
+
+  it.each([
+    ['it never asked', () => undefined],
+    [
+      'already answered',
+      (replyId: string) =>
+        fromHost(replyId, {
+          type: 'APPROVAL_RESOLVED',
+          approvalId: 'a1',
+          answer: 'deny',
+        }),
+    ],
+    ['whose Reply finished', (replyId: string) => finish(replyId)],
+    ['whose Reply failed', (replyId: string) => fail(replyId)],
+    ['whose Tree is deleted', () => turns.stopAll(treeId)],
+    ['in another Tree', () => (treeId = crypto.randomUUID())],
+  ])('refuses a card %s, sending and keeping nothing', (_case, setUp) => {
+    const home = treeId
+    const first = savedRoot()
+    const replyId = sendPrompt(first)
+    ask(replyId, _case === 'it never asked' ? 'a0' : 'a1')
+    setUp(replyId)
+    hostCommands = []
+
+    expect(answer(replyId, 'a1', 'always-allow')).toBe(false)
+    expect(hostCommands).toEqual([])
+
+    turns.sendPrompt({
+      model: picked,
+      treeId: home,
+      parentReplyId: first,
+      text: 'Or',
+    })
+
+    expect(sentGrants()).toEqual([[]])
+  })
+
+  it('answers through a host that can no longer be reached as stopping does: by throwing', () => {
+    const replyId = sendPrompt(null)
+    ask(replyId, 'a1')
+    hostReachable = false
+
+    expect(() => answer(replyId, 'a1', 'allow-once')).toThrow(
+      'The claude host is not running.'
+    )
   })
 })

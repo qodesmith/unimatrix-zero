@@ -13,6 +13,7 @@ import type {
   SessionCutReport,
   SignInRequest,
 } from '@uz/contract/host'
+import type {PermissionMode} from '@uz/contract/permissions'
 import type {ProviderId} from '@uz/contract/providers'
 import type {CompactionSettings} from '@uz/contract/settings'
 import type {Reply, ReplyEvent} from '@uz/contract/turns'
@@ -20,6 +21,7 @@ import type {Reply, ReplyEvent} from '@uz/contract/turns'
 import {refuseTooManyImages} from '#modules/attachments/main'
 import {schema} from '#modules/database/main'
 import {withAppSections} from '#modules/tree-files/main'
+import {grantsFor, withGrants} from '@uz/contract/permissions'
 import {PROVIDER_NAMES} from '@uz/contract/providers'
 import {eq} from 'drizzle-orm'
 import {randomUUID} from 'node:crypto'
@@ -38,8 +40,10 @@ import {
   lastModel,
   listTurns,
   resetReply,
+  saveGrants,
   savedReply,
   startedUnder,
+  treeGrants,
   treeSystemPrompt,
   treeTools,
 } from './rows'
@@ -67,6 +71,7 @@ export interface TurnsDeps {
     parentReplyId: string | null
   ) => Promise<void> | null
   compactionSettingsFor: (provider: ProviderId) => CompactionSettings
+  permissionMode: () => PermissionMode
   listedModels: ListedModels
   attachmentsDir: string
   now: () => Date
@@ -76,6 +81,11 @@ export interface TurnsDeps {
 }
 
 export type NewPrompt = Omit<Extract<Command, {type: 'prompt.send'}>, 'type'>
+
+export type ApprovalAnswered = Omit<
+  Extract<Command, {type: 'reply.answer-approval'}>,
+  'type'
+>
 
 export type Turns = ReturnType<typeof createTurns>
 
@@ -91,6 +101,7 @@ export function createTurns({
   treeFolderFor,
   snapshotsBefore,
   compactionSettingsFor,
+  permissionMode,
   listedModels,
   attachmentsDir,
   now,
@@ -259,6 +270,8 @@ export function createTurns({
             systemPrompt.id
           ),
           tools: treeTools(db, treeId),
+          permissionMode: permissionMode(),
+          grants: treeGrants(db, treeId),
         },
         parentReplyId
       )
@@ -322,6 +335,8 @@ export function createTurns({
             systemPrompt.id
           ),
           tools: treeTools(db, treeId),
+          permissionMode: permissionMode(),
+          grants: treeGrants(db, treeId),
         },
         recovered.parentReplyId
       )
@@ -334,6 +349,34 @@ export function createTurns({
       if (!provider) throw new Error('That Reply isn’t being written.')
 
       hosts.send(provider, {type: 'reply.stop', replyId})
+    },
+
+    /**
+     * False once the card no longer waits. Throws when its host can't be
+     * reached, after keeping an Always allow.
+     */
+    answerApproval({
+      treeId,
+      replyId,
+      approvalId,
+      answer,
+    }: ApprovalAnswered): boolean {
+      const waiting = inFlight.waitingApproval(treeId, replyId, approvalId)
+
+      if (!waiting) return false
+
+      if (answer === 'always-allow') {
+        const granted = grantsFor(waiting.action)
+        saveGrants(db, treeId, withGrants(treeGrants(db, treeId), granted))
+      }
+
+      hosts.send(waiting.provider, {
+        type: 'approval.answer',
+        approvalId,
+        answer,
+      })
+
+      return true
     },
 
     /** For deleting the Tree: anything its hosts send after this is dropped. */

@@ -1,6 +1,7 @@
 import type {Database} from '#modules/database/main'
 import type {Removal} from './deletion'
 import type {Attachment} from '@uz/contract/attachments'
+import type {ApprovalGrant} from '@uz/contract/permissions'
 import type {ModelChoice, ProviderId} from '@uz/contract/providers'
 import type {TreeTools} from '@uz/contract/tools'
 import type {Prompt, Reply} from '@uz/contract/turns'
@@ -8,6 +9,7 @@ import type {SQL} from 'drizzle-orm'
 
 import {attachToPrompt, attachmentsOf} from '#modules/attachments/main'
 import {schema} from '#modules/database/main'
+import {ApprovalGrantSchema} from '@uz/contract/permissions'
 import {NEW_REPLY, ReplyPartSchema, RunFailureSchema} from '@uz/contract/turns'
 import {and, asc, desc, eq, isNull} from 'drizzle-orm'
 import {z} from 'zod'
@@ -21,6 +23,8 @@ const {compacted: _, ...NEW_REPLY_ROW} = NEW_REPLY
 const ContentSchema = z.array(ReplyPartSchema)
 
 const FailureSchema = RunFailureSchema.nullable()
+
+const GrantsSchema = z.array(ApprovalGrantSchema)
 
 type PromptRow = typeof schema.prompts.$inferSelect
 
@@ -168,6 +172,29 @@ export function treeTools(db: Database, treeId: string): TreeTools {
   if (!row) throw new Error('That Tree no longer exists.')
 
   return row
+}
+
+export function treeGrants(db: Database, treeId: string): ApprovalGrant[] {
+  const row = db
+    .select({grants: trees.approvalGrants})
+    .from(trees)
+    .where(eq(trees.id, treeId))
+    .get()
+
+  if (!row) throw new Error('That Tree no longer exists.')
+
+  return GrantsSchema.parse(row.grants)
+}
+
+export function saveGrants(
+  db: Database,
+  treeId: string,
+  grants: ApprovalGrant[]
+) {
+  db.update(trees)
+    .set({approvalGrants: grants})
+    .where(eq(trees.id, treeId))
+    .run()
 }
 
 export interface NewExchange {

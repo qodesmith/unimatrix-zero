@@ -6,6 +6,7 @@ import type {
   ReplyRecorded,
   ReplyRequest,
 } from '@uz/contract/host'
+import type {ApprovalAction} from '@uz/contract/permissions'
 import type {ProviderId} from '@uz/contract/providers'
 import type {
   ReplyEvent,
@@ -54,6 +55,8 @@ interface Entry {
   promptMessageId: string
   reply: StreamingReply
   saveTimer: ReturnType<typeof setTimeout> | null
+  /** By approvalId; never saved. */
+  approvals: Map<string, ApprovalAction>
 }
 
 /** Saves before it publishes, so no window shows what main won't save. */
@@ -99,6 +102,14 @@ export function createInFlight(
     entry.reply = foldReplyEvent(before, event)
 
     if (event.type === 'CONTEXT_COMPACTED') recordCompaction(entry, event)
+
+    if (event.type === 'APPROVAL_REQUESTED') {
+      entry.approvals.set(event.approvalId, event.action)
+    }
+
+    if (event.type === 'APPROVAL_RESOLVED') {
+      entry.approvals.delete(event.approvalId)
+    }
 
     if (event.type === 'RUN_FINISHED') {
       entries.delete(event.replyId)
@@ -158,6 +169,7 @@ export function createInFlight(
         promptMessageId: prompt.messageId,
         reply: {...NEW_REPLY, treeId, replyId},
         saveTimer: null,
+        approvals: new Map(),
       })
     },
 
@@ -215,6 +227,16 @@ export function createInFlight(
       const entry = entries.get(replyId)
 
       return entry?.reply.treeId === treeId ? entry.provider : null
+    },
+
+    /** Null once the card is answered or its Reply has ended. */
+    waitingApproval(treeId: string, replyId: string, approvalId: string) {
+      const entry = entries.get(replyId)
+
+      const action =
+        entry?.reply.treeId === treeId && entry.approvals.get(approvalId)
+
+      return action ? {provider: entry.provider, action} : null
     },
 
     fail(replyId: string, failure: RunFailure) {

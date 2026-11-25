@@ -52,6 +52,8 @@ export const trees = sqliteTable('trees', {
   claudeBuiltInSkills: toolSwitch('claude_built_in_skills', false),
   chatgptBuiltInSkills: toolSwitch('chatgpt_built_in_skills', false),
   chatgptRemotePlugins: toolSwitch('chatgpt_remote_plugins', false),
+  /** As `ApprovalGrantSchema`. */
+  approvalGrants: text('approval_grants', {mode: 'json'}).notNull().default([]),
   createdAt: createdAt(),
 })
 
