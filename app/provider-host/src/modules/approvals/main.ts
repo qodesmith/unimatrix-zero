@@ -36,6 +36,24 @@ export function createApprovals() {
   const waiting = new Map<string, (answer: ApprovalAnswer) => void>()
   const allowedInTree = new Map<string, ApprovalGrant[]>()
 
+  async function answerTo(approvalId: string, signal?: AbortSignal) {
+    const {promise, resolve} = Promise.withResolvers<ApprovalAnswer | null>()
+
+    function dropped() {
+      resolve(null)
+    }
+
+    waiting.set(approvalId, resolve)
+    signal?.addEventListener('abort', dropped, {once: true})
+
+    try {
+      return signal?.aborted ? null : await promise
+    } finally {
+      waiting.delete(approvalId)
+      signal?.removeEventListener('abort', dropped)
+    }
+  }
+
   function forReply(
     {treeId, replyId, grants}: ReplyOf,
     emit: (event: ApprovalEvent) => void
@@ -45,24 +63,6 @@ export function createApprovals() {
         [...grants, ...(allowedInTree.get(treeId) ?? [])],
         action
       )
-    }
-
-    async function answerTo(approvalId: string, signal?: AbortSignal) {
-      const {promise, resolve} = Promise.withResolvers<ApprovalAnswer | null>()
-
-      function dropped() {
-        resolve(null)
-      }
-
-      waiting.set(approvalId, resolve)
-      signal?.addEventListener('abort', dropped, {once: true})
-
-      try {
-        return signal?.aborted ? null : await promise
-      } finally {
-        waiting.delete(approvalId)
-        signal?.removeEventListener('abort', dropped)
-      }
     }
 
     return {

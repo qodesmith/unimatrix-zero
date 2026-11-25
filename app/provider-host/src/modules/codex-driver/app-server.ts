@@ -63,7 +63,7 @@ type Outgoing =
   | {id: RequestId; result: ApprovalAnswer}
 
 /** True when it takes the request, and so answers it with `respond`. */
-export type ApprovalListener = (request: ApprovalRequest) => boolean
+type ApprovalListener = (request: ApprovalRequest) => boolean
 
 /** `codex app-server` over stdio: an object per line, no `jsonrpc` field. */
 export interface AppServer {
