@@ -1,4 +1,11 @@
-import type {Method, Notification, ParamsOf, ResponseOf} from './wire'
+import type {
+  ApprovalRequest,
+  Method,
+  Notification,
+  ParamsOf,
+  ResponseOf,
+  approvalAnswer,
+} from './wire'
 import type {SignInRequest} from '@uz/contract/host'
 import type {EventEmitter} from 'node:events'
 import type {Readable, Writable} from 'node:stream'
@@ -12,6 +19,7 @@ import {setTimeout as delay} from 'node:timers/promises'
 
 import {
   AnswerSchema,
+  ApprovalRequestSchema,
   NotificationSchema,
   RESPONSES,
   ServerRequestSchema,
@@ -44,10 +52,18 @@ interface Pending {
   reject: (error: Error) => void
 }
 
+type RequestId = ApprovalRequest['id']
+
+type ApprovalAnswer = ReturnType<typeof approvalAnswer>
+
 type Outgoing =
   | {id: number; method: Method; params: unknown}
   | {method: 'initialized'}
-  | {id: Answer['id'] | string; error: {code: number; message: string}}
+  | {id: RequestId; error: {code: number; message: string}}
+  | {id: RequestId; result: ApprovalAnswer}
+
+/** True when it takes the request, and so answers it with `respond`. */
+export type ApprovalListener = (request: ApprovalRequest) => boolean
 
 /** `codex app-server` over stdio: an object per line, no `jsonrpc` field. */
 export interface AppServer {
@@ -56,6 +72,9 @@ export interface AppServer {
     params: ParamsOf<M>
   ): Promise<ResponseOf<M>>
   listen(listener: (notification: Notification) => void): () => void
+  /** A request no listener takes is refused. */
+  takeApprovals(listener: ApprovalListener): () => void
+  respond(id: RequestId, result: ApprovalAnswer): void
   readonly exited: Promise<void>
   readonly hasExited: boolean
   close(): Promise<void>
@@ -76,6 +95,7 @@ export async function startAppServer(
   const child = spawn(command, options)
   const pending = new Map<number, Pending>()
   const listeners = new Set<(notification: Notification) => void>()
+  const approvalListeners = new Set<ApprovalListener>()
   let nextId = 1
   let hasExited = false
 
@@ -117,7 +137,16 @@ export async function startAppServer(
     const asked = ServerRequestSchema.safeParse(json)
 
     if (asked.success) {
-      // Nothing the app turns on asks the app anything.
+      const approval = ApprovalRequestSchema.safeParse(json)
+
+      if (
+        approval.success &&
+        [...approvalListeners].some(listener => listener(approval.data))
+      ) {
+        return
+      }
+
+      // Nothing else the app turns on asks the app anything.
       write({
         id: asked.data.id,
         error: {code: -32_601, message: 'Unimatrix Zero can’t answer this.'},
@@ -171,6 +200,16 @@ export async function startAppServer(
       listeners.add(listener)
 
       return () => listeners.delete(listener)
+    },
+
+    takeApprovals(listener) {
+      approvalListeners.add(listener)
+
+      return () => approvalListeners.delete(listener)
+    },
+
+    respond(id, result) {
+      write({id, result})
     },
 
     exited: ended,

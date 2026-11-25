@@ -7,6 +7,9 @@ export const RECORDINGS = path.join(import.meta.dirname, 'recordings')
 
 export const CODEX_HOME_STAND_IN = '/codex-home'
 
+/** A replay puts back the `cwd` the driver last opened a thread or turn in. */
+export const TREE_FOLDER_STAND_IN = '/tree-folder'
+
 export const RecordedMessageSchema = z.looseObject({})
 
 /** `in` is what the driver wrote to `codex`; `out`, what it wrote back. */
@@ -52,6 +55,8 @@ export const FakeCodexRunSchema = z.strictObject({
   cwd: z.string(),
   vendorVariables: z.array(z.string()),
   methods: z.array(z.string()),
+  /** What the driver answered each server request. */
+  answers: z.array(z.looseObject({id: z.union([z.string(), z.number()])})),
   /** The text of each `turn/start`'s first text item. */
   prompts: z.array(z.string()),
   inputs: z.array(z.array(z.looseObject({type: z.string()}))),
@@ -91,8 +96,10 @@ const run = fs.readdirSync(reports).length
 const reportFile = path.join(reports, run + '.json')
 const home = process.env.CODEX_HOME
 const standIn = ${JSON.stringify(CODEX_HOME_STAND_IN)}
+const treeStandIn = ${JSON.stringify(TREE_FOLDER_STAND_IN)}
+let treeFolder = null
 const vendorVariables = Object.keys(process.env).filter(name => /^(OPENAI|CODEX|ANTHROPIC|CLAUDE)_/i.test(name))
-const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], prompts: [], inputs: [], threadModels: [], threadConfigs: [], threadInstructions: [], threadAccess: [], turnModels: [], turnAccess: [], modelLists: [], resumedFrom: [], contexts: [], injected: [], forkedThrough: null, interrupted: null, reverted: null, ended: null}
+const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], answers: [], prompts: [], inputs: [], threadModels: [], threadConfigs: [], threadInstructions: [], threadAccess: [], turnModels: [], turnAccess: [], modelLists: [], resumedFrom: [], contexts: [], injected: [], forkedThrough: null, interrupted: null, reverted: null, ended: null}
 
 function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
@@ -150,7 +157,8 @@ function exitsHere(method) {
 function write(message) {
   if (exitsHere(message.method)) end('exited', 1)
   if ('id' in message && ('result' in message || 'error' in message)) message = {...message, id: ids.get(message.id)}
-  const text = JSON.stringify(message).replaceAll(standIn, JSON.stringify(home).slice(1, -1))
+  let text = JSON.stringify(message).replaceAll(standIn, JSON.stringify(home).slice(1, -1))
+  if (treeFolder) text = text.replaceAll(treeStandIn, JSON.stringify(treeFolder).slice(1, -1))
   message = JSON.parse(text)
   const thread = message.result?.thread
   if (thread?.path && !fs.existsSync(thread.path)) {
@@ -194,7 +202,15 @@ process.stdin.on('data', chunk => {
   for (let newline = buffer.indexOf('\\n'); newline >= 0; newline = buffer.indexOf('\\n')) {
     const message = JSON.parse(buffer.slice(0, newline))
     buffer = buffer.slice(newline + 1)
+    if (message.method === undefined) {
+      report.answers.push(message)
+      expected(message)
+      save()
+      answer()
+      continue
+    }
     report.methods.push(message.method)
+    if (['thread/start', 'thread/resume', 'thread/fork', 'turn/start'].includes(message.method)) treeFolder = message.params.cwd ?? treeFolder
     if (exitsHere(message.method)) end('exited', 1)
     if (message.method === 'thread/resume' || message.method === 'thread/fork') {
       const rollout = rolloutOf(message.params.threadId)

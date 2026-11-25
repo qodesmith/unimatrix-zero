@@ -2,13 +2,19 @@ import type {AppServer} from './app-server'
 import type {ResponseItem} from './protocol/ResponseItem'
 import type {LoadedThread} from './threads'
 import type {ParamsOf} from './wire'
-import type {ReplyRequest, Thread} from '@uz/contract/host'
+import type {
+  DeletionCut,
+  ReplyRequest,
+  SessionFile,
+  Thread,
+} from '@uz/contract/host'
 
 import {RequestRefused} from '#modules/failures/main'
 import {earlierPrompted} from '#modules/prompt-content/main'
 import {explainingLabels, replyText} from '#modules/thread-replay/main'
 
 import {messageContent, read} from './input'
+import {writeRolloutsBack} from './rollouts'
 import {configOf, loadThread} from './threads'
 
 const SESSION_LOST = /no rollout found for thread id/
@@ -26,12 +32,38 @@ export interface Opened {
 
 export type Restored = Omit<Opened, 'replay' | 'rebuilt'>
 
-/** Full access, until the Permission mode decides (ADR 0022). */
+/**
+ * Supervised writes only in the Tree's folder, and asks before every command
+ * and edit; the app answers the asking (ADR 0022).
+ */
+function threadAccessOf({permissionMode}: ReplyRequest) {
+  return permissionMode === 'supervised'
+    ? ({sandbox: 'workspace-write', approvalPolicy: 'untrusted'} as const)
+    : ({sandbox: 'danger-full-access', approvalPolicy: 'never'} as const)
+}
+
+/** The same access for one turn, which holds for its thread from then on. */
+export function turnAccessOf(request: ReplyRequest) {
+  return {
+    cwd: request.treeFolder,
+    approvalPolicy: threadAccessOf(request).approvalPolicy,
+    sandboxPolicy:
+      request.permissionMode === 'supervised'
+        ? {
+            type: 'workspaceWrite',
+            writableRoots: [request.treeFolder],
+            networkAccess: false,
+            excludeTmpdirEnvVar: false,
+            excludeSlashTmp: false,
+          }
+        : {type: 'dangerFullAccess'},
+  } satisfies Omit<ParamsOf<'turn/start'>, 'threadId' | 'input'>
+}
+
 export function settingsOf(request: ReplyRequest) {
   return {
     cwd: request.treeFolder,
-    sandbox: 'danger-full-access',
-    approvalPolicy: 'never',
+    ...threadAccessOf(request),
     model: request.model,
     developerInstructions:
       explainingLabels(request.systemPrompt, request.thread) || null,
@@ -147,4 +179,30 @@ export async function openThread(
 
     return newThread(opening, request)
   }
+}
+
+/** A deletion cut loads its thread read-only in the config folder. */
+export async function resumeForCut(
+  {server, threads}: Opening,
+  {sessionId: id, messageId}: DeletionCut,
+  configDir: string,
+  files: SessionFile[]
+) {
+  writeRolloutsBack(configDir, files, {rewind: false})
+
+  const opened = await server.request('thread/resume', {
+    threadId: id,
+    cwd: configDir,
+    sandbox: 'read-only',
+    approvalPolicy: 'never',
+    config: {},
+    excludeTurns: true,
+  })
+
+  return loadThread(
+    threads,
+    opened,
+    messageId === null ? [] : [messageId],
+    null
+  )
 }

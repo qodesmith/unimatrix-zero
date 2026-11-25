@@ -7,7 +7,11 @@ import fs from 'node:fs'
 import {createInterface} from 'node:readline'
 import {PassThrough} from 'node:stream'
 
-import {CODEX_HOME_STAND_IN, RecordedMessageSchema} from './replay'
+import {
+  CODEX_HOME_STAND_IN,
+  RecordedMessageSchema,
+  TREE_FOLDER_STAND_IN,
+} from './replay'
 
 const EMAIL = /"email":"[^"]*"/g
 
@@ -16,10 +20,19 @@ const ID =
 
 const MACHINE = /"(serverName|userAgent)":"[^"]*"/g
 
-function scrub(lines: RecordedLine[], codexHome: string) {
-  const homes = [fs.realpathSync(codexHome), codexHome].map(home =>
-    JSON.stringify(home).slice(1, -1)
+function escaped(folder: string) {
+  return [fs.realpathSync(folder), folder].map(name =>
+    JSON.stringify(name).slice(1, -1)
   )
+}
+
+function scrub(
+  lines: RecordedLine[],
+  codexHome: string,
+  treeFolder: string | undefined
+) {
+  const homes = escaped(codexHome)
+  const trees = treeFolder === undefined ? [] : escaped(treeFolder)
 
   return lines
     .map(line => {
@@ -27,6 +40,9 @@ function scrub(lines: RecordedLine[], codexHome: string) {
 
       for (const home of homes)
         text = text.replaceAll(home, CODEX_HOME_STAND_IN)
+
+      for (const tree of trees)
+        text = text.replaceAll(tree, TREE_FOLDER_STAND_IN)
 
       return text
         .replaceAll(EMAIL, '"email":"user@example.com"')
@@ -37,8 +53,14 @@ function scrub(lines: RecordedLine[], codexHome: string) {
     .join('')
 }
 
-/** Records each real `codex app-server` process into the next of `files`. */
-export function createRecorder(files: string[]) {
+/**
+ * Records each real `codex app-server` process into the next of `files`, with
+ * `treeFolder` as a stand-in a replay fills in.
+ */
+export function createRecorder(
+  files: string[],
+  {treeFolder}: {treeFolder?: string} = {}
+) {
   let run = 0
 
   function record(
@@ -77,7 +99,8 @@ export function createRecorder(files: string[]) {
 
     child.on('error', error => recorded.emit('error', error))
     child.on('exit', (code, signal) => {
-      if (file) fs.writeFileSync(file, scrub(lines, env.CODEX_HOME ?? cwd))
+      if (file)
+        fs.writeFileSync(file, scrub(lines, env.CODEX_HOME ?? cwd, treeFolder))
 
       recorded.emit('exit', code, signal)
     })

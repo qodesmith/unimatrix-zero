@@ -66,7 +66,12 @@ export function turnOf(notification: Notification) {
     return notification.params.turn.id
   }
 
-  if (aboutTheAccount(notification)) return null
+  if (
+    aboutTheAccount(notification) ||
+    notification.method === 'serverRequest/resolved'
+  ) {
+    return null
+  }
 
   return notification.params.turnId
 }

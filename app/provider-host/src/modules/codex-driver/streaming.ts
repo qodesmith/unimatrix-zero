@@ -1,3 +1,4 @@
+import type {Approvals} from '#modules/approvals/main'
 import type {WhenIdle} from '#modules/idle/main'
 import type {
   ContentEvent,
@@ -7,12 +8,12 @@ import type {
 } from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
+import type {Received} from './asking'
 import type {UserInput} from './protocol/v2/UserInput'
 import type {Restored} from './rebuild'
 import type {LoadedThread, ThreadConfig} from './threads'
 import type {Notification, ParamsOf, RateLimits} from './wire'
 import type {
-  DeletionCut,
   PromptRecorded,
   ProviderDriver,
   ReplyRequest,
@@ -24,10 +25,11 @@ import {createInbox} from '#modules/inbox/main'
 import {ProgramCrashed, createReplyRuns} from '#modules/reply-runs/main'
 import {isDeepStrictEqual} from 'node:util'
 
+import {createTurnAsking} from './asking'
 import {codexContent} from './input'
 import {readModels} from './models'
 import {limitLifts} from './rate-limits'
-import {openThread, settingsOf} from './rebuild'
+import {openThread, resumeForCut, settingsOf, turnAccessOf} from './rebuild'
 import {createReplyMapper, turnOf} from './replies'
 import {requestRevert} from './revert'
 import {folderOf, readRollouts, rolloutAt, writeRolloutsBack} from './rollouts'
@@ -39,6 +41,7 @@ export interface CodexRepliesDeps {
   store: SessionStoreClient
   open: OpenAppServer
   whenIdle: WhenIdle
+  approvals: Approvals
 }
 
 type CutRequest = Parameters<ProviderDriver['cutSession']>[0]
@@ -261,34 +264,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     return loadThread(running.threads, opened, thread.turns, config)
   }
 
-  async function resume(
-    running: Running,
-    session: DeletionCut,
-    configDir: string
-  ) {
-    const {sessionId: id, messageId} = session
-
-    writeRolloutsBack(configDir, await deps.store.loadFiles(folderOf(id)), {
-      rewind: false,
-    })
-
-    const opened = await running.server.request('thread/resume', {
-      threadId: id,
-      cwd: configDir,
-      sandbox: 'read-only',
-      approvalPolicy: 'never',
-      config: {},
-      excludeTurns: true,
-    })
-
-    return loadThread(
-      running.threads,
-      opened,
-      messageId === null ? [] : [messageId],
-      null
-    )
-  }
-
   /** Saves the reverted rollout, so a later resume lacks what it dropped. */
   async function cutThread(
     {session, vendorProgram}: CutRequest,
@@ -302,7 +277,12 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     try {
       const thread =
         running.threads.get(session.sessionId) ??
-        (await resume(running, session, configDir))
+        (await resumeForCut(
+          running,
+          session,
+          configDir,
+          await deps.store.loadFiles(folderOf(session.sessionId))
+        ))
 
       await revert(running, thread, session.dropFrom, configDir)
 
@@ -351,10 +331,18 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
   ): AsyncGenerator<ContentEvent | PromptRecorded, Ending> {
     const ids = {treeId: request.treeId, replyId: request.replyId}
     const {server} = running
-    const inbox = createInbox<Notification | {method: 'exited'}>()
+    const inbox = createInbox<Received>()
     void server.exited.then(() => inbox.push({method: 'exited'}))
 
     const unlisten = server.listen(notification => inbox.push(notification))
+
+    const asking = createTurnAsking({
+      server,
+      approvals: deps.approvals,
+      request,
+      threadId: thread.id,
+      push: received => inbox.push(received),
+    })
 
     let unstoppable: (() => void) | null = null
 
@@ -364,10 +352,9 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
         threadId: thread.id,
         input,
         model: request.model,
-        // Every turn too (ADR 0022): a deletion cut resumes its thread read-only in the config folder.
-        cwd: request.treeFolder,
-        approvalPolicy: 'never',
-        sandboxPolicy: {type: 'dangerFullAccess'},
+        // Every turn too: a deletion cut resumes its thread read-only in the
+        // config folder, and a loaded thread may have run under another mode.
+        ...turnAccessOf(request),
       })
 
       thread.model = request.model
@@ -395,9 +382,17 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
           throw new ProgramCrashed('Codex stopped before finishing this Reply.')
         }
 
+        if (notification.method === 'shown') {
+          yield notification.event
+          continue
+        }
+
+        if (asking.took(notification)) continue
+
         // Other threads' notifications arrive here too, and a resume repeats the last turn's token count.
         if (turnOf(notification) !== turnId) continue
 
+        asking.seen(notification)
         yield* mapper.map(notification)
 
         if (notification.method !== 'turn/completed') continue
@@ -426,6 +421,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       }
     } finally {
       unstoppable?.()
+      asking.close()
       unlisten()
     }
   }

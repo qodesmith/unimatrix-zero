@@ -9,8 +9,10 @@ import type {
   StartReplyEvent,
   Thread,
 } from '@uz/contract/host'
+import type {ApprovalGrant, PermissionMode} from '@uz/contract/permissions'
 import type {CompactionSettings} from '@uz/contract/settings'
 import type {TreeTools} from '@uz/contract/tools'
+import type {ApprovalAnswer} from '@uz/contract/turns'
 
 import {
   PNG_BASE64,
@@ -221,6 +223,7 @@ async function setUp(
       attachments = [],
       systemPromptChanged = false,
       tools = DEFAULT_TREE_TOOLS,
+      ...asking
     }: {
       stopAfter?: number
       model?: string
@@ -229,14 +232,27 @@ async function setUp(
       attachments?: HostAttachment[]
       systemPromptChanged?: boolean
       tools?: TreeTools
+      permissionMode?: PermissionMode
+      grants?: ApprovalGrant[]
+      /** Each card's answer; `stop` stops the Reply instead. */
+      answer?: ApprovalAnswer | 'stop'
+      inTree?: string
     } = {}
   ) {
+    const {permissionMode, grants, answer, inTree} = {
+      permissionMode: 'full-access',
+      grants: [],
+      answer: 'allow-once',
+      inTree: treeId,
+      ...asking,
+    } satisfies typeof asking
+
     const replyId = crypto.randomUUID()
     const events: Streamed[] = []
     let deltas = 0
 
     for await (const event of driver.startReply({
-      treeId,
+      treeId: inTree,
       replyId,
       model,
       systemPrompt: SYSTEM_PROMPT,
@@ -248,17 +264,31 @@ async function setUp(
       compactionSettings,
       systemPromptChanged,
       tools,
-      permissionMode: 'full-access',
-      grants: [],
+      permissionMode,
+      grants,
     })) {
       events.push(event)
 
       if (event.type === 'TEXT_DELTA' && ++deltas === stopAfter) {
         await driver.stop(replyId)
       }
+
+      if (event.type === 'APPROVAL_REQUESTED') {
+        await answerCard(replyId, event.approvalId, answer)
+      }
     }
 
     return events
+  }
+
+  async function answerCard(
+    replyId: string,
+    approvalId: string,
+    answer: ApprovalAnswer | 'stop'
+  ) {
+    await (answer === 'stop'
+      ? driver.stop(replyId)
+      : driver.answerApproval(approvalId, answer))
   }
 
   function reportsSoFar() {
@@ -1739,6 +1769,221 @@ it('starts, resumes and forks every thread in the Tree’s folder with full acce
     [{cwd: opened.treeFolder, ...fullAccess}],
     [{cwd: resumed.treeFolder, ...fullAccess}],
     [{cwd: forked.treeFolder, ...fullAccess}],
+  ])
+})
+
+it('starts, resumes and forks every thread under Supervised in the Tree’s folder, sandboxed to write there and asking before anything that isn’t trusted', async () => {
+  const supervised = {permissionMode: 'supervised'} as const
+  const opened = await setUp(['started.ndjson'])
+  const first = await opened.reply(FIRST_PROMPT, null, supervised)
+  await opened.reply(SECOND_PROMPT, recordedIn(first), supervised)
+  await opened.allClosed()
+
+  const resumed = await setUp(['resumed.ndjson'], {store: opened.store})
+  await resumed.reply(THIRD_PROMPT, recordedIn(first), supervised)
+
+  const forked = await setUp(['forked.ndjson'], {store: opened.store})
+
+  await forked.reply(
+    FORK_PROMPT,
+    {...recordedIn(first), type: 'fork'},
+    supervised
+  )
+
+  const asking = {sandbox: 'workspace-write', approvalPolicy: 'untrusted'}
+
+  expect(
+    [opened, resumed, forked].map(codex => codex.reports()[0]?.threadAccess)
+  ).toEqual([
+    [{cwd: opened.treeFolder, ...asking}],
+    [{cwd: resumed.treeFolder, ...asking}],
+    [{cwd: forked.treeFolder, ...asking}],
+  ])
+  expect(opened.reports()[0]?.turnAccess).toEqual(
+    [1, 2].map(() => ({
+      cwd: opened.treeFolder,
+      approvalPolicy: 'untrusted',
+      sandboxPolicy: {
+        type: 'workspaceWrite',
+        writableRoots: [opened.treeFolder],
+        networkAccess: false,
+        excludeTmpdirEnvVar: false,
+        excludeSlashTmp: false,
+      },
+    }))
+  )
+})
+
+const APPROVALS_THREAD_ID = '01a2150c-452a-7f93-a351-0e1be2fe7630'
+const ALLOWED_CHANGE = 'exec-b941c2bd-c584-4f54-9d29-4bd5fadc28fd'
+const LISTING = 'exec-1f6c1f4d-14ba-4af9-ba8e-91161d7b6dd5'
+
+function cardsIn(events: Streamed[]) {
+  return events.flatMap(event =>
+    event.type === 'APPROVAL_REQUESTED' || event.type === 'APPROVAL_RESOLVED'
+      ? [event]
+      : []
+  )
+}
+
+/** The Replies of `approvals.ndjson`, in order, up to `count` of them. */
+async function approvalReplies(
+  codex: Awaited<ReturnType<typeof setUp>>,
+  count: number,
+  allowedUnder: PermissionMode = 'supervised'
+) {
+  const supervised = {permissionMode: 'supervised'} as const
+  const ready = await codex.reply('Reply with the single word READY.')
+  const replies = [ready]
+
+  const steps = [
+    async () =>
+      codex.reply('allowed', recordedIn(ready), {permissionMode: allowedUnder}),
+    async (before: Streamed[]) =>
+      codex.reply('denied', recordedIn(before), {
+        ...supervised,
+        answer: 'deny',
+      }),
+    async (before: Streamed[]) =>
+      codex.reply('stopped', recordedIn(before), {
+        ...supervised,
+        answer: 'stop',
+      }),
+    async (before: Streamed[]) =>
+      codex.reply('first', recordedIn(before), {
+        ...supervised,
+        answer: 'always-allow',
+      }),
+    async (before: Streamed[]) =>
+      codex.reply('second', recordedIn(before), supervised),
+    async () =>
+      codex.reply('third', null, {
+        ...supervised,
+        inTree: crypto.randomUUID(),
+        grants: [{kind: 'edits-in-tree'}],
+      }),
+  ]
+
+  for (const step of steps.slice(0, count - 1)) {
+    replies.push(await step(replies.at(-1) ?? ready))
+  }
+
+  return replies
+}
+
+it('under Supervised, shows a card for a file write in the Tree’s folder at its tool call, before its result, and lets Codex write it once allowed; a command Codex parsed as a listing runs with no card', async () => {
+  const codex = await setUp(['approvals.ndjson'])
+  const [, allowed = []] = await approvalReplies(codex, 2)
+
+  const card = allowed.find(event => event.type === 'APPROVAL_REQUESTED')
+
+  expect(cardsIn(allowed)).toEqual([
+    {
+      treeId: expect.any(String),
+      replyId: expect.any(String),
+      type: 'APPROVAL_REQUESTED',
+      approvalId: expect.any(String),
+      toolCallId: ALLOWED_CHANGE,
+      action: {
+        kind: 'edit',
+        paths: [path.join(codex.treeFolder, 'allowed.txt')],
+        inTreeFiles: true,
+      },
+    },
+    expect.objectContaining({
+      type: 'APPROVAL_RESOLVED',
+      approvalId: card?.approvalId,
+      answer: 'allow-once',
+    }),
+  ])
+  expect(
+    allowed
+      .filter(
+        event =>
+          event.type.startsWith('APPROVAL_') ||
+          ('toolCallId' in event && event.toolCallId === ALLOWED_CHANGE)
+      )
+      .map(event => event.type)
+  ).toEqual([
+    'TOOL_CALL_START',
+    'TOOL_CALL_ARGS',
+    'APPROVAL_REQUESTED',
+    'APPROVAL_RESOLVED',
+    'TOOL_RESULT',
+  ])
+  expect(shown(allowed).content).toContainEqual(
+    expect.objectContaining({toolCallId: LISTING, toolName: 'commandExecution'})
+  )
+  expect(allowed.at(-1)).toMatchObject({status: 'complete'})
+  expect(codex.reports()[0]?.answers).toEqual([
+    {id: 0, result: {decision: 'accept'}},
+    {id: 1, result: {decision: 'accept'}},
+  ])
+})
+
+it('declines a file write the card denies, and the Reply goes on', async () => {
+  const codex = await setUp(['approvals.ndjson'])
+  const [, , denied = []] = await approvalReplies(codex, 3)
+
+  expect(cardsIn(denied).map(event => event.type)).toEqual([
+    'APPROVAL_REQUESTED',
+    'APPROVAL_RESOLVED',
+  ])
+  expect(denied.at(-1)).toMatchObject({status: 'complete'})
+  expect(codex.reports()[0]?.answers.at(-1)).toEqual({
+    id: 2,
+    result: {decision: 'decline'},
+  })
+})
+
+it('drops the card of a Reply stopped while it waits, answering Codex nothing', async () => {
+  const codex = await setUp(['approvals.ndjson'])
+  const replies = await approvalReplies(codex, 4)
+  const stopped = replies[3] ?? []
+  const card = stopped.find(event => event.type === 'APPROVAL_REQUESTED')
+
+  expect(cardsIn(stopped).map(event => event.type)).toEqual([
+    'APPROVAL_REQUESTED',
+  ])
+  expect(stopped.at(-1)).toMatchObject({status: 'stopped'})
+
+  // An answer after the Reply moved on reaches no one.
+  if (card) await codex.driver.answerApproval(card.approvalId, 'allow-once')
+
+  await new Promise(resolve => {
+    setTimeout(resolve, 0)
+  })
+  await codex.allClosed()
+  const [report] = codex.reports()
+
+  expect(report?.answers.map(answer => answer.id)).toEqual([0, 1, 2])
+  expect(report?.interrupted).toBe(promptRecordedIn(stopped).messageId)
+})
+
+it('shows no card in a Tree once a write there was always allowed, nor in another Tree whose request carries the grant, and accepts both writes', async () => {
+  const codex = await setUp(['approvals.ndjson'])
+  const replies = await approvalReplies(codex, 7)
+  const [first = [], second = [], third = []] = replies.slice(4)
+
+  expect(cardsIn(first).at(-1)).toMatchObject({answer: 'always-allow'})
+  expect(cardsIn(second)).toEqual([])
+  expect(cardsIn(third)).toEqual([])
+  expect(recordedIn(third).sessionId).not.toBe(APPROVALS_THREAD_ID)
+  expect(codex.reports()[0]?.answers.slice(-3)).toEqual([
+    {id: 4, result: {decision: 'accept'}},
+    {id: 5, result: {decision: 'accept'}},
+    {id: 6, result: {decision: 'accept'}},
+  ])
+})
+
+it('refuses every approval request under full access, with no card', async () => {
+  const codex = await setUp(['approvals.ndjson'])
+  const [, allowed = []] = await approvalReplies(codex, 2, 'full-access')
+
+  expect(cardsIn(allowed)).toEqual([])
+  expect(codex.reports()[0]?.answers).toEqual([
+    {id: 0, error: expect.objectContaining({code: -32_601})},
+    {id: 1, error: expect.objectContaining({code: -32_601})},
   ])
 })
 
