@@ -16,7 +16,7 @@ Edit the right-hand column to match whatever vocabulary you actually use.
 
 ## `needs-provider`
 
-Our own label, with no role in the skills. It marks a ticket whose build or check needs a connected Provider in the dev app, so `/implement-next` stops and asks the human to connect one before building.
+Our own label, not one of the five roles above. It marks a ticket whose build or check needs a connected Provider in the dev app, so `/implement-next` stops and asks the human to connect one before building.
 
 Decide it for every ticket you create or triage, beside its triage label. Apply it when the ticket:
 
