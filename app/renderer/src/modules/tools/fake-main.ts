@@ -23,20 +23,20 @@ export function savedTree(fields: Partial<Tree> = {}): Tree {
   }
 }
 
-interface Saved {
+interface FakeMainOptions {
   settings?: Partial<Settings>
   trees?: Tree[]
   refusesSettings?: boolean
 }
 
-export function fakeMain(saved: Saved = {}) {
-  const settings: Settings = {...DEFAULT_SETTINGS, ...saved.settings}
-  const trees = saved.trees ?? []
+export function fakeMain(options: FakeMainOptions = {}) {
+  const settings: Settings = {...DEFAULT_SETTINGS, ...options.settings}
+  const trees = options.trees ?? []
   const sent: Command[] = []
 
   function answer(command: Command): CommandOutcome<CommandType> {
     if (command.type === 'settings.update') {
-      if (saved.refusesSettings) {
+      if (options.refusesSettings) {
         return {ok: false, error: {code: 'handler-failed', message: 'Refused'}}
       }
 

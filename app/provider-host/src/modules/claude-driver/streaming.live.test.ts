@@ -1247,26 +1247,35 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     const first = await live.reply('Say hi.', null)
 
+    async function resumeWith(
+      session: SessionRef,
+      tools: ReplyRequest['tools']
+    ) {
+      const events = await Array.fromAsync(
+        live.driver.startReply({
+          ...live.request('Say hi.', continuing(session)),
+          tools,
+        })
+      )
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+      expect(recordedIn(events).session.sessionId).toBe(
+        first.recorded.session.sessionId
+      )
+
+      return events
+    }
+
     expect(await live.queries[0]?.mcpServerStatus()).toEqual([])
 
     await live.closed()
 
-    const second = await Array.fromAsync(
-      live.driver.startReply({
-        ...live.request('Say hi.', continuing(first.recorded.session)),
-        tools: {
-          ...DEFAULT_TREE_TOOLS,
-          webSearch: false,
-          claudeConnectors: true,
-          claudeBuiltInSkills: true,
-        },
-      })
-    )
-
-    expect(second.at(-1)).toMatchObject({status: 'complete'})
-    expect(recordedIn(second).session.sessionId).toBe(
-      first.recorded.session.sessionId
-    )
+    const second = await resumeWith(first.recorded.session, {
+      ...DEFAULT_TREE_TOOLS,
+      webSearch: false,
+      claudeConnectors: true,
+      claudeBuiltInSkills: true,
+    })
 
     const inits = live.printed.flatMap(line => {
       const parsed = InitLine.safeParse(JSON.parse(line))
@@ -1294,22 +1303,13 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
     await live.closed()
 
-    const third = await Array.fromAsync(
-      live.driver.startReply({
-        ...live.request('Say hi.', continuing(recordedIn(second).session)),
-        tools: {
-          ...DEFAULT_TREE_TOOLS,
-          webSearch: false,
-          claudeConnectors: false,
-          claudeBuiltInSkills: true,
-        },
-      })
-    )
+    await resumeWith(recordedIn(second).session, {
+      ...DEFAULT_TREE_TOOLS,
+      webSearch: false,
+      claudeConnectors: false,
+      claudeBuiltInSkills: true,
+    })
 
-    expect(third.at(-1)).toMatchObject({status: 'complete'})
-    expect(recordedIn(third).session.sessionId).toBe(
-      first.recorded.session.sessionId
-    )
     expect(await live.queries[2]?.mcpServerStatus()).toEqual([])
 
     await live.done()
