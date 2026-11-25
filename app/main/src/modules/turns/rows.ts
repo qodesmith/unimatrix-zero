@@ -2,6 +2,7 @@ import type {Database} from '#modules/database/main'
 import type {Removal} from './deletion'
 import type {Attachment} from '@uz/contract/attachments'
 import type {ModelChoice, ProviderId} from '@uz/contract/providers'
+import type {TreeTools} from '@uz/contract/tools'
 import type {Prompt, Reply} from '@uz/contract/turns'
 import type {SQL} from 'drizzle-orm'
 
@@ -143,6 +144,24 @@ export function treeSystemPrompt(db: Database, treeId: string) {
     .select({id: systemPrompts.id, text: systemPrompts.text})
     .from(trees)
     .innerJoin(systemPrompts, eq(systemPrompts.id, trees.systemPromptId))
+    .where(eq(trees.id, treeId))
+    .get()
+
+  if (!row) throw new Error('That Tree no longer exists.')
+
+  return row
+}
+
+export function treeTools(db: Database, treeId: string): TreeTools {
+  const row = db
+    .select({
+      webSearch: trees.webSearch,
+      claudeConnectors: trees.claudeConnectors,
+      claudeBuiltInSkills: trees.claudeBuiltInSkills,
+      chatgptBuiltInSkills: trees.chatgptBuiltInSkills,
+      chatgptRemotePlugins: trees.chatgptRemotePlugins,
+    })
+    .from(trees)
     .where(eq(trees.id, treeId))
     .get()
 

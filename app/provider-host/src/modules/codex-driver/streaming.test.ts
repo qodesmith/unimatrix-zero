@@ -10,6 +10,7 @@ import type {
   Thread,
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
+import type {TreeTools} from '@uz/contract/tools'
 
 import {
   PNG_BASE64,
@@ -21,6 +22,7 @@ import {heldIdle} from '#modules/test-idle/main'
 import {fakeStore} from '#modules/test-store/main'
 import {explainingLabels} from '#modules/thread-replay/main'
 import {isReplyEvent} from '@uz/contract/host'
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {once} from 'node:events'
 import fs from 'node:fs'
@@ -90,6 +92,13 @@ function folder(prefix: string) {
   cleanUps.push(async () => fs.rmSync(made, {recursive: true, force: true}))
 
   return made
+}
+
+/** What the default Tools panel turns off, which Codex has on by default. */
+const DEFAULT_TOOLS_OFF = {
+  'skills.bundled.enabled': false,
+  'features.plugins': false,
+  'features.apps': false,
 }
 
 function edited(name: string, edit: (text: string) => string) {
@@ -211,6 +220,7 @@ async function setUp(
       thread = [],
       attachments = [],
       systemPromptChanged = false,
+      tools = DEFAULT_TREE_TOOLS,
     }: {
       stopAfter?: number
       model?: string
@@ -218,6 +228,7 @@ async function setUp(
       thread?: Thread
       attachments?: HostAttachment[]
       systemPromptChanged?: boolean
+      tools?: TreeTools
     } = {}
   ) {
     const replyId = crypto.randomUUID()
@@ -236,6 +247,7 @@ async function setUp(
       thread,
       compactionSettings,
       systemPromptChanged,
+      tools,
     })) {
       events.push(event)
 
@@ -414,6 +426,16 @@ it('starts codex with project docs off and in its own `CODEX_HOME`, so neither a
   expect(report?.home).toBe(codex.configDir)
 })
 
+it('starts codex with Subagents off', async () => {
+  const codex = await setUp(['started.ndjson'])
+  await codex.reply(FIRST_PROMPT)
+
+  const args = codex.reports()[0]?.args.join(' ')
+
+  expect(args).toContain('-c features.multi_agent=false')
+  expect(args).toContain('-c agents.enabled=false')
+})
+
 it('names the app’s developer folder to an app-server that starts on a Mac with no developer tools, and to none that starts on a Mac with them', async () => {
   const codex = await setUp(['started.ndjson', 'started.ndjson'])
 
@@ -540,7 +562,7 @@ it('continues the Provider session in the app-server that has it loaded, then cl
   expect(reports[0]?.ended).toBe('input-closed')
 })
 
-it('resumes the Provider session from the app’s copy alone, written back under its own name, with an empty config for the default Compaction threshold', async () => {
+it('resumes the Provider session from the app’s copy alone, written back under its own name, with no Compaction limit in its config for the default threshold', async () => {
   const opened = await setUp(['started.ndjson'])
   const first = await opened.reply(FIRST_PROMPT)
   const second = await opened.reply(SECOND_PROMPT, recordedIn(first))
@@ -561,7 +583,7 @@ it('resumes the Provider session from the app’s copy alone, written back under
   const [report] = codex.reports()
 
   expect(report?.methods).toContain('thread/resume')
-  expect(report?.threadConfigs).toEqual([{}])
+  expect(report?.threadConfigs).toEqual([DEFAULT_TOOLS_OFF])
   expect(report?.resumedFrom.map(line => line.id)).toEqual([
     THREAD_ID,
     FIRST_TURN,
@@ -644,7 +666,7 @@ it('forks the Provider session through a mid-Thread Reply into a new thread with
   expect(report?.methods).not.toContain('thread/resume')
   expect(report?.forkedThrough).toBe(FIRST_TURN)
   expect(report?.threadConfigs).toEqual([
-    {model_auto_compact_token_limit: 30_000},
+    {model_auto_compact_token_limit: 30_000, ...DEFAULT_TOOLS_OFF},
   ])
   // Written back whole for Codex to fork; the fork is Codex's to cut.
   expect(report?.resumedFrom.map(line => line.id)).toEqual([
@@ -704,12 +726,12 @@ async function compactingThread(recording: string) {
   return {filled, compacting}
 }
 
-it('starts a thread with no config for the default Compaction threshold', async () => {
+it('starts a thread with no Compaction limit in its config for the default threshold', async () => {
   const codex = await setUp(['started.ndjson'])
   await codex.reply('Reply with the single word TEAL.')
   await codex.allClosed()
 
-  expect(codex.reports()[0]?.threadConfigs).toEqual([null])
+  expect(codex.reports()[0]?.threadConfigs).toEqual([DEFAULT_TOOLS_OFF])
 })
 
 it('unsubscribes a loaded thread and resumes it with a changed Compaction threshold', async () => {
@@ -735,8 +757,8 @@ it('unsubscribes a loaded thread and resumes it with a changed Compaction thresh
   const [report] = codex.reports()
 
   expect(report?.threadConfigs).toEqual([
-    {model_auto_compact_token_limit: 30_000},
-    {model_auto_compact_token_limit: 20_000},
+    {model_auto_compact_token_limit: 30_000, ...DEFAULT_TOOLS_OFF},
+    {model_auto_compact_token_limit: 20_000, ...DEFAULT_TOOLS_OFF},
   ])
   expect(
     report?.methods.filter(method => method.startsWith('thread/'))
@@ -752,7 +774,66 @@ it('unsubscribes a loaded thread and resumes it with a changed Compaction thresh
   expect(textOf(lowered)).toBe('HERON')
 })
 
-it('loads a thread again with an empty config to go back to Codex’s default', async () => {
+it('turns web search, built-in Skills and remote plugins on or off as the Tools panel says, unsubscribing a loaded thread to change them', async () => {
+  const codex = await setUp(['compaction-settings.ndjson'])
+  const lowered = {compactionSettings: {auto: true, threshold: 30_000}}
+
+  const padded = await codex.reply(
+    'Reply with the single word TEAL.',
+    null,
+    lowered
+  )
+
+  const under = await codex.reply(
+    'Reply with the single word OTTER.',
+    recordedIn(padded),
+    lowered
+  )
+
+  const flipped = await codex.reply(
+    'Reply with the single word HERON.',
+    recordedIn(under),
+    {
+      ...lowered,
+      tools: {
+        ...DEFAULT_TREE_TOOLS,
+        webSearch: false,
+        chatgptBuiltInSkills: true,
+        chatgptRemotePlugins: true,
+      },
+    }
+  )
+
+  await codex.allClosed()
+  const [report] = codex.reports()
+
+  expect(report?.threadConfigs).toEqual([
+    {
+      model_auto_compact_token_limit: 30_000,
+      ...DEFAULT_TOOLS_OFF,
+    },
+    {
+      model_auto_compact_token_limit: 30_000,
+      web_search: 'disabled',
+      'skills.bundled.enabled': true,
+      'features.plugins': true,
+      'features.apps': true,
+    },
+  ])
+  expect(
+    report?.methods.filter(method => method.startsWith('thread/'))
+  ).toEqual([
+    'thread/start',
+    'thread/read',
+    'thread/read',
+    'thread/unsubscribe',
+    'thread/resume',
+    'thread/read',
+  ])
+  expect(textOf(flipped)).toBe('HERON')
+})
+
+it('loads a thread again with no Compaction limit in its config to go back to Codex’s default', async () => {
   const codex = await setUp(['compaction-settings.ndjson'])
   const lowered = {compactionSettings: {auto: true, threshold: 30_000}}
 
@@ -772,8 +853,8 @@ it('loads a thread again with an empty config to go back to Codex’s default', 
   await codex.allClosed()
 
   expect(codex.reports()[0]?.threadConfigs).toEqual([
-    {model_auto_compact_token_limit: 30_000},
-    {},
+    {model_auto_compact_token_limit: 30_000, ...DEFAULT_TOOLS_OFF},
+    DEFAULT_TOOLS_OFF,
   ])
 })
 
@@ -1499,6 +1580,28 @@ function readOf(threadId: string, rollout: string) {
   ]
 }
 
+/** Main's switches differ from the empty `config` a cut loads a thread with. */
+function reloadOf(threadId: string, rollout: string) {
+  return [
+    {
+      kind: 'in',
+      message: {id: 96, method: 'thread/unsubscribe', params: {threadId}},
+    },
+    {kind: 'out', message: {id: 96, result: {status: 'unsubscribed'}}},
+    {
+      kind: 'in',
+      message: {id: 97, method: 'thread/resume', params: {threadId}},
+    },
+    {
+      kind: 'out',
+      message: {
+        id: 97,
+        result: {thread: openedAt(threadId, rollout), model: MODEL},
+      },
+    },
+  ]
+}
+
 function withSteps(
   name: string,
   afterId: number,
@@ -1651,6 +1754,7 @@ it('starts a Reply in a thread only once a cut of it has finished, in the Tree�
         [
           ...revertTo(THREAD_ID, CUT_ROLLOUT),
           ...readOf(THREAD_ID, CUT_ROLLOUT),
+          ...reloadOf(THREAD_ID, CUT_ROLLOUT),
         ],
         {rest: true}
       ),
@@ -1668,6 +1772,7 @@ it('starts a Reply in a thread only once a cut of it has finished, in the Tree�
   const [report] = codex.reports()
 
   expect(report?.contexts).toEqual([[THREAD_ID, FIRST_TURN]])
+  expect(report?.threadConfigs).toEqual([{}, DEFAULT_TOOLS_OFF])
   // The turn undoes the cut's read-only load in the config folder.
   expect(report?.turnAccess).toEqual([
     {

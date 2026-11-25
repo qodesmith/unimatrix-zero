@@ -20,15 +20,21 @@ import {SECTIONS} from './settings-sections'
 interface SettingsPageProps {
   connections: ReactNode
   systemPrompts: ReactNode
+  tools: ReactNode
 }
 
-export function SettingsPage({connections, systemPrompts}: SettingsPageProps) {
+export function SettingsPage({
+  connections,
+  systemPrompts,
+  tools,
+}: SettingsPageProps) {
   const [openSection, setOpenSection] = useState<Section>('Appearance')
 
   const content: Partial<Record<Section, ReactNode>> = {
     Appearance: <AppearanceSection />,
     Chat: <ChatSection />,
     'System prompts': systemPrompts,
+    Tools: tools,
     Connections: connections,
   }
 

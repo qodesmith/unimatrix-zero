@@ -1,6 +1,7 @@
 import type {Command} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {HostCommand} from '@uz/contract/host'
+import type {TreeTools} from '@uz/contract/tools'
 
 import {createAttachments} from '#modules/attachments/main'
 import {createConnections} from '#modules/connections/main'
@@ -18,6 +19,7 @@ import {
 } from '@uz/contract/commands'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {PRESETS, SystemPromptEntrySchema} from '@uz/contract/system-prompts'
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {TREE_TITLE_MAX_LENGTH, TreeSchema} from '@uz/contract/trees'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -994,6 +996,89 @@ describe('System prompts', () => {
         type: 'tree.set-system-prompt',
         treeId: crypto.randomUUID(),
         text: '',
+      })
+    ).toMatchObject({ok: false, error: {code: 'not-found'}})
+  })
+})
+
+async function setTools(treeId: string, changes: Partial<TreeTools>) {
+  const outcome = await send({type: 'tree.set-tools', treeId, changes})
+
+  if (!outcome.ok) throw new Error(outcome.error.message)
+
+  return TreeSchema.parse(outcome.value)
+}
+
+function sentTools() {
+  return hostCommands.flatMap(command =>
+    command.type === 'reply.start' ? [command.request.tools] : []
+  )
+}
+
+describe('the Tools panel', () => {
+  it('gives a new Tree a copy of the Tools defaults, which no later change to the defaults touches', async () => {
+    const before = await createTree()
+
+    const defaults = {
+      ...DEFAULT_TREE_TOOLS,
+      webSearch: false,
+      chatgptRemotePlugins: true,
+    }
+
+    await send({type: 'settings.update', changes: {toolDefaults: defaults}})
+
+    clock = new Date('2026-10-20T12:00:00.000Z')
+
+    const after = await createTree()
+
+    expect(before.tools).toEqual(DEFAULT_TREE_TOOLS)
+    expect(after.tools).toEqual(defaults)
+    expect(await listed()).toEqual([after, before])
+  })
+
+  it('changes only that Tree, tells every window, and sends the change with the Tree’s next Reply and a Retry', async () => {
+    const tree = await createTree()
+    const other = await createTree()
+    const first = await sendPrompt(tree.id, null)
+    answer(tree.id, first.reply.id)
+    published = []
+
+    const noSearch = await setTools(tree.id, {webSearch: false})
+    const connectors = await setTools(tree.id, {claudeConnectors: true})
+
+    expect(noSearch.tools).toEqual({...DEFAULT_TREE_TOOLS, webSearch: false})
+    expect(connectors.tools).toEqual({
+      ...DEFAULT_TREE_TOOLS,
+      webSearch: false,
+      claudeConnectors: true,
+    })
+    expect(changed()).toEqual([noSearch, connectors])
+
+    const {reply} = await sendPrompt(tree.id, first.reply.id)
+    deps.turns.hostEvent('claude', {
+      type: 'RUN_FINISHED',
+      treeId: tree.id,
+      replyId: reply.id,
+      status: 'failed',
+      failure: {code: 'host-crashed', message: 'Claude stopped unexpectedly.'},
+    })
+    await send({type: 'reply.retry', treeId: tree.id, replyId: reply.id})
+    await sendPrompt(other.id, null)
+
+    expect(sentTools()).toEqual([
+      DEFAULT_TREE_TOOLS,
+      connectors.tools,
+      connectors.tools,
+      DEFAULT_TREE_TOOLS,
+    ])
+  })
+
+  it('answers not-found for changing a Tree that does not exist', async () => {
+    expect(
+      await send({
+        type: 'tree.set-tools',
+        treeId: crypto.randomUUID(),
+        changes: {webSearch: false},
       })
     ).toMatchObject({ok: false, error: {code: 'not-found'}})
   })

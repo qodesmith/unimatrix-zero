@@ -1,12 +1,5 @@
-import type {Bridge} from '@uz/contract/bridge'
+export {bridge} from './bridge'
 
-declare global {
-  interface Window {
-    uz: Bridge
-  }
-}
+export {Refusal} from './ui/Refusal'
 
-/** The preload's `window.uz`: the renderer's only way to reach main. */
-export function bridge(): Bridge {
-  return globalThis.window.uz
-}
+export {useCommand} from './use-command'

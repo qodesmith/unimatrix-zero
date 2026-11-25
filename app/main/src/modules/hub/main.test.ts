@@ -2,6 +2,7 @@ import type {AppEvent} from '@uz/contract/events'
 
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {expect, it} from 'vitest'
 
 import {createHub} from './main'
@@ -14,6 +15,7 @@ const tree = {
   lastActiveAt: '2026-10-19T12:00:00.000Z',
   unseenFailure: false,
   systemPrompt: {id: '01a16096-00ad-7d3b-8205-6b76ddc26ce1', text: ''},
+  tools: DEFAULT_TREE_TOOLS,
 }
 
 function setUp() {

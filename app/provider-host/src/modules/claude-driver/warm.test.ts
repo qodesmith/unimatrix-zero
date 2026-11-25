@@ -1,6 +1,7 @@
 import type {CompactionSettings} from '@uz/contract/settings'
 
 import {idleFor} from '#modules/idle/main'
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {afterEach, beforeEach, expect, it, vi} from 'vitest'
 
 import {createWarmSessions} from './warm'
@@ -14,6 +15,7 @@ function session(sessionId: string, messageId: string, model = 'haiku') {
     model,
     compactionSettings: DEFAULTS,
     systemPrompt: '',
+    tools: DEFAULT_TREE_TOOLS,
     closed: false,
     async close() {
       this.closed = true
@@ -46,13 +48,23 @@ it('gives back the idle session standing at that Reply', () => {
   expect(
     warm.claim(
       {sessionId: 's1', messageId: 'm1'},
-      {model: 'haiku', compactionSettings: DEFAULTS, systemPrompt: ''}
+      {
+        model: 'haiku',
+        compactionSettings: DEFAULTS,
+        systemPrompt: '',
+        tools: DEFAULT_TREE_TOOLS,
+      }
     )
   ).toBe(one)
   expect(
     warm.claim(
       {sessionId: 's1', messageId: 'm1'},
-      {model: 'haiku', compactionSettings: DEFAULTS, systemPrompt: ''}
+      {
+        model: 'haiku',
+        compactionSettings: DEFAULTS,
+        systemPrompt: '',
+        tools: DEFAULT_TREE_TOOLS,
+      }
     )
   ).toBeNull()
 })
@@ -66,7 +78,12 @@ it('closes one standing elsewhere in the session instead of giving it back', () 
   expect(
     warm.claim(
       {sessionId: 's1', messageId: 'm1'},
-      {model: 'haiku', compactionSettings: DEFAULTS, systemPrompt: ''}
+      {
+        model: 'haiku',
+        compactionSettings: DEFAULTS,
+        systemPrompt: '',
+        tools: DEFAULT_TREE_TOOLS,
+      }
     )
   ).toBeNull()
   expect(one.closed).toBe(true)
@@ -82,7 +99,12 @@ it('closes one on another Model instead of giving it back', () => {
   expect(
     warm.claim(
       {sessionId: 's1', messageId: 'm1'},
-      {model: 'sonnet', compactionSettings: DEFAULTS, systemPrompt: ''}
+      {
+        model: 'sonnet',
+        compactionSettings: DEFAULTS,
+        systemPrompt: '',
+        tools: DEFAULT_TREE_TOOLS,
+      }
     )
   ).toBeNull()
   expect(one.closed).toBe(true)
@@ -102,6 +124,7 @@ it('closes one started with other Compaction Settings instead of giving it back'
         model: 'haiku',
         compactionSettings: {auto: true, threshold: 150_000},
         systemPrompt: '',
+        tools: DEFAULT_TREE_TOOLS,
       }
     )
   ).toBeNull()
@@ -122,6 +145,7 @@ it('closes one started with automatic Compaction on when the Reply has it off', 
         model: 'haiku',
         compactionSettings: {auto: false, threshold: null},
         systemPrompt: '',
+        tools: DEFAULT_TREE_TOOLS,
       }
     )
   ).toBeNull()
@@ -137,11 +161,61 @@ it('closes one started under another System prompt instead of giving it back', (
   expect(
     warm.claim(
       {sessionId: 's1', messageId: 'm1'},
-      {model: 'haiku', compactionSettings: DEFAULTS, systemPrompt: 'Be brief.'}
+      {
+        model: 'haiku',
+        compactionSettings: DEFAULTS,
+        systemPrompt: 'Be brief.',
+        tools: DEFAULT_TREE_TOOLS,
+      }
     )
   ).toBeNull()
   expect(one.closed).toBe(true)
   expect(warm.size).toBe(0)
+})
+
+it('closes one started with other tools instead of giving it back', () => {
+  const warm = warmSessions(6)
+  const one = session('s1', 'm1')
+  warm.add(one)
+  warm.release(one)
+
+  expect(
+    warm.claim(
+      {sessionId: 's1', messageId: 'm1'},
+      {
+        model: 'haiku',
+        compactionSettings: DEFAULTS,
+        systemPrompt: '',
+        tools: {...DEFAULT_TREE_TOOLS, webSearch: false},
+      }
+    )
+  ).toBeNull()
+  expect(one.closed).toBe(true)
+  expect(warm.size).toBe(0)
+})
+
+it("gives back one whose tools differ only in ChatGPT's switches", () => {
+  const warm = warmSessions(6)
+  const one = session('s1', 'm1')
+  warm.add(one)
+  warm.release(one)
+
+  expect(
+    warm.claim(
+      {sessionId: 's1', messageId: 'm1'},
+      {
+        model: 'haiku',
+        compactionSettings: DEFAULTS,
+        systemPrompt: '',
+        tools: {
+          ...DEFAULT_TREE_TOOLS,
+          chatgptBuiltInSkills: !DEFAULT_TREE_TOOLS.chatgptBuiltInSkills,
+          chatgptRemotePlugins: !DEFAULT_TREE_TOOLS.chatgptRemotePlugins,
+        },
+      }
+    )
+  ).toBe(one)
+  expect(one.closed).toBe(false)
 })
 
 it('starts the idle wait over after each Reply', () => {
@@ -153,7 +227,12 @@ it('starts the idle wait over after each Reply', () => {
 
   warm.claim(
     {sessionId: 's1', messageId: 'm1'},
-    {model: 'haiku', compactionSettings: DEFAULTS, systemPrompt: ''}
+    {
+      model: 'haiku',
+      compactionSettings: DEFAULTS,
+      systemPrompt: '',
+      tools: DEFAULT_TREE_TOOLS,
+    }
   )
   vi.advanceTimersByTime(5000)
   expect(one.closed).toBe(false)
@@ -173,7 +252,12 @@ it('never closes a session claimed after being released twice', () => {
 
   warm.claim(
     {sessionId: 's1', messageId: 'm1'},
-    {model: 'haiku', compactionSettings: DEFAULTS, systemPrompt: ''}
+    {
+      model: 'haiku',
+      compactionSettings: DEFAULTS,
+      systemPrompt: '',
+      tools: DEFAULT_TREE_TOOLS,
+    }
   )
   vi.advanceTimersByTime(5000)
 
@@ -207,7 +291,12 @@ it('says when every `claude` it closed in a session has ended', async () => {
   warm.release(one)
   warm.claim(
     {sessionId: 's1', messageId: 'm1'},
-    {model: 'haiku', compactionSettings: DEFAULTS, systemPrompt: ''}
+    {
+      model: 'haiku',
+      compactionSettings: DEFAULTS,
+      systemPrompt: '',
+      tools: DEFAULT_TREE_TOOLS,
+    }
   )
   const closed = warm.closed('s1')
 

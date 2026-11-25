@@ -1,10 +1,29 @@
 import type {WhenIdle} from '#modules/idle/main'
 import type {ReplyRequest, SessionRef} from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
+import type {TreeTools} from '@uz/contract/tools'
+
+import {TreeToolsSchema} from '@uz/contract/tools'
 
 export const IDLE_CLOSE_MS = 10 * 60 * 1000
 
 export const MAX_WARM = 6
+
+/**
+ * Whether `claude` reads each switch. A flip of one it doesn't read keeps a
+ * warm session.
+ */
+const CLAUDE_READS: Record<keyof TreeTools, boolean> = {
+  webSearch: true,
+  claudeConnectors: true,
+  claudeBuiltInSkills: true,
+  chatgptBuiltInSkills: false,
+  chatgptRemotePlugins: false,
+}
+
+const CLAUDE_TOOLS = TreeToolsSchema.keyof().options.filter(
+  key => CLAUDE_READS[key]
+)
 
 export interface WarmSession {
   readonly sessionId: string | null
@@ -15,6 +34,8 @@ export interface WarmSession {
   readonly compactionSettings: CompactionSettings
   /** Fixed as `claude` starts: a changed System prompt needs a new `claude`. */
   readonly systemPrompt: string
+  /** Fixed as `claude` starts: it can't add or remove a tool later. */
+  readonly tools: TreeTools
   close(): Promise<void>
 }
 
@@ -81,8 +102,8 @@ export function createWarmSessions<Session extends WarmSession>({
   return {
     /**
      * Closes it at any other point, on another Model, with other Compaction
-     * Settings or under another System prompt, so `claude` never runs a
-     * session twice. Another name for its Model keeps it.
+     * Settings, under another System prompt or with other tools, so `claude`
+     * never runs a session twice. Another name for its Model keeps it.
      */
     claim(
       ref: SessionRef,
@@ -90,7 +111,11 @@ export function createWarmSessions<Session extends WarmSession>({
         model,
         compactionSettings,
         systemPrompt,
-      }: Pick<ReplyRequest, 'model' | 'compactionSettings' | 'systemPrompt'>
+        tools,
+      }: Pick<
+        ReplyRequest,
+        'model' | 'compactionSettings' | 'systemPrompt' | 'tools'
+      >
     ): Session | null {
       const wanted = resolveModel(model)
 
@@ -103,7 +128,8 @@ export function createWarmSessions<Session extends WarmSession>({
           session.compactionSettings.auto === compactionSettings.auto &&
           session.compactionSettings.threshold ===
             compactionSettings.threshold &&
-          session.systemPrompt === systemPrompt
+          session.systemPrompt === systemPrompt &&
+          CLAUDE_TOOLS.every(key => session.tools[key] === tools[key])
         ) {
           wake(session)
 

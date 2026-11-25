@@ -1,14 +1,12 @@
 import type {TreeSystemPrompt as Saved} from '@uz/contract/system-prompts'
 
-import {bridge} from '#modules/bridge/main'
+import {Refusal, bridge, useCommand} from '#modules/bridge/main'
 import {Button} from '#shadcn/ui/button'
 import {Textarea} from '#shadcn/ui/textarea'
 import {useId, useState} from 'react'
 
 import {useDialogCommand} from '../dialog-command/use-dialog-command'
 import {isTooLong} from '../too-long'
-import {useCommand} from '../use-command'
-import {Refusal} from './Refusal'
 import {SaveToLibraryDialog} from './SaveToLibraryDialog'
 import {TooLong} from './TooLong'
 

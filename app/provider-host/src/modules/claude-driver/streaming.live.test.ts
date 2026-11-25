@@ -2,6 +2,7 @@
  * Needs a real plan and the env `bun run provider-checks` sets.
  * `UZ_RECORD=yes` rewrites `recordings/`, which the driver tests replay.
  */
+import type {Query} from '@anthropic-ai/claude-agent-sdk'
 import type {
   ReplyRecorded,
   ReplyRequest,
@@ -21,6 +22,7 @@ import {fakeStore} from '#modules/test-store/main'
 import {withGitLast} from '#modules/vendor-environment/main'
 import {query} from '@anthropic-ai/claude-agent-sdk'
 import {isReplyEvent} from '@uz/contract/host'
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {spawn} from 'node:child_process'
 import fs from 'node:fs'
@@ -170,6 +172,7 @@ function liveDriver(
   let compactionSettings: CompactionSettings = {auto: true, threshold: null}
   const store = fakeStore(refuses)
   const printed: string[] = []
+  const queries: Query[] = []
 
   const recorder = createRecorder(
     ({command, args, cwd, env, signal}) =>
@@ -205,6 +208,12 @@ function liveDriver(
     },
     env: hostEnv,
     whenIdle: idle.whenIdle,
+    query: params => {
+      const running = query(params)
+      queries.push(running)
+
+      return running
+    },
   })
 
   async function closed() {
@@ -236,6 +245,7 @@ function liveDriver(
       thread: [],
       compactionSettings,
       systemPromptChanged: false,
+      tools: DEFAULT_TREE_TOOLS,
     }
   }
 
@@ -265,6 +275,7 @@ function liveDriver(
       compactionSettings = next
     },
     printed,
+    queries,
     entriesOf: (sessionId: string) =>
       store.entriesOf(projectKeyOf(configDir), sessionId),
     entryCount: (sessionId: string) =>
@@ -1227,6 +1238,58 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       first.recorded.session.sessionId
     )
     expect(shownText(second.events)).toMatch(/MANGO\W*$/)
+
+    await live.done()
+  }, 300_000)
+
+  it('[dep:claude-tool-switches] offers the web, the account’s connectors and the built-in Skills only as the Tools panel says, in the session it resumes', async () => {
+    const live = liveDriver([])
+
+    const first = await live.reply('Say hi.', null)
+
+    expect(await live.queries[0]?.mcpServerStatus()).toEqual([])
+
+    await live.closed()
+
+    const second = await Array.fromAsync(
+      live.driver.startReply({
+        ...live.request('Say hi.', continuing(first.recorded.session)),
+        tools: {
+          ...DEFAULT_TREE_TOOLS,
+          webSearch: false,
+          claudeConnectors: true,
+          claudeBuiltInSkills: true,
+        },
+      })
+    )
+
+    expect(second.at(-1)).toMatchObject({status: 'complete'})
+    expect(recordedIn(second).session.sessionId).toBe(
+      first.recorded.session.sessionId
+    )
+
+    const inits = live.printed.flatMap(line => {
+      const parsed = InitLine.safeParse(JSON.parse(line))
+
+      return parsed.success ? [parsed.data] : []
+    })
+
+    expect(inits).toHaveLength(2)
+
+    const [before, after] = inits
+
+    expect(before?.tools).toEqual(
+      expect.arrayContaining(['WebFetch', 'WebSearch'])
+    )
+    expect(before?.tools).not.toContain('Skill')
+    expect(after?.tools).not.toContain('WebFetch')
+    expect(after?.tools).not.toContain('WebSearch')
+    expect(after?.tools).toContain('Skill')
+    // `claude` fetches them after it starts. Only an account with a
+    // connector has any: the maintainer's has some.
+    await expect
+      .poll(async () => (await live.queries[1]?.mcpServerStatus())?.length)
+      .toBeGreaterThan(0)
 
     await live.done()
   }, 300_000)

@@ -9,7 +9,7 @@ import type {SessionStoreClient} from '#modules/session-store/main'
 import type {AppServer, OpenAppServer} from './app-server'
 import type {UserInput} from './protocol/v2/UserInput'
 import type {Restored} from './rebuild'
-import type {LoadedThread} from './threads'
+import type {LoadedThread, ThreadConfig} from './threads'
 import type {Notification, ParamsOf, RateLimits} from './wire'
 import type {
   DeletionCut,
@@ -19,10 +19,10 @@ import type {
   ReplySession,
   SignInRequest,
 } from '@uz/contract/host'
-import type {CompactionSettings} from '@uz/contract/settings'
 
 import {createInbox} from '#modules/inbox/main'
 import {ProgramCrashed, createReplyRuns} from '#modules/reply-runs/main'
+import {isDeepStrictEqual} from 'node:util'
 
 import {codexContent} from './input'
 import {readModels} from './models'
@@ -171,11 +171,10 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     dropFrom: string | null
   ): Promise<Restored> {
     const {configDir} = request.vendorProgram
-    const {threshold} = request.compactionSettings
     const settings = settingsOf(request)
 
-    // A resume or fork that brings no `config` keeps the thread's old limit.
-    const config = configOf(threshold)
+    // A resume or fork that brings no `config` keeps the thread's old one.
+    const config = configOf(request)
 
     const {sessionId: id, messageId, type} = session
     const fork = type === 'fork'
@@ -192,10 +191,9 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     }
 
     if (loaded && !fork) {
-      const thread =
-        loaded.threshold === threshold
-          ? loaded
-          : await reload(running, loaded, settings, threshold)
+      const thread = isDeepStrictEqual(loaded.config, config)
+        ? loaded
+        : await reload(running, loaded, settings, config)
 
       if (!rewind) return cut(thread)
 
@@ -223,7 +221,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
           excludeTurns: true,
         }),
         openedAt,
-        threshold
+        config
       )
 
       return {thread, dropped: false}
@@ -238,7 +236,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
         excludeTurns: true,
       }),
       openedAt,
-      threshold
+      config
     )
 
     return cut(resumed)
@@ -249,18 +247,18 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     running: Running,
     thread: LoadedThread,
     settings: ParamsOf<'thread/start'>,
-    threshold: CompactionSettings['threshold']
+    config: ThreadConfig
   ) {
     await running.server.request('thread/unsubscribe', {threadId: thread.id})
 
     const opened = await running.server.request('thread/resume', {
       threadId: thread.id,
       ...settings,
-      config: configOf(threshold),
+      config,
       excludeTurns: true,
     })
 
-    return loadThread(running.threads, opened, thread.turns, threshold)
+    return loadThread(running.threads, opened, thread.turns, config)
   }
 
   async function resume(

@@ -13,6 +13,7 @@ import {
   SystemPromptNameSchema,
   SystemPromptTextSchema,
 } from '#modules/system-prompts/main'
+import {TreeToolsSchema} from '#modules/tools/main'
 import {TREE_TITLE_MAX_LENGTH, TreeSchema} from '#modules/trees/main'
 import {PromptSchema, ReplySchema} from '#modules/turns/main'
 import {z} from 'zod'
@@ -62,6 +63,13 @@ export const TreeSetSystemPromptCommand = z.strictObject({
   type: z.literal('tree.set-system-prompt'),
   treeId: z.uuid(),
   text: SystemPromptTextSchema,
+})
+
+/** From the Tree's next Reply; `TREE_CHANGED` follows. */
+export const TreeSetToolsCommand = z.strictObject({
+  type: z.literal('tree.set-tools'),
+  treeId: z.uuid(),
+  changes: TreeToolsSchema.partial(),
 })
 
 export const TreeTurnsCommand = z.strictObject({
@@ -243,6 +251,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   TreeDeleteCommand,
   TreeTurnsCommand,
   TreeSetSystemPromptCommand,
+  TreeSetToolsCommand,
   PromptSendCommand,
   PromptDeleteCommand,
   ReplyStopCommand,
@@ -274,6 +283,7 @@ const resultSchemas = {
   'tree.delete': Done,
   'tree.turns': TreeTurnsResult,
   'tree.set-system-prompt': TreeSchema,
+  'tree.set-tools': TreeSchema,
   'prompt.send': PromptSendResult,
   'prompt.delete': PromptDeleteResult,
   'reply.stop': Done,

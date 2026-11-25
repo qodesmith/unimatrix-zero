@@ -1,5 +1,6 @@
 import type {Database} from '#modules/database/main'
 import type {AppEvent} from '@uz/contract/events'
+import type {TreeTools} from '@uz/contract/tools'
 import type {Tree} from '@uz/contract/trees'
 import type {ReplyStatus} from '@uz/contract/turns'
 
@@ -54,6 +55,13 @@ function toTree(row: TreeRow): Tree {
     lastActiveAt: row.lastActiveAt.toISOString(),
     unseenFailure: row.unseenFailure,
     systemPrompt: {id: row.systemPromptId, text: row.systemPromptText},
+    tools: {
+      webSearch: row.webSearch,
+      claudeConnectors: row.claudeConnectors,
+      claudeBuiltInSkills: row.claudeBuiltInSkills,
+      chatgptBuiltInSkills: row.chatgptBuiltInSkills,
+      chatgptRemotePlugins: row.chatgptRemotePlugins,
+    },
   }
 }
 
@@ -71,11 +79,12 @@ export function createTrees(db: Database) {
   }
 
   return {
-    create(now: Date, systemPrompt: string): Tree {
+    create(now: Date, systemPrompt: string, tools: TreeTools): Tree {
       const {id} = db
         .insert(trees)
         .values({
           systemPromptId: saveSystemPrompt(db, systemPrompt),
+          ...tools,
           createdAt: now,
         })
         .returning({id: trees.id})
@@ -127,6 +136,19 @@ export function createTrees(db: Database) {
         db
           .update(trees)
           .set({systemPromptId: saveSystemPrompt(db, text)})
+          .where(eq(trees.id, id))
+          .returning({id: trees.id})
+          .get()
+      )
+    },
+
+    setTools(id: string, changes: Partial<TreeTools>): Tree | null {
+      if (Object.keys(changes).length === 0) return get(id)
+
+      return updated(
+        db
+          .update(trees)
+          .set(changes)
           .where(eq(trees.id, id))
           .returning({id: trees.id})
           .get()

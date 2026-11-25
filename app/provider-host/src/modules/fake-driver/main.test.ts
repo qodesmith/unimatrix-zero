@@ -1,6 +1,7 @@
 import type {StartReplyEvent} from '@uz/contract/host'
 
 import {isReplyEvent} from '@uz/contract/host'
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 import {expect, it} from 'vitest'
 
@@ -17,6 +18,7 @@ const request = {
   thread: [],
   compactionSettings: {auto: true, threshold: null},
   systemPromptChanged: false,
+  tools: DEFAULT_TREE_TOOLS,
 }
 
 type Streamed = StartReplyEvent

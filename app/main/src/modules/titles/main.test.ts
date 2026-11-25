@@ -7,6 +7,7 @@ import type {ProviderId} from '@uz/contract/providers'
 import {openDatabase} from '#modules/database/main'
 import {createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {TREE_TITLE_MAX_LENGTH} from '@uz/contract/trees'
 import path from 'node:path'
 import {beforeEach, describe, expect, it} from 'vitest'
@@ -69,7 +70,11 @@ beforeEach(() => {
     onReplyFinished: finished => pending.push(titles.replyFinished(finished)),
   })
 
-  treeId = trees.create(new Date('2026-10-19T12:00:00.000Z'), '').id
+  treeId = trees.create(
+    new Date('2026-10-19T12:00:00.000Z'),
+    '',
+    DEFAULT_TREE_TOOLS
+  ).id
 })
 
 function sendPrompt(parentReplyId: string | null, text = 'Hi') {

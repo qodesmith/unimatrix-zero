@@ -1,7 +1,8 @@
 import type {Command} from '@uz/contract/commands'
 
-import {bridge} from '#modules/bridge/main'
 import {useState} from 'react'
+
+import {bridge} from './bridge'
 
 /** Sends one command, keeping main's refusal to show beside its button. */
 export function useCommand() {

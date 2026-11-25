@@ -18,6 +18,7 @@ async function renderSettings(saved: Partial<Settings> = {}) {
       <SettingsPage
         connections={<p>The Provider cards</p>}
         systemPrompts={<p>The library</p>}
+        tools={<p>The Tools defaults</p>}
       />
     </SettingsProvider>
   )
@@ -37,7 +38,13 @@ it('lists every section, with those not built yet unavailable', async () => {
     .elements()
     .map(button => [button.textContent, button.hasAttribute('disabled')])
 
-  const built = new Set(['Appearance', 'Chat', 'System prompts', 'Connections'])
+  const built = new Set([
+    'Appearance',
+    'Chat',
+    'System prompts',
+    'Tools',
+    'Connections',
+  ])
 
   expect(names).toEqual(SECTIONS.map(section => [section, !built.has(section)]))
 })

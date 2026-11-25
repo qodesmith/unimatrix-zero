@@ -41,6 +41,7 @@ import {
   savedReply,
   startedUnder,
   treeSystemPrompt,
+  treeTools,
 } from './rows'
 import {threadTo, withAttachments} from './thread'
 
@@ -257,6 +258,7 @@ export function createTurns({
             session,
             systemPrompt.id
           ),
+          tools: treeTools(db, treeId),
         },
         parentReplyId
       )
@@ -319,6 +321,7 @@ export function createTurns({
             session,
             systemPrompt.id
           ),
+          tools: treeTools(db, treeId),
         },
         recovered.parentReplyId
       )

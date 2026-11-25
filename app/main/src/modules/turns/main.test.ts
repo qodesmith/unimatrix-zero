@@ -10,6 +10,7 @@ import {createAttachments} from '#modules/attachments/main'
 import {openDatabase, schema} from '#modules/database/main'
 import {createSessions} from '#modules/sessions/main'
 import {createTrees} from '#modules/trees/main'
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {eq} from 'drizzle-orm'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -100,7 +101,7 @@ beforeEach(() => {
   listedModels = {claude: [], chatgpt: []}
   attachmentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-turns-'))
   turns = launch()
-  treeId = createTrees(db).create(createdAt, '').id
+  treeId = createTrees(db).create(createdAt, '', DEFAULT_TREE_TOOLS).id
 })
 
 afterEach(() => {
@@ -208,7 +209,7 @@ function sessionsStarted() {
 function inAnotherTree() {
   const sent = turns.sendPrompt({
     model: picked,
-    treeId: createTrees(db).create(createdAt, '').id,
+    treeId: createTrees(db).create(createdAt, '', DEFAULT_TREE_TOOLS).id,
     parentReplyId: null,
     text: 'Elsewhere',
   })
@@ -275,6 +276,7 @@ describe('sending the root Prompt', () => {
           thread: [],
           compactionSettings: {auto: true, threshold: null},
           systemPromptChanged: false,
+          tools: DEFAULT_TREE_TOOLS,
         },
       },
     ])
@@ -293,7 +295,7 @@ describe('sending the root Prompt', () => {
 
     turns.sendPrompt({
       model: opus,
-      treeId: createTrees(db).create(clock, '').id,
+      treeId: createTrees(db).create(clock, '', DEFAULT_TREE_TOOLS).id,
       parentReplyId: null,
       text: 'Hi',
     })
@@ -999,6 +1001,7 @@ describe('a Prompt answering a Reply', () => {
           thread: [{prompt: 'Hi', attachments: [], reply: [], label: null}],
           compactionSettings: {auto: true, threshold: null},
           systemPromptChanged: false,
+          tools: DEFAULT_TREE_TOOLS,
         },
       },
     ])
@@ -1877,7 +1880,7 @@ describe('stopping every Reply in a Tree', () => {
 
     const elsewhere = turns.sendPrompt({
       model: picked,
-      treeId: createTrees(db).create(createdAt, '').id,
+      treeId: createTrees(db).create(createdAt, '', DEFAULT_TREE_TOOLS).id,
       parentReplyId: null,
       text: 'Hi',
     })
@@ -1956,6 +1959,7 @@ describe('retrying a Reply', () => {
           thread: [],
           compactionSettings: {auto: true, threshold: null},
           systemPromptChanged: false,
+          tools: DEFAULT_TREE_TOOLS,
         },
       },
     ])

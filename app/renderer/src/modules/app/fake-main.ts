@@ -16,6 +16,7 @@ import {
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
 import {PRESETS, defaultEntry} from '@uz/contract/system-prompts'
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 
 type AttachmentAdd = Extract<Command, {type: 'attachment.add'}>
 
@@ -40,6 +41,7 @@ export function savedTree(fields: Partial<Tree> = {}): Tree {
     lastActiveAt: receivedAt,
     unseenFailure: false,
     systemPrompt: {id: crypto.randomUUID(), text: ''},
+    tools: DEFAULT_TREE_TOOLS,
     ...fields,
   }
 }
@@ -113,6 +115,20 @@ export function fakeMain(saved: Saved = {}) {
     return tree
   }
 
+  function setTools({
+    treeId,
+    changes,
+  }: Extract<Command, {type: 'tree.set-tools'}>): CommandOutcome<CommandType> {
+    const index = trees.findIndex(tree => tree.id === treeId)
+    const found = trees[index]
+
+    if (!found) return {ok: false, error: {code: 'not-found', message: 'Gone'}}
+
+    const tools = {...found.tools, ...changes}
+
+    return {ok: true, value: change(index, {...found, tools})}
+  }
+
   function systemPrompts() {
     return {entries: library.map(entry => ({...entry}))}
   }
@@ -162,7 +178,13 @@ export function fakeMain(saved: Saved = {}) {
   function answer(
     command: Exclude<
       Command,
-      | {type: 'attachment.add' | 'snapshots.download-again' | 'image.load'}
+      | {
+          type:
+            | 'attachment.add'
+            | 'snapshots.download-again'
+            | 'image.load'
+            | 'tree.set-tools'
+        }
       | {type: `system-prompt.${string}`}
     >
   ): CommandOutcome<CommandType> {
@@ -196,6 +218,7 @@ export function fakeMain(saved: Saved = {}) {
           id: crypto.randomUUID(),
           text: defaultEntry(library, settings.defaultSystemPromptId).text,
         },
+        tools: {...settings.toolDefaults},
       })
 
       trees.push(tree)
@@ -299,6 +322,8 @@ export function fakeMain(saved: Saved = {}) {
       if (command.type === 'snapshots.download-again') {
         return {ok: true, value: {}}
       }
+
+      if (command.type === 'tree.set-tools') return setTools(command)
 
       if (command.type === 'image.load') {
         return {ok: true, value: {dataUrl: 'data:image/png;base64,'}}

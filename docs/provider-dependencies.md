@@ -200,10 +200,21 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Kind:** D
 - **Provider:** Claude
 - **Relies on:** `claude` offers the Model exactly the tools named in the SDK's `tools` list that the machine can run, `disallowedTools: ['Agent']` keeps the Subagent tool (listed as `Task`) out, and `permissionMode: 'bypassPermissions'` with `allowDangerouslySkipPermissions` runs every tool call in `cwd` without asking. The `claude_code` tool preset would add tools that outlive a Reply or leave the folder (cron jobs, worktrees, remote triggers). On Windows with no Git Bash, `claude` offers no `Bash` though it is named.
-- **App side:** `claude-driver` names its tools for files, commands and the web, on Windows `PowerShell` among them (ADR 0026), and runs every Reply in the Tree's folder with full access, until the Permission mode decides (ADR 0022). Its Reply mapper shows each tool call and its result.
+- **App side:** `claude-driver` names its tools for files and commands, on Windows `PowerShell` among them (ADR 0026), adds the web tools when the Tools panel has web search on (`claude-tool-switches`), and runs every Reply in the Tree's folder with full access, until the Permission mode decides (ADR 0022). Its Reply mapper shows each tool call and its result.
 - **User would see:** a Reply that can't open, write or run anything, that stalls on a permission request nothing answers, or that starts Subagents or background jobs the app can't show.
 - **Changed by:** upgrade
 - **Check:** `[dep:claude-tools-full-access]` in `claude-driver`: a Reply writes a file in the Tree's folder and runs a command there, `claude` lists exactly the named tools, so no `Agent` or `Task`, and sends no control request. On a Mac or Linux only: the tools on Windows are covered by `windows-powershell-keeps-path`.
+
+### Claude's tools follow the Tools panel
+
+- **Id:** `claude-tool-switches`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** `claude` offers `WebFetch`, `WebSearch` and `Skill`, through which its built-in Skills reach the Model, only when the SDK's `tools` list names them. `strictMcpConfig: true` keeps out the connectors on the signed-in Claude account, and `false` loads them, with `settingSources: []`. None of it changes in a running session, and a session resumed with other options takes them.
+- **App side:** `claude-driver` builds a Reply's tools and `strictMcpConfig` from the Tree's Tools panel. A warm session started with other switches is closed, and the next Reply resumes the same session.
+- **User would see:** a switch in the Tools panel that changes nothing: web search, the account's connectors or the built-in Skills offered while off, or missing while on.
+- **Changed by:** upgrade
+- **Check:** `[dep:claude-tool-switches]` in `claude-driver`: a session resumed after the switches flip offers no web tools and offers `Skill`, which its first Reply did the other way round, and reports the account's connectors, which the first did not. The connectors half needs an account with a connector, as the maintainer's has.
 
 ### A session resumed in another folder
 
@@ -392,16 +403,27 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Changed by:** upgrade
 - **Check:** `[dep:codex-full-access]` in `codex-driver`: a Reply writes a file in the Tree's folder and runs a command there, and a Reply on a thread a cut loaded read-only writes a file there too.
 
+### Codex's tools follow the Tools panel
+
+- **Id:** `codex-tool-switches`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** in a thread's `config`, `web_search: 'disabled'` takes away Codex's web search, which is on by default; `skills.bundled.enabled` decides whether the Skills that ship with Codex are listed; `features.plugins` and `features.apps` decide whether OpenAI's remote plugins and their connectors load. A resume brings a new `config` only once the thread is unsubscribed, and a resume with none of a key goes back to Codex's default for it. `turn/start` takes no `config`.
+- **App side:** `codex-driver` builds every thread's `config` from the Tree's Tools panel, and unsubscribes and resumes a loaded thread whose `config` differs from the next Reply's, so no new thread starts.
+- **User would see:** a switch in the Tools panel that changes nothing: web search, the built-in Skills or the remote plugins offered while off, or missing while on.
+- **Changed by:** upgrade + drift. OpenAI's servers decide which remote plugins and connectors there are.
+- **Check:** `[dep:codex-tool-switches]` in `codex-driver`: through a stand-in for OpenAI's API, a thread offers the Model web search and the built-in Skills, and after both switches go off, a turn on the same thread adds neither, while the Skills listed before stay in its history; once web search goes back on, the next turn offers it again. Remote plugins have no check: their list comes from chatgpt.com, which the stand-in can't serve. The check looks for Codex's own names for the web tool (`web__run`) and the Skills list (`<skills_instructions>`), which an upgrade may rename.
+
 ### Codex's Subagents turned off
 
 - **Id:** `codex-subagents-off`
 - **Kind:** D
 - **Provider:** ChatGPT
-- **Relies on:** Codex turns its `multi_agent` feature on by default, which lets the Model start Subagents, and `features.multi_agent=false` turns it off.
-- **App side:** `codex-driver`'s environment turns it off, as `claude-driver` leaves out Claude's `Agent` tool, until the app can show Subagents. Under full access a Subagent could write and run anything, with nothing in the Reply to show it.
+- **Relies on:** Codex offers the Model Subagents (`spawn_agent` and its other agent tools) by default, and `agents.enabled=false` takes them away. `features.multi_agent=false` alone does not: Models that Codex's list marks `multi_agent_version: v2` override it (Codex 0.163.0, found in [#80](https://github.com/qodesmith/unimatrix-zero/issues/80)).
+- **App side:** `codex-driver`'s environment sets both, as `claude-driver` leaves out Claude's `Agent` tool, until the app can show Subagents. Under full access a Subagent could write and run anything, with nothing in the Reply to show it.
 - **User would see:** a Reply that hands work to Subagents the Reply never shows.
 - **Changed by:** upgrade
-- **Check:** `[dep:codex-subagents-off]` in `codex-driver`: the app-server, started as the app starts it, lists `multi_agent` as on by default and off.
+- **Check:** `[dep:codex-subagents-off]` in `codex-driver`: through a stand-in for OpenAI's API, a Reply offers the Model no `spawn_agent`, and one from an app-server started without `agents.enabled=false` still offers it, so a renamed tool can't pass.
 
 ### A Tree folder's own Codex config left out
 
@@ -526,11 +548,11 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Id:** `codex-compaction-limit`
 - **Kind:** D/W
 - **Provider:** ChatGPT
-- **Relies on:** Codex takes `model_auto_compact_token_limit`, an integer, in `config` on `thread/start`, `thread/resume` and `thread/fork`, and accepts a misspelled key without an error. It checks the limit as a turn starts, and clamps it to 90% of the Model's raw Context window. On `thread/resume` it ignores `config` for a thread that a client is subscribed to, and takes it after `thread/unsubscribe`. A resume that brings no `config` keeps the old limit, and one with an empty `config` goes back to the default.
-- **App side:** `codex-driver` sends the threshold in `config` on every thread it starts, resumes or forks, and for the default sends no `config` on a start and an empty one on a resume or fork. When the threshold for a loaded thread changes, it unsubscribes and resumes the thread.
+- **Relies on:** Codex takes `model_auto_compact_token_limit`, an integer, in `config` on `thread/start`, `thread/resume` and `thread/fork`, and accepts a misspelled key without an error. It checks the limit as a turn starts, and clamps it to 90% of the Model's raw Context window. On `thread/resume` it ignores `config` for a thread that a client is subscribed to, and takes it after `thread/unsubscribe`. A resume that brings no `config` keeps the old limit, and one whose `config` leaves the key out goes back to the default.
+- **App side:** `codex-driver` sends the threshold in `config` on every thread it starts, resumes or forks, and for the default sends a `config` without `model_auto_compact_token_limit`. When the threshold for a loaded thread changes, it unsubscribes and resumes the thread.
 - **User would see:** a threshold that changes nothing, or that reaches a Thread only once the app-server restarts.
 - **Changed by:** upgrade
-- **Check:** `[dep:codex-compaction-limit]` in `codex-driver`: a thread under the threshold doesn't compact, and compacts on the next Reply once the threshold drops below its size while it's loaded; a thread past the threshold doesn't compact once it's loaded again with an empty `config` for the default. The clamp has no check: a full Context window costs about 450,000 tokens. Whether a subscribed resume still ignores `config`, and a resume with none still keeps the old limit, which would make unsubscribing and the empty `config` unnecessary, has no check: `codex-driver` does neither, so the check would drive the app-server on its own and fill a thread past a limit for each.
+- **Check:** `[dep:codex-compaction-limit]` in `codex-driver`: a thread under the threshold doesn't compact, and compacts on the next Reply once the threshold drops below its size while it's loaded; a thread past the threshold doesn't compact once it's loaded again with a `config` without `model_auto_compact_token_limit` for the default. The clamp has no check: a full Context window costs about 450,000 tokens. Whether a subscribed resume still ignores `config`, which would make unsubscribing unnecessary, has no check: `codex-driver` never resumes a subscribed thread, so the check would drive the app-server on its own and fill a thread past a limit.
 
 ### The largest Codex Context window
 

@@ -1,6 +1,7 @@
 import type {ContentEvent, Ending, ReplyRun, WriteReply} from './main'
 import type {ReplyRequest} from '@uz/contract/host'
 
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {expect, it, vi} from 'vitest'
 
 import {ProgramCrashed, createReplyRuns} from './main'
@@ -21,6 +22,7 @@ const request: ReplyRequest = {
   thread: [],
   compactionSettings: {auto: true, threshold: null},
   systemPromptChanged: false,
+  tools: DEFAULT_TREE_TOOLS,
 }
 
 const delta: ContentEvent = {...ids, type: 'TEXT_DELTA', delta: 'Hi'}

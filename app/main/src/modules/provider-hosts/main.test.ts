@@ -11,6 +11,7 @@ import type {
 import type {Model, ProviderId, SignInUpdate} from '@uz/contract/providers'
 import type {ReplyEvent} from '@uz/contract/turns'
 
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 
 import {
@@ -311,6 +312,7 @@ it('sends commands to the Provider’s host', () => {
       thread: [],
       compactionSettings: {auto: true, threshold: null},
       systemPromptChanged: false,
+      tools: DEFAULT_TREE_TOOLS,
     },
   }
 

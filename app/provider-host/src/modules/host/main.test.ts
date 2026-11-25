@@ -3,6 +3,7 @@ import type {HostMessage, ProviderDriver} from '@uz/contract/host'
 import type {Model} from '@uz/contract/providers'
 
 import {createFakeDriver} from '#modules/fake-driver/main'
+import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 import {expect, it} from 'vitest'
 
 import {runHost} from './main'
@@ -19,6 +20,7 @@ const request = {
   thread: [],
   compactionSettings: {auto: true, threshold: null},
   systemPromptChanged: false,
+  tools: DEFAULT_TREE_TOOLS,
 }
 
 function fakeMain() {

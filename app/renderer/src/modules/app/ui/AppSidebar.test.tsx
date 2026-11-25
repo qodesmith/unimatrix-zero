@@ -268,7 +268,11 @@ describe('a Tree’s panel', () => {
     await expect.element(panel.getByText('Trip', {exact: true})).toBeVisible()
     await expect.element(text).toHaveValue(TRIP_PROMPT)
     await expect
-      .element(panel.getByText('Applies from this Tree’s next Reply.'))
+      .element(
+        panel
+          .getByRole('region', {name: 'System prompt'})
+          .getByText('Applies from this Tree’s next Reply.')
+      )
       .toBeVisible()
     await expect.element(save).toBeDisabled()
 
@@ -345,6 +349,27 @@ describe('a Tree’s panel', () => {
     await expect.element(panel.getByRole('status')).not.toBeInTheDocument()
     await expect.element(save).toBeEnabled()
     await expect.element(toLibrary).toBeEnabled()
+  })
+
+  it('follows its Tools changed elsewhere', async () => {
+    const tree = savedTree({title: 'Trip'})
+    const main = fakeMain({trees: [tree]})
+    await renderApp(main)
+
+    const panel = await openTreePanel('Trip')
+
+    const skills = panel
+      .getByRole('group', {name: 'Built in · Claude'})
+      .getByRole('switch', {name: 'Built-in Skills'})
+
+    await expect.element(skills).not.toBeChecked()
+
+    main.publish({
+      type: 'TREE_CHANGED',
+      tree: {...tree, tools: {...tree.tools, claudeBuiltInSkills: true}},
+    })
+
+    await expect.element(skills).toBeChecked()
   })
 })
 

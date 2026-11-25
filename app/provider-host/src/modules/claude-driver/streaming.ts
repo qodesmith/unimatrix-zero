@@ -15,6 +15,7 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRequest, SessionFile} from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
+import type {TreeTools} from '@uz/contract/tools'
 import type {RunFailure} from '@uz/contract/turns'
 
 import {failureOf} from '#modules/failures/main'
@@ -53,6 +54,7 @@ interface Live extends ClaudeSession {
   model: string
   compactionSettings: CompactionSettings
   systemPrompt: string
+  tools: TreeTools
   restore: Restore
   store: SessionStoreClient
   projectKey: string
@@ -197,6 +199,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       model: request.model,
       compactionSettings: request.compactionSettings,
       systemPrompt: request.systemPrompt,
+      tools: request.tools,
       restore,
       store: appCopy,
       projectKey,
