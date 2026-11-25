@@ -34,7 +34,7 @@ Work one ticket from the **frontier**: the open `ready-for-agent` issues with no
 
    Every later step runs inside the worktree, so the checkout you started in stays untouched. If the branch or folder already exists, stop and say so.
 
-4. **Implement.** Read issue #<n>, body and every comment, with this command:
+4. **Read.** Read issue #<n>, body and every comment, with this command:
 
    ```sh
    gh issue view <n> --json number,title,state,labels,body,comments \
@@ -45,15 +45,17 @@ Work one ticket from the **frontier**: the open `ready-for-agent` issues with no
 
    The body and the comments together are the spec: an agent brief comment is the contract, and a later comment overrides the body where the two disagree. When a comment points at another issue's findings, read that issue with the same command.
 
-   Then read `.agents/skills/implement/SKILL.md` and follow it with that spec, handing legwork to subagents as **Subagents** below describes. Build only what the ticket's acceptance criteria name. Anything the PR adds that nothing in the same PR reads or calls is anticipating a later ticket; it belongs to the ticket that needs it, even when the PRD mentions it. A ticket asks for two things: criteria to meet and (potentially) questions to answer. Those answers, and answers to questions that come up while building, go in one comment on the issue so they outlive the session.
+5. **Providers.** Check the spec from step 4 against the `needs-provider` rules in `docs/agents/triage-labels.md`. When a rule matches and the label is missing, add it (`gh issue edit <n> --add-label needs-provider`) and comment as that doc says. If the issue now carries `needs-provider`, stop and tell the human which Provider the ticket needs (Claude, ChatGPT or both) and why. Each checkout keeps its own dev data, so a Provider connected in another checkout isn't connected in this one: the human runs `bun run dev` in `<root>/<n>-<slug>` and connects the Provider there. Wait until they say it's done.
 
-5. **Open the PR.** Push the branch (`git push -u origin <n>-<slug>`) and open the PR with the `pr` skill's template, first line `Closes #<n>`. Merging it closes the issue and unblocks the tickets behind it.
+6. **Implement.** Read `.agents/skills/implement/SKILL.md` and follow it with the spec from step 4, handing legwork to subagents as **Subagents** below describes. Build only what the ticket's acceptance criteria name. Anything the PR adds that nothing in the same PR reads or calls is anticipating a later ticket; it belongs to the ticket that needs it, even when the PRD mentions it. A ticket asks for two things: criteria to meet and (potentially) questions to answer. Those answers, and answers to questions that come up while building, go in one comment on the issue so they outlive the session. If the build shows a `needs-provider` rule matches after all (a probe needs a live Reply, or the code you change touches a Provider dependency), go back to step 5 before going on.
+
+7. **Open the PR.** Push the branch (`git push -u origin <n>-<slug>`) and open the PR with the `pr` skill's template, first line `Closes #<n>`. Merging it closes the issue and unblocks the tickets behind it.
 
 ## Subagents
 
 Keep the session's context for decisions: the contract, integration, review fixes. Legwork whose result fits in a paragraph goes to a subagent that returns the paragraph. Brief each one with context pointers (issue #<n>, an ADR, a PRD section, file paths) rather than pasted content, plus the worktree path written as the literal `<root>/<n>-<slug>`; the subagent starts every command with `cd <root>/<n>-<slug> &&`. A subagent sent to an issue reads it with step 4's command, so write that command into its brief.
 
-- **Probes.** Each open question is a probe: what a dependency or SDK does, what a PRD section or prototype settles, what the running app shows on a screen. One subagent per question, returning the answer with its evidence. Run independent probes in parallel while you read the code you'll change. Their answers are the material for the issue comment in step 4.
+- **Probes.** Each open question is a probe: what a dependency or SDK does, what a PRD section or prototype settles, what the running app shows on a screen. One subagent per question, returning the answer with its evidence. Run independent probes in parallel while you read the code you'll change. Their answers are the material for the issue comment in step 6.
 - **Slices.** When the ticket spans several packages, write the shared pieces yourself first (contract types, new dependencies, `bun install`) and commit them. Each package is then a slice: one subagent per package, all running in parallel, each calling the Skill tool with `tdd` to build its package's part of the criteria, editing only inside that package, and checking with that package's typecheck and tests. When every slice reports, read the diff, integrate, and run `fmt`, `lint` and the full test suite yourself. A ticket inside one package is one slice: build it yourself.
 
 The session makes every commit.

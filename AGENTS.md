@@ -6,7 +6,7 @@ Issues are tracked in GitHub Issues (`qodesmith/unimatrix-zero`) via the `gh` CL
 
 ### Triage labels
 
-Uses the default labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+Uses the default labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`, plus our own `needs-provider`. Read `docs/agents/triage-labels.md` before you create or triage a ticket: it says when `needs-provider` applies.
 
 ### Domain docs
 
