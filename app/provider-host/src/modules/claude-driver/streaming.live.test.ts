@@ -1242,7 +1242,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 300_000)
 
-  it('[dep:claude-tool-switches] offers the web, the account’s connectors and the built-in Skills only as the Tools panel says, in the session it resumes', async () => {
+  it('[dep:claude-tool-switches] offers the web, the account’s connectors and the built-in Skills only as the Tools panel says, in the session it resumes, and drops the connectors once their switch goes off again', async () => {
     const live = liveDriver([])
 
     const first = await live.reply('Say hi.', null)
@@ -1290,6 +1290,21 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await expect
       .poll(async () => (await live.queries[1]?.mcpServerStatus())?.length)
       .toBeGreaterThan(0)
+
+    await live.closed()
+
+    const third = await Array.fromAsync(
+      live.driver.startReply({
+        ...live.request('Say hi.', continuing(recordedIn(second).session)),
+        tools: {...DEFAULT_TREE_TOOLS, claudeConnectors: false},
+      })
+    )
+
+    expect(third.at(-1)).toMatchObject({status: 'complete'})
+    expect(recordedIn(third).session.sessionId).toBe(
+      first.recorded.session.sessionId
+    )
+    expect(await live.queries[2]?.mcpServerStatus()).toEqual([])
 
     await live.done()
   }, 300_000)
