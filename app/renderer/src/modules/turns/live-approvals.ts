@@ -3,10 +3,7 @@ import type {ApprovalAnswer, ReplyEvent, ReplyPart} from '@uz/contract/turns'
 
 type ReviewFinished = Extract<ReplyEvent, {type: 'REVIEW_FINISHED'}>
 
-export interface ReviewDecision {
-  decision: ReviewFinished['decision']
-  reason: string | null
-}
+export type ReviewDecision = Pick<ReviewFinished, 'decision' | 'reason'>
 
 interface Placed {
   id: string

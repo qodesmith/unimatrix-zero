@@ -3,8 +3,7 @@ import type {AppServer} from './app-server'
 import type {ApprovalRequest, Item, Notification} from './wire'
 import type {ReplyRequest} from '@uz/contract/host'
 
-import fs from 'node:fs'
-import path from 'node:path'
+import {isInTreeFolder} from '#modules/tree-folder/main'
 
 import {
   McpToolCallItemSchema,
@@ -37,24 +36,6 @@ interface TurnAskingOptions {
   push: (received: Received) => void
 }
 
-function folderNames(folder: string) {
-  try {
-    return [folder, fs.realpathSync(folder)]
-  } catch {
-    return [folder]
-  }
-}
-
-function isInside(folder: string, file: string) {
-  const relative = path.relative(folder, file)
-
-  return (
-    relative !== '' &&
-    relative.split(path.sep)[0] !== '..' &&
-    !path.isAbsolute(relative)
-  )
-}
-
 /** A command Codex parsed into reads alone runs without a card. */
 function onlyReads({commandActions}: CommandRequest) {
   return (
@@ -85,7 +66,6 @@ export function createTurnAsking({
   threadId,
   push,
 }: TurnAskingOptions) {
-  const folders = folderNames(request.treeFolder)
   const toolCalls = new Set<string>()
   const changedPaths = new Map<string, string[]>()
   const mcpCalls = new Map<string, {server: string; tool: string}>()
@@ -122,7 +102,7 @@ export function createTurnAsking({
         kind: 'edit',
         paths: [first, ...rest],
         inTreeFiles: paths.every(file =>
-          folders.some(folder => isInside(folder, file))
+          isInTreeFolder(request.treeFolder, file)
         ),
       },
       ...linked(itemId),
@@ -242,7 +222,7 @@ export function createTurnAsking({
       }
     },
 
-    /** A card still waiting once the turn ends goes. */
+    /** A card still waiting once the turn ends is dropped. */
     close() {
       untake()
 

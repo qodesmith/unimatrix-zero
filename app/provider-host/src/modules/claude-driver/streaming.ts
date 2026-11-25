@@ -5,7 +5,7 @@ import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {Silent, WhenSilent} from './heard'
 import type {Outcome} from './outcome'
-import type {Asking} from './permissions'
+import type {SessionApprovals} from './permissions'
 import type {Restore} from './resumption'
 import type {ClaudeSession, QueryFn} from './session'
 import type {ClaudeSignInDeps} from './sign-in'
@@ -61,7 +61,7 @@ interface Live extends ClaudeSession {
   systemPrompt: string
   tools: TreeTools
   permissionMode: PermissionMode
-  asking: Asking
+  asking: SessionApprovals
   restore: Restore
   store: SessionStoreClient
   projectKey: string
@@ -161,7 +161,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     const {resume, fork, upTo} = resumption(request.session, restore)
     let activeConfigDir = configDir
     const appCopy = storeFor(request)
-    const asking: Asking = {current: null}
+    const asking: SessionApprovals = {current: null}
 
     const sessionStore = appSessionStore(
       appCopy,

@@ -1,4 +1,4 @@
-import type {Asking} from './permissions'
+import type {SessionApprovals} from './permissions'
 import type {Options} from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRequest} from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
@@ -44,7 +44,7 @@ export function replyOptions(
   programPath: string,
   env: NodeJS.ProcessEnv,
   platform: NodeJS.Platform,
-  asking: Asking
+  asking: SessionApprovals
 ): Options {
   return {
     pathToClaudeCodeExecutable: programPath,

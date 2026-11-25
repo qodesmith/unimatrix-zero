@@ -4,7 +4,7 @@ export interface DevRun {
   vitePort: number
   scriptNonce: string
   fakeProvider: boolean
-  /** Until #94 adds the Setting. */
+  /** Every Reply runs Supervised; a dev-only stand-in for the Setting. */
   supervised: boolean
 }
 

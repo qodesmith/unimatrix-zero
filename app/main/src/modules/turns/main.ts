@@ -82,7 +82,7 @@ export interface TurnsDeps {
 
 export type NewPrompt = Omit<Extract<Command, {type: 'prompt.send'}>, 'type'>
 
-export type ApprovalAnswered = Omit<
+export type CardAnswer = Omit<
   Extract<Command, {type: 'reply.answer-approval'}>,
   'type'
 >
@@ -355,12 +355,7 @@ export function createTurns({
      * False once the card no longer waits. Throws when its host can't be
      * reached, after keeping an Always allow.
      */
-    answerApproval({
-      treeId,
-      replyId,
-      approvalId,
-      answer,
-    }: ApprovalAnswered): boolean {
+    answerApproval({treeId, replyId, approvalId, answer}: CardAnswer): boolean {
       const waiting = inFlight.waitingApproval(treeId, replyId, approvalId)
 
       if (!waiting) return false

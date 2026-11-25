@@ -3,12 +3,12 @@ import type {CanUseTool, Options} from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ApprovalAction} from '@uz/contract/permissions'
 
-import fs from 'node:fs'
+import {isInTreeFolder} from '#modules/tree-folder/main'
 import path from 'node:path'
 import {z} from 'zod'
 
 /** The Reply being written on a `claude`, whose callback is fixed at start. */
-export interface Asking {
+export interface SessionApprovals {
   current: ReplyApprovals | null
 }
 
@@ -29,34 +29,13 @@ type ToolInput = z.infer<typeof ToolInputSchema>
 
 const MCP_TOOL = /^mcp__(.+?)__(.+)$/
 
-/** Through the nearest folder that exists, so `/var` and `/private/var` agree. */
-function realPath(target: string): string {
-  try {
-    return fs.realpathSync(target)
-  } catch {
-    const parent = path.dirname(target)
-
-    return parent === target
-      ? target
-      : path.join(realPath(parent), path.basename(target))
-  }
-}
-
-function isInside(target: string, folder: string) {
-  const relative = path.relative(realPath(folder), realPath(target))
-
-  return (
-    relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)
-  )
-}
-
 function editOf(filePath: string, treeFolder: string): ApprovalAction {
   const absolute = path.resolve(treeFolder, filePath)
 
   return {
     kind: 'edit',
     paths: [absolute],
-    inTreeFiles: isInside(absolute, treeFolder),
+    inTreeFiles: isInTreeFolder(treeFolder, absolute),
   }
 }
 
@@ -103,7 +82,7 @@ export function actionOf(
  * `claude`'s own suggestions are never passed back: one for a Write turns the
  * whole session to accepting edits.
  */
-function askOn(asking: Asking, treeFolder: string): CanUseTool {
+function askOn(asking: SessionApprovals, treeFolder: string): CanUseTool {
   return async (toolName, input, {signal, toolUseID, agentID}) => {
     const approvals = asking.current
 
@@ -125,7 +104,7 @@ function askOn(asking: Asking, treeFolder: string): CanUseTool {
 /** Full access asks nothing; Supervised asks the user through `asking`. */
 export function permissionOptions(
   {permissionMode, treeFolder}: ReplyRequest,
-  asking: Asking
+  asking: SessionApprovals
 ): Options {
   if (permissionMode === 'full-access') {
     return {

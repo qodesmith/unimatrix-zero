@@ -1,3 +1,4 @@
+import type {ReplyRequest} from '@uz/contract/host'
 import type {ApprovalAction, ApprovalGrant} from '@uz/contract/permissions'
 import type {ApprovalAnswer, ReplyEvent} from '@uz/contract/turns'
 
@@ -22,11 +23,7 @@ export interface ReplyApprovals {
   ask(asking: Asking): Promise<boolean>
 }
 
-interface ReplyOf {
-  treeId: string
-  replyId: string
-  grants: ApprovalGrant[]
-}
+type ReplyOf = Pick<ReplyRequest, 'treeId' | 'replyId' | 'grants'>
 
 /**
  * The cards waiting in one Provider host. An always-allow holds at once for

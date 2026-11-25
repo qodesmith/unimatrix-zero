@@ -106,8 +106,8 @@ export function createWarmSessions<Session extends WarmSession>({
     /**
      * Closes it at any other point, on another Model, with other Compaction
      * Settings, under another System prompt, with other tools or under another
-     * Permission mode, so `claude`
-     * never runs a session twice. Another name for its Model keeps it.
+     * Permission mode, so `claude` never runs a session twice. Another name for
+     * its Model keeps it.
      */
     claim(
       ref: SessionRef,
