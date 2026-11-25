@@ -29,15 +29,17 @@ The libraries (System prompts, MCP servers, Skills, Plugins) are content, as The
 
 **Reach on the page.** Every group of controls holds one reach only. A group of look-and-behavior Settings has no note, since applying at once and never reaching the AI is what a user expects. Every other group has one note under its legend:
 
-| Group                                                                              | Note                                                                                                    |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| The Permission mode                                                                | "Every Tree that doesn't use its own mode, from the next Reply."                                        |
-| The Tools defaults                                                                 | "For new Trees. Each Tree changes its own in its Tree panel."                                           |
-| The default System prompt                                                          | "New Trees start with a copy. Each Tree changes its own in its Tree panel."                             |
-| The System prompt library                                                          | "Each Tree keeps its own copy. Editing here changes no existing Tree."                                  |
-| The MCP server, Skill and Plugin libraries, and the vendors' default Skill folders | "Editing an entry reaches every Tree that uses it. 'On in new Trees' affects only Trees created later." |
-| Each Provider's Compaction Settings                                                | "Every Thread, from its next Reply."                                                                    |
-| The Summary prompts                                                                | "Every Summary made from now on."                                                                       |
+| Group                                                                              | Note                                                                                                                             |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| The Permission mode                                                                | "Every Tree that doesn't use its own mode, from the next Reply."                                                                 |
+| The Tools defaults                                                                 | "A Tree you already made keeps its own switches. Change them in its Tree panel, from the ⋯ menu beside its name in the sidebar." |
+| The default System prompt                                                          | "New Trees start with a copy. Each Tree changes its own in its Tree panel."                                                      |
+| The System prompt library                                                          | "Each Tree keeps its own copy. Editing here changes no existing Tree."                                                           |
+| The MCP server, Skill and Plugin libraries, and the vendors' default Skill folders | "Editing an entry reaches every Tree that uses it. 'On in new Trees' affects only Trees created later."                          |
+| Each Provider's Compaction Settings                                                | "Every Thread, from its next Reply."                                                                                             |
+| The Summary prompts                                                                | "Every Summary made from now on."                                                                                                |
+
+The Tools defaults also say so when flipped: a line under the group reads "Saved for new Trees. Trees you already made kept their own." Their legend is "Defaults for new Trees", since a user who flips one there expects the open Tree to change ([#294](https://github.com/qodesmith/unimatrix-zero/issues/294)).
 
 **The narrowing prompt.** Narrowing the global Permission mode can leave Trees with a wider mode of their own; [§8](./08-system-prompts-the-tools-panel-approvals-and-permission-modes.md) says when the prompt appears and what it does.
 
