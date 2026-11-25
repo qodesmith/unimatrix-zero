@@ -1,3 +1,4 @@
+import type {ApprovalItem} from '../live-approvals'
 import type {ThinkingBlock, Wait} from '../live-replies'
 import type {Reply, ReplyPart, ReplyStatus} from '@uz/contract/turns'
 
@@ -24,25 +25,74 @@ import {cn} from 'cn'
 import {ChevronRightIcon} from 'lucide-react'
 import {Fragment} from 'react'
 
-import {useReply, useThinking, useWaiting} from '../use-live-reply'
+import {
+  useApprovals,
+  useReply,
+  useThinking,
+  useWaiting,
+} from '../use-live-reply'
 import {useOnline} from '../use-online'
+import {ApprovalView} from './ApprovalView'
 import {ChangedFiles} from './ChangedFiles'
 
 type ToolCall = Extract<ReplyPart, {type: 'tool-call'}>
 
+type Aside =
+  | {kind: 'thinking'; at: number; key: string; block: ThinkingBlock}
+  | {kind: 'approval'; at: number; key: string; item: ApprovalItem}
+
+/** What sits before part `part` of the content, in the order it arrived. */
+function asidesBefore(
+  part: number,
+  blocks: ThinkingBlock[],
+  approvals: ApprovalItem[]
+): Aside[] {
+  return [
+    ...blocks.flatMap((block, index): Aside[] =>
+      block.beforePart === part
+        ? [
+            {
+              kind: 'thinking',
+              at: block.startedAt,
+              key: `thinking-${index}`,
+              block,
+            },
+          ]
+        : []
+    ),
+    ...approvals.flatMap((item): Aside[] =>
+      item.afterParts === part
+        ? [
+            {
+              kind: 'approval',
+              at: item.arrivedAt,
+              key: `${item.kind}-${item.id}`,
+              item,
+            },
+          ]
+        : []
+    ),
+  ].toSorted((a, b) => a.at - b.at)
+}
+
 export function ReplyView({reply}: {reply: Reply}) {
   const blocks = useThinking(reply.id)
+  const approvals = useApprovals(reply.id)
   const {status, content, compacted, rebuilt} = useReply(reply)
   const streaming = status === 'streaming'
 
-  function thinkingBefore(part: number) {
-    return blocks.flatMap((block, index) =>
-      block.beforePart === part
-        ? [
-            // oxlint-disable-next-line react/no-array-index-key -- blocks only ever append, so positions are stable
-            <ThinkingBlockView key={index} block={block} />,
-          ]
-        : []
+  function asidesAt(part: number) {
+    return asidesBefore(part, blocks, approvals).map(aside =>
+      aside.kind === 'thinking' ? (
+        <ThinkingBlockView key={aside.key} block={aside.block} />
+      ) : (
+        <ApprovalView
+          key={aside.key}
+          treeId={reply.treeId}
+          replyId={reply.id}
+          item={aside.item}
+        />
+      )
     )
   }
 
@@ -62,7 +112,7 @@ export function ReplyView({reply}: {reply: Reply}) {
       {content.map((part, index) => (
         // oxlint-disable-next-line react/no-array-index-key -- parts only ever append, so positions are stable
         <Fragment key={index}>
-          {thinkingBefore(index)}
+          {asidesAt(index)}
           {part.type === 'text' ? (
             <ReplyMarkdown
               text={part.text}
@@ -73,7 +123,7 @@ export function ReplyView({reply}: {reply: Reply}) {
           )}
         </Fragment>
       ))}
-      {thinkingBefore(content.length)}
+      {asidesAt(content.length)}
       {!streaming && <ChangedFiles files={reply.files} />}
       {streaming && <StreamingLine replyId={reply.id} />}
       <StatusLine status={status} />

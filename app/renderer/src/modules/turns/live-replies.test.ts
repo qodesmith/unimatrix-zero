@@ -1,5 +1,6 @@
 import type {Turns} from './saved-turns'
 import type {AppEvent} from '@uz/contract/events'
+import type {ApprovalAction} from '@uz/contract/permissions'
 import type {Reply} from '@uz/contract/turns'
 
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
@@ -278,4 +279,154 @@ it('keeps a Reply waiting across a snapshot only while the snapshot still stream
   ])
 
   expect(live.store.state.waiting).toEqual({[ids.replyId]: 'reconnecting'})
+})
+
+const edit: ApprovalAction = {
+  kind: 'edit',
+  paths: ['/trees/one/plan.md'],
+  inTreeFiles: true,
+}
+
+function approvalsAfter(events: AppEvent[]) {
+  const live = createReplay()
+
+  live.replay(events)
+
+  return live.store.state.approvals[ids.replyId] ?? []
+}
+
+it('puts a card right after the tool call it names, else where the Reply had got to, a Subagent’s included', () => {
+  const approvals = approvalsAfter([
+    {...ids, type: 'RUN_STARTED'},
+    {...ids, type: 'TEXT_DELTA', delta: 'Writing the plan.'},
+    {...ids, type: 'TOOL_CALL_START', toolCallId: 'tool-1', toolName: 'Write'},
+    {...ids, type: 'TEXT_DELTA', delta: 'And then.'},
+    {
+      ...ids,
+      type: 'APPROVAL_REQUESTED',
+      approvalId: 'approval-1',
+      toolCallId: 'tool-1',
+      action: edit,
+    },
+    {
+      ...ids,
+      subagentId: 'subagent-1',
+      type: 'APPROVAL_REQUESTED',
+      approvalId: 'approval-2',
+      toolCallId: 'subagent-tool',
+      action: {kind: 'command', command: 'ls'},
+    },
+    {
+      ...ids,
+      type: 'REVIEW_STARTED',
+      reviewId: 'review-1',
+      action: {kind: 'host', host: 'example.com'},
+    },
+  ])
+
+  expect(
+    approvals.map(({id, afterParts, subagentId}) => ({
+      id,
+      afterParts,
+      subagentId,
+    }))
+  ).toEqual([
+    {id: 'approval-1', afterParts: 2, subagentId: null},
+    {id: 'approval-2', afterParts: 3, subagentId: 'subagent-1'},
+    {id: 'review-1', afterParts: 3, subagentId: null},
+  ])
+})
+
+it('records the answer to a card and the Reviewer’s decision', () => {
+  const approvals = approvalsAfter([
+    {...ids, type: 'RUN_STARTED'},
+    {
+      ...ids,
+      type: 'APPROVAL_REQUESTED',
+      approvalId: 'approval-1',
+      action: edit,
+    },
+    {...ids, type: 'REVIEW_STARTED', reviewId: 'review-1', action: edit},
+    {
+      ...ids,
+      type: 'APPROVAL_RESOLVED',
+      approvalId: 'approval-1',
+      answer: 'deny',
+    },
+    {
+      ...ids,
+      type: 'REVIEW_FINISHED',
+      reviewId: 'review-1',
+      decision: 'approved',
+      reason: 'Inside the Tree.',
+    },
+  ])
+
+  expect(approvals).toMatchObject([
+    {kind: 'card', answer: 'deny'},
+    {
+      kind: 'review',
+      decision: {decision: 'approved', reason: 'Inside the Tree.'},
+    },
+  ])
+})
+
+it('keeps answered cards and decided reviews once the Reply finishes, dropping those still open', () => {
+  const approvals = approvalsAfter([
+    {...ids, type: 'RUN_STARTED'},
+    {...ids, type: 'APPROVAL_REQUESTED', approvalId: 'answered', action: edit},
+    {
+      ...ids,
+      type: 'APPROVAL_RESOLVED',
+      approvalId: 'answered',
+      answer: 'allow-once',
+    },
+    {...ids, type: 'REVIEW_STARTED', reviewId: 'decided', action: edit},
+    {
+      ...ids,
+      type: 'REVIEW_FINISHED',
+      reviewId: 'decided',
+      decision: 'unanswered',
+      reason: null,
+    },
+    {...ids, type: 'APPROVAL_REQUESTED', approvalId: 'waiting', action: edit},
+    {...ids, type: 'REVIEW_STARTED', reviewId: 'reviewing', action: edit},
+    {...ids, type: 'RUN_FINISHED', status: 'stopped'},
+  ])
+
+  expect(approvals.map(({id}) => id)).toEqual(['answered', 'decided'])
+})
+
+it('starts the cards, reviews and Subagents over on a Retry, but not on a Subagent’s start', () => {
+  const live = createReplay()
+
+  live.replay([
+    {...ids, type: 'RUN_STARTED'},
+    {
+      ...ids,
+      type: 'SUBAGENT_STARTED',
+      subagentId: 'subagent-1',
+      description: 'Find the bug',
+    },
+    {
+      ...ids,
+      type: 'APPROVAL_REQUESTED',
+      approvalId: 'approval-1',
+      action: edit,
+    },
+    {...ids, type: 'RUN_STARTED', subagentId: 'subagent-1'},
+  ])
+
+  expect(live.store.state.approvals[ids.replyId]).toHaveLength(1)
+  expect(live.store.state.subagents[ids.replyId]).toEqual({
+    'subagent-1': 'Find the bug',
+  })
+
+  live.replay([
+    {...ids, type: 'RUN_FINISHED', status: 'failed'},
+    {...ids, type: 'RUN_STARTED'},
+  ])
+
+  expect(live.store.state.approvals[ids.replyId]).toBeUndefined()
+  expect(live.store.state.subagents[ids.replyId]).toBeUndefined()
 })

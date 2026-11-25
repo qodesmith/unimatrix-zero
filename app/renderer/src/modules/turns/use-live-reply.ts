@@ -53,3 +53,33 @@ export function useThinking(replyId: string) {
 export function useWaiting(replyId: string) {
   return useSelector(useReplyStore(), state => state.waiting[replyId])
 }
+
+const NO_APPROVALS: never[] = []
+
+/** The Reply's approval cards and reviews, while this window has been open. */
+export function useApprovals(replyId: string) {
+  return useSelector(
+    useReplyStore(),
+    state => state.approvals[replyId] ?? NO_APPROVALS
+  )
+}
+
+/** Its description, or null when the Subagent never said what it does. */
+export function useSubagentDescription(
+  replyId: string,
+  subagentId: string | null
+) {
+  return useSelector(useReplyStore(), state =>
+    subagentId === null
+      ? null
+      : (state.subagents[replyId]?.[subagentId] ?? null)
+  )
+}
+
+export function useAwaitingAnswer(replyId: string) {
+  return useSelector(useReplyStore(), state =>
+    (state.approvals[replyId] ?? []).some(
+      item => item.kind === 'card' && item.answer === null
+    )
+  )
+}
