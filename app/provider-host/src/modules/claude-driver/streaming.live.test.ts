@@ -1296,7 +1296,12 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     const third = await Array.fromAsync(
       live.driver.startReply({
         ...live.request('Say hi.', continuing(recordedIn(second).session)),
-        tools: {...DEFAULT_TREE_TOOLS, claudeConnectors: false},
+        tools: {
+          ...DEFAULT_TREE_TOOLS,
+          webSearch: false,
+          claudeConnectors: false,
+          claudeBuiltInSkills: true,
+        },
       })
     )
 
