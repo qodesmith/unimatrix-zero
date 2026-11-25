@@ -4,6 +4,7 @@ import type {ClaudeRepliesDeps} from './streaming'
 import type {SpawnOptions} from '@anthropic-ai/claude-agent-sdk'
 import type {ProviderDriver, SignInRequest} from '@uz/contract/host'
 
+import {createApprovals} from '#modules/approvals/main'
 import {idleFor} from '#modules/idle/main'
 import {
   macHasDeveloperTools,
@@ -63,7 +64,7 @@ type ClaudeDriverOptions = Pick<ClaudeRepliesDeps, 'store'> &
   Partial<
     Omit<
       ClaudeRepliesDeps,
-      'store' | 'learnModels' | 'resolveModel' | 'hostEnv'
+      'store' | 'learnModels' | 'resolveModel' | 'hostEnv' | 'approvals'
     >
   > & {
     env?: NodeJS.ProcessEnv
@@ -87,6 +88,7 @@ export function createClaudeDriver({
   }
 
   const models = createModelList(readModelsWith(hostEnv))
+  const approvals = createApprovals()
 
   const replies = createClaudeReplies({
     store,
@@ -99,6 +101,7 @@ export function createClaudeDriver({
     platform,
     learnModels: models.learn,
     resolveModel: models.resolve,
+    approvals,
   })
 
   return {
@@ -126,7 +129,9 @@ export function createClaudeDriver({
     readUsage: notYet,
     startReply: replies.startReply,
     stop: replies.stop,
-    answerApproval: notYet,
+    answerApproval: async (approvalId, answer) => {
+      approvals.answer(approvalId, answer)
+    },
     forkSession: notYet,
     cutSession: replies.cutSession,
     runOneShot: async (request, signal) =>

@@ -1,3 +1,4 @@
+import type {Asking} from './permissions'
 import type {Options} from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRequest} from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
@@ -6,6 +7,7 @@ import type {TreeTools} from '@uz/contract/tools'
 import {explainingLabels} from '#modules/thread-replay/main'
 
 import {claudeReplyEnvironment} from './environment'
+import {permissionOptions} from './permissions'
 
 /**
  * Named one by one: Claude Code's preset adds tools that outlive the Reply or
@@ -41,7 +43,8 @@ export function replyOptions(
   request: ReplyRequest,
   programPath: string,
   env: NodeJS.ProcessEnv,
-  platform: NodeJS.Platform
+  platform: NodeJS.Platform,
+  asking: Asking
 ): Options {
   return {
     pathToClaudeCodeExecutable: programPath,
@@ -55,9 +58,7 @@ export function replyOptions(
     tools: toolsOn(platform, request.tools),
     // The app can't show Subagents yet.
     disallowedTools: ['Agent'],
-    // Full access, until the Permission mode decides (ADR 0022).
-    permissionMode: 'bypassPermissions',
-    allowDangerouslySkipPermissions: true,
+    ...permissionOptions(request, asking),
     // On, `claude` loads no MCP servers but these, so the account's connectors stay out.
     strictMcpConfig: !request.tools.claudeConnectors,
     mcpServers: {},

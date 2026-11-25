@@ -108,6 +108,7 @@ export function createRecorder(
         kind: 'start',
         configDir: options.env.CLAUDE_CONFIG_DIR ?? '',
         projectKey: projectKeyOf(options.cwd ?? '.'),
+        cwd: options.cwd ?? '',
       },
     ]
 
