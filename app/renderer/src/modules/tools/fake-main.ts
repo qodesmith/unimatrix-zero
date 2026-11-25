@@ -26,6 +26,7 @@ export function savedTree(fields: Partial<Tree> = {}): Tree {
 interface Saved {
   settings?: Partial<Settings>
   trees?: Tree[]
+  refusesSettings?: boolean
 }
 
 export function fakeMain(saved: Saved = {}) {
@@ -35,6 +36,10 @@ export function fakeMain(saved: Saved = {}) {
 
   function answer(command: Command): CommandOutcome<CommandType> {
     if (command.type === 'settings.update') {
+      if (saved.refusesSettings) {
+        return {ok: false, error: {code: 'handler-failed', message: 'Refused'}}
+      }
+
       Object.assign(settings, command.changes)
 
       return {ok: true, value: {...settings}}

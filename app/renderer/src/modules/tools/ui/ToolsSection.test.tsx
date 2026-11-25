@@ -57,3 +57,20 @@ it('holds the Tools defaults under a legend for new Trees, with a note that send
     },
   ])
 })
+
+it('springs a Tools default back and leaves the status line empty when main refuses the flip', async () => {
+  globalThis.window.uz = fakeMain({refusesSettings: true})
+
+  const {locator} = await render(
+    <SettingsProvider>
+      <ToolsSection />
+    </SettingsProvider>
+  )
+
+  await toolSwitches(locator).chatgptRemotePlugins.click()
+
+  await expect
+    .element(toolSwitches(locator).chatgptRemotePlugins)
+    .not.toBeChecked()
+  await expect.element(page.getByRole('status')).toHaveTextContent('')
+})

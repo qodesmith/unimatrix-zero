@@ -39,7 +39,7 @@ The libraries (System prompts, MCP servers, Skills, Plugins) are content, as The
 | Each Provider's Compaction Settings                                                | "Every Thread, from its next Reply."                                                                                             |
 | The Summary prompts                                                                | "Every Summary made from now on."                                                                                                |
 
-The Tools defaults also say so when flipped: a line under the group reads "Saved for new Trees. Trees you already made kept their own." Their legend is "Defaults for new Trees", since a user who flips one there expects the open Tree to change ([#294](https://github.com/qodesmith/unimatrix-zero/issues/294)).
+A saved flip in the Tools defaults shows a line under the group: "Saved for new Trees. Trees you already made kept their own." Their legend reads "Defaults for new Trees", since a user who flips one there may expect the open Tree to change ([#294](https://github.com/qodesmith/unimatrix-zero/issues/294)).
 
 **The narrowing prompt.** Narrowing the global Permission mode can leave Trees with a wider mode of their own; [§8](./08-system-prompts-the-tools-panel-approvals-and-permission-modes.md) says when the prompt appears and what it does.
 

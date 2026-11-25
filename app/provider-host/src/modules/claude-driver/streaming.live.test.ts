@@ -1285,11 +1285,12 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     expect(after?.tools).not.toContain('WebFetch')
     expect(after?.tools).not.toContain('WebSearch')
     expect(after?.tools).toContain('Skill')
-    // `claude` fetches them after it starts. Only an account with a
-    // connector has any: the maintainer's has some.
-    await expect
-      .poll(async () => (await live.queries[1]?.mcpServerStatus())?.length)
-      .toBeGreaterThan(0)
+    // `claude` lists the connectors by the end of a Reply, so the reads after
+    // Replies 1 and 3 are fair. Only an account with a connector has any: the
+    // maintainer's has some.
+    expect((await live.queries[1]?.mcpServerStatus())?.length).toBeGreaterThan(
+      0
+    )
 
     await live.closed()
 

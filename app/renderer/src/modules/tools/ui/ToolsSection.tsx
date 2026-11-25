@@ -1,3 +1,5 @@
+import type {TreeTools} from '@uz/contract/tools'
+
 import {Group, useSettings, useUpdateSettings} from '#modules/settings/main'
 import {FieldDescription} from '#shadcn/ui/field'
 import {useState} from 'react'
@@ -7,7 +9,12 @@ import {ToolSwitches} from './ToolSwitches'
 export function ToolsSection() {
   const {toolDefaults} = useSettings()
   const update = useUpdateSettings()
-  const [flipped, setFlipped] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  async function save(changes: Partial<TreeTools>) {
+    setSaved(false)
+    setSaved(await update({toolDefaults: {...toolDefaults, ...changes}}))
+  }
 
   return (
     <Group
@@ -16,15 +23,11 @@ export function ToolsSection() {
     >
       <ToolSwitches
         tools={toolDefaults}
-        onChange={changes => {
-          setFlipped(true)
-          void update({toolDefaults: {...toolDefaults, ...changes}})
-        }}
+        onChange={changes => void save(changes)}
       />
       {/* Always rendered, so a screen reader announces the text when it appears. */}
       <FieldDescription role="status">
-        {flipped &&
-          'Saved for new Trees. Trees you already made kept their own.'}
+        {saved && 'Saved for new Trees. Trees you already made kept their own.'}
       </FieldDescription>
     </Group>
   )
