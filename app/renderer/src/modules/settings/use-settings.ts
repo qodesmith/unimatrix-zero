@@ -19,7 +19,7 @@ export function useSettings(): Settings {
   return useSelector(useSettingsStore(), state => state)
 }
 
-/** Shows the change at once; main's answer or refusal settles it. */
+/** Shows the change at once; resolves to whether main saved it. */
 export function useUpdateSettings() {
   const store = useSettingsStore()
 
@@ -30,5 +30,7 @@ export function useUpdateSettings() {
     const outcome = await bridge().send({type: 'settings.update', changes})
 
     store.setState(() => (outcome.ok ? outcome.value : before))
+
+    return outcome.ok
   }
 }

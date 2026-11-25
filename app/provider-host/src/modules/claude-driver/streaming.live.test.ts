@@ -1242,31 +1242,40 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 300_000)
 
-  it('[dep:claude-tool-switches] offers the web, the account’s connectors and the built-in Skills only as the Tools panel says, in the session it resumes', async () => {
+  it('[dep:claude-tool-switches] offers the web, the account’s connectors and the built-in Skills only as the Tools panel says, in the session it resumes, and drops the connectors once their switch goes off again', async () => {
     const live = liveDriver([])
 
     const first = await live.reply('Say hi.', null)
+
+    async function resumeWith(
+      session: SessionRef,
+      tools: ReplyRequest['tools']
+    ) {
+      const events = await Array.fromAsync(
+        live.driver.startReply({
+          ...live.request('Say hi.', continuing(session)),
+          tools,
+        })
+      )
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+      expect(recordedIn(events).session.sessionId).toBe(
+        first.recorded.session.sessionId
+      )
+
+      return events
+    }
 
     expect(await live.queries[0]?.mcpServerStatus()).toEqual([])
 
     await live.closed()
 
-    const second = await Array.fromAsync(
-      live.driver.startReply({
-        ...live.request('Say hi.', continuing(first.recorded.session)),
-        tools: {
-          ...DEFAULT_TREE_TOOLS,
-          webSearch: false,
-          claudeConnectors: true,
-          claudeBuiltInSkills: true,
-        },
-      })
-    )
-
-    expect(second.at(-1)).toMatchObject({status: 'complete'})
-    expect(recordedIn(second).session.sessionId).toBe(
-      first.recorded.session.sessionId
-    )
+    const second = await resumeWith(first.recorded.session, {
+      ...DEFAULT_TREE_TOOLS,
+      webSearch: false,
+      claudeConnectors: true,
+      claudeBuiltInSkills: true,
+    })
 
     const inits = live.printed.flatMap(line => {
       const parsed = InitLine.safeParse(JSON.parse(line))
@@ -1285,11 +1294,23 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     expect(after?.tools).not.toContain('WebFetch')
     expect(after?.tools).not.toContain('WebSearch')
     expect(after?.tools).toContain('Skill')
-    // `claude` fetches them after it starts. Only an account with a
-    // connector has any: the maintainer's has some.
-    await expect
-      .poll(async () => (await live.queries[1]?.mcpServerStatus())?.length)
-      .toBeGreaterThan(0)
+    // `claude` lists the connectors by the end of a Reply, so the reads after
+    // Replies 1 and 3 are fair. Only an account with a connector has any: the
+    // maintainer's has some.
+    expect((await live.queries[1]?.mcpServerStatus())?.length).toBeGreaterThan(
+      0
+    )
+
+    await live.closed()
+
+    await resumeWith(recordedIn(second).session, {
+      ...DEFAULT_TREE_TOOLS,
+      webSearch: false,
+      claudeConnectors: false,
+      claudeBuiltInSkills: true,
+    })
+
+    expect(await live.queries[2]?.mcpServerStatus()).toEqual([])
 
     await live.done()
   }, 300_000)

@@ -214,7 +214,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **App side:** `claude-driver` builds a Reply's tools and `strictMcpConfig` from the Tree's Tools panel. A warm session started with other switches is closed, and the next Reply resumes the same session.
 - **User would see:** a switch in the Tools panel that changes nothing: web search, the account's connectors or the built-in Skills offered while off, or missing while on.
 - **Changed by:** upgrade
-- **Check:** `[dep:claude-tool-switches]` in `claude-driver`: a session resumed after the switches flip offers no web tools and offers `Skill`, which its first Reply did the other way round, and reports the account's connectors, which the first did not. The connectors half needs an account with a connector, as the maintainer's has.
+- **Check:** `[dep:claude-tool-switches]` in `claude-driver`: a session resumed after the switches flip offers no web tools and offers `Skill`, which its first Reply did the other way round, and reports the account's connectors, which the first did not. A third Reply on the same session, with the connectors switched off again, reports none. The connectors half needs an account with a connector, as the maintainer's has.
 
 ### A session resumed in another folder
 
@@ -408,11 +408,11 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Id:** `codex-tool-switches`
 - **Kind:** D
 - **Provider:** ChatGPT
-- **Relies on:** in a thread's `config`, `web_search: 'disabled'` takes away Codex's web search, which is on by default; `skills.bundled.enabled` decides whether the Skills that ship with Codex are listed; `features.plugins` and `features.apps` decide whether OpenAI's remote plugins and their connectors load. A resume brings a new `config` only once the thread is unsubscribed, and a resume with none of a key goes back to Codex's default for it. `turn/start` takes no `config`.
+- **Relies on:** in a thread's `config`, `web_search: 'disabled'` takes away Codex's web search, which is on by default; `skills.bundled.enabled` decides whether the Skills that ship with Codex are listed; `features.plugins` and `features.apps` decide whether OpenAI's remote plugins and their connectors load, and a loaded thread resumed with them off drops the connectors it had. A resume brings a new `config` only once the thread is unsubscribed, and a resume with none of a key goes back to Codex's default for it. `turn/start` takes no `config`.
 - **App side:** `codex-driver` builds every thread's `config` from the Tree's Tools panel, and unsubscribes and resumes a loaded thread whose `config` differs from the next Reply's, so no new thread starts.
 - **User would see:** a switch in the Tools panel that changes nothing: web search, the built-in Skills or the remote plugins offered while off, or missing while on.
 - **Changed by:** upgrade + drift. OpenAI's servers decide which remote plugins and connectors there are.
-- **Check:** `[dep:codex-tool-switches]` in `codex-driver`: through a stand-in for OpenAI's API, a thread offers the Model web search and the built-in Skills, and after both switches go off, a turn on the same thread adds neither, while the Skills listed before stay in its history; once web search goes back on, the next turn offers it again. Remote plugins have no check: their list comes from chatgpt.com, which the stand-in can't serve. The check looks for Codex's own names for the web tool (`web__run`) and the Skills list (`<skills_instructions>`), which an upgrade may rename.
+- **Check:** `[dep:codex-tool-switches]` in `codex-driver`: through a stand-in for OpenAI's API, a thread offers the Model web search and the built-in Skills, and after both switches go off, a turn on the same thread adds neither, while the Skills listed before stay in its history; once web search goes back on, the next turn offers it again. Remote plugins have no live check: their list comes from chatgpt.com, which the stand-in can't serve. Instead, a hand check on Codex 0.163.0 ([#294](https://github.com/qodesmith/unimatrix-zero/issues/294)) turned them off on a thread that had used the account's Google Drive connector, and the next turn's `ALL_TOOLS` held none of its tools. Repeat it by hand after an upgrade, following #294's steps. The live check looks for Codex's own names for the web tool (`web__run`) and the Skills list (`<skills_instructions>`), which an upgrade may rename.
 
 ### Codex's Subagents turned off
 
