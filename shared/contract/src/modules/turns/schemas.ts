@@ -1,5 +1,4 @@
 import {AttachmentSchema} from '#modules/attachments/main'
-import {ApprovalActionSchema} from '#modules/permissions/main'
 import {ProviderIdSchema} from '#modules/providers/main'
 import {z} from 'zod'
 
@@ -203,6 +202,28 @@ export const ToolResultEvent = z.strictObject({
   content: z.string(),
   isError: z.boolean(),
 })
+
+/** What an approval card asks about. Reads never ask, so none is a read. */
+export const ApprovalActionSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('edit'),
+    /** Absolute, in the order the Provider named them. */
+    paths: z.array(z.string().min(1)).min(1),
+    /** Every path is inside the Tree's files, so the Branch versions it. */
+    inTreeFiles: z.boolean(),
+  }),
+  z.strictObject({kind: z.literal('command'), command: z.string()}),
+  z.strictObject({kind: z.literal('host'), host: z.string().min(1)}),
+  z.strictObject({
+    kind: z.literal('mcp-tool'),
+    server: z.string(),
+    tool: z.string(),
+  }),
+  /** Any other tool, by the name the Provider gives it. */
+  z.strictObject({kind: z.literal('tool'), name: z.string().min(1)}),
+])
+
+export type ApprovalAction = z.infer<typeof ApprovalActionSchema>
 
 export const ApprovalAnswerSchema = z.enum([
   'allow-once',

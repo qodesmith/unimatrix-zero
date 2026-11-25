@@ -1,31 +1,13 @@
+import type {ApprovalAction} from '#modules/turns/main'
+
 import {z} from 'zod'
+
+export type {ApprovalAction} from '#modules/turns/main'
 
 /** Full access asks nothing; Supervised brings an approval card. */
 export const PermissionModeSchema = z.enum(['full-access', 'supervised'])
 
 export type PermissionMode = z.infer<typeof PermissionModeSchema>
-
-/** What an approval card asks about. Reads never ask, so none is a read. */
-export const ApprovalActionSchema = z.discriminatedUnion('kind', [
-  z.strictObject({
-    kind: z.literal('edit'),
-    /** Absolute, in the order the Provider named them. */
-    paths: z.array(z.string().min(1)).min(1),
-    /** Every path is inside the Tree's files, so the Branch versions it. */
-    inTreeFiles: z.boolean(),
-  }),
-  z.strictObject({kind: z.literal('command'), command: z.string()}),
-  z.strictObject({kind: z.literal('host'), host: z.string().min(1)}),
-  z.strictObject({
-    kind: z.literal('mcp-tool'),
-    server: z.string(),
-    tool: z.string(),
-  }),
-  /** Any other tool, by the name the Provider gives it. */
-  z.strictObject({kind: z.literal('tool'), name: z.string().min(1)}),
-])
-
-export type ApprovalAction = z.infer<typeof ApprovalActionSchema>
 
 /** One "Always allow in this Tree", for every Branch of the Tree. */
 export const ApprovalGrantSchema = z.discriminatedUnion('kind', [
@@ -79,11 +61,13 @@ export function withGrants(
   grants: ApprovalGrant[],
   added: ApprovalGrant[]
 ): ApprovalGrant[] {
-  return added.reduce(
-    (all, grant) =>
-      all.some(kept => sameGrant(kept, grant)) ? all : [...all, grant],
-    grants
-  )
+  const all = [...grants]
+
+  for (const grant of added) {
+    if (!all.some(kept => sameGrant(kept, grant))) all.push(grant)
+  }
+
+  return all
 }
 
 /** Only an edit inside the Tree's files is versioned with the Branch. */
