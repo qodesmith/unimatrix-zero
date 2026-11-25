@@ -1,18 +1,21 @@
 import type {Database} from '#modules/database/main'
+import type {ExtractionResult} from '#modules/extraction/main'
 import type {Attachment} from '@uz/contract/attachments'
 import type {Prompt} from '@uz/contract/turns'
 
-import {openDatabase} from '#modules/database/main'
+import {openDatabase, schema} from '#modules/database/main'
 import {
   ATTACHMENT_SIZE_LIMIT,
   INLINE_IMAGE_SIZE_LIMIT,
 } from '@uz/contract/attachments'
+import {EXTRACTOR_VERSION} from '@uz/contract/extraction'
+import {eq} from 'drizzle-orm'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import {afterEach, beforeEach, describe, expect, it} from 'vitest'
 
-import {createAttachments} from './main'
+import {attachToPrompt, createAttachments, hostAttachments} from './main'
 
 const migrationsFolder = path.resolve(import.meta.dirname, '../../../drizzle')
 
@@ -31,16 +34,25 @@ let dir: string
 let db: Database
 let dropped: Map<string, string>
 let attachments: ReturnType<typeof createAttachments>
+let extracted: Uint8Array[]
+let extractorOutput: () => Promise<ExtractionResult>
 
 beforeEach(() => {
   folder = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-attachments-'))
   dir = path.join(folder, 'attachments')
   db = openDatabase({file: ':memory:', migrationsFolder})
   dropped = new Map()
+  extracted = []
+  extractorOutput = async () => ({type: 'unsupported'})
   attachments = createAttachments({
     db,
     dir,
     droppedPath: fileId => dropped.get(fileId) ?? null,
+    extract: async bytes => {
+      extracted.push(bytes)
+
+      return extractorOutput()
+    },
   })
 })
 
@@ -83,6 +95,34 @@ function promptWith(attached: Attachment[]): Prompt {
     attachments: attached,
     createdAt: '2026-11-24T12:00:00.000Z',
   }
+}
+
+function promptOf(ids: string[]) {
+  const systemPrompt = db
+    .insert(schema.systemPrompts)
+    .values({hash: crypto.randomUUID(), text: ''})
+    .returning()
+    .get()
+
+  const tree = db
+    .insert(schema.trees)
+    .values({systemPromptId: systemPrompt.id})
+    .returning()
+    .get()
+
+  const prompt = db
+    .insert(schema.prompts)
+    .values({treeId: tree.id, text: 'Read it.'})
+    .returning()
+    .get()
+
+  attachToPrompt(db, prompt.id, ids)
+
+  return prompt.id
+}
+
+function modeOf(target: string) {
+  return fs.statSync(target).mode.toString(8).slice(-3)
 }
 
 async function missingOf(prompts: Prompt[]) {
@@ -184,6 +224,7 @@ describe('adding a file', () => {
       shrunkSize: null,
       folderPath: null,
       missing: false,
+      extraction: null,
     })
     expect(fs.readFileSync(originalOf(attachment.id))).toEqual(Buffer.from(PNG))
   })
@@ -337,6 +378,7 @@ describe('a dropped folder', () => {
       shrunkSize: null,
       folderPath: project,
       missing: false,
+      extraction: null,
     })
     expect(fs.existsSync(dir)).toBe(false)
     expect(attachments.original(attachment.id)).toBeNull()
@@ -383,4 +425,303 @@ describe('checking the copies of Prompts’ files', () => {
       expect(await missingOf([promptWith([locked])])).toEqual([[true]])
     }
   )
+})
+
+describe('an Extraction', () => {
+  const PDF = bytesOf('%PDF-1.7\n')
+
+  const PDF_SHA256 =
+    '0716f9264c9fe19f5d7455276107f3ddcc1d3497f63d60689a73558ae8a1bf5e'
+
+  const PAGE = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])
+
+  function extractedFolder(version = EXTRACTOR_VERSION) {
+    return path.join(dir, 'extractions', PDF_SHA256, `v${version}`)
+  }
+
+  function readPdf(text: string): ExtractionResult {
+    return {
+      type: 'read',
+      format: 'pdf',
+      text,
+      pageImages: [
+        {page: 2, bytes: PAGE},
+        {page: 5, bytes: PAGE},
+      ],
+      imagesStopped: true,
+    }
+  }
+
+  const READ = {
+    status: 'read',
+    version: EXTRACTOR_VERSION,
+    text: true,
+    pageImages: [2, 5],
+    imagesStopped: true,
+  }
+
+  it('is made when a PDF is added, its text and page images kept under its SHA-256 and the extractor’s version', async () => {
+    extractorOutput = async () => readPdf('# Page 1\nHello')
+
+    const attachment = await paste('report.pdf', PDF)
+
+    expect(extracted).toEqual([PDF])
+    expect(attachment.extraction).toEqual(READ)
+    expect(fs.readdirSync(extractedFolder()).toSorted()).toEqual([
+      'page-2.jpg',
+      'page-5.jpg',
+      'text.txt',
+    ])
+    expect(
+      fs.readFileSync(path.join(extractedFolder(), 'text.txt'), 'utf8')
+    ).toBe('# Page 1\nHello')
+    expect(fs.readFileSync(path.join(extractedFolder(), 'page-5.jpg'))).toEqual(
+      Buffer.from(PAGE)
+    )
+    expect(fs.readdirSync(path.join(dir, 'extractions'))).toEqual([PDF_SHA256])
+  })
+
+  // Windows has no owner-only mode to read back.
+  it.skipIf(process.platform === 'win32')(
+    'is readable by its owner alone',
+    async () => {
+      extractorOutput = async () => readPdf('Hello')
+
+      await paste('report.pdf', PDF)
+
+      expect(modeOf(path.join(dir, 'extractions'))).toBe('700')
+      expect(modeOf(path.join(dir, 'extractions', PDF_SHA256))).toBe('700')
+      expect(modeOf(extractedFolder())).toBe('700')
+      expect(modeOf(path.join(extractedFolder(), 'text.txt'))).toBe('600')
+      expect(modeOf(path.join(extractedFolder(), 'page-2.jpg'))).toBe('600')
+    }
+  )
+
+  it('keeps no text file when the text is only whitespace', async () => {
+    extractorOutput = async () => readPdf(' \n\t')
+
+    const attachment = await paste('scan.pdf', PDF)
+
+    expect(attachment.extraction).toEqual({...READ, text: false})
+    expect(fs.readdirSync(extractedFolder()).toSorted()).toEqual([
+      'page-2.jpg',
+      'page-5.jpg',
+    ])
+  })
+
+  it('is reused for the same bytes added again, with no second job', async () => {
+    extractorOutput = async () => readPdf('Hello')
+    await paste('report.pdf', PDF)
+
+    const again = await paste('copy.pdf', PDF)
+
+    expect(extracted).toHaveLength(1)
+    expect(again.extraction).toEqual(READ)
+  })
+
+  it('is made again when the kept one is gone from disk', async () => {
+    extractorOutput = async () => readPdf('Hello')
+    await paste('report.pdf', PDF)
+    fs.rmSync(extractedFolder(), {recursive: true})
+
+    const again = await paste('copy.pdf', PDF)
+
+    expect(extracted).toHaveLength(2)
+    expect(again.extraction).toEqual(READ)
+    expect(fs.existsSync(path.join(extractedFolder(), 'text.txt'))).toBe(true)
+  })
+
+  it('is made again when the one kept is another version’s', async () => {
+    extractorOutput = async () => readPdf('Hello')
+    const first = await paste('report.pdf', PDF)
+    const other = EXTRACTOR_VERSION + 1
+    fs.cpSync(extractedFolder(), extractedFolder(other), {recursive: true})
+    db.update(schema.attachments)
+      .set({extraction: {...READ, version: other}})
+      .where(eq(schema.attachments.id, first.id))
+      .run()
+
+    const again = await paste('copy.pdf', PDF)
+
+    expect(extracted).toHaveLength(2)
+    expect(again.extraction).toEqual(READ)
+    expect(fs.existsSync(path.join(extractedFolder(), 'text.txt'))).toBe(true)
+  })
+
+  it('takes the files an identical job put in place first', async () => {
+    extractorOutput = async () => readPdf('Hello')
+    const first = await paste('report.pdf', PDF)
+    db.update(schema.attachments)
+      .set({extraction: null})
+      .where(eq(schema.attachments.id, first.id))
+      .run()
+    extractorOutput = async () => readPdf('Hello again')
+
+    const again = await paste('copy.pdf', PDF)
+
+    expect(extracted).toHaveLength(2)
+    expect(again.extraction).toEqual(READ)
+    expect(
+      fs.readFileSync(path.join(extractedFolder(), 'text.txt'), 'utf8')
+    ).toBe('Hello')
+    expect(fs.readdirSync(path.join(dir, 'extractions'))).toEqual([PDF_SHA256])
+  })
+
+  it('is made again when the first one failed', async () => {
+    extractorOutput = async () => ({type: 'failed'})
+    await paste('report.pdf', PDF)
+    extractorOutput = async () => readPdf('Hello')
+
+    const again = await paste('copy.pdf', PDF)
+
+    expect(extracted).toHaveLength(2)
+    expect(again.extraction).toEqual(READ)
+  })
+
+  it.each([
+    [
+      'the job fails',
+      async (): Promise<ExtractionResult> => ({type: 'failed'}),
+    ],
+    [
+      'the extractor throws',
+      async (): Promise<ExtractionResult> => {
+        throw new Error('Gone')
+      },
+    ],
+  ])(
+    'is marked failed when %s, and the file still attaches with nothing extracted',
+    async (_case, output) => {
+      extractorOutput = output
+
+      const attachment = await paste('report.pdf', PDF)
+
+      expect(attachment).toMatchObject({
+        name: 'report.pdf',
+        extraction: {status: 'failed', version: EXTRACTOR_VERSION},
+      })
+      expect(fs.readFileSync(originalOf(attachment.id))).toEqual(
+        Buffer.from(PDF)
+      )
+      expect(fs.existsSync(path.join(dir, 'extractions', PDF_SHA256))).toBe(
+        false
+      )
+    }
+  )
+
+  it('is marked failed when its files can’t be written, and the file still attaches', async () => {
+    extractorOutput = async () => readPdf('Hello')
+    fs.mkdirSync(dir, {recursive: true})
+    fs.writeFileSync(path.join(dir, 'extractions'), 'in the way')
+
+    const attachment = await paste('report.pdf', PDF)
+
+    expect(attachment.extraction).toEqual({
+      status: 'failed',
+      version: EXTRACTOR_VERSION,
+    })
+    expect(fs.readFileSync(originalOf(attachment.id))).toEqual(Buffer.from(PDF))
+  })
+
+  it('is none when the window doesn’t read the format', async () => {
+    const attachment = await paste('archive.zip', bytesOf('PK\u0003\u0004rest'))
+
+    expect(extracted).toHaveLength(1)
+    expect(attachment.extraction).toBeNull()
+    expect(fs.existsSync(path.join(dir, 'extractions'))).toBe(false)
+  })
+
+  it.each([
+    ['a zip', bytesOf('PK\u0003\u0004rest')],
+    ['an RTF', bytesOf(String.raw`{\rtf1\ansi Hello}`)],
+    ['a notebook', bytesOf(' \n{"cells": [], "nbformat": 4}')],
+    [
+      'a notebook that starts with a byte order mark',
+      bytesOf('\uFEFF{"cells": [], "nbformat": 4}'),
+    ],
+  ])('is tried for %s', async (_case, bytes) => {
+    await paste('file', bytes)
+
+    expect(extracted).toEqual([bytes])
+  })
+
+  it.each([
+    ['text', bytesOf('Hello')],
+    ['JSON that is not a notebook', bytesOf('{"cells": []}')],
+    ['text that names nbformat but is not JSON', bytesOf('"nbformat": 4')],
+    ['a notebook with a NUL byte', bytesOf('{"nbformat": 4}\u0000')],
+    ['an image', PNG],
+    ['a file of no known type', Uint8Array.from([0, 1, 2])],
+  ])('is never tried for %s', async (_case, bytes) => {
+    const attachment = await paste('file', bytes)
+
+    expect(extracted).toEqual([])
+    expect(attachment.extraction).toBeNull()
+  })
+
+  it('is never tried for a folder', async () => {
+    const project = path.join(folder, 'project')
+    fs.mkdirSync(project)
+    const fileId = crypto.randomUUID()
+    dropped.set(fileId, project)
+
+    const attachment = await attachments.add({type: 'dropped', fileId})
+
+    expect(extracted).toEqual([])
+    expect(attachment.extraction).toBeNull()
+  })
+
+  async function hostOf(provider: 'claude' | 'chatgpt') {
+    const attachment = await paste('report.pdf', PDF)
+
+    const [ofPrompt] = hostAttachments(db, dir, provider, [
+      promptOf([attachment.id]),
+    ])
+
+    return ofPrompt?.[0]
+  }
+
+  describe('for a Provider host', () => {
+    it('gives the extracted files’ paths beside the original’s', async () => {
+      extractorOutput = async () => readPdf('Hello')
+
+      expect(await hostOf('chatgpt')).toEqual({
+        name: 'report.pdf',
+        path: path.join(dir, PDF_SHA256, 'report.pdf'),
+        folder: false,
+        inline: null,
+        extraction: {
+          text: path.join(extractedFolder(), 'text.txt'),
+          pageImages: [
+            {page: 2, path: path.join(extractedFolder(), 'page-2.jpg')},
+            {page: 5, path: path.join(extractedFolder(), 'page-5.jpg')},
+          ],
+          imagesStopped: true,
+        },
+      })
+    })
+
+    it('gives no text path for an Extraction with no text', async () => {
+      extractorOutput = async () => readPdf('')
+
+      expect((await hostOf('chatgpt'))?.extraction).toMatchObject({
+        text: null,
+      })
+    })
+
+    it('gives none for a PDF that goes inline whole', async () => {
+      extractorOutput = async () => readPdf('Hello')
+
+      expect(await hostOf('claude')).toMatchObject({
+        inline: {type: 'pdf'},
+        extraction: null,
+      })
+    })
+
+    it('gives none for a failed Extraction', async () => {
+      extractorOutput = async () => ({type: 'failed'})
+
+      expect((await hostOf('chatgpt'))?.extraction).toBeNull()
+    })
+  })
 })

@@ -137,6 +137,7 @@ function kept(
     shrunkSize: null,
     folderPath: null,
     missing: false,
+    extraction: null,
     ...fields,
   }
 }
@@ -687,7 +688,7 @@ async function startAttaching(...files: File[]) {
 async function expectAdded(name: string) {
   await expect.element(attachedFile(name)).toBeVisible()
   await expect
-    .element(attachedFile(name).getByText('Adding…'))
+    .element(attachedFile(name).getByText('Reading…'))
     .not.toBeInTheDocument()
 }
 
@@ -794,7 +795,7 @@ it('shows a file as being added, holding Send, until main has kept it', async ()
   await startAttaching(textFile('notes.txt', 'Some notes'))
 
   await expect
-    .element(attachedFile('notes.txt').getByText('Adding…'))
+    .element(attachedFile('notes.txt').getByText('Reading…'))
     .toBeVisible()
   await expect.element(sendButton).toBeDisabled()
 
@@ -949,7 +950,9 @@ it('shows an image as a thumbnail that opens large in a lightbox, and another fi
 })
 
 function description(name: string) {
-  return attachedFile(name).getByText(/ · |The AI|Sent as|Claude reads/)
+  return attachedFile(name).getByText(
+    / · |The AI|Sent as|Claude reads|Unimatrix Zero/
+  )
 }
 
 const DRAFTED = [
@@ -1017,6 +1020,67 @@ it('says a PDF goes by path when the Prompt alone passes Claude’s media budget
   await expect
     .element(description('second.pdf'))
     .toHaveTextContent('9 MiB · Claude reads the whole PDF')
+})
+
+function readByApp(
+  text: boolean,
+  pageImages: number[] = [],
+  imagesStopped = false
+): Attachment['extraction'] {
+  return {status: 'read', version: 1, text, pageImages, imagesStopped}
+}
+
+it('says what the AI reads of a file the app read, that page images stopped at 100, and that the app couldn’t read a file', async () => {
+  const hundred = Array.from({length: 100}, (_, at) => at + 1)
+
+  await renderInput({
+    attachedTo: attachedReply('chatgpt', 'gpt-5'),
+    attachments: [
+      kept('report.docx', 'application/octet-stream', 2048, {
+        extraction: readByApp(true),
+      }),
+      kept('scan.pdf', 'application/pdf', 2048, {
+        extraction: readByApp(false, [1, 2, 3]),
+      }),
+      kept('paper.pdf', 'application/pdf', 2048, {
+        extraction: readByApp(true, [4]),
+      }),
+      kept('book.pdf', 'application/pdf', 2048, {
+        extraction: readByApp(true, hundred, true),
+      }),
+      kept('long-scan.pdf', 'application/pdf', 2048, {
+        extraction: readByApp(false, hundred, true),
+      }),
+      kept('broken.xlsx', 'application/octet-stream', 2048, {
+        extraction: {status: 'failed', version: 1},
+      }),
+    ],
+  })
+
+  await expect
+    .element(description('report.docx'))
+    .toHaveTextContent('2 KiB · The AI reads its text')
+  await expect
+    .element(description('scan.pdf'))
+    .toHaveTextContent('2 KiB · The AI reads 3 page images')
+  await expect
+    .element(description('paper.pdf'))
+    .toHaveTextContent('2 KiB · The AI reads its text and 1 page image')
+  await expect
+    .element(description('book.pdf'))
+    .toHaveTextContent(
+      '2 KiB · The AI reads its text and 100 page images; later pages as text only'
+    )
+  await expect
+    .element(description('long-scan.pdf'))
+    .toHaveTextContent(
+      '2 KiB · The AI reads 100 page images; later pages not read'
+    )
+  await expect
+    .element(description('broken.xlsx'))
+    .toHaveTextContent(
+      '2 KiB · Unimatrix Zero couldn’t read this file; the AI can still open it'
+    )
 })
 
 it('says what the Model does with an image in a tooltip on its thumbnail', async () => {

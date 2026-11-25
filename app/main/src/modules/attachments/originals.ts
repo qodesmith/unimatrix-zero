@@ -21,6 +21,21 @@ export function shrunkPath(
   return path.join(dir, 'shrunk', `${sha256}.${SHRUNK_EXTENSIONS[mediaType]}`)
 }
 
+export function extractionsPath(dir: string) {
+  return path.join(dir, 'extractions')
+}
+
+/** Complete once it exists: it is written elsewhere and renamed into place. */
+export function extractionPath(dir: string, sha256: string, version: number) {
+  return path.join(extractionsPath(dir), sha256, `v${version}`)
+}
+
+export const EXTRACTED_TEXT_NAME = 'text.txt'
+
+export function pageImageName(page: number) {
+  return `page-${page}.jpg`
+}
+
 /** False for a path that can't be read, which the read then reports. */
 export async function isFolder(filePath: string) {
   try {
@@ -65,7 +80,7 @@ export async function canRead(target: string) {
   }
 }
 
-async function exists(target: string) {
+export async function exists(target: string) {
   try {
     await fs.access(target)
 

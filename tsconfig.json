@@ -6,6 +6,7 @@
     {"path": "./app/main"},
     {"path": "./app/preload"},
     {"path": "./app/renderer"},
+    {"path": "./app/extractor"},
     {"path": "./app/provider-host"},
     {"path": "./shell"},
     {"path": "./tsconfig.tooling.json"}

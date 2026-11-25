@@ -117,6 +117,7 @@ const report: HostAttachment = {
   path: '/attachments/report.pdf',
   folder: false,
   inline: {type: 'pdf'},
+  extraction: null,
 }
 
 const chart: HostAttachment = {
@@ -128,6 +129,7 @@ const chart: HostAttachment = {
     mediaType: 'image/png',
     path: '/attachments/chart.png',
   },
+  extraction: null,
 }
 
 const dropped: HostAttachment = {
@@ -135,6 +137,7 @@ const dropped: HostAttachment = {
   path: '/attachments/old.pdf',
   folder: false,
   inline: null,
+  extraction: null,
 }
 
 const project: HostAttachment = {
@@ -142,6 +145,7 @@ const project: HostAttachment = {
   path: '/work/project',
   folder: true,
   inline: null,
+  extraction: null,
 }
 
 it('puts each earlier Prompt’s files inside its own <prompt>, in order and before its text, to be read when the content is, and the Prompt’s own path lines after the Thread, each inline file right after its own line', () => {

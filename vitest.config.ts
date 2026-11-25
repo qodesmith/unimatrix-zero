@@ -27,6 +27,7 @@ export default defineConfig({
         },
       },
       'app/renderer/vite.config.ts',
+      'app/extractor/vite.config.ts',
     ],
   },
 })

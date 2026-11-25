@@ -4,7 +4,7 @@ import {defineConfig} from 'vite'
 export default defineConfig(({mode}) =>
   nodeBundle({
     root: import.meta.dirname,
-    entry: {preload: 'src/index.ts'},
+    entry: {preload: 'src/index.ts', extraction: 'src/extraction.ts'},
     format: 'cjs',
     mode,
     plugins: [selfContainedPreload()],

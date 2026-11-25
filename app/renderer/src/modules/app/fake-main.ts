@@ -90,6 +90,7 @@ export function fakeMain(saved: Saved = {}) {
       shrunkSize: shrunk?.byteLength ?? null,
       folderPath: null,
       missing: false,
+      extraction: null,
     }
 
     attachments.set(attachment.id, attachment)

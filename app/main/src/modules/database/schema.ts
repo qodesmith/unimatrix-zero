@@ -92,6 +92,8 @@ export const attachments = sqliteTable('attachments', {
   }),
   shrunkSize: integer('shrunk_size'),
   folderPath: text('folder_path'),
+  /** As `ExtractionSchema`; null when no Extraction was made. */
+  extraction: text('extraction', {mode: 'json'}),
   createdAt: createdAt(),
 })
 

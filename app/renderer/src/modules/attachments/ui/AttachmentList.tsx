@@ -42,7 +42,7 @@ import {
 } from 'lucide-react'
 import {useId} from 'react'
 
-import {FILE_MISSING, PATH_ONLY_NOW, modelUse} from '../model-use'
+import {COULDNT_READ, FILE_MISSING, PATH_ONLY_NOW, modelUse} from '../model-use'
 
 function RemoveButton({label, onClick}: {label: string; onClick: () => void}) {
   return (
@@ -180,12 +180,12 @@ function PendingAttachment({
       className="min-w-0"
     >
       <AttachmentMedia>
-        {refused ? <CircleAlertIcon /> : <Spinner aria-label="Adding" />}
+        {refused ? <CircleAlertIcon /> : <Spinner aria-label="Reading" />}
       </AttachmentMedia>
       <AttachmentContent>
         <AttachmentTitle>{add.name}</AttachmentTitle>
         <AttachmentDescription role={refused ? 'alert' : undefined}>
-          {refused ? add.error : 'Adding…'}
+          {refused ? add.error : 'Reading…'}
         </AttachmentDescription>
       </AttachmentContent>
       <RemoveButton
@@ -205,6 +205,8 @@ function noteOf(
   if (attachment.missing) return FILE_MISSING
 
   if (pathOnly) return PATH_ONLY_NOW
+
+  if (attachment.extraction?.status === 'failed') return COULDNT_READ
 
   return form === undefined ? null : modelUse(form, attachment)
 }

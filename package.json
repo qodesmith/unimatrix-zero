@@ -31,6 +31,7 @@
     "test": "bun run scripts/vitest.ts run",
     "test:node": "bun run scripts/vitest.ts run --project node",
     "test:renderer": "bun run scripts/vitest.ts run --project renderer",
+    "test:extractor": "bun run scripts/vitest.ts run --project extractor",
     "check": "bun run fmt:check && bun run lint && bun run typecheck && bun run knip && bun run test",
     "electron-runtime": "bun run scripts/electron-runtime.ts",
     "codex-protocol": "bun run scripts/codex-protocol.ts",
@@ -67,6 +68,7 @@
     "@anthropic-ai/claude-agent-sdk-linux-x64": "file:./tooling/no-vendor-binary",
     "@anthropic-ai/claude-agent-sdk-linux-x64-musl": "file:./tooling/no-vendor-binary",
     "@anthropic-ai/claude-agent-sdk-win32-arm64": "file:./tooling/no-vendor-binary",
-    "@anthropic-ai/claude-agent-sdk-win32-x64": "file:./tooling/no-vendor-binary"
+    "@anthropic-ai/claude-agent-sdk-win32-x64": "file:./tooling/no-vendor-binary",
+    "@napi-rs/canvas": "file:./tooling/no-vendor-binary"
   }
 }

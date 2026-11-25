@@ -1,0 +1,23 @@
+{
+  "name": "@uz/extractor",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#modules/*": "./src/modules/*.ts"
+  },
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@uz/contract": "workspace:*",
+    "fflate": "^0.8.3",
+    "pdfjs-dist": "6.5.438",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@uz/tooling": "workspace:*",
+    "@vitest/browser-playwright": "^5.0.5",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}

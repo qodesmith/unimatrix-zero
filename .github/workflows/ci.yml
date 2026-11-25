@@ -56,6 +56,8 @@ jobs:
         timeout-minutes: 5
       - if: matrix.renderer
         run: bun run test:renderer
+      - if: matrix.renderer
+        run: bun run test:extractor
 
   no-developer-tools:
     name: A Mac with no developer tools

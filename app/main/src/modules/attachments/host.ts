@@ -4,9 +4,16 @@ import type {HostAttachment, InlineForm} from '@uz/contract/attachments'
 import type {ProviderId} from '@uz/contract/providers'
 
 import {ImageMediaTypeSchema, planInline} from '@uz/contract/attachments'
+import path from 'node:path'
 
-import {originalPath, shrunkPath} from './originals'
-import {rowsOf} from './prompts'
+import {
+  EXTRACTED_TEXT_NAME,
+  extractionPath,
+  originalPath,
+  pageImageName,
+  shrunkPath,
+} from './originals'
+import {extractionOf, rowsOf} from './prompts'
 
 function pathOf(dir: string, row: AttachmentRow) {
   if (row.folderPath !== null) return row.folderPath
@@ -32,6 +39,30 @@ function inlineImage(dir: string, row: AttachmentRow, original: string) {
   }
 }
 
+/** None for a PDF that goes inline: the Model reads it whole. */
+function extractedFiles(
+  dir: string,
+  row: AttachmentRow,
+  form: InlineForm | null
+): HostAttachment['extraction'] {
+  const extraction = extractionOf(row)
+
+  if (form === 'pdf' || row.sha256 === null || extraction?.status !== 'read') {
+    return null
+  }
+
+  const folder = extractionPath(dir, row.sha256, extraction.version)
+
+  return {
+    text: extraction.text ? path.join(folder, EXTRACTED_TEXT_NAME) : null,
+    pageImages: extraction.pageImages.map(page => ({
+      page,
+      path: path.join(folder, pageImageName(page)),
+    })),
+    imagesStopped: extraction.imagesStopped,
+  }
+}
+
 function toHost(
   dir: string,
   row: AttachmentRow,
@@ -45,6 +76,7 @@ function toHost(
     folder: row.folderPath !== null,
     inline:
       form === 'image' ? inlineImage(dir, row, filePath) : form && {type: form},
+    extraction: extractedFiles(dir, row, form),
   }
 }
 

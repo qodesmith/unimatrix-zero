@@ -6,6 +6,7 @@ import {
   INLINE_IMAGES_PER_PROMPT_LIMIT,
   inlineImagesSize,
 } from '@uz/contract/attachments'
+import {ExtractionSchema} from '@uz/contract/extraction'
 import {formatSize} from '@uz/contract/sizes'
 import {asc, eq, getTableColumns, inArray} from 'drizzle-orm'
 
@@ -17,6 +18,13 @@ type Reader = Pick<Database, 'select'>
 
 type Writer = Pick<Database, 'select' | 'insert'>
 
+/** Null for a row with none, and for one that doesn't parse. */
+export function extractionOf(row: Pick<AttachmentRow, 'extraction'>) {
+  const parsed = ExtractionSchema.nullable().safeParse(row.extraction)
+
+  return parsed.success ? parsed.data : null
+}
+
 export function toAttachment(row: AttachmentRow): Attachment {
   return {
     id: row.id,
@@ -26,6 +34,7 @@ export function toAttachment(row: AttachmentRow): Attachment {
     shrunkSize: row.shrunkSize,
     folderPath: row.folderPath,
     missing: false,
+    extraction: extractionOf(row),
   }
 }
 

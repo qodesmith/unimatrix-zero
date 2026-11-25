@@ -16,6 +16,11 @@ import {DatabaseOpenError, openDatabase} from '#modules/database/main'
 import {readDevRun} from '#modules/dev/main'
 import {writeDeveloperFolder} from '#modules/developer-folder/main'
 import {createDroppedFiles} from '#modules/dropped-files/main'
+import {
+  extractionSession,
+  extractionWindows,
+} from '#modules/extraction-window/main'
+import {runExtraction} from '#modules/extraction/main'
 import {createGitProgram} from '#modules/git-program/main'
 import {
   shippedGitExe,
@@ -62,7 +67,14 @@ const preloadPath = path.join(
   '../../preload/dist/preload.cjs'
 )
 
+const extractionPreloadPath = path.join(
+  import.meta.dirname,
+  '../../preload/dist/extraction.cjs'
+)
+
 const rendererDist = path.join(import.meta.dirname, '../../renderer/dist')
+
+const extractorDist = path.join(import.meta.dirname, '../../extractor/dist')
 
 const hostsDist = path.join(import.meta.dirname, '../../provider-host/dist')
 
@@ -80,6 +92,11 @@ const GIT_NEWS = {
  * main must read them from its resources.
  */
 const gitExes = path.join(import.meta.dirname, '../../../shell/git-exe/dist')
+
+// Electron's default opens a modal dialog that main waits behind.
+process.on('uncaughtException', error => {
+  process.stderr.write(`Uncaught: ${error.stack ?? String(error)}\n`)
+})
 
 app.setName('Unimatrix Zero')
 
@@ -141,10 +158,16 @@ function openWindow(db: Database) {
   const attachmentsDir = path.join(app.getPath('userData'), 'attachments')
   const droppedFiles = createDroppedFiles()
 
+  const openExtraction = extractionWindows(
+    extractionSession(extractorDist),
+    extractionPreloadPath
+  )
+
   const attachments = createAttachments({
     db,
     dir: attachmentsDir,
     droppedPath: droppedFiles.pathOf,
+    extract: async bytes => runExtraction(bytes, openExtraction),
   })
 
   serveAttachments(protocol, id => attachments.original(id))

@@ -1,5 +1,6 @@
 import type {ProviderId} from '#modules/providers/main'
 
+import {ExtractionSchema} from '#modules/extraction/main'
 import {MIB} from '#modules/sizes/main'
 import {z} from 'zod'
 
@@ -85,6 +86,8 @@ export const AttachmentSchema = z.strictObject({
    * it answers a send; everywhere else, and for a folder, it is false.
    */
   missing: z.boolean(),
+  /** Null for a file no Extraction is made of, and for a folder. */
+  extraction: ExtractionSchema.nullable(),
 })
 
 export type Attachment = z.infer<typeof AttachmentSchema>
@@ -272,6 +275,20 @@ export const HostAttachmentSchema = z.strictObject({
       z.strictObject({type: z.literal('pdf')}),
       z.strictObject({type: z.literal('text')}),
     ])
+    .nullable(),
+  /** Null when there is none, and when the file goes inline as a PDF. */
+  extraction: z
+    .strictObject({
+      /** Absolute, like `path`; null when the file has no text. */
+      text: z.string().min(1).nullable(),
+      pageImages: z.array(
+        z.strictObject({
+          page: z.number().int().positive(),
+          path: z.string().min(1),
+        })
+      ),
+      imagesStopped: z.boolean(),
+    })
     .nullable(),
 })
 
