@@ -2966,6 +2966,32 @@ describe('approvals', () => {
     expect(sentGrants()).toEqual([[]])
   })
 
+  it('lists the cards still waiting, for a window that opens while they wait', () => {
+    const root = savedRoot()
+    const waiting = sendPrompt(root)
+    const answered = sendPrompt(root)
+    const ended = sendPrompt(root)
+    ask(waiting, 'a1')
+    ask(answered, 'a2')
+    ask(ended, 'a3')
+    fromHost(answered, {
+      type: 'APPROVAL_RESOLVED',
+      approvalId: 'a2',
+      answer: 'allow-once',
+    })
+    finish(ended)
+
+    expect(turns.waitingApprovals()).toEqual([
+      {
+        type: 'APPROVAL_REQUESTED',
+        treeId,
+        replyId: waiting,
+        approvalId: 'a1',
+        action: write,
+      },
+    ])
+  })
+
   it('answers through a host that can no longer be reached as stopping does: by throwing', () => {
     const replyId = sendPrompt(null)
     ask(replyId, 'a1')

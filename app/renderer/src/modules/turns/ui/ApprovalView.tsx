@@ -113,7 +113,8 @@ function AskingCard({
       size="sm"
       role="group"
       aria-label="Approval card"
-      className="ring-primary/50"
+      // Inset: the Reply's scroll box clips a ring drawn outside the card.
+      className="ring-0 inset-ring inset-ring-primary/50"
     >
       <CardHeader>
         {subagentId !== null && (

@@ -11,6 +11,7 @@ import {SettingsSchema} from '#modules/settings/main'
 import {SystemPromptLibrarySchema} from '#modules/system-prompts/main'
 import {TreeSchema} from '#modules/trees/main'
 import {
+  ApprovalRequestedEvent,
   FilesChangedEvent,
   ReplyEventSchema,
   StreamingReplySchema,
@@ -21,6 +22,8 @@ export const SnapshotEvent = z.strictObject({
   type: z.literal('SNAPSHOT'),
   app: z.strictObject({version: z.string()}),
   replies: z.array(StreamingReplySchema),
+  /** The cards still waiting, so a window opened meanwhile can answer them. */
+  approvals: z.array(ApprovalRequestedEvent),
   providers: z.array(ProviderStatusSchema),
   /** Each Provider's Models as it last listed them; empty if it never has. */
   models: z.record(ProviderIdSchema, z.array(ModelSchema)),

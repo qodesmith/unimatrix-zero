@@ -184,6 +184,7 @@ function fakeMain(saved: Saved) {
       type: 'SNAPSHOT',
       app: {version: '0.0.0'},
       replies: [],
+      approvals: [],
       providers: PROVIDERS,
       models: {
         claude: [
@@ -3087,7 +3088,8 @@ it('shows a root Reply that fails with the slideout open on it only as the chip,
 
 it('badges a Turn whose Reply waits on an approval card until it is answered', async () => {
   const {main} = await renderCanvas(endingIn('streaming', ''))
-  const badge = page.getByText('Waiting for you')
+  // The Reply's own line says it too, below the badge.
+  const badge = page.getByText('Waiting for you').first()
 
   await expect.element(page.getByText('Writing…')).toBeVisible()
   expect(badge.query()).toBeNull()

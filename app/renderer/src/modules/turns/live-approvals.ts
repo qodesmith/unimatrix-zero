@@ -1,7 +1,14 @@
 import type {ApprovalAction} from '@uz/contract/permissions'
-import type {ApprovalAnswer, ReplyEvent, ReplyPart} from '@uz/contract/turns'
+import type {
+  ApprovalAnswer,
+  ReplyEvent,
+  ReplyPart,
+  StreamingReply,
+} from '@uz/contract/turns'
 
 type ReviewFinished = Extract<ReplyEvent, {type: 'REVIEW_FINISHED'}>
+
+type ApprovalRequested = Extract<ReplyEvent, {type: 'APPROVAL_REQUESTED'}>
 
 export type ReviewDecision = Pick<ReviewFinished, 'decision' | 'reason'>
 
@@ -114,6 +121,41 @@ export function approvalsAfter(
   const next = foldItems(items, event, content, now)
 
   return next === items ? approvals : {...approvals, [replyId]: next}
+}
+
+/**
+ * Main lists the cards still waiting, for a window that opened meanwhile. A
+ * card open here that main no longer lists was answered or dropped then.
+ */
+export function approvalsFromSnapshot(
+  approvals: ApprovalsByReply,
+  waiting: ApprovalRequested[],
+  replies: StreamingReply[],
+  now: number
+): ApprovalsByReply {
+  const listed = new Set(waiting.map(event => event.approvalId))
+
+  const next: ApprovalsByReply = Object.fromEntries(
+    Object.entries(approvals).map(([replyId, items]) => [
+      replyId,
+      items.filter(
+        item => !(item.kind === 'card' && isOpen(item) && !listed.has(item.id))
+      ),
+    ])
+  )
+
+  for (const event of waiting) {
+    const items = next[event.replyId] ?? []
+
+    if (items.some(item => item.id === event.approvalId)) continue
+
+    const content =
+      replies.find(reply => reply.replyId === event.replyId)?.content ?? []
+
+    next[event.replyId] = [...items, placed(event, content, now)]
+  }
+
+  return next
 }
 
 /** So a card can name the Subagent asking. */

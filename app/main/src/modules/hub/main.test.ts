@@ -23,6 +23,7 @@ function setUp() {
     type: 'SNAPSHOT',
     app: {version: '1.0.0'},
     replies: [],
+    approvals: [],
     providers: [],
     models: {claude: [], chatgpt: []},
     lastModel: null,

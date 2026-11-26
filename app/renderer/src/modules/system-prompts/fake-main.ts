@@ -108,6 +108,7 @@ export function fakeMain(saved: Saved = {}) {
         type: 'SNAPSHOT',
         app: {version: '0.0.0'},
         replies: [],
+        approvals: [],
         providers: [],
         models: {claude: [], chatgpt: []},
         lastModel: null,

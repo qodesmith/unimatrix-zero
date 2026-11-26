@@ -203,6 +203,8 @@ export function createTurns({
 
     streaming: () => inFlight.streaming(),
 
+    waitingApprovals: () => inFlight.waitingApprovals(),
+
     lastModel: () => lastModel(db),
 
     /** Null when the Reply it answers is gone. */

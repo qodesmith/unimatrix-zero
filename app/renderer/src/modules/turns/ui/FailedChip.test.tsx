@@ -72,6 +72,7 @@ function fakeMain(claude: ProviderStatus['status'] = 'ready') {
         type: 'SNAPSHOT',
         app: {version: '0.0.0'},
         replies: [],
+        approvals: [],
         providers: [
           {provider: 'claude', status: claude, account: null},
           {provider: 'chatgpt', status: 'not-connected', account: null},

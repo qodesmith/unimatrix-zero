@@ -144,6 +144,7 @@ function openWindow(db: Database) {
     type: 'SNAPSHOT',
     app: {version: app.getVersion()},
     replies: turns.streaming(),
+    approvals: turns.waitingApprovals(),
     ...connections.snapshot(),
     lastModel: turns.lastModel(),
     settings: settings.read(),

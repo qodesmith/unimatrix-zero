@@ -19,6 +19,7 @@ const snapshot: AppEvent = {
   type: 'SNAPSHOT',
   app: {version: '1.0.0'},
   replies: [],
+  approvals: [],
   providers: [
     {provider: 'claude', status: 'not-connected', account: null},
     {provider: 'chatgpt', status: 'not-connected', account: null},

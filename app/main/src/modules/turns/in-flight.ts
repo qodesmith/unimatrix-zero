@@ -6,7 +6,6 @@ import type {
   ReplyRecorded,
   ReplyRequest,
 } from '@uz/contract/host'
-import type {ApprovalAction} from '@uz/contract/permissions'
 import type {ProviderId} from '@uz/contract/providers'
 import type {
   ReplyEvent,
@@ -39,6 +38,8 @@ function providersReply(provider: ProviderId, treeId: string, replyId: string) {
   )
 }
 
+type ApprovalRequested = Extract<ReplyEvent, {type: 'APPROVAL_REQUESTED'}>
+
 export interface FinishedReply {
   provider: ProviderId
   treeId: string
@@ -55,8 +56,8 @@ interface Entry {
   promptMessageId: string
   reply: StreamingReply
   saveTimer: ReturnType<typeof setTimeout> | null
-  /** By approvalId; never saved. */
-  approvals: Map<string, ApprovalAction>
+  /** The cards waiting, by approvalId; never saved. */
+  approvals: Map<string, ApprovalRequested>
 }
 
 /** Saves before it publishes, so no window shows what main won't save. */
@@ -104,7 +105,7 @@ export function createInFlight(
     if (event.type === 'CONTEXT_COMPACTED') recordCompaction(entry, event)
 
     if (event.type === 'APPROVAL_REQUESTED') {
-      entry.approvals.set(event.approvalId, event.action)
+      entry.approvals.set(event.approvalId, event)
     }
 
     if (event.type === 'APPROVAL_RESOLVED') {
@@ -233,10 +234,10 @@ export function createInFlight(
     waitingApproval(treeId: string, replyId: string, approvalId: string) {
       const entry = entries.get(replyId)
 
-      const action =
+      const asked =
         entry?.reply.treeId === treeId && entry.approvals.get(approvalId)
 
-      return action ? {provider: entry.provider, action} : null
+      return asked ? {provider: entry.provider, action: asked.action} : null
     },
 
     fail(replyId: string, failure: RunFailure) {
@@ -284,6 +285,12 @@ export function createInFlight(
 
     streaming(): StreamingReply[] {
       return [...entries.values()].map(entry => entry.reply)
+    },
+
+    waitingApprovals(): ApprovalRequested[] {
+      return [...entries.values()].flatMap(entry =>
+        Array.from(entry.approvals.values())
+      )
     },
   }
 }

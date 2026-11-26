@@ -268,6 +268,7 @@ it('keeps a Reply waiting across a snapshot only while the snapshot still stream
       type: 'SNAPSHOT',
       app: {version: '0.0.0'},
       replies: [kept],
+      approvals: [],
       providers: [],
       models: {claude: [], chatgpt: []},
       lastModel: null,
@@ -395,6 +396,109 @@ it('keeps answered cards and decided reviews once the Reply finishes, dropping t
   ])
 
   expect(approvals.map(({id}) => id)).toEqual(['answered', 'decided'])
+})
+
+function snapshotOf(
+  replies: Extract<AppEvent, {type: 'SNAPSHOT'}>['replies'],
+  approvals: Extract<AppEvent, {type: 'SNAPSHOT'}>['approvals']
+): AppEvent {
+  return {
+    type: 'SNAPSHOT',
+    app: {version: '0.0.0'},
+    replies,
+    approvals,
+    providers: [],
+    models: {claude: [], chatgpt: []},
+    lastModel: null,
+    signIn: null,
+    settings: DEFAULT_SETTINGS,
+    systemPrompts: {entries: [...PRESETS]},
+    layout: DEFAULT_LAYOUT,
+  }
+}
+
+it('shows the cards still waiting to a window that opens while they wait, at their tool call', () => {
+  const live = createReplay()
+
+  live.replay([
+    snapshotOf(
+      [
+        {
+          ...ids,
+          status: 'streaming',
+          content: [
+            {type: 'text', text: 'Writing it.'},
+            {
+              type: 'tool-call',
+              toolCallId: 'tool-1',
+              toolName: 'Write',
+              args: '{}',
+              result: null,
+            },
+            {type: 'text', text: 'And more.'},
+          ],
+          contextSize: null,
+          contextWindow: null,
+          failure: null,
+          compacted: false,
+          rebuilt: false,
+        },
+      ],
+      [
+        {
+          ...ids,
+          type: 'APPROVAL_REQUESTED',
+          approvalId: 'waiting',
+          toolCallId: 'tool-1',
+          action: edit,
+        },
+      ]
+    ),
+  ])
+
+  expect(live.store.state.approvals[ids.replyId]).toMatchObject([
+    {id: 'waiting', kind: 'card', answer: null, afterParts: 2, action: edit},
+  ])
+})
+
+it('keeps answered cards through a new snapshot, drops open ones it no longer lists, and shows each waiting card once', () => {
+  const live = createReplay()
+
+  live.replay([
+    {...ids, type: 'RUN_STARTED'},
+    {...ids, type: 'APPROVAL_REQUESTED', approvalId: 'answered', action: edit},
+    {
+      ...ids,
+      type: 'APPROVAL_RESOLVED',
+      approvalId: 'answered',
+      answer: 'deny',
+    },
+    {...ids, type: 'APPROVAL_REQUESTED', approvalId: 'gone', action: edit},
+    {...ids, type: 'APPROVAL_REQUESTED', approvalId: 'waiting', action: edit},
+  ])
+
+  const kept = live.store.state.replies[ids.replyId]
+
+  if (!kept) throw new Error('The Reply is not streaming')
+
+  live.replay([
+    snapshotOf(
+      [kept],
+      [
+        {
+          ...ids,
+          type: 'APPROVAL_REQUESTED',
+          approvalId: 'waiting',
+          action: edit,
+        },
+      ]
+    ),
+  ])
+
+  expect(live.store.state.approvals[ids.replyId]?.map(({id}) => id)).toEqual([
+    'answered',
+    'waiting',
+  ])
 })
 
 it('starts the cards, reviews and Subagents over on a Retry, but not on a Subagent’s start', () => {

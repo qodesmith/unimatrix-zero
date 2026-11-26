@@ -75,6 +75,7 @@ function fakeMain() {
         type: 'SNAPSHOT',
         app: {version: '0.0.0'},
         replies: [],
+        approvals: [],
         providers: [
           {provider: 'claude', status: 'ready', account: null},
           {provider: 'chatgpt', status: 'not-connected', account: null},
@@ -177,6 +178,26 @@ it.each([
     await expect.element(card(screen).getByText(OUTSIDE)).toBeVisible()
   }
 )
+
+it('says the Reply waits for you while a card waits, not that it is writing', async () => {
+  const screen = await renderReply()
+
+  await expect.element(screen.getByText('Writing…')).toBeVisible()
+
+  main.publish(asked({kind: 'command', command: 'ls'}))
+
+  await expect.element(screen.getByText('Waiting for you')).toBeVisible()
+  expect(screen.getByText('Writing…').query()).toBeNull()
+
+  main.publish({
+    ...ids,
+    type: 'APPROVAL_RESOLVED',
+    approvalId: 'approval-1',
+    answer: 'allow-once',
+  })
+
+  await expect.element(screen.getByText('Writing…')).toBeVisible()
+})
 
 it('names the file an edit inside the Tree’s files would change, and leaves out the outside line', async () => {
   const screen = await renderReply(

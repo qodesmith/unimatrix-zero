@@ -7,7 +7,11 @@ import type {ReplyEvent, StreamingReply} from '@uz/contract/turns'
 import {Store} from '@tanstack/react-store'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 
-import {approvalsAfter, subagentsAfter} from './live-approvals'
+import {
+  approvalsAfter,
+  approvalsFromSnapshot,
+  subagentsAfter,
+} from './live-approvals'
 import {replyRunTransition} from './reply-run/machine'
 import {updateSavedReply, withProgress} from './saved-turns'
 
@@ -194,6 +198,12 @@ export function applyLiveEvent(
 
           return wait ? [[replyId, wait]] : []
         })
+      ),
+      approvals: approvalsFromSnapshot(
+        state.approvals,
+        event.approvals,
+        event.replies,
+        now()
       ),
     }))
     void queryClient.invalidateQueries({queryKey: ['turns']})

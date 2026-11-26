@@ -345,6 +345,7 @@ export function fakeMain(saved: Saved = {}) {
         type: 'SNAPSHOT',
         app: {version: '0.0.0'},
         replies: saved.streaming ?? [],
+        approvals: [],
         providers: [
           saved.firstLaunch
             ? {provider: 'claude', status: 'not-connected', account: null}

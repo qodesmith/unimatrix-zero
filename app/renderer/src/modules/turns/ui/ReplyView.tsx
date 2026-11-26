@@ -27,6 +27,7 @@ import {Fragment} from 'react'
 
 import {
   useApprovals,
+  useAwaitingAnswer,
   useReply,
   useThinking,
   useWaiting,
@@ -162,14 +163,24 @@ const WAIT_LABELS: Record<Wait, string> = {
   reconnecting: 'Reconnecting…',
 }
 
-function streamingLabel(online: boolean, wait: Wait | undefined) {
+function streamingLabel(
+  online: boolean,
+  wait: Wait | undefined,
+  awaitingAnswer: boolean
+) {
   if (!online) return 'Offline · waiting for the connection'
+
+  if (awaitingAnswer) return 'Waiting for you'
 
   return wait ? WAIT_LABELS[wait] : 'Writing…'
 }
 
 function StreamingLine({replyId}: {replyId: string}) {
-  const label = streamingLabel(useOnline(), useWaiting(replyId))
+  const label = streamingLabel(
+    useOnline(),
+    useWaiting(replyId),
+    useAwaitingAnswer(replyId)
+  )
 
   return <span className="text-xs text-muted-foreground">{label}</span>
 }
