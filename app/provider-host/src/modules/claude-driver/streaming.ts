@@ -1,9 +1,11 @@
+import type {Approvals} from '#modules/approvals/main'
 import type {WhenIdle} from '#modules/idle/main'
 import type {ContentPart} from '#modules/prompt-content/main'
 import type {ContentEvent, Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SessionStoreClient} from '#modules/session-store/main'
 import type {Silent, WhenSilent} from './heard'
 import type {Outcome} from './outcome'
+import type {SessionApprovals} from './permissions'
 import type {Restore} from './resumption'
 import type {ClaudeSession, QueryFn} from './session'
 import type {ClaudeSignInDeps} from './sign-in'
@@ -14,6 +16,7 @@ import type {
   SpawnedProcess,
 } from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRequest, SessionFile} from '@uz/contract/host'
+import type {PermissionMode} from '@uz/contract/permissions'
 import type {CompactionSettings} from '@uz/contract/settings'
 import type {TreeTools} from '@uz/contract/tools'
 import type {RunFailure} from '@uz/contract/turns'
@@ -21,6 +24,7 @@ import type {RunFailure} from '@uz/contract/turns'
 import {failureOf} from '#modules/failures/main'
 import {createReplyRuns} from '#modules/reply-runs/main'
 
+import {createApprovalFeed} from './approval-feed'
 import {firstHeard, silentEnding, startingWith} from './heard'
 import {replyOptions} from './options'
 import {sessionLost} from './outcome'
@@ -48,6 +52,7 @@ export interface ClaudeRepliesDeps {
   platform: NodeJS.Platform
   learnModels: (models: ModelInfo[]) => void
   resolveModel: (id: string) => string
+  approvals: Approvals
 }
 
 interface Live extends ClaudeSession {
@@ -55,6 +60,8 @@ interface Live extends ClaudeSession {
   compactionSettings: CompactionSettings
   systemPrompt: string
   tools: TreeTools
+  permissionMode: PermissionMode
+  asking: SessionApprovals
   restore: Restore
   store: SessionStoreClient
   projectKey: string
@@ -154,6 +161,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     const {resume, fork, upTo} = resumption(request.session, restore)
     let activeConfigDir = configDir
     const appCopy = storeFor(request)
+    const asking: SessionApprovals = {current: null}
 
     const sessionStore = appSessionStore(
       appCopy,
@@ -167,7 +175,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
         : sessionStore
 
     const options: Options = {
-      ...replyOptions(request, program.path, env, deps.platform),
+      ...replyOptions(request, program.path, env, deps.platform, asking),
       ...(resume ? {resume} : {}),
       ...(fork ? {forkSession: true} : {}),
       ...(upTo ? {resumeSessionAt: upTo} : {}),
@@ -200,6 +208,8 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       compactionSettings: request.compactionSettings,
       systemPrompt: request.systemPrompt,
       tools: request.tools,
+      permissionMode: request.permissionMode,
+      asking,
       restore,
       store: appCopy,
       projectKey,
@@ -218,6 +228,9 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     const messages = session.send(content, request.prompt.messageId)
     let heard = false
     let unstoppable: (() => void) | null = null
+    const feed = createApprovalFeed()
+
+    session.asking.current = deps.approvals.forReply(request, feed.emit)
 
     try {
       const first = await firstHeard(messages, run, deps.whenSilent)
@@ -233,10 +246,17 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
         heard = true
         unstoppable = run.stoppable(async () => session.interrupt())
 
-        for await (const message of startingWith(first.value, messages)) {
-          if (message.type === 'result') return {result: message}
+        for await (const fed of feed.merge(
+          startingWith(first.value, messages)
+        )) {
+          if (fed.kind === 'approval') {
+            yield fed.event
+            continue
+          }
 
-          yield* mapper.map(message)
+          if (fed.message.type === 'result') return {result: fed.message}
+
+          yield* mapper.map(fed.message)
         }
       }
 
@@ -251,6 +271,7 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
       return {failure: heard ? crashed(message) : failureOf(message), heard}
     } finally {
       unstoppable?.()
+      session.asking.current = null
     }
   }
 

@@ -203,6 +203,28 @@ export const ToolResultEvent = z.strictObject({
   isError: z.boolean(),
 })
 
+/** What an approval card asks about. Reads never ask, so none is a read. */
+export const ApprovalActionSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('edit'),
+    /** Absolute, in the order the Provider named them. */
+    paths: z.array(z.string().min(1)).min(1),
+    /** Every path is inside the Tree's files, so the Branch versions it. */
+    inTreeFiles: z.boolean(),
+  }),
+  z.strictObject({kind: z.literal('command'), command: z.string()}),
+  z.strictObject({kind: z.literal('host'), host: z.string().min(1)}),
+  z.strictObject({
+    kind: z.literal('mcp-tool'),
+    server: z.string(),
+    tool: z.string(),
+  }),
+  /** Any other tool, by the name the Provider gives it. */
+  z.strictObject({kind: z.literal('tool'), name: z.string().min(1)}),
+])
+
+export type ApprovalAction = z.infer<typeof ApprovalActionSchema>
+
 export const ApprovalAnswerSchema = z.enum([
   'allow-once',
   'always-allow',
@@ -211,12 +233,14 @@ export const ApprovalAnswerSchema = z.enum([
 
 export type ApprovalAnswer = z.infer<typeof ApprovalAnswerSchema>
 
+/** The Reply waits on the user's answer; display only, as is the answer. */
 export const ApprovalRequestedEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('APPROVAL_REQUESTED'),
   approvalId: z.string(),
+  /** The tool call it sits at, when the Provider streamed one first. */
   toolCallId: z.string().optional(),
-  summary: z.string(),
+  action: ApprovalActionSchema,
 })
 
 export const ApprovalResolvedEvent = z.strictObject({
@@ -224,6 +248,24 @@ export const ApprovalResolvedEvent = z.strictObject({
   type: z.literal('APPROVAL_RESOLVED'),
   approvalId: z.string(),
   answer: ApprovalAnswerSchema,
+})
+
+/** Under Auto the Reviewer decides instead of the user. */
+export const ReviewStartedEvent = z.strictObject({
+  ...replyEvent,
+  type: z.literal('REVIEW_STARTED'),
+  reviewId: z.string(),
+  toolCallId: z.string().optional(),
+  action: ApprovalActionSchema,
+})
+
+/** `unanswered`: it timed out or failed, which counts as declined. */
+export const ReviewFinishedEvent = z.strictObject({
+  ...replyEvent,
+  type: z.literal('REVIEW_FINISHED'),
+  reviewId: z.string(),
+  decision: z.enum(['approved', 'declined', 'unanswered']),
+  reason: z.string().nullable(),
 })
 
 export const SubagentStartedEvent = z.strictObject({
@@ -305,6 +347,8 @@ export const ReplyEventSchema = z.discriminatedUnion('type', [
   ToolResultEvent,
   ApprovalRequestedEvent,
   ApprovalResolvedEvent,
+  ReviewStartedEvent,
+  ReviewFinishedEvent,
   SubagentStartedEvent,
   SubagentFinishedEvent,
   TokensEvent,

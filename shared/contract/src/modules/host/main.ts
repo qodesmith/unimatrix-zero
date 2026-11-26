@@ -9,10 +9,18 @@ import type {ApprovalAnswer, ReplyEvent} from '#modules/turns/main'
 
 import {HostAttachmentSchema} from '#modules/attachments/main'
 import {VendorBuildSchema} from '#modules/manifest/main'
+import {
+  ApprovalGrantSchema,
+  PermissionModeSchema,
+} from '#modules/permissions/main'
 import {ModelSchema, SignInUpdateSchema} from '#modules/providers/main'
 import {CompactionSettingsSchema} from '#modules/settings/main'
 import {TreeToolsSchema} from '#modules/tools/main'
-import {ReplyEventSchema, ReplyPartSchema} from '#modules/turns/main'
+import {
+  ApprovalAnswerSchema,
+  ReplyEventSchema,
+  ReplyPartSchema,
+} from '#modules/turns/main'
 import {z} from 'zod'
 
 import {
@@ -139,6 +147,9 @@ export const ReplyRequestSchema = z.strictObject({
    */
   systemPromptChanged: z.boolean(),
   tools: TreeToolsSchema,
+  permissionMode: PermissionModeSchema,
+  /** The Tree's "Always allow in this Tree" answers so far. */
+  grants: z.array(ApprovalGrantSchema),
 })
 
 export type ReplyRequest = z.infer<typeof ReplyRequestSchema>
@@ -257,6 +268,12 @@ export const HostCommandSchema = z.discriminatedUnion('type', [
   z.strictObject({type: z.literal('reply.start'), request: ReplyRequestSchema}),
   /** Interrupts the Reply's turn; its `RUN_FINISHED` follows. */
   z.strictObject({type: z.literal('reply.stop'), replyId: z.uuid()}),
+  /** `APPROVAL_RESOLVED` follows, unless the Reply already moved on. */
+  z.strictObject({
+    type: z.literal('approval.answer'),
+    approvalId: z.string(),
+    answer: ApprovalAnswerSchema,
+  }),
   /** `SESSION_CUT` follows once the driver's `cutSession` has cut. */
   z.strictObject({
     type: z.literal('session.cut'),

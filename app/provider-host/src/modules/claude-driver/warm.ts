@@ -1,5 +1,6 @@
 import type {WhenIdle} from '#modules/idle/main'
 import type {ReplyRequest, SessionRef} from '@uz/contract/host'
+import type {PermissionMode} from '@uz/contract/permissions'
 import type {CompactionSettings} from '@uz/contract/settings'
 import type {TreeTools} from '@uz/contract/tools'
 
@@ -36,6 +37,8 @@ export interface WarmSession {
   readonly systemPrompt: string
   /** Fixed as `claude` starts: it can't add or remove a tool later. */
   readonly tools: TreeTools
+  /** Fixed as `claude` starts, with the callback that asks. */
+  readonly permissionMode: PermissionMode
   close(): Promise<void>
 }
 
@@ -102,8 +105,9 @@ export function createWarmSessions<Session extends WarmSession>({
   return {
     /**
      * Closes it at any other point, on another Model, with other Compaction
-     * Settings, under another System prompt or with other tools, so `claude`
-     * never runs a session twice. Another name for its Model keeps it.
+     * Settings, under another System prompt, with other tools or under another
+     * Permission mode, so `claude` never runs a session twice. Another name for
+     * its Model keeps it.
      */
     claim(
       ref: SessionRef,
@@ -112,9 +116,14 @@ export function createWarmSessions<Session extends WarmSession>({
         compactionSettings,
         systemPrompt,
         tools,
+        permissionMode,
       }: Pick<
         ReplyRequest,
-        'model' | 'compactionSettings' | 'systemPrompt' | 'tools'
+        | 'model'
+        | 'compactionSettings'
+        | 'systemPrompt'
+        | 'tools'
+        | 'permissionMode'
       >
     ): Session | null {
       const wanted = resolveModel(model)
@@ -129,7 +138,8 @@ export function createWarmSessions<Session extends WarmSession>({
           session.compactionSettings.threshold ===
             compactionSettings.threshold &&
           session.systemPrompt === systemPrompt &&
-          CLAUDE_TOOLS.every(key => session.tools[key] === tools[key])
+          CLAUDE_TOOLS.every(key => session.tools[key] === tools[key]) &&
+          session.permissionMode === permissionMode
         ) {
           wake(session)
 

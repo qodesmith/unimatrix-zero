@@ -38,6 +38,8 @@ function providersReply(provider: ProviderId, treeId: string, replyId: string) {
   )
 }
 
+type ApprovalRequested = Extract<ReplyEvent, {type: 'APPROVAL_REQUESTED'}>
+
 export interface FinishedReply {
   provider: ProviderId
   treeId: string
@@ -54,6 +56,8 @@ interface Entry {
   promptMessageId: string
   reply: StreamingReply
   saveTimer: ReturnType<typeof setTimeout> | null
+  /** The cards waiting, by approvalId; never saved. */
+  approvals: Map<string, ApprovalRequested>
 }
 
 /** Saves before it publishes, so no window shows what main won't save. */
@@ -99,6 +103,14 @@ export function createInFlight(
     entry.reply = foldReplyEvent(before, event)
 
     if (event.type === 'CONTEXT_COMPACTED') recordCompaction(entry, event)
+
+    if (event.type === 'APPROVAL_REQUESTED') {
+      entry.approvals.set(event.approvalId, event)
+    }
+
+    if (event.type === 'APPROVAL_RESOLVED') {
+      entry.approvals.delete(event.approvalId)
+    }
 
     if (event.type === 'RUN_FINISHED') {
       entries.delete(event.replyId)
@@ -158,6 +170,7 @@ export function createInFlight(
         promptMessageId: prompt.messageId,
         reply: {...NEW_REPLY, treeId, replyId},
         saveTimer: null,
+        approvals: new Map(),
       })
     },
 
@@ -217,6 +230,16 @@ export function createInFlight(
       return entry?.reply.treeId === treeId ? entry.provider : null
     },
 
+    /** Null once the card is answered or its Reply has ended. */
+    waitingApproval(treeId: string, replyId: string, approvalId: string) {
+      const entry = entries.get(replyId)
+
+      const asked =
+        entry?.reply.treeId === treeId && entry.approvals.get(approvalId)
+
+      return asked ? {provider: entry.provider, action: asked.action} : null
+    },
+
     fail(replyId: string, failure: RunFailure) {
       const entry = entries.get(replyId)
 
@@ -262,6 +285,12 @@ export function createInFlight(
 
     streaming(): StreamingReply[] {
       return [...entries.values()].map(entry => entry.reply)
+    },
+
+    waitingApprovals(): ApprovalRequested[] {
+      return [...entries.values()].flatMap(entry =>
+        Array.from(entry.approvals.values())
+      )
     },
   }
 }

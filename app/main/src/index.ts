@@ -144,6 +144,7 @@ function openWindow(db: Database) {
     type: 'SNAPSHOT',
     app: {version: app.getVersion()},
     replies: turns.streaming(),
+    approvals: turns.waitingApprovals(),
     ...connections.snapshot(),
     lastModel: turns.lastModel(),
     settings: settings.read(),
@@ -263,6 +264,7 @@ function openWindow(db: Database) {
     snapshotsBefore: treeFiles.snapshotsBefore,
     compactionSettingsFor: provider =>
       compactionSettingsFor(settings.read(), provider),
+    permissionMode: () => (dev?.supervised ? 'supervised' : 'full-access'),
     listedModels: provider => connections.models(provider),
     attachmentsDir,
     now: () => new Date(),

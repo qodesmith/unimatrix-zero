@@ -14,9 +14,11 @@ import type {
   StartReplyEvent,
   Thread,
 } from '@uz/contract/host'
+import type {ApprovalGrant, PermissionMode} from '@uz/contract/permissions'
 import type {Model} from '@uz/contract/providers'
 import type {CompactionSettings} from '@uz/contract/settings'
 import type {TreeTools} from '@uz/contract/tools'
+import type {ApprovalAnswer} from '@uz/contract/turns'
 
 import {
   PDF_BASE64,
@@ -176,6 +178,10 @@ async function setUp(
     thread?: Thread
     attachments?: HostAttachment[]
     tools?: TreeTools
+    permissionMode?: PermissionMode
+    grants?: ApprovalGrant[]
+    /** Each card's answer in turn, or a Stop while it waits. */
+    answers?: (ApprovalAnswer | 'stop')[]
   }
 
   const vendorProgram = {
@@ -186,6 +192,21 @@ async function setUp(
     configDir,
     developerDir: path.join(configDir, 'developer'),
     gitFolder: path.join(configDir, 'git'),
+  }
+
+  /** Answers each card in turn, as the user would; past the list, Deny. */
+  function answering(replyId: string, answers: ReplyOptions['answers'] = []) {
+    const left = [...answers]
+
+    return async (event: Streamed) => {
+      if (event.type !== 'APPROVAL_REQUESTED') return
+
+      const answer = left.shift() ?? 'deny'
+
+      await (answer === 'stop'
+        ? driver.stop(replyId)
+        : driver.answerApproval(event.approvalId, answer))
+    }
   }
 
   async function reply(
@@ -199,11 +220,13 @@ async function setUp(
       compactionSettings = DEFAULT_COMPACTION_SETTINGS,
       thread = [],
       attachments = [],
+      answers,
       ...given
     }: ReplyOptions = {}
   ) {
     const events: Streamed[] = []
     let deltas = 0
+    const answer = answering(replyId, answers)
 
     for await (const event of driver.startReply({
       treeId,
@@ -218,6 +241,8 @@ async function setUp(
       compactionSettings,
       systemPromptChanged: false,
       tools: DEFAULT_TREE_TOOLS,
+      permissionMode: 'full-access',
+      grants: [],
       ...given,
     })) {
       events.push(event)
@@ -228,6 +253,8 @@ async function setUp(
       ) {
         await driver.stop(replyId)
       }
+
+      await answer(event)
     }
 
     return events
@@ -2205,6 +2232,241 @@ it('runs claude with the web, account connectors and built-in Skills only as the
     '--tools=Bash,Read,Write,Edit,Glob,Grep,NotebookEdit,Skill'
   )
   expect(changed?.args).not.toContain('--strict-mcp-config')
+})
+
+const SUPERVISED_WRITE =
+  'Create a file named notes.txt in the current folder holding the single word HERON, with your Write tool, then reply with only the word DONE.'
+
+function approvalsIn(events: Streamed[]) {
+  return events.flatMap(event =>
+    event.type === 'APPROVAL_REQUESTED' || event.type === 'APPROVAL_RESOLVED'
+      ? [event]
+      : []
+  )
+}
+
+function answersTo(claude: {reports: () => {answers: unknown[]}[]}) {
+  return claude
+    .reports()
+    .flatMap(report => report.answers)
+    .map(
+      answer => z.looseObject({response: z.unknown()}).parse(answer).response
+    )
+}
+
+it('runs claude under Supervised in its default mode, with no full access, asking the app before a tool runs', async () => {
+  const claude = await setUp(['read-outside.ndjson'])
+  await claude.reply('Read the file outside.', null, {
+    permissionMode: 'supervised',
+  })
+  const [report] = claude.reports()
+
+  expect(report?.args).toContain('--permission-mode=default')
+  expect(report?.args).toContain('--permission-prompt-tool=stdio')
+  expect(report?.args).not.toContain('--allow-dangerously-skip-permissions')
+})
+
+it('under Supervised, asks about a Write in the Tree’s files at its tool call once the call has shown, lets it run as written once allowed, and asks the next Reply in the same claude at that Reply', async () => {
+  const claude = await setUp(['approved.ndjson'])
+
+  const events = await claude.reply(SUPERVISED_WRITE, null, {
+    permissionMode: 'supervised',
+    answers: ['allow-once'],
+  })
+
+  const [write] = shown(events).content.flatMap(part =>
+    part.type === 'tool-call' ? [part] : []
+  )
+
+  const asked = events.findIndex(event => event.type === 'APPROVAL_REQUESTED')
+  const notes = path.join(claude.treeFolder, 'notes.txt')
+  // The recording was made on a Mac, so on Windows its path mixes separators.
+  const asWritten = `${claude.treeFolder}/notes.txt`
+
+  expect(approvalsIn(events)).toEqual([
+    {
+      treeId: expect.any(String),
+      replyId: expect.any(String),
+      type: 'APPROVAL_REQUESTED',
+      approvalId: expect.any(String),
+      toolCallId: write?.toolCallId,
+      action: {kind: 'edit', paths: [notes], inTreeFiles: true},
+    },
+    expect.objectContaining({type: 'APPROVAL_RESOLVED', answer: 'allow-once'}),
+  ])
+  expect(
+    events.findLastIndex(
+      event =>
+        event.type === 'TOOL_CALL_ARGS' &&
+        event.toolCallId === write?.toolCallId
+    )
+  ).toBeLessThan(asked)
+  expect(write?.result?.isError).toBe(false)
+  expect(answersTo(claude)).toEqual([
+    {
+      behavior: 'allow',
+      updatedInput: {file_path: asWritten, content: 'HERON'},
+      toolUseID: write?.toolCallId,
+    },
+  ])
+
+  const replyId = crypto.randomUUID()
+
+  const more = await claude.reply('Now write more.txt.', recordedIn(events), {
+    permissionMode: 'supervised',
+    replyId,
+    answers: ['allow-once'],
+  })
+
+  expect(approvalsIn(more).map(event => [event.type, event.replyId])).toEqual([
+    ['APPROVAL_REQUESTED', replyId],
+    ['APPROVAL_RESOLVED', replyId],
+  ])
+  expect(more.at(-1)).toMatchObject({status: 'complete'})
+  expect(claude.reports()).toHaveLength(1)
+})
+
+it('under Supervised, asks once for two Writes in the Tree’s files after Always allow, and lets the second run without a card', async () => {
+  const claude = await setUp(['always-allowed.ndjson'])
+
+  const events = await claude.reply('Write a.txt, then b.txt.', null, {
+    permissionMode: 'supervised',
+    answers: ['always-allow'],
+  })
+
+  expect(approvalsIn(events).map(event => event.type)).toEqual([
+    'APPROVAL_REQUESTED',
+    'APPROVAL_RESOLVED',
+  ])
+  expect(answersTo(claude)).toEqual([
+    expect.objectContaining({behavior: 'allow'}),
+    expect.objectContaining({behavior: 'allow'}),
+  ])
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+})
+
+it('under Supervised, shows no card for a Write a grant the Reply carries covers, and lets it run', async () => {
+  const claude = await setUp(['granted.ndjson'])
+
+  const events = await claude.reply('Write c.txt.', null, {
+    permissionMode: 'supervised',
+    grants: [{kind: 'edits-in-tree'}],
+  })
+
+  expect(approvalsIn(events)).toEqual([])
+  expect(answersTo(claude)).toEqual([
+    expect.objectContaining({behavior: 'allow'}),
+  ])
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+})
+
+it('under Supervised, denies a Write the user denies with a short reason, and the Reply goes on to finish', async () => {
+  const claude = await setUp(['denied.ndjson'])
+
+  const events = await claude.reply(SUPERVISED_WRITE, null, {
+    permissionMode: 'supervised',
+    answers: ['deny'],
+  })
+
+  const [write] = shown(events).content.flatMap(part =>
+    part.type === 'tool-call' ? [part] : []
+  )
+
+  expect(approvalsIn(events).at(-1)).toMatchObject({answer: 'deny'})
+  expect(answersTo(claude)).toEqual([
+    {
+      behavior: 'deny',
+      message: expect.stringMatching(/\S/),
+      toolUseID: write?.toolCallId,
+    },
+  ])
+  expect(write?.result?.isError).toBe(true)
+  expect(textOf(events)).not.toBe('')
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+})
+
+it('under Supervised, shows a card only once its tool call has, when claude asks before streaming the call', async () => {
+  const early = edited('denied.ndjson', lines => {
+    const ask = lines.findIndex(line => isOut(line, '"can_use_tool"'))
+    const start = lines.findIndex(line => isOut(line, '"message_start"'))
+    const asking = lines[ask]
+
+    if (!asking) throw new Error('The recording never asks')
+
+    const rest = lines.filter((_, index) => index !== ask)
+
+    return [...rest.slice(0, start + 1), asking, ...rest.slice(start + 1)]
+  })
+
+  const claude = await setUp([early])
+
+  const events = await claude.reply(SUPERVISED_WRITE, null, {
+    permissionMode: 'supervised',
+    answers: ['deny'],
+  })
+
+  const asked = events.findIndex(event => event.type === 'APPROVAL_REQUESTED')
+
+  expect(asked).toBeGreaterThan(
+    events.findLastIndex(event => event.type === 'TOOL_CALL_ARGS')
+  )
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+})
+
+it('under Supervised, ends a Reply stopped while a card waits as stopped, answering the card for no one and denying the Write', async () => {
+  const claude = await setUp(['stopped-asking.ndjson'])
+
+  const events = await claude.reply(SUPERVISED_WRITE, null, {
+    permissionMode: 'supervised',
+    answers: ['stop'],
+  })
+
+  expect(approvalsIn(events).map(event => event.type)).toEqual([
+    'APPROVAL_REQUESTED',
+  ])
+  expect(answersTo(claude)).toEqual([
+    expect.objectContaining({behavior: 'deny'}),
+  ])
+  expect(events.at(-1)).toMatchObject({status: 'stopped'})
+})
+
+it('under Supervised, lets a Read outside the Tree’s folder run with no card', async () => {
+  const claude = await setUp(['read-outside.ndjson'])
+
+  const events = await claude.reply('Read the file outside.', null, {
+    permissionMode: 'supervised',
+  })
+
+  expect(approvalsIn(events)).toEqual([])
+  expect(answersTo(claude)).toEqual([
+    {
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'allow',
+      },
+    },
+  ])
+  expect(textOf(events)).toMatch(/OSPREY/)
+})
+
+it('resumes the session in a new claude for a Reply under another Permission mode, closing the warm one', async () => {
+  const claude = await setUp(['warm.ndjson', 'resumed.ndjson'])
+  const first = await claude.reply(FIRST_PROMPT)
+  const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
+
+  const third = await claude.reply(THIRD_PROMPT, recordedIn(second), {
+    permissionMode: 'supervised',
+  })
+
+  expect(textOf(third)).toBe('TEAL OTTER')
+
+  await claude.allClosed()
+  const [warm, changed] = claude.reports()
+
+  expect(warm?.prompts).toEqual([FIRST_PROMPT, SECOND_PROMPT])
+  expect(warm?.args).toContain('--permission-mode=bypassPermissions')
+  expect(changed?.args).toContain(`--resume=${SESSION_ID}`)
+  expect(changed?.args).toContain('--permission-mode=default')
 })
 
 const HANDED_OVER: Thread = [

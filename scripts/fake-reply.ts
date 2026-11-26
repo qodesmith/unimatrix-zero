@@ -51,6 +51,8 @@ export async function recordFakeReply(): Promise<ReplyEvent[]> {
     compactionSettings: {auto: true, threshold: null},
     systemPromptChanged: false,
     tools: DEFAULT_TREE_TOOLS,
+    permissionMode: 'full-access',
+    grants: [],
   })) {
     if (!isReplyEvent(event)) continue
 

@@ -153,6 +153,14 @@ export const handlers: Handlers = {
     return {}
   },
 
+  'reply.answer-approval': (command, {turns}) => {
+    if (!turns.answerApproval(command)) {
+      throw new NotFoundError('That Approval card is no longer waiting.')
+    }
+
+    return {}
+  },
+
   'reply.retry': ({treeId, replyId}, {trees, turns}) => {
     found(trees.get(treeId))
 

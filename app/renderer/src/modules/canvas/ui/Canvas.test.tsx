@@ -184,6 +184,7 @@ function fakeMain(saved: Saved) {
       type: 'SNAPSHOT',
       app: {version: '0.0.0'},
       replies: [],
+      approvals: [],
       providers: PROVIDERS,
       models: {
         claude: [
@@ -3083,6 +3084,38 @@ it('shows a root Reply that fails with the slideout open on it only as the chip,
       model: {provider: 'claude', model: 'fake'},
     },
   ])
+})
+
+it('badges a Turn whose Reply waits on an approval card until it is answered', async () => {
+  const {main} = await renderCanvas(endingIn('streaming', ''))
+  // The Reply's own line says it too, below the badge.
+  const badge = page.getByText('Waiting for you').first()
+
+  await expect.element(page.getByText('Writing…')).toBeVisible()
+  expect(badge.query()).toBeNull()
+
+  main.publish({
+    treeId,
+    replyId: uuid(12),
+    type: 'APPROVAL_REQUESTED',
+    approvalId: 'approval-1',
+    action: {kind: 'command', command: 'ls'},
+  })
+
+  await expect.element(badge).toBeVisible()
+  expect(
+    badge.element().closest('[data-turn]')?.getAttribute('data-turn')
+  ).toBe(uuid(12))
+
+  main.publish({
+    treeId,
+    replyId: uuid(12),
+    type: 'APPROVAL_RESOLVED',
+    approvalId: 'approval-1',
+    answer: 'allow-once',
+  })
+
+  await expect.element(badge).not.toBeInTheDocument()
 })
 
 it('stops the streaming Reply at the end of the Active Thread with Esc, unless the user is typing elsewhere', async () => {

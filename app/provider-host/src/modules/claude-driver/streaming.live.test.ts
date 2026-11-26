@@ -4,6 +4,7 @@
  */
 import type {Query} from '@anthropic-ai/claude-agent-sdk'
 import type {
+  ProviderDriver,
   ReplyRecorded,
   ReplyRequest,
   ReplySession,
@@ -12,6 +13,7 @@ import type {
   Thread,
 } from '@uz/contract/host'
 import type {CompactionSettings} from '@uz/contract/settings'
+import type {ApprovalAnswer} from '@uz/contract/turns'
 
 import {byPathOnly, pdfSaying, pngShowing} from '#modules/test-attachments/main'
 import {markedDeveloperFolder} from '#modules/test-developer-folder/main'
@@ -246,6 +248,8 @@ function liveDriver(
       compactionSettings,
       systemPromptChanged: false,
       tools: DEFAULT_TREE_TOOLS,
+      permissionMode: 'full-access',
+      grants: [],
     }
   }
 
@@ -298,6 +302,73 @@ function reaching(session: ReplyRecorded['session']): ReplySession {
 }
 
 type Live = ReturnType<typeof liveDriver>
+
+const SUPERVISED_WRITE =
+  'Create a file named notes.txt in the current folder holding the single word HERON, with your Write tool, then reply with only the word DONE.'
+
+const SECOND_WRITE =
+  'Now create more.txt in the current folder holding the single word OSPREY, with your Write tool, then reply with only the word DONE.'
+
+const TWO_WRITES =
+  'With your Write tool, create a.txt holding the single word ONE in the current folder, and once that is done create b.txt holding the single word TWO there, then reply with only the word DONE.'
+
+const GRANTED_WRITE =
+  'Create a file named c.txt in the current folder holding the single word THREE, with your Write tool, then reply with only the word DONE.'
+
+function supervised(live: Live, text: string, tree: string): ReplyRequest {
+  return {
+    ...live.request(text, null),
+    treeFolder: tree,
+    permissionMode: 'supervised',
+  }
+}
+
+function approvalsIn(events: Streamed[]) {
+  return events.flatMap(event =>
+    event.type === 'APPROVAL_REQUESTED' || event.type === 'APPROVAL_RESOLVED'
+      ? [event]
+      : []
+  )
+}
+
+/** Answers each card in turn while the Reply waits, as the user would. */
+async function answering(
+  driver: ProviderDriver,
+  request: ReplyRequest,
+  answers: ApprovalAnswer[]
+) {
+  const events: Streamed[] = []
+  const left = [...answers]
+
+  for await (const event of driver.startReply(request)) {
+    events.push(event)
+
+    if (event.type === 'APPROVAL_REQUESTED') {
+      await driver.answerApproval(event.approvalId, left.shift() ?? 'deny')
+    }
+  }
+
+  return events
+}
+
+function controlRequestsIn(live: Live) {
+  return live.printed
+    .map(line => z.looseObject({type: z.string()}).parse(JSON.parse(line)))
+    .flatMap(line => {
+      const request = z
+        .looseObject({
+          type: z.literal('control_request'),
+          request: z.looseObject({subtype: z.string()}),
+        })
+        .safeParse(line)
+
+      return request.success ? [request.data.request.subtype] : []
+    })
+}
+
+function readIn(tree: string, name: string) {
+  return fs.readFileSync(path.join(tree, name), 'utf8').trim()
+}
 
 /** The SDK runs a `.mjs` with the `node` on PATH. */
 function exitWatcher(ended: string) {
@@ -1106,6 +1177,215 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     },
     300_000
   )
+
+  it('[dep:claude-supervised-asks] under Supervised, asks about a Write in the Tree’s folder once its tool call shows, at that call, and writes the file once allowed, then asks the next Reply’s own card in the same claude', async () => {
+    const live = liveDriver(['approved.ndjson'])
+    const tree = newTreeFolder()
+
+    try {
+      const events = await answering(
+        live.driver,
+        supervised(live, SUPERVISED_WRITE, tree),
+        ['allow-once']
+      )
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+      expect(readIn(tree, 'notes.txt')).toBe('HERON')
+
+      const [write] = toolCallsIn(events)
+      const asked = events.findIndex(e => e.type === 'APPROVAL_REQUESTED')
+
+      expect(events[asked]).toMatchObject({
+        toolCallId: write?.toolCallId,
+        action: {
+          kind: 'edit',
+          paths: [path.join(tree, 'notes.txt')],
+          inTreeFiles: true,
+        },
+      })
+      expect(
+        events.findLastIndex(
+          event =>
+            event.type === 'TOOL_CALL_ARGS' &&
+            event.toolCallId === write?.toolCallId
+        )
+      ).toBeLessThan(asked)
+      expect(approvalsIn(events).map(event => event.type)).toEqual([
+        'APPROVAL_REQUESTED',
+        'APPROVAL_RESOLVED',
+      ])
+      expect(write?.result?.isError).toBe(false)
+
+      const next = {
+        ...supervised(live, SECOND_WRITE, tree),
+        session: continuing(recordedIn(events).session),
+      }
+
+      const again = await answering(live.driver, next, ['allow-once'])
+
+      expect(again.at(-1)).toMatchObject({status: 'complete'})
+      expect(readIn(tree, 'more.txt')).toBe('OSPREY')
+      expect(approvalsIn(again)[0]).toMatchObject({replyId: next.replyId})
+      expect(live.queries).toHaveLength(1)
+
+      await live.done()
+    } finally {
+      fs.rmSync(tree, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:claude-supervised-asks] under Supervised, asks once for two Writes in the Tree’s files after Always allow, and not at all in a Reply that carries the grant, though claude asks the app each time', async () => {
+    const live = liveDriver(['always-allowed.ndjson'])
+    const tree = newTreeFolder()
+
+    try {
+      const events = await answering(
+        live.driver,
+        supervised(live, TWO_WRITES, tree),
+        ['always-allow']
+      )
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+      expect([readIn(tree, 'a.txt'), readIn(tree, 'b.txt')]).toEqual([
+        'ONE',
+        'TWO',
+      ])
+      expect(
+        toolCallsIn(events).filter(call => call.toolName === 'Write')
+      ).toHaveLength(2)
+      expect(approvalsIn(events).map(event => event.type)).toEqual([
+        'APPROVAL_REQUESTED',
+        'APPROVAL_RESOLVED',
+      ])
+      expect(
+        controlRequestsIn(live).filter(type => type === 'can_use_tool')
+      ).toHaveLength(2)
+
+      await live.done()
+
+      const granted = liveDriver(['granted.ndjson'])
+
+      const next = await answering(
+        granted.driver,
+        {
+          ...supervised(granted, GRANTED_WRITE, tree),
+          grants: [{kind: 'edits-in-tree'}],
+        },
+        []
+      )
+
+      expect(next.at(-1)).toMatchObject({status: 'complete'})
+      expect(readIn(tree, 'c.txt')).toBe('THREE')
+      expect(approvalsIn(next)).toEqual([])
+      expect(controlRequestsIn(granted)).toContain('can_use_tool')
+
+      await granted.done()
+    } finally {
+      fs.rmSync(tree, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:claude-supervised-asks] under Supervised, leaves a denied Write undone and the Reply goes on', async () => {
+    const live = liveDriver(['denied.ndjson'])
+    const tree = newTreeFolder()
+
+    try {
+      const events = await answering(
+        live.driver,
+        supervised(live, SUPERVISED_WRITE, tree),
+        ['deny']
+      )
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+      expect(fs.readdirSync(tree)).toEqual([])
+      expect(toolCallsIn(events)[0]?.result?.isError).toBe(true)
+      expect(approvalsIn(events).at(-1)).toMatchObject({answer: 'deny'})
+      expect(shownText(events)).not.toBe('')
+
+      await live.done()
+    } finally {
+      fs.rmSync(tree, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:claude-supervised-asks] under Supervised, a Stop while a card waits ends the Reply stopped, and the Write never happens', async () => {
+    const live = liveDriver(['stopped-asking.ndjson'])
+    const tree = newTreeFolder()
+    const request = supervised(live, SUPERVISED_WRITE, tree)
+    const events: Streamed[] = []
+
+    try {
+      for await (const event of live.driver.startReply(request)) {
+        events.push(event)
+
+        if (event.type === 'APPROVAL_REQUESTED') {
+          await live.driver.stop(request.replyId)
+        }
+      }
+
+      expect(events.at(-1)).toMatchObject({status: 'stopped'})
+      expect(approvalsIn(events).map(event => event.type)).toEqual([
+        'APPROVAL_REQUESTED',
+      ])
+      expect(fs.readdirSync(tree)).toEqual([])
+
+      await live.done()
+    } finally {
+      fs.rmSync(tree, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:claude-supervised-asks] under Supervised, reads a file outside the Tree’s folder without asking, which claude asks about without the hook', async () => {
+    const live = liveDriver(['read-outside.ndjson'])
+    const tree = newTreeFolder()
+    const outside = newTreeFolder()
+    const secret = path.join(outside, 'secret.txt')
+    fs.writeFileSync(secret, 'OSPREY\n')
+    const prompt = `Read ${secret} with your Read tool and reply with only what it holds.`
+
+    try {
+      const events = await answering(
+        live.driver,
+        supervised(live, prompt, tree),
+        []
+      )
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+      expect(toolCallsIn(events).map(call => call.toolName)).toEqual(['Read'])
+      expect(shownText(events)).toMatch(/OSPREY/)
+      expect(approvalsIn(events)).toEqual([])
+      expect(controlRequestsIn(live)).toEqual(['hook_callback'])
+
+      await live.done()
+
+      const asked: string[] = []
+
+      await Array.fromAsync(
+        query({
+          prompt,
+          options: {
+            pathToClaudeCodeExecutable: program,
+            env: claudeReplyEnvironment(process.env, configDir),
+            cwd: tree,
+            settingSources: [],
+            tools: ['Read'],
+            permissionMode: 'default',
+            model: 'haiku',
+            canUseTool: async (toolName, input) => {
+              asked.push(toolName)
+
+              return {behavior: 'allow', updatedInput: input}
+            },
+          },
+        })
+      )
+
+      expect(asked).toEqual(['Read'])
+    } finally {
+      fs.rmSync(tree, {recursive: true, force: true})
+      fs.rmSync(outside, {recursive: true, force: true})
+    }
+  }, 300_000)
 
   it('[dep:claude-resume-moved-folder] resumes a session from the app’s copy alone in a Tree folder other than the one it started in, and works there', async () => {
     const live = liveDriver([])

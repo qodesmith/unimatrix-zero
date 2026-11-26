@@ -200,10 +200,21 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Kind:** D
 - **Provider:** Claude
 - **Relies on:** `claude` offers the Model exactly the tools named in the SDK's `tools` list that the machine can run, `disallowedTools: ['Agent']` keeps the Subagent tool (listed as `Task`) out, and `permissionMode: 'bypassPermissions'` with `allowDangerouslySkipPermissions` runs every tool call in `cwd` without asking. The `claude_code` tool preset would add tools that outlive a Reply or leave the folder (cron jobs, worktrees, remote triggers). On Windows with no Git Bash, `claude` offers no `Bash` though it is named.
-- **App side:** `claude-driver` names its tools for files and commands, on Windows `PowerShell` among them (ADR 0026), adds the web tools when the Tools panel has web search on (`claude-tool-switches`), and runs every Reply in the Tree's folder with full access, until the Permission mode decides (ADR 0022). Its Reply mapper shows each tool call and its result.
+- **App side:** `claude-driver` names its tools for files and commands, on Windows `PowerShell` among them (ADR 0026), adds the web tools when the Tools panel has web search on (`claude-tool-switches`), and runs every Reply in the Tree's folder, under Full access with no `canUseTool` and no hook (ADR 0022). Its Reply mapper shows each tool call and its result.
 - **User would see:** a Reply that can't open, write or run anything, that stalls on a permission request nothing answers, or that starts Subagents or background jobs the app can't show.
 - **Changed by:** upgrade
 - **Check:** `[dep:claude-tools-full-access]` in `claude-driver`: a Reply writes a file in the Tree's folder and runs a command there, `claude` lists exactly the named tools, so no `Agent` or `Task`, and sends no control request. On a Mac or Linux only: the tools on Windows are covered by `windows-powershell-keeps-path`.
+
+### Claude asks the app under Supervised
+
+- **Id:** `claude-supervised-asks`
+- **Kind:** D/W
+- **Provider:** Claude
+- **Relies on:** under `permissionMode: 'default'`, `claude` sends `can_use_tool` before a tool call that would ask: a Write in `cwd` or outside it, a Bash command that changes something, WebFetch, and a Read, Glob or `ls` outside `cwd`. The callback gets the call's `toolUseID`, the id of the streamed `tool_use` block, and `agentID` for a Subagent's call. It comes after the call's `assistant` message. A `PreToolUse` hook that answers `permissionDecision: 'allow'` skips `can_use_tool` for that call. `{behavior: 'deny', message}` fails the call with the message as its result, and the turn goes on. An interrupt while the callback waits cancels it (`control_cancel_request`), aborts its `signal` and ends the turn. `canUseTool` and hooks are fixed when `claude` starts. A `permission_suggestions` entry passed back as `updatedPermissions` would change the whole session: Write's switches it to `acceptEdits`.
+- **App side:** under Supervised `claude-driver` starts `claude` in `default` mode with a `PreToolUse` hook that allows Read, Glob and Grep, so reads never ask, and a `canUseTool` that asks the app's approvals for the Reply now written on that `claude`. The card sits at the tool call whose id `claude` gives, and shows once that call's `assistant` message has been taken. Answers never pass the suggestions back. A warm `claude` started under another Permission mode is closed, and the next Reply resumes the session.
+- **User would see:** under Supervised, a Write or command that runs with no card, a card for a read, a card shown away from its tool call or never shown while the Reply waits, a denied call that ends the Reply, or a Stop that leaves the Reply waiting.
+- **Changed by:** upgrade
+- **Check:** `[dep:claude-supervised-asks]` in `claude-driver`: a Write in the Tree's folder asks at its tool call and runs once allowed, and the next Reply on the same `claude` asks at that Reply. Two Writes ask once after Always allow, and `claude` still sends `can_use_tool` for a Reply that carries the grant. A denied Write isn't made and the Reply completes. A Stop while a card waits ends the Reply stopped with no file. A Read outside the folder sends only `hook_callback`, and without the hook `claude` asks about it. A Subagent's `agentID` has no check: the app keeps Subagents out.
 
 ### Claude's tools follow the Tools panel
 
@@ -398,10 +409,10 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Kind:** D
 - **Provider:** ChatGPT
 - **Relies on:** `sandbox: 'danger-full-access'` with `approvalPolicy: 'never'` on `thread/start`, `thread/resume` and `thread/fork`, and `sandboxPolicy: {type: 'dangerFullAccess'}` with the same `cwd` and policy on `turn/start`, lets Codex edit files and run commands in `cwd` without asking. A turn's settings hold for its thread from then on.
-- **App side:** `codex-driver` runs every thread and every turn in the Tree's folder with full access, until the Permission mode decides (ADR 0022). A turn carries the settings too, because a thread a cut loaded runs read-only in the config folder until then. Its Reply mapper shows `fileChange` and `commandExecution` items as tool calls with their results.
-- **User would see:** a Reply that can't write or run anything, or that works in the config folder.
+- **App side:** `codex-driver` runs every thread and every turn in the Tree's folder with full access under the Full access Permission mode, the default (ADR 0022). A turn carries the settings too, because a thread a cut loaded runs read-only in the config folder until then, and a loaded thread may have run under Supervised. Its Reply mapper shows `fileChange` and `commandExecution` items as tool calls with their results.
+- **User would see:** a Reply that can't write or run anything, that works in the config folder, or that asks under Full access.
 - **Changed by:** upgrade
-- **Check:** `[dep:codex-full-access]` in `codex-driver`: a Reply writes a file in the Tree's folder and runs a command there, and a Reply on a thread a cut loaded read-only writes a file there too.
+- **Check:** `[dep:codex-full-access]` in `codex-driver`: a Reply writes a file in the Tree's folder and runs a command there, a Reply on a thread a cut loaded read-only writes a file there too, and a Reply under full access on a thread that ran Supervised turns writes one without a server request.
 
 ### Codex's tools follow the Tools panel
 
@@ -464,10 +475,28 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Kind:** D
 - **Provider:** ChatGPT
 - **Relies on:** with `approvalPolicy: 'never'`, full access and no client capabilities, Codex sends none of its server requests (approvals, user input, tool calls, token refreshes) during a Reply. It asks for user input only in Plan mode, and denies an MCP tool's approval outright under `never`.
-- **App side:** the app-server client in `codex-driver` refuses every server request at once.
+- **App side:** the app-server client in `codex-driver` refuses every server request at once, except the approval requests of a thread whose Reply runs under Supervised (`codex-approval-requests`).
 - **User would see:** a Reply that stalls or fails in Codex's wording, for example when an upgrade adds a request type or a connector asks the user for input.
 - **Changed by:** upgrade + drift. An upgrade can add request types, the Model picks the tools it calls, and OpenAI's servers supply the connectors.
-- **Check:** `[dep:codex-server-requests-refused]` in `codex-driver`: a Reply that writes a file and runs a shell command, with no server request on the wire.
+- **Check:** `[dep:codex-server-requests-refused]` in `codex-driver`: a Reply under full access that writes a file and runs a shell command, with no server request on the wire.
+
+### Codex asks before each command and edit under Supervised
+
+- **Id:** `codex-approval-requests`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** with `sandbox: 'workspace-write'` and `approvalPolicy: 'untrusted'`, and on `turn/start` the same policy with `sandboxPolicy: {type: 'workspaceWrite'}` naming the Tree's folder as writable, Codex 0.163.0:
+  - sends `item/fileChange/requestApproval` before every patch, even one inside `cwd`, and `item/commandExecution/requestApproval` before every command, with no list of safe commands. A command that only reads carries `commandActions` of the kinds `read`, `listFiles` and `search` alone.
+  - names a command in the user's login shell, quoted for it: `/bin/zsh -lc ls`, or `/bin/zsh -lc 'cat notes.txt'` for more than one word.
+  - gives each request the `itemId` of the `fileChange` or `commandExecution` item that `item/started` sent before it. A patch's request names no paths; its item does.
+  - takes `{decision: 'accept'}` or `{decision: 'decline'}`. After a decline nothing is written and the turn goes on.
+  - drops a waiting request on `turn/interrupt` and sends `serverRequest/resolved` for it, after `turn/completed`. It sends one after each answered request too.
+  - asks an MCP tool's approval as `mcpServer/elicitation/request` with `_meta.codex_approval_kind: 'mcp_tool_call'`, naming the server but not the call, and takes `{action: 'accept' | 'decline'}`.
+  - applies a turn's settings to its thread from then on, so a loaded thread changes mode at its next turn.
+- **App side:** `codex-driver` runs Supervised Replies this way and answers each approval request of the Reply's thread itself: a command Codex parsed into reads alone at once, anything else from the approval card or a grant of the Tree (`approvals`). A card and a grant name a command without its shell, so a grant from Claude holds on Codex; a command of any other shape stays as Codex sent it. It reads an edit's paths from the file change item, links the card to the tool call by `itemId`, and gives an MCP tool's approval to the oldest unfinished call of that server. It never answers `acceptForSession`, since the app keeps the grants. A card still waiting when the turn ends is dropped.
+- **User would see:** under Supervised, a write or a command that runs without asking, a Reply that stalls, a card for every `ls` or `cat`, a card that shows the shell around a command, an Always allow from Claude that Codex asks again for, a card that names no file or sits at the wrong tool call, or a card left after a Stop.
+- **Changed by:** upgrade
+- **Check:** `[dep:codex-approval-requests]` in `codex-driver`: under Supervised, on a thread first loaded under full access, a file write in the Tree's folder asks at its file change and is written once allowed; `ls` asks with `listFiles` alone, wrapped in a shell, and runs with no card; a denied write leaves no file and the Reply completes; a Stop drops the waiting request; an Always allow, and a grant a new Tree's request carries, answer the next writes. MCP tool approvals have no live check: the app gives Codex no MCP servers of its own, and the remote plugins' connectors need an account that has some connected.
 
 ### Codex's protocol types
 

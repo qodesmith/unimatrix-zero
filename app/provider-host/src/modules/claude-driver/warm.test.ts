@@ -1,3 +1,4 @@
+import type {PermissionMode} from '@uz/contract/permissions'
 import type {CompactionSettings} from '@uz/contract/settings'
 
 import {idleFor} from '#modules/idle/main'
@@ -8,12 +9,15 @@ import {createWarmSessions} from './warm'
 
 const DEFAULTS: CompactionSettings = {auto: true, threshold: null}
 
+const FULL_ACCESS: PermissionMode = 'full-access'
+
 function session(sessionId: string, messageId: string, model = 'haiku') {
   return {
     sessionId,
     messageId,
     model,
     compactionSettings: DEFAULTS,
+    permissionMode: FULL_ACCESS,
     systemPrompt: '',
     tools: DEFAULT_TREE_TOOLS,
     closed: false,
@@ -51,6 +55,7 @@ it('gives back the idle session standing at that Reply', () => {
       {
         model: 'haiku',
         compactionSettings: DEFAULTS,
+        permissionMode: FULL_ACCESS,
         systemPrompt: '',
         tools: DEFAULT_TREE_TOOLS,
       }
@@ -62,6 +67,7 @@ it('gives back the idle session standing at that Reply', () => {
       {
         model: 'haiku',
         compactionSettings: DEFAULTS,
+        permissionMode: FULL_ACCESS,
         systemPrompt: '',
         tools: DEFAULT_TREE_TOOLS,
       }
@@ -81,6 +87,7 @@ it('closes one standing elsewhere in the session instead of giving it back', () 
       {
         model: 'haiku',
         compactionSettings: DEFAULTS,
+        permissionMode: FULL_ACCESS,
         systemPrompt: '',
         tools: DEFAULT_TREE_TOOLS,
       }
@@ -102,6 +109,7 @@ it('closes one on another Model instead of giving it back', () => {
       {
         model: 'sonnet',
         compactionSettings: DEFAULTS,
+        permissionMode: FULL_ACCESS,
         systemPrompt: '',
         tools: DEFAULT_TREE_TOOLS,
       }
@@ -123,6 +131,7 @@ it('closes one started with other Compaction Settings instead of giving it back'
       {
         model: 'haiku',
         compactionSettings: {auto: true, threshold: 150_000},
+        permissionMode: FULL_ACCESS,
         systemPrompt: '',
         tools: DEFAULT_TREE_TOOLS,
       }
@@ -144,6 +153,7 @@ it('closes one started with automatic Compaction on when the Reply has it off', 
       {
         model: 'haiku',
         compactionSettings: {auto: false, threshold: null},
+        permissionMode: FULL_ACCESS,
         systemPrompt: '',
         tools: DEFAULT_TREE_TOOLS,
       }
@@ -164,6 +174,7 @@ it('closes one started under another System prompt instead of giving it back', (
       {
         model: 'haiku',
         compactionSettings: DEFAULTS,
+        permissionMode: FULL_ACCESS,
         systemPrompt: 'Be brief.',
         tools: DEFAULT_TREE_TOOLS,
       }
@@ -185,8 +196,31 @@ it('closes one started with other tools instead of giving it back', () => {
       {
         model: 'haiku',
         compactionSettings: DEFAULTS,
+        permissionMode: FULL_ACCESS,
         systemPrompt: '',
         tools: {...DEFAULT_TREE_TOOLS, webSearch: false},
+      }
+    )
+  ).toBeNull()
+  expect(one.closed).toBe(true)
+  expect(warm.size).toBe(0)
+})
+
+it('closes one started under another Permission mode instead of giving it back', () => {
+  const warm = warmSessions(6)
+  const one = session('s1', 'm1')
+  warm.add(one)
+  warm.release(one)
+
+  expect(
+    warm.claim(
+      {sessionId: 's1', messageId: 'm1'},
+      {
+        model: 'haiku',
+        permissionMode: 'supervised',
+        compactionSettings: DEFAULTS,
+        systemPrompt: '',
+        tools: DEFAULT_TREE_TOOLS,
       }
     )
   ).toBeNull()
@@ -206,6 +240,7 @@ it("gives back one whose tools differ only in ChatGPT's switches", () => {
       {
         model: 'haiku',
         compactionSettings: DEFAULTS,
+        permissionMode: FULL_ACCESS,
         systemPrompt: '',
         tools: {
           ...DEFAULT_TREE_TOOLS,
@@ -230,6 +265,7 @@ it('starts the idle wait over after each Reply', () => {
     {
       model: 'haiku',
       compactionSettings: DEFAULTS,
+      permissionMode: FULL_ACCESS,
       systemPrompt: '',
       tools: DEFAULT_TREE_TOOLS,
     }
@@ -255,6 +291,7 @@ it('never closes a session claimed after being released twice', () => {
     {
       model: 'haiku',
       compactionSettings: DEFAULTS,
+      permissionMode: FULL_ACCESS,
       systemPrompt: '',
       tools: DEFAULT_TREE_TOOLS,
     }
@@ -294,6 +331,7 @@ it('says when every `claude` it closed in a session has ended', async () => {
     {
       model: 'haiku',
       compactionSettings: DEFAULTS,
+      permissionMode: FULL_ACCESS,
       systemPrompt: '',
       tools: DEFAULT_TREE_TOOLS,
     }

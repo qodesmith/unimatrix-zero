@@ -30,6 +30,7 @@ function worktreePort(base: number, span: number) {
 const vitePort = worktreePort(5173, 2000)
 const debugPort = worktreePort(9222, 1000)
 const fakeProvider = process.argv.includes('--fake')
+const supervised = process.argv.includes('--supervised')
 
 // A fake connection saved in the real data would pass for a real one.
 const dataFolder = devDataFolderName(root, fakeProvider)
@@ -115,6 +116,7 @@ function startElectron() {
         UZ_DEV_NONCE: scriptNonce,
         UZ_DEV_DATA_FOLDER: dataFolder,
         UZ_DEV_FAKE: fakeProvider ? '1' : '0',
+        UZ_DEV_SUPERVISED: supervised ? '1' : '0',
       },
       onExit: (_proc, code) => {
         switch (state.status) {
@@ -188,7 +190,7 @@ process.on('SIGINT', () => send({type: 'stopAsked'}))
 process.on('SIGTERM', () => send({type: 'stopAsked'}))
 
 console.log(
-  `Unimatrix Zero dev: renderer on app-dev:// (Vite :${vitePort}), CDP on :${debugPort}, data in ${dataFolder}${fakeProvider ? ', fake Provider' : ''}`
+  `Unimatrix Zero dev: renderer on app-dev:// (Vite :${vitePort}), CDP on :${debugPort}, data in ${dataFolder}${fakeProvider ? ', fake Provider' : ''}${supervised ? ', Supervised' : ''}`
 )
 
 startElectron()

@@ -3,6 +3,7 @@ import type {SessionStoreClient} from '#modules/session-store/main'
 import type {CodexCommand, SpawnCodex} from './app-server'
 import type {ProviderDriver, SignInRequest} from '@uz/contract/host'
 
+import {createApprovals} from '#modules/approvals/main'
 import {idleFor} from '#modules/idle/main'
 import {
   loginShellPath,
@@ -95,7 +96,8 @@ export function createCodexDriver({
     )
   }
 
-  const replies = createCodexReplies({store, open, whenIdle})
+  const approvals = createApprovals()
+  const replies = createCodexReplies({store, open, whenIdle, approvals})
 
   return {
     capabilities: {
@@ -113,7 +115,9 @@ export function createCodexDriver({
     readUsage: notYet,
     startReply: replies.startReply,
     stop: replies.stop,
-    answerApproval: notYet,
+    answerApproval: async (approvalId, answer) => {
+      approvals.answer(approvalId, answer)
+    },
     forkSession: notYet,
     cutSession: replies.cutSession,
     runOneShot: notYet,

@@ -12,8 +12,10 @@ import type {
   StartReplyEvent,
   Thread,
 } from '@uz/contract/host'
+import type {ApprovalGrant, PermissionMode} from '@uz/contract/permissions'
 import type {CompactionSettings} from '@uz/contract/settings'
 import type {TreeTools} from '@uz/contract/tools'
+import type {ApprovalAnswer} from '@uz/contract/turns'
 
 import {fileHolding, pngShowing} from '#modules/test-attachments/main'
 import {markedDeveloperFolder} from '#modules/test-developer-folder/main'
@@ -272,6 +274,8 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
         compactionSettings: {auto: true, threshold},
         systemPromptChanged: false,
         tools: DEFAULT_TREE_TOOLS,
+        permissionMode: 'full-access',
+        grants: [],
       })
     )
 
@@ -364,6 +368,8 @@ function threadReplies(program: string, home: string) {
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         systemPromptChanged: false,
         tools: DEFAULT_TREE_TOOLS,
+        permissionMode: 'full-access',
+        grants: [],
       })
     )
 
@@ -402,6 +408,157 @@ function threadReplies(program: string, home: string) {
   }
 
   return {reply, closed, threadsStarted}
+}
+
+const ServerRequestLine = z.looseObject({
+  id: z.union([z.number(), z.string()]),
+  method: z.string(),
+  params: z.looseObject({
+    itemId: z.string().optional(),
+    command: z.string().nullable().optional(),
+    commandActions: z
+      .array(z.looseObject({type: z.string()}))
+      .nullable()
+      .optional(),
+  }),
+})
+
+const ResolvedLine = z.looseObject({
+  method: z.literal('serverRequest/resolved'),
+  params: z.looseObject({requestId: z.union([z.number(), z.string()])}),
+})
+
+function writing(name: string) {
+  return `Create a file named ${name} in the current folder holding the single word HERON, with your file editing tool.`
+}
+
+interface ApprovalReplyOptions {
+  treeId: string
+  session: SessionRef | null
+  permissionMode?: PermissionMode
+  grants?: ApprovalGrant[]
+  /** How the test answers each card; `stop` stops the Reply instead. */
+  answer?: ApprovalAnswer | 'stop'
+}
+
+/** Replies on one app-server in `tree`, answering each card as told. */
+function approvalReplies(
+  program: string,
+  home: string,
+  tree: string,
+  start: SpawnCodex
+) {
+  const idle = heldIdle()
+  const exits: Promise<unknown>[] = []
+  const output: Buffer[] = []
+
+  const driver = createCodexDriver({
+    store: fakeStore().client,
+    spawn: (command, options) => {
+      const child = start(command, options)
+      exits.push(once(child, 'exit').catch(() => undefined))
+      child.stdout.on('data', (chunk: Buffer) => output.push(chunk))
+
+      return child
+    },
+    whenIdle: idle.whenIdle,
+  })
+
+  async function reply(
+    text: string,
+    {
+      treeId,
+      session,
+      permissionMode = 'supervised',
+      grants = [],
+      answer = 'allow-once',
+    }: ApprovalReplyOptions
+  ) {
+    const replyId = crypto.randomUUID()
+    const from = output.length
+    const events: Streamed[] = []
+
+    for await (const event of driver.startReply({
+      treeId,
+      replyId,
+      model: MODEL,
+      systemPrompt: 'You answer in as few words as you can.',
+      prompt: {text, attachments: [], messageId: crypto.randomUUID()},
+      vendorProgram: {
+        program: {
+          path: program,
+          build: {
+            url: 'https://example.com/codex.tar.gz',
+            sha256: '0'.repeat(64),
+            size: 1,
+            archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+          },
+        },
+        configDir: home,
+      },
+      treeFolder: tree,
+      session: session && {...session, type: 'continue'},
+      thread: [],
+      compactionSettings: DEFAULT_COMPACTION_SETTINGS,
+      systemPromptChanged: false,
+      tools: DEFAULT_TREE_TOOLS,
+      permissionMode,
+      grants,
+    })) {
+      events.push(event)
+
+      if (event.type !== 'APPROVAL_REQUESTED') continue
+
+      await (answer === 'stop'
+        ? driver.stop(replyId)
+        : driver.answerApproval(event.approvalId, answer))
+    }
+
+    const recorded = events.find(
+      (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
+    )
+
+    if (!recorded) throw new Error('The Reply was not recorded')
+
+    const {content, status} = events
+      .filter(isReplyEvent)
+      .reduce(foldReplyEvent, NEW_REPLY)
+
+    const lines = Buffer.concat(output.slice(from))
+      .toString('utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map(line => z.looseObject({}).parse(JSON.parse(line)))
+
+    return {
+      events,
+      status,
+      session: recorded.session,
+      calls: content.flatMap(part => (part.type === 'tool-call' ? [part] : [])),
+      text: content
+        .flatMap(part => (part.type === 'text' ? [part.text] : []))
+        .join(''),
+      cards: events.flatMap(event =>
+        event.type === 'APPROVAL_REQUESTED' ? [event] : []
+      ),
+      resolved: events.flatMap(event =>
+        event.type === 'APPROVAL_RESOLVED' ? [event] : []
+      ),
+      lines,
+      requests: lines.flatMap(line => {
+        const request = ServerRequestLine.safeParse(line)
+
+        return request.success ? [request.data] : []
+      }),
+    }
+  }
+
+  async function closed() {
+    idle.pass()
+    await Promise.all(exits)
+  }
+
+  return {reply, closed}
 }
 
 const TurnCompleted = z.looseObject({
@@ -506,6 +663,8 @@ function codedReplies(
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         systemPromptChanged: false,
         tools,
+        permissionMode: 'full-access',
+        grants: [],
       })
     )
 
@@ -838,6 +997,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
 
@@ -1000,6 +1161,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         systemPromptChanged: false,
         tools: DEFAULT_TREE_TOOLS,
+        permissionMode: 'full-access',
+        grants: [],
       })) {
         events.push(event)
 
@@ -1161,6 +1324,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
 
@@ -1287,6 +1452,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
     }
@@ -1438,6 +1605,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         compactionSettings: DEFAULT_COMPACTION_SETTINGS,
         systemPromptChanged: false,
         tools: DEFAULT_TREE_TOOLS,
+        permissionMode: 'full-access',
+        grants: [],
       })) {
         events.push(event)
 
@@ -1800,6 +1969,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
 
@@ -1996,6 +2167,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: changed,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
 
@@ -2203,6 +2376,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
 
@@ -2285,6 +2460,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
 
@@ -2343,6 +2520,163 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 300_000)
 
+  it('[dep:codex-approval-requests] [dep:codex-full-access] under Supervised, on a thread loaded under full access, asks before a file write in the Tree’s folder at its file change, writes it only once allowed, and goes on after a denied one; asks before `ls` with listFiles alone, wrapped in a shell, which runs with no card; drops a waiting request on a Stop; lets an Always allow or a grant the request carries answer later writes; and asks nothing of the thread back under full access', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const tree = newTreeFolder()
+
+    const recorder = createRecorder(
+      [path.join(RECORDINGS, 'approvals.ndjson')],
+      {
+        treeFolder: tree,
+      }
+    )
+
+    const start = process.env.UZ_RECORD === 'yes' ? recorder.spawn : spawnCodex
+    const live = approvalReplies(folder, home, tree, start)
+    const treeId = crypto.randomUUID()
+
+    function inTree(name: string) {
+      return {kind: 'edit', paths: [path.join(tree, name)], inTreeFiles: true}
+    }
+
+    function written(name: string) {
+      return fs.existsSync(path.join(tree, name))
+    }
+
+    try {
+      const ready = await live.reply('Reply with the single word READY.', {
+        treeId,
+        session: null,
+        permissionMode: 'full-access',
+      })
+
+      expect(ready.requests).toEqual([])
+
+      // A thread loaded under full access asks from the next turn.
+      const allowed = await live.reply(
+        `${writing('allowed.txt')} Then run \`ls\` in your shell, and reply with only what it printed.`,
+        {treeId, session: ready.session}
+      )
+
+      const change = allowed.calls.find(call => call.toolName === 'fileChange')
+
+      const listing = allowed.calls.find(
+        call => call.toolName === 'commandExecution'
+      )
+
+      expect(allowed.cards.map(card => card.action)).toEqual([
+        inTree('allowed.txt'),
+      ])
+      expect(allowed.cards[0]?.toolCallId).toBe(change?.toolCallId)
+      expect(allowed.resolved.map(event => event.answer)).toEqual([
+        'allow-once',
+      ])
+      expect(written('allowed.txt')).toBe(true)
+      expect(listing?.result?.content).toContain('allowed.txt')
+      expect(
+        allowed.requests.map(request => ({
+          method: request.method,
+          itemId: request.params.itemId,
+          command: request.params.command,
+          actions: request.params.commandActions?.map(action => action.type),
+        }))
+      ).toEqual([
+        {
+          method: 'item/fileChange/requestApproval',
+          itemId: change?.toolCallId,
+          command: undefined,
+          actions: undefined,
+        },
+        {
+          method: 'item/commandExecution/requestApproval',
+          itemId: listing?.toolCallId,
+          command: expect.stringMatching(/^\/\S*sh -lc ls$/u),
+          actions: ['listFiles'],
+        },
+      ])
+
+      const denied = await live.reply(
+        `${writing('denied.txt')} Reply with only DONE once you have tried.`,
+        {treeId, session: allowed.session, answer: 'deny'}
+      )
+
+      expect(denied.cards.map(card => card.action)).toEqual([
+        inTree('denied.txt'),
+      ])
+      expect(denied.status).toBe('complete')
+      expect(written('denied.txt')).toBe(false)
+
+      const stopped = await live.reply(writing('stopped.txt'), {
+        treeId,
+        session: denied.session,
+        answer: 'stop',
+      })
+
+      // Codex drops the request it waits on, and says so once the turn ends.
+      const dropped = stopped.lines.flatMap(line => {
+        const resolved = ResolvedLine.safeParse(line)
+
+        return resolved.success ? [resolved.data.params.requestId] : []
+      })
+
+      expect(stopped.status).toBe('stopped')
+      expect(stopped.cards).toHaveLength(1)
+      expect(stopped.resolved).toEqual([])
+      expect(written('stopped.txt')).toBe(false)
+      expect(dropped).toEqual(stopped.requests.map(request => request.id))
+      expect(dropped).toHaveLength(1)
+
+      const always = await live.reply(writing('first.txt'), {
+        treeId,
+        session: stopped.session,
+        answer: 'always-allow',
+      })
+
+      expect(always.cards.map(card => card.action)).toEqual([
+        inTree('first.txt'),
+      ])
+      expect(written('first.txt')).toBe(true)
+
+      // Codex still asks; the Tree's Always allow answers.
+      const again = await live.reply(writing('second.txt'), {
+        treeId,
+        session: always.session,
+      })
+
+      expect(again.cards).toEqual([])
+      expect(again.requests.map(request => request.method)).toEqual([
+        'item/fileChange/requestApproval',
+      ])
+      expect(written('second.txt')).toBe(true)
+
+      const granted = await live.reply(writing('third.txt'), {
+        treeId: crypto.randomUUID(),
+        session: null,
+        grants: [{kind: 'edits-in-tree'}],
+      })
+
+      expect(granted.cards).toEqual([])
+      expect(granted.requests).toHaveLength(1)
+      expect(written('third.txt')).toBe(true)
+
+      const last = await live.reply(writing('last.txt'), {
+        treeId,
+        session: again.session,
+        permissionMode: 'full-access',
+      })
+
+      expect(last.requests).toEqual([])
+      expect(written('last.txt')).toBe(true)
+
+      await live.closed()
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+      fs.rmSync(tree, {recursive: true, force: true})
+    }
+  }, 600_000)
+
   it('[dep:codex-resume-moved-folder] resumes a thread from the app’s copy alone in a Tree folder other than the one it started in, and works there', async () => {
     if (!folder || !signedIn) return
 
@@ -2394,6 +2728,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
 
@@ -2563,6 +2899,8 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
           compactionSettings: DEFAULT_COMPACTION_SETTINGS,
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
+          permissionMode: 'full-access',
+          grants: [],
         })
       )
 

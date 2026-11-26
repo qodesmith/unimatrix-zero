@@ -13,6 +13,8 @@ export const RecordedLineSchema = z.discriminatedUnion('kind', [
     kind: z.literal('start'),
     configDir: z.string(),
     projectKey: z.string(),
+    /** Read as the folder the fake runs in wherever an out line names it. */
+    cwd: z.string().optional(),
   }),
   z.strictObject({kind: z.literal('in'), message: RecordedMessageSchema}),
   z.strictObject({kind: z.literal('out'), message: RecordedMessageSchema}),
@@ -73,6 +75,8 @@ export const FakeClaudeRunSchema = z.strictObject({
   toolResults: z.array(z.string()),
   /** The subtype of each control request it took after it went silent. */
   silentRequests: z.array(z.string()),
+  /** What the SDK answered each control request `claude` sent. */
+  answers: z.array(z.looseObject({subtype: z.string()})),
   inputClosed: z.boolean(),
   ended: z
     .enum([
@@ -105,7 +109,7 @@ function stillRunning(file) {
 const runningAtStart = fs.readdirSync(reports).filter(stillRunning).map(file => Number.parseInt(file, 10))
 const args = process.argv.slice(2)
 const configDir = process.env.CLAUDE_CONFIG_DIR
-const report = {args, configDir, developerDir: process.env.DEVELOPER_DIR ?? null, cwd: process.cwd(), runningAtStart, prompts: [], clientComposed: [], systemPrompt: [], appendedPrompt: null, promptSnapshot: null, resumedFrom: [], toolResults: [], silentRequests: [], inputClosed: false, ended: null}
+const report = {args, configDir, developerDir: process.env.DEVELOPER_DIR ?? null, cwd: process.cwd(), runningAtStart, prompts: [], clientComposed: [], systemPrompt: [], appendedPrompt: null, promptSnapshot: null, resumedFrom: [], toolResults: [], silentRequests: [], answers: [], inputClosed: false, ended: null}
 save()
 const recording = options.recordings[run]
 const lines = fs.readFileSync(recording, 'utf8')
@@ -158,7 +162,15 @@ function rename(entry) {
   }
 }
 
+const realCwd = fs.realpathSync(process.cwd())
+function inThisFolder(message) {
+  if (!start.cwd) return message
+  const quoted = folder => JSON.stringify(folder).slice(1, -1)
+  return JSON.parse(JSON.stringify(message).replaceAll(quoted(start.cwd), quoted(realCwd)))
+}
+
 function write(message) {
+  message = inThisFolder(message)
   if (message.type === 'control_response') {
     message = {...message, response: {...message.response, request_id: requestIds.get(message.response.request_id)}}
   }
@@ -235,6 +247,7 @@ process.stdin.on('data', chunk => {
       recorded.type === message.type &&
       (message.type !== 'control_request' || recorded.request.subtype === message.request.subtype))
     if (message.type === 'control_request') requestIds.set(step.message.request_id, message.request_id)
+    if (message.type === 'control_response') report.answers.push(message.response)
     if (message.type === 'control_request' && message.request.subtype === 'initialize') {
       const prompt = message.request.systemPrompt
       report.systemPrompt = Array.isArray(prompt) ? prompt : prompt == null ? [] : [prompt]

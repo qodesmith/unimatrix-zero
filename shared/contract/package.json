@@ -14,6 +14,7 @@
     "./host": "./src/modules/host/main.ts",
     "./layout": "./src/modules/layout/main.ts",
     "./manifest": "./src/modules/manifest/main.ts",
+    "./permissions": "./src/modules/permissions/main.ts",
     "./providers": "./src/modules/providers/main.ts",
     "./sizes": "./src/modules/sizes/main.ts",
     "./settings": "./src/modules/settings/main.ts",

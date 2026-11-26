@@ -81,6 +81,7 @@ function fakeMain() {
         type: 'SNAPSHOT',
         app: {version: '0.0.0'},
         replies: [],
+        approvals: [],
         providers: [
           {provider: 'claude', status: 'ready', account: null},
           {provider: 'chatgpt', status: 'not-connected', account: null},

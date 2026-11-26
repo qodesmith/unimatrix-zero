@@ -87,6 +87,7 @@ beforeEach(() => {
       treeFolderFor: id => `/trees/${id}`,
       snapshotsBefore: () => null,
       compactionSettingsFor: () => ({auto: true, threshold: null}),
+      permissionMode: () => 'supervised',
       listedModels: () => [],
       attachmentsDir,
       now,
@@ -585,6 +586,52 @@ describe('Reply commands', () => {
         message: 'That Reply isn’t being written.',
       },
     })
+  })
+
+  it('answers an approval card, keeping Always allow for the Tree’s later Replies, and answers not-found for one no longer waiting', async () => {
+    const tree = await createTree()
+    const {reply} = await sendPrompt(tree.id, null)
+    deps.turns.hostEvent('claude', {
+      type: 'APPROVAL_REQUESTED',
+      treeId: tree.id,
+      replyId: reply.id,
+      approvalId: 'a1',
+      action: {kind: 'host', host: 'example.com'},
+    })
+    hostCommands = []
+
+    const answered = {
+      type: 'reply.answer-approval',
+      treeId: tree.id,
+      replyId: reply.id,
+      approvalId: 'a1',
+      answer: 'always-allow',
+    } as const
+
+    expect(await send(answered)).toEqual({ok: true, value: {}})
+    expect(hostCommands).toEqual([
+      {type: 'approval.answer', approvalId: 'a1', answer: 'always-allow'},
+    ])
+
+    answer(tree.id, reply.id)
+    hostCommands = []
+
+    expect(await send(answered)).toMatchObject({
+      ok: false,
+      error: {code: 'not-found'},
+    })
+
+    await sendPrompt(tree.id, reply.id)
+
+    expect(hostCommands).toMatchObject([
+      {
+        type: 'reply.start',
+        request: {
+          permissionMode: 'supervised',
+          grants: [{kind: 'host', host: 'example.com'}],
+        },
+      },
+    ])
   })
 
   it('answers not-found for retrying a Reply the Tree doesn’t have', async () => {

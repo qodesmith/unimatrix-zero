@@ -1,0 +1,1 @@
+ALTER TABLE `trees` ADD `approval_grants` text DEFAULT '[]' NOT NULL;

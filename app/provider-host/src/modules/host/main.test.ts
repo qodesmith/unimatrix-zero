@@ -21,6 +21,8 @@ const request = {
   compactionSettings: {auto: true, threshold: null},
   systemPromptChanged: false,
   tools: DEFAULT_TREE_TOOLS,
+  permissionMode: 'full-access',
+  grants: [],
 }
 
 function fakeMain() {

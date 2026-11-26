@@ -1,3 +1,4 @@
+import type {ApprovalsByReply, SubagentsByReply} from './live-approvals'
 import type {ReplyRunEvent, ReplyRunState} from './reply-run/machine'
 import type {QueryClient} from '@tanstack/react-query'
 import type {AppEvent} from '@uz/contract/events'
@@ -6,6 +7,11 @@ import type {ReplyEvent, StreamingReply} from '@uz/contract/turns'
 import {Store} from '@tanstack/react-store'
 import {NEW_REPLY, foldReplyEvent} from '@uz/contract/turns'
 
+import {
+  approvalsAfter,
+  approvalsFromSnapshot,
+  subagentsAfter,
+} from './live-approvals'
 import {replyRunTransition} from './reply-run/machine'
 import {updateSavedReply, withProgress} from './saved-turns'
 
@@ -23,6 +29,9 @@ interface LiveState {
   thinking: Record<string, ThinkingBlock[]>
   runs: Record<string, ReplyRunState>
   waiting: Record<string, Wait>
+  approvals: ApprovalsByReply
+  /** Each Subagent's description, by Reply. */
+  subagents: SubagentsByReply
 }
 
 export type Wait = 'busy' | 'reconnecting'
@@ -35,6 +44,8 @@ export function createReplyStore(): ReplyStore {
     thinking: {},
     runs: {},
     waiting: {},
+    approvals: {},
+    subagents: {},
   })
 }
 
@@ -188,6 +199,12 @@ export function applyLiveEvent(
           return wait ? [[replyId, wait]] : []
         })
       ),
+      approvals: approvalsFromSnapshot(
+        state.approvals,
+        event.approvals,
+        event.replies,
+        now()
+      ),
     }))
     void queryClient.invalidateQueries({queryKey: ['turns']})
 
@@ -207,38 +224,39 @@ export function applyLiveEvent(
   }
 
   const {treeId, replyId} = event
-  const {replies, thinking, runs, waiting} = store.state
+  const {replies, ...rest} = store.state
   const current = replies[replyId] ?? {...NEW_REPLY, treeId, replyId}
   const next = foldReplyEvent(current, event)
-  const nextThinking = thinkingAfter(thinking, event, current, now())
-  const nextRuns = runsAfter(runs, event)
-  const nextWaiting = waitingAfter(waiting, event)
+  const at = now()
+
+  const after = {
+    thinking: thinkingAfter(rest.thinking, event, current, at),
+    runs: runsAfter(rest.runs, event),
+    waiting: waitingAfter(rest.waiting, event),
+    approvals: approvalsAfter(rest.approvals, event, current.content, at),
+    subagents: subagentsAfter(rest.subagents, event),
+  }
 
   if (event.type === 'RUN_FINISHED') {
     updateSavedReply(queryClient, event, saved => withProgress(saved, next))
-    store.setState(() => ({
-      replies: without(replies, replyId),
-      thinking: nextThinking,
-      runs: nextRuns,
-      waiting: nextWaiting,
-    }))
+    store.setState(() => ({replies: without(replies, replyId), ...after}))
 
     return
   }
 
   const changed = next !== current || !(replyId in replies)
 
-  if (
-    changed ||
-    nextThinking !== thinking ||
-    nextRuns !== runs ||
-    nextWaiting !== waiting
-  ) {
+  const othersChanged =
+    after.thinking !== rest.thinking ||
+    after.runs !== rest.runs ||
+    after.waiting !== rest.waiting ||
+    after.approvals !== rest.approvals ||
+    after.subagents !== rest.subagents
+
+  if (changed || othersChanged) {
     store.setState(() => ({
       replies: changed ? {...replies, [replyId]: next} : replies,
-      thinking: nextThinking,
-      runs: nextRuns,
-      waiting: nextWaiting,
+      ...after,
     }))
   }
 }

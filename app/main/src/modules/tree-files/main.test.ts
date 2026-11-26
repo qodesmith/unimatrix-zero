@@ -54,6 +54,7 @@ function launch() {
     treeFolderFor: treeFiles.folderFor,
     snapshotsBefore: treeFiles.snapshotsBefore,
     compactionSettingsFor: () => ({auto: true, threshold: null}),
+    permissionMode: () => 'full-access',
     listedModels: () => [],
     attachmentsDir: path.join(userData, 'attachments'),
     now: () => new Date(),

@@ -4,7 +4,13 @@ import type {Node, NodeProps} from '@xyflow/react'
 import type {Ref} from 'react'
 
 import {useSettings} from '#modules/settings/main'
-import {FailedChip, ReplyView, useReply} from '#modules/turns/main'
+import {
+  FailedChip,
+  ReplyView,
+  useAwaitingAnswer,
+  useReply,
+} from '#modules/turns/main'
+import {Badge} from '#shadcn/ui/badge'
 import {Card} from '#shadcn/ui/card'
 import {Handle, Position} from '@xyflow/react'
 import {cn} from 'cn'
@@ -69,6 +75,7 @@ function ReplyBody({reply}: {reply: Reply}) {
   } = useCanvas()
 
   const {status, contextSize, contextWindow} = useReply(reply)
+  const awaitingAnswer = useAwaitingAnswer(reply.id)
   const previous = previousReply(index, reply)
   const bottomChatButton = useRef<HTMLButtonElement>(null)
 
@@ -83,6 +90,7 @@ function ReplyBody({reply}: {reply: Reply}) {
             mediaBudgetUse={mediaBudgetUseOf(index, reply)}
           />
         )}
+        {awaitingAnswer && <Badge>Waiting for you</Badge>}
         <OpenChatButton replyId={reply.id} className="ml-auto" />
       </header>
       <CappedText

@@ -48,6 +48,8 @@ function fakeServer(answers: Answers) {
 
       return () => listeners.delete(listener)
     },
+    takeApprovals: () => () => undefined,
+    respond: () => undefined,
     exited,
     get hasExited() {
       return hasExited

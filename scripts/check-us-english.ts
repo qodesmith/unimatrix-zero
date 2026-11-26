@@ -82,8 +82,10 @@ const RULES: Rule[] = [
   [
     /\b(\w+)is(e|es|ed|ing|ation|ations|er|ers)\b/gi,
     '$1iz$2',
+    // A name such as `UZ_DEV_SUPERVISED` is checked by its last word.
     ([, stem = '']) =>
-      US_ISE.has(`${stem}ise`.toLowerCase()) || /w$/i.test(stem),
+      US_ISE.has(`${stem.split('_').at(-1)}ise`.toLowerCase()) ||
+      /w$/i.test(stem),
   ],
   [/\b(analy|paraly|cataly|dialy|electroly|hydroly)s(e|ed|ing)\b/gi, '$1z$2'],
   [
@@ -132,6 +134,9 @@ function skipped(file: string) {
     file.startsWith('tooling/oxlint/anti-slop/') ||
     file.startsWith('app/provider-host/src/modules/codex-driver/protocol/') ||
     file.startsWith('app/provider-host/src/modules/codex-driver/recordings/') ||
+    file.startsWith(
+      'app/provider-host/src/modules/claude-driver/recordings/'
+    ) ||
     installedSkills.some(dir => file === dir || file.startsWith(`${dir}/`))
   )
 }
