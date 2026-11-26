@@ -204,12 +204,16 @@ export function createTreeFiles({
     return taken
   }
 
+  function folderFor(treeId: string) {
+    return makeTreeFolder(userData, treeId)
+  }
+
   const files = createSnapshotFiles({
     db,
     git,
     blobs: () => createGitBlobs(program(), process.env),
     storeOf,
-    folderFor: treeId => makeTreeFolder(userData, treeId),
+    folderFor,
     settled: async treeId => snapshotting.get(treeId),
     snapshotAbove: (treeId, replyId) =>
       parentSnapshots(snapshotRows(db, treeId))(replyId),
@@ -219,7 +223,7 @@ export function createTreeFiles({
 
   return {
     ...files,
-    folderFor: (treeId: string) => makeTreeFolder(userData, treeId),
+    folderFor,
 
     /** However the Reply ended. Never rejects. */
     async replyFinished({treeId, replyId}: {treeId: string; replyId: string}) {

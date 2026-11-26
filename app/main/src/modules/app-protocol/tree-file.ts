@@ -173,7 +173,10 @@ async function treeFileResponse(
   })
 }
 
-/** `uzfile://` serves attachments and the Tree's files, by id (ADR 0014). */
+/**
+ * `uzfile://` serves attachments and the Tree's files by id, never by path
+ * (ADR 0014).
+ */
 export async function fileSchemeResponse(
   request: Request,
   lookups: FileLookups

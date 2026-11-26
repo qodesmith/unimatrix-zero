@@ -1,4 +1,4 @@
-import {ATTACHMENT_SCHEME} from '#modules/attachments/main'
+import {FILE_SCHEME} from '#modules/attachments/main'
 import {ChangedFileSchema} from '#modules/turns/main'
 import {z} from 'zod'
 
@@ -65,7 +65,7 @@ export type TreeFileDetails = z.infer<typeof TreeFileDetailsSchema>
 
 /** `html` serves an HTML file to run in an `allow-scripts`-only frame. */
 export function treeFileUrl(id: TreeFileId, view?: 'html') {
-  const url = `${ATTACHMENT_SCHEME}://unimatrix-zero/tree-files/${id}`
+  const url = `${FILE_SCHEME}://unimatrix-zero/tree-files/${id}`
 
   return view ? `${url}?view=${view}` : url
 }

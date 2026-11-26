@@ -1,7 +1,7 @@
 import type {FileLookups} from './tree-file'
 import type {Protocol} from 'electron'
 
-import {ATTACHMENT_SCHEME} from '@uz/contract/attachments'
+import {FILE_SCHEME} from '@uz/contract/attachments'
 import {protocol} from 'electron'
 import {readFile} from 'node:fs/promises'
 
@@ -36,7 +36,7 @@ export function registerAppSchemes() {
       privileges: {standard: true, secure: true, supportFetchAPI: true},
     },
     {
-      scheme: ATTACHMENT_SCHEME,
+      scheme: FILE_SCHEME,
       privileges: {
         standard: true,
         secure: true,
@@ -66,12 +66,8 @@ export function serveExtractor(target: Protocol, distDir: string) {
   return EXTRACTOR_URL
 }
 
-/**
- * `uzfile://` serves attachments and the Tree's files by id, never by path
- * (ADR 0014).
- */
 export function serveFiles(target: Protocol, lookups: FileLookups) {
-  target.handle(ATTACHMENT_SCHEME, async request =>
+  target.handle(FILE_SCHEME, async request =>
     fileSchemeResponse(request, lookups)
   )
 }

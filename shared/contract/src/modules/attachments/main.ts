@@ -92,10 +92,10 @@ export const AttachmentSchema = z.strictObject({
 
 export type Attachment = z.infer<typeof AttachmentSchema>
 
-export const ATTACHMENT_SCHEME = 'uzfile'
+export const FILE_SCHEME = 'uzfile'
 
 export function attachmentUrl(id: string) {
-  return `${ATTACHMENT_SCHEME}://unimatrix-zero/attachments/${id}`
+  return `${FILE_SCHEME}://unimatrix-zero/attachments/${id}`
 }
 
 export type InlineForm = 'image' | 'pdf' | 'text'
