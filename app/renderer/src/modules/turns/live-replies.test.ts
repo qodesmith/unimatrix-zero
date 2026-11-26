@@ -326,15 +326,15 @@ it('puts a card right after the tool call it names, else where the Reply had got
   ])
 
   expect(
-    approvals.map(({id, afterParts, subagentId}) => ({
+    approvals.map(({id, beforePart, subagentId}) => ({
       id,
-      afterParts,
+      beforePart,
       subagentId,
     }))
   ).toEqual([
-    {id: 'approval-1', afterParts: 2, subagentId: null},
-    {id: 'approval-2', afterParts: 3, subagentId: 'subagent-1'},
-    {id: 'review-1', afterParts: 3, subagentId: null},
+    {id: 'approval-1', beforePart: 2, subagentId: null},
+    {id: 'approval-2', beforePart: 3, subagentId: 'subagent-1'},
+    {id: 'review-1', beforePart: 3, subagentId: null},
   ])
 })
 
@@ -457,7 +457,7 @@ it('shows the cards still waiting to a window that opens while they wait, at the
   ])
 
   expect(live.store.state.approvals[ids.replyId]).toMatchObject([
-    {id: 'waiting', kind: 'card', answer: null, afterParts: 2, action: edit},
+    {id: 'waiting', kind: 'card', answer: null, beforePart: 2, action: edit},
   ])
 })
 

@@ -17,7 +17,7 @@ const WRITE: ApprovalAction = {
 const COMMAND: ApprovalAction = {kind: 'command', command: 'touch made.txt'}
 
 function replyIn(treeId: string, replyId = 'reply-1') {
-  return {treeId, replyId, grants: []}
+  return {treeId, replyId, grants: [], treeFolder: '/tree'}
 }
 
 function setUp() {
@@ -123,6 +123,31 @@ it('goes ahead without asking when the request carries a grant', async () => {
   )
 
   await expect(replying.ask({action: COMMAND})).resolves.toBe(true)
+  expect(events).toEqual([])
+})
+
+it('goes ahead without asking on an edit both in and outside the Tree once each is granted', async () => {
+  const {approvals, events} = setUp()
+
+  const replying = approvals.forReply(
+    {
+      ...replyIn(TREE),
+      grants: [{kind: 'edits-in-tree'}, {kind: 'edit', path: '/outside.txt'}],
+    },
+    event => {
+      events.push(event)
+    }
+  )
+
+  await expect(
+    replying.ask({
+      action: {
+        kind: 'edit',
+        paths: ['/tree/notes.txt', '/outside.txt'],
+        inTreeFiles: false,
+      },
+    })
+  ).resolves.toBe(true)
   expect(events).toEqual([])
 })
 

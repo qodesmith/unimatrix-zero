@@ -62,7 +62,7 @@ function asidesBefore(
         : []
     ),
     ...approvals.flatMap((item): Aside[] =>
-      item.afterParts === part
+      item.beforePart === part
         ? [
             {
               kind: 'approval',

@@ -16,8 +16,7 @@ interface Placed {
   id: string
   action: ApprovalAction
   subagentId: string | null
-  /** How many of the Reply's parts come before it. */
-  afterParts: number
+  beforePart: number
   arrivedAt: number
 }
 
@@ -62,7 +61,7 @@ function placed(
   const at = {
     action: event.action,
     subagentId: event.subagentId ?? null,
-    afterParts: partsBefore(content, event.toolCallId),
+    beforePart: partsBefore(content, event.toolCallId),
     arrivedAt: now,
   }
 

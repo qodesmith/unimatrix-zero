@@ -2,6 +2,7 @@ import type {ReplyRequest} from '@uz/contract/host'
 import type {ApprovalAction, ApprovalGrant} from '@uz/contract/permissions'
 import type {ApprovalAnswer, ReplyEvent} from '@uz/contract/turns'
 
+import {isInTreeFolder} from '#modules/tree-folder/main'
 import {grantsFor, sameGrant, withGrants} from '@uz/contract/permissions'
 import {randomUUID} from 'node:crypto'
 
@@ -23,12 +24,32 @@ export interface ReplyApprovals {
   ask(asking: Asking): Promise<boolean>
 }
 
-type ReplyOf = Pick<ReplyRequest, 'treeId' | 'replyId' | 'grants'>
+type ReplyOf = Pick<
+  ReplyRequest,
+  'treeId' | 'replyId' | 'grants' | 'treeFolder'
+>
 
-/** An edit is granted when each of its paths is. */
-function isGranted(grants: ApprovalGrant[], action: ApprovalAction) {
-  return grantsFor(action).every(wanted =>
-    grants.some(grant => sameGrant(grant, wanted))
+/**
+ * An edit is granted when each of its paths is: by its own grant, or by
+ * `edits-in-tree` when it lies in the Tree's files.
+ */
+function isGranted(
+  grants: ApprovalGrant[],
+  action: ApprovalAction,
+  treeFolder: string
+) {
+  function has(wanted: ApprovalGrant) {
+    return grants.some(grant => sameGrant(grant, wanted))
+  }
+
+  if (action.kind !== 'edit') return grantsFor(action).every(has)
+
+  const editsInTree = has({kind: 'edits-in-tree'})
+
+  return action.paths.every(
+    path =>
+      has({kind: 'edit', path}) ||
+      (editsInTree && isInTreeFolder(treeFolder, path))
   )
 }
 
@@ -59,13 +80,14 @@ export function createApprovals() {
   }
 
   function forReply(
-    {treeId, replyId, grants}: ReplyOf,
+    {treeId, replyId, grants, treeFolder}: ReplyOf,
     emit: (event: ApprovalEvent) => void
   ): ReplyApprovals {
     function granted(action: ApprovalAction) {
       return isGranted(
         [...grants, ...(allowedInTree.get(treeId) ?? [])],
-        action
+        action,
+        treeFolder
       )
     }
 
