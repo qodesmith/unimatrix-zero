@@ -76,3 +76,29 @@ it('asks about a command, a host, an MCP tool and any other tool by what each na
     name: 'WebSearch',
   })
 })
+
+it('asks about the retry of a command outside the Sandbox as that form alone, and about the Sandbox’s network prompt by its host', () => {
+  const tree = treeFolder()
+
+  expect(
+    actionOf(
+      'Bash',
+      {command: 'touch ../made.txt', dangerouslyDisableSandbox: true},
+      tree
+    )
+  ).toEqual({
+    kind: 'command',
+    command: 'touch ../made.txt',
+    outsideSandbox: true,
+  })
+  expect(
+    actionOf(
+      'Bash',
+      {command: 'touch made.txt', dangerouslyDisableSandbox: false},
+      tree
+    )
+  ).toEqual({kind: 'command', command: 'touch made.txt'})
+  expect(
+    actionOf('SandboxNetworkAccess', {host: 'example.com'}, tree)
+  ).toEqual({kind: 'host', host: 'example.com'})
+})

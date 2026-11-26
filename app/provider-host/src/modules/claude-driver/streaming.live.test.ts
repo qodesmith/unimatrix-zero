@@ -40,6 +40,7 @@ import {planOf, readAccount} from './account'
 import {claudeEnvironment, claudeReplyEnvironment} from './environment'
 import {createClaudeDriver, spawnClaude} from './main'
 import {runClaudeOneShot} from './one-shot'
+import {sandboxSettings} from './permissions'
 import {createRecorder} from './recording'
 import {RECORDINGS} from './replay'
 import {projectKeyOf} from './transcripts'
@@ -372,6 +373,42 @@ function controlRequestsIn(live: Live) {
 
 function readIn(tree: string, name: string) {
   return fs.readFileSync(path.join(tree, name), 'utf8').trim()
+}
+
+/** Laid out as the app's `trees` folder: this Tree's and another's. */
+function sandboxedTrees() {
+  const root = newTreeFolder()
+  const tree = path.join(root, 'one')
+  const other = path.join(root, 'two')
+  fs.mkdirSync(tree)
+  fs.mkdirSync(other)
+
+  return {root, tree, other}
+}
+
+function inSandbox(
+  live: Live,
+  text: string,
+  trees: ReturnType<typeof sandboxedTrees>
+): ReplyRequest {
+  return {
+    ...supervised(live, text, trees.tree),
+    treesFolder: trees.root,
+  }
+}
+
+const SANDBOXED_COMMAND =
+  'Run exactly this command with Bash, once: `echo HERON > notes.txt && printenv SANDBOX_RUNTIME`. Then reply with only what it printed.'
+
+const NETWORK_COMMAND =
+  "Run exactly this command with Bash, once: `curl -sS https://example.com -o /dev/null -w '%{http_code}'`. Then reply with only what it printed."
+
+function leavingPrompt(file: string) {
+  return `Run exactly this command with Bash: \`echo KESTREL > ${file}\`. If the sandbox blocks it, retry it once with dangerouslyDisableSandbox set to true, and if that is denied too, stop. Then reply with only the word DONE.`
+}
+
+function readingPrompt(secret: string, otherSecret: string) {
+  return `Do these two steps in order, each once, with no retry, whatever happens: read ${secret} with your Read tool; then run exactly \`cat ${otherSecret}\` with Bash. Then reply with only the word DONE.`
 }
 
 /** The SDK runs a `.mjs` with the `node` on PATH. */
@@ -1388,6 +1425,205 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     } finally {
       fs.rmSync(tree, {recursive: true, force: true})
       fs.rmSync(outside, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:claude-sandbox] under Supervised, asks before a command, then runs it inside the Sandbox, where it writes in the Tree’s folder though every other Tree is hidden', async () => {
+    const live = liveDriver(['sandboxed.ndjson'])
+    const trees = sandboxedTrees()
+
+    try {
+      const events = await answering(
+        live.driver,
+        inSandbox(live, SANDBOXED_COMMAND, trees),
+        ['allow-once']
+      )
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+      expect(readIn(trees.tree, 'notes.txt')).toBe('HERON')
+
+      const [card] = approvalsIn(events)
+      const [bash] = toolCallsIn(events)
+
+      expect(card).toMatchObject({
+        type: 'APPROVAL_REQUESTED',
+        toolCallId: bash?.toolCallId,
+        action: {kind: 'command', command: expect.stringContaining('HERON')},
+      })
+      expect(card?.type === 'APPROVAL_REQUESTED' && card.action).not.toHaveProperty(
+        'outsideSandbox'
+      )
+      expect(bash?.result?.content).toMatch(/^1\s*$/m)
+
+      await live.done()
+    } finally {
+      fs.rmSync(trees.root, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:claude-sandbox] under Supervised, a write outside the Tree’s folder fails inside the Sandbox, and its retry outside asks on a card of its own', async () => {
+    const live = liveDriver(['left-sandbox.ndjson'])
+    const trees = sandboxedTrees()
+    const outside = path.join('/Library/Caches', `uz-sandbox-${crypto.randomUUID()}.txt`)
+
+    try {
+      const events = await answering(
+        live.driver,
+        inSandbox(live, leavingPrompt(outside), trees),
+        ['allow-once', 'deny']
+      )
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+      expect(fs.existsSync(outside)).toBe(false)
+
+      const asked = approvalsIn(events).flatMap(event =>
+        event.type === 'APPROVAL_REQUESTED' ? [event.action] : []
+      )
+      const [inside, retried] = toolCallsIn(events)
+
+      expect(asked).toEqual([
+        {kind: 'command', command: expect.stringContaining(outside)},
+        {
+          kind: 'command',
+          command: expect.stringContaining(outside),
+          outsideSandbox: true,
+        },
+      ])
+      expect(inside?.result?.content).toMatch(/Operation not permitted/)
+      expect(retried?.result?.isError).toBe(true)
+
+      await live.done()
+    } finally {
+      fs.rmSync(trees.root, {recursive: true, force: true})
+      fs.rmSync(outside, {force: true})
+    }
+  }, 300_000)
+
+  it('[dep:claude-sandbox] under Supervised, a connection from inside the Sandbox asks on a card naming its host, and goes through once allowed', async () => {
+    const live = liveDriver(['network.ndjson'])
+    const trees = sandboxedTrees()
+
+    try {
+      const events = await answering(
+        live.driver,
+        inSandbox(live, NETWORK_COMMAND, trees),
+        ['allow-once', 'always-allow']
+      )
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+      const asked = approvalsIn(events).flatMap(event =>
+        event.type === 'APPROVAL_REQUESTED' ? [event.action] : []
+      )
+
+      expect(asked).toEqual([
+        {kind: 'command', command: expect.stringContaining('curl')},
+        {kind: 'host', host: 'example.com'},
+      ])
+      expect(toolCallsIn(events)[0]?.result?.content).toMatch(/200/)
+
+      await live.done()
+    } finally {
+      fs.rmSync(trees.root, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:claude-sandbox] under Supervised, refuses with no card a Read of a hidden folder, and the Sandbox refuses an allowed command reading another Tree', async () => {
+    const live = liveDriver(['read-denied.ndjson'])
+    const trees = sandboxedTrees()
+    const hidden = newTreeFolder()
+    const secret = path.join(hidden, 'secret.txt')
+    const otherSecret = path.join(trees.other, 'secret.txt')
+    fs.writeFileSync(secret, 'OSPREY\n')
+    fs.writeFileSync(otherSecret, 'PLOVER\n')
+
+    try {
+      const events = await answering(
+        live.driver,
+        {
+          ...inSandbox(live, readingPrompt(secret, otherSecret), trees),
+          hiddenFolders: [hidden],
+        },
+        ['allow-once']
+      )
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+      const calls = toolCallsIn(events)
+      const [read, other] = calls
+      const asked = approvalsIn(events).flatMap(event =>
+        event.type === 'APPROVAL_REQUESTED' ? [event] : []
+      )
+
+      expect(calls.map(call => call.toolName)).toEqual(['Read', 'Bash'])
+      expect(asked).toEqual([
+        expect.objectContaining({
+          toolCallId: other?.toolCallId,
+          action: {kind: 'command', command: `cat ${otherSecret}`},
+        }),
+      ])
+      expect(read?.result?.isError).toBe(true)
+      expect(other?.result?.content).toMatch(
+        /secret\.txt: Operation not permitted/
+      )
+      expect(shownText(events)).not.toMatch(/OSPREY|PLOVER/)
+
+      await live.done()
+    } finally {
+      fs.rmSync(trees.root, {recursive: true, force: true})
+      fs.rmSync(hidden, {recursive: true, force: true})
+    }
+  }, 300_000)
+
+  it('[dep:claude-sandbox] the ask rule brings a command’s retry outside the Sandbox to canUseTool past a Bash allow rule, which lets it through silently alone', async () => {
+    const trees = sandboxedTrees()
+    const prompt =
+      'Run exactly this command with Bash, with dangerouslyDisableSandbox set to true: `echo PLOVER`. Then reply with only what it printed.'
+
+    const {sandbox, permissions} = sandboxSettings(
+      {
+        ...liveDriver([]).request(prompt, null),
+        treeFolder: trees.tree,
+        treesFolder: trees.root,
+        permissionMode: 'supervised',
+      },
+      'darwin'
+    )
+
+    async function retriesAsked(ask: string[]) {
+      const asked: unknown[] = []
+
+      await Array.fromAsync(
+        query({
+          prompt,
+          options: {
+            pathToClaudeCodeExecutable: program,
+            env: claudeReplyEnvironment(process.env, configDir),
+            cwd: trees.tree,
+            settingSources: [],
+            tools: ['Bash'],
+            permissionMode: 'default',
+            model: 'haiku',
+            ...(sandbox && {sandbox}),
+            settings: {permissions: {...permissions, ask}},
+            allowedTools: ['Bash(echo:*)'],
+            canUseTool: async (toolName, input) => {
+              if (toolName === 'Bash') asked.push(input.dangerouslyDisableSandbox)
+
+              return {behavior: 'allow', updatedInput: input}
+            },
+          },
+        })
+      )
+
+      return asked
+    }
+
+    try {
+      expect(await retriesAsked(permissions?.ask ?? [])).toContain(true)
+      expect(await retriesAsked([])).toEqual([])
+    } finally {
+      fs.rmSync(trees.root, {recursive: true, force: true})
     }
   }, 300_000)
 

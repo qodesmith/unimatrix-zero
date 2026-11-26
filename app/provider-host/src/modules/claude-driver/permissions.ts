@@ -1,9 +1,19 @@
 import type {ReplyApprovals} from '#modules/approvals/main'
-import type {CanUseTool, Options} from '@anthropic-ai/claude-agent-sdk'
+import type {
+  CanUseTool,
+  Options,
+  SandboxSettings,
+} from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ApprovalAction} from '@uz/contract/permissions'
 
+import {
+  credentialFolders,
+  hasSandbox,
+  packageCaches,
+} from '#modules/sandbox/main'
 import {isInTreeFolder} from '#modules/tree-folder/main'
+import os from 'node:os'
 import path from 'node:path'
 import {z} from 'zod'
 
@@ -23,11 +33,18 @@ const ToolInputSchema = z.object({
   notebook_path: z.string().min(1).optional().catch(undefined),
   command: z.string().optional().catch(undefined),
   url: z.string().optional().catch(undefined),
+  /** The Sandbox blocked the command, and the Model asks to run it outside. */
+  dangerouslyDisableSandbox: z.boolean().optional().catch(undefined),
+  /** The host a sandboxed command wants to reach. */
+  host: z.string().min(1).optional().catch(undefined),
 })
 
 type ToolInput = z.infer<typeof ToolInputSchema>
 
 const MCP_TOOL = /^mcp__(.+?)__(.+)$/
+
+/** `claude`'s prompt when a command inside the Sandbox opens a connection. */
+const SANDBOX_NETWORK = 'SandboxNetworkAccess'
 
 function editOf(filePath: string, treeFolder: string): ApprovalAction {
   const absolute = path.resolve(treeFolder, filePath)
@@ -43,13 +60,19 @@ function hostOf(url: string | undefined) {
   return url !== undefined && URL.canParse(url) ? new URL(url).hostname : null
 }
 
+function hostIn(toolName: string, input: ToolInput) {
+  if (toolName === SANDBOX_NETWORK) return input.host ?? null
+
+  return toolName === 'WebFetch' ? hostOf(input.url) : null
+}
+
 export function actionOf(
   toolName: string,
   input: ToolInput,
   treeFolder: string
 ): ApprovalAction {
   const {file_path: filePath, notebook_path: notebookPath, command} = input
-  const host = toolName === 'WebFetch' ? hostOf(input.url) : null
+  const host = hostIn(toolName, input)
   const [, server, tool] = MCP_TOOL.exec(toolName) ?? []
 
   if ((toolName === 'Write' || toolName === 'Edit') && filePath) {
@@ -64,7 +87,9 @@ export function actionOf(
     (toolName === 'Bash' || toolName === 'PowerShell') &&
     command !== undefined
   ) {
-    return {kind: 'command', command}
+    return input.dangerouslyDisableSandbox
+      ? {kind: 'command', command, outsideSandbox: true}
+      : {kind: 'command', command}
   }
 
   if (host) return {kind: 'host', host}
@@ -72,6 +97,16 @@ export function actionOf(
   if (server && tool) return {kind: 'mcp-tool', server, tool}
 
   return {kind: 'tool', name: toolName}
+}
+
+/**
+ * A Subagent's call is never shown, so its card sits at none. Nor does the
+ * Sandbox's network prompt: its id names no tool call.
+ */
+function placeOf(toolName: string, toolUseID: string, agentID?: string) {
+  if (agentID) return {subagentId: agentID}
+
+  return toolName === SANDBOX_NETWORK ? {} : {toolCallId: toolUseID}
 }
 
 /**
@@ -86,8 +121,7 @@ function askOn(asking: SessionApprovals, treeFolder: string): CanUseTool {
       approvals !== null &&
       (await approvals.ask({
         action: actionOf(toolName, ToolInputSchema.parse(input), treeFolder),
-        // A Subagent's call is never shown, so its card sits at none.
-        ...(agentID ? {subagentId: agentID} : {toolCallId: toolUseID}),
+        ...placeOf(toolName, toolUseID, agentID),
         signal,
       }))
 
@@ -127,6 +161,62 @@ export function permissionOptions(
           ],
         },
       ],
+    },
+  }
+}
+
+/**
+ * Even a Bash allow rule then brings the retry outside the Sandbox to
+ * `canUseTool`, where no grant for the command covers it (ADR 0018).
+ */
+const LEAVING_THE_SANDBOX = 'Bash(dangerouslyDisableSandbox:true)'
+
+/** `//` names an absolute path; with one `/` the rule matches nothing. */
+function readDenied(folder: string) {
+  return `Read(/${folder}/**)`
+}
+
+function sandboxOf(
+  {treeFolder, treesFolder}: ReplyRequest,
+  home: string
+): SandboxSettings {
+  return {
+    enabled: true,
+    // The Sandbox is the floor under the cards, never a reason to skip one.
+    failIfUnavailable: false,
+    allowUnsandboxedCommands: true,
+    autoAllowBashIfSandboxed: false,
+    network: {allowedDomains: []},
+    filesystem: {
+      allowWrite: [treeFolder, os.tmpdir(), ...packageCaches(home)],
+      denyRead: [treesFolder],
+      allowRead: [treeFolder],
+    },
+  }
+}
+
+/**
+ * Supervised runs every command inside the Sandbox where it can run. The
+ * deny rules hold for the Read tool too, over the hook that lets reads
+ * through, and `claude` adds them to the Sandbox's own.
+ */
+export function sandboxSettings(
+  request: ReplyRequest,
+  platform: NodeJS.Platform
+) {
+  if (request.permissionMode === 'full-access') return {}
+
+  const home = os.homedir()
+
+  return {
+    sandbox: hasSandbox(platform)
+      ? sandboxOf(request, home)
+      : {enabled: false},
+    permissions: {
+      deny: [...credentialFolders(home), ...request.hiddenFolders].map(
+        readDenied
+      ),
+      ask: [LEAVING_THE_SANDBOX],
     },
   }
 }
