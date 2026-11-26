@@ -6,7 +6,13 @@ import os from 'node:os'
 import path from 'node:path'
 import {afterEach, expect, it, vi} from 'vitest'
 
-import {actionOf, askOn, readDecision} from './permissions'
+import {
+  actionOf,
+  askOn,
+  editDecision,
+  permissionOptions,
+  readDecision,
+} from './permissions'
 
 const made: string[] = []
 
@@ -295,4 +301,112 @@ it('refuses a Glob and a Grep that start at or above the folder of every Tree, b
       permissionDecisionReason: expect.stringContaining('narrower folder'),
     }))
   )
+})
+
+const CHANGED_ELSEWHERE =
+  'This path is in a folder that can’t be changed from here.'
+
+function hidden() {
+  const {folders, ...paths} = trees()
+  const appFolder = treeFolder()
+
+  return {
+    folders: {...folders, hiddenFolders: [appFolder]},
+    ...paths,
+    appFolder,
+  }
+}
+
+it('refuses a Write, an Edit and a NotebookEdit into another Tree’s files or one of the app’s hidden folders, by a relative, a real, a `~` or a space-led path too, and tells the Model the folder can’t be changed', () => {
+  const {folders, treesFolder, other, appFolder} = hidden()
+  vi.spyOn(os, 'homedir').mockReturnValue(path.dirname(appFolder))
+  const fromHome = `~/${path.basename(appFolder)}`
+
+  function decided(toolName: string, input: Record<string, string>) {
+    return editDecision(toolName, input, folders)
+  }
+
+  expect([
+    decided('Write', {file_path: path.join(other, 'a.txt')}),
+    decided('Edit', {file_path: path.join('..', 'two', 'a.txt')}),
+    decided('NotebookEdit', {notebook_path: path.join(other, 'a.ipynb')}),
+    decided('Write', {file_path: path.join(treesFolder, 'three', 'a.txt')}),
+    decided('Edit', {file_path: ` ${path.join(other, 'a.txt')}`}),
+    decided('Write', {file_path: path.join(appFolder, 'unimatrix.sqlite')}),
+    decided('Edit', {
+      file_path: path.join(fs.realpathSync(appFolder), 'deep', 'a.json'),
+    }),
+    decided('NotebookEdit', {notebook_path: `${fromHome}/a.ipynb`}),
+    decided('Write', {file_path: ` ${fromHome}/a.txt`}),
+  ]).toEqual(
+    Array.from({length: 9}, () => ({
+      permissionDecision: 'deny',
+      permissionDecisionReason: CHANGED_ELSEWHERE,
+    }))
+  )
+})
+
+it('leaves an edit in this Tree’s files, outside every Tree or in a credential folder to its card', () => {
+  const {folders, tree} = hidden()
+  const beside = treeFolder()
+
+  function decided(toolName: string, input: Record<string, string>) {
+    return editDecision(toolName, input, folders)
+  }
+
+  expect([
+    decided('Write', {file_path: 'notes.txt'}),
+    decided('Edit', {file_path: path.join(tree, 'deep', 'a.md')}),
+    decided('NotebookEdit', {notebook_path: path.join(tree, 'a.ipynb')}),
+    decided('Write', {file_path: path.join(beside, 'x.txt')}),
+    decided('Edit', {file_path: '~/.zshrc'}),
+    decided('Write', {file_path: path.join(os.homedir(), '.ssh', 'config')}),
+  ]).toEqual(Array.from({length: 6}, () => ({})))
+})
+
+it('under Supervised, has claude refuse an edit into another Tree before it asks, and ask about one in this Tree', async () => {
+  const {folders, other, tree} = hidden()
+
+  const {hooks} = permissionOptions(
+    {permissionMode: 'supervised', ...folders},
+    {current: null}
+  )
+
+  async function hookAnswer(toolName: string, filePath: string) {
+    const answers = await Promise.all(
+      (hooks?.PreToolUse ?? [])
+        .filter(({matcher}) => matcher?.split('|').includes(toolName))
+        .flatMap(matched => matched.hooks)
+        .map(async hook =>
+          hook(
+            {
+              hook_event_name: 'PreToolUse',
+              session_id: 's',
+              transcript_path: '/t',
+              cwd: tree,
+              tool_name: toolName,
+              tool_input: {file_path: filePath},
+              tool_use_id: 'u',
+            },
+            'u',
+            {signal: new AbortController().signal}
+          )
+        )
+    )
+
+    return answers
+  }
+
+  expect(await hookAnswer('Write', path.join(other, 'a.txt'))).toEqual([
+    {
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+        permissionDecisionReason: CHANGED_ELSEWHERE,
+      },
+    },
+  ])
+  expect(await hookAnswer('Write', path.join(tree, 'a.txt'))).toEqual([
+    {hookSpecificOutput: {hookEventName: 'PreToolUse'}},
+  ])
 })

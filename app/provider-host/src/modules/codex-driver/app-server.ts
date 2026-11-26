@@ -1,11 +1,5 @@
-import type {
-  ApprovalRequest,
-  Method,
-  Notification,
-  ParamsOf,
-  ResponseOf,
-  approvalAnswer,
-} from './wire'
+import type {ApprovalRequest, approvalAnswer} from './approval-wire'
+import type {Method, Notification, ParamsOf, ResponseOf} from './wire'
 import type {SignInRequest} from '@uz/contract/host'
 import type {EventEmitter} from 'node:events'
 import type {Readable, Writable} from 'node:stream'
@@ -17,9 +11,9 @@ import {once} from 'node:events'
 import {createInterface} from 'node:readline'
 import {setTimeout as delay} from 'node:timers/promises'
 
+import {ApprovalRequestSchema} from './approval-wire'
 import {
   AnswerSchema,
-  ApprovalRequestSchema,
   NotificationSchema,
   RESPONSES,
   ServerRequestSchema,

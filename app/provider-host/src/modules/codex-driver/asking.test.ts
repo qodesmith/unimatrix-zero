@@ -1,5 +1,5 @@
+import type {ApprovalRequest} from './approval-wire'
 import type {Received} from './asking'
-import type {ApprovalRequest} from './wire'
 import type {ApprovalGrant} from '@uz/contract/permissions'
 
 import {createApprovals} from '#modules/approvals/main'
@@ -49,14 +49,14 @@ function setUp(grants: ApprovalGrant[] = []) {
         messageId: '01a16096-00ad-7d3b-8205-6b76ddc26ce2',
       },
       vendorProgram: {program: null, configDir: '/config'},
-      treeFolder: '/tree',
+      treeFolder: '/trees/one',
       session: null,
       thread: [],
       compactionSettings: {auto: true, threshold: null},
       systemPromptChanged: false,
       tools: DEFAULT_TREE_TOOLS,
       permissionMode: 'supervised',
-      hiddenFolders: [],
+      hiddenFolders: ['/app/data'],
       treesFolder: '/trees',
       grants,
     }),
@@ -83,6 +83,41 @@ function setUp(grants: ApprovalGrant[] = []) {
           command: WRAPPED,
           ...params,
         },
+      }
+
+      for (const take of taking) take(request)
+
+      return nextId
+    },
+    /** Codex asks before a file change; returns the request's id. */
+    edit(changes: {path: string; movedTo?: string}[]) {
+      nextId += 1
+      const itemId = `item-${nextId}`
+
+      asking.seen({
+        method: 'item/started',
+        params: {
+          threadId: THREAD,
+          turnId: 'turn-1',
+          item: {
+            type: 'fileChange',
+            id: itemId,
+            status: 'inProgress',
+            changes: changes.map(({path, movedTo}) => ({
+              path,
+              kind: movedTo
+                ? {type: 'update', move_path: movedTo}
+                : {type: 'add'},
+              diff: '',
+            })),
+          },
+        },
+      })
+
+      const request: ApprovalRequest = {
+        id: nextId,
+        method: 'item/fileChange/requestApproval',
+        params: {threadId: THREAD, turnId: 'turn-1', itemId},
       }
 
       for (const take of taking) take(request)
@@ -167,5 +202,28 @@ it('runs a read with no card, but asks before one that would leave the Sandbox',
 
   expect(codex.cards()).toEqual([
     {kind: 'command', command: 'ls', outsideSandbox: true},
+  ])
+})
+
+it('declines with no card a change to another Tree’s files or an app folder, a move into one and a change that also reaches one, and asks about one in this Tree or elsewhere outside it', async () => {
+  const codex = setUp()
+
+  const declined = [
+    codex.edit([{path: '/trees/two/a.txt'}]),
+    codex.edit([{path: '/app/data/backups/a.sqlite'}]),
+    codex.edit([{path: '/trees/one/a.txt', movedTo: '/trees/two/a.txt'}]),
+    codex.edit([{path: '/trees/one/a.txt'}, {path: '/trees/two/b.txt'}]),
+  ]
+
+  await expect
+    .poll(() => codex.responses)
+    .toEqual(declined.map(id => ({id, result: {decision: 'decline'}})))
+
+  codex.edit([{path: '/trees/one/a.txt'}])
+  codex.edit([{path: '/elsewhere/notes.txt'}])
+
+  expect(codex.cards()).toEqual([
+    {kind: 'edit', paths: ['/trees/one/a.txt'], inTreeFiles: true},
+    {kind: 'edit', paths: ['/elsewhere/notes.txt'], inTreeFiles: false},
   ])
 })

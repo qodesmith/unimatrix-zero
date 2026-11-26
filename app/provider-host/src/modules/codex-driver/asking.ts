@@ -1,17 +1,14 @@
 import type {ApprovalEvent, Approvals, Asking} from '#modules/approvals/main'
 import type {AppServer} from './app-server'
-import type {ApprovalRequest, Item, Notification} from './wire'
+import type {ApprovalRequest} from './approval-wire'
+import type {Item, Notification} from './wire'
 import type {ReplyRequest} from '@uz/contract/host'
 
-import {isInTreeFolder} from '#modules/tree-folder/main'
+import {isInTreeFolder, isOffLimits} from '#modules/tree-folder/main'
 import {z} from 'zod'
 
-import {
-  McpToolCallItemSchema,
-  READ_ACTIONS,
-  ToolItemSchema,
-  approvalAnswer,
-} from './wire'
+import {READ_ACTIONS, approvalAnswer} from './approval-wire'
+import {McpToolCallItemSchema, ToolItemSchema} from './wire'
 
 /** What a turn reads, in the order it happened. */
 export type Received =
@@ -125,6 +122,7 @@ export function createTurnAsking({
 }: TurnAskingOptions) {
   const toolCalls = new Set<string>()
   const changedPaths = new Map<string, string[]>()
+  const offLimitsChanges = new Set<string>()
   const mcpCalls = new Map<string, {server: string; tool: string}>()
   const waiting = new Map<ApprovalRequest['id'], AbortController>()
 
@@ -147,7 +145,14 @@ export function createTurnAsking({
     return toolCalls.has(toolCallId) ? {toolCallId} : {}
   }
 
+  /**
+   * A change to another Tree's files or the app's own folders is declined,
+   * not carded: once allowed, Codex writes it even inside a folder the
+   * profile denies (ADR 0018).
+   */
   function editCard(itemId: string): Card | null {
+    if (offLimitsChanges.has(itemId)) return null
+
     const paths = changedPaths.get(itemId) ?? []
     const [first, ...rest] = paths
 
@@ -235,10 +240,19 @@ export function createTurnAsking({
       toolCalls.add(tool.data.id)
 
       if (tool.data.type === 'fileChange') {
+        const {id, changes} = tool.data
         changedPaths.set(
-          tool.data.id,
-          tool.data.changes.map(change => change.path)
+          id,
+          changes.map(change => change.path)
         )
+
+        const reached = changes.flatMap(({path, kind}) =>
+          kind.move_path ? [path, kind.move_path] : [path]
+        )
+
+        if (reached.some(file => isOffLimits(request, file))) {
+          offLimitsChanges.add(id)
+        }
       }
     }
 

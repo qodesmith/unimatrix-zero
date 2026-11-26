@@ -53,6 +53,22 @@ export function isInAnotherTree(
 }
 
 /**
+ * Whether `file`, read from the Tree's folder, is one the AI may never change:
+ * another Tree's, or in one of the app's hidden folders.
+ */
+export function isOffLimits(
+  folders: {treeFolder: string; treesFolder: string; hiddenFolders: string[]},
+  file: string
+) {
+  const absolute = path.resolve(folders.treeFolder, file)
+
+  return (
+    isInAnotherTree(folders, absolute) ||
+    folders.hiddenFolders.some(folder => isAtOrUnder(folder, absolute))
+  )
+}
+
+/**
  * Whether a search that starts at `folder` would reach other Trees' files:
  * `folder` is the one that holds every Tree's files, or one above it.
  */

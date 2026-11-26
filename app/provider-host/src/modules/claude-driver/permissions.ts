@@ -1,6 +1,7 @@
 import type {ReplyApprovals} from '#modules/approvals/main'
 import type {
   CanUseTool,
+  HookCallbackMatcher,
   Options,
   PreToolUseHookSpecificOutput,
   SandboxSettings,
@@ -17,6 +18,7 @@ import {
   holdsEveryTree,
   isInAnotherTree,
   isInTreeFolder,
+  isOffLimits,
 } from '#modules/tree-folder/main'
 import os from 'node:os'
 import path from 'node:path'
@@ -30,11 +32,16 @@ export interface SessionApprovals {
 /** Reads never ask, in any mode: `default` asks for one outside `cwd`. */
 const READS = 'Read|Glob|Grep'
 
+const EDITS = 'Write|Edit|NotebookEdit'
+
 const DENIED = 'The user denied this.'
 
 const NO_HOST = 'This connection names no host, so it can’t be allowed.'
 
 const ANOTHER_TREE = 'This path is in a folder that can’t be read from here.'
+
+const CHANGED_ELSEWHERE =
+  'This path is in a folder that can’t be changed from here.'
 
 const ABOVE_THE_TREES =
   'This search covers folders that can’t be read from here. Search a narrower folder.'
@@ -250,10 +257,7 @@ export function readDecision(
   toolName: string,
   input: ToolInput,
   folders: Pick<ReplyRequest, 'treeFolder' | 'treesFolder'>
-): Pick<
-  PreToolUseHookSpecificOutput,
-  'permissionDecision' | 'permissionDecisionReason'
-> {
+): Decision {
   const reason = refusal(toolName, withPathsRead(input), folders)
 
   return reason === null
@@ -261,9 +265,64 @@ export function readDecision(
     : {permissionDecision: 'deny', permissionDecisionReason: reason}
 }
 
+type Decision = Pick<
+  PreToolUseHookSpecificOutput,
+  'permissionDecision' | 'permissionDecisionReason'
+>
+
+type SandboxFolders = Pick<
+  ReplyRequest,
+  'treeFolder' | 'treesFolder' | 'hiddenFolders'
+>
+
+/**
+ * An edit into another Tree's files or the app's own folders is refused, not
+ * carded: the user can't judge one there (ADR 0018). Any other edit gets its
+ * card.
+ */
+export function editDecision(
+  toolName: string,
+  input: ToolInput,
+  folders: SandboxFolders
+): Decision {
+  const {file_path: filePath, notebook_path: notebookPath} =
+    withPathsRead(input)
+
+  const target = toolName === 'NotebookEdit' ? notebookPath : filePath
+
+  if (target === undefined || !isOffLimits(folders, target)) return {}
+
+  return {
+    permissionDecision: 'deny',
+    permissionDecisionReason: CHANGED_ELSEWHERE,
+  }
+}
+
+function preToolUse(
+  matcher: string,
+  decide: (toolName: string, input: ToolInput) => Decision
+): HookCallbackMatcher {
+  return {
+    matcher,
+    hooks: [
+      async input => {
+        const {tool_name: toolName, tool_input: toolInput} =
+          HookInputSchema.parse(input)
+
+        return {
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            ...decide(toolName, toolInput),
+          },
+        }
+      },
+    ],
+  }
+}
+
 /** Full access asks nothing; Supervised asks the user through `asking`. */
 export function permissionOptions(
-  request: ReplyRequest,
+  request: Pick<ReplyRequest, 'permissionMode'> & SandboxFolders,
   asking: SessionApprovals
 ): Options {
   const {permissionMode, treeFolder} = request
@@ -281,22 +340,12 @@ export function permissionOptions(
     // An allow here skips `canUseTool`.
     hooks: {
       PreToolUse: [
-        {
-          matcher: READS,
-          hooks: [
-            async input => {
-              const {tool_name: toolName, tool_input: toolInput} =
-                HookInputSchema.parse(input)
-
-              return {
-                hookSpecificOutput: {
-                  hookEventName: 'PreToolUse',
-                  ...readDecision(toolName, toolInput, request),
-                },
-              }
-            },
-          ],
-        },
+        preToolUse(READS, (toolName, input) =>
+          readDecision(toolName, input, request)
+        ),
+        preToolUse(EDITS, (toolName, input) =>
+          editDecision(toolName, input, request)
+        ),
       ],
     },
   }
