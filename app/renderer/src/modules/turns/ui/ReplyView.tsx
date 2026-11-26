@@ -125,7 +125,7 @@ export function ReplyView({reply}: {reply: Reply}) {
         </Fragment>
       ))}
       {asidesAt(content.length)}
-      {!streaming && <ChangedFiles files={reply.files} />}
+      {!streaming && <ChangedFiles reply={reply} />}
       {streaming && <StreamingLine replyId={reply.id} />}
       <StatusLine status={status} />
     </article>

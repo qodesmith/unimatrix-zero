@@ -1,0 +1,87 @@
+import type {Command} from '@uz/contract/commands'
+import type {TreeFileDetails} from '@uz/contract/tree-files'
+import type {ReactNode} from 'react'
+
+import {Button} from '#shadcn/ui/button'
+
+type Run = (command: Command) => void
+
+interface FileActionsProps {
+  details: TreeFileDetails
+  run: Run
+}
+
+function Action({onClick, children}: {onClick: () => void; children: string}) {
+  return (
+    <Button variant="outline" size="sm" onClick={onClick}>
+      {children}
+    </Button>
+  )
+}
+
+function actionsFor({details, run}: FileActionsProps): ReactNode {
+  const fileId = details.id
+
+  function open(how: 'default-app' | 'browser' | 'editor') {
+    return () => run({type: 'tree-file.open', fileId, with: how})
+  }
+
+  function reveal() {
+    run({type: 'tree-file.reveal', fileId})
+  }
+
+  function saveCopy() {
+    run({type: 'tree-file.save-copy', fileId})
+  }
+
+  if (details.change === 'deleted') {
+    return <Action onClick={saveCopy}>Save a copy…</Action>
+  }
+
+  if (details.executable) {
+    return details.onDisk ? (
+      <Action onClick={reveal}>Reveal in Finder</Action>
+    ) : (
+      <Action onClick={saveCopy}>Save a copy…</Action>
+    )
+  }
+
+  const browser = details.preview === 'html' && (
+    <Action onClick={open('browser')}>Open in browser</Action>
+  )
+
+  if (!details.onDisk) {
+    return (
+      <>
+        {browser}
+        <Action onClick={open('default-app')}>Open this version</Action>
+        <Action onClick={saveCopy}>Save a copy…</Action>
+      </>
+    )
+  }
+
+  return (
+    <>
+      {browser}
+      <Action onClick={open('default-app')}>Open in default app</Action>
+      <Action onClick={reveal}>Reveal in Finder</Action>
+      {details.editor !== null && (
+        <Action onClick={open('editor')}>{`Open in ${details.editor}`}</Action>
+      )}
+    </>
+  )
+}
+
+/** Opening needs the file in the Tree's folder, or a read-only copy of it. */
+export function FileActions(props: FileActionsProps) {
+  return (
+    <div className="flex flex-col gap-2">
+      {props.details.executable && (
+        <p className="text-xs text-muted-foreground">
+          This file is marked as a program, and the app never opens programs.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2">{actionsFor(props)}</div>
+    </div>
+  )
+}

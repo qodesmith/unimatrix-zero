@@ -6,6 +6,7 @@ import {useReply, useReplyRun} from '#modules/turns/main'
 import {useEffect} from 'react'
 
 import {dialogOpen} from './dialog-open'
+import {replyInView} from './reply-in-view'
 
 interface EscapeStops {
   treeId: string
@@ -27,7 +28,7 @@ export function useEscapeStops({
   chatOpen,
   chatEnd,
 }: EscapeStops) {
-  const replyId = chatOpen && chatEnd ? chatEnd.id : activeReplyId
+  const replyId = replyInView(chatOpen, chatEnd, activeReplyId)
 
   const shown = useReply(
     replyId === null ? null : (index.replyById.get(replyId) ?? null)

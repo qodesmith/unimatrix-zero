@@ -16,6 +16,7 @@ import {
   SettingsProvider,
 } from '#modules/settings/main'
 import {SystemPromptsProvider} from '#modules/system-prompts/main'
+import {TreeFilePreview, TreeFilesProvider} from '#modules/tree-files/main'
 import {NoTreeOpen, TreeTitle, useTrees} from '#modules/trees/main'
 import {LiveReplies} from '#modules/turns/main'
 import {SidebarInset} from '#shadcn/ui/sidebar'
@@ -40,9 +41,11 @@ export function App() {
           <LayoutProvider>
             <ConnectionsProvider>
               <LiveReplies>
-                <TooltipProvider>
-                  <AppLayout />
-                </TooltipProvider>
+                <TreeFilesProvider>
+                  <TooltipProvider>
+                    <AppLayout />
+                  </TooltipProvider>
+                </TreeFilesProvider>
                 <SnapshotsWaiting />
                 <Toaster />
               </LiveReplies>
@@ -112,6 +115,7 @@ function AppLayout() {
             )}
           </>
         )}
+        <TreeFilePreview />
       </SidebarInset>
     </LayoutSidebar>
   )
