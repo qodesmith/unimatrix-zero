@@ -2280,6 +2280,8 @@ it('under Supervised, asks about a Write in the Tree’s files at its tool call 
 
   const asked = events.findIndex(event => event.type === 'APPROVAL_REQUESTED')
   const notes = path.join(claude.treeFolder, 'notes.txt')
+  // The recording was made on a Mac, so on Windows its path mixes separators.
+  const asWritten = `${claude.treeFolder}/notes.txt`
 
   expect(approvalsIn(events)).toEqual([
     {
@@ -2303,7 +2305,7 @@ it('under Supervised, asks about a Write in the Tree’s files at its tool call 
   expect(answersTo(claude)).toEqual([
     {
       behavior: 'allow',
-      updatedInput: {file_path: notes, content: 'HERON'},
+      updatedInput: {file_path: asWritten, content: 'HERON'},
       toolUseID: write?.toolCallId,
     },
   ])

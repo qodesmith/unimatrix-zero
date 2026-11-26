@@ -1886,7 +1886,8 @@ it('under Supervised, shows a card for a file write in the Tree’s folder at it
       toolCallId: ALLOWED_CHANGE,
       action: {
         kind: 'edit',
-        paths: [path.join(codex.treeFolder, 'allowed.txt')],
+        // The recording was made on a Mac, so on Windows its path mixes separators.
+        paths: [`${codex.treeFolder}/allowed.txt`],
         inTreeFiles: true,
       },
     },
