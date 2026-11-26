@@ -12,7 +12,11 @@ import {
 import {createAttachments} from '#modules/attachments/main'
 import {registerCommandChannel} from '#modules/commands/main'
 import {createConnections} from '#modules/connections/main'
-import {DatabaseOpenError, openDatabase} from '#modules/database/main'
+import {
+  DatabaseOpenError,
+  dataFolderOf,
+  openDatabase,
+} from '#modules/database/main'
 import {readDevRun} from '#modules/dev/main'
 import {writeDeveloperFolder} from '#modules/developer-folder/main'
 import {createDroppedFiles} from '#modules/dropped-files/main'
@@ -110,7 +114,10 @@ registerAppSchemes()
 function openData(): Database | null {
   try {
     return openDatabase({
-      file: path.join(app.getPath('userData'), 'data', 'unimatrix.sqlite'),
+      file: path.join(
+        dataFolderOf(app.getPath('userData')),
+        'unimatrix.sqlite'
+      ),
       migrationsFolder,
     })
   } catch (error) {
@@ -274,6 +281,7 @@ function openWindow(db: Database) {
       hiddenFolders: [
         providersFolderOf(machine.userData),
         storesFolderOf(machine.userData),
+        dataFolderOf(machine.userData),
       ],
       treesFolder: treesFolderOf(machine.userData),
     },

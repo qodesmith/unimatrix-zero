@@ -16,6 +16,10 @@ const NUMBERED_BACKUP_NAME = /^unimatrix-(\d+)\.sqlite$/
 const UUID_BACKUP_NAME = /^unimatrix-[\da-f-]{36}\.sqlite$/
 const MIGRATIONS_TABLE = '__drizzle_migrations'
 
+export function dataFolderOf(userData: string) {
+  return path.join(userData, 'data')
+}
+
 /** A reason the app can't open its data, in words the user can act on. */
 export class DatabaseOpenError extends Error {
   override name = 'DatabaseOpenError'

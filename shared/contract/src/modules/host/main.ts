@@ -150,7 +150,8 @@ export const ReplyRequestSchema = z.strictObject({
   permissionMode: PermissionModeSchema,
   /**
    * The app's own folders, which the Sandbox keeps the AI from reading: the
-   * Provider folders and the store of Snapshots.
+   * Provider folders, the store of Snapshots and the database, which holds
+   * every Tree's Prompts and Replies.
    */
   hiddenFolders: z.array(z.string().min(1)),
   /** Holds every Tree's files, of which the Sandbox shows only `treeFolder`. */
