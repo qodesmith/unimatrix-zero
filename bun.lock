@@ -47,6 +47,7 @@
         "zod": "^4.6.7",
       },
       "devDependencies": {
+        "@total-typescript/shoehorn": "^0.1.2",
         "@uz/tooling": "workspace:*",
         "drizzle-kit": "1.0.0-rc.5",
         "electron": "^45.0.0",
