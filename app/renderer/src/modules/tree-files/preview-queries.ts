@@ -3,11 +3,14 @@ import type {TreeFile} from '@uz/contract/tree-files'
 
 import {bridge} from '#modules/bridge/main'
 import {useQuery} from '@tanstack/react-query'
-import {TEXT_PREVIEW_BYTES, treeFileUrl} from '@uz/contract/tree-files'
+import {treeFileUrl} from '@uz/contract/tree-files'
 import {use, useEffect} from 'react'
 
 import {PdfOpener} from './pdf'
 import {treeFilesKey} from './tree-files-store'
+
+/** How much of a Markdown, CSV or text file the preview shows. */
+export const TEXT_PREVIEW_BYTES = 256 * 1024
 
 function fileKey({treeId, replyId}: FileAt, file: TreeFile) {
   return [...treeFilesKey(treeId, replyId), 'file', file.id]

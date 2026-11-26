@@ -58,6 +58,7 @@ export function App() {
 }
 
 function AppLayout() {
+  const [inset, setInset] = useState<HTMLElement | null>(null)
   const connections = useConnections()
   const trees = useTrees()
   const {hasTrees, openTree, create} = trees
@@ -94,7 +95,10 @@ function AppLayout() {
         />
       }
     >
-      <SidebarInset className="min-h-0 min-w-0 bg-canvas-background">
+      <SidebarInset
+        ref={setInset}
+        className="min-h-0 min-w-0 bg-canvas-background"
+      >
         {openTree ? (
           <div className="min-h-0 flex-1">
             <Canvas
@@ -115,7 +119,7 @@ function AppLayout() {
             )}
           </>
         )}
-        <TreeFilePreview />
+        <TreeFilePreview container={inset} />
       </SidebarInset>
     </LayoutSidebar>
   )

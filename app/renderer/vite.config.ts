@@ -17,6 +17,16 @@ const PDFJS_FOLDERS = ['cmaps', 'iccs', 'standard_fonts', 'wasm']
 
 const PDFJS_PREFIX = '/pdfjs'
 
+/**
+ * The window's CSP compiles no wasm, so only the JS decoders in `wasm/` are
+ * served.
+ */
+function pdfjsFiles(folder: string) {
+  return readdirSync(path.join(pdfjs, folder)).filter(
+    file => !file.endsWith('.wasm')
+  )
+}
+
 /** The page's own origin serves them: in `dist/pdfjs/`, or from Vite in dev. */
 function pdfjsAssets(): Plugin {
   return {
@@ -30,7 +40,7 @@ function pdfjsAssets(): Plugin {
         const known =
           rest.length === 0 &&
           PDFJS_FOLDERS.includes(folder) &&
-          readdirSync(path.join(pdfjs, folder)).includes(file)
+          pdfjsFiles(folder).includes(file)
 
         if (known) response.end(readFileSync(path.join(pdfjs, folder, file)))
         else next()
@@ -38,7 +48,7 @@ function pdfjsAssets(): Plugin {
     },
     generateBundle() {
       for (const folder of PDFJS_FOLDERS)
-        for (const file of readdirSync(path.join(pdfjs, folder)))
+        for (const file of pdfjsFiles(folder))
           this.emitFile({
             type: 'asset',
             fileName: `pdfjs/${folder}/${file}`,

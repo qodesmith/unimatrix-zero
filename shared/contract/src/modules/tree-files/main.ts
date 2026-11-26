@@ -1,5 +1,4 @@
 import {ATTACHMENT_SCHEME} from '#modules/attachments/main'
-import {MIB} from '#modules/sizes/main'
 import {ChangedFileSchema} from '#modules/turns/main'
 import {z} from 'zod'
 
@@ -36,23 +35,11 @@ export const TreeFilePreviewSchema = z.enum([
 
 export type TreeFilePreview = z.infer<typeof TreeFilePreviewSchema>
 
-/** Over these, a file isn't previewed; text-like files preview their start. */
-export const PREVIEW_SIZE_LIMIT = {
-  image: 64 * MIB,
-  audio: 2048 * MIB,
-  video: 2048 * MIB,
-  pdf: 128 * MIB,
-  html: 8 * MIB,
-} as const satisfies Partial<Record<TreeFilePreview, number>>
-
-/** How much of a Markdown, CSV or text file the preview shows. */
-export const TEXT_PREVIEW_BYTES = 256 * 1024
-
 export const TreeFileDetailsSchema = z.strictObject({
   ...TreeFileSchema.shape,
   /** Decided from the bytes, and the name only among text or media types. */
   preview: TreeFilePreviewSchema,
-  /** Over `PREVIEW_SIZE_LIMIT` for its preview. */
+  /** Too large for main to preview it as its kind. */
   tooLarge: z.boolean(),
   /**
    * Why Open with its app is refused: marked as a program, or not a document

@@ -4,10 +4,11 @@ import type {TreeFile, TreeFileDetails} from '@uz/contract/tree-files'
 
 import {Refusal, useCommand} from '#modules/bridge/main'
 import {Button} from '#shadcn/ui/button'
+import {Sheet, SheetContent} from '#shadcn/ui/sheet'
 import {Spinner} from '#shadcn/ui/spinner'
 import {formatSize} from '@uz/contract/sizes'
 import {XIcon} from 'lucide-react'
-import {useEffect, useRef, useState} from 'react'
+import {useRef} from 'react'
 
 import {baseName} from '../file-kinds'
 import {useTreeFileDetails} from '../preview-queries'
@@ -29,47 +30,9 @@ const CHANGES = {
 function dialogAbove() {
   return (
     document.querySelector(
-      '[role="dialog"][data-open]:not([data-slideout]), [role="alertdialog"][data-open]'
+      '[role="dialog"][data-open]:not([data-slideout], [data-file-preview]), [role="alertdialog"][data-open]'
     ) !== null
   )
-}
-
-function useEscapeCloses(panel: HTMLElement | null, close: () => void) {
-  const closer = useRef(close)
-
-  useEffect(() => {
-    closer.current = close
-  }, [close])
-
-  useEffect(() => {
-    if (!panel) return undefined
-
-    const inPanel = panel
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape' || event.defaultPrevented || dialogAbove()) {
-        return
-      }
-
-      const {target} = event
-
-      // Esc in a field elsewhere, like a Tree's name, belongs to that field.
-      if (
-        target instanceof Element &&
-        target.closest('input, textarea') &&
-        !inPanel.contains(target)
-      ) {
-        return
-      }
-
-      event.preventDefault()
-      closer.current()
-    }
-
-    globalThis.addEventListener('keydown', onKeyDown, true)
-
-    return () => globalThis.removeEventListener('keydown', onKeyDown, true)
-  }, [panel])
 }
 
 function Header({details, earlier}: {details: TreeFile; earlier: boolean}) {
@@ -173,41 +136,81 @@ function Previewed({at}: {at: FileAt}) {
   return <Listed at={at} file={file} earlier={!list.data.onDisk} />
 }
 
+interface TreeFilePreviewProps {
+  /** Where the panel draws, over the canvas beside the sidebar. */
+  container?: HTMLElement | null
+}
+
 /** One file at a time, over the canvas beside the sidebar. */
-export function TreeFilePreview() {
+export function TreeFilePreview({container}: TreeFilePreviewProps) {
   const previewed = usePreviewedFile()
   const close = useCloseTreeFile()
-  const [panel, setPanel] = useState<HTMLElement | null>(null)
-
-  useEscapeCloses(panel, close)
+  const panel = useRef<HTMLDivElement>(null)
 
   if (!previewed) return null
 
+  // Esc in a field elsewhere, like a Tree's name, belongs to that field. The slideout's Input has no use for it.
+  function inFieldElsewhere({target}: Event) {
+    return (
+      target instanceof Element &&
+      target.closest('input, textarea') &&
+      !panel.current?.contains(target) &&
+      !target.closest('[data-slideout]')
+    )
+  }
+
   return (
-    <section
-      ref={setPanel}
-      role="dialog"
-      aria-label="File preview"
-      data-file-preview=""
-      className="absolute inset-y-0 left-0 z-30 flex w-[min(460px,100%)] flex-col border-r border-border bg-background text-foreground shadow-xl"
+    <Sheet
+      open
+      modal={false}
+      disablePointerDismissal
+      onOpenChange={(next, details) => {
+        if (next) return
+
+        if (
+          details.reason === 'escape-key' &&
+          (details.event.defaultPrevented ||
+            dialogAbove() ||
+            inFieldElsewhere(details.event))
+        ) {
+          details.cancel()
+
+          return
+        }
+
+        close()
+      }}
     >
-      <header className="flex items-start gap-2 px-4 pt-3 pb-1">
-        <h2 className="min-w-0 flex-1 truncate font-medium">
-          {baseName(previewed.path)}
-        </h2>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Close preview"
-          onClick={close}
-        >
-          <XIcon />
-        </Button>
-      </header>
-      <Previewed
-        key={`${previewed.replyId}:${previewed.path}`}
-        at={previewed}
-      />
-    </section>
+      <SheetContent
+        ref={panel}
+        container={container}
+        side="left"
+        overlay={false}
+        showCloseButton={false}
+        // Arrow keys in the Files section move through files, so focus stays there.
+        initialFocus={false}
+        aria-label="File preview"
+        data-file-preview=""
+        className="absolute z-30 max-w-full gap-0 bg-background text-foreground shadow-xl data-[side=left]:w-115 data-[side=left]:sm:max-w-full"
+      >
+        <header className="flex items-start gap-2 px-4 pt-3 pb-1">
+          <h2 className="min-w-0 flex-1 truncate font-medium">
+            {baseName(previewed.path)}
+          </h2>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Close preview"
+            onClick={close}
+          >
+            <XIcon />
+          </Button>
+        </header>
+        <Previewed
+          key={`${previewed.replyId}:${previewed.path}`}
+          at={previewed}
+        />
+      </SheetContent>
+    </Sheet>
   )
 }

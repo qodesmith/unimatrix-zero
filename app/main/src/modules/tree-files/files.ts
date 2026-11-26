@@ -284,20 +284,18 @@ export function createSnapshotFiles(context: FilesContext) {
       return {saved: true}
     },
 
-    /** Null for an id never listed. */
+    /** Null for an id never listed. Like a preview, it reads the Snapshot. */
     async thumbnail(id: TreeFileId) {
-      const found = await openable(id)
+      const file = knownFile(id)?.file
 
-      if (!found) return null
+      if (!file) return null
 
-      if (context.desktop.platform !== 'darwin' || found.link) {
+      if (context.desktop.platform !== 'darwin' || isLinkMode(file.mode)) {
         return {dataUrl: null}
       }
 
       try {
-        const {file} = await found.locate()
-
-        return {dataUrl: await context.desktop.thumbnail(file)}
+        return {dataUrl: await context.desktop.thumbnail(await copyOf(file))}
       } catch {
         return {dataUrl: null}
       }

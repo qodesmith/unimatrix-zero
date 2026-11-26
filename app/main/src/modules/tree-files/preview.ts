@@ -1,10 +1,19 @@
 import type {TreeFileDetails, TreeFilePreview} from '@uz/contract/tree-files'
 
-import {PREVIEW_SIZE_LIMIT} from '@uz/contract/tree-files'
+import {MIB} from '@uz/contract/sizes'
 import path from 'node:path'
 
 /** How much of a file decides its preview. */
 export const SAMPLE_BYTES = 8 * 1024
+
+/** Over these, a file isn't previewed; text-like files preview their start. */
+export const PREVIEW_SIZE_LIMIT = {
+  image: 64 * MIB,
+  audio: 2048 * MIB,
+  video: 2048 * MIB,
+  pdf: 128 * MIB,
+  html: 8 * MIB,
+} as const satisfies Partial<Record<TreeFilePreview, number>>
 
 const MEDIA_TYPES = new Map<string, ['image' | 'audio' | 'video', string]>([
   ['png', ['image', 'image/png']],

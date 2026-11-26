@@ -110,16 +110,12 @@ function OsCard({at, details, onQuickLook}: OsCardProps) {
           <img src={thumbnail.data} alt="" className="size-full object-cover" />
         ) : undefined
       }
-    >
-      <Button
-        variant="outline"
-        size="xs"
-        className="self-start"
-        onClick={onQuickLook}
-      >
-        Quick Look
-      </Button>
-    </FileCard>
+      actions={
+        <Button variant="outline" size="xs" onClick={onQuickLook}>
+          Quick Look
+        </Button>
+      }
+    />
   )
 }
 

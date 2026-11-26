@@ -43,6 +43,8 @@ async function openPdf(url: string): Promise<PdfFile> {
     cMapPacked: true,
     iccUrl: assetsAt('iccs'),
     standardFontDataUrl: assetsAt('standard_fonts'),
+    // The window's CSP compiles no wasm, so pdf.js loads its JS decoders from here.
+    useWasm: false,
     wasmUrl: assetsAt('wasm'),
   })
 

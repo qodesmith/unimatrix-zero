@@ -23,7 +23,7 @@ it('serves assets with a fixed MIME type', () => {
 
 it.each([
   '/assets/pdf.worker.min.mjs',
-  '/pdfjs/wasm/openjpeg.wasm',
+  '/pdfjs/wasm/openjpeg_nowasm_fallback.js',
   '/pdfjs/cmaps/UniJIS-UTF8-H.bcmap',
   '/pdfjs/standard_fonts/FoxitSans.pfb',
   '/pdfjs/standard_fonts/LiberationSans-Regular.ttf',

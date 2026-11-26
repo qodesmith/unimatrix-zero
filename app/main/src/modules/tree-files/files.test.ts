@@ -8,13 +8,13 @@ import {openDatabase} from '#modules/database/main'
 import {createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
 import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
-import {PREVIEW_SIZE_LIMIT} from '@uz/contract/tree-files'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import {afterEach, beforeEach, describe, expect, inject, it} from 'vitest'
 
 import {createTreeFiles} from './main'
+import {PREVIEW_SIZE_LIMIT} from './preview'
 import {removeFolder} from './test-cleanup'
 
 const migrationsFolder = path.resolve(import.meta.dirname, '../../../drizzle')
@@ -881,7 +881,7 @@ describe('saving a copy', () => {
 })
 
 describe('the OS’s thumbnail', () => {
-  it('asks macOS for the thumbnail of the file, as a copy at an earlier Turn', async () => {
+  it('asks macOS for the thumbnail of the file as its Snapshot holds it, never the Tree’s folder', async () => {
     const asked: string[] = []
     desktop.thumbnail = async file => {
       asked.push(fs.readFileSync(file, 'utf8'))
@@ -890,14 +890,19 @@ describe('the OS’s thumbnail', () => {
     }
 
     const first = await replyWriting(null, {'a.key': 'then'})
-    await replyWriting(first, {'a.key': 'now'})
+    const second = await replyWriting(first, {'a.key': 'now'})
+    aiWrites('a.key', 'edited since')
 
-    const {id} = await fileAt(first, 'a.key')
+    const earlier = await fileAt(first, 'a.key')
+    const newest = await fileAt(second, 'a.key')
 
-    expect(await treeFiles.thumbnail(id)).toEqual({
+    expect(await treeFiles.thumbnail(earlier.id)).toEqual({
       dataUrl: 'data:image/png;base64,AAAA',
     })
-    expect(asked).toEqual(['then'])
+    expect(await treeFiles.thumbnail(newest.id)).toEqual({
+      dataUrl: 'data:image/png;base64,AAAA',
+    })
+    expect(asked).toEqual(['then', 'now'])
   })
 
   it('gives none off macOS, for a link, or when the OS has none', async () => {
