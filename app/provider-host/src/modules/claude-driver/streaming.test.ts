@@ -2302,12 +2302,12 @@ it('runs claude under Supervised inside the Sandbox: it writes only in the Treeâ
   expect(options?.settings).toMatchObject({
     permissions: {
       deny: expect.arrayContaining([
-        `Read(/${home}/.ssh/**)`,
-        `Read(/${home}/.aws/**)`,
-        `Read(/${home}/.config/gh/**)`,
-        `Read(/${home}/.kube/**)`,
-        `Read(/${home}/.gnupg/**)`,
-        `Read(/${home}/Library/Keychains/**)`,
+        `Read(/${path.join(home, '.ssh')}/**)`,
+        `Read(/${path.join(home, '.aws')}/**)`,
+        `Read(/${path.join(home, '.config', 'gh')}/**)`,
+        `Read(/${path.join(home, '.kube')}/**)`,
+        `Read(/${path.join(home, '.gnupg')}/**)`,
+        `Read(/${path.join(home, 'Library', 'Keychains')}/**)`,
         'Read(//app/providers/**)',
         'Read(//app/tree-stores/**)',
       ]),
