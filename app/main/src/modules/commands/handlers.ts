@@ -59,6 +59,13 @@ function found(tree: Tree | null): Tree {
 
 const REPLY_GONE = 'That Reply no longer exists.'
 
+/** Null when the Tree has no such Reply. */
+function replyFound<T>(value: T | null): T {
+  if (value === null) throw new NotFoundError(REPLY_GONE)
+
+  return value
+}
+
 /** An id main never listed, or one whose Reply is gone. */
 function fileFound<T>(file: T | null | false): T {
   if (file === null || file === false) {
@@ -276,21 +283,13 @@ export const handlers: Handlers = {
   'tree-files.list': async ({treeId, replyId}, {trees, treeFiles}) => {
     found(trees.get(treeId))
 
-    const listed = await treeFiles.listFiles(treeId, replyId)
-
-    if (!listed) throw new NotFoundError(REPLY_GONE)
-
-    return listed
+    return replyFound(await treeFiles.listFiles(treeId, replyId))
   },
 
   'tree-files.save-copy': async ({treeId, replyId}, {trees, treeFiles}) => {
     found(trees.get(treeId))
 
-    const saved = await treeFiles.saveFilesCopy(treeId, replyId)
-
-    if (!saved) throw new NotFoundError(REPLY_GONE)
-
-    return saved
+    return replyFound(await treeFiles.saveFilesCopy(treeId, replyId))
   },
 
   'tree-file.describe': async ({fileId}, {treeFiles}) =>

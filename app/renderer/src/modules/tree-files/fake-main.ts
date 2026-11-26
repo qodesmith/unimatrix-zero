@@ -17,7 +17,7 @@ export function fileDetails(
     change: null,
     preview: 'text',
     tooLarge: false,
-    executable: false,
+    notOpened: null,
     link: false,
     onDisk: true,
     editor: null,

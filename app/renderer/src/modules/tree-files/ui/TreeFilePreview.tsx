@@ -109,7 +109,7 @@ interface DescribedProps {
 function Described({at, details, earlier}: DescribedProps) {
   const {error, run} = useCommand()
   const fileId = details.id
-  const opens = !details.executable && details.change !== 'deleted'
+  const opens = details.notOpened === null && details.change !== 'deleted'
 
   const openers: PreviewOpeners = {
     open: opens

@@ -54,8 +54,11 @@ export const TreeFileDetailsSchema = z.strictObject({
   preview: TreeFilePreviewSchema,
   /** Over `PREVIEW_SIZE_LIMIT` for its preview. */
   tooLarge: z.boolean(),
-  /** Marked as a program: never opened, only revealed or saved. */
-  executable: z.boolean(),
+  /**
+   * Why Open with its app is refused: marked as a program, or not a document
+   * type, which can run on any platform. `program` when both apply.
+   */
+  notOpened: z.enum(['program', 'not-a-document']).nullable(),
   /** A link, which is never followed. */
   link: z.boolean(),
   /**

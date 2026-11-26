@@ -75,7 +75,9 @@ export function createCopies(tempDir: string, blobs: () => GitBlobs) {
     async copyOf(store: string, blob: string, filePath: string) {
       const copy = path.join(tempDir, blob, path.posix.basename(filePath))
 
-      if (fs.existsSync(copy)) return copy
+      if (fs.lstatSync(copy, {throwIfNoEntry: false})?.isFile()) return copy
+
+      fs.rmSync(copy, {recursive: true, force: true})
 
       const pending = copying.get(copy) ?? write(store, blob, copy)
       copying.set(copy, pending)

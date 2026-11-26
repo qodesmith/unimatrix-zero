@@ -17,30 +17,35 @@ interface SnapshotProps {
   replyId: string
 }
 
-function EarlierTurn({treeId, replyId}: SnapshotProps) {
+function EarlierTurn({
+  treeId,
+  replyId,
+  saves,
+}: SnapshotProps & {saves: boolean}) {
   const {error, run} = useCommand()
 
   return (
     <div className="mx-2 mb-1 flex flex-col gap-1 rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">
       <p>These files are as they were at an earlier Turn.</p>
-      <Button
-        variant="outline"
-        size="xs"
-        className="self-start"
-        onClick={() =>
-          void run({type: 'tree-files.save-copy', treeId, replyId})
-        }
-      >
-        Save a copy…
-      </Button>
+      {saves && (
+        <Button
+          variant="outline"
+          size="xs"
+          className="self-start"
+          onClick={() =>
+            void run({type: 'tree-files.save-copy', treeId, replyId})
+          }
+        >
+          Save a copy…
+        </Button>
+      )}
       <Refusal error={error} />
     </div>
   )
 }
 
 function Snapshot({treeId, replyId}: SnapshotProps) {
-  // The tree stays put between Replies, so its folders and scroll do too.
-  const list = useTreeFileList(treeId, replyId, true)
+  const list = useTreeFileList(treeId, replyId, {keepLastShown: true})
   const open = useOpenTreeFile()
 
   if (list.isPending) return null
@@ -51,7 +56,13 @@ function Snapshot({treeId, replyId}: SnapshotProps) {
 
   return (
     <div className="flex h-full flex-col">
-      {!onDisk && <EarlierTurn treeId={treeId} replyId={replyId} />}
+      {!onDisk && (
+        <EarlierTurn
+          treeId={treeId}
+          replyId={replyId}
+          saves={files.some(file => file.change !== 'deleted')}
+        />
+      )}
       {files.length === 0 ? (
         <Quiet>No files yet.</Quiet>
       ) : (

@@ -1,4 +1,5 @@
 import type {FileAt} from '../tree-files-store'
+import type {TextPreviewProps} from './TextPreview'
 import type {TreeFileDetails} from '@uz/contract/tree-files'
 
 import {Button} from '#shadcn/ui/button'
@@ -123,8 +124,7 @@ function OsCard({at, details, onQuickLook}: OsCardProps) {
 }
 
 export interface PreviewOpeners {
-  /** Opens the whole file; null when the file may not be opened. */
-  open: (() => void) | null
+  open: TextPreviewProps['onOpen']
   quickLook: () => void
 }
 
@@ -134,7 +134,7 @@ interface PreviewBodyProps {
   openers: PreviewOpeners
 }
 
-/** In the app, then the OS, then the fallback card (PRD §9 Previews). */
+/** In the app, then the OS, then the fallback card. */
 export function PreviewBody({at, details, openers}: PreviewBodyProps) {
   if (details.link) {
     return (
@@ -143,6 +143,10 @@ export function PreviewBody({at, details, openers}: PreviewBodyProps) {
         note="This is a link to another file. The app doesn’t follow links."
       />
     )
+  }
+
+  if (details.size === 0) {
+    return <FileCard details={details} note="This file is empty." />
   }
 
   if (details.tooLarge) {

@@ -1,10 +1,19 @@
-import type {Command} from '@uz/contract/commands'
+import type {Command, TreeFileOpenWith} from '@uz/contract/commands'
 import type {TreeFileDetails} from '@uz/contract/tree-files'
 import type {ReactNode} from 'react'
 
 import {Button} from '#shadcn/ui/button'
 
 type Run = (command: Command) => void
+
+type OpenWith = Exclude<TreeFileOpenWith, 'quick-look'>
+
+const NOT_OPENED = {
+  program:
+    'This file is marked as a program, and the app never opens programs.',
+  'not-a-document':
+    'The app opens only documents, and this kind of file can run as a program.',
+} satisfies Record<NonNullable<TreeFileDetails['notOpened']>, string>
 
 interface FileActionsProps {
   details: TreeFileDetails
@@ -22,7 +31,7 @@ function Action({onClick, children}: {onClick: () => void; children: string}) {
 function actionsFor({details, run}: FileActionsProps): ReactNode {
   const fileId = details.id
 
-  function open(how: 'default-app' | 'browser' | 'editor') {
+  function open(how: OpenWith) {
     return () => run({type: 'tree-file.open', fileId, with: how})
   }
 
@@ -38,9 +47,16 @@ function actionsFor({details, run}: FileActionsProps): ReactNode {
     return <Action onClick={saveCopy}>Save a copy…</Action>
   }
 
-  if (details.executable) {
+  const editor = details.editor !== null && (
+    <Action onClick={open('editor')}>{`Open in ${details.editor}`}</Action>
+  )
+
+  if (details.notOpened !== null) {
     return details.onDisk ? (
-      <Action onClick={reveal}>Reveal in Finder</Action>
+      <>
+        <Action onClick={reveal}>Reveal in Finder</Action>
+        {editor}
+      </>
     ) : (
       <Action onClick={saveCopy}>Save a copy…</Action>
     )
@@ -65,9 +81,7 @@ function actionsFor({details, run}: FileActionsProps): ReactNode {
       {browser}
       <Action onClick={open('default-app')}>Open in default app</Action>
       <Action onClick={reveal}>Reveal in Finder</Action>
-      {details.editor !== null && (
-        <Action onClick={open('editor')}>{`Open in ${details.editor}`}</Action>
-      )}
+      {editor}
     </>
   )
 }
@@ -76,9 +90,9 @@ function actionsFor({details, run}: FileActionsProps): ReactNode {
 export function FileActions(props: FileActionsProps) {
   return (
     <div className="flex flex-col gap-2">
-      {props.details.executable && (
+      {props.details.notOpened !== null && (
         <p className="text-xs text-muted-foreground">
-          This file is marked as a program, and the app never opens programs.
+          {NOT_OPENED[props.details.notOpened]}
         </p>
       )}
       <div className="flex flex-wrap gap-2">{actionsFor(props)}</div>

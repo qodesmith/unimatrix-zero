@@ -170,7 +170,7 @@ export function fakeMain(saved: Saved = {}) {
           ...file,
           preview: 'text',
           tooLarge: false,
-          executable: false,
+          notOpened: null,
           link: false,
           onDisk: snapshot.onDisk && file.change !== 'deleted',
           editor: null,

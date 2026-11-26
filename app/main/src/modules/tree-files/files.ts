@@ -2,7 +2,8 @@ import type {Database} from '#modules/database/main'
 import type {Desktop} from './desktop'
 import type {Git, GitBlobs} from './git'
 import type {ListedFile} from './listing'
-import type {OpenWith, Openable} from './opening'
+import type {Openable} from './opening'
+import type {TreeFileOpenWith} from '@uz/contract/commands'
 import type {
   TreeFile,
   TreeFileDetails,
@@ -222,7 +223,7 @@ export function createSnapshotFiles(context: FilesContext) {
     },
 
     /** False for an id never listed; rejects with why it won't open. */
-    async openFile(id: TreeFileId, how: OpenWith) {
+    async openFile(id: TreeFileId, how: TreeFileOpenWith) {
       const found = await openable(id)
 
       if (found) await openWith(context.desktop, found, how)

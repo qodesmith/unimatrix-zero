@@ -63,7 +63,7 @@ const BY_EXTENSION = new Map([
 export function iconOf(details: TreeFileDetails): LucideIcon {
   if (details.link) return LinkIcon
 
-  if (details.executable) return FileTerminalIcon
+  if (details.notOpened === 'program') return FileTerminalIcon
 
   return (
     BY_PREVIEW[details.preview] ??

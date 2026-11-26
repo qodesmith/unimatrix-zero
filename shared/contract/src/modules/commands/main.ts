@@ -285,14 +285,24 @@ export const TreeFileDescribeCommand = z.strictObject({
   fileId: TreeFileIdSchema,
 })
 
+const TreeFileOpenWithSchema = z.enum([
+  'default-app',
+  'browser',
+  'editor',
+  'quick-look',
+])
+
+export type TreeFileOpenWith = z.infer<typeof TreeFileOpenWithSchema>
+
 /**
  * In the Tree's folder when `onDisk`, else a read-only copy of this Snapshot's
- * file. `default-app` and `browser` are refused for a program.
+ * file. `default-app` is refused for a file `notOpened`, and `browser` for a
+ * program or a file that isn't HTML.
  */
 export const TreeFileOpenCommand = z.strictObject({
   type: z.literal('tree-file.open'),
   fileId: TreeFileIdSchema,
-  with: z.enum(['default-app', 'browser', 'editor', 'quick-look']),
+  with: TreeFileOpenWithSchema,
 })
 
 /** Only when `onDisk`. */

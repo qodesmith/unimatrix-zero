@@ -1161,6 +1161,30 @@ describe('the Files section', () => {
     ])
   })
 
+  it.each([
+    ['no files', []],
+    ['only files it deleted', [treeFile('old.txt', {change: 'deleted'})]],
+  ])(
+    'offers no Save a copy… for an earlier Turn with %s',
+    async (_case, files) => {
+      const tree = savedTree({title: 'Notes'})
+      const later = {...latest, snapshot: {onDisk: false, files}}
+      const main = fakeMain(savedThread(tree, earlier, later))
+      await openTreeOf(main, 'Notes')
+
+      await expect
+        .element(
+          filesSection().getByText(
+            'These files are as they were at an earlier Turn.'
+          )
+        )
+        .toBeVisible()
+      await expect
+        .element(filesSection().getByRole('button', {name: 'Save a copy…'}))
+        .not.toBeInTheDocument()
+    }
+  )
+
   it('says so when no Tree is open, and when the open Tree has no files yet', async () => {
     const tree = savedTree({title: 'Empty'})
     const main = fakeMain({trees: [tree]})

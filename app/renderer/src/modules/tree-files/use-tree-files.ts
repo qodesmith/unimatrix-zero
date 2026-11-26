@@ -63,15 +63,18 @@ export function useCloseTreeFile() {
   }
 }
 
-/** `keepShown` shows the last Reply's list until this one's comes. */
+/**
+ * `keepLastShown` shows the last Reply's list until this one's comes, so a
+ * tree drawn from it keeps its open folders and scroll.
+ */
 export function useTreeFileList(
   treeId: string,
   replyId: string,
-  keepShown = false
+  {keepLastShown = false} = {}
 ) {
   return useQuery({
     queryKey: treeFilesKey(treeId, replyId),
-    placeholderData: keepShown ? keepPreviousData : undefined,
+    placeholderData: keepLastShown ? keepPreviousData : undefined,
     queryFn: async () => {
       const outcome = await bridge().send({
         type: 'tree-files.list',

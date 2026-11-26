@@ -1,5 +1,6 @@
 import type {Database} from '#modules/database/main'
 import type {Desktop} from './main'
+import type {TreeFileOpenWith} from '@uz/contract/commands'
 import type {HostCommand} from '@uz/contract/host'
 import type {TreeFile} from '@uz/contract/tree-files'
 
@@ -329,7 +330,6 @@ describe('describing a file', () => {
       preview,
       tooLarge: false,
       link: false,
-      executable: false,
     })
   })
 
@@ -354,16 +354,25 @@ describe('describing a file', () => {
     })
   })
 
-  it('marks a file with the executable bit as a program', async () => {
+  it('says the app won’t open a program, or a file that isn’t a document, and calls a file that is both a program', async () => {
     const replyId = await send(null)
     aiWrites('run.sh', 'echo hi')
     fs.chmodSync(path.join(folder(), 'run.sh'), 0o755)
+    aiWrites('notes.docx', 'not really')
+    fs.chmodSync(path.join(folder(), 'notes.docx'), 0o755)
+    aiWrites('start.bat', 'echo hi')
+    aiWrites('report.docx', BINARY)
     await finish(replyId)
 
     expect(await described(replyId, 'run.sh')).toMatchObject({
       preview: 'text',
-      executable: true,
+      notOpened: 'program',
     })
+    expect((await described(replyId, 'notes.docx')).notOpened).toBe('program')
+    expect((await described(replyId, 'start.bat')).notOpened).toBe(
+      'not-a-document'
+    )
+    expect((await described(replyId, 'report.docx')).notOpened).toBeNull()
   })
 
   it('doesn’t preview an HTML file over its limit, but previews the start of any long text', async () => {
@@ -482,18 +491,34 @@ describe('serving a file to the window', () => {
     expect(fs.readFileSync(served.path, 'utf8')).toBe('was here')
   })
 
+  it('writes the copy again where a link or a folder stands in its place', async () => {
+    const replyId = await replyWriting(null, {'a.txt': 'mine'})
+    const copy = (await servedAt(replyId, 'a.txt')).path
+
+    for (const stand of [
+      () => fs.symlinkSync(path.join(outside('a.txt'), 'a.txt'), copy),
+      () => fs.mkdirSync(copy),
+    ]) {
+      fs.rmSync(copy, {force: true})
+      stand()
+
+      const served = await servedAt(replyId, 'a.txt')
+
+      expect(served.path).toBe(copy)
+      expect(fs.lstatSync(copy).isFile()).toBe(true)
+      expect(fs.readFileSync(copy, 'utf8')).toBe('mine')
+    }
+  })
+
   it('serves nothing for an id it never listed', async () => {
     expect(await treeFiles.servedFile('0'.repeat(32))).toBeNull()
   })
 })
 
 const PROGRAM = /marked as a program, which Unimatrix Zero never opens/u
+const NOT_A_DOCUMENT = /opens only documents/u
 
-async function open(
-  replyId: string,
-  filePath: string,
-  how: 'default-app' | 'browser' | 'editor' | 'quick-look'
-) {
+async function open(replyId: string, filePath: string, how: TreeFileOpenWith) {
   const {id} = await fileAt(replyId, filePath)
 
   return treeFiles.openFile(id, how)
@@ -572,6 +597,77 @@ describe('opening a file', () => {
     )
     await expect(open(first, 'run.html', 'browser')).rejects.toThrow(PROGRAM)
     expect(opened).toEqual([])
+  })
+
+  it.each([
+    'start.bat',
+    'start.cmd',
+    'setup.ps1',
+    'shortcut.lnk',
+    'tool.exe',
+    'page.hta',
+    'script.vbs',
+    'script.js',
+    'shell.terminal',
+    'run.command',
+    'place.fileloc',
+    'site.webloc',
+    'tool.jar',
+    'Tool.app',
+    'setup.pkg',
+  ])(
+    'never opens %s, which can run with no execute bit, with its app or the browser, at any Turn',
+    async name => {
+      const first = await replyWriting(null, {[name]: 'echo hi'})
+
+      await expect(open(first, name, 'default-app')).rejects.toThrow(
+        NOT_A_DOCUMENT
+      )
+      await expect(open(first, name, 'browser')).rejects.toThrow(
+        /Only an HTML file/u
+      )
+
+      await replyWriting(first, {'other.txt': 'x'})
+
+      await expect(open(first, name, 'default-app')).rejects.toThrow(
+        NOT_A_DOCUMENT
+      )
+      expect(opened).toEqual([])
+    }
+  )
+
+  it('opens a file that isn’t a document only where it never runs: the editor and Quick Look', async () => {
+    const replyId = await replyWriting(null, {'start.bat': 'echo hi'})
+
+    await open(replyId, 'start.bat', 'editor')
+    await open(replyId, 'start.bat', 'quick-look')
+
+    expect(opened).toEqual([
+      {how: 'editor', file: inFolder('start.bat')},
+      {how: 'quick-look', file: inFolder('start.bat'), name: 'start.bat'},
+    ])
+  })
+
+  it.each([
+    'letter.docx',
+    'sheet.xlsx',
+    'deck.key',
+    'notes.odt',
+    'paper.pdf',
+    'photo.heic',
+    'scan.tiff',
+    'art.psd',
+    'song.mp3',
+    'clip.mov',
+    'design.sketch',
+    'notes.md',
+    'data.csv',
+    'page.html',
+  ])('opens the document %s with its app', async name => {
+    const replyId = await replyWriting(null, {[name]: BINARY})
+
+    expect(await open(replyId, name, 'default-app')).toBe(true)
+    expect(opened).toEqual([{how: 'default-app', file: inFolder(name)}])
   })
 
   it('never opens a file marked as a program in the Tree’s folder since its Snapshot', async () => {

@@ -22,7 +22,21 @@ const DOCX = '1'.repeat(16)
 const BIG_HTML = '2'.repeat(16)
 const MARKDOWN = '3'.repeat(16)
 const GONE = '4'.repeat(16)
-const ids = {TEXT, PDF, HTML, PNG, SVG, VIDEO, DOCX, BIG_HTML, MARKDOWN, GONE}
+const EMPTY = '5'.repeat(16)
+
+const ids = {
+  TEXT,
+  PDF,
+  HTML,
+  PNG,
+  SVG,
+  VIDEO,
+  DOCX,
+  BIG_HTML,
+  MARKDOWN,
+  GONE,
+  EMPTY,
+}
 
 function idOf(name: keyof typeof ids) {
   return ids[name].repeat(2)
@@ -69,6 +83,7 @@ beforeEach(() => {
     file('DOCX', 'PK', 'other'),
     file('BIG_HTML', '<p>Big</p>', 'html', {tooLarge: true}),
     file('MARKDOWN', '# Hi', 'markdown'),
+    file('EMPTY', '', 'text'),
     [
       idOf('GONE'),
       {
@@ -151,6 +166,19 @@ describe('serving a Tree’s file by id', () => {
     }
   )
 
+  it.each(['bytes=0-', 'bytes=0-262143', 'bytes=-5'])(
+    'serves an empty file whole and empty for the range %s',
+    async range => {
+      const response = await ranged('EMPTY', range)
+
+      expect(response.status).toBe(200)
+      expectLockedDown(response)
+      expect(response.headers.get('Content-Length')).toBe('0')
+      expect(response.headers.get('Content-Range')).toBeNull()
+      expect(await response.text()).toBe('')
+    }
+  )
+
   it.each(['bytes=0-1,4-5', 'lines=1-2', 'bytes=x-y', 'bytes=5-2'])(
     'serves the whole file for a range it doesn’t read, %s',
     async range => {
@@ -223,6 +251,8 @@ describe('serving a Tree’s file by id', () => {
       treeFileUrl(idOf('BIG_HTML'), 'html'),
     ],
     ['another view', `${treeFileUrl(idOf('HTML'))}?view=page`],
+    ['an empty view', `${treeFileUrl(idOf('HTML'))}?view=`],
+    ['another query', `${treeFileUrl(idOf('HTML'))}?page=1`],
     ['an id main never gave out', treeFileUrl('9'.repeat(32))],
     ['a file whose copy is gone', treeFileUrl(idOf('GONE'))],
     ['a path below the id', `${treeFileUrl(idOf('TEXT'))}/more`],

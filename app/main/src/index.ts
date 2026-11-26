@@ -235,8 +235,7 @@ function openWindow(db: Database) {
     tell: news => hub.publish({type: GIT_NEWS[news]}),
   })
 
-  // Nothing uses an earlier run's copies.
-  const copiesDir = path.join(app.getPath('temp'), 'unimatrix-zero-files')
+  const copiesDir = path.join(machine.userData, 'file-copies')
   clearCopies(copiesDir)
 
   let appWindow: BrowserWindow | null = null

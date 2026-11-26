@@ -282,6 +282,19 @@ it('runs HTML in a frame that allows scripts and nothing more, with Open in brow
   ])
 })
 
+it.each([
+  ['.gitkeep', 'text'],
+  ['notes.md', 'markdown'],
+  ['page.html', 'html'],
+] as const)('says %s is empty, and reads none of it', async (name, preview) => {
+  const fetched = served('')
+  await renderPreview(fileDetails(name, {preview, size: 0}))
+
+  await expect.element(panel().getByText('This file is empty.')).toBeVisible()
+  expect(fetched).not.toHaveBeenCalled()
+  expect(framesAndEmbeds()).toHaveLength(0)
+})
+
 it('shows the fallback card for a file too large to preview', async () => {
   const file = fileDetails('huge.png', {preview: 'image', tooLarge: true})
   await renderPreview(file)
@@ -404,7 +417,7 @@ it('opens or saves the version of a file at an earlier Turn, saying so', async (
 
 it('never opens a file marked as a program, and says so, offering Reveal in Finder', async () => {
   served('#!/bin/sh\n')
-  const file = fileDetails('run.sh', {executable: true, size: 10})
+  const file = fileDetails('run.sh', {notOpened: 'program', size: 10})
   const {main} = await renderPreview(file)
 
   await expect
@@ -426,9 +439,75 @@ it('never opens a file marked as a program, and says so, offering Reveal in Find
   ).toEqual([])
 })
 
+it('never opens a file that isn’t a document with its app, and says so, offering Reveal in Finder and the editor', async () => {
+  served('echo hi\n')
+
+  const file = fileDetails('start.bat', {
+    notOpened: 'not-a-document',
+    editor: 'Cursor',
+    size: 8,
+  })
+
+  const {main} = await renderPreview(file)
+
+  await expect
+    .element(
+      panel().getByText(
+        'The app opens only documents, and this kind of file can run as a program.'
+      )
+    )
+    .toBeVisible()
+  await panel().getByRole('button', {name: 'Reveal in Finder'}).click()
+  await panel().getByRole('button', {name: 'Open in Cursor'}).click()
+
+  expect(opened(main)).toEqual([
+    {type: 'tree-file.reveal', fileId: file.id},
+    {type: 'tree-file.open', fileId: file.id, with: 'editor'},
+  ])
+  await expect
+    .element(panel().getByRole('button', {name: 'Open in default app'}))
+    .not.toBeInTheDocument()
+})
+
+it('offers only Save a copy… for a file that isn’t a document at an earlier Turn', async () => {
+  served('echo hi\n')
+
+  const file = fileDetails('start.bat', {
+    notOpened: 'not-a-document',
+    onDisk: false,
+  })
+
+  const {main} = await renderPreview(file)
+
+  await expect
+    .element(panel().getByText(/^The app opens only documents/))
+    .toBeVisible()
+  await panel().getByRole('button', {name: 'Save a copy…'}).click()
+
+  expect(opened(main)).toEqual([{type: 'tree-file.save-copy', fileId: file.id}])
+  await expect
+    .element(panel().getByRole('button', {name: 'Open this version'}))
+    .not.toBeInTheDocument()
+})
+
+it('offers no Open to see the rest of a long file that isn’t a document', async () => {
+  served(`${'x'.repeat(99)}\n`.repeat(10))
+  await renderPreview(
+    fileDetails('build.log', {
+      notOpened: 'not-a-document',
+      size: TEXT_PREVIEW_BYTES * 4,
+    })
+  )
+
+  await expect.element(panel().getByText(/^Showing the first /)).toBeVisible()
+  await expect
+    .element(panel().getByRole('button', {name: 'Open to see the rest'}))
+    .not.toBeInTheDocument()
+})
+
 it('offers only Save a copy… for a program at an earlier Turn', async () => {
   served('#!/bin/sh\n')
-  const file = fileDetails('run.sh', {executable: true, onDisk: false})
+  const file = fileDetails('run.sh', {notOpened: 'program', onDisk: false})
   const {main} = await renderPreview(file)
 
   await panel().getByRole('button', {name: 'Save a copy…'}).click()

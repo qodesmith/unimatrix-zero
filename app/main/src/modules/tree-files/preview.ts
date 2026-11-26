@@ -1,4 +1,4 @@
-import type {TreeFilePreview} from '@uz/contract/tree-files'
+import type {TreeFileDetails, TreeFilePreview} from '@uz/contract/tree-files'
 
 import {PREVIEW_SIZE_LIMIT} from '@uz/contract/tree-files'
 import path from 'node:path'
@@ -40,10 +40,27 @@ const TEXT_KINDS = new Map<string, TreeFilePreview>([
   ['htm', 'html'],
 ])
 
+/**
+ * The types Open hands to their app, decided by name on every platform:
+ * Windows keeps no execute bit, and a `.bat` or a `.lnk` would run.
+ */
+const DOCUMENTS = new Set(
+  [
+    'doc docx xls xlsx ppt pptx pages numbers key',
+    'odt ods odp odg rtf txt md markdown csv tsv pdf epub html htm',
+    'png jpg jpeg gif webp avif bmp ico svg heic heif tif tiff psd',
+    'mp3 m4a aac wav ogg oga opus flac aif aiff',
+    'mp4 m4v webm mov ogv avi mkv',
+    'sketch fig ai',
+  ].flatMap(group => group.split(' '))
+)
+
 const LINK_MODE = '120000'
 const PROGRAM_MODE = '100755'
 
 const PDF_MAGIC = '%PDF-'
+
+type TreeFileNotOpened = TreeFileDetails['notOpened']
 
 function extensionOf(name: string) {
   return path.posix.extname(name).slice(1).toLowerCase()
@@ -83,6 +100,12 @@ function kindOf(name: string, sample: Buffer, size: number) {
   return TEXT_KINDS.get(extension) ?? 'text'
 }
 
+function notOpenedOf(name: string, mode: string): TreeFileNotOpened {
+  if (mode === PROGRAM_MODE) return 'program'
+
+  return DOCUMENTS.has(extensionOf(name)) ? null : 'not-a-document'
+}
+
 function overLimit(preview: TreeFilePreview, size: number) {
   const limits: Partial<Record<TreeFilePreview, number>> = PREVIEW_SIZE_LIMIT
   const limit = limits[preview]
@@ -102,13 +125,13 @@ export function previewOf({
   size: number
   sample: Buffer
 }) {
-  const link = mode === LINK_MODE
+  const link = isLinkMode(mode)
   const preview: TreeFilePreview = link ? 'other' : kindOf(name, sample, size)
 
   return {
     preview,
     tooLarge: overLimit(preview, size),
-    executable: mode === PROGRAM_MODE,
+    notOpened: notOpenedOf(name, mode),
     link,
   }
 }

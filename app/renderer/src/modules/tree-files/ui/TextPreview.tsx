@@ -90,7 +90,7 @@ function Body({kind, path, start}: BodyProps) {
   }
 }
 
-interface TextPreviewProps {
+export interface TextPreviewProps {
   at: FileAt
   details: TreeFileDetails
   kind: TextKind

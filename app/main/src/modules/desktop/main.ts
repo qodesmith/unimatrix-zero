@@ -3,11 +3,15 @@ import type {Editor} from './editor'
 import type {BrowserWindow} from 'electron'
 
 import {app, dialog, nativeImage, shell} from 'electron'
-import {spawn} from 'node:child_process'
+import {execFile, spawn} from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
+import {promisify} from 'node:util'
 
+import {openInLinuxBrowser} from './browser'
 import {detectEditor} from './editor'
+
+const execFileAsync = promisify(execFile)
 
 /** Resolves once the program starts; it runs on after the app quits. */
 async function launch(program: string, args: string[]) {
@@ -28,9 +32,18 @@ async function launch(program: string, args: string[]) {
   })
 }
 
+async function runToEnd(program: string, args: string[]) {
+  const {stdout} = await execFileAsync(program, args, {
+    timeout: 10_000,
+    windowsHide: true,
+  })
+
+  return stdout
+}
+
 /** The default browser, never whatever app opens HTML files. */
 async function openInBrowser(file: string) {
-  if (process.platform === 'linux') return launch('xdg-open', [file])
+  if (process.platform === 'linux') return openInLinuxBrowser(runToEnd, file)
 
   const browser = await app.getApplicationInfoForProtocol('https://')
 

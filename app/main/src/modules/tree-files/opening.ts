@@ -1,18 +1,17 @@
 import type {Desktop} from './desktop'
-import type {TreeFilePreview} from '@uz/contract/tree-files'
+import type {TreeFileOpenWith} from '@uz/contract/commands'
+import type {TreeFileDetails} from '@uz/contract/tree-files'
 
 import path from 'node:path'
 
 import {LINK_REFUSED} from './location'
 
-export type OpenWith = 'default-app' | 'browser' | 'editor' | 'quick-look'
-
 export interface Openable {
   /** Inside the Tree's files. */
   path: string
   onDisk: boolean
-  preview: TreeFilePreview
-  executable: boolean
+  preview: TreeFileDetails['preview']
+  notOpened: TreeFileDetails['notOpened']
   link: boolean
   /** The file in the Tree's folder when `onDisk`, else a read-only copy. */
   locate: () => Promise<{file: string; executable: boolean}>
@@ -21,15 +20,32 @@ export interface Openable {
 const PROGRAM_REFUSED =
   'That file is marked as a program, which Unimatrix Zero never opens.'
 
+const NOT_A_DOCUMENT_REFUSED =
+  'Unimatrix Zero opens only documents, and that kind of file can run as a program.'
+
 const NOT_IN_FOLDER =
   'At this Turn the file isn’t in the Tree’s folder, so it can only be opened as a copy.'
 
-function refusal(desktop: Desktop, how: OpenWith, openable: Openable) {
+/**
+ * Its app and the browser can run a program; the editor and Quick Look never
+ * do.
+ */
+function programRefusal(how: TreeFileOpenWith, program: boolean) {
+  return (how === 'default-app' || how === 'browser') && program
+    ? PROGRAM_REFUSED
+    : null
+}
+
+function refusal(desktop: Desktop, how: TreeFileOpenWith, openable: Openable) {
   if (openable.link) return LINK_REFUSED
 
-  const runs = how === 'default-app' || how === 'browser'
+  const program = programRefusal(how, openable.notOpened === 'program')
 
-  if (runs && openable.executable) return PROGRAM_REFUSED
+  if (program) return program
+
+  if (how === 'default-app' && openable.notOpened !== null) {
+    return NOT_A_DOCUMENT_REFUSED
+  }
 
   if (how === 'browser' && openable.preview !== 'html') {
     return 'Only an HTML file opens in the browser.'
@@ -52,7 +68,7 @@ function refusal(desktop: Desktop, how: OpenWith, openable: Openable) {
 export async function openWith(
   desktop: Desktop,
   openable: Openable,
-  how: OpenWith
+  how: TreeFileOpenWith
 ) {
   const refused = refusal(desktop, how, openable)
 
@@ -60,9 +76,9 @@ export async function openWith(
 
   const {file, executable} = await openable.locate()
 
-  if ((how === 'default-app' || how === 'browser') && executable) {
-    throw new Error(PROGRAM_REFUSED)
-  }
+  const program = programRefusal(how, executable)
+
+  if (program) throw new Error(program)
 
   switch (how) {
     case 'default-app':

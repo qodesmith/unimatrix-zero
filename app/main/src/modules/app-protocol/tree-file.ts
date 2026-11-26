@@ -78,16 +78,19 @@ type Range = {start: number; end: number} | 'unsatisfiable' | null
 
 const BYTE_RANGE = /^bytes=(\d*)-(\d*)$/u
 
-/** One range only; any other `Range` is ignored, as RFC 9110 allows. */
+/**
+ * One range only; any other `Range` is ignored, as RFC 9110 allows. An empty
+ * file has no byte to range over, so it is served whole.
+ */
 function rangeOf(header: string | null, size: number): Range {
   const [, first = '', last = ''] = BYTE_RANGE.exec(header?.trim() ?? '') ?? []
 
-  if (first === '' && last === '') return null
+  if (size === 0 || (first === '' && last === '')) return null
 
   if (first === '') {
     const suffix = Number(last)
 
-    return suffix === 0 || size === 0
+    return suffix === 0
       ? 'unsatisfiable'
       : {start: Math.max(0, size - suffix), end: size - 1}
   }
