@@ -354,26 +354,41 @@ describe('describing a file', () => {
     })
   })
 
-  it('says the app won’t open a program, or a file that isn’t a document, and calls a file that is both a program', async () => {
-    const replyId = await send(null)
-    aiWrites('run.sh', 'echo hi')
-    fs.chmodSync(path.join(folder(), 'run.sh'), 0o755)
-    aiWrites('notes.docx', 'not really')
-    fs.chmodSync(path.join(folder(), 'notes.docx'), 0o755)
-    aiWrites('start.bat', 'echo hi')
-    aiWrites('report.docx', BINARY)
-    await finish(replyId)
+  it('says the app won’t open a file that isn’t a document', async () => {
+    const replyId = await replyWriting(null, {
+      'run.sh': 'echo hi',
+      'start.bat': 'echo hi',
+      'report.docx': BINARY,
+    })
 
     expect(await described(replyId, 'run.sh')).toMatchObject({
       preview: 'text',
-      notOpened: 'program',
+      notOpened: 'not-a-document',
     })
-    expect((await described(replyId, 'notes.docx')).notOpened).toBe('program')
     expect((await described(replyId, 'start.bat')).notOpened).toBe(
       'not-a-document'
     )
     expect((await described(replyId, 'report.docx')).notOpened).toBeNull()
   })
+
+  // Windows keeps no executable bit, so no file there is marked as a program.
+  it.skipIf(process.platform === 'win32')(
+    'says the app won’t open a program, and calls a document marked as one a program',
+    async () => {
+      const replyId = await send(null)
+      aiWrites('run.sh', 'echo hi')
+      fs.chmodSync(path.join(folder(), 'run.sh'), 0o755)
+      aiWrites('notes.docx', 'not really')
+      fs.chmodSync(path.join(folder(), 'notes.docx'), 0o755)
+      await finish(replyId)
+
+      expect(await described(replyId, 'run.sh')).toMatchObject({
+        preview: 'text',
+        notOpened: 'program',
+      })
+      expect((await described(replyId, 'notes.docx')).notOpened).toBe('program')
+    }
+  )
 
   it('doesn’t preview an HTML file over its limit, but previews the start of any long text', async () => {
     const replyId = await replyWriting(null, {
@@ -513,6 +528,8 @@ describe('serving a file to the window', () => {
       () => fs.symlinkSync(path.join(outside('a.txt'), 'a.txt'), copy),
       () => fs.mkdirSync(copy),
     ]) {
+      // Windows won't remove a read-only file.
+      fs.chmodSync(copy, 0o600)
       fs.rmSync(copy, {force: true})
       stand()
 
@@ -593,25 +610,29 @@ describe('opening a file', () => {
     expect(fs.readFileSync(opened[0]?.file ?? '', 'utf8')).toBe('was here')
   })
 
-  it('never opens a program, in its app or the browser, at any Turn', async () => {
-    const first = await send(null)
-    aiWrites('run.html', '<script></script>')
-    fs.chmodSync(path.join(folder(), 'run.html'), 0o755)
-    await finish(first)
+  // Windows keeps no executable bit, so no file there is marked as a program.
+  it.skipIf(process.platform === 'win32')(
+    'never opens a program, in its app or the browser, at any Turn',
+    async () => {
+      const first = await send(null)
+      aiWrites('run.html', '<script></script>')
+      fs.chmodSync(path.join(folder(), 'run.html'), 0o755)
+      await finish(first)
 
-    await expect(open(first, 'run.html', 'default-app')).rejects.toThrow(
-      PROGRAM
-    )
-    await expect(open(first, 'run.html', 'browser')).rejects.toThrow(PROGRAM)
+      await expect(open(first, 'run.html', 'default-app')).rejects.toThrow(
+        PROGRAM
+      )
+      await expect(open(first, 'run.html', 'browser')).rejects.toThrow(PROGRAM)
 
-    await replyWriting(first, {'other.txt': 'x'})
+      await replyWriting(first, {'other.txt': 'x'})
 
-    await expect(open(first, 'run.html', 'default-app')).rejects.toThrow(
-      PROGRAM
-    )
-    await expect(open(first, 'run.html', 'browser')).rejects.toThrow(PROGRAM)
-    expect(opened).toEqual([])
-  })
+      await expect(open(first, 'run.html', 'default-app')).rejects.toThrow(
+        PROGRAM
+      )
+      await expect(open(first, 'run.html', 'browser')).rejects.toThrow(PROGRAM)
+      expect(opened).toEqual([])
+    }
+  )
 
   it.each([
     'start.bat',
@@ -684,15 +705,19 @@ describe('opening a file', () => {
     expect(opened).toEqual([{how: 'default-app', file: inFolder(name)}])
   })
 
-  it('never opens a file marked as a program in the Tree’s folder since its Snapshot', async () => {
-    const replyId = await replyWriting(null, {'tool.txt': 'echo hi'})
-    fs.chmodSync(path.join(folder(), 'tool.txt'), 0o700)
+  // Windows keeps no executable bit, so no file there is marked as a program.
+  it.skipIf(process.platform === 'win32')(
+    'never opens a file marked as a program in the Tree’s folder since its Snapshot',
+    async () => {
+      const replyId = await replyWriting(null, {'tool.txt': 'echo hi'})
+      fs.chmodSync(path.join(folder(), 'tool.txt'), 0o700)
 
-    await expect(open(replyId, 'tool.txt', 'default-app')).rejects.toThrow(
-      PROGRAM
-    )
-    expect(opened).toEqual([])
-  })
+      await expect(open(replyId, 'tool.txt', 'default-app')).rejects.toThrow(
+        PROGRAM
+      )
+      expect(opened).toEqual([])
+    }
+  )
 
   it('never follows a link, in the folder or from a copy', async () => {
     const replyId = await send(null)
@@ -853,7 +878,8 @@ describe('saving a copy', () => {
     const second = await send(first)
     aiWrites('a.txt', 'one more')
     aiDeletes('gone.txt')
-    fs.symlinkSync('/etc/passwd', path.join(folder(), 'link'))
+    // No slash or drive in the target, which Windows would rewrite.
+    fs.symlinkSync('elsewhere.txt', path.join(folder(), 'link'))
     await finish(second)
     await replyWriting(second, {'later.txt': 'four'})
 
@@ -865,7 +891,7 @@ describe('saving a copy', () => {
     })
     expect(filesUnder(target)).toEqual([
       ['a.txt', 'one more'],
-      ['link', '/etc/passwd'],
+      ['link', 'elsewhere.txt'],
       ['notes/b.md', 'two'],
     ])
   })
