@@ -78,11 +78,11 @@ it('replaces only the text after a tool call, and keeps a message the call cut s
   ])
 })
 
-function startedCommand(id: string, turn = inTurn): Notification {
+function startedCommand(id: string): Notification {
   return {
     method: 'item/started',
     params: {
-      ...turn,
+      ...inTurn,
       item: {
         type: 'commandExecution',
         id,
@@ -97,14 +97,13 @@ function startedCommand(id: string, turn = inTurn): Notification {
 }
 
 function turnEnds(
-  status: 'completed' | 'interrupted' | 'failed',
-  turn = inTurn
+  status: 'completed' | 'interrupted' | 'failed'
 ): Notification {
   return {
     method: 'turn/completed',
     params: {
-      threadId: turn.threadId,
-      turn: {id: turn.turnId, status, error: null},
+      threadId: inTurn.threadId,
+      turn: {id: inTurn.turnId, status, error: null},
     },
   }
 }
@@ -153,26 +152,6 @@ it.each(['interrupted', 'failed'] as const)(
     expect(mapper.map(turnEnds(status))).toEqual([])
   }
 )
-
-it('fails only the commands of the turn that completed', () => {
-  const mapper = createReplyMapper(ids)
-  const otherTurn = {threadId: 'thread', turnId: 'other-turn'}
-  const otherThread = {threadId: 'other-thread', turnId: 'turn'}
-
-  mapper.map(startedCommand('mine'))
-  mapper.map(startedCommand('later', otherTurn))
-  mapper.map(startedCommand('elsewhere', otherThread))
-
-  expect(
-    mapper
-      .map(turnEnds('completed'))
-      .map(event => event.type === 'TOOL_RESULT' && event.toolCallId)
-  ).toEqual(['mine'])
-
-  expect(mapper.map(turnEnds('completed', otherTurn))).toMatchObject([
-    {type: 'TOOL_RESULT', toolCallId: 'later'},
-  ])
-})
 
 it('replaces what streamed when the finished message differs', () => {
   const mapper = createReplyMapper(ids)

@@ -2,6 +2,7 @@ import type {ReplyApprovals} from '#modules/approvals/main'
 import type {
   CanUseTool,
   Options,
+  PreToolUseHookSpecificOutput,
   SandboxSettings,
 } from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRequest} from '@uz/contract/host'
@@ -12,7 +13,7 @@ import {
   hasSandbox,
   packageCaches,
 } from '#modules/sandbox/main'
-import {isInTreeFolder} from '#modules/tree-folder/main'
+import {isInAnotherTree, isInTreeFolder} from '#modules/tree-folder/main'
 import os from 'node:os'
 import path from 'node:path'
 import {z} from 'zod'
@@ -27,9 +28,14 @@ const READS = 'Read|Glob|Grep'
 
 const DENIED = 'The user denied this.'
 
+const ANOTHER_TREE = 'This path is in a folder that can’t be read from here.'
+
 /** What a card needs of a tool call's input; anything else is left out. */
 const ToolInputSchema = z.object({
   file_path: z.string().min(1).optional().catch(undefined),
+  /** The folder a Glob or a Grep searches. */
+  path: z.string().min(1).optional().catch(undefined),
+  pattern: z.string().min(1).optional().catch(undefined),
   notebook_path: z.string().min(1).optional().catch(undefined),
   command: z.string().optional().catch(undefined),
   url: z.string().optional().catch(undefined),
@@ -131,11 +137,50 @@ function askOn(asking: SessionApprovals, treeFolder: string): CanUseTool {
   }
 }
 
+const HookInputSchema = z.object({
+  tool_name: z.string(),
+  tool_input: ToolInputSchema,
+})
+
+/** A Glob's pattern may itself name a folder, from the one it searches. */
+function readTargets(toolName: string, input: ToolInput, treeFolder: string) {
+  const {file_path: filePath, path: folder, pattern} = input
+
+  const globbed =
+    toolName === 'Glob' && pattern
+      ? [path.resolve(treeFolder, folder ?? '.', pattern)]
+      : []
+
+  return [filePath, folder, ...globbed].filter(target => target !== undefined)
+}
+
+/**
+ * The Sandbox hides other Trees from commands only, and a Read deny rule for
+ * their folder would hide this Tree's own, so the hook refuses them
+ * (ADR 0018).
+ */
+export function readDecision(
+  toolName: string,
+  input: ToolInput,
+  folders: Pick<ReplyRequest, 'treeFolder' | 'treesFolder'>
+): Pick<
+  PreToolUseHookSpecificOutput,
+  'permissionDecision' | 'permissionDecisionReason'
+> {
+  return readTargets(toolName, input, folders.treeFolder).some(target =>
+    isInAnotherTree(folders, target)
+  )
+    ? {permissionDecision: 'deny', permissionDecisionReason: ANOTHER_TREE}
+    : {permissionDecision: 'allow'}
+}
+
 /** Full access asks nothing; Supervised asks the user through `asking`. */
 export function permissionOptions(
-  {permissionMode, treeFolder}: ReplyRequest,
+  request: ReplyRequest,
   asking: SessionApprovals
 ): Options {
+  const {permissionMode, treeFolder} = request
+
   if (permissionMode === 'full-access') {
     return {
       permissionMode: 'bypassPermissions',
@@ -152,12 +197,17 @@ export function permissionOptions(
         {
           matcher: READS,
           hooks: [
-            async () => ({
-              hookSpecificOutput: {
-                hookEventName: 'PreToolUse',
-                permissionDecision: 'allow',
-              },
-            }),
+            async input => {
+              const {tool_name: toolName, tool_input: toolInput} =
+                HookInputSchema.parse(input)
+
+              return {
+                hookSpecificOutput: {
+                  hookEventName: 'PreToolUse',
+                  ...readDecision(toolName, toolInput, request),
+                },
+              }
+            },
           ],
         },
       ],

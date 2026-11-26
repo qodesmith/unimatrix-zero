@@ -1817,7 +1817,7 @@ it('starts, resumes and forks every thread under Supervised in the Tree’s fold
         permissions: {
           uz: {
             extends: ':workspace',
-            filesystem: expect.objectContaining({
+            filesystem: {
               [path.join(home, '.ssh')]: 'deny',
               [path.join(home, '.aws')]: 'deny',
               [path.join(home, '.config', 'gh')]: 'deny',
@@ -1830,8 +1830,13 @@ it('starts, resumes and forks every thread under Supervised in the Tree’s fold
               [codex.treeFolder]: 'write',
               [path.join(home, '.bun', 'install', 'cache')]: 'write',
               [path.join(home, '.npm')]: 'write',
+              [path.join(home, 'Library', 'pnpm', 'store')]: 'write',
+              [path.join(home, '.yarn', 'berry')]: 'write',
+              [path.join(home, '.cargo', 'registry')]: 'write',
+              [path.join(home, '.cargo', 'git')]: 'write',
               [path.join(home, 'Library', 'Caches')]: 'write',
-            }),
+              [path.join(home, '.cache')]: 'write',
+            },
           },
         },
       },

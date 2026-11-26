@@ -58,12 +58,6 @@ const UNFINISHED = {
   fileChange: 'This edit didn’t finish.',
 } as const satisfies Record<ToolItem['type'], string>
 
-interface UnfinishedToolCall {
-  threadId: string
-  turnId: string
-  toolName: ToolItem['type']
-}
-
 type AccountNotification = Extract<Notification, {method: `account/${string}`}>
 
 function aboutTheAccount(
@@ -94,7 +88,7 @@ export function turnOf(notification: Notification) {
 export function createReplyMapper(ids: ReplyIds) {
   let shown = ''
   const toolCalls = new Set<string>()
-  const unfinished = new Map<string, UnfinishedToolCall>()
+  const unfinished = new Map<string, ToolItem['type']>()
 
   const messages = new Map<
     string,
@@ -220,19 +214,17 @@ export function createReplyMapper(ids: ReplyIds) {
    * turn still completes. A tool call left open in a stopped or failed turn
    * stays open, which the app shows as cut off.
    */
-  function failUnfinished(threadId: string, turn: CodexTurn): ContentEvent[] {
+  function failUnfinished(turn: CodexTurn): ContentEvent[] {
     if (turn.status !== 'completed') return []
 
     const failed: ContentEvent[] = []
 
-    for (const [toolCallId, call] of unfinished) {
-      if (call.threadId !== threadId || call.turnId !== turn.id) continue
-
+    for (const [toolCallId, toolName] of unfinished) {
       failed.push({
         ...ids,
         type: 'TOOL_RESULT',
         toolCallId,
-        content: UNFINISHED[call.toolName],
+        content: UNFINISHED[toolName],
         isError: true,
       })
     }
@@ -267,14 +259,13 @@ export function createReplyMapper(ids: ReplyIds) {
 
         if (!tool || toolCalls.has(tool.id)) return []
 
-        const {threadId, turnId} = params
-        unfinished.set(tool.id, {threadId, turnId, toolName: tool.type})
+        unfinished.set(tool.id, tool.type)
 
         return startToolCall(tool)
       }
 
       if (method === 'turn/completed') {
-        return failUnfinished(params.threadId, params.turn)
+        return failUnfinished(params.turn)
       }
 
       if (method === 'item/completed') {

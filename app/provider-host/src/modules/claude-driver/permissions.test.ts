@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import {afterEach, expect, it} from 'vitest'
 
-import {actionOf} from './permissions'
+import {actionOf, readDecision} from './permissions'
 
 const made: string[] = []
 
@@ -101,4 +101,36 @@ it('asks about the retry of a command outside the Sandbox as that form alone, an
   expect(actionOf('SandboxNetworkAccess', {host: 'example.com'}, tree)).toEqual(
     {kind: 'host', host: 'example.com'}
   )
+})
+
+it('refuses a Read, a Glob and a Grep of another Tree’s files, by a relative path and a Glob pattern too, and lets through one of this Tree’s files or outside every Tree', () => {
+  const treesFolder = treeFolder()
+  const tree = path.join(treesFolder, 'one')
+  const other = path.join(treesFolder, 'two')
+  fs.mkdirSync(tree)
+  fs.mkdirSync(other)
+  const folders = {treeFolder: tree, treesFolder}
+
+  function decided(toolName: string, input: Record<string, string>) {
+    return readDecision(toolName, input, folders).permissionDecision
+  }
+
+  expect([
+    decided('Read', {file_path: path.join(other, 'secret.txt')}),
+    decided('Read', {file_path: path.join('..', 'two', 'secret.txt')}),
+    decided('Read', {file_path: path.join(fs.realpathSync(other), 'a.txt')}),
+    decided('Glob', {pattern: '*.txt', path: other}),
+    decided('Glob', {pattern: path.join(other, '**')}),
+    decided('Glob', {pattern: path.join('..', '**')}),
+    decided('Grep', {pattern: 'PLOVER', path: treesFolder}),
+  ]).toEqual(Array.from({length: 7}, () => 'deny'))
+
+  expect([
+    decided('Read', {file_path: path.join(tree, 'notes.txt')}),
+    decided('Read', {file_path: 'notes.txt'}),
+    decided('Read', {file_path: path.join(os.homedir(), '.zshrc')}),
+    decided('Glob', {pattern: '**/*.txt'}),
+    decided('Glob', {pattern: '*.txt', path: tree}),
+    decided('Grep', {pattern: '../two'}),
+  ]).toEqual(Array.from({length: 6}, () => 'allow'))
 })

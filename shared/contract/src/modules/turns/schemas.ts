@@ -215,7 +215,7 @@ export const ApprovalActionSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('command'),
     command: z.string(),
-    /** The Sandbox blocked it, and the AI asks to run it without one. */
+    /** The AI asks to run it outside the Sandbox. */
     outsideSandbox: z.literal(true).optional(),
   }),
   z.strictObject({kind: z.literal('host'), host: z.string().min(1)}),

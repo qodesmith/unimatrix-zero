@@ -386,6 +386,7 @@ function sandboxedTrees() {
   return {root, tree, other}
 }
 
+/** With the folder that holds `claude`'s own config hidden, as the app has it. */
 function inSandbox(
   live: Live,
   text: string,
@@ -393,6 +394,7 @@ function inSandbox(
 ): ReplyRequest {
   return {
     ...supervised(live, text, trees.tree),
+    hiddenFolders: [configDir],
     treesFolder: trees.root,
   }
 }
@@ -408,7 +410,7 @@ function leavingPrompt(file: string) {
 }
 
 function readingPrompt(secret: string, otherSecret: string) {
-  return `Do these two steps in order, each once, with no retry, whatever happens: read ${secret} with your Read tool; then run exactly \`cat ${otherSecret}\` with Bash. Then reply with only the word DONE.`
+  return `Do these three steps in order, each once, with no retry, whatever happens: read ${secret} with your Read tool; then read ${otherSecret} with your Read tool; then run exactly \`cat ${otherSecret}\` with Bash. Then reply with only the word DONE.`
 }
 
 /** The SDK runs a `.mjs` with the `node` on PATH. */
@@ -1533,7 +1535,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     }
   }, 300_000)
 
-  it('[dep:claude-sandbox] under Supervised, refuses with no card a Read of a hidden folder, and the Sandbox refuses an allowed command reading another Tree', async () => {
+  it('[dep:claude-sandbox] under Supervised, refuses with no card a Read of a hidden folder and a Read of another Tree, and the Sandbox refuses an allowed command reading another Tree', async () => {
     const live = liveDriver(['read-denied.ndjson'])
     const trees = sandboxedTrees()
     const hidden = newTreeFolder()
@@ -1547,7 +1549,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
         live.driver,
         {
           ...inSandbox(live, readingPrompt(secret, otherSecret), trees),
-          hiddenFolders: [hidden],
+          hiddenFolders: [configDir, hidden],
         },
         ['allow-once']
       )
@@ -1555,13 +1557,13 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       expect(events.at(-1)).toMatchObject({status: 'complete'})
 
       const calls = toolCallsIn(events)
-      const [read, other] = calls
+      const [read, otherRead, other] = calls
 
       const asked = approvalsIn(events).flatMap(event =>
         event.type === 'APPROVAL_REQUESTED' ? [event] : []
       )
 
-      expect(calls.map(call => call.toolName)).toEqual(['Read', 'Bash'])
+      expect(calls.map(call => call.toolName)).toEqual(['Read', 'Read', 'Bash'])
       expect(asked).toEqual([
         expect.objectContaining({
           toolCallId: other?.toolCallId,
@@ -1569,6 +1571,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
         }),
       ])
       expect(read?.result?.isError).toBe(true)
+      expect(otherRead?.result?.isError).toBe(true)
       expect(other?.result?.content).toMatch(
         /secret\.txt: Operation not permitted/
       )

@@ -2,7 +2,7 @@ import path from 'node:path'
 
 /**
  * Where the vendor's Sandbox runs. Elsewhere commands run without it, and
- * the cards still come first (ADR 0018); #93 brings Linux and Windows.
+ * the cards still come first (ADR 0018).
  */
 export function hasSandbox(platform: NodeJS.Platform) {
   return platform === 'darwin'
@@ -16,7 +16,7 @@ export function packageCaches(home: string) {
   return [
     ['.bun', 'install', 'cache'],
     ['.npm'],
-    ['Library', 'pnpm'],
+    ['Library', 'pnpm', 'store'],
     ['.yarn', 'berry'],
     ['.cargo', 'registry'],
     ['.cargo', 'git'],

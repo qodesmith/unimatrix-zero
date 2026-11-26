@@ -14,19 +14,37 @@ function realPath(target: string): string {
   }
 }
 
+/** `file` is `folder` itself or sits anywhere under it. */
+function isAtOrUnder(folder: string, file: string) {
+  const relative = path.relative(realPath(folder), realPath(file))
+
+  return relative.split(path.sep)[0] !== '..' && !path.isAbsolute(relative)
+}
+
 /**
  * Whether an edit to `file` lands in the Tree's files, which each Branch
  * versions.
  */
 export function isInTreeFolder(treeFolder: string, file: string) {
-  const relative = path.relative(
-    realPath(treeFolder),
-    realPath(path.resolve(treeFolder, file))
-  )
+  const absolute = path.resolve(treeFolder, file)
 
   return (
-    relative !== '' &&
-    relative.split(path.sep)[0] !== '..' &&
-    !path.isAbsolute(relative)
+    isAtOrUnder(treeFolder, absolute) &&
+    realPath(absolute) !== realPath(treeFolder)
+  )
+}
+
+/**
+ * Whether `file`, read from the Tree's folder, is another Tree's: anything
+ * in the folder that holds every Tree's files but this Tree's own.
+ */
+export function isInAnotherTree(
+  {treeFolder, treesFolder}: {treeFolder: string; treesFolder: string},
+  file: string
+) {
+  const absolute = path.resolve(treeFolder, file)
+
+  return (
+    isAtOrUnder(treesFolder, absolute) && !isAtOrUnder(treeFolder, absolute)
   )
 }

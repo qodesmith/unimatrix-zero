@@ -2288,13 +2288,18 @@ it('runs claude under Supervised inside the Sandbox: it writes only in the Treeâ
     autoAllowBashIfSandboxed: false,
     network: {allowedDomains: []},
     filesystem: {
-      allowWrite: expect.arrayContaining([
+      allowWrite: [
         claude.treeFolder,
         os.tmpdir(),
         path.join(home, '.bun', 'install', 'cache'),
         path.join(home, '.npm'),
+        path.join(home, 'Library', 'pnpm', 'store'),
+        path.join(home, '.yarn', 'berry'),
+        path.join(home, '.cargo', 'registry'),
+        path.join(home, '.cargo', 'git'),
         path.join(home, 'Library', 'Caches'),
-      ]),
+        path.join(home, '.cache'),
+      ],
       denyRead: ['/app/trees'],
       allowRead: [claude.treeFolder],
     },
@@ -2600,7 +2605,7 @@ it('under Supervised, asks about a connection from inside the Sandbox on a card 
   expect(events.at(-1)).toMatchObject({status: 'complete'})
 })
 
-it('under Supervised, shows a refused Read of a hidden folder with no card', async () => {
+it('under Supervised, shows a refused Read of a hidden folder and one of another Tree with no card', async () => {
   const claude = await setUp(['read-denied.ndjson'])
 
   const events = await claude.reply('Read the hidden file.', null, {
@@ -2608,9 +2613,10 @@ it('under Supervised, shows a refused Read of a hidden folder with no card', asy
     answers: ['allow-once'],
   })
 
-  const [refused, bash] = toolCallsOf(events)
+  const [refused, otherTree, bash] = toolCallsOf(events)
 
   expect(refused?.result?.isError).toBe(true)
+  expect(otherTree?.result?.isError).toBe(true)
   expect(askedIn(events).map(event => event.toolCallId)).toEqual([
     bash?.toolCallId,
   ])
