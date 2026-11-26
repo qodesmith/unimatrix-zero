@@ -216,6 +216,22 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Changed by:** upgrade
 - **Check:** `[dep:claude-supervised-asks]` in `claude-driver`: a Write in the Tree's folder asks at its tool call and runs once allowed, and the next Reply on the same `claude` asks at that Reply. Two Writes ask once after Always allow, and `claude` still sends `can_use_tool` for a Reply that carries the grant. A denied Write isn't made and the Reply completes. A Stop while a card waits ends the Reply stopped with no file. A Read outside the folder sends only `hook_callback`, and without the hook `claude` asks about it. A Subagent's `agentID` has no check: the app keeps Subagents out.
 
+### Claude runs commands inside the Sandbox under Supervised
+
+- **Id:** `claude-sandbox`
+- **Kind:** D
+- **Provider:** Claude
+- **Relies on:** with the SDK's `sandbox` option (`enabled`, `allowUnsandboxedCommands: true`, `autoAllowBashIfSandboxed: false`, `failIfUnavailable: false`, a network with no allowed domains, and `filesystem` lists of `allowWrite`, `denyRead` and `allowRead`), `claude` on macOS:
+  - still sends `can_use_tool` before a Bash command, then runs it inside a Sandbox that refuses a write outside `allowWrite` and a read under `denyRead`, except what `allowRead` names inside it.
+  - retries a command the Sandbox blocked with `dangerouslyDisableSandbox: true` in the tool's input, and sends `can_use_tool` for that retry.
+  - lets a `Bash(...)` allow rule approve that retry with no callback, unless the settings also hold the ask rule `Bash(dangerouslyDisableSandbox:true)`.
+  - asks about a connection from inside the Sandbox as `can_use_tool` for a tool named `SandboxNetworkAccess`, whose input names the `host` and whose id names no tool call.
+  - refuses, with no callback, a Read that a `Read(//<folder>/**)` deny rule covers, over a hook that allows reads, and adds the deny rules to the Sandbox's own.
+- **App side:** under Supervised `claude-driver` turns the Sandbox on where it can run, with writes in the Tree's folder, temp and the package caches, every other Tree's files hidden, and the credential folders and the app's own hidden folders under Read deny rules; the `sandbox` module holds the lists it shares with Codex. A retry outside the Sandbox brings the card that says so, and only a grant given on that card answers it (`approvals`). The network prompt brings a card naming the host, at no tool call. The ask rule sits in the app's own settings.
+- **User would see:** under Supervised, a command that writes outside the Tree's files or reads credentials or another Tree's files, a command that leaves the Sandbox with no card or on a grant given for the command inside it, a connection that goes through unasked or never asks, or an install that fails at its package cache.
+- **Changed by:** upgrade
+- **Check:** `[dep:claude-sandbox]` in `claude-driver`: under Supervised, a command asks, then writes in the Tree's folder while every other Tree is hidden; a write outside the folder fails inside the Sandbox and its retry asks on a card of its own; a connection asks on a card naming its host and goes through once allowed; a Read of a hidden folder is refused with no card, and the Sandbox refuses an allowed command that reads another Tree; and the ask rule brings a retry to `canUseTool` past a Bash allow rule, which alone lets it through.
+
 ### Claude's tools follow the Tools panel
 
 - **Id:** `claude-tool-switches`
@@ -408,8 +424,8 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Id:** `codex-full-access`
 - **Kind:** D
 - **Provider:** ChatGPT
-- **Relies on:** `sandbox: 'danger-full-access'` with `approvalPolicy: 'never'` on `thread/start`, `thread/resume` and `thread/fork`, and `sandboxPolicy: {type: 'dangerFullAccess'}` with the same `cwd` and policy on `turn/start`, lets Codex edit files and run commands in `cwd` without asking. A turn's settings hold for its thread from then on.
-- **App side:** `codex-driver` runs every thread and every turn in the Tree's folder with full access under the Full access Permission mode, the default (ADR 0022). A turn carries the settings too, because a thread a cut loaded runs read-only in the config folder until then, and a loaded thread may have run under Supervised. Its Reply mapper shows `fileChange` and `commandExecution` items as tool calls with their results.
+- **Relies on:** `sandbox: 'danger-full-access'` with `approvalPolicy: 'never'` on `thread/start`, `thread/resume` and `thread/fork`, and `sandboxPolicy: {type: 'dangerFullAccess'}` with the same `cwd` and policy on `turn/start`, lets Codex edit files and run commands in `cwd` without asking. A turn's settings hold for its thread from then on. A thread resumed this way, with a `config` that names no permission profile, drops the profile it had (`codex-sandbox-profile`).
+- **App side:** `codex-driver` runs every thread and every turn in the Tree's folder with full access under the Full access Permission mode, the default (ADR 0022). A turn carries the settings too, because a thread a cut loaded runs read-only in the config folder until then. A loaded thread that ran under Supervised has another `config`, so the driver unsubscribes and resumes it first. Its Reply mapper shows `fileChange` and `commandExecution` items as tool calls with their results.
 - **User would see:** a Reply that can't write or run anything, that works in the config folder, or that asks under Full access.
 - **Changed by:** upgrade
 - **Check:** `[dep:codex-full-access]` in `codex-driver`: a Reply writes a file in the Tree's folder and runs a command there, a Reply on a thread a cut loaded read-only writes a file there too, and a Reply under full access on a thread that ran Supervised turns writes one without a server request.
@@ -485,18 +501,49 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Id:** `codex-approval-requests`
 - **Kind:** D
 - **Provider:** ChatGPT
-- **Relies on:** with `sandbox: 'workspace-write'` and `approvalPolicy: 'untrusted'`, and on `turn/start` the same policy with `sandboxPolicy: {type: 'workspaceWrite'}` naming the Tree's folder as writable, Codex 0.163.0:
+- **Relies on:** with `approvalPolicy: 'untrusted'` and the permission profile of `codex-sandbox-profile`, Codex 0.163.0:
   - sends `item/fileChange/requestApproval` before every patch, even one inside `cwd`, and `item/commandExecution/requestApproval` before every command, with no list of safe commands. A command that only reads carries `commandActions` of the kinds `read`, `listFiles` and `search` alone.
   - names a command in the user's login shell, quoted for it: `/bin/zsh -lc ls`, or `/bin/zsh -lc 'cat notes.txt'` for more than one word.
   - gives each request the `itemId` of the `fileChange` or `commandExecution` item that `item/started` sent before it. A patch's request names no paths; its item does.
+  - gives a command's request a `reason` only when the Model asked to run the command outside the Sandbox (`codex-sandbox-profile`).
   - takes `{decision: 'accept'}` or `{decision: 'decline'}`. After a decline nothing is written and the turn goes on.
   - drops a waiting request on `turn/interrupt` and sends `serverRequest/resolved` for it, after `turn/completed`. It sends one after each answered request too.
   - asks an MCP tool's approval as `mcpServer/elicitation/request` with `_meta.codex_approval_kind: 'mcp_tool_call'`, naming the server but not the call, and takes `{action: 'accept' | 'decline'}`.
-  - applies a turn's settings to its thread from then on, so a loaded thread changes mode at its next turn.
-- **App side:** `codex-driver` runs Supervised Replies this way and answers each approval request of the Reply's thread itself: a command Codex parsed into reads alone at once, anything else from the approval card or a grant of the Tree (`approvals`). A card and a grant name a command without its shell, so a grant from Claude holds on Codex; a command of any other shape stays as Codex sent it. It reads an edit's paths from the file change item, links the card to the tool call by `itemId`, and gives an MCP tool's approval to the oldest unfinished call of that server. It never answers `acceptForSession`, since the app keeps the grants. A card still waiting when the turn ends is dropped.
-- **User would see:** under Supervised, a write or a command that runs without asking, a Reply that stalls, a card for every `ls` or `cat`, a card that shows the shell around a command, an Always allow from Claude that Codex asks again for, a card that names no file or sits at the wrong tool call, or a card left after a Stop.
+  - applies a turn's `approvalPolicy` to its thread from then on. The profile is in the thread's `config`, so a loaded thread changes mode by a resume (`codex-tool-switches`).
+- **App side:** `codex-driver` runs Supervised Replies this way and answers each approval request of the Reply's thread itself: a command Codex parsed into reads alone at once, anything else from the approval card or a grant of the Tree (`approvals`). A request with a `reason` always asks, on the card for a command that would run outside the Sandbox, unless a grant given on that card covers it. A card and a grant name a command without its shell, so a grant from Claude holds on Codex; a command of any other shape stays as Codex sent it. It reads an edit's paths from the file change item, links the card to the tool call by `itemId`, and gives an MCP tool's approval to the oldest unfinished call of that server. It never answers `acceptForSession`, since the app keeps the grants. A card still waiting when the turn ends is dropped.
+- **User would see:** under Supervised, a write or a command that runs without asking, a Reply that stalls, a card for every `ls` or `cat`, a command that leaves the Sandbox on a plain card, a card that shows the shell around a command, an Always allow from Claude that Codex asks again for, a card that names no file or sits at the wrong tool call, or a card left after a Stop.
 - **Changed by:** upgrade
-- **Check:** `[dep:codex-approval-requests]` in `codex-driver`: under Supervised, on a thread first loaded under full access, a file write in the Tree's folder asks at its file change and is written once allowed; `ls` asks with `listFiles` alone, wrapped in a shell, and runs with no card; a denied write leaves no file and the Reply completes; a Stop drops the waiting request; an Always allow, and a grant a new Tree's request carries, answer the next writes. MCP tool approvals have no live check: the app gives Codex no MCP servers of its own, and the remote plugins' connectors need an account that has some connected.
+- **Check:** `[dep:codex-approval-requests]` in `codex-driver`: under Supervised, on a thread first loaded under full access, a file write in the Tree's folder asks at its file change and is written once allowed; `ls` asks with `listFiles` alone, wrapped in a shell, and runs with no card; a denied write leaves no file and the Reply completes; a Stop drops the waiting request; an Always allow, and a grant a new Tree's request carries, answer the next writes. A request's `reason` is checked by `codex-sandbox-profile`. MCP tool approvals have no live check: the app gives Codex no MCP servers of its own, and the remote plugins' connectors need an account that has some connected.
+
+### Codex keeps an allowed command inside the Sandbox under a permission profile
+
+- **Id:** `codex-sandbox-profile`
+- **Kind:** D
+- **Provider:** ChatGPT
+- **Relies on:** with `approvalPolicy: 'untrusted'` and, in the thread's `config`, `default_permissions` naming a `[permissions.<name>]` profile that `extends` the built-in `:workspace` and has `filesystem` entries of `deny` and `write`, Codex 0.163.0:
+  - takes the profile with no experimental API on `thread/start`, `thread/resume` and `thread/fork`, and drops it when the request carries `sandbox` too.
+  - lets a `write` entry sit inside a `deny` entry: the inner folder stays readable and writable.
+  - replaces the profile for good once a turn carries `sandboxPolicy: {type: 'dangerFullAccess'}`; only a resume with the profile in `config` brings it back.
+  - runs each command inside a Sandbox that refuses a write outside the `write` entries and a read of a `deny` entry (`Operation not permitted`), with the network off.
+  - does not run again outside the Sandbox an allowed command the Sandbox blocked, because the policy denies a read. With no denied read, `untrusted` runs it again outside and asks nothing more.
+  - fails a blocked connection and does not run it again.
+  - tells the Model the denied folders can't be escalated, and keeps them denied for a command that runs outside the Sandbox.
+  - sends a command the Model asks up front to run outside (`sandbox_permissions: require_escalated`) as one `item/commandExecution/requestApproval` whose only mark is `reason`, the Model's `justification`. It rejects a `justification` without explicit `sandbox_permissions`, and does not make the Model give one.
+- **App side:** `codex-driver` gives every Supervised thread a profile that denies the credential folders, the app's own hidden folders and other Trees' files, and allows writes in the Tree's folder, temp and the package caches; the `sandbox` module holds the lists it shares with Claude. It sends no `sandbox` when it opens such a thread and no `sandboxPolicy` on its turns, and a change of Permission mode resumes a loaded thread. A command's request with a `reason` brings the card that says the command would run outside the Sandbox, and only a grant given on that card answers it (`approvals`).
+- **User would see:** under Supervised, an allowed command that writes outside the Tree's files, or reads credentials or another Tree's files; an install that fails at its package cache; or a command that leaves the Sandbox on a plain command card, or on a grant given for the command inside it.
+- **Changed by:** upgrade + drift. The Model chooses whether to give a `justification`.
+- **Check:** `[dep:codex-sandbox-profile]` in `codex-driver`: under Supervised, an allowed command that writes outside the Tree's folder fails and is not run again; a write in the Tree's folder and one in a package cache work; a read of a denied folder fails; a blocked connection fails; a read of another Tree's files fails; and a command the Model asks to run outside arrives with `reason` and shows the outside-the-Sandbox card. A second check moves one thread from full access to Supervised and back, on a resume and on a fork. An escalation with no `reason` has no check: nothing makes the Model send one, and in three live runs it always gave a `reason`.
+
+### Codex never finishes a command its Sandbox refused
+
+- **Id:** `codex-refused-command-unfinished`
+- **Kind:** W
+- **Provider:** ChatGPT
+- **Relies on:** Codex 0.163.0 sends no `item/completed` for a `commandExecution` item whose command its Sandbox refused. After `item/started` and the answered approval request come only the Model's message and `turn/completed`.
+- **App side:** the Reply mapper in `codex-driver` ends, as failed, every tool call still open when its turn completes.
+- **User would see:** nothing while Codex keeps doing this. If Codex starts finishing the item, the workaround is no longer needed. Without the workaround, a refused command shows as still running after its Reply has ended.
+- **Changed by:** upgrade
+- **Check:** `[dep:codex-refused-command-unfinished]` in `codex-driver`: under Supervised, an allowed command that writes outside the Tree's folder, asserting Codex still sends no `item/completed` for it before `turn/completed`.
 
 ### Codex's protocol types
 

@@ -4,6 +4,7 @@ import type {ApprovalRequest, Item, Notification} from './wire'
 import type {ReplyRequest} from '@uz/contract/host'
 
 import {isInTreeFolder} from '#modules/tree-folder/main'
+import {z} from 'zod'
 
 import {
   McpToolCallItemSchema,
@@ -36,9 +37,25 @@ interface TurnAskingOptions {
   push: (received: Received) => void
 }
 
-/** A command Codex parsed into reads alone runs without a card. */
-function onlyReads({commandActions}: CommandRequest) {
+const ReasonSchema = z.string().min(1)
+
+/**
+ * Codex takes the Model's `justification` only with a request to run outside
+ * the Sandbox, and sends it as `reason`.
+ */
+function leavesSandbox({reason}: CommandRequest) {
+  return ReasonSchema.safeParse(reason).success
+}
+
+/**
+ * A command Codex parsed into reads alone runs without a card, unless it would
+ * leave the Sandbox.
+ */
+function onlyReads(params: CommandRequest) {
+  const {commandActions} = params
+
   return (
+    !leavesSandbox(params) &&
     !!commandActions?.length &&
     commandActions.every(action => READ_ACTIONS.includes(action.type))
   )
@@ -85,7 +102,13 @@ function commandCard(params: CommandRequest): Card | null {
 
   if (!params.command) return null
 
-  return {action: {kind: 'command', command: unwrapped(params.command)}}
+  const command = unwrapped(params.command)
+
+  return {
+    action: leavesSandbox(params)
+      ? {kind: 'command', command, outsideSandbox: true}
+      : {kind: 'command', command},
+  }
 }
 
 /**

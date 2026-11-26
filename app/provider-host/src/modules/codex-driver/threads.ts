@@ -1,5 +1,12 @@
 import type {ReplyRequest} from '@uz/contract/host'
 
+import {
+  credentialFolders,
+  hasSandbox,
+  packageCaches,
+} from '#modules/sandbox/main'
+import os from 'node:os'
+
 export interface LoadedThread {
   id: string
   model: string
@@ -10,14 +17,61 @@ export interface LoadedThread {
   path: string | null
 }
 
+type Configured = Pick<
+  ReplyRequest,
+  | 'compactionSettings'
+  | 'tools'
+  | 'permissionMode'
+  | 'treeFolder'
+  | 'treesFolder'
+  | 'hiddenFolders'
+>
+
+/** Supervised runs commands inside the Sandbox wherever it can run. */
+export function isSandboxed(
+  {permissionMode}: Pick<ReplyRequest, 'permissionMode'>,
+  platform: NodeJS.Platform
+) {
+  return permissionMode !== 'full-access' && hasSandbox(platform)
+}
+
+const PROFILE = 'uz'
+
+/**
+ * A permission profile, since a denied read is what stops Codex from running
+ * a command again outside the Sandbox, unasked, once the Sandbox blocks it
+ * (ADR 0018). `:workspace` writes in `cwd` and temp, with the network off.
+ * The Tree's folder sits inside the folder of every Tree, which is denied.
+ */
+function sandboxProfile(
+  {treeFolder, treesFolder, hiddenFolders}: Configured,
+  home: string
+) {
+  const denied = [...credentialFolders(home), ...hiddenFolders, treesFolder]
+  const writable = [treeFolder, ...packageCaches(home)]
+
+  return {
+    default_permissions: PROFILE,
+    permissions: {
+      [PROFILE]: {
+        extends: ':workspace',
+        filesystem: Object.fromEntries([
+          ...denied.map(folder => [folder, 'deny']),
+          ...writable.map(folder => [folder, 'write']),
+        ]),
+      },
+    },
+  }
+}
+
 /**
  * Leaves out a key whose default is Codex's own: a resume without it goes back
  * to that default.
  */
-export function configOf({
-  compactionSettings: {threshold},
-  tools,
-}: Pick<ReplyRequest, 'compactionSettings' | 'tools'>) {
+export function configOf(request: Configured, platform: NodeJS.Platform) {
+  const {threshold} = request.compactionSettings
+  const {tools} = request
+
   return {
     ...(threshold === null ? {} : {model_auto_compact_token_limit: threshold}),
     ...(tools.webSearch ? {} : {web_search: 'disabled'}),
@@ -25,6 +79,9 @@ export function configOf({
     // Remote plugins and the connectors that come with them.
     'features.plugins': tools.chatgptRemotePlugins,
     'features.apps': tools.chatgptRemotePlugins,
+    ...(isSandboxed(request, platform)
+      ? sandboxProfile(request, os.homedir())
+      : {}),
   }
 }
 

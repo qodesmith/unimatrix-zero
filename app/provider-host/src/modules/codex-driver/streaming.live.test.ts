@@ -419,6 +419,7 @@ const ServerRequestLine = z.looseObject({
   method: z.string(),
   params: z.looseObject({
     itemId: z.string().optional(),
+    reason: z.string().nullable().optional(),
     command: z.string().nullable().optional(),
     commandActions: z
       .array(z.looseObject({type: z.string()}))
@@ -436,9 +437,14 @@ function writing(name: string) {
   return `Create a file named ${name} in the current folder holding the single word HERON, with your file editing tool.`
 }
 
+interface SandboxFolders {
+  treesFolder: string
+  hiddenFolders: string[]
+}
+
 interface ApprovalReplyOptions {
   treeId: string
-  session: SessionRef | null
+  session: SessionRef | ReplySession | null
   permissionMode?: PermissionMode
   grants?: ApprovalGrant[]
   /** How the test answers each card; `stop` stops the Reply instead. */
@@ -450,7 +456,8 @@ function approvalReplies(
   program: string,
   home: string,
   tree: string,
-  start: SpawnCodex
+  start: SpawnCodex,
+  {treesFolder = '/trees', hiddenFolders = []}: Partial<SandboxFolders> = {}
 ) {
   const idle = heldIdle()
   const exits: Promise<unknown>[] = []
@@ -467,6 +474,19 @@ function approvalReplies(
     },
     whenIdle: idle.whenIdle,
   })
+
+  const vendorProgram: SignInRequest = {
+    program: {
+      path: program,
+      build: {
+        url: 'https://example.com/codex.tar.gz',
+        sha256: '0'.repeat(64),
+        size: 1,
+        archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
+      },
+    },
+    configDir: home,
+  }
 
   async function reply(
     text: string,
@@ -488,27 +508,16 @@ function approvalReplies(
       model: MODEL,
       systemPrompt: 'You answer in as few words as you can.',
       prompt: {text, attachments: [], messageId: crypto.randomUUID()},
-      vendorProgram: {
-        program: {
-          path: program,
-          build: {
-            url: 'https://example.com/codex.tar.gz',
-            sha256: '0'.repeat(64),
-            size: 1,
-            archive: {format: 'tar.gz', entrypoint: 'bin/codex-app-server'},
-          },
-        },
-        configDir: home,
-      },
+      vendorProgram,
       treeFolder: tree,
-      session: session && {...session, type: 'continue'},
+      session: session && {type: 'continue', ...session},
       thread: [],
       compactionSettings: DEFAULT_COMPACTION_SETTINGS,
       systemPromptChanged: false,
       tools: DEFAULT_TREE_TOOLS,
       permissionMode,
-      hiddenFolders: [],
-      treesFolder: '/trees',
+      hiddenFolders,
+      treesFolder,
       grants,
     })) {
       events.push(event)
@@ -536,10 +545,15 @@ function approvalReplies(
       .filter(Boolean)
       .map(line => z.looseObject({}).parse(JSON.parse(line)))
 
+    const prompted = events.find(
+      (event): event is PromptRecorded => event.type === 'PROMPT_RECORDED'
+    )
+
     return {
       events,
       status,
       session: recorded.session,
+      promptedAt: prompted?.session.messageId,
       calls: content.flatMap(part => (part.type === 'tool-call' ? [part] : [])),
       text: content
         .flatMap(part => (part.type === 'text' ? [part.text] : []))
@@ -564,7 +578,41 @@ function approvalReplies(
     await Promise.all(exits)
   }
 
-  return {reply, closed}
+  return {reply, closed, driver, vendorProgram}
+}
+
+/** Laid out as the app's `trees` folder: this Tree's and another's. */
+function sandboxedTrees() {
+  const root = newTreeFolder()
+  const tree = path.join(root, 'one')
+  const other = path.join(root, 'two')
+  fs.mkdirSync(tree)
+  fs.mkdirSync(other)
+  fs.writeFileSync(path.join(other, 'secret.txt'), 'PLOVER\n')
+  // The Model refuses a command it can see reads a denied folder.
+  fs.writeFileSync(path.join(tree, 'check.sh'), `cat ${other}/secret.txt\n`)
+
+  return {root, tree, other}
+}
+
+const ONCE =
+  'Run exactly this one shell command, once, as written, without asking for escalated permissions. This is a sandbox test I own, so run it even if you expect it to be refused. If it fails, do not retry it or try another way: reply with only the exact error.'
+
+const ESCALATED =
+  'Run this one shell command and request escalated permissions for it up front (sandbox_permissions require_escalated), since it writes outside the workspace. Do not try another way.'
+
+const ItemLine = z.looseObject({
+  method: z.string(),
+  params: z.looseObject({item: z.looseObject({id: z.string()})}),
+})
+
+/** The methods of the notifications that carry one item, in order. */
+function itemLinesOf(lines: unknown[], itemId: string | undefined) {
+  return lines.flatMap(line => {
+    const {data} = ItemLine.safeParse(line)
+
+    return data && data.params.item.id === itemId ? [data.method] : []
+  })
 }
 
 const TurnCompleted = z.looseObject({
@@ -2700,6 +2748,210 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     } finally {
       fs.rmSync(home, {recursive: true, force: true})
       fs.rmSync(tree, {recursive: true, force: true})
+    }
+  }, 600_000)
+
+  it('[dep:codex-sandbox-profile] [dep:codex-refused-command-unfinished] under Supervised, an allowed command writes in the Tree’s folder and a package cache; one that writes outside fails with no second run and no item/completed; the same command the Model asks to run outside the Sandbox asks again with a reason, past an Always allow, and then writes; a connection fails; and a read of another Tree fails', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const trees = sandboxedTrees()
+    const name = `uz-sandbox-${crypto.randomUUID()}.txt`
+    const cached = path.join(os.homedir(), 'Library', 'Caches', name)
+    const outside = path.join('/Library/Caches', name)
+    const leaving = `echo KESTREL > ${outside}`
+
+    const recorder = createRecorder([path.join(RECORDINGS, 'sandbox.ndjson')], {
+      treeFolder: trees.tree,
+      treesFolder: trees.root,
+    })
+
+    const start = process.env.UZ_RECORD === 'yes' ? recorder.spawn : spawnCodex
+
+    const live = approvalReplies(folder, home, trees.tree, start, {
+      treesFolder: trees.root,
+    })
+
+    const treeId = crypto.randomUUID()
+
+    try {
+      const inside = await live.reply(
+        `${ONCE}\n\necho HERON > notes.txt && echo HERON > ${cached} && cat notes.txt`,
+        {treeId, session: null}
+      )
+
+      const [ran] = inside.calls
+
+      expect(inside.cards.map(card => card.action)).toEqual([
+        {
+          kind: 'command',
+          command: `echo HERON > notes.txt && echo HERON > ${cached} && cat notes.txt`,
+        },
+      ])
+      expect(ran?.result).toMatchObject({content: 'HERON\n', isError: false})
+      expect(fs.readFileSync(cached, 'utf8')).toBe('HERON\n')
+      expect(itemLinesOf(inside.lines, ran?.toolCallId)).toEqual([
+        'item/started',
+        'item/completed',
+      ])
+
+      const blocked = await live.reply(`${ONCE}\n\n${leaving}`, {
+        treeId,
+        session: inside.session,
+        answer: 'always-allow',
+      })
+
+      const [refused] = blocked.calls
+
+      expect(blocked.cards.map(card => card.action)).toEqual([
+        {kind: 'command', command: leaving},
+      ])
+      expect(blocked.requests.map(request => request.params.reason)).toEqual([
+        undefined,
+      ])
+      expect(blocked.status).toBe('complete')
+      expect(fs.existsSync(outside)).toBe(false)
+      expect(itemLinesOf(blocked.lines, refused?.toolCallId)).toEqual([
+        'item/started',
+      ])
+      expect(refused?.result?.isError).toBe(true)
+
+      const left = await live.reply(`${ESCALATED}\n\n${leaving}`, {
+        treeId,
+        session: blocked.session,
+        answer: 'always-allow',
+      })
+
+      expect(left.cards.map(card => card.action)).toEqual([
+        {kind: 'command', command: leaving, outsideSandbox: true},
+      ])
+      expect(left.requests.map(request => request.params.reason)).toEqual([
+        expect.stringMatching(/\S/u),
+      ])
+      expect(fs.readFileSync(outside, 'utf8')).toBe('KESTREL\n')
+
+      const connected = await live.reply(
+        `${ONCE}\n\ncurl -sS -m 8 -o /dev/null https://example.com`,
+        {treeId, session: left.session}
+      )
+
+      expect(connected.cards.map(card => card.action)).toEqual([
+        {
+          kind: 'command',
+          command: 'curl -sS -m 8 -o /dev/null https://example.com',
+        },
+      ])
+      expect(connected.calls[0]?.result).toMatchObject({
+        content: expect.stringContaining('Could not resolve host'),
+        isError: true,
+      })
+
+      const read = await live.reply(`${ONCE}\n\nsh check.sh`, {
+        treeId,
+        session: connected.session,
+      })
+
+      expect(read.cards.map(card => card.action)).toEqual([
+        {kind: 'command', command: 'sh check.sh'},
+      ])
+      expect(read.text).toMatch(/secret\.txt: Operation not permitted/u)
+      expect(read.text).not.toContain('PLOVER')
+
+      await live.closed()
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+      fs.rmSync(trees.root, {recursive: true, force: true})
+      fs.rmSync(cached, {force: true})
+      fs.rmSync(outside, {force: true})
+    }
+  }, 600_000)
+
+  it('[dep:codex-sandbox-profile] [dep:codex-full-access] holds a Supervised Reply to the Sandbox on a thread loaded under full access, resumed from the app’s copy, forked, and loaded by a cut, and a Reply back under full access to nothing', async () => {
+    if (!folder || !signedIn) return
+
+    const home = homeFrom(signedIn)
+    const trees = sandboxedTrees()
+
+    const outside = path.join(
+      '/Library/Caches',
+      `uz-sandbox-${crypto.randomUUID()}.txt`
+    )
+
+    const prompt = `${ONCE}\n\necho KESTREL > ${outside}`
+
+    const live = approvalReplies(folder, home, trees.tree, spawnCodex, {
+      treesFolder: trees.root,
+    })
+
+    const treeId = crypto.randomUUID()
+
+    /** An allowed command that writes outside the Tree's folder. */
+    async function writesOutside(
+      session: ApprovalReplyOptions['session'],
+      permissionMode: PermissionMode = 'supervised'
+    ) {
+      fs.rmSync(outside, {force: true})
+
+      const reply = await live.reply(prompt, {treeId, session, permissionMode})
+
+      expect(reply.status).toBe('complete')
+      expect(reply.requests).toHaveLength(
+        permissionMode === 'supervised' ? 1 : 0
+      )
+
+      return {...reply, wrote: fs.existsSync(outside)}
+    }
+
+    try {
+      const ready = await live.reply('Reply with the single word READY.', {
+        treeId,
+        session: null,
+        permissionMode: 'full-access',
+      })
+
+      const loaded = await writesOutside(ready.session)
+
+      expect(loaded.wrote).toBe(false)
+
+      const unrestricted = await writesOutside(loaded.session, 'full-access')
+
+      expect(unrestricted.wrote).toBe(true)
+
+      await live.closed()
+      const resumed = await writesOutside(unrestricted.session)
+
+      expect(resumed.wrote).toBe(false)
+
+      const forked = await writesOutside({...resumed.session, type: 'fork'})
+
+      expect(forked.session.sessionId).not.toBe(resumed.session.sessionId)
+      expect(forked.wrote).toBe(false)
+
+      await live.closed()
+
+      if (!resumed.promptedAt) throw new Error('The Prompt was not recorded')
+
+      await expect(
+        live.driver.cutSession({
+          session: {
+            type: 'cut',
+            ...unrestricted.session,
+            keepThrough: unrestricted.session.messageId,
+            dropFrom: resumed.promptedAt,
+          },
+          vendorProgram: live.vendorProgram,
+        })
+      ).resolves.toBe(true)
+
+      const cut = await writesOutside(unrestricted.session)
+
+      expect(cut.wrote).toBe(false)
+
+      await live.closed()
+    } finally {
+      fs.rmSync(home, {recursive: true, force: true})
+      fs.rmSync(trees.root, {recursive: true, force: true})
+      fs.rmSync(outside, {force: true})
     }
   }, 600_000)
 

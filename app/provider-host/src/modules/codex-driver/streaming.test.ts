@@ -237,15 +237,20 @@ async function setUp(
       /** Each card's answer; `stop` stops the Reply instead. */
       answer?: ApprovalAnswer | 'stop'
       inTree?: string
+      hiddenFolders?: string[]
+      treesFolder?: string
     } = {}
   ) {
-    const {permissionMode, grants, answer, inTree} = {
-      permissionMode: 'full-access',
-      grants: [],
-      answer: 'allow-once',
-      inTree: treeId,
-      ...asking,
-    } satisfies typeof asking
+    const {permissionMode, grants, answer, inTree, hiddenFolders, treesFolder} =
+      {
+        permissionMode: 'full-access',
+        grants: [],
+        answer: 'allow-once',
+        inTree: treeId,
+        hiddenFolders: [],
+        treesFolder: '/trees',
+        ...asking,
+      } satisfies typeof asking
 
     const replyId = crypto.randomUUID()
     const events: Streamed[] = []
@@ -265,8 +270,8 @@ async function setUp(
       systemPromptChanged,
       tools,
       permissionMode,
-      hiddenFolders: [],
-      treesFolder: '/trees',
+      hiddenFolders,
+      treesFolder,
       grants,
     })) {
       events.push(event)
@@ -1774,8 +1779,13 @@ it('starts, resumes and forks every thread in the Tree’s folder with full acce
   ])
 })
 
-it('starts, resumes and forks every thread under Supervised in the Tree’s folder, sandboxed to write there and asking before anything that isn’t trusted', async () => {
-  const supervised = {permissionMode: 'supervised'} as const
+it('starts, resumes and forks every thread under Supervised in the Tree’s folder on a permission profile, with no sandbox setting on the thread or its turns, asking before anything that isn’t trusted; the profile denies the credentials, the app’s folders and every other Tree, and writes in the Tree’s folder and the package caches', async () => {
+  const supervised = {
+    permissionMode: 'supervised' as const,
+    hiddenFolders: ['/app/providers', '/app/tree-stores'],
+    treesFolder: '/app/trees',
+  }
+
   const opened = await setUp(['started.ndjson'])
   const first = await opened.reply(FIRST_PROMPT, null, supervised)
   await opened.reply(SECOND_PROMPT, recordedIn(first), supervised)
@@ -1792,33 +1802,73 @@ it('starts, resumes and forks every thread under Supervised in the Tree’s fold
     supervised
   )
 
-  const asking = {sandbox: 'workspace-write', approvalPolicy: 'untrusted'}
+  const home = os.homedir()
 
-  expect(
-    [opened, resumed, forked].map(codex => codex.reports()[0]?.threadAccess)
-  ).toEqual([
-    [{cwd: opened.treeFolder, ...asking}],
-    [{cwd: resumed.treeFolder, ...asking}],
-    [{cwd: forked.treeFolder, ...asking}],
-  ])
-  expect(opened.reports()[0]?.turnAccess).toEqual(
-    [1, 2].map(() => ({
-      cwd: opened.treeFolder,
-      approvalPolicy: 'untrusted',
-      sandboxPolicy: {
-        type: 'workspaceWrite',
-        writableRoots: [opened.treeFolder],
-        networkAccess: false,
-        excludeTmpdirEnvVar: false,
-        excludeSlashTmp: false,
+  for (const codex of [opened, resumed, forked]) {
+    const [report] = codex.reports()
+
+    expect(report?.threadAccess).toStrictEqual([
+      {cwd: codex.treeFolder, approvalPolicy: 'untrusted'},
+    ])
+    expect(report?.threadConfigs).toEqual([
+      {
+        ...DEFAULT_TOOLS_OFF,
+        default_permissions: 'uz',
+        permissions: {
+          uz: {
+            extends: ':workspace',
+            filesystem: expect.objectContaining({
+              [path.join(home, '.ssh')]: 'deny',
+              [path.join(home, '.aws')]: 'deny',
+              [path.join(home, '.config', 'gh')]: 'deny',
+              [path.join(home, '.kube')]: 'deny',
+              [path.join(home, '.gnupg')]: 'deny',
+              [path.join(home, 'Library', 'Keychains')]: 'deny',
+              '/app/providers': 'deny',
+              '/app/tree-stores': 'deny',
+              '/app/trees': 'deny',
+              [codex.treeFolder]: 'write',
+              [path.join(home, '.bun', 'install', 'cache')]: 'write',
+              [path.join(home, '.npm')]: 'write',
+              [path.join(home, 'Library', 'Caches')]: 'write',
+            }),
+          },
+        },
       },
-    }))
+    ])
+  }
+
+  expect(opened.reports()[0]?.turnAccess).toStrictEqual(
+    [1, 2].map(() => ({cwd: opened.treeFolder, approvalPolicy: 'untrusted'}))
   )
 })
 
-const APPROVALS_THREAD_ID = '01a2150c-452a-7f93-a351-0e1be2fe7630'
-const ALLOWED_CHANGE = 'exec-b941c2bd-c584-4f54-9d29-4bd5fadc28fd'
-const LISTING = 'exec-1f6c1f4d-14ba-4af9-ba8e-91161d7b6dd5'
+it('where the Sandbox can’t run, starts a Supervised thread and its turns with full access that still asks, on no permission profile', async () => {
+  const codex = await setUp(['started.ndjson'], {platform: 'linux'})
+
+  await codex.reply(FIRST_PROMPT, null, {permissionMode: 'supervised'})
+  const [report] = codex.reports()
+
+  expect(report?.threadAccess).toEqual([
+    {
+      cwd: codex.treeFolder,
+      sandbox: 'danger-full-access',
+      approvalPolicy: 'untrusted',
+    },
+  ])
+  expect(report?.threadConfigs).toStrictEqual([DEFAULT_TOOLS_OFF])
+  expect(report?.turnAccess).toEqual([
+    {
+      cwd: codex.treeFolder,
+      sandboxPolicy: {type: 'dangerFullAccess'},
+      approvalPolicy: 'untrusted',
+    },
+  ])
+})
+
+const APPROVALS_THREAD_ID = '01a21886-e0d5-78b1-b757-26aba0a145ca'
+const ALLOWED_CHANGE = 'exec-b10a3dc9-0351-4680-8d71-8ba1b8271a31'
+const LISTING = 'exec-9232779d-c178-478e-a269-3a55fe93aff7'
 
 function cardsIn(events: Streamed[]) {
   return events.flatMap(event =>
@@ -2063,8 +2113,22 @@ it('shows no card for a command Claude’s Always allow granted in the Tree, and
   ])
 })
 
+/** Without the first reload, which a Reply under the same mode never asks for. */
+function withoutReload(name: string) {
+  return edited(name, text => {
+    const lines = text.split('\n')
+    const from = lines.findIndex(line => line.includes('"thread/unsubscribe"'))
+
+    const to = lines.findIndex(
+      (line, at) => at > from && line.includes('"method":"turn/start"')
+    )
+
+    return [...lines.slice(0, from), ...lines.slice(to)].join('\n')
+  })
+}
+
 it('refuses every approval request under full access, with no card', async () => {
-  const codex = await setUp(['approvals.ndjson'])
+  const codex = await setUp([withoutReload('approvals.ndjson')])
   const [, allowed = []] = await approvalReplies(codex, 2, 'full-access')
 
   expect(cardsIn(allowed)).toEqual([])
@@ -2072,6 +2136,168 @@ it('refuses every approval request under full access, with no card', async () =>
     {id: 0, error: expect.objectContaining({code: -32_601})},
     {id: 1, error: expect.objectContaining({code: -32_601})},
   ])
+})
+
+it('unsubscribes a loaded thread and resumes it on the permission profile for a Supervised Reply after one under full access, then with full access and no profile for a Reply back under it', async () => {
+  const codex = await setUp(['approvals.ndjson'])
+  const replies = await approvalReplies(codex, 7)
+
+  await codex.reply('last', recordedIn(replies[5] ?? []))
+  const [report] = codex.reports()
+  const fullAccess = {sandbox: 'danger-full-access', approvalPolicy: 'never'}
+
+  expect(
+    report?.methods.filter(method =>
+      ['thread/start', 'thread/unsubscribe', 'thread/resume'].includes(method)
+    )
+  ).toEqual([
+    'thread/start',
+    'thread/unsubscribe',
+    'thread/resume',
+    'thread/start',
+    'thread/unsubscribe',
+    'thread/resume',
+  ])
+  expect(report?.threadAccess).toStrictEqual([
+    {cwd: codex.treeFolder, ...fullAccess},
+    {cwd: codex.treeFolder, approvalPolicy: 'untrusted'},
+    {cwd: codex.treeFolder, approvalPolicy: 'untrusted'},
+    {cwd: codex.treeFolder, ...fullAccess},
+  ])
+  expect(
+    report?.threadConfigs.map(config => config?.default_permissions)
+  ).toEqual([undefined, 'uz', 'uz', undefined])
+  expect(report?.turnAccess.at(-1)).toEqual({
+    cwd: codex.treeFolder,
+    sandboxPolicy: {type: 'dangerFullAccess'},
+    approvalPolicy: 'never',
+  })
+})
+
+const LEAVING =
+  'echo KESTREL > /Library/Caches/uz-sandbox-1ae95c20-aaa1-4a36-b7f1-ab621a0cd009.txt'
+
+/**
+ * The Replies of `sandbox.ndjson`, in order: a command inside the Sandbox,
+ * `LEAVING` refused by it, `LEAVING` asked to run outside, a connection.
+ */
+async function sandboxReplies(
+  codex: Awaited<ReturnType<typeof setUp>>,
+  count: number,
+  asking: {answer?: ApprovalAnswer; grants?: ApprovalGrant[]} = {}
+) {
+  const replies: Streamed[][] = []
+
+  for (const prompt of ['inside', 'blocked', 'leaving', 'connecting']) {
+    if (replies.length === count) break
+
+    const before = replies.at(-1)
+
+    replies.push(
+      await codex.reply(prompt, before ? recordedIn(before) : null, {
+        permissionMode: 'supervised',
+        ...asking,
+      })
+    )
+  }
+
+  return replies
+}
+
+function actionsAsked(events: Streamed[]) {
+  return events.flatMap(event =>
+    event.type === 'APPROVAL_REQUESTED' ? [event.action] : []
+  )
+}
+
+function toolCallsOf(events: Streamed[]) {
+  return shown(events).content.flatMap(part =>
+    part.type === 'tool-call' ? [part] : []
+  )
+}
+
+it('under Supervised, asks about a command at its tool call as one that stays inside the Sandbox, and shows what it printed once allowed', async () => {
+  const codex = await setUp(['sandbox.ndjson'])
+  const [inside = []] = await sandboxReplies(codex, 1)
+  const [ran] = toolCallsOf(inside)
+
+  expect(cardsIn(inside)[0]).toMatchObject({
+    type: 'APPROVAL_REQUESTED',
+    toolCallId: ran?.toolCallId,
+  })
+  expect(actionsAsked(inside)).toEqual([
+    {
+      kind: 'command',
+      command: expect.stringMatching(
+        /^echo HERON > notes\.txt && .* && cat notes\.txt$/u
+      ),
+    },
+  ])
+  expect(ran?.result).toMatchObject({content: 'HERON\n', isError: false})
+  expect(codex.reports()[0]?.answers).toEqual([
+    {id: 0, result: {decision: 'accept'}},
+  ])
+})
+
+it('ends the tool call of an allowed command the Sandbox refused as failed once its turn completes, having answered Codex about it once', async () => {
+  const codex = await setUp(['sandbox.ndjson'])
+  const [, blocked = []] = await sandboxReplies(codex, 2)
+
+  expect(actionsAsked(blocked)).toEqual([{kind: 'command', command: LEAVING}])
+  expect(toolCallsOf(blocked).map(call => call.result?.isError)).toEqual([true])
+  expect(blocked.at(-1)).toMatchObject({status: 'complete'})
+  expect(codex.reports()[0]?.answers).toEqual([
+    {id: 0, result: {decision: 'accept'}},
+    {id: 1, result: {decision: 'accept'}},
+  ])
+})
+
+it('asks about a command the Model wants to run outside the Sandbox on a card of that form, past an Always allow for the command inside it', async () => {
+  const codex = await setUp(['sandbox.ndjson'])
+
+  const [, blocked = [], leaving = []] = await sandboxReplies(codex, 3, {
+    answer: 'always-allow',
+  })
+
+  expect(cardsIn(blocked).at(-1)).toMatchObject({answer: 'always-allow'})
+  expect(actionsAsked(leaving)).toEqual([
+    {kind: 'command', command: LEAVING, outsideSandbox: true},
+  ])
+  expect(toolCallsOf(leaving).map(call => call.result?.isError)).toEqual([
+    false,
+  ])
+})
+
+it('asks about a command inside the Sandbox past a grant to run it outside, which answers the Model’s ask to run it there with no card', async () => {
+  const codex = await setUp(['sandbox.ndjson'])
+
+  const [, blocked = [], leaving = []] = await sandboxReplies(codex, 3, {
+    grants: [{kind: 'command', command: LEAVING, outsideSandbox: true}],
+  })
+
+  expect(actionsAsked(blocked)).toEqual([{kind: 'command', command: LEAVING}])
+  expect(cardsIn(leaving)).toEqual([])
+  expect(codex.reports()[0]?.answers.at(-1)).toEqual({
+    id: 2,
+    result: {decision: 'accept'},
+  })
+})
+
+it('shows a connection the Sandbox blocked as a command that failed, after its card', async () => {
+  const codex = await setUp(['sandbox.ndjson'])
+  const replies = await sandboxReplies(codex, 4)
+  const connecting = replies[3] ?? []
+
+  expect(actionsAsked(connecting)).toEqual([
+    {
+      kind: 'command',
+      command: 'curl -sS -m 8 -o /dev/null https://example.com',
+    },
+  ])
+  expect(toolCallsOf(connecting)[0]?.result).toMatchObject({
+    content: expect.stringContaining('Could not resolve host: example.com'),
+    isError: true,
+  })
 })
 
 it('starts a Reply in a thread only once a cut of it has finished, in the Tree’s folder with full access', async () => {

@@ -53,6 +53,17 @@ function resultOf(item: ToolItem) {
   }
 }
 
+const UNFINISHED = {
+  commandExecution: 'This command didn’t run to the end.',
+  fileChange: 'This edit didn’t finish.',
+} as const satisfies Record<ToolItem['type'], string>
+
+interface UnfinishedToolCall {
+  threadId: string
+  turnId: string
+  toolName: ToolItem['type']
+}
+
 type AccountNotification = Extract<Notification, {method: `account/${string}`}>
 
 function aboutTheAccount(
@@ -83,6 +94,7 @@ export function turnOf(notification: Notification) {
 export function createReplyMapper(ids: ReplyIds) {
   let shown = ''
   const toolCalls = new Set<string>()
+  const unfinished = new Map<string, UnfinishedToolCall>()
 
   const messages = new Map<
     string,
@@ -174,6 +186,7 @@ export function createReplyMapper(ids: ReplyIds) {
 
   function finishToolCall(item: ToolItem): ContentEvent[] {
     const started = toolCalls.has(item.id) ? [] : startToolCall(item)
+    unfinished.delete(item.id)
 
     return [
       ...started,
@@ -202,6 +215,31 @@ export function createReplyMapper(ids: ReplyIds) {
     return message.success ? onMessage(message.data.id, message.data.text) : []
   }
 
+  /**
+   * Codex sends no `item/completed` for a command its Sandbox refused, and the
+   * turn still completes. A tool call left open in a stopped or failed turn
+   * stays open, which the app shows as cut off.
+   */
+  function failUnfinished(threadId: string, turn: CodexTurn): ContentEvent[] {
+    if (turn.status !== 'completed') return []
+
+    const failed: ContentEvent[] = []
+
+    for (const [toolCallId, call] of unfinished) {
+      if (call.threadId !== threadId || call.turnId !== turn.id) continue
+
+      failed.push({
+        ...ids,
+        type: 'TOOL_RESULT',
+        toolCallId,
+        content: UNFINISHED[call.toolName],
+        isError: true,
+      })
+    }
+
+    return failed
+  }
+
   return {
     map(notification: Notification): ContentEvent[] {
       const {method, params} = notification
@@ -227,7 +265,16 @@ export function createReplyMapper(ids: ReplyIds) {
       if (method === 'item/started') {
         const tool = toolItemOf(params.item)
 
-        return tool && !toolCalls.has(tool.id) ? startToolCall(tool) : []
+        if (!tool || toolCalls.has(tool.id)) return []
+
+        const {threadId, turnId} = params
+        unfinished.set(tool.id, {threadId, turnId, toolName: tool.type})
+
+        return startToolCall(tool)
+      }
+
+      if (method === 'turn/completed') {
+        return failUnfinished(params.threadId, params.turn)
       }
 
       if (method === 'item/completed') {

@@ -4,6 +4,7 @@ import type {RecordedLine} from './replay'
 import {spawn} from 'node:child_process'
 import {EventEmitter} from 'node:events'
 import fs from 'node:fs'
+import os from 'node:os'
 import {createInterface} from 'node:readline'
 import {PassThrough} from 'node:stream'
 
@@ -20,19 +21,31 @@ const ID =
 
 const MACHINE = /"(serverName|userAgent)":"[^"]*"/g
 
+/** A Supervised thread's `config` names folders in the user's home. */
+const HOME_STAND_IN = '/Users/sam'
+
+const TREES_FOLDER_STAND_IN = '/trees-folder'
+
 function escaped(folder: string) {
   return [fs.realpathSync(folder), folder].map(name =>
     JSON.stringify(name).slice(1, -1)
   )
 }
 
+interface Recorded {
+  treeFolder?: string
+  /** The folder of every Tree, which a Supervised thread's `config` names. */
+  treesFolder?: string
+}
+
 function scrub(
   lines: RecordedLine[],
   codexHome: string,
-  treeFolder: string | undefined
+  {treeFolder, treesFolder}: Recorded
 ) {
   const homes = escaped(codexHome)
   const trees = treeFolder === undefined ? [] : escaped(treeFolder)
+  const roots = treesFolder === undefined ? [] : escaped(treesFolder)
 
   return lines
     .map(line => {
@@ -44,7 +57,14 @@ function scrub(
       for (const tree of trees)
         text = text.replaceAll(tree, TREE_FOLDER_STAND_IN)
 
+      for (const root of roots)
+        text = text.replaceAll(root, TREES_FOLDER_STAND_IN)
+
+      for (const home of escaped(os.homedir()))
+        text = text.replaceAll(home, HOME_STAND_IN)
+
       return text
+        .replaceAll(os.userInfo().username, 'sam')
         .replaceAll(EMAIL, '"email":"user@example.com"')
         .replaceAll(ID, '"$1":"00000000-0000-4000-8000-000000000000"')
         .replaceAll(MACHINE, '"$1":"stand-in"')
@@ -55,12 +75,9 @@ function scrub(
 
 /**
  * Records each real `codex app-server` process into the next of `files`, with
- * `treeFolder` as a stand-in a replay fills in.
+ * the Tree's folder as a stand-in a replay fills in.
  */
-export function createRecorder(
-  files: string[],
-  {treeFolder}: {treeFolder?: string} = {}
-) {
+export function createRecorder(files: string[], folders: Recorded = {}) {
   let run = 0
 
   function record(
@@ -100,7 +117,7 @@ export function createRecorder(
     child.on('error', error => recorded.emit('error', error))
     child.on('exit', (code, signal) => {
       if (file)
-        fs.writeFileSync(file, scrub(lines, env.CODEX_HOME ?? cwd, treeFolder))
+        fs.writeFileSync(file, scrub(lines, env.CODEX_HOME ?? cwd, folders))
 
       recorded.emit('exit', code, signal)
     })
