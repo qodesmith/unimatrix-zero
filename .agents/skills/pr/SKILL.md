@@ -18,14 +18,21 @@ A PR body has two halves. The first half is read by everyone. The second half is
 - <bullet>
 - <bullet>
 
+## Try it
+
+1. <one action>
+2. <one action>
+3. <what you should see>
+
+### Screenshots
+
+| Before | After |
+|---|---|
+| <img alt="Before" src="<url>" /> | <img alt="After" src="<url>" /> |
+
 ## Details
 
 <diagram, diff-sketch, or tree>
-
-## Evidence
-
-- **Before:** <screenshot/output/failing test run>
-  **After:** <screenshot/output/passing test run>
 
 ## Merge Danger
 
@@ -49,6 +56,26 @@ Prose rules for this section:
 - Plain text. Bold and inline code only for a name the reader must search for.
 - Every not, never, no, only survives. Clarity beats compression.
 - Keep tangents (reverted commits, drive-by test fixes, what is left for another PR) out of this section. They go under Details.
+
+## Try it
+
+Numbered steps the reader follows to see the change, or to reproduce the bug it fixes. Write for someone who knows the project: skip setup they do anyway, and name a mode or a precondition only when it matters ("With the fake backend running").
+
+- One action per step: click, scroll, type, select, run. Name the text on screen in bold: "Click **New project**".
+- The last step says what the reader should see. For a bug fix, it says what used to happen and what happens now.
+- When nothing shows on screen, the steps are commands and the output to expect.
+
+Leave the section out when the reader has nothing to do: a refactor, or a change only tests can show. CI covers those.
+
+### Screenshots
+
+Add screenshots only when the change is visual and the environment can capture it. Capture the part that changed (a panel, a dialog, a row), and the whole window only when the change spans it.
+
+- A change to something already on screen gets a before and an after, side by side in the two-column table.
+- Something new gets one after shot, with no table.
+- Keep the `<img>` tag GitHub writes on upload, minus its `width` and `height`, so the browser sizes the image.
+
+Leave the sub-section out when nothing changes on screen.
 
 ## Details
 
@@ -117,15 +144,11 @@ sequenceDiagram
 
 - Show the whole block when most of it is new, when omitted context would hide ownership or order, or when the user needs a copyable target shape.
 
+For a bug fix, show the test that pins it, in pseudocode: what it checks, and that it fails without the fix.
+
 Place each visual next to the short text it supports. Keep only the calls, files, props, states, and boundaries needed to make the point. You may use one of these, you may use several, it is unlikely you will use all of them.
 
 Tangents go here too, each under its own short sub-heading: a commit that was superseded, a pre-existing failure this PR also repairs, work deliberately left for another PR.
-
-## Evidence
-
-Concrete evidence that the change works. Show a before and after.
-
-Screenshots are S-tier when the environment is set up for it and the change is visual. Execution-based evidence is A-tier: test results, console output. Show the exact test that now fails and passes, using pseudocode.
 
 ## Merge Danger
 
@@ -138,3 +161,4 @@ The blast radius is the potential scope of the change. Consider all possibilitie
 1. Does the first section stand alone? A reader who stops there has the whole picture.
 2. Does any bullet in the first section open with context or mechanism instead of the change? Flip it.
 3. Did a tangent sneak into the first section? Move it to Details.
+4. Can the reader follow Try it without asking you anything? Each step names one action and the text on screen, and the last says what they should see.
