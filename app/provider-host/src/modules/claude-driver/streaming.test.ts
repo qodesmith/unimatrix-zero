@@ -2300,7 +2300,17 @@ it('runs claude under Supervised inside the Sandbox: it writes only in the Treeâ
         path.join(home, 'Library', 'Caches'),
         path.join(home, '.cache'),
       ],
-      denyRead: ['/app/trees'],
+      denyRead: [
+        '/app/trees',
+        path.join(home, '.ssh'),
+        path.join(home, '.aws'),
+        path.join(home, '.config', 'gh'),
+        path.join(home, '.kube'),
+        path.join(home, '.gnupg'),
+        path.join(home, 'Library', 'Keychains'),
+        '/app/providers',
+        '/app/tree-stores',
+      ],
       allowRead: [claude.treeFolder],
     },
   })
@@ -2610,15 +2620,16 @@ it('under Supervised, shows a refused Read of a hidden folder and one of another
 
   const events = await claude.reply('Read the hidden file.', null, {
     permissionMode: 'supervised',
-    answers: ['allow-once'],
+    answers: ['allow-once', 'allow-once'],
   })
 
-  const [refused, otherTree, bash] = toolCallsOf(events)
+  const [refused, otherTree, bash, script] = toolCallsOf(events)
 
   expect(refused?.result?.isError).toBe(true)
   expect(otherTree?.result?.isError).toBe(true)
   expect(askedIn(events).map(event => event.toolCallId)).toEqual([
     bash?.toolCallId,
+    script?.toolCallId,
   ])
 })
 

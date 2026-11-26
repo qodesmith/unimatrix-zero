@@ -277,19 +277,19 @@ function readDenied(folder: string) {
 }
 
 function sandboxOf(
-  {treeFolder, treesFolder}: ReplyRequest,
+  {treeFolder, treesFolder, hiddenFolders}: ReplyRequest,
   home: string
 ): SandboxSettings {
   return {
     enabled: true,
-    // The Sandbox is the floor under the cards, never a reason to skip one.
     failIfUnavailable: false,
     allowUnsandboxedCommands: true,
+    // The Sandbox is the floor under the cards, never a reason to skip one.
     autoAllowBashIfSandboxed: false,
     network: {allowedDomains: []},
     filesystem: {
       allowWrite: [treeFolder, os.tmpdir(), ...packageCaches(home)],
-      denyRead: [treesFolder],
+      denyRead: [treesFolder, ...credentialFolders(home), ...hiddenFolders],
       allowRead: [treeFolder],
     },
   }
@@ -297,8 +297,7 @@ function sandboxOf(
 
 /**
  * Supervised runs every command inside the Sandbox where it can run. The
- * deny rules hold for the Read tool too, over the hook that lets reads
- * through, and `claude` adds them to the Sandbox's own.
+ * deny rules hold for the Read tool, over the hook that lets reads through.
  */
 export function sandboxSettings(
   request: ReplyRequest,

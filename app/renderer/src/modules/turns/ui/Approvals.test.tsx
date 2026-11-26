@@ -205,7 +205,9 @@ it('leads a command that would leave the Sandbox with what it could then reach, 
   })
 
   await expect
-    .element(screen.getByText('The AI wants to run this command'))
+    .element(
+      screen.getByText('The AI wants to run this command', {exact: true})
+    )
     .toBeVisible()
   expect(screen.getByText(UNSANDBOXED).all()).toHaveLength(1)
 })

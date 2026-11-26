@@ -129,7 +129,8 @@ it('refuses a Read, a Glob and a Grep of another Tree’s files, by a relative p
     decided('Glob', {pattern: '*.txt', path: other}),
     decided('Glob', {pattern: path.join(other, '**')}),
     decided('Glob', {pattern: path.join('*', '..', '..', 'two', '**')}),
-  ]).toEqual(Array.from({length: 6}, () => 'deny'))
+    decided('Grep', {pattern: 'PLOVER', path: other}),
+  ]).toEqual(Array.from({length: 7}, () => 'deny'))
 
   expect([
     decided('Read', {file_path: path.join(tree, 'notes.txt')}),
@@ -143,6 +144,29 @@ it('refuses a Read, a Glob and a Grep of another Tree’s files, by a relative p
     decided('Grep', {pattern: 'PLOVER', path: beside}),
   ]).toEqual(Array.from({length: 9}, () => 'allow'))
 })
+
+it.runIf(fs.existsSync(os.tmpdir().toUpperCase()))(
+  'refuses a Read, a Glob and a Grep of another Tree’s files through a folder’s name in another letter case, on a disk that ignores case',
+  () => {
+    const {folders, treesFolder} = trees()
+
+    const other = path.join(
+      path.dirname(treesFolder),
+      path.basename(treesFolder).toUpperCase(),
+      'two'
+    )
+
+    function decided(toolName: string, input: Record<string, string>) {
+      return readDecision(toolName, input, folders).permissionDecision
+    }
+
+    expect([
+      decided('Read', {file_path: path.join(other, 'secret.txt')}),
+      decided('Glob', {pattern: '*.txt', path: other}),
+      decided('Grep', {pattern: 'PLOVER', path: other}),
+    ]).toEqual(['deny', 'deny', 'deny'])
+  }
+)
 
 it('refuses a Glob and a Grep that start at or above the folder of every Tree, by a pattern with a wildcard above it too, and tells the Model to search a narrower folder', () => {
   const {folders, treesFolder} = trees()

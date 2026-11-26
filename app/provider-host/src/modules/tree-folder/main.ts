@@ -1,10 +1,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-/** Through the nearest folder that exists, so `/var` and `/private/var` agree. */
+/**
+ * Through the nearest folder that exists, so `/var` and `/private/var` agree.
+ * Only `native` returns the letter case on disk: Node's own keeps the case
+ * it was given.
+ */
 function realPath(target: string): string {
   try {
-    return fs.realpathSync(target)
+    return fs.realpathSync.native(target)
   } catch {
     const parent = path.dirname(target)
 
