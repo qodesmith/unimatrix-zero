@@ -1,4 +1,5 @@
 import type {Database} from '#modules/database/main'
+import type {Desktop} from './desktop'
 import type {Git} from './git'
 import type {SnapshotPair, VersionedFolder} from './store'
 import type {AppEvent} from '@uz/contract/events'
@@ -9,9 +10,14 @@ import {and, eq, isNull, ne} from 'drizzle-orm'
 import fs from 'node:fs'
 import path from 'node:path'
 
+import {createSnapshotFiles} from './files'
 import {makeTreeFolder} from './folder'
-import {createGit} from './git'
+import {createGit, createGitBlobs} from './git'
 import {changedFiles, storeExists, takeSnapshot} from './store'
+
+export type {Desktop} from './desktop'
+
+export {clearCopies} from './location'
 
 export {withAppSections} from './section'
 
@@ -20,6 +26,9 @@ const {prompts, replies} = schema
 export interface TreeFilesDeps {
   db: Database
   userData: string
+  /** Main's own: copies of files to open or serve. */
+  tempDir: string
+  desktop: Desktop
   publish: (event: AppEvent) => void
   onFailure: (error: Error) => void
   gitProgram: () => string | null
@@ -27,7 +36,10 @@ export interface TreeFilesDeps {
   onWaitingForGit: () => void
 }
 
-class GitMissingError extends Error {}
+class GitMissingError extends Error {
+  override message =
+    'The Tree’s files can’t be read until the app’s git is in place.'
+}
 
 function parentSnapshots(rows: SnapshotRow[]) {
   const byId = new Map(rows.map(row => [row.replyId, row]))
@@ -64,17 +76,23 @@ export type TreeFiles = ReturnType<typeof createTreeFiles>
 export function createTreeFiles({
   db,
   userData,
+  tempDir,
+  desktop,
   publish,
   onFailure,
   gitProgram,
   onWaitingForGit,
 }: TreeFilesDeps) {
+  function program() {
+    const found = gitProgram()
+
+    if (!found) throw new GitMissingError()
+
+    return found
+  }
+
   async function git(...call: Parameters<Git>) {
-    const program = gitProgram()
-
-    if (!program) throw new GitMissingError()
-
-    return createGit(program, process.env)(...call)
+    return createGit(program(), process.env)(...call)
   }
 
   function report(error: Error) {
@@ -186,7 +204,21 @@ export function createTreeFiles({
     return taken
   }
 
+  const files = createSnapshotFiles({
+    db,
+    git,
+    blobs: () => createGitBlobs(program(), process.env),
+    storeOf,
+    folderFor: treeId => makeTreeFolder(userData, treeId),
+    settled: async treeId => snapshotting.get(treeId),
+    snapshotAbove: (treeId, replyId) =>
+      parentSnapshots(snapshotRows(db, treeId))(replyId),
+    tempDir,
+    desktop,
+  })
+
   return {
+    ...files,
     folderFor: (treeId: string) => makeTreeFolder(userData, treeId),
 
     /** However the Reply ended. Never rejects. */

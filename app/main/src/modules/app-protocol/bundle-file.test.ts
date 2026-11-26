@@ -22,6 +22,17 @@ it('serves assets with a fixed MIME type', () => {
 })
 
 it.each([
+  '/assets/pdf.worker.min.mjs',
+  '/pdfjs/wasm/openjpeg.wasm',
+  '/pdfjs/cmaps/UniJIS-UTF8-H.bcmap',
+  '/pdfjs/standard_fonts/FoxitSans.pfb',
+  '/pdfjs/standard_fonts/LiberationSans-Regular.ttf',
+  '/pdfjs/iccs/CGATS001Compat-v2-micro.icc',
+])('serves pdf.js’s file %s', pathname => {
+  expect(resolveBundleFile(dir, pathname)).not.toBeNull()
+})
+
+it.each([
   '/../secret.js',
   '/%2e%2e/secret.js',
   '/a/..%2Fb.js',

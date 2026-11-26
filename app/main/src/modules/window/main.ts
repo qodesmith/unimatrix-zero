@@ -99,8 +99,12 @@ export function openLink(url: string) {
   if (isOpenableExternally(url)) void shell.openExternal(url)
 }
 
-/** Blocks http and ws except `allowedOrigins`, whatever the CSP says. */
+/**
+ * Blocks http and ws except `allowedOrigins`, whatever the CSP says, and every
+ * download: `uzfile://` serves a file it doesn't preview as one.
+ */
 export function hardenSession(session: Session, allowedOrigins: string[]) {
+  session.on('will-download', event => event.preventDefault())
   session.webRequest.onBeforeRequest(
     {urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*']},
     (details, callback) => {

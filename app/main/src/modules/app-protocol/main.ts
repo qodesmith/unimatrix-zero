@@ -1,11 +1,10 @@
-import type {OriginalLookup} from './attachment-file'
+import type {FileLookups} from './tree-file'
 import type {Protocol} from 'electron'
 
 import {ATTACHMENT_SCHEME} from '@uz/contract/attachments'
 import {protocol} from 'electron'
 import {readFile} from 'node:fs/promises'
 
-import {attachmentResponse} from './attachment-file'
 import {resolveBundleFile} from './bundle-file'
 import {renderCsp} from './csp'
 import {
@@ -14,6 +13,7 @@ import {
   extractorFiles,
   extractorResponse,
 } from './extractor-file'
+import {fileSchemeResponse} from './tree-file'
 
 const APP_SCHEME = 'app'
 const APP_DEV_SCHEME = 'app-dev'
@@ -42,6 +42,8 @@ export function registerAppSchemes() {
         secure: true,
         supportFetchAPI: true,
         stream: true,
+        // The window fetches text and PDFs from it, cross-origin.
+        corsEnabled: true,
       },
     },
     {
@@ -64,11 +66,21 @@ export function serveExtractor(target: Protocol, distDir: string) {
   return EXTRACTOR_URL
 }
 
-/** `uzfile://` serves attachments by id, never by path (ADR 0014). */
-export function serveAttachments(target: Protocol, lookup: OriginalLookup) {
+/**
+ * `uzfile://` serves attachments and the Tree's files by id, never by path
+ * (ADR 0014).
+ */
+export function serveFiles(target: Protocol, lookups: FileLookups) {
   target.handle(ATTACHMENT_SCHEME, async request =>
-    attachmentResponse(request, lookup)
+    fileSchemeResponse(request, lookups)
   )
+}
+
+/** `app://unimatrix-zero`: Node's URL gives a custom scheme no origin. */
+export function originOf(appUrl: string) {
+  const {protocol: scheme, host} = new URL(appUrl)
+
+  return `${scheme}//${host}`
 }
 
 function securityHeaders(csp: string) {

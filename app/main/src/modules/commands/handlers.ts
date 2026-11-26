@@ -15,7 +15,17 @@ export interface HandlerDeps {
   now: () => Date
   trees: Trees
   turns: Turns
-  treeFiles: Pick<TreeFiles, 'withChangedFiles'>
+  treeFiles: Pick<
+    TreeFiles,
+    | 'withChangedFiles'
+    | 'listFiles'
+    | 'saveFilesCopy'
+    | 'describeFile'
+    | 'openFile'
+    | 'revealFile'
+    | 'saveFileCopy'
+    | 'thumbnail'
+  >
   connections: Pick<
     Connections,
     'connect' | 'openPage' | 'submitCode' | 'cancel'
@@ -45,6 +55,17 @@ function found(tree: Tree | null): Tree {
   if (!tree) throw new NotFoundError('That Tree no longer exists.')
 
   return tree
+}
+
+const REPLY_GONE = 'That Reply no longer exists.'
+
+/** An id main never listed, or one whose Reply is gone. */
+function fileFound<T>(file: T | null | false): T {
+  if (file === null || file === false) {
+    throw new NotFoundError('That file is no longer in the Tree’s files.')
+  }
+
+  return file
 }
 
 const GONE_FROM_LIBRARY = 'That System prompt is no longer in the library.'
@@ -127,7 +148,7 @@ export const handlers: Handlers = {
 
     const sent = turns.sendPrompt(command)
 
-    if (!sent) throw new NotFoundError('That Reply no longer exists.')
+    if (!sent) throw new NotFoundError(REPLY_GONE)
 
     // Its Reply can fail before the Turns are fetched again.
     const [prompt = sent.prompt] = await attachments.withMissingCopies([
@@ -166,7 +187,7 @@ export const handlers: Handlers = {
 
     const reply = turns.retry(treeId, replyId)
 
-    if (!reply) throw new NotFoundError('That Reply no longer exists.')
+    if (!reply) throw new NotFoundError(REPLY_GONE)
 
     return {reply}
   },
@@ -251,4 +272,45 @@ export const handlers: Handlers = {
 
     return {}
   },
+
+  'tree-files.list': async ({treeId, replyId}, {trees, treeFiles}) => {
+    found(trees.get(treeId))
+
+    const listed = await treeFiles.listFiles(treeId, replyId)
+
+    if (!listed) throw new NotFoundError(REPLY_GONE)
+
+    return listed
+  },
+
+  'tree-files.save-copy': async ({treeId, replyId}, {trees, treeFiles}) => {
+    found(trees.get(treeId))
+
+    const saved = await treeFiles.saveFilesCopy(treeId, replyId)
+
+    if (!saved) throw new NotFoundError(REPLY_GONE)
+
+    return saved
+  },
+
+  'tree-file.describe': async ({fileId}, {treeFiles}) =>
+    fileFound(await treeFiles.describeFile(fileId)),
+
+  'tree-file.open': async ({fileId, with: how}, {treeFiles}) => {
+    fileFound(await treeFiles.openFile(fileId, how))
+
+    return {}
+  },
+
+  'tree-file.reveal': async ({fileId}, {treeFiles}) => {
+    fileFound(await treeFiles.revealFile(fileId))
+
+    return {}
+  },
+
+  'tree-file.save-copy': async ({fileId}, {treeFiles}) =>
+    fileFound(await treeFiles.saveFileCopy(fileId)),
+
+  'tree-file.thumbnail': async ({fileId}, {treeFiles}) =>
+    fileFound(await treeFiles.thumbnail(fileId)),
 }

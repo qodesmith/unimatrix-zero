@@ -1,5 +1,7 @@
-import {execFile} from 'node:child_process'
+import {execFile, spawn} from 'node:child_process'
+import fs from 'node:fs'
 import path from 'node:path'
+import {pipeline} from 'node:stream/promises'
 
 /**
  * Git reads this as an empty file on every platform, but not as a folder:
@@ -108,4 +110,75 @@ export function createGit(program: string, env: NodeJS.ProcessEnv): Git {
       child.stdin?.on('error', () => undefined)
       child.stdin?.end(input)
     })
+}
+
+export interface GitBlobs {
+  /** Its bytes, written to `file`. */
+  write: (store: string, blob: string, file: string) => Promise<void>
+  /** Up to `bytes` from its start, read without the rest. */
+  start: (store: string, blob: string, bytes: number) => Promise<Buffer>
+}
+
+function catBlob(
+  program: string,
+  env: NodeJS.ProcessEnv,
+  store: string,
+  blob: string
+) {
+  const child = spawn(
+    program,
+    [...isolation(program), 'cat-file', 'blob', blob],
+    {
+      env: isolated(env, program, {store}),
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    }
+  )
+
+  const stderr: Buffer[] = []
+  child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk))
+
+  const exited = new Promise<number | null>((resolve, reject) => {
+    child.on('error', reject)
+    child.on('close', code => resolve(code))
+  })
+
+  return {child, exited, stderr: () => Buffer.concat(stderr).toString('utf8')}
+}
+
+/** `createGit` reads output as text, which would garble a binary file. */
+export function createGitBlobs(
+  program: string,
+  env: NodeJS.ProcessEnv
+): GitBlobs {
+  return {
+    async write(store, blob, file) {
+      const cat = catBlob(program, env, store, blob)
+      await pipeline(cat.child.stdout, fs.createWriteStream(file))
+
+      if ((await cat.exited) !== 0) throw new Error(cat.stderr())
+    },
+
+    async start(store, blob, bytes) {
+      const cat = catBlob(program, env, store, blob)
+      const chunks: Buffer[] = []
+      let read = 0
+
+      for await (const chunk of cat.child.stdout) {
+        if (!Buffer.isBuffer(chunk)) continue
+
+        chunks.push(chunk)
+        read += chunk.byteLength
+
+        if (read >= bytes) break
+      }
+
+      cat.child.kill()
+      const code = await cat.exited
+
+      if (read < bytes && code !== 0) throw new Error(cat.stderr())
+
+      return Buffer.concat(chunks).subarray(0, bytes)
+    },
+  }
 }
