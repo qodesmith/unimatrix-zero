@@ -18,7 +18,6 @@ function realPath(target: string): string {
   }
 }
 
-/** `file` is `folder` itself or sits anywhere under it. */
 function isAtOrUnder(folder: string, file: string) {
   const relative = path.relative(realPath(folder), realPath(file))
 

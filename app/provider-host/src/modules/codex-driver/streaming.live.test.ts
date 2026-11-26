@@ -2884,7 +2884,6 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
 
     const treeId = crypto.randomUUID()
 
-    /** An allowed command that writes outside the Tree's folder. */
     async function writesOutside(
       session: ApprovalReplyOptions['session'],
       permissionMode: PermissionMode = 'supervised'

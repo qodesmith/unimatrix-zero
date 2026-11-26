@@ -1,9 +1,12 @@
+import type {ApprovalEvent} from '#modules/approvals/main'
+
+import {createApprovals} from '#modules/approvals/main'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import {afterEach, expect, it, vi} from 'vitest'
 
-import {actionOf, readDecision} from './permissions'
+import {actionOf, askOn, readDecision} from './permissions'
 
 const made: string[] = []
 
@@ -132,6 +135,62 @@ it('asks about the retry of a command outside the Sandbox as that form alone, an
   expect(actionOf('SandboxNetworkAccess', {host: 'example.com'}, tree)).toEqual(
     {kind: 'host', host: 'example.com'}
   )
+})
+
+it('denies the Sandbox’s network prompt that names no host, with no card and no grant, and still asks about one that names a host', async () => {
+  const tree = treeFolder()
+  const approvals = createApprovals()
+  const events: ApprovalEvent[] = []
+
+  const canUseTool = askOn(
+    {
+      current: approvals.forReply(
+        {treeId: 'tree-1', replyId: 'reply-1', grants: [], treeFolder: tree},
+        event => {
+          events.push(event)
+        }
+      ),
+    },
+    tree
+  )
+
+  async function prompted(input: {host?: string | number}) {
+    const asked = canUseTool('SandboxNetworkAccess', input, {
+      signal: new AbortController().signal,
+      toolUseID: 'prompt-1',
+      requestId: 'request-1',
+    })
+
+    for (const event of events) {
+      if (event.type === 'APPROVAL_REQUESTED') {
+        approvals.answer(event.approvalId, 'always-allow')
+      }
+    }
+
+    return await asked
+  }
+
+  const denied = [
+    await prompted({}),
+    await prompted({host: ''}),
+    await prompted({host: 7}),
+  ]
+
+  expect(denied).toEqual(
+    Array.from({length: 3}, () => ({
+      behavior: 'deny',
+      message: expect.stringContaining('no host'),
+    }))
+  )
+  expect(events).toEqual([])
+
+  await expect(prompted({host: 'example.com'})).resolves.toMatchObject({
+    behavior: 'allow',
+  })
+  expect(events).toMatchObject([
+    {type: 'APPROVAL_REQUESTED', action: {kind: 'host', host: 'example.com'}},
+    {type: 'APPROVAL_RESOLVED', answer: 'always-allow'},
+  ])
 })
 
 it('refuses a Read, a Glob and a Grep of another Tree’s files, by a relative path and a Glob pattern too, and lets through one of this Tree’s files or outside every Tree', () => {

@@ -32,6 +32,8 @@ const READS = 'Read|Glob|Grep'
 
 const DENIED = 'The user denied this.'
 
+const NO_HOST = 'This connection names no host, so it can’t be allowed.'
+
 const ANOTHER_TREE = 'This path is in a folder that can’t be read from here.'
 
 const ABOVE_THE_TREES =
@@ -152,14 +154,23 @@ function placeOf(toolName: string, toolUseID: string, agentID?: string) {
  * `claude`'s own suggestions are never passed back: one for a Write turns the
  * whole session to accepting edits.
  */
-function askOn(asking: SessionApprovals, treeFolder: string): CanUseTool {
+export function askOn(
+  asking: SessionApprovals,
+  treeFolder: string
+): CanUseTool {
   return async (toolName, input, {signal, toolUseID, agentID}) => {
     const approvals = asking.current
+    const parsed = ToolInputSchema.parse(input)
+
+    // A card with no host would read as one for a tool, and so would its grant.
+    if (toolName === SANDBOX_NETWORK && !parsed.host) {
+      return {behavior: 'deny', message: NO_HOST}
+    }
 
     const allowed =
       approvals !== null &&
       (await approvals.ask({
-        action: actionOf(toolName, ToolInputSchema.parse(input), treeFolder),
+        action: actionOf(toolName, parsed, treeFolder),
         ...placeOf(toolName, toolUseID, agentID),
         signal,
       }))
