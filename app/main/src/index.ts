@@ -1,18 +1,21 @@
 import type {Database} from '#modules/database/main'
 import type {GitNews} from '#modules/git-program/main'
 import type {AppEvent} from '@uz/contract/events'
+import type {BrowserWindow} from 'electron'
 
 import {
   hmrOrigin,
+  originOf,
   proxyDevServer,
   registerAppSchemes,
-  serveAttachments,
   serveBundle,
+  serveFiles,
 } from '#modules/app-protocol/main'
 import {createAttachments} from '#modules/attachments/main'
 import {registerCommandChannel} from '#modules/commands/main'
 import {createConnections} from '#modules/connections/main'
 import {DatabaseOpenError, openDatabase} from '#modules/database/main'
+import {createDesktop} from '#modules/desktop/main'
 import {readDevRun} from '#modules/dev/main'
 import {writeDeveloperFolder} from '#modules/developer-folder/main'
 import {createDroppedFiles} from '#modules/dropped-files/main'
@@ -36,7 +39,7 @@ import {createSessions} from '#modules/sessions/main'
 import {createSettings} from '#modules/settings/main'
 import {createSystemPrompts} from '#modules/system-prompts/main'
 import {createTitles} from '#modules/titles/main'
-import {createTreeFiles} from '#modules/tree-files/main'
+import {clearCopies, createTreeFiles} from '#modules/tree-files/main'
 import {createTreeRows, createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
 import {
@@ -171,8 +174,6 @@ function openWindow(db: Database) {
     extract: async bytes => runExtraction(bytes, openExtraction),
   })
 
-  serveAttachments(protocol, id => attachments.original(id))
-
   const trees = createTrees(db)
   const treeRows = createTreeRows(trees, hub.publish)
 
@@ -234,15 +235,28 @@ function openWindow(db: Database) {
     tell: news => hub.publish({type: GIT_NEWS[news]}),
   })
 
+  const copiesDir = path.join(machine.userData, 'file-copies')
+  clearCopies(copiesDir)
+
+  let appWindow: BrowserWindow | null = null
+
   const treeFiles = createTreeFiles({
     db,
     userData: machine.userData,
+    tempDir: copiesDir,
+    desktop: createDesktop(() => appWindow),
     publish: hub.publish,
     onFailure: ({message}) => {
       process.stderr.write(`A Snapshot failed: ${message}\n`)
     },
     gitProgram: gitProgram.program,
     onWaitingForGit: () => gitProgram.snapshotWaited(),
+  })
+
+  serveFiles(protocol, {
+    attachment: id => attachments.original(id),
+    treeFile: async id => treeFiles.servedFile(id),
+    appOrigin: originOf(url),
   })
 
   const titles = createTitles({
@@ -331,7 +345,7 @@ function openWindow(db: Database) {
   registerSubscribeChannel(ipcMain, hub, fromAppWindow)
 
   setAppMenu()
-  createWindow({
+  appWindow = createWindow({
     session: windowSession,
     preloadPath,
     url,

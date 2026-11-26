@@ -1,8 +1,9 @@
 /// <reference types="@vitest/browser-playwright" />
-import type {FakeMain} from '../fake-main'
+import type {FakeMain, FakeSnapshot} from '../fake-main'
 import type {Bridge} from '@uz/contract/bridge'
 import type {Command} from '@uz/contract/commands'
 import type {Tree} from '@uz/contract/trees'
+import type {ChangedFile, Prompt, Reply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
 
 import {SYSTEM_PROMPT_MAX_LENGTH} from '@uz/contract/system-prompts'
@@ -18,7 +19,7 @@ import {
 import {render} from 'vitest-browser-react'
 import {cdp, page, userEvent} from 'vitest/browser'
 
-import {fakeMain, savedTree} from '../fake-main'
+import {fakeMain, receivedAt, savedTree, treeFile} from '../fake-main'
 import {App} from './App'
 
 const MINUTE = 60_000
@@ -959,5 +960,326 @@ describe('the sidebar’s sections', () => {
     expect(heightOf('Trees')).toBe(before.trees)
     expect(heightOf('Usage')).toBe(before.usage)
     expect(savedSections(main)).toHaveLength(1)
+  })
+})
+
+interface SavedTurn {
+  text: string
+  files?: ChangedFile[]
+  snapshot: FakeSnapshot
+}
+
+/** One Thread: each Reply answers the Prompt after the one before it. */
+function savedThread(tree: Tree, ...turns: SavedTurn[]) {
+  const prompts: Prompt[] = []
+  const replies: Reply[] = []
+  const snapshots: Record<string, FakeSnapshot> = {}
+
+  for (const [nth, turn] of turns.entries()) {
+    const createdAt = new Date(
+      Date.parse(receivedAt) + nth * MINUTE
+    ).toISOString()
+
+    const prompt: Prompt = {
+      id: crypto.randomUUID(),
+      treeId: tree.id,
+      parentReplyId: replies.at(-1)?.id ?? null,
+      text: `Prompt ${nth + 1}`,
+      attachments: [],
+      createdAt,
+    }
+
+    const reply: Reply = {
+      id: crypto.randomUUID(),
+      treeId: tree.id,
+      promptId: prompt.id,
+      provider: 'claude',
+      model: 'fake',
+      status: 'complete',
+      content: [{type: 'text', text: turn.text}],
+      contextSize: null,
+      contextWindow: null,
+      failure: null,
+      compacted: false,
+      rebuilt: false,
+      systemPromptId: tree.systemPrompt.id,
+      files: turn.files ?? [],
+      createdAt,
+    }
+
+    prompts.push(prompt)
+    replies.push(reply)
+    snapshots[reply.id] = turn.snapshot
+  }
+
+  return {trees: [tree], prompts, replies, snapshots}
+}
+
+function filesSection() {
+  return page.getByRole('region', {name: 'Files'})
+}
+
+/** Each file row in the Files section's tree, with its git status. */
+function fileRows() {
+  const host = filesSection().element().querySelector('file-tree-container')
+  const rows = host?.shadowRoot?.querySelectorAll('[data-item-path]') ?? []
+
+  return [...rows].flatMap(row =>
+    row.getAttribute('data-item-type') === 'folder'
+      ? []
+      : [
+          [
+            row.getAttribute('data-item-path'),
+            row.getAttribute('data-item-git-status'),
+          ],
+        ]
+  )
+}
+
+function fileRow(path: string) {
+  const host = filesSection().element().querySelector('file-tree-container')
+  const row = host?.shadowRoot?.querySelector(`[data-item-path="${path}"]`)
+
+  if (!row) throw new Error(`${path} is not in the Files section`)
+
+  return page.elementLocator(row)
+}
+
+function turnNode(text: string) {
+  const box = page.getByText(text).element().closest('.react-flow__node')
+
+  if (!box) throw new Error(`${text} is not on the canvas`)
+
+  return page.elementLocator(box)
+}
+
+function preview() {
+  return page.getByRole('dialog', {name: 'File preview'})
+}
+
+const earlier = {
+  text: 'Reply one',
+  files: [{path: 'notes.md', change: 'created', size: 12}],
+  snapshot: {
+    onDisk: false,
+    files: [treeFile('notes.md', {change: 'created'})],
+  },
+} satisfies SavedTurn
+
+const latest = {
+  text: 'Reply two',
+  files: [
+    {path: 'notes.md', change: 'edited', size: 20},
+    {path: 'src/plan.txt', change: 'created', size: 5},
+    {path: 'old.txt', change: 'deleted', size: null},
+  ],
+  snapshot: {
+    onDisk: true,
+    files: [
+      treeFile('notes.md', {change: 'edited', size: 20}),
+      treeFile('old.txt', {change: 'deleted'}),
+      treeFile('readme.txt'),
+      treeFile('src/plan.txt', {change: 'created', size: 5}),
+    ],
+  },
+} satisfies SavedTurn
+
+async function openTreeOf(main: FakeMain, title: string) {
+  await renderApp(main)
+  await treeRow(title).click()
+  await expect.element(page.getByText('Reply two')).toBeVisible()
+}
+
+describe('the Files section', () => {
+  it('shows the Snapshot where the Active Thread ends, deleted files too, each colored by what that Reply did', async () => {
+    const tree = savedTree({title: 'Notes'})
+    const main = fakeMain(savedThread(tree, earlier, latest))
+    await openTreeOf(main, 'Notes')
+
+    await expect.poll(fileRows).toEqual([
+      ['src/plan.txt', 'added'],
+      ['notes.md', 'modified'],
+      ['old.txt', 'deleted'],
+      ['readme.txt', null],
+    ])
+    expect(sentOf(main, 'tree-files.list').at(-1)).toEqual({
+      type: 'tree-files.list',
+      treeId: tree.id,
+      replyId: main.replies[1]?.id,
+    })
+    await expect
+      .element(filesSection().getByText('as they were at an earlier Turn'))
+      .not.toBeInTheDocument()
+  })
+
+  it('follows the Reply the chat slideout opens at, then the leaf whose Input takes focus, keeping its folders open', async () => {
+    const tree = savedTree({title: 'Notes'})
+    const main = fakeMain(savedThread(tree, earlier, latest))
+    await openTreeOf(main, 'Notes')
+    await expect.poll(fileRows).toHaveLength(4)
+
+    await turnNode('Reply one')
+      .getByRole('button', {name: 'Open in Chat mode'})
+      .first()
+      .click()
+
+    await expect.poll(fileRows).toEqual([['notes.md', 'added']])
+
+    // Focusing a leaf's Input, under the slideout here, closes the slideout and makes its Thread active.
+    turnNode('Reply two')
+      .getByRole('textbox', {name: 'Prompt'})
+      .element()
+      .focus()
+
+    await expect
+      .element(page.getByRole('dialog', {name: 'Chat'}))
+      .not.toHaveAttribute('data-open')
+    await expect.poll(fileRows).toHaveLength(4)
+  })
+
+  it('says files at an earlier Turn are as they were then, and saves a copy of them', async () => {
+    const tree = savedTree({title: 'Notes'})
+    const later = {...latest, snapshot: {...latest.snapshot, onDisk: false}}
+    const main = fakeMain(savedThread(tree, earlier, later))
+    await openTreeOf(main, 'Notes')
+
+    await expect
+      .element(
+        filesSection().getByText(
+          'These files are as they were at an earlier Turn.'
+        )
+      )
+      .toBeVisible()
+    await filesSection().getByRole('button', {name: 'Save a copy…'}).click()
+
+    expect(sentOf(main, 'tree-files.save-copy')).toEqual([
+      {
+        type: 'tree-files.save-copy',
+        treeId: tree.id,
+        replyId: main.replies[1]?.id,
+      },
+    ])
+  })
+
+  it.each([
+    ['no files', []],
+    ['only files it deleted', [treeFile('old.txt', {change: 'deleted'})]],
+  ])(
+    'offers no Save a copy… for an earlier Turn with %s',
+    async (_case, files) => {
+      const tree = savedTree({title: 'Notes'})
+      const later = {...latest, snapshot: {onDisk: false, files}}
+      const main = fakeMain(savedThread(tree, earlier, later))
+      await openTreeOf(main, 'Notes')
+
+      await expect
+        .element(
+          filesSection().getByText(
+            'These files are as they were at an earlier Turn.'
+          )
+        )
+        .toBeVisible()
+      await expect
+        .element(filesSection().getByRole('button', {name: 'Save a copy…'}))
+        .not.toBeInTheDocument()
+    }
+  )
+
+  it('says so when no Tree is open, and when the open Tree has no files yet', async () => {
+    const tree = savedTree({title: 'Empty'})
+    const main = fakeMain({trees: [tree]})
+    await renderApp(main)
+
+    await expect
+      .element(filesSection().getByText('No Tree open.'))
+      .toBeVisible()
+
+    await treeRow('Empty').click()
+
+    await expect
+      .element(filesSection().getByText('No files yet.'))
+      .toBeVisible()
+  })
+
+  it('shows the files a Reply wrote once main says its files changed', async () => {
+    const tree = savedTree({title: 'Notes'})
+    const empty = {...latest, files: [], snapshot: {onDisk: true, files: []}}
+    const main = fakeMain(savedThread(tree, empty))
+    await renderApp(main)
+    await treeRow('Notes').click()
+    await expect
+      .element(filesSection().getByText('No files yet.'))
+      .toBeVisible()
+
+    const [reply] = main.replies
+
+    if (!reply) throw new Error('No Reply')
+
+    main.snapshots[reply.id] = latest.snapshot
+    main.publish({
+      type: 'FILES_CHANGED',
+      treeId: tree.id,
+      replyId: reply.id,
+      files: latest.files,
+    })
+
+    await expect.poll(fileRows).toHaveLength(4)
+  })
+})
+
+describe('a file’s preview', () => {
+  it('opens a file clicked in the tree, and opens it again after it was closed', async () => {
+    const tree = savedTree({title: 'Notes'})
+    const main = fakeMain(savedThread(tree, earlier, latest))
+    await openTreeOf(main, 'Notes')
+    await expect.poll(fileRows).toHaveLength(4)
+
+    await fileRow('readme.txt').click()
+
+    await expect
+      .element(preview().getByRole('heading'))
+      .toHaveTextContent('readme.txt')
+    await preview().getByRole('button', {name: 'Close preview'}).click()
+    await expect.element(preview()).not.toBeInTheDocument()
+
+    await fileRow('readme.txt').click()
+
+    await expect.element(preview()).toBeVisible()
+  })
+
+  it('opens a chip’s file as it was at that chip’s Reply', async () => {
+    const tree = savedTree({title: 'Notes'})
+    const main = fakeMain(savedThread(tree, earlier, latest))
+    await openTreeOf(main, 'Notes')
+
+    await turnNode('Reply one')
+      .getByRole('button', {name: 'Open notes.md'})
+      .click()
+
+    await expect
+      .element(preview().getByText('How this file looked at this Turn.'))
+      .toBeVisible()
+    expect(sentOf(main, 'tree-file.describe')).toEqual([
+      {type: 'tree-file.describe', fileId: earlier.snapshot.files[0]?.id},
+    ])
+  })
+
+  it('closes on Esc, leaving the chat slideout open', async () => {
+    const tree = savedTree({title: 'Notes'})
+    const main = fakeMain(savedThread(tree, earlier, latest))
+    await openTreeOf(main, 'Notes')
+    await turnNode('Reply two')
+      .getByRole('button', {name: 'Open in Chat mode'})
+      .first()
+      .click()
+    const slideout = page.getByRole('dialog', {name: 'Chat'})
+    await expect.element(slideout).toBeVisible()
+
+    await slideout.getByRole('button', {name: 'Open src/plan.txt'}).click()
+    await expect.element(preview()).toBeVisible()
+    await userEvent.keyboard('{Escape}')
+
+    await expect.element(preview()).not.toBeInTheDocument()
+    expect(slideout.element()).toHaveAttribute('data-open')
   })
 })

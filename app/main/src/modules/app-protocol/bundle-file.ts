@@ -13,6 +13,11 @@ const mimeTypes = new Map([
   ['.woff', 'font/woff'],
   ['.woff2', 'font/woff2'],
   ['.map', 'application/json'],
+  // pdf.js's character maps, fonts and color profiles.
+  ['.bcmap', 'application/octet-stream'],
+  ['.pfb', 'application/octet-stream'],
+  ['.ttf', 'font/ttf'],
+  ['.icc', 'application/vnd.iccprofile'],
 ])
 
 export interface BundleFile {

@@ -6,6 +6,7 @@ import type {ApprovalAnswer, Reply} from '@uz/contract/turns'
 import type {ReactNode} from 'react'
 
 import {ConnectionsProvider} from '#modules/connections/main'
+import {TreeFilesProvider} from '#modules/tree-files/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
 import {DEFAULT_SETTINGS} from '@uz/contract/settings'
@@ -115,7 +116,9 @@ function Providers({children}: {children: ReactNode}) {
   return (
     <QueryClientProvider client={new QueryClient()}>
       <ConnectionsProvider>
-        <LiveReplies>{children}</LiveReplies>
+        <LiveReplies>
+          <TreeFilesProvider>{children}</TreeFilesProvider>
+        </LiveReplies>
       </ConnectionsProvider>
     </QueryClientProvider>
   )

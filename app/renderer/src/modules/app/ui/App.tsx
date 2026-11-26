@@ -16,6 +16,7 @@ import {
   SettingsProvider,
 } from '#modules/settings/main'
 import {SystemPromptsProvider} from '#modules/system-prompts/main'
+import {TreeFilePreview, TreeFilesProvider} from '#modules/tree-files/main'
 import {NoTreeOpen, TreeTitle, useTrees} from '#modules/trees/main'
 import {LiveReplies} from '#modules/turns/main'
 import {SidebarInset} from '#shadcn/ui/sidebar'
@@ -40,9 +41,11 @@ export function App() {
           <LayoutProvider>
             <ConnectionsProvider>
               <LiveReplies>
-                <TooltipProvider>
-                  <AppLayout />
-                </TooltipProvider>
+                <TreeFilesProvider>
+                  <TooltipProvider>
+                    <AppLayout />
+                  </TooltipProvider>
+                </TreeFilesProvider>
                 <SnapshotsWaiting />
                 <Toaster />
               </LiveReplies>
@@ -55,6 +58,7 @@ export function App() {
 }
 
 function AppLayout() {
+  const [inset, setInset] = useState<HTMLElement | null>(null)
   const connections = useConnections()
   const trees = useTrees()
   const {hasTrees, openTree, create} = trees
@@ -91,7 +95,10 @@ function AppLayout() {
         />
       }
     >
-      <SidebarInset className="min-h-0 min-w-0 bg-canvas-background">
+      <SidebarInset
+        ref={setInset}
+        className="min-h-0 min-w-0 bg-canvas-background"
+      >
         {openTree ? (
           <div className="min-h-0 flex-1">
             <Canvas
@@ -112,6 +119,7 @@ function AppLayout() {
             )}
           </>
         )}
+        <TreeFilePreview container={inset} />
       </SidebarInset>
     </LayoutSidebar>
   )

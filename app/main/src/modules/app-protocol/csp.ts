@@ -31,8 +31,13 @@ export function renderCsp({
     `script-src ${script.join(' ')}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: uzfile:",
+    'media-src uzfile:',
+    // An HTML file's preview, under its own response's sandbox.
+    'frame-src uzfile:',
+    // pdf.js's worker, from the bundle.
+    "worker-src 'self'",
     "font-src 'self' data:",
-    `connect-src ${["'self'", ...connectSources].join(' ')}`,
+    `connect-src ${["'self'", 'uzfile:', ...connectSources].join(' ')}`,
     "object-src 'none'",
     "base-uri 'none'",
     "form-action 'none'",
