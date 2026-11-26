@@ -393,6 +393,25 @@ it('opens, reveals and edits a file in the Tree’s folder', async () => {
     .not.toBeInTheDocument()
 })
 
+it.each([
+  {fileManager: 'explorer', name: 'Show in File Explorer'},
+  {fileManager: 'other', name: 'Show in folder'},
+] as const)(
+  'labels Reveal "$name" for the $fileManager file manager',
+  async ({fileManager, name}) => {
+    served('hello\n')
+    const file = fileDetails('notes.txt', {fileManager})
+    const {main} = await renderPreview(file)
+
+    await panel().getByRole('button', {name}).click()
+
+    expect(opened(main)).toEqual([{type: 'tree-file.reveal', fileId: file.id}])
+    await expect
+      .element(panel().getByRole('button', {name: 'Reveal in Finder'}))
+      .not.toBeInTheDocument()
+  }
+)
+
 it('opens or saves the version of a file at an earlier Turn, saying so', async () => {
   served('hello\n')
   const file = fileDetails('notes.txt', {onDisk: false, editor: 'Cursor'})

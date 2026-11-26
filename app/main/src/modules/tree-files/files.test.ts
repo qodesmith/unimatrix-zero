@@ -445,6 +445,20 @@ describe('describing a file', () => {
     })
   })
 
+  it('names Finder on macOS, File Explorer on Windows, and no file manager elsewhere', async () => {
+    const replyId = await replyWriting(null, {'a.txt': 'one'})
+
+    for (const [platform, fileManager] of [
+      ['darwin', 'finder'],
+      ['win32', 'explorer'],
+      ['linux', 'other'],
+    ] as const) {
+      desktop.platform = platform
+
+      expect((await described(replyId, 'a.txt')).fileManager).toBe(fileManager)
+    }
+  })
+
   it('finds no file for an id it never listed', async () => {
     expect(await treeFiles.describeFile('0'.repeat(32))).toBeNull()
   })

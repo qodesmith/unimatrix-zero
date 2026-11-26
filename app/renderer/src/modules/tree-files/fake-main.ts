@@ -22,6 +22,7 @@ export function fileDetails(
     onDisk: true,
     editor: null,
     quickLook: false,
+    fileManager: 'finder',
     modified: null,
     ...fields,
   }

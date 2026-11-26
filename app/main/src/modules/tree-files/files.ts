@@ -23,6 +23,10 @@ import {SAMPLE_BYTES, isLinkMode, mediaTypeOf, previewOf} from './preview'
 
 const {replies} = schema
 
+const FILE_MANAGERS: Partial<
+  Record<NodeJS.Platform, TreeFileDetails['fileManager']>
+> = {darwin: 'finder', win32: 'explorer'}
+
 export interface FilesContext {
   db: Database
   git: Git
@@ -202,6 +206,7 @@ export function createSnapshotFiles(context: FilesContext) {
         onDisk,
         editor: onDisk && !kind.link ? context.desktop.editor() : null,
         quickLook: context.desktop.platform === 'darwin' && !kind.link,
+        fileManager: FILE_MANAGERS[context.desktop.platform] ?? 'other',
         modified: onDisk ? modifiedOf(file) : null,
       }
     },

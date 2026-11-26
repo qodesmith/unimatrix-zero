@@ -177,6 +177,7 @@ export function fakeMain(saved: Saved = {}) {
           onDisk: snapshot.onDisk && file.change !== 'deleted',
           editor: null,
           quickLook: false,
+          fileManager: 'finder',
           modified: null,
           ...saved.fileDetails?.[fileId],
         }

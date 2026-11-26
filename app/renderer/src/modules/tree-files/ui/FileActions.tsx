@@ -15,6 +15,12 @@ const NOT_OPENED = {
     'The app opens only documents, and this kind of file can run as a program.',
 } satisfies Record<NonNullable<TreeFileDetails['notOpened']>, string>
 
+const REVEAL = {
+  finder: 'Reveal in Finder',
+  explorer: 'Show in File Explorer',
+  other: 'Show in folder',
+} satisfies Record<TreeFileDetails['fileManager'], string>
+
 interface FileActionsProps {
   details: TreeFileDetails
   run: Run
@@ -54,7 +60,7 @@ function actionsFor({details, run}: FileActionsProps): ReactNode {
   if (details.notOpened !== null) {
     return details.onDisk ? (
       <>
-        <Action onClick={reveal}>Reveal in Finder</Action>
+        <Action onClick={reveal}>{REVEAL[details.fileManager]}</Action>
         {editor}
       </>
     ) : (
@@ -80,7 +86,7 @@ function actionsFor({details, run}: FileActionsProps): ReactNode {
     <>
       {browser}
       <Action onClick={open('default-app')}>Open in default app</Action>
-      <Action onClick={reveal}>Reveal in Finder</Action>
+      <Action onClick={reveal}>{REVEAL[details.fileManager]}</Action>
       {editor}
     </>
   )

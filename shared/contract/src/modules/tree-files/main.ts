@@ -57,6 +57,8 @@ export const TreeFileDetailsSchema = z.strictObject({
   editor: z.string().nullable(),
   /** Quick Look can show it, on macOS only. */
   quickLook: z.boolean(),
+  /** The file manager Reveal shows it in, so its label can name it. */
+  fileManager: z.enum(['finder', 'explorer', 'other']),
   /** From the file in the Tree's folder, when `onDisk`. */
   modified: z.iso.datetime().nullable(),
 })
