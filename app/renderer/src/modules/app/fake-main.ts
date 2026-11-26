@@ -1,6 +1,11 @@
 import type {Attachment} from '@uz/contract/attachments'
 import type {Bridge} from '@uz/contract/bridge'
-import type {Command, CommandOutcome, CommandType} from '@uz/contract/commands'
+import type {
+  Command,
+  CommandOutcome,
+  CommandResult,
+  CommandType,
+} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {Layout} from '@uz/contract/layout'
 import type {Model} from '@uz/contract/providers'
@@ -28,10 +33,7 @@ function isTreeFileCommand(command: Command): command is TreeFileCommand {
 }
 
 /** A Reply's Snapshot as `tree-files.list` gives it. */
-export interface FakeSnapshot {
-  files: TreeFile[]
-  onDisk: boolean
-}
+export type FakeSnapshot = CommandResult<'tree-files.list'>
 
 export function treeFile(
   path: string,
