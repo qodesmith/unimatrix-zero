@@ -44,13 +44,47 @@ function onlyReads({commandActions}: CommandRequest) {
   )
 }
 
+const SHELL_WRAPPED = /^\/(?:[^\s/]+\/)*(?:ba|da|k|z)?sh -l?c (?<script>.+)$/su
+
+const WORD_PIECE =
+  /^(?:'(?<single>[^']*)'|"(?<double>(?:[^"$\\`]|\\["$\\`])*)"|\\(?<escaped>[^\n])|(?<plain>[\w%+,./:@^-]+))/u
+
+/** Null when the text is anything but a single shell word. */
+function shellWord(text: string) {
+  let word = ''
+  let rest = text
+
+  while (rest !== '') {
+    const piece = WORD_PIECE.exec(rest)
+
+    if (!piece?.groups) return null
+
+    const {single, double, escaped, plain} = piece.groups
+    word +=
+      single ?? double?.replaceAll(/\\(.)/gu, '$1') ?? escaped ?? plain ?? ''
+    rest = rest.slice(piece[0].length)
+  }
+
+  return word
+}
+
+/**
+ * Codex runs a command in the user's shell, as `/bin/zsh -lc 'cat notes.txt'`.
+ * Without the wrapper, a grant matches the same command from Claude.
+ */
+function unwrapped(command: string) {
+  const script = SHELL_WRAPPED.exec(command)?.groups?.script
+
+  return (script === undefined ? null : shellWord(script)) ?? command
+}
+
 function commandCard(params: CommandRequest): Card {
   const host = params.networkApprovalContext?.host
 
   return {
     action: host
       ? {kind: 'host', host}
-      : {kind: 'command', command: params.command ?? ''},
+      : {kind: 'command', command: unwrapped(params.command ?? '')},
   }
 }
 

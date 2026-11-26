@@ -45,15 +45,8 @@ export function grantsFor(action: ApprovalAction): ApprovalGrant[] {
   }
 }
 
-function sameGrant(a: ApprovalGrant, b: ApprovalGrant) {
+export function sameGrant(a: ApprovalGrant, b: ApprovalGrant) {
   return JSON.stringify(a) === JSON.stringify(b)
-}
-
-/** An edit is granted when each of its paths is. */
-export function isGranted(grants: ApprovalGrant[], action: ApprovalAction) {
-  return grantsFor(action).every(wanted =>
-    grants.some(grant => sameGrant(grant, wanted))
-  )
 }
 
 /** Without the ones already there. */
@@ -68,9 +61,4 @@ export function withGrants(
   }
 
   return all
-}
-
-/** Only an edit inside the Tree's files is versioned with the Branch. */
-export function landsOutsideTree(action: ApprovalAction) {
-  return !(action.kind === 'edit' && action.inTreeFiles)
 }

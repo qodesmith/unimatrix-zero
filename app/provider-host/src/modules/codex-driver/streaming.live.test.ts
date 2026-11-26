@@ -2520,7 +2520,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 300_000)
 
-  it('[dep:codex-approval-requests] [dep:codex-full-access] under Supervised, on a thread loaded under full access, asks before a file write in the Tree’s folder at its file change, writes it only once allowed, and goes on after a denied one; asks before `ls` with listFiles alone, which runs with no card; drops a waiting request on a Stop; lets an Always allow or a grant the request carries answer later writes; and asks nothing of the thread back under full access', async () => {
+  it('[dep:codex-approval-requests] [dep:codex-full-access] under Supervised, on a thread loaded under full access, asks before a file write in the Tree’s folder at its file change, writes it only once allowed, and goes on after a denied one; asks before `ls` with listFiles alone, wrapped in a shell, which runs with no card; drops a waiting request on a Stop; lets an Always allow or a grant the request carries answer later writes; and asks nothing of the thread back under full access', async () => {
     if (!folder || !signedIn) return
 
     const home = homeFrom(signedIn)
@@ -2579,17 +2579,20 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         allowed.requests.map(request => ({
           method: request.method,
           itemId: request.params.itemId,
+          command: request.params.command,
           actions: request.params.commandActions?.map(action => action.type),
         }))
       ).toEqual([
         {
           method: 'item/fileChange/requestApproval',
           itemId: change?.toolCallId,
+          command: undefined,
           actions: undefined,
         },
         {
           method: 'item/commandExecution/requestApproval',
           itemId: listing?.toolCallId,
+          command: expect.stringMatching(/^\/\S*sh -lc ls$/u),
           actions: ['listFiles'],
         },
       ])

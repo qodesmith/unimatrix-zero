@@ -1977,6 +1977,62 @@ it('shows no card in a Tree once a write there was always allowed, nor in anothe
   ])
 })
 
+/** `approvals.ndjson` with its `ls` run as `command`, not parsed as a read. */
+function unparsedListing(command: string) {
+  return edited('approvals.ndjson', text =>
+    text
+      .replaceAll(
+        '{"type":"listFiles","command":"ls","path":null}',
+        '{"type":"unknown","command":"ls"}'
+      )
+      .replaceAll('"/bin/zsh -lc ls"', JSON.stringify(command))
+  )
+}
+
+it.each([
+  ['/bin/zsh -lc ls', 'ls'],
+  [String.raw`/bin/bash -c 'cat notes.txt'\''s'`, "cat notes.txt's"],
+  ['/bin/sh -c "echo \\"hi\\""', 'echo "hi"'],
+  ['/bin/zsh -lc "echo $HOME"', '/bin/zsh -lc "echo $HOME"'],
+  ['ls -la', 'ls -la'],
+])(
+  'shows the card of the command %j as %j, without the shell it runs in unless it’s some other shape',
+  async (command, onCard) => {
+    const codex = await setUp([unparsedListing(command)])
+    const [, allowed = []] = await approvalReplies(codex, 2)
+
+    expect(
+      cardsIn(allowed).flatMap(event =>
+        event.type === 'APPROVAL_REQUESTED' ? [event.action] : []
+      )
+    ).toEqual([
+      expect.objectContaining({kind: 'edit'}),
+      {kind: 'command', command: onCard},
+    ])
+  }
+)
+
+it('shows no card for a command Claude’s Always allow granted in the Tree, and accepts it', async () => {
+  const codex = await setUp([unparsedListing('/bin/zsh -lc ls')])
+  const ready = await codex.reply('Reply with the single word READY.')
+
+  const allowed = await codex.reply('allowed', recordedIn(ready), {
+    permissionMode: 'supervised',
+    // What an Always allow on Claude's Bash `ls` grants.
+    grants: [{kind: 'command', command: 'ls'}],
+  })
+
+  expect(
+    cardsIn(allowed).flatMap(event =>
+      event.type === 'APPROVAL_REQUESTED' ? [event.action.kind] : []
+    )
+  ).toEqual(['edit'])
+  expect(codex.reports()[0]?.answers).toEqual([
+    {id: 0, result: {decision: 'accept'}},
+    {id: 1, result: {decision: 'accept'}},
+  ])
+})
+
 it('refuses every approval request under full access, with no card', async () => {
   const codex = await setUp(['approvals.ndjson'])
   const [, allowed = []] = await approvalReplies(codex, 2, 'full-access')

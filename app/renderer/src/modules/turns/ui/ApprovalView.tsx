@@ -18,12 +18,16 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '#shadcn/ui/collapsible'
-import {landsOutsideTree} from '@uz/contract/permissions'
 import {cn} from 'cn'
 import {ChevronRightIcon} from 'lucide-react'
 import {useState} from 'react'
 
 import {useSubagentDescription} from '../use-live-reply'
+
+/** Only an edit inside the Tree's files is versioned with the Branch. */
+function landsOutsideTree(action: ApprovalAction) {
+  return !(action.kind === 'edit' && action.inTreeFiles)
+}
 
 type CardItem = Extract<ApprovalItem, {kind: 'card'}>
 

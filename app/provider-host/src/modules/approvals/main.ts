@@ -2,7 +2,7 @@ import type {ReplyRequest} from '@uz/contract/host'
 import type {ApprovalAction, ApprovalGrant} from '@uz/contract/permissions'
 import type {ApprovalAnswer, ReplyEvent} from '@uz/contract/turns'
 
-import {grantsFor, isGranted, withGrants} from '@uz/contract/permissions'
+import {grantsFor, sameGrant, withGrants} from '@uz/contract/permissions'
 import {randomUUID} from 'node:crypto'
 
 export type ApprovalEvent = Extract<
@@ -24,6 +24,13 @@ export interface ReplyApprovals {
 }
 
 type ReplyOf = Pick<ReplyRequest, 'treeId' | 'replyId' | 'grants'>
+
+/** An edit is granted when each of its paths is. */
+function isGranted(grants: ApprovalGrant[], action: ApprovalAction) {
+  return grantsFor(action).every(wanted =>
+    grants.some(grant => sameGrant(grant, wanted))
+  )
+}
 
 /**
  * The cards waiting in one Provider host. An always-allow holds at once for

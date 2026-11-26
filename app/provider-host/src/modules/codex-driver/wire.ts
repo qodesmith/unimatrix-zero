@@ -271,6 +271,11 @@ function notification<
   return z.looseObject({method: z.literal(method), params})
 }
 
+const RequestIdSchema = z.union([
+  z.string(),
+  z.number(),
+]) satisfies z.ZodType<RequestId>
+
 export const NotificationSchema = z.discriminatedUnion('method', [
   notification(
     'account/login/completed',
@@ -323,22 +328,18 @@ export const NotificationSchema = z.discriminatedUnion('method', [
     'turn/completed',
     z.looseObject({threadId: z.string(), turn: TurnSchema})
   ),
-  // Codex dropped the request unanswered, as on `turn/interrupt`.
+  // Codex is done with a request: answered, or dropped unanswered as on
+  // `turn/interrupt`.
   notification(
     'serverRequest/resolved',
     z.looseObject({
       threadId: z.string(),
-      requestId: z.union([z.string(), z.number()]),
+      requestId: RequestIdSchema,
     }) satisfies z.ZodType<ServerRequestResolvedNotification>
   ),
 ])
 
 export type Notification = z.infer<typeof NotificationSchema>
-
-const RequestIdSchema = z.union([
-  z.string(),
-  z.number(),
-]) satisfies z.ZodType<RequestId>
 
 export const ServerRequestSchema = z.looseObject({
   id: RequestIdSchema,
