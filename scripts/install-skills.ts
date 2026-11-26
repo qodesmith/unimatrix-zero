@@ -2,8 +2,8 @@ import type {SkillsAddJsonResult} from './skills-types'
 
 import {$} from 'bun'
 
-// Order matters: a later repo overwrites a skill of the same name.
-const SKILL_REPOS = ['qodesmith/skills', 'mattpocock/skills']
+// A later repo overwrites a skill of the same name, so the last one wins.
+const SKILL_REPOS = ['mattpocock/skills', 'qodesmith/skills']
 
 const installedNamesSet = new Set<string>()
 const overwrittenNamesSet = new Set<string>()
