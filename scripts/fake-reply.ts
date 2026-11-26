@@ -52,6 +52,8 @@ export async function recordFakeReply(): Promise<ReplyEvent[]> {
     systemPromptChanged: false,
     tools: DEFAULT_TREE_TOOLS,
     permissionMode: 'full-access',
+    hiddenFolders: [],
+    treesFolder: '/trees',
     grants: [],
   })) {
     if (!isReplyEvent(event)) continue

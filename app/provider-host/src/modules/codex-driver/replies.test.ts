@@ -78,6 +78,81 @@ it('replaces only the text after a tool call, and keeps a message the call cut s
   ])
 })
 
+function startedCommand(id: string): Notification {
+  return {
+    method: 'item/started',
+    params: {
+      ...inTurn,
+      item: {
+        type: 'commandExecution',
+        id,
+        command: 'echo hi > /outside.txt',
+        cwd: '/tree',
+        status: 'inProgress',
+        aggregatedOutput: null,
+        exitCode: null,
+      },
+    },
+  }
+}
+
+function turnEnds(
+  status: 'completed' | 'interrupted' | 'failed'
+): Notification {
+  return {
+    method: 'turn/completed',
+    params: {
+      threadId: inTurn.threadId,
+      turn: {id: inTurn.turnId, status, error: null},
+    },
+  }
+}
+
+it('fails a command Codex never finished once its turn completes, and adds nothing to one it did finish', () => {
+  const mapper = createReplyMapper(ids)
+
+  mapper.map(command('item/started'))
+  mapper.map(command('item/completed'))
+  mapper.map(startedCommand('refused'))
+
+  expect(mapper.map(turnEnds('completed'))).toEqual([
+    {
+      ...ids,
+      type: 'TOOL_RESULT',
+      toolCallId: 'refused',
+      content: 'This command didn’t run to the end.',
+      isError: true,
+    },
+  ])
+})
+
+it('fails an unfinished edit in its own words', () => {
+  const mapper = createReplyMapper(ids)
+
+  mapper.map({
+    method: 'item/started',
+    params: {
+      ...inTurn,
+      item: {type: 'fileChange', id: 'edit', changes: [], status: 'inProgress'},
+    },
+  })
+
+  expect(mapper.map(turnEnds('completed'))).toMatchObject([
+    {toolCallId: 'edit', content: 'This edit didn’t finish.', isError: true},
+  ])
+})
+
+it.each(['interrupted', 'failed'] as const)(
+  'leaves an unfinished command open when its turn is %s, which the app shows as cut off',
+  status => {
+    const mapper = createReplyMapper(ids)
+
+    mapper.map(startedCommand('open'))
+
+    expect(mapper.map(turnEnds(status))).toEqual([])
+  }
+)
+
 it('replaces what streamed when the finished message differs', () => {
   const mapper = createReplyMapper(ids)
 

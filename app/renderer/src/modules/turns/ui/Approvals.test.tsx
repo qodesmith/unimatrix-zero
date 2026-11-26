@@ -182,6 +182,39 @@ it.each([
   }
 )
 
+const UNSANDBOXED =
+  'Outside the Sandbox, it could read and change any of your files, use your saved logins and reach the internet.'
+
+it('leads a command that would leave the Sandbox with what it could then reach, which a command inside it leaves out', async () => {
+  const screen = await renderReply(
+    asked({kind: 'command', command: 'rm -rf build', outsideSandbox: true})
+  )
+
+  await expect
+    .element(
+      card(screen).getByText(
+        'The AI wants to run this command on your whole computer'
+      )
+    )
+    .toBeVisible()
+  await expect.element(card(screen).getByText('rm -rf build')).toBeVisible()
+  await expect.element(card(screen).getByText(UNSANDBOXED)).toBeVisible()
+
+  main.publish({
+    ...ids,
+    type: 'APPROVAL_REQUESTED',
+    approvalId: 'approval-2',
+    action: {kind: 'command', command: 'ls'},
+  })
+
+  await expect
+    .element(
+      screen.getByText('The AI wants to run this command', {exact: true})
+    )
+    .toBeVisible()
+  expect(screen.getByText(UNSANDBOXED).all()).toHaveLength(1)
+})
+
 it('says the Reply waits for you while a card waits, not that it is writing', async () => {
   const screen = await renderReply()
 

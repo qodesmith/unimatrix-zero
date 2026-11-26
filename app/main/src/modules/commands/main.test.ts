@@ -88,6 +88,7 @@ beforeEach(() => {
       snapshotsBefore: () => null,
       compactionSettingsFor: () => ({auto: true, threshold: null}),
       permissionMode: () => 'supervised',
+      sandboxFolders: {hiddenFolders: [], treesFolder: '/trees'},
       listedModels: () => [],
       attachmentsDir,
       now,

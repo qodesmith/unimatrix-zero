@@ -7,6 +7,7 @@ it('holds no email, home folder or account id but the stand-ins in a committed r
   expect(
     accountDetailsIn(RECORDINGS, [
       'user@example.com',
+      '/Users/sam',
       '00000000-0000-4000-8000-000000000000',
     ])
   ).toEqual([])

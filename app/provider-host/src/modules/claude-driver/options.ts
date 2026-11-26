@@ -7,7 +7,7 @@ import type {TreeTools} from '@uz/contract/tools'
 import {explainingLabels} from '#modules/thread-replay/main'
 
 import {claudeReplyEnvironment} from './environment'
-import {permissionOptions} from './permissions'
+import {permissionOptions, sandboxSettings} from './permissions'
 
 /**
  * Named one by one: Claude Code's preset adds tools that outlive the Reply or
@@ -46,6 +46,8 @@ export function replyOptions(
   platform: NodeJS.Platform,
   asking: SessionApprovals
 ): Options {
+  const {sandbox, permissions} = sandboxSettings(request, platform)
+
   return {
     pathToClaudeCodeExecutable: programPath,
     env: claudeReplyEnvironment(env, request.vendorProgram.configDir),
@@ -54,7 +56,9 @@ export function replyOptions(
     settings: {
       autoMemoryEnabled: false,
       ...claudeSettingsOf(request.compactionSettings),
+      ...(permissions && {permissions}),
     },
+    ...(sandbox && {sandbox}),
     tools: toolsOn(platform, request.tools),
     // The app can't show Subagents yet.
     disallowedTools: ['Agent'],

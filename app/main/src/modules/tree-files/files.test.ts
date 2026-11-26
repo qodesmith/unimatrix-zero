@@ -91,6 +91,7 @@ beforeEach(() => {
     snapshotsBefore: treeFiles.snapshotsBefore,
     compactionSettingsFor: () => ({auto: true, threshold: null}),
     permissionMode: () => 'full-access',
+    sandboxFolders: {hiddenFolders: [], treesFolder: '/trees'},
     listedModels: () => [],
     attachmentsDir: path.join(userData, 'attachments'),
     now: () => new Date(),

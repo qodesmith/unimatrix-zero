@@ -15,7 +15,7 @@ import {explainingLabels, replyText} from '#modules/thread-replay/main'
 
 import {messageContent, read} from './input'
 import {writeRolloutsBack} from './rollouts'
-import {configOf, loadThread} from './threads'
+import {configOf, isSandboxed, loadThread} from './threads'
 
 const SESSION_LOST = /no rollout found for thread id/
 
@@ -33,37 +33,59 @@ export interface Opened {
 export type Restored = Omit<Opened, 'replay' | 'rebuilt'>
 
 /**
- * Supervised writes only in the Tree's folder, and asks before every command
- * and edit; the app answers the asking (ADR 0022).
+ * Supervised asks before every command and edit, and the app answers the
+ * asking (ADR 0022). Its Sandbox is the profile in the thread's `config`: a
+ * `sandbox` here would replace the profile. Where the profile can't run yet,
+ * `workspace-write` holds instead (ADR 0018).
  */
-function threadAccessOf({permissionMode}: ReplyRequest) {
-  return permissionMode === 'full-access'
-    ? ({sandbox: 'danger-full-access', approvalPolicy: 'never'} as const)
+function threadAccessOf(request: ReplyRequest, platform: NodeJS.Platform) {
+  if (request.permissionMode === 'full-access') {
+    return {sandbox: 'danger-full-access', approvalPolicy: 'never'} as const
+  }
+
+  return isSandboxed(request, platform)
+    ? ({approvalPolicy: 'untrusted'} as const)
     : ({sandbox: 'workspace-write', approvalPolicy: 'untrusted'} as const)
 }
 
-/** The same access for one turn, which holds for its thread from then on. */
-export function turnAccessOf(request: ReplyRequest) {
+function turnSandboxOf(
+  request: ReplyRequest,
+  platform: NodeJS.Platform
+): Pick<ParamsOf<'turn/start'>, 'sandboxPolicy'> {
+  if (request.permissionMode === 'full-access') {
+    return {sandboxPolicy: {type: 'dangerFullAccess'}}
+  }
+
+  return isSandboxed(request, platform)
+    ? {}
+    : {
+        sandboxPolicy: {
+          type: 'workspaceWrite',
+          writableRoots: [request.treeFolder],
+          networkAccess: false,
+          excludeTmpdirEnvVar: false,
+          excludeSlashTmp: false,
+        },
+      }
+}
+
+/**
+ * The same access for one turn, which holds for its thread from then on. A
+ * `sandboxPolicy` replaces the thread's profile for good, so a sandboxed turn
+ * sends none: its thread was loaded with the profile.
+ */
+export function turnAccessOf(request: ReplyRequest, platform: NodeJS.Platform) {
   return {
     cwd: request.treeFolder,
-    approvalPolicy: threadAccessOf(request).approvalPolicy,
-    sandboxPolicy:
-      request.permissionMode === 'full-access'
-        ? {type: 'dangerFullAccess'}
-        : {
-            type: 'workspaceWrite',
-            writableRoots: [request.treeFolder],
-            networkAccess: false,
-            excludeTmpdirEnvVar: false,
-            excludeSlashTmp: false,
-          },
+    approvalPolicy: threadAccessOf(request, platform).approvalPolicy,
+    ...turnSandboxOf(request, platform),
   } satisfies Omit<ParamsOf<'turn/start'>, 'threadId' | 'input'>
 }
 
-export function settingsOf(request: ReplyRequest) {
+export function settingsOf(request: ReplyRequest, platform: NodeJS.Platform) {
   return {
     cwd: request.treeFolder,
-    ...threadAccessOf(request),
+    ...threadAccessOf(request, platform),
     model: request.model,
     developerInstructions:
       explainingLabels(request.systemPrompt, request.thread) || null,
@@ -73,6 +95,7 @@ export function settingsOf(request: ReplyRequest) {
 export interface Opening {
   server: Pick<AppServer, 'request'>
   threads: Map<string, LoadedThread>
+  platform: NodeJS.Platform
 }
 
 function replied(text: string) {
@@ -126,11 +149,11 @@ async function injectThread(
 }
 
 async function newThread(
-  {server, threads}: Opening,
+  {server, threads, platform}: Opening,
   request: ReplyRequest
 ): Promise<Opened> {
-  const settings = settingsOf(request)
-  const config = configOf(request)
+  const settings = settingsOf(request, platform)
+  const config = configOf(request, platform)
   // Before the thread starts, so a failure leaves none behind.
   const items = await itemsOf(request.thread)
 
@@ -183,7 +206,7 @@ export async function openThread(
 
 /** A deletion cut loads its thread read-only in the config folder. */
 export async function resumeForCut(
-  {server, threads}: Opening,
+  {server, threads}: Omit<Opening, 'platform'>,
   {sessionId: id, messageId}: DeletionCut,
   configDir: string,
   files: SessionFile[]

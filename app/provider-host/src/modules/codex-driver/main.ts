@@ -97,7 +97,14 @@ export function createCodexDriver({
   }
 
   const approvals = createApprovals()
-  const replies = createCodexReplies({store, open, whenIdle, approvals})
+
+  const replies = createCodexReplies({
+    store,
+    open,
+    whenIdle,
+    approvals,
+    platform,
+  })
 
   return {
     capabilities: {

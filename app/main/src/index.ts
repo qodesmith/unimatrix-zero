@@ -14,7 +14,11 @@ import {
 import {createAttachments} from '#modules/attachments/main'
 import {registerCommandChannel} from '#modules/commands/main'
 import {createConnections} from '#modules/connections/main'
-import {DatabaseOpenError, openDatabase} from '#modules/database/main'
+import {
+  DatabaseOpenError,
+  dataFolderOf,
+  openDatabase,
+} from '#modules/database/main'
 import {createDesktop} from '#modules/desktop/main'
 import {readDevRun} from '#modules/dev/main'
 import {writeDeveloperFolder} from '#modules/developer-folder/main'
@@ -39,7 +43,12 @@ import {createSessions} from '#modules/sessions/main'
 import {createSettings} from '#modules/settings/main'
 import {createSystemPrompts} from '#modules/system-prompts/main'
 import {createTitles} from '#modules/titles/main'
-import {clearCopies, createTreeFiles} from '#modules/tree-files/main'
+import {
+  clearCopies,
+  createTreeFiles,
+  storesFolderOf,
+  treesFolderOf,
+} from '#modules/tree-files/main'
 import {createTreeRows, createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
 import {
@@ -47,6 +56,7 @@ import {
   gitFolderFor,
   gitTargetFor,
   needsNewerLinux,
+  providersFolderOf,
   readGlibcVersion,
   signInRequestFor,
 } from '#modules/vendor-programs/main'
@@ -108,7 +118,10 @@ registerAppSchemes()
 function openData(): Database | null {
   try {
     return openDatabase({
-      file: path.join(app.getPath('userData'), 'data', 'unimatrix.sqlite'),
+      file: path.join(
+        dataFolderOf(app.getPath('userData')),
+        'unimatrix.sqlite'
+      ),
       migrationsFolder,
     })
   } catch (error) {
@@ -279,6 +292,14 @@ function openWindow(db: Database) {
     compactionSettingsFor: provider =>
       compactionSettingsFor(settings.read(), provider),
     permissionMode: () => (dev?.supervised ? 'supervised' : 'full-access'),
+    sandboxFolders: {
+      hiddenFolders: [
+        providersFolderOf(machine.userData),
+        storesFolderOf(machine.userData),
+        dataFolderOf(machine.userData),
+      ],
+      treesFolder: treesFolderOf(machine.userData),
+    },
     listedModels: provider => connections.models(provider),
     attachmentsDir,
     now: () => new Date(),

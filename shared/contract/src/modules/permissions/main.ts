@@ -13,7 +13,12 @@ export type PermissionMode = z.infer<typeof PermissionModeSchema>
 export const ApprovalGrantSchema = z.discriminatedUnion('kind', [
   z.strictObject({kind: z.literal('edits-in-tree')}),
   z.strictObject({kind: z.literal('edit'), path: z.string().min(1)}),
-  z.strictObject({kind: z.literal('command'), command: z.string()}),
+  /** Covers only the form it was given for: inside the Sandbox or out. */
+  z.strictObject({
+    kind: z.literal('command'),
+    command: z.string(),
+    outsideSandbox: z.literal(true).optional(),
+  }),
   z.strictObject({kind: z.literal('host'), host: z.string().min(1)}),
   z.strictObject({
     kind: z.literal('mcp-tool'),
@@ -33,7 +38,13 @@ export function grantsFor(action: ApprovalAction): ApprovalGrant[] {
         ? [{kind: 'edits-in-tree'}]
         : action.paths.map(path => ({kind: 'edit', path}))
     case 'command':
-      return [{kind: 'command', command: action.command}]
+      return [
+        {
+          kind: 'command',
+          command: action.command,
+          ...(action.outsideSandbox ? {outsideSandbox: true} : {}),
+        },
+      ]
     case 'host':
       return [{kind: 'host', host: action.host}]
     case 'mcp-tool':

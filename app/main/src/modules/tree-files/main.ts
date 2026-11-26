@@ -11,7 +11,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import {createSnapshotFiles} from './files'
-import {makeTreeFolder} from './folder'
+import {makeTreeFolder, storesFolderOf} from './folder'
 import {createGit, createGitBlobs} from './git'
 import {changedFiles, storeExists, takeSnapshot} from './store'
 
@@ -20,6 +20,8 @@ export type {Desktop} from './desktop'
 export {clearCopies} from './location'
 
 export {withAppSections} from './section'
+
+export {storesFolderOf, treesFolderOf} from './folder'
 
 const {prompts, replies} = schema
 
@@ -103,7 +105,7 @@ export function createTreeFiles({
   const snapshotting = new Map<string, Promise<void>>()
 
   function storeOf(treeId: string) {
-    return path.join(userData, 'tree-stores', `${treeId}.git`)
+    return path.join(storesFolderOf(userData), `${treeId}.git`)
   }
 
   function workingCopyOf(treeId: string): VersionedFolder {

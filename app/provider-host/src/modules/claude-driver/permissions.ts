@@ -1,11 +1,35 @@
 import type {ReplyApprovals} from '#modules/approvals/main'
-import type {CanUseTool, Options} from '@anthropic-ai/claude-agent-sdk'
+import type {
+  CanUseTool,
+  HookCallbackMatcher,
+  Options,
+  PreToolUseHookSpecificOutput,
+  SandboxSettings,
+} from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRequest} from '@uz/contract/host'
 import type {ApprovalAction} from '@uz/contract/permissions'
 
-import {isInTreeFolder} from '#modules/tree-folder/main'
+import {
+  credentialFolders,
+  hasSandbox,
+  packageCaches,
+} from '#modules/sandbox/main'
+import {
+  holdsEveryTree,
+  holdsHiddenFolder,
+  isAtOrUnder,
+  isHidden,
+  isInAnotherTree,
+  isInTreeFolder,
+  isOffLimits,
+  namesBelow,
+  realPath,
+} from '#modules/tree-folder/main'
+import os from 'node:os'
 import path from 'node:path'
 import {z} from 'zod'
+
+import {projectKeyOf} from './transcripts'
 
 /** The Reply being written on a `claude`, whose callback is fixed at start. */
 export interface SessionApprovals {
@@ -15,19 +39,66 @@ export interface SessionApprovals {
 /** Reads never ask, in any mode: `default` asks for one outside `cwd`. */
 const READS = 'Read|Glob|Grep'
 
+const EDITS = 'Write|Edit|NotebookEdit'
+
 const DENIED = 'The user denied this.'
+
+const NO_HOST = 'This connection names no host, so it can’t be allowed.'
+
+const CANT_BE_READ = 'This path is in a folder that can’t be read from here.'
+
+const CHANGED_ELSEWHERE =
+  'This path is in a folder that can’t be changed from here.'
+
+const ABOVE_THE_TREES =
+  'This search covers folders that can’t be read from here. Search a narrower folder.'
 
 /** What a card needs of a tool call's input; anything else is left out. */
 const ToolInputSchema = z.object({
   file_path: z.string().min(1).optional().catch(undefined),
+  /** The folder a Glob or a Grep searches. */
+  path: z.string().min(1).optional().catch(undefined),
+  pattern: z.string().min(1).optional().catch(undefined),
   notebook_path: z.string().min(1).optional().catch(undefined),
   command: z.string().optional().catch(undefined),
   url: z.string().optional().catch(undefined),
+  /** The Sandbox blocked the command, and the Model asks to run it outside. */
+  dangerouslyDisableSandbox: z.boolean().optional().catch(undefined),
+  /** The host a sandboxed command wants to reach. */
+  host: z.string().min(1).optional().catch(undefined),
 })
 
 type ToolInput = z.infer<typeof ToolInputSchema>
 
 const MCP_TOOL = /^mcp__(.+?)__(.+)$/
+
+/** `claude`'s prompt when a command inside the Sandbox opens a connection. */
+const SANDBOX_NETWORK = 'SandboxNetworkAccess'
+
+/**
+ * `claude` trims a path, then reads `~` as the home folder, before it
+ * resolves it.
+ */
+function asClaudeReads(given: string) {
+  const trimmed = given.trim()
+
+  if (trimmed === '~') return os.homedir()
+
+  return trimmed.startsWith('~/')
+    ? path.join(os.homedir(), trimmed.slice(2))
+    : trimmed
+}
+
+function withPathsRead(input: ToolInput): ToolInput {
+  const {file_path: filePath, path: folder, notebook_path: notebookPath} = input
+
+  return {
+    ...input,
+    file_path: filePath && asClaudeReads(filePath),
+    path: folder && asClaudeReads(folder),
+    notebook_path: notebookPath && asClaudeReads(notebookPath),
+  }
+}
 
 function editOf(filePath: string, treeFolder: string): ApprovalAction {
   const absolute = path.resolve(treeFolder, filePath)
@@ -43,13 +114,20 @@ function hostOf(url: string | undefined) {
   return url !== undefined && URL.canParse(url) ? new URL(url).hostname : null
 }
 
+function hostIn(toolName: string, input: ToolInput) {
+  if (toolName === SANDBOX_NETWORK) return input.host ?? null
+
+  return toolName === 'WebFetch' ? hostOf(input.url) : null
+}
+
 export function actionOf(
   toolName: string,
-  input: ToolInput,
+  given: ToolInput,
   treeFolder: string
 ): ApprovalAction {
+  const input = withPathsRead(given)
   const {file_path: filePath, notebook_path: notebookPath, command} = input
-  const host = toolName === 'WebFetch' ? hostOf(input.url) : null
+  const host = hostIn(toolName, input)
   const [, server, tool] = MCP_TOOL.exec(toolName) ?? []
 
   if ((toolName === 'Write' || toolName === 'Edit') && filePath) {
@@ -64,7 +142,9 @@ export function actionOf(
     (toolName === 'Bash' || toolName === 'PowerShell') &&
     command !== undefined
   ) {
-    return {kind: 'command', command}
+    return input.dangerouslyDisableSandbox
+      ? {kind: 'command', command, outsideSandbox: true}
+      : {kind: 'command', command}
   }
 
   if (host) return {kind: 'host', host}
@@ -75,19 +155,37 @@ export function actionOf(
 }
 
 /**
+ * A Subagent's call is never shown, and the id of the Sandbox's network prompt
+ * names no tool call, so neither card sits at one.
+ */
+function placeOf(toolName: string, toolUseID: string, agentID?: string) {
+  if (agentID) return {subagentId: agentID}
+
+  return toolName === SANDBOX_NETWORK ? {} : {toolCallId: toolUseID}
+}
+
+/**
  * `claude`'s own suggestions are never passed back: one for a Write turns the
  * whole session to accepting edits.
  */
-function askOn(asking: SessionApprovals, treeFolder: string): CanUseTool {
+export function askOn(
+  asking: SessionApprovals,
+  treeFolder: string
+): CanUseTool {
   return async (toolName, input, {signal, toolUseID, agentID}) => {
     const approvals = asking.current
+    const parsed = ToolInputSchema.parse(input)
+
+    // A card with no host would read as one for a tool, and so would its grant.
+    if (toolName === SANDBOX_NETWORK && !parsed.host) {
+      return {behavior: 'deny', message: NO_HOST}
+    }
 
     const allowed =
       approvals !== null &&
       (await approvals.ask({
-        action: actionOf(toolName, ToolInputSchema.parse(input), treeFolder),
-        // A Subagent's call is never shown, so its card sits at none.
-        ...(agentID ? {subagentId: agentID} : {toolCallId: toolUseID}),
+        action: actionOf(toolName, parsed, treeFolder),
+        ...placeOf(toolName, toolUseID, agentID),
         signal,
       }))
 
@@ -97,11 +195,190 @@ function askOn(asking: SessionApprovals, treeFolder: string): CanUseTool {
   }
 }
 
+const HookInputSchema = z.object({
+  tool_name: z.string(),
+  tool_input: ToolInputSchema,
+})
+
+/** A Glob's pattern may itself name a folder, from the one it searches. */
+function readTargets(toolName: string, input: ToolInput, treeFolder: string) {
+  const {file_path: filePath, path: folder, pattern} = input
+
+  const globbed =
+    toolName === 'Glob' && pattern
+      ? [path.resolve(treeFolder, folder ?? '.', pattern)]
+      : []
+
+  return [filePath, folder, ...globbed].filter(target => target !== undefined)
+}
+
+const GLOB_CHARACTER = /[*?[{]/u
+
+/** The deepest folder that holds every file `pattern` can match. */
+function globRoot(searched: string, pattern: string) {
+  const wildcardAt = pattern.search(GLOB_CHARACTER)
+
+  return wildcardAt === -1
+    ? path.resolve(searched, pattern)
+    : path.dirname(path.resolve(searched, `${pattern.slice(0, wildcardAt)}_`))
+}
+
+/** The folders a Glob or a Grep walks down from; a Read walks none. */
+function searchRoots(toolName: string, input: ToolInput, treeFolder: string) {
+  const {path: folder, pattern} = input
+  const searched = path.resolve(treeFolder, folder ?? '.')
+
+  if (toolName === 'Grep') return [searched]
+
+  return toolName === 'Glob' && pattern ? [globRoot(searched, pattern)] : []
+}
+
+type SandboxFolders = Pick<
+  ReplyRequest,
+  'treeFolder' | 'treesFolder' | 'hiddenFolders'
+>
+
+/** `configDir` is `claude`'s config folder, which may sit in a hidden folder. */
+type ReadFolders = SandboxFolders & {configDir: string}
+
+/**
+ * `claude` saves a tool's output too large to give inline under
+ * `<configDir>/projects/<key of its folder>/<session>/tool-results/`, then
+ * tells the Model to Read it there. Other Trees' sessions sit under other keys.
+ * The key follows the folder's spelling as given, which on Windows may hold a
+ * short name like `RUNNER~1`, or its letter case on disk.
+ */
+function isSavedOutput({configDir, treeFolder}: ReadFolders, file: string) {
+  const keys = new Set([
+    projectKeyOf(treeFolder),
+    projectKeyOf(realPath(treeFolder)),
+  ])
+
+  return [...keys].some(key => {
+    const [, folder] =
+      namesBelow(
+        path.join(configDir, 'projects', key),
+        path.resolve(treeFolder, file)
+      ) ?? []
+
+    return folder === 'tool-results'
+  })
+}
+
+function hiddenRefusal(
+  roots: string[],
+  file: string | undefined,
+  folders: ReadFolders
+) {
+  const looked = file === undefined ? roots : [file]
+
+  if (
+    looked.some(
+      target => isHidden(folders, target) && !isSavedOutput(folders, target)
+    )
+  ) {
+    return CANT_BE_READ
+  }
+
+  return roots.some(root => holdsHiddenFolder(folders, root))
+    ? ABOVE_THE_TREES
+    : null
+}
+
+function refusal(toolName: string, input: ToolInput, folders: ReadFolders) {
+  const {treeFolder} = folders
+  const roots = searchRoots(toolName, input, treeFolder)
+
+  if (roots.some(root => holdsEveryTree(folders, root))) return ABOVE_THE_TREES
+
+  if (
+    readTargets(toolName, input, treeFolder).some(target =>
+      isInAnotherTree(folders, target)
+    )
+  ) {
+    return CANT_BE_READ
+  }
+
+  return hiddenRefusal(roots, input.file_path, folders)
+}
+
+/**
+ * The Sandbox hides other Trees and the hidden folders from commands only. A
+ * Read deny rule for the Trees' folder would hide this Tree's own, and one for
+ * `claude`'s config folder would hide the outputs it saves there, since a deny
+ * beats every allow, so the hook refuses them (ADR 0018).
+ */
+export function readDecision(
+  toolName: string,
+  input: ToolInput,
+  folders: ReadFolders
+): Decision {
+  const reason = refusal(toolName, withPathsRead(input), folders)
+
+  return reason === null
+    ? {permissionDecision: 'allow'}
+    : {permissionDecision: 'deny', permissionDecisionReason: reason}
+}
+
+type Decision = Pick<
+  PreToolUseHookSpecificOutput,
+  'permissionDecision' | 'permissionDecisionReason'
+>
+
+/**
+ * An edit into another Tree's files or the app's own folders is refused, not
+ * carded: the user can't judge one there (ADR 0018). Any other edit gets its
+ * card.
+ */
+export function editDecision(
+  toolName: string,
+  input: ToolInput,
+  folders: SandboxFolders
+): Decision {
+  const {file_path: filePath, notebook_path: notebookPath} =
+    withPathsRead(input)
+
+  const target = toolName === 'NotebookEdit' ? notebookPath : filePath
+
+  if (target === undefined || !isOffLimits(folders, target)) return {}
+
+  return {
+    permissionDecision: 'deny',
+    permissionDecisionReason: CHANGED_ELSEWHERE,
+  }
+}
+
+function preToolUse(
+  matcher: string,
+  decide: (toolName: string, input: ToolInput) => Decision
+): HookCallbackMatcher {
+  return {
+    matcher,
+    hooks: [
+      async input => {
+        const {tool_name: toolName, tool_input: toolInput} =
+          HookInputSchema.parse(input)
+
+        return {
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            ...decide(toolName, toolInput),
+          },
+        }
+      },
+    ],
+  }
+}
+
 /** Full access asks nothing; Supervised asks the user through `asking`. */
 export function permissionOptions(
-  {permissionMode, treeFolder}: ReplyRequest,
+  request: Pick<ReplyRequest, 'permissionMode' | 'vendorProgram'> &
+    SandboxFolders,
   asking: SessionApprovals
 ): Options {
+  const {permissionMode, treeFolder, vendorProgram} = request
+  const folders = {...request, configDir: vendorProgram.configDir}
+
   if (permissionMode === 'full-access') {
     return {
       permissionMode: 'bypassPermissions',
@@ -115,18 +392,72 @@ export function permissionOptions(
     // An allow here skips `canUseTool`.
     hooks: {
       PreToolUse: [
-        {
-          matcher: READS,
-          hooks: [
-            async () => ({
-              hookSpecificOutput: {
-                hookEventName: 'PreToolUse',
-                permissionDecision: 'allow',
-              },
-            }),
-          ],
-        },
+        preToolUse(READS, (toolName, input) =>
+          readDecision(toolName, input, folders)
+        ),
+        preToolUse(EDITS, (toolName, input) =>
+          editDecision(toolName, input, request)
+        ),
       ],
+    },
+  }
+}
+
+/**
+ * Even a Bash allow rule then brings the retry outside the Sandbox to
+ * `canUseTool`, where no grant for the command covers it (ADR 0018).
+ */
+const LEAVING_THE_SANDBOX = 'Bash(dangerouslyDisableSandbox:true)'
+
+/** `//` names an absolute path; with one `/` the rule matches nothing. */
+function readDenied(folder: string) {
+  return `Read(/${folder}/**)`
+}
+
+function sandboxOf(
+  {treeFolder, treesFolder, hiddenFolders}: SandboxFolders,
+  home: string
+): SandboxSettings {
+  return {
+    enabled: true,
+    failIfUnavailable: false,
+    allowUnsandboxedCommands: true,
+    // The Sandbox is the floor under the cards, never a reason to skip one.
+    autoAllowBashIfSandboxed: false,
+    network: {allowedDomains: []},
+    filesystem: {
+      allowWrite: [treeFolder, os.tmpdir(), ...packageCaches(home)],
+      denyRead: [treesFolder, ...credentialFolders(home), ...hiddenFolders],
+      allowRead: [treeFolder],
+    },
+  }
+}
+
+/**
+ * Supervised runs every command inside the Sandbox where it can run. The
+ * deny rules hold for the Read tool, over the hook that lets reads through,
+ * but for the hidden folder that holds `claude`'s config folder, which the hook
+ * guards alone.
+ */
+export function sandboxSettings(
+  request: Pick<ReplyRequest, 'permissionMode' | 'vendorProgram'> &
+    SandboxFolders,
+  platform: NodeJS.Platform
+) {
+  if (request.permissionMode === 'full-access') return {}
+
+  const home = os.homedir()
+  const {hiddenFolders, vendorProgram} = request
+
+  const denied = hiddenFolders.filter(
+    folder => !isAtOrUnder(folder, vendorProgram.configDir)
+  )
+
+  return {
+    sandbox: hasSandbox(platform) ? sandboxOf(request, home) : {enabled: false},
+    permissions: {
+      deny: [...credentialFolders(home), ...denied].map(readDenied),
+      ask: [LEAVING_THE_SANDBOX],
     },
   }
 }

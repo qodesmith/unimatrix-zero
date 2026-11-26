@@ -85,6 +85,11 @@ export function gitFolderFor(
     : null
 }
 
+/** Each Provider's sign-in and session data, in a folder of its own. */
+export function providersFolderOf(userData: string) {
+  return path.join(userData, 'providers')
+}
+
 export function signInRequestFor(
   provider: ProviderId,
   machine: Machine,
@@ -95,7 +100,7 @@ export function signInRequestFor(
   const gitFolder = gitFolderFor(machine, manifest)
 
   const folders = {
-    configDir: path.join(userData, 'providers', provider),
+    configDir: path.join(providersFolderOf(userData), provider),
     ...(developerDir && {developerDir}),
     ...(gitFolder && {gitFolder}),
   }

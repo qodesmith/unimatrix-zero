@@ -42,6 +42,7 @@ export interface CodexRepliesDeps {
   open: OpenAppServer
   whenIdle: WhenIdle
   approvals: Approvals
+  platform: NodeJS.Platform
 }
 
 type CutRequest = Parameters<ProviderDriver['cutSession']>[0]
@@ -174,10 +175,10 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     dropFrom: string | null
   ): Promise<Restored> {
     const {configDir} = request.vendorProgram
-    const settings = settingsOf(request)
+    const settings = settingsOf(request, deps.platform)
 
     // A resume or fork that brings no `config` keeps the thread's old one.
-    const config = configOf(request)
+    const config = configOf(request, deps.platform)
 
     const {sessionId: id, messageId, type} = session
     const fork = type === 'fork'
@@ -354,7 +355,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
         model: request.model,
         // Every turn too: a deletion cut resumes its thread read-only in the
         // config folder, and a loaded thread may have run under another mode.
-        ...turnAccessOf(request),
+        ...turnAccessOf(request, deps.platform),
       })
 
       thread.model = request.model
@@ -450,7 +451,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
         const {server, threads} = running
 
         const opened = await openThread(
-          {server, threads},
+          {server, threads, platform: deps.platform},
           request,
           session && (async () => restore(running, request, session, dropFrom))
         )

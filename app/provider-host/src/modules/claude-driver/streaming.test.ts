@@ -179,6 +179,8 @@ async function setUp(
     attachments?: HostAttachment[]
     tools?: TreeTools
     permissionMode?: PermissionMode
+    hiddenFolders?: string[]
+    treesFolder?: string
     grants?: ApprovalGrant[]
     /** Each card's answer in turn, or a Stop while it waits. */
     answers?: (ApprovalAnswer | 'stop')[]
@@ -242,6 +244,8 @@ async function setUp(
       systemPromptChanged: false,
       tools: DEFAULT_TREE_TOOLS,
       permissionMode: 'full-access',
+      hiddenFolders: [],
+      treesFolder: '/trees',
       grants: [],
       ...given,
     })) {
@@ -2266,6 +2270,88 @@ it('runs claude under Supervised in its default mode, with no full access, askin
   expect(report?.args).not.toContain('--allow-dangerously-skip-permissions')
 })
 
+it('runs claude under Supervised inside the Sandbox: it writes only in the Tree’s folder, temp and the package caches, reads no credentials, other Tree or app folder, reaches no host, and asks before every command and before leaving the Sandbox, while the Read tool’s deny rules leave out claude’s config folder', async () => {
+  const claude = await setUp(['read-outside.ndjson'])
+  const home = os.homedir()
+
+  await claude.reply('Read the file outside.', null, {
+    permissionMode: 'supervised',
+    hiddenFolders: [claude.configDir, '/app/tree-stores', '/app/data'],
+    treesFolder: '/app/trees',
+  })
+  const [options] = claude.queried
+
+  expect(options?.sandbox).toEqual({
+    enabled: true,
+    failIfUnavailable: false,
+    allowUnsandboxedCommands: true,
+    autoAllowBashIfSandboxed: false,
+    network: {allowedDomains: []},
+    filesystem: {
+      allowWrite: [
+        claude.treeFolder,
+        os.tmpdir(),
+        path.join(home, '.bun', 'install', 'cache'),
+        path.join(home, '.npm'),
+        path.join(home, 'Library', 'pnpm', 'store'),
+        path.join(home, '.yarn', 'berry'),
+        path.join(home, '.cargo', 'registry'),
+        path.join(home, '.cargo', 'git'),
+        path.join(home, 'Library', 'Caches'),
+      ],
+      denyRead: [
+        '/app/trees',
+        path.join(home, '.ssh'),
+        path.join(home, '.aws'),
+        path.join(home, '.config', 'gh'),
+        path.join(home, '.kube'),
+        path.join(home, '.gnupg'),
+        path.join(home, 'Library', 'Keychains'),
+        claude.configDir,
+        '/app/tree-stores',
+        '/app/data',
+      ],
+      allowRead: [claude.treeFolder],
+    },
+  })
+  expect(options?.settings).toMatchObject({
+    permissions: {
+      deny: [
+        `Read(/${path.join(home, '.ssh')}/**)`,
+        `Read(/${path.join(home, '.aws')}/**)`,
+        `Read(/${path.join(home, '.config', 'gh')}/**)`,
+        `Read(/${path.join(home, '.kube')}/**)`,
+        `Read(/${path.join(home, '.gnupg')}/**)`,
+        `Read(/${path.join(home, 'Library', 'Keychains')}/**)`,
+        'Read(//app/tree-stores/**)',
+        'Read(//app/data/**)',
+      ],
+      ask: ['Bash(dangerouslyDisableSandbox:true)'],
+    },
+    autoMemoryEnabled: false,
+  })
+})
+
+it('runs claude with no Sandbox where the Sandbox can’t run, and under Full access', async () => {
+  const elsewhere = await setUp(
+    ['read-outside.ndjson'],
+    {},
+    fakeStore(),
+    'linux'
+  )
+
+  await elsewhere.reply('Read the file outside.', null, {
+    permissionMode: 'supervised',
+  })
+
+  const fullAccess = await setUp(['warm.ndjson'])
+  await fullAccess.reply(FIRST_PROMPT)
+
+  expect(elsewhere.queried[0]?.sandbox).toEqual({enabled: false})
+  expect(elsewhere.queried[0]?.permissionMode).toBe('default')
+  expect(fullAccess.queried[0]?.sandbox).toBeUndefined()
+})
+
 it('under Supervised, asks about a Write in the Tree’s files at its tool call once the call has shown, lets it run as written once allowed, and asks the next Reply in the same claude at that Reply', async () => {
   const claude = await setUp(['approved.ndjson'])
 
@@ -2447,6 +2533,104 @@ it('under Supervised, lets a Read outside the Tree’s folder run with no card',
     },
   ])
   expect(textOf(events)).toMatch(/OSPREY/)
+})
+
+function askedIn(events: Streamed[]) {
+  return events.flatMap(event =>
+    event.type === 'APPROVAL_REQUESTED' ? [event] : []
+  )
+}
+
+function toolCallsOf(events: Streamed[]) {
+  return shown(events).content.flatMap(part =>
+    part.type === 'tool-call' ? [part] : []
+  )
+}
+
+it('under Supervised, asks about a command inside the Sandbox at its tool call, as a command that stays in', async () => {
+  const claude = await setUp(['sandboxed.ndjson'])
+
+  const events = await claude.reply('Run the command.', null, {
+    permissionMode: 'supervised',
+    answers: ['allow-once'],
+  })
+
+  const [bash] = toolCallsOf(events)
+
+  expect(askedIn(events)).toEqual([
+    expect.objectContaining({
+      toolCallId: bash?.toolCallId,
+      action: {
+        kind: 'command',
+        command: 'echo HERON > notes.txt && printenv SANDBOX_RUNTIME',
+      },
+    }),
+  ])
+  expect(answersTo(claude)).toEqual([
+    expect.objectContaining({behavior: 'allow', toolUseID: bash?.toolCallId}),
+  ])
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+})
+
+it('under Supervised, asks again to run a command outside the Sandbox after an Always allow for it, as that form alone, and leaves it undone once denied', async () => {
+  const claude = await setUp(['left-sandbox.ndjson'])
+
+  const events = await claude.reply('Write outside.', null, {
+    permissionMode: 'supervised',
+    answers: ['always-allow', 'deny'],
+  })
+
+  const [, outside] = toolCallsOf(events)
+  const [first, leaving, ...rest] = askedIn(events).map(event => event.action)
+
+  expect(first).toEqual({
+    kind: 'command',
+    command: expect.stringMatching(/^echo KESTREL > \/Library\/Caches\//),
+  })
+  expect(leaving).toEqual({...first, outsideSandbox: true})
+  expect(rest).toEqual([])
+  expect(answersTo(claude)).toEqual([
+    expect.objectContaining({behavior: 'allow'}),
+    expect.objectContaining({behavior: 'deny', toolUseID: outside?.toolCallId}),
+  ])
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+})
+
+it('under Supervised, asks about a connection from inside the Sandbox on a card naming its host, which sits at no tool call', async () => {
+  const claude = await setUp(['network.ndjson'])
+
+  const events = await claude.reply('Fetch the page.', null, {
+    permissionMode: 'supervised',
+    answers: ['allow-once', 'always-allow'],
+  })
+
+  const [, host] = askedIn(events)
+
+  expect(host?.action).toEqual({kind: 'host', host: 'example.com'})
+  expect(host).not.toHaveProperty('toolCallId')
+  expect(answersTo(claude)).toEqual([
+    expect.objectContaining({behavior: 'allow'}),
+    expect.objectContaining({behavior: 'allow'}),
+  ])
+  expect(events.at(-1)).toMatchObject({status: 'complete'})
+})
+
+it('under Supervised, shows a refused Read of a hidden folder and one of another Tree with no card', async () => {
+  const claude = await setUp(['read-denied.ndjson'])
+
+  const events = await claude.reply('Read the hidden file.', null, {
+    permissionMode: 'supervised',
+    answers: ['allow-once', 'allow-once'],
+  })
+
+  const [refused, otherTree, bash, script] = toolCallsOf(events)
+
+  expect(refused?.result?.isError).toBe(true)
+  expect(otherTree?.result?.isError).toBe(true)
+  expect(askedIn(events).map(event => event.toolCallId)).toEqual([
+    bash?.toolCallId,
+    script?.toolCallId,
+  ])
 })
 
 it('resumes the session in a new claude for a Reply under another Permission mode, closing the warm one', async () => {
