@@ -37,9 +37,9 @@ export type Restored = Omit<Opened, 'replay' | 'rebuilt'>
  * and edit; the app answers the asking (ADR 0022).
  */
 function threadAccessOf({permissionMode}: ReplyRequest) {
-  return permissionMode === 'supervised'
-    ? ({sandbox: 'workspace-write', approvalPolicy: 'untrusted'} as const)
-    : ({sandbox: 'danger-full-access', approvalPolicy: 'never'} as const)
+  return permissionMode === 'full-access'
+    ? ({sandbox: 'danger-full-access', approvalPolicy: 'never'} as const)
+    : ({sandbox: 'workspace-write', approvalPolicy: 'untrusted'} as const)
 }
 
 /** The same access for one turn, which holds for its thread from then on. */
@@ -48,15 +48,15 @@ export function turnAccessOf(request: ReplyRequest) {
     cwd: request.treeFolder,
     approvalPolicy: threadAccessOf(request).approvalPolicy,
     sandboxPolicy:
-      request.permissionMode === 'supervised'
-        ? {
+      request.permissionMode === 'full-access'
+        ? {type: 'dangerFullAccess'}
+        : {
             type: 'workspaceWrite',
             writableRoots: [request.treeFolder],
             networkAccess: false,
             excludeTmpdirEnvVar: false,
             excludeSlashTmp: false,
-          }
-        : {type: 'dangerFullAccess'},
+          },
   } satisfies Omit<ParamsOf<'turn/start'>, 'threadId' | 'input'>
 }
 

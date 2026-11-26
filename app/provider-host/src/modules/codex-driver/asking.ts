@@ -78,14 +78,14 @@ function unwrapped(command: string) {
   return (script === undefined ? null : shellWord(script)) ?? command
 }
 
-function commandCard(params: CommandRequest): Card {
+function commandCard(params: CommandRequest): Card | null {
   const host = params.networkApprovalContext?.host
 
-  return {
-    action: host
-      ? {kind: 'host', host}
-      : {kind: 'command', command: unwrapped(params.command ?? '')},
-  }
+  if (host) return {action: {kind: 'host', host}}
+
+  if (!params.command) return null
+
+  return {action: {kind: 'command', command: unwrapped(params.command)}}
 }
 
 /**
@@ -110,15 +110,15 @@ export function createTurnAsking({
   )
 
   const untake =
-    request.permissionMode === 'supervised'
-      ? server.takeApprovals(approval => {
+    request.permissionMode === 'full-access'
+      ? () => undefined
+      : server.takeApprovals(approval => {
           if (approval.params.threadId !== threadId) return false
 
           push({method: 'approval', request: approval})
 
           return true
         })
-      : () => undefined
 
   function linked(toolCallId: string) {
     return toolCalls.has(toolCallId) ? {toolCallId} : {}
@@ -161,8 +161,12 @@ export function createTurnAsking({
   /** Null: nothing to show on a card, so it's declined. */
   function cardOf(asked: ApprovalRequest): Card | null {
     switch (asked.method) {
-      case 'item/commandExecution/requestApproval':
-        return {...commandCard(asked.params), ...linked(asked.params.itemId)}
+      case 'item/commandExecution/requestApproval': {
+        const card = commandCard(asked.params)
+
+        return card && {...card, ...linked(asked.params.itemId)}
+      }
+
       case 'item/fileChange/requestApproval':
         return editCard(asked.params.itemId)
       case 'mcpServer/elicitation/request':

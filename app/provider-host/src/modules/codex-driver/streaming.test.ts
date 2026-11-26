@@ -2012,6 +2012,34 @@ it.each([
   }
 )
 
+it('declines a command request that names no command, with no card', async () => {
+  const codex = await setUp([
+    edited('approvals.ndjson', text =>
+      text
+        .replaceAll(
+          '{"type":"listFiles","command":"ls","path":null}',
+          '{"type":"unknown","command":"ls"}'
+        )
+        .replace(
+          '"environmentId":"local","command":"/bin/zsh -lc ls",',
+          '"environmentId":"local","command":null,'
+        )
+    ),
+  ])
+
+  const [, allowed = []] = await approvalReplies(codex, 2)
+
+  expect(
+    cardsIn(allowed).flatMap(event =>
+      event.type === 'APPROVAL_REQUESTED' ? [event.action.kind] : []
+    )
+  ).toEqual(['edit'])
+  expect(codex.reports()[0]?.answers).toEqual([
+    {id: 0, result: {decision: 'accept'}},
+    {id: 1, result: {decision: 'decline'}},
+  ])
+})
+
 it('shows no card for a command Claude’s Always allow granted in the Tree, and accepts it', async () => {
   const codex = await setUp([unparsedListing('/bin/zsh -lc ls')])
   const ready = await codex.reply('Reply with the single word READY.')

@@ -250,7 +250,7 @@ export const ApprovalResolvedEvent = z.strictObject({
   answer: ApprovalAnswerSchema,
 })
 
-/** Under Auto the vendor's reviewer decides instead of the user. */
+/** Under Auto the Reviewer decides instead of the user. */
 export const ReviewStartedEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('REVIEW_STARTED'),
