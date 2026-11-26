@@ -148,6 +148,13 @@ export const ReplyRequestSchema = z.strictObject({
   systemPromptChanged: z.boolean(),
   tools: TreeToolsSchema,
   permissionMode: PermissionModeSchema,
+  /**
+   * The app's own folders, which the Sandbox keeps the AI from reading: the
+   * Provider folders and the store of Snapshots.
+   */
+  hiddenFolders: z.array(z.string().min(1)),
+  /** Holds every Tree's files, of which the Sandbox shows only `treeFolder`. */
+  treesFolder: z.string().min(1),
   /** The Tree's "Always allow in this Tree" answers so far. */
   grants: z.array(ApprovalGrantSchema),
 })

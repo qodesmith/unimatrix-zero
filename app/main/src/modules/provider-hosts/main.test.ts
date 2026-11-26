@@ -314,6 +314,8 @@ it('sends commands to the Provider’s host', () => {
       systemPromptChanged: false,
       tools: DEFAULT_TREE_TOOLS,
       permissionMode: 'full-access',
+      hiddenFolders: [],
+      treesFolder: '/trees',
       grants: [],
     },
   }

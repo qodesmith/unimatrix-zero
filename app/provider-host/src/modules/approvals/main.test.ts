@@ -126,6 +126,30 @@ it('goes ahead without asking when the request carries a grant', async () => {
   expect(events).toEqual([])
 })
 
+it('asks to run a granted command outside the Sandbox, and keeps that answer to the outside form', async () => {
+  const {approvals, events, reply, requested} = setUp()
+  const outside: ApprovalAction = {...COMMAND, outsideSandbox: true}
+
+  const replying = approvals.forReply(
+    {...replyIn(TREE), grants: [{kind: 'command', command: 'touch made.txt'}]},
+    event => {
+      events.push(event)
+    }
+  )
+
+  const asked = replying.ask({action: outside})
+  approvals.answer(requested()[0]?.approvalId ?? '', 'always-allow')
+  await asked
+
+  await expect(reply().ask({action: outside})).resolves.toBe(true)
+  void reply(OTHER_TREE).ask({action: COMMAND})
+
+  expect(requested().map(request => request.action)).toEqual([
+    outside,
+    COMMAND,
+  ])
+})
+
 it('goes ahead without asking on an edit both in and outside the Tree once each is granted', async () => {
   const {approvals, events} = setUp()
 

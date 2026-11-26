@@ -275,6 +275,8 @@ function compactionReplies(program: string, home: string, spawn: SpawnCodex) {
         systemPromptChanged: false,
         tools: DEFAULT_TREE_TOOLS,
         permissionMode: 'full-access',
+        hiddenFolders: [],
+        treesFolder: '/trees',
         grants: [],
       })
     )
@@ -369,6 +371,8 @@ function threadReplies(program: string, home: string) {
         systemPromptChanged: false,
         tools: DEFAULT_TREE_TOOLS,
         permissionMode: 'full-access',
+        hiddenFolders: [],
+        treesFolder: '/trees',
         grants: [],
       })
     )
@@ -503,6 +507,8 @@ function approvalReplies(
       systemPromptChanged: false,
       tools: DEFAULT_TREE_TOOLS,
       permissionMode,
+      hiddenFolders: [],
+      treesFolder: '/trees',
       grants,
     })) {
       events.push(event)
@@ -664,6 +670,8 @@ function codedReplies(
         systemPromptChanged: false,
         tools,
         permissionMode: 'full-access',
+        hiddenFolders: [],
+        treesFolder: '/trees',
         grants: [],
       })
     )
@@ -998,6 +1006,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
           permissionMode: 'full-access',
+          hiddenFolders: [],
+          treesFolder: '/trees',
           grants: [],
         })
       )
@@ -1162,6 +1172,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         systemPromptChanged: false,
         tools: DEFAULT_TREE_TOOLS,
         permissionMode: 'full-access',
+        hiddenFolders: [],
+        treesFolder: '/trees',
         grants: [],
       })) {
         events.push(event)
@@ -1325,6 +1337,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
           permissionMode: 'full-access',
+          hiddenFolders: [],
+          treesFolder: '/trees',
           grants: [],
         })
       )
@@ -1453,6 +1467,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
           permissionMode: 'full-access',
+          hiddenFolders: [],
+          treesFolder: '/trees',
           grants: [],
         })
       )
@@ -1606,6 +1622,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         systemPromptChanged: false,
         tools: DEFAULT_TREE_TOOLS,
         permissionMode: 'full-access',
+        hiddenFolders: [],
+        treesFolder: '/trees',
         grants: [],
       })) {
         events.push(event)
@@ -1970,6 +1988,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
           permissionMode: 'full-access',
+          hiddenFolders: [],
+          treesFolder: '/trees',
           grants: [],
         })
       )
@@ -2168,6 +2188,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           systemPromptChanged: changed,
           tools: DEFAULT_TREE_TOOLS,
           permissionMode: 'full-access',
+          hiddenFolders: [],
+          treesFolder: '/trees',
           grants: [],
         })
       )
@@ -2377,6 +2399,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
           permissionMode: 'full-access',
+          hiddenFolders: [],
+          treesFolder: '/trees',
           grants: [],
         })
       )
@@ -2461,6 +2485,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
           permissionMode: 'full-access',
+          hiddenFolders: [],
+          treesFolder: '/trees',
           grants: [],
         })
       )
@@ -2729,6 +2755,8 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
           permissionMode: 'full-access',
+          hiddenFolders: [],
+          treesFolder: '/trees',
           grants: [],
         })
       )
@@ -2900,6 +2928,8 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
           systemPromptChanged: false,
           tools: DEFAULT_TREE_TOOLS,
           permissionMode: 'full-access',
+          hiddenFolders: [],
+          treesFolder: '/trees',
           grants: [],
         })
       )

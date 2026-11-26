@@ -20,6 +20,8 @@ const request = {
   systemPromptChanged: false,
   tools: DEFAULT_TREE_TOOLS,
   permissionMode: 'full-access' as const,
+  hiddenFolders: [],
+  treesFolder: '/trees',
   grants: [],
 }
 

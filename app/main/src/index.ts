@@ -36,7 +36,11 @@ import {createSessions} from '#modules/sessions/main'
 import {createSettings} from '#modules/settings/main'
 import {createSystemPrompts} from '#modules/system-prompts/main'
 import {createTitles} from '#modules/titles/main'
-import {createTreeFiles} from '#modules/tree-files/main'
+import {
+  createTreeFiles,
+  storesFolderOf,
+  treesFolderOf,
+} from '#modules/tree-files/main'
 import {createTreeRows, createTrees} from '#modules/trees/main'
 import {createTurns} from '#modules/turns/main'
 import {
@@ -44,6 +48,7 @@ import {
   gitFolderFor,
   gitTargetFor,
   needsNewerLinux,
+  providersFolderOf,
   readGlibcVersion,
   signInRequestFor,
 } from '#modules/vendor-programs/main'
@@ -265,6 +270,13 @@ function openWindow(db: Database) {
     compactionSettingsFor: provider =>
       compactionSettingsFor(settings.read(), provider),
     permissionMode: () => (dev?.supervised ? 'supervised' : 'full-access'),
+    sandboxFolders: {
+      hiddenFolders: [
+        providersFolderOf(machine.userData),
+        storesFolderOf(machine.userData),
+      ],
+      treesFolder: treesFolderOf(machine.userData),
+    },
     listedModels: provider => connections.models(provider),
     attachmentsDir,
     now: () => new Date(),

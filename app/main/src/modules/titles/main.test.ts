@@ -64,6 +64,7 @@ beforeEach(() => {
     snapshotsBefore: () => null,
     compactionSettingsFor: () => ({auto: true, threshold: null}),
     permissionMode: () => 'full-access',
+    sandboxFolders: {hiddenFolders: [], treesFolder: '/trees'},
     listedModels: () => [],
     attachmentsDir: '/attachments',
     now: () => new Date('2026-10-19T12:00:00.000Z'),

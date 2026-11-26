@@ -249,6 +249,8 @@ function liveDriver(
       systemPromptChanged: false,
       tools: DEFAULT_TREE_TOOLS,
       permissionMode: 'full-access',
+      hiddenFolders: [],
+      treesFolder: '/trees',
       grants: [],
     }
   }
@@ -320,6 +322,8 @@ function supervised(live: Live, text: string, tree: string): ReplyRequest {
     ...live.request(text, null),
     treeFolder: tree,
     permissionMode: 'supervised',
+    hiddenFolders: [],
+    treesFolder: '/trees',
   }
 }
 

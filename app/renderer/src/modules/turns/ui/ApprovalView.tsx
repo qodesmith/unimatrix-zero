@@ -49,7 +49,9 @@ function whatItDoes(action: ApprovalAction) {
     case 'edit':
       return `edit ${listed(action.inTreeFiles ? action.paths.map(fileName) : action.paths)}`
     case 'command':
-      return 'run this command'
+      return action.outsideSandbox
+        ? 'run this command on your whole computer'
+        : 'run this command'
     case 'host':
       return `connect to ${action.host}`
     case 'mcp-tool':
@@ -132,6 +134,12 @@ function AskingCard({
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         <CommandText action={action} />
+        {action.kind === 'command' && action.outsideSandbox && (
+          <p className="text-xs text-muted-foreground">
+            Outside the Sandbox, it could read and change any of your files,
+            use your saved logins and reach the internet.
+          </p>
+        )}
         {landsOutsideTree(action) && (
           <p className="text-xs text-muted-foreground">
             This happens outside the conversation, so other Branches will see it

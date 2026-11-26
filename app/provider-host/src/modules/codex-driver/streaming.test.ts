@@ -265,6 +265,8 @@ async function setUp(
       systemPromptChanged,
       tools,
       permissionMode,
+      hiddenFolders: [],
+      treesFolder: '/trees',
       grants,
     })) {
       events.push(event)

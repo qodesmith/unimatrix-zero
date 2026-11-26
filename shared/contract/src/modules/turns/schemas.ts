@@ -212,7 +212,12 @@ export const ApprovalActionSchema = z.discriminatedUnion('kind', [
     /** Every path is inside the Tree's files, so the Branch versions it. */
     inTreeFiles: z.boolean(),
   }),
-  z.strictObject({kind: z.literal('command'), command: z.string()}),
+  z.strictObject({
+    kind: z.literal('command'),
+    command: z.string(),
+    /** The Sandbox blocked it, and the AI asks to run it without one. */
+    outsideSandbox: z.literal(true).optional(),
+  }),
   z.strictObject({kind: z.literal('host'), host: z.string().min(1)}),
   z.strictObject({
     kind: z.literal('mcp-tool'),

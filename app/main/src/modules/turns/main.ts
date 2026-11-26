@@ -72,6 +72,7 @@ export interface TurnsDeps {
   ) => Promise<void> | null
   compactionSettingsFor: (provider: ProviderId) => CompactionSettings
   permissionMode: () => PermissionMode
+  sandboxFolders: Pick<ReplyRequest, 'hiddenFolders' | 'treesFolder'>
   listedModels: ListedModels
   attachmentsDir: string
   now: () => Date
@@ -102,6 +103,7 @@ export function createTurns({
   snapshotsBefore,
   compactionSettingsFor,
   permissionMode,
+  sandboxFolders,
   listedModels,
   attachmentsDir,
   now,
@@ -273,6 +275,7 @@ export function createTurns({
           ),
           tools: treeTools(db, treeId),
           permissionMode: permissionMode(),
+          ...sandboxFolders,
           grants: treeGrants(db, treeId),
         },
         parentReplyId
@@ -338,6 +341,7 @@ export function createTurns({
           ),
           tools: treeTools(db, treeId),
           permissionMode: permissionMode(),
+          ...sandboxFolders,
           grants: treeGrants(db, treeId),
         },
         recovered.parentReplyId
