@@ -209,9 +209,7 @@ export function sandboxSettings(
   const home = os.homedir()
 
   return {
-    sandbox: hasSandbox(platform)
-      ? sandboxOf(request, home)
-      : {enabled: false},
+    sandbox: hasSandbox(platform) ? sandboxOf(request, home) : {enabled: false},
     permissions: {
       deny: [...credentialFolders(home), ...request.hiddenFolders].map(
         readDenied

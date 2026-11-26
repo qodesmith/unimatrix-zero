@@ -2318,7 +2318,13 @@ it('runs claude under Supervised inside the Sandbox: it writes only in the Treeâ
 })
 
 it('runs claude with no Sandbox where the Sandbox canâ€™t run, and under Full access', async () => {
-  const elsewhere = await setUp(['read-outside.ndjson'], {}, fakeStore(), 'linux')
+  const elsewhere = await setUp(
+    ['read-outside.ndjson'],
+    {},
+    fakeStore(),
+    'linux'
+  )
+
   await elsewhere.reply('Read the file outside.', null, {
     permissionMode: 'supervised',
   })
@@ -2533,6 +2539,7 @@ it('under Supervised, asks about a command inside the Sandbox at its tool call, 
     permissionMode: 'supervised',
     answers: ['allow-once'],
   })
+
   const [bash] = toolCallsOf(events)
 
   expect(askedIn(events)).toEqual([
@@ -2557,14 +2564,15 @@ it('under Supervised, asks again to run a command outside the Sandbox after an A
     permissionMode: 'supervised',
     answers: ['always-allow', 'deny'],
   })
+
   const [, outside] = toolCallsOf(events)
-  const [first, retried, ...rest] = askedIn(events).map(event => event.action)
+  const [first, leaving, ...rest] = askedIn(events).map(event => event.action)
 
   expect(first).toEqual({
     kind: 'command',
     command: expect.stringMatching(/^echo KESTREL > \/Library\/Caches\//),
   })
-  expect(retried).toEqual({...first, outsideSandbox: true})
+  expect(leaving).toEqual({...first, outsideSandbox: true})
   expect(rest).toEqual([])
   expect(answersTo(claude)).toEqual([
     expect.objectContaining({behavior: 'allow'}),
@@ -2580,6 +2588,7 @@ it('under Supervised, asks about a connection from inside the Sandbox on a card 
     permissionMode: 'supervised',
     answers: ['allow-once', 'always-allow'],
   })
+
   const [, host] = askedIn(events)
 
   expect(host?.action).toEqual({kind: 'host', host: 'example.com'})
@@ -2598,9 +2607,10 @@ it('under Supervised, shows a refused Read of a hidden folder with no card', asy
     permissionMode: 'supervised',
     answers: ['allow-once'],
   })
-  const [read, bash] = toolCallsOf(events)
 
-  expect(read?.result?.isError).toBe(true)
+  const [refused, bash] = toolCallsOf(events)
+
+  expect(refused?.result?.isError).toBe(true)
   expect(askedIn(events).map(event => event.toolCallId)).toEqual([
     bash?.toolCallId,
   ])

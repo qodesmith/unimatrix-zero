@@ -136,8 +136,8 @@ function AskingCard({
         <CommandText action={action} />
         {action.kind === 'command' && action.outsideSandbox && (
           <p className="text-xs text-muted-foreground">
-            Outside the Sandbox, it could read and change any of your files,
-            use your saved logins and reach the internet.
+            Outside the Sandbox, it could read and change any of your files, use
+            your saved logins and reach the internet.
           </p>
         )}
         {landsOutsideTree(action) && (

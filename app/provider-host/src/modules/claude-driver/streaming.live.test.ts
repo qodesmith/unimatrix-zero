@@ -1450,9 +1450,9 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
         toolCallId: bash?.toolCallId,
         action: {kind: 'command', command: expect.stringContaining('HERON')},
       })
-      expect(card?.type === 'APPROVAL_REQUESTED' && card.action).not.toHaveProperty(
-        'outsideSandbox'
-      )
+      expect(
+        card?.type === 'APPROVAL_REQUESTED' && card.action
+      ).not.toHaveProperty('outsideSandbox')
       expect(bash?.result?.content).toMatch(/^1\s*$/m)
 
       await live.done()
@@ -1464,7 +1464,11 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
   it('[dep:claude-sandbox] under Supervised, a write outside the Tree’s folder fails inside the Sandbox, and its retry outside asks on a card of its own', async () => {
     const live = liveDriver(['left-sandbox.ndjson'])
     const trees = sandboxedTrees()
-    const outside = path.join('/Library/Caches', `uz-sandbox-${crypto.randomUUID()}.txt`)
+
+    const outside = path.join(
+      '/Library/Caches',
+      `uz-sandbox-${crypto.randomUUID()}.txt`
+    )
 
     try {
       const events = await answering(
@@ -1479,6 +1483,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       const asked = approvalsIn(events).flatMap(event =>
         event.type === 'APPROVAL_REQUESTED' ? [event.action] : []
       )
+
       const [inside, retried] = toolCallsIn(events)
 
       expect(asked).toEqual([
@@ -1551,6 +1556,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
       const calls = toolCallsIn(events)
       const [read, other] = calls
+
       const asked = approvalsIn(events).flatMap(event =>
         event.type === 'APPROVAL_REQUESTED' ? [event] : []
       )
@@ -1577,6 +1583,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
   it('[dep:claude-sandbox] the ask rule brings a command’s retry outside the Sandbox to canUseTool past a Bash allow rule, which lets it through silently alone', async () => {
     const trees = sandboxedTrees()
+
     const prompt =
       'Run exactly this command with Bash, with dangerouslyDisableSandbox set to true: `echo PLOVER`. Then reply with only what it printed.'
 
@@ -1608,7 +1615,8 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
             settings: {permissions: {...permissions, ask}},
             allowedTools: ['Bash(echo:*)'],
             canUseTool: async (toolName, input) => {
-              if (toolName === 'Bash') asked.push(input.dangerouslyDisableSandbox)
+              if (toolName === 'Bash')
+                asked.push(input.dangerouslyDisableSandbox)
 
               return {behavior: 'allow', updatedInput: input}
             },

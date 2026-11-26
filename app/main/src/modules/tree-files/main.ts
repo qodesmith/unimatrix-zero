@@ -14,6 +14,7 @@ import {createGit} from './git'
 import {changedFiles, storeExists, takeSnapshot} from './store'
 
 export {withAppSections} from './section'
+
 export {storesFolderOf, treesFolderOf} from './folder'
 
 const {prompts, replies} = schema

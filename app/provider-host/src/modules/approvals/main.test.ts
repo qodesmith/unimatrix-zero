@@ -144,10 +144,7 @@ it('asks to run a granted command outside the Sandbox, and keeps that answer to 
   await expect(reply().ask({action: outside})).resolves.toBe(true)
   void reply(OTHER_TREE).ask({action: COMMAND})
 
-  expect(requested().map(request => request.action)).toEqual([
-    outside,
-    COMMAND,
-  ])
+  expect(requested().map(request => request.action)).toEqual([outside, COMMAND])
 })
 
 it('goes ahead without asking on an edit both in and outside the Tree once each is granted', async () => {
