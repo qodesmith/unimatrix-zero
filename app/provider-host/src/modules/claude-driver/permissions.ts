@@ -43,10 +43,6 @@ function hostOf(url: string | undefined) {
   return url !== undefined && URL.canParse(url) ? new URL(url).hostname : null
 }
 
-/**
- * What a card asks about a tool call `claude` asks for, by Claude Code's tool
- * names.
- */
 export function actionOf(
   toolName: string,
   input: ToolInput,
