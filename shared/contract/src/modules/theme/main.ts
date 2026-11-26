@@ -19,6 +19,7 @@ export const ThemeSetSchema = z.object({
   'accent-foreground': color,
   destructive: color,
   success: color,
+  warning: color,
   border: color,
   input: color,
   ring: color,

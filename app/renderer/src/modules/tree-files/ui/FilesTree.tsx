@@ -82,7 +82,7 @@ export function FilesTree({files, onOpen}: FilesTreeProps) {
         '[--trees-bg-muted-override:var(--sidebar-accent)] [--trees-selected-bg-override:var(--sidebar-accent)] [--trees-selected-fg-override:var(--sidebar-accent-foreground)]',
         '[--trees-accent-override:var(--sidebar-primary)] [--trees-focus-ring-color-override:var(--sidebar-ring)] [--trees-selected-focused-border-color-override:var(--sidebar-ring)]',
         '[--trees-border-color-override:var(--sidebar-border)] [--trees-font-family-override:var(--font)]',
-        '[--trees-git-added-color-override:var(--success)] [--trees-git-deleted-color-override:var(--destructive)] [--trees-git-modified-color-override:var(--primary)]'
+        '[--trees-git-added-color-override:var(--success)] [--trees-git-deleted-color-override:var(--destructive)] [--trees-git-modified-color-override:var(--warning)]'
       )}
     />
   )
