@@ -14,6 +14,11 @@ import {
   SystemPromptTextSchema,
 } from '#modules/system-prompts/main'
 import {TreeToolsSchema} from '#modules/tools/main'
+import {
+  TreeFileDetailsSchema,
+  TreeFileIdSchema,
+  TreeFileSchema,
+} from '#modules/tree-files/main'
 import {TREE_TITLE_MAX_LENGTH, TreeSchema} from '#modules/trees/main'
 import {
   ApprovalAnswerSchema,
@@ -247,6 +252,80 @@ export const SystemPromptDeleteCommand = z.strictObject({
   id: SystemPromptEntryIdSchema,
 })
 
+/**
+ * The Snapshot of the Reply, or the nearest one above it while it has none
+ * yet, with the files the Reply deleted.
+ */
+export const TreeFilesListCommand = z.strictObject({
+  type: z.literal('tree-files.list'),
+  treeId: z.uuid(),
+  replyId: z.uuid(),
+})
+
+export const TreeFilesListResult = z.strictObject({
+  files: z.array(TreeFileSchema),
+  /** The Tree's folder holds this Snapshot: Open and Reveal act on it there. */
+  onDisk: z.boolean(),
+})
+
+/** Every file of the Reply's Snapshot into an empty folder the user picks. */
+export const TreeFilesSaveCopyCommand = z.strictObject({
+  type: z.literal('tree-files.save-copy'),
+  treeId: z.uuid(),
+  replyId: z.uuid(),
+})
+
+export const SavedResult = z.strictObject({
+  /** False when the user canceled the dialog. */
+  saved: z.boolean(),
+})
+
+export const TreeFileDescribeCommand = z.strictObject({
+  type: z.literal('tree-file.describe'),
+  fileId: TreeFileIdSchema,
+})
+
+const TreeFileOpenWithSchema = z.enum([
+  'default-app',
+  'browser',
+  'editor',
+  'quick-look',
+])
+
+export type TreeFileOpenWith = z.infer<typeof TreeFileOpenWithSchema>
+
+/**
+ * In the Tree's folder when `onDisk`, else a read-only copy of this Snapshot's
+ * file. `default-app` is refused for a file `notOpened`, and `browser` for a
+ * program or a file that isn't HTML.
+ */
+export const TreeFileOpenCommand = z.strictObject({
+  type: z.literal('tree-file.open'),
+  fileId: TreeFileIdSchema,
+  with: TreeFileOpenWithSchema,
+})
+
+/** Only when `onDisk`. */
+export const TreeFileRevealCommand = z.strictObject({
+  type: z.literal('tree-file.reveal'),
+  fileId: TreeFileIdSchema,
+})
+
+export const TreeFileSaveCopyCommand = z.strictObject({
+  type: z.literal('tree-file.save-copy'),
+  fileId: TreeFileIdSchema,
+})
+
+/** The OS's thumbnail, on macOS only; null where there is none. */
+export const TreeFileThumbnailCommand = z.strictObject({
+  type: z.literal('tree-file.thumbnail'),
+  fileId: TreeFileIdSchema,
+})
+
+export const TreeFileThumbnailResult = z.strictObject({
+  dataUrl: z.string().startsWith('data:image/').nullable(),
+})
+
 /** `LAYOUT_CHANGED` follows with the whole Layout. */
 export const LayoutUpdateCommand = z.strictObject({
   type: z.literal('layout.update'),
@@ -282,6 +361,13 @@ export const CommandSchema = z.discriminatedUnion('type', [
   SystemPromptDeleteCommand,
   LayoutUpdateCommand,
   SnapshotsDownloadAgainCommand,
+  TreeFilesListCommand,
+  TreeFilesSaveCopyCommand,
+  TreeFileDescribeCommand,
+  TreeFileOpenCommand,
+  TreeFileRevealCommand,
+  TreeFileSaveCopyCommand,
+  TreeFileThumbnailCommand,
 ])
 
 export type Command = z.infer<typeof CommandSchema>
@@ -315,6 +401,13 @@ const resultSchemas = {
   'system-prompt.delete': Done,
   'layout.update': LayoutSchema,
   'snapshots.download-again': Done,
+  'tree-files.list': TreeFilesListResult,
+  'tree-files.save-copy': SavedResult,
+  'tree-file.describe': TreeFileDetailsSchema,
+  'tree-file.open': Done,
+  'tree-file.reveal': Done,
+  'tree-file.save-copy': SavedResult,
+  'tree-file.thumbnail': TreeFileThumbnailResult,
 } as const satisfies Record<CommandType, z.ZodType>
 
 export type CommandResult<T extends CommandType> = z.infer<

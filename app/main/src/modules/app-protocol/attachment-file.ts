@@ -13,8 +13,11 @@ export type OriginalLookup = (id: string) => Original | null
 
 const ATTACHMENT_PATH = /^\/attachments\/([\da-f-]{36})$/u
 
-/** On every response, so nothing served runs as a page (ADR 0014). */
-const LOCKED_DOWN = {
+/**
+ * On every response, so nothing served runs as a page unless its response
+ * replaces this CSP (ADR 0014).
+ */
+export const LOCKED_DOWN = {
   'Content-Security-Policy': 'sandbox',
   'X-Content-Type-Options': 'nosniff',
 }

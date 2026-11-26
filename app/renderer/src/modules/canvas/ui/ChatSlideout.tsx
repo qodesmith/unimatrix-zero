@@ -11,6 +11,7 @@ import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 
 import {atBottom} from '../at-bottom'
 import {useCanvas} from '../canvas-context'
+import {filePreviewOpen} from '../dialog-open'
 import {EMPTY_DRAFT} from '../drafts'
 import {pathTo} from '../tree'
 import {PromptInput} from './PromptInput'
@@ -141,6 +142,13 @@ export function ChatSlideout({
           (details.event.defaultPrevented || inFieldElsewhere(details.event))
         ) {
           details.cancel()
+
+          return
+        }
+
+        if (details.reason === 'escape-key' && filePreviewOpen()) {
+          details.cancel()
+          details.allowPropagation()
 
           return
         }

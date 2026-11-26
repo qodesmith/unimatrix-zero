@@ -1,4 +1,5 @@
 import type {Database} from '#modules/database/main'
+import type {Desktop} from './main'
 import type {AppEvent} from '@uz/contract/events'
 import type {HostCommand} from '@uz/contract/host'
 import type {ProviderId} from '@uz/contract/providers'
@@ -31,10 +32,29 @@ let treeFiles: ReturnType<typeof createTreeFiles>
 let turns: ReturnType<typeof createTurns>
 let treeId: string
 
+function unused(): never {
+  throw new Error('These tests open no file')
+}
+
+const noDesktop: Desktop = {
+  platform: process.platform,
+  editor: () => null,
+  openWithDefaultApp: unused,
+  openInBrowser: unused,
+  openInEditor: unused,
+  quickLook: unused,
+  reveal: unused,
+  pickSaveFile: unused,
+  pickFolder: unused,
+  thumbnail: unused,
+}
+
 function launch() {
   treeFiles = createTreeFiles({
     db,
     userData,
+    tempDir: path.join(userData, '..', 'uz-no-copies'),
+    desktop: noDesktop,
     publish: event => published.push(event),
     onFailure: error => failures.push(error),
     gitProgram: () => gitProgram,

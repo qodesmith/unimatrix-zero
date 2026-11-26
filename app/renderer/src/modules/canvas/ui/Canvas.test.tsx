@@ -11,6 +11,7 @@ import type {Locator} from 'vitest/browser'
 
 import {ConnectionsProvider} from '#modules/connections/main'
 import {SettingsProvider} from '#modules/settings/main'
+import {TreeFilesProvider} from '#modules/tree-files/main'
 import {LiveReplies} from '#modules/turns/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {attachmentUrl} from '@uz/contract/attachments'
@@ -383,8 +384,10 @@ function Providers({children}: {children: ReactNode}) {
       <SettingsProvider>
         <ConnectionsProvider>
           <LiveReplies>
-            <RenderProbe />
-            <div style={{height: '100vh'}}>{children}</div>
+            <TreeFilesProvider>
+              <RenderProbe />
+              <div style={{height: '100vh'}}>{children}</div>
+            </TreeFilesProvider>
           </LiveReplies>
         </ConnectionsProvider>
       </SettingsProvider>

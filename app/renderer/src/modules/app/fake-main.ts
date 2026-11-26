@@ -1,11 +1,17 @@
 import type {Attachment} from '@uz/contract/attachments'
 import type {Bridge} from '@uz/contract/bridge'
-import type {Command, CommandOutcome, CommandType} from '@uz/contract/commands'
+import type {
+  Command,
+  CommandOutcome,
+  CommandResult,
+  CommandType,
+} from '@uz/contract/commands'
 import type {AppEvent} from '@uz/contract/events'
 import type {Layout} from '@uz/contract/layout'
 import type {Model} from '@uz/contract/providers'
 import type {Settings} from '@uz/contract/settings'
 import type {SystemPromptEntry} from '@uz/contract/system-prompts'
+import type {TreeFile, TreeFileDetails} from '@uz/contract/tree-files'
 import type {Tree} from '@uz/contract/trees'
 import type {Prompt, Reply, StreamingReply} from '@uz/contract/turns'
 
@@ -19,6 +25,28 @@ import {PRESETS, defaultEntry} from '@uz/contract/system-prompts'
 import {DEFAULT_TREE_TOOLS} from '@uz/contract/tools'
 
 type AttachmentAdd = Extract<Command, {type: 'attachment.add'}>
+
+type TreeFileCommand = Extract<Command, {type: `tree-file${string}`}>
+
+function isTreeFileCommand(command: Command): command is TreeFileCommand {
+  return command.type.startsWith('tree-file')
+}
+
+/** A Reply's Snapshot as `tree-files.list` gives it. */
+export type FakeSnapshot = CommandResult<'tree-files.list'>
+
+export function treeFile(
+  path: string,
+  fields: Partial<TreeFile> = {}
+): TreeFile {
+  return {
+    id: crypto.randomUUID().replaceAll('-', ''),
+    path,
+    size: 12,
+    change: null,
+    ...fields,
+  }
+}
 
 export const receivedAt = '2026-10-19T12:00:00.000Z'
 
@@ -56,6 +84,10 @@ interface Saved {
   /** The user's own System prompts, after the presets. */
   systemPrompts?: SystemPromptEntry[]
   layout?: Partial<Layout>
+  /** By Reply id; a Reply missing here has no files. */
+  snapshots?: Record<string, FakeSnapshot>
+  /** By file id, over what `tree-file.describe` makes of the listed file. */
+  fileDetails?: Record<string, Partial<TreeFileDetails>>
 }
 
 /** A dropped folder looks like a plain file to the window. */
@@ -129,6 +161,67 @@ export function fakeMain(saved: Saved = {}) {
     return {ok: true, value: change(index, {...found, tools})}
   }
 
+  const snapshots = saved.snapshots ?? {}
+
+  function describe(fileId: string): TreeFileDetails | null {
+    for (const snapshot of Object.values(snapshots)) {
+      const file = snapshot.files.find(one => one.id === fileId)
+
+      if (file) {
+        return {
+          ...file,
+          preview: 'text',
+          tooLarge: false,
+          notOpened: null,
+          link: false,
+          onDisk: snapshot.onDisk && file.change !== 'deleted',
+          editor: null,
+          quickLook: false,
+          fileManager: 'finder',
+          modified: null,
+          ...saved.fileDetails?.[fileId],
+        }
+      }
+    }
+
+    return null
+  }
+
+  function answerTreeFile(
+    command: TreeFileCommand
+  ): CommandOutcome<CommandType> {
+    if (command.type === 'tree-files.list') {
+      return {
+        ok: true,
+        value: snapshots[command.replyId] ?? {files: [], onDisk: true},
+      }
+    }
+
+    if (command.type === 'tree-files.save-copy') {
+      return {ok: true, value: {saved: true}}
+    }
+
+    const details = describe(command.fileId)
+
+    if (!details) {
+      return {ok: false, error: {code: 'not-found', message: 'Gone'}}
+    }
+
+    switch (command.type) {
+      case 'tree-file.describe':
+        return {ok: true, value: details}
+      case 'tree-file.save-copy':
+        return {ok: true, value: {saved: true}}
+      case 'tree-file.thumbnail':
+        return {ok: true, value: {dataUrl: null}}
+      case 'tree-file.open':
+      case 'tree-file.reveal':
+        return {ok: true, value: {}}
+      default:
+        throw new Error('Unknown file command.')
+    }
+  }
+
   function systemPrompts() {
     return {entries: library.map(entry => ({...entry}))}
   }
@@ -186,6 +279,7 @@ export function fakeMain(saved: Saved = {}) {
             | 'tree.set-tools'
         }
       | {type: `system-prompt.${string}`}
+      | TreeFileCommand
     >
   ): CommandOutcome<CommandType> {
     if ('provider' in command) return {ok: true, value: {}}
@@ -325,6 +419,8 @@ export function fakeMain(saved: Saved = {}) {
 
       if (command.type === 'tree.set-tools') return setTools(command)
 
+      if (isTreeFileCommand(command)) return answerTreeFile(command)
+
       if (command.type === 'image.load') {
         return {ok: true, value: {dataUrl: 'data:image/png;base64,'}}
       }
@@ -371,5 +467,5 @@ export function fakeMain(saved: Saved = {}) {
     },
   }
 
-  return {...bridge, sent, trees, replies, layout, publish}
+  return {...bridge, sent, trees, replies, layout, snapshots, publish}
 }

@@ -7,6 +7,7 @@ import type {Locator} from 'vitest/browser'
 
 import {ConnectionsProvider} from '#modules/connections/main'
 import {followColorScheme} from '#modules/theme/main'
+import {TreeFilesProvider} from '#modules/tree-files/main'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {EventSchema} from '@uz/contract/events'
 import {DEFAULT_LAYOUT} from '@uz/contract/layout'
@@ -134,7 +135,9 @@ function Providers({children}: {children: ReactNode}) {
   return (
     <QueryClientProvider client={new QueryClient()}>
       <ConnectionsProvider>
-        <LiveReplies>{children}</LiveReplies>
+        <LiveReplies>
+          <TreeFilesProvider>{children}</TreeFilesProvider>
+        </LiveReplies>
       </ConnectionsProvider>
     </QueryClientProvider>
   )

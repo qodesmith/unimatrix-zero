@@ -8,6 +8,7 @@ import type {Viewport} from '@xyflow/react'
 import type {ReactNode, Ref} from 'react'
 
 import {useSettings, useUpdateSettings} from '#modules/settings/main'
+import {useShowTreeFiles} from '#modules/tree-files/main'
 import {useTurns} from '#modules/turns/main'
 import {Alert, AlertDescription} from '#shadcn/ui/alert'
 import {ReactFlowProvider} from '@xyflow/react'
@@ -19,6 +20,7 @@ import {useChatSlideout} from '../chat-slideout/use-chat-slideout'
 import {useDeletion} from '../deletion'
 import {NO_DRAFTS, reconcileDrafts, withDraft} from '../drafts'
 import {useEscapeStops} from '../escape-stops'
+import {replyInView} from '../reply-in-view'
 import {indexTurns, isEmpty, pathTo, previousReply} from '../tree'
 import {CanvasControls} from './CanvasControls'
 import {ChatSlideout} from './ChatSlideout'
@@ -221,6 +223,7 @@ function TreeCanvas({treeId, systemPromptId, heading, turns}: TreeCanvasProps) {
   )
 
   useEscapeStops({treeId, index, activeReplyId, chatOpen, chatEnd})
+  useShowTreeFiles(treeId, replyInView(chatOpen, chatEnd, activeReplyId))
 
   // A box deleted under the pointer never says the pointer left it.
   const hoveredTurnId =

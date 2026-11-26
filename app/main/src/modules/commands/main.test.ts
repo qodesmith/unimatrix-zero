@@ -103,6 +103,13 @@ beforeEach(() => {
               files: [{path: `${treeId}.md`, change: 'created', size: 1}],
             }))
           : replies,
+      listFiles: async () => null,
+      saveFilesCopy: async () => null,
+      describeFile: async () => null,
+      openFile: async () => false,
+      revealFile: async () => false,
+      saveFileCopy: async () => null,
+      thumbnail: async () => null,
     },
     connections: createConnections({
       db,
@@ -792,6 +799,50 @@ describe('file history', () => {
     })
     expect(downloadsAgain).toBe(1)
   })
+})
+
+describe('the Tree’s files', () => {
+  const fileId = '0'.repeat(32)
+
+  it.each([
+    {type: 'tree-file.describe', fileId},
+    {type: 'tree-file.open', fileId, with: 'default-app'},
+    {type: 'tree-file.reveal', fileId},
+    {type: 'tree-file.save-copy', fileId},
+    {type: 'tree-file.thumbnail', fileId},
+  ] as const)(
+    'answers not-found for $type of a file main never listed',
+    async command => {
+      expect(await send(command)).toMatchObject({
+        ok: false,
+        error: {code: 'not-found'},
+      })
+    }
+  )
+
+  it.each(['tree-files.list', 'tree-files.save-copy'] as const)(
+    'answers not-found for %s of a Tree or a Reply that doesn’t exist',
+    async type => {
+      const tree = await createTree()
+
+      expect(
+        await send({
+          type,
+          treeId: crypto.randomUUID(),
+          replyId: crypto.randomUUID(),
+        })
+      ).toMatchObject({
+        ok: false,
+        error: {code: 'not-found', message: 'That Tree no longer exists.'},
+      })
+      expect(
+        await send({type, treeId: tree.id, replyId: crypto.randomUUID()})
+      ).toMatchObject({
+        ok: false,
+        error: {code: 'not-found', message: 'That Reply no longer exists.'},
+      })
+    }
+  )
 })
 
 describe('connecting a Provider', () => {

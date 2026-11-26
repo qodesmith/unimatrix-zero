@@ -22,6 +22,7 @@
     "./system-prompts": "./src/modules/system-prompts/main.ts",
     "./theme": "./src/modules/theme/main.ts",
     "./tools": "./src/modules/tools/main.ts",
+    "./tree-files": "./src/modules/tree-files/main.ts",
     "./trees": "./src/modules/trees/main.ts",
     "./turns": "./src/modules/turns/main.ts"
   },

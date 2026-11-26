@@ -1,5 +1,6 @@
-import type {ChangedFile} from '@uz/contract/turns'
+import type {ChangedFile, Reply} from '@uz/contract/turns'
 
+import {useOpenTreeFile} from '#modules/tree-files/main'
 import {
   Attachment,
   AttachmentContent,
@@ -7,6 +8,7 @@ import {
   AttachmentGroup,
   AttachmentMedia,
   AttachmentTitle,
+  AttachmentTrigger,
 } from '#shadcn/ui/attachment'
 import {formatSize} from '@uz/contract/sizes'
 import {cn} from 'cn'
@@ -18,7 +20,12 @@ const CHANGES = {
   deleted: {verb: 'Deleted', Icon: FileXIcon},
 }
 
-function ChangedFileChip({file: {path, change, size}}: {file: ChangedFile}) {
+interface ChipProps {
+  file: ChangedFile
+  onOpen: () => void
+}
+
+function ChangedFileChip({file: {path, change, size}, onOpen}: ChipProps) {
   const {verb, Icon} = CHANGES[change]
   const deleted = change === 'deleted'
 
@@ -30,6 +37,7 @@ function ChangedFileChip({file: {path, change, size}}: {file: ChangedFile}) {
       size="xs"
       className={cn('min-w-0', deleted && 'opacity-60')}
     >
+      <AttachmentTrigger aria-label={`Open ${path}`} onClick={onOpen} />
       <AttachmentMedia>
         <Icon />
       </AttachmentMedia>
@@ -45,7 +53,11 @@ function ChangedFileChip({file: {path, change, size}}: {file: ChangedFile}) {
   )
 }
 
-export function ChangedFiles({files}: {files: readonly ChangedFile[]}) {
+/** Each chip opens its file as it was at this Reply. */
+export function ChangedFiles({reply}: {reply: Reply}) {
+  const open = useOpenTreeFile()
+  const {files, treeId, id: replyId} = reply
+
   if (files.length === 0) return null
 
   return (
@@ -55,7 +67,11 @@ export function ChangedFiles({files}: {files: readonly ChangedFile[]}) {
       className="flex-wrap gap-1.5 overflow-visible"
     >
       {files.map(file => (
-        <ChangedFileChip key={file.path} file={file} />
+        <ChangedFileChip
+          key={file.path}
+          file={file}
+          onOpen={() => open({treeId, replyId, path: file.path})}
+        />
       ))}
     </AttachmentGroup>
   )

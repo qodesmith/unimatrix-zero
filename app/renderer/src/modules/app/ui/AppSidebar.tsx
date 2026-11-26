@@ -5,6 +5,7 @@ import {SidebarSections} from '#modules/layout/main'
 import {SettingsPage} from '#modules/settings/main'
 import {SystemPromptsSection} from '#modules/system-prompts/main'
 import {ToolsSection} from '#modules/tools/main'
+import {FilesSection} from '#modules/tree-files/main'
 import {NewTreeButton, TreeList} from '#modules/trees/main'
 import {Alert, AlertDescription} from '#shadcn/ui/alert'
 import {Sheet, SheetContent, SheetTrigger} from '#shadcn/ui/sheet'
@@ -44,7 +45,7 @@ export function AppSidebar({trees, connections}: AppSidebarProps) {
               />
             ),
           }}
-          files={{title: 'Files'}}
+          files={{title: 'Files', children: <FilesSection />}}
           usage={{title: 'Usage'}}
         />
         {trees.error && (
