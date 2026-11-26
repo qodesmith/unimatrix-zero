@@ -73,7 +73,7 @@ it('does not go ahead once denied', async () => {
   await expect(asked).resolves.toBe(false)
 })
 
-it('asks once allowed only once', async () => {
+it('asks again for an action allowed once', async () => {
   const {approvals, reply, requested} = setUp()
   const replying = reply()
 
