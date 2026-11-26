@@ -2298,7 +2298,6 @@ it('runs claude under Supervised inside the Sandbox: it writes only in the Treeâ
         path.join(home, '.cargo', 'registry'),
         path.join(home, '.cargo', 'git'),
         path.join(home, 'Library', 'Caches'),
-        path.join(home, '.cache'),
       ],
       denyRead: [
         '/app/trees',

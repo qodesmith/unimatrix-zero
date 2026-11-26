@@ -1835,7 +1835,6 @@ it('starts, resumes and forks every thread under Supervised in the Tree’s fold
               [path.join(home, '.cargo', 'registry')]: 'write',
               [path.join(home, '.cargo', 'git')]: 'write',
               [path.join(home, 'Library', 'Caches')]: 'write',
-              [path.join(home, '.cache')]: 'write',
             },
           },
         },
