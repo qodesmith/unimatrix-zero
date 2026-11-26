@@ -35,8 +35,8 @@ export type Restored = Omit<Opened, 'replay' | 'rebuilt'>
 /**
  * Supervised asks before every command and edit, and the app answers the
  * asking (ADR 0022). Its Sandbox is the profile in the thread's `config`: a
- * `sandbox` here would replace the profile. Where no Sandbox runs, the asking
- * stays (ADR 0018).
+ * `sandbox` here would replace the profile. Where the profile can't run yet,
+ * `workspace-write` holds instead (ADR 0018).
  */
 function threadAccessOf(request: ReplyRequest, platform: NodeJS.Platform) {
   if (request.permissionMode === 'full-access') {
@@ -45,7 +45,28 @@ function threadAccessOf(request: ReplyRequest, platform: NodeJS.Platform) {
 
   return isSandboxed(request, platform)
     ? ({approvalPolicy: 'untrusted'} as const)
-    : ({sandbox: 'danger-full-access', approvalPolicy: 'untrusted'} as const)
+    : ({sandbox: 'workspace-write', approvalPolicy: 'untrusted'} as const)
+}
+
+function turnSandboxOf(
+  request: ReplyRequest,
+  platform: NodeJS.Platform
+): Pick<ParamsOf<'turn/start'>, 'sandboxPolicy'> {
+  if (request.permissionMode === 'full-access') {
+    return {sandboxPolicy: {type: 'dangerFullAccess'}}
+  }
+
+  return isSandboxed(request, platform)
+    ? {}
+    : {
+        sandboxPolicy: {
+          type: 'workspaceWrite',
+          writableRoots: [request.treeFolder],
+          networkAccess: false,
+          excludeTmpdirEnvVar: false,
+          excludeSlashTmp: false,
+        },
+      }
 }
 
 /**
@@ -57,9 +78,7 @@ export function turnAccessOf(request: ReplyRequest, platform: NodeJS.Platform) {
   return {
     cwd: request.treeFolder,
     approvalPolicy: threadAccessOf(request, platform).approvalPolicy,
-    ...(isSandboxed(request, platform)
-      ? {}
-      : {sandboxPolicy: {type: 'dangerFullAccess'}}),
+    ...turnSandboxOf(request, platform),
   } satisfies Omit<ParamsOf<'turn/start'>, 'threadId' | 'input'>
 }
 

@@ -702,7 +702,6 @@ it('forks the Provider session through a mid-Thread Reply into a new thread with
 
   const [report] = codex.reports()
 
-  expect(report?.methods).not.toContain('thread/resume')
   expect(report?.forkedThrough).toBe(FIRST_TURN)
   expect(report?.threadConfigs).toEqual([
     {model_auto_compact_token_limit: 30_000, ...DEFAULT_TOOLS_OFF},
@@ -1847,25 +1846,41 @@ it('starts, resumes and forks every thread under Supervised in the Tree’s fold
   )
 })
 
-it('where the Sandbox can’t run, starts a Supervised thread and its turns with full access that still asks, on no permission profile', async () => {
+it('where the Sandbox can’t run, starts a Supervised thread in workspace-write that asks before anything that isn’t trusted, on no permission profile, its turns writing only in the Tree’s folder with the network off, and a later turn under full access goes back to it', async () => {
   const codex = await setUp(['started.ndjson'], {platform: 'linux'})
 
-  await codex.reply(FIRST_PROMPT, null, {permissionMode: 'supervised'})
+  const first = await codex.reply(FIRST_PROMPT, null, {
+    permissionMode: 'supervised',
+  })
+
+  await codex.reply(SECOND_PROMPT, recordedIn(first))
   const [report] = codex.reports()
 
   expect(report?.threadAccess).toEqual([
     {
       cwd: codex.treeFolder,
-      sandbox: 'danger-full-access',
+      sandbox: 'workspace-write',
       approvalPolicy: 'untrusted',
     },
   ])
   expect(report?.threadConfigs).toStrictEqual([DEFAULT_TOOLS_OFF])
+  expect(report?.methods).not.toContain('thread/resume')
   expect(report?.turnAccess).toEqual([
     {
       cwd: codex.treeFolder,
-      sandboxPolicy: {type: 'dangerFullAccess'},
+      sandboxPolicy: {
+        type: 'workspaceWrite',
+        writableRoots: [codex.treeFolder],
+        networkAccess: false,
+        excludeTmpdirEnvVar: false,
+        excludeSlashTmp: false,
+      },
       approvalPolicy: 'untrusted',
+    },
+    {
+      cwd: codex.treeFolder,
+      sandboxPolicy: {type: 'dangerFullAccess'},
+      approvalPolicy: 'never',
     },
   ])
 })
