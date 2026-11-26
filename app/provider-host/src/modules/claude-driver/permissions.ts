@@ -141,8 +141,8 @@ export function actionOf(
 }
 
 /**
- * A Subagent's call is never shown, so its card sits at none. Nor does the
- * Sandbox's network prompt: its id names no tool call.
+ * A Subagent's call is never shown, and the id of the Sandbox's network prompt
+ * names no tool call, so neither card sits at one.
  */
 function placeOf(toolName: string, toolUseID: string, agentID?: string) {
   if (agentID) return {subagentId: agentID}
