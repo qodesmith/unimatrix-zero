@@ -39,9 +39,9 @@ function programRefusal(how: TreeFileOpenWith, program: boolean) {
 function refusal(desktop: Desktop, how: TreeFileOpenWith, openable: Openable) {
   if (openable.link) return LINK_REFUSED
 
-  const program = programRefusal(how, openable.notOpened === 'program')
+  const asProgram = programRefusal(how, openable.notOpened === 'program')
 
-  if (program) return program
+  if (asProgram) return asProgram
 
   if (how === 'default-app' && openable.notOpened !== null) {
     return NOT_A_DOCUMENT_REFUSED
@@ -76,9 +76,9 @@ export async function openWith(
 
   const {file, executable} = await openable.locate()
 
-  const program = programRefusal(how, executable)
+  const asProgram = programRefusal(how, executable)
 
-  if (program) throw new Error(program)
+  if (asProgram) throw new Error(asProgram)
 
   switch (how) {
     case 'default-app':

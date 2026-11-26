@@ -15,7 +15,7 @@ function fakeSession() {
   }
 }
 
-it('proxies everything but loopback to a closed loopback port', () => {
+it('hands the session a proxy on a closed loopback port', () => {
   const session = fakeSession()
 
   hardenSession(fromPartial<Session>(session), [])
