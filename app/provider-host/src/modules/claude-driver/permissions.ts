@@ -245,17 +245,24 @@ type ReadFolders = SandboxFolders & {configDir: string}
  * `claude` saves a tool's output too large to give inline under
  * `<configDir>/projects/<key of its folder>/<session>/tool-results/`, then
  * tells the Model to Read it there. Other Trees' sessions sit under other keys.
+ * The key follows the folder's spelling as given, which on Windows may hold a
+ * short name like `RUNNER~1`, or its letter case on disk.
  */
 function isSavedOutput({configDir, treeFolder}: ReadFolders, file: string) {
-  const key = projectKeyOf(realPath(treeFolder))
+  const keys = new Set([
+    projectKeyOf(treeFolder),
+    projectKeyOf(realPath(treeFolder)),
+  ])
 
-  const [, folder] =
-    namesBelow(
-      path.join(configDir, 'projects', key),
-      path.resolve(treeFolder, file)
-    ) ?? []
+  return [...keys].some(key => {
+    const [, folder] =
+      namesBelow(
+        path.join(configDir, 'projects', key),
+        path.resolve(treeFolder, file)
+      ) ?? []
 
-  return folder === 'tool-results'
+    return folder === 'tool-results'
+  })
 }
 
 function hiddenRefusal(
