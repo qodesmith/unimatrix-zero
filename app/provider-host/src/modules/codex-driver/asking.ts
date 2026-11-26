@@ -71,9 +71,8 @@ export function createTurnAsking({
   const mcpCalls = new Map<string, {server: string; tool: string}>()
   const waiting = new Map<ApprovalRequest['id'], AbortController>()
 
-  const cards = approvals.forReply(
-    {treeId: request.treeId, replyId: request.replyId, grants: request.grants},
-    event => push({method: 'shown', event})
+  const cards = approvals.forReply(request, event =>
+    push({method: 'shown', event})
   )
 
   const untake =

@@ -229,12 +229,8 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     let heard = false
     let unstoppable: (() => void) | null = null
     const feed = createApprovalFeed()
-    const {treeId, replyId, grants} = request
 
-    session.asking.current = deps.approvals.forReply(
-      {treeId, replyId, grants},
-      feed.emit
-    )
+    session.asking.current = deps.approvals.forReply(request, feed.emit)
 
     try {
       const first = await firstHeard(messages, run, deps.whenSilent)

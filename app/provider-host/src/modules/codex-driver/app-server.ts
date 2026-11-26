@@ -54,13 +54,13 @@ interface Pending {
 
 type RequestId = ApprovalRequest['id']
 
-type ApprovalAnswer = ReturnType<typeof approvalAnswer>
+type ApprovalResult = ReturnType<typeof approvalAnswer>
 
 type Outgoing =
   | {id: number; method: Method; params: unknown}
   | {method: 'initialized'}
   | {id: RequestId; error: {code: number; message: string}}
-  | {id: RequestId; result: ApprovalAnswer}
+  | {id: RequestId; result: ApprovalResult}
 
 /** True when it takes the request, and so answers it with `respond`. */
 type ApprovalListener = (request: ApprovalRequest) => boolean
@@ -74,7 +74,7 @@ export interface AppServer {
   listen(listener: (notification: Notification) => void): () => void
   /** A request no listener takes is refused. */
   takeApprovals(listener: ApprovalListener): () => void
-  respond(id: RequestId, result: ApprovalAnswer): void
+  respond(id: RequestId, result: ApprovalResult): void
   readonly exited: Promise<void>
   readonly hasExited: boolean
   close(): Promise<void>
