@@ -2306,7 +2306,7 @@ it('runs claude under Supervised inside the Sandbox: it writes only in the Treeâ
   })
   expect(options?.settings).toMatchObject({
     permissions: {
-      deny: expect.arrayContaining([
+      deny: [
         `Read(/${path.join(home, '.ssh')}/**)`,
         `Read(/${path.join(home, '.aws')}/**)`,
         `Read(/${path.join(home, '.config', 'gh')}/**)`,
@@ -2315,7 +2315,7 @@ it('runs claude under Supervised inside the Sandbox: it writes only in the Treeâ
         `Read(/${path.join(home, 'Library', 'Keychains')}/**)`,
         'Read(//app/providers/**)',
         'Read(//app/tree-stores/**)',
-      ]),
+      ],
       ask: ['Bash(dangerouslyDisableSandbox:true)'],
     },
     autoMemoryEnabled: false,

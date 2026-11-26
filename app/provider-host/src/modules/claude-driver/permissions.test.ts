@@ -21,6 +21,17 @@ function treeFolder() {
   return folder
 }
 
+/** Laid out as the app's `trees` folder: this Tree's and another's. */
+function trees() {
+  const treesFolder = treeFolder()
+  const tree = path.join(treesFolder, 'one')
+  const other = path.join(treesFolder, 'two')
+  fs.mkdirSync(tree)
+  fs.mkdirSync(other)
+
+  return {folders: {treeFolder: tree, treesFolder}, treesFolder, tree, other}
+}
+
 it('asks about an edit in the Tree’s files by its full path, a relative one too, and one through the real path of the folder', () => {
   const tree = treeFolder()
   const real = fs.realpathSync(tree)
@@ -104,12 +115,8 @@ it('asks about the retry of a command outside the Sandbox as that form alone, an
 })
 
 it('refuses a Read, a Glob and a Grep of another Tree’s files, by a relative path and a Glob pattern too, and lets through one of this Tree’s files or outside every Tree', () => {
-  const treesFolder = treeFolder()
-  const tree = path.join(treesFolder, 'one')
-  const other = path.join(treesFolder, 'two')
-  fs.mkdirSync(tree)
-  fs.mkdirSync(other)
-  const folders = {treeFolder: tree, treesFolder}
+  const {folders, tree, other} = trees()
+  const beside = treeFolder()
 
   function decided(toolName: string, input: Record<string, string>) {
     return readDecision(toolName, input, folders).permissionDecision
@@ -121,9 +128,8 @@ it('refuses a Read, a Glob and a Grep of another Tree’s files, by a relative p
     decided('Read', {file_path: path.join(fs.realpathSync(other), 'a.txt')}),
     decided('Glob', {pattern: '*.txt', path: other}),
     decided('Glob', {pattern: path.join(other, '**')}),
-    decided('Glob', {pattern: path.join('..', '**')}),
-    decided('Grep', {pattern: 'PLOVER', path: treesFolder}),
-  ]).toEqual(Array.from({length: 7}, () => 'deny'))
+    decided('Glob', {pattern: path.join('*', '..', '..', 'two', '**')}),
+  ]).toEqual(Array.from({length: 6}, () => 'deny'))
 
   expect([
     decided('Read', {file_path: path.join(tree, 'notes.txt')}),
@@ -131,6 +137,40 @@ it('refuses a Read, a Glob and a Grep of another Tree’s files, by a relative p
     decided('Read', {file_path: path.join(os.homedir(), '.zshrc')}),
     decided('Glob', {pattern: '**/*.txt'}),
     decided('Glob', {pattern: '*.txt', path: tree}),
+    decided('Glob', {pattern: path.join(tree, 'src', '{a,b}', '*.ts')}),
+    decided('Glob', {pattern: '*.txt', path: beside}),
     decided('Grep', {pattern: '../two'}),
-  ]).toEqual(Array.from({length: 6}, () => 'allow'))
+    decided('Grep', {pattern: 'PLOVER', path: beside}),
+  ]).toEqual(Array.from({length: 9}, () => 'allow'))
+})
+
+it('refuses a Glob and a Grep that start at or above the folder of every Tree, by a pattern with a wildcard above it too, and tells the Model to search a narrower folder', () => {
+  const {folders, treesFolder} = trees()
+  const above = path.dirname(treesFolder)
+  const {root} = path.parse(treesFolder)
+
+  expect([
+    readDecision('Grep', {pattern: 'PLOVER', path: treesFolder}, folders),
+    readDecision('Grep', {pattern: 'PLOVER', path: above}, folders),
+    readDecision('Grep', {pattern: 'PLOVER', path: root}, folders),
+    readDecision('Glob', {pattern: '**/secret.txt', path: above}, folders),
+    readDecision('Glob', {pattern: '**', path: root}, folders),
+    readDecision('Glob', {pattern: path.join('..', '**')}, folders),
+    readDecision('Glob', {pattern: path.join('..', '..', '*')}, folders),
+    readDecision(
+      'Glob',
+      {pattern: path.join(above, 'uz-tr*', '**', 'secret.txt')},
+      folders
+    ),
+    readDecision(
+      'Glob',
+      {pattern: path.join(above, `{${path.basename(treesFolder)},x}`, '**')},
+      folders
+    ),
+  ]).toEqual(
+    Array.from({length: 9}, () => ({
+      permissionDecision: 'deny',
+      permissionDecisionReason: expect.stringContaining('narrower folder'),
+    }))
+  )
 })

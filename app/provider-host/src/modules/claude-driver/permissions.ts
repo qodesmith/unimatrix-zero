@@ -13,7 +13,11 @@ import {
   hasSandbox,
   packageCaches,
 } from '#modules/sandbox/main'
-import {isInAnotherTree, isInTreeFolder} from '#modules/tree-folder/main'
+import {
+  holdsEveryTree,
+  isInAnotherTree,
+  isInTreeFolder,
+} from '#modules/tree-folder/main'
 import os from 'node:os'
 import path from 'node:path'
 import {z} from 'zod'
@@ -29,6 +33,9 @@ const READS = 'Read|Glob|Grep'
 const DENIED = 'The user denied this.'
 
 const ANOTHER_TREE = 'This path is in a folder that can’t be read from here.'
+
+const ABOVE_THE_TREES =
+  'This search covers folders that can’t be read from here. Search a narrower folder.'
 
 /** What a card needs of a tool call's input; anything else is left out. */
 const ToolInputSchema = z.object({
@@ -154,6 +161,49 @@ function readTargets(toolName: string, input: ToolInput, treeFolder: string) {
   return [filePath, folder, ...globbed].filter(target => target !== undefined)
 }
 
+const GLOB_CHARACTER = /[*?[{]/u
+
+/** The deepest folder that holds every file `pattern` can match. */
+function globRoot(searched: string, pattern: string) {
+  const wildcardAt = pattern.search(GLOB_CHARACTER)
+
+  return wildcardAt === -1
+    ? path.resolve(searched, pattern)
+    : path.dirname(path.resolve(searched, `${pattern.slice(0, wildcardAt)}_`))
+}
+
+/** The folders a Glob or a Grep walks down from; a Read walks none. */
+function searchRoots(toolName: string, input: ToolInput, treeFolder: string) {
+  const {path: folder, pattern} = input
+  const searched = path.resolve(treeFolder, folder ?? '.')
+
+  if (toolName === 'Grep') return [searched]
+
+  return toolName === 'Glob' && pattern ? [globRoot(searched, pattern)] : []
+}
+
+function refusal(
+  toolName: string,
+  input: ToolInput,
+  folders: Pick<ReplyRequest, 'treeFolder' | 'treesFolder'>
+) {
+  const {treeFolder} = folders
+
+  if (
+    searchRoots(toolName, input, treeFolder).some(root =>
+      holdsEveryTree(folders, root)
+    )
+  ) {
+    return ABOVE_THE_TREES
+  }
+
+  return readTargets(toolName, input, treeFolder).some(target =>
+    isInAnotherTree(folders, target)
+  )
+    ? ANOTHER_TREE
+    : null
+}
+
 /**
  * The Sandbox hides other Trees from commands only, and a Read deny rule for
  * their folder would hide this Tree's own, so the hook refuses them
@@ -167,11 +217,11 @@ export function readDecision(
   PreToolUseHookSpecificOutput,
   'permissionDecision' | 'permissionDecisionReason'
 > {
-  return readTargets(toolName, input, folders.treeFolder).some(target =>
-    isInAnotherTree(folders, target)
-  )
-    ? {permissionDecision: 'deny', permissionDecisionReason: ANOTHER_TREE}
-    : {permissionDecision: 'allow'}
+  const reason = refusal(toolName, input, folders)
+
+  return reason === null
+    ? {permissionDecision: 'allow'}
+    : {permissionDecision: 'deny', permissionDecisionReason: reason}
 }
 
 /** Full access asks nothing; Supervised asks the user through `asking`. */

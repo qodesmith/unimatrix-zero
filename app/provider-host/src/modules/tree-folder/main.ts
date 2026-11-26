@@ -48,3 +48,14 @@ export function isInAnotherTree(
     isAtOrUnder(treesFolder, absolute) && !isAtOrUnder(treeFolder, absolute)
   )
 }
+
+/**
+ * Whether a search that starts at `folder` would reach other Trees' files:
+ * `folder` is the one that holds every Tree's files, or one above it.
+ */
+export function holdsEveryTree(
+  {treeFolder, treesFolder}: {treeFolder: string; treesFolder: string},
+  folder: string
+) {
+  return isAtOrUnder(path.resolve(treeFolder, folder), treesFolder)
+}

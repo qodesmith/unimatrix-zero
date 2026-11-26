@@ -142,7 +142,7 @@ it('asks to run a granted command outside the Sandbox, and keeps that answer to 
   await asked
 
   await expect(reply().ask({action: outside})).resolves.toBe(true)
-  void reply(OTHER_TREE).ask({action: COMMAND})
+  void reply().ask({action: COMMAND})
 
   expect(requested().map(request => request.action)).toEqual([outside, COMMAND])
 })
