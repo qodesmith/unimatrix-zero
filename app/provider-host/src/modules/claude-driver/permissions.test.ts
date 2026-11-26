@@ -1,13 +1,15 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import {afterEach, expect, it} from 'vitest'
+import {afterEach, expect, it, vi} from 'vitest'
 
 import {actionOf, readDecision} from './permissions'
 
 const made: string[] = []
 
 afterEach(() => {
+  vi.restoreAllMocks()
+
   for (const folder of made.splice(0)) {
     fs.rmSync(folder, {recursive: true, force: true})
   }
@@ -21,7 +23,6 @@ function treeFolder() {
   return folder
 }
 
-/** Laid out as the app's `trees` folder: this Tree's and another's. */
 function trees() {
   const treesFolder = treeFolder()
   const tree = path.join(treesFolder, 'one')
@@ -61,6 +62,25 @@ it('asks about an edit outside the Tree’s files as one other Branches will see
   expect(
     actionOf('Edit', {file_path: path.join(tree, '..', 'x.txt')}, tree)
   ).toMatchObject({inTreeFiles: false})
+})
+
+it('asks about an edit by a `~` path, or one with a space before it, as the file `claude` would write', () => {
+  const tree = treeFolder()
+  const home = treeFolder()
+  vi.spyOn(os, 'homedir').mockReturnValue(home)
+
+  expect(actionOf('Write', {file_path: '~/.zshrc'}, tree)).toEqual({
+    kind: 'edit',
+    paths: [path.join(home, '.zshrc')],
+    inTreeFiles: false,
+  })
+  expect(
+    actionOf('NotebookEdit', {notebook_path: ` ${home}/a.ipynb`}, tree)
+  ).toEqual({
+    kind: 'edit',
+    paths: [path.join(home, 'a.ipynb')],
+    inTreeFiles: false,
+  })
 })
 
 it('asks about a command, a host, an MCP tool and any other tool by what each names', () => {
@@ -167,6 +187,25 @@ it.runIf(fs.existsSync(os.tmpdir().toUpperCase()))(
     ]).toEqual(['deny', 'deny', 'deny'])
   }
 )
+
+it('refuses a Read, a Glob and a Grep that reach another Tree through a `~` path or a path with a space before it', () => {
+  const {folders, treesFolder, other} = trees()
+  vi.spyOn(os, 'homedir').mockReturnValue(path.dirname(treesFolder))
+  const fromHome = `~/${path.basename(treesFolder)}/two`
+
+  function decided(toolName: string, input: Record<string, string>) {
+    return readDecision(toolName, input, folders).permissionDecision
+  }
+
+  expect([
+    decided('Read', {file_path: `${fromHome}/secret.txt`}),
+    decided('Glob', {pattern: '*.txt', path: fromHome}),
+    decided('Grep', {pattern: 'PLOVER', path: fromHome}),
+    decided('Grep', {pattern: 'PLOVER', path: '~'}),
+    decided('Read', {file_path: ` ${path.join(other, 'secret.txt')}`}),
+    decided('Grep', {pattern: 'PLOVER', path: ` ${treesFolder}`}),
+  ]).toEqual(Array.from({length: 6}, () => 'deny'))
+})
 
 it('refuses a Glob and a Grep that start at or above the folder of every Tree, by a pattern with a wildcard above it too, and tells the Model to search a narrower folder', () => {
   const {folders, treesFolder} = trees()

@@ -69,7 +69,7 @@ function setUp(grants: ApprovalGrant[] = []) {
 
   return {
     responses,
-    /** Codex asks before a command; resolves to the request's id. */
+    /** Codex asks before a command; returns the request's id. */
     command(params: Partial<CommandParams>) {
       nextId += 1
 

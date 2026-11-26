@@ -581,7 +581,6 @@ function approvalReplies(
   return {reply, closed, driver, vendorProgram}
 }
 
-/** Laid out as the app's `trees` folder: this Tree's and another's. */
 function sandboxedTrees() {
   const root = newTreeFolder()
   const tree = path.join(root, 'one')

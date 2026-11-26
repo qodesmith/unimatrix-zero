@@ -59,6 +59,31 @@ const MCP_TOOL = /^mcp__(.+?)__(.+)$/
 /** `claude`'s prompt when a command inside the Sandbox opens a connection. */
 const SANDBOX_NETWORK = 'SandboxNetworkAccess'
 
+/**
+ * `claude` trims a path, then reads `~` as the home folder, before it
+ * resolves it.
+ */
+function asClaudeReads(given: string) {
+  const trimmed = given.trim()
+
+  if (trimmed === '~') return os.homedir()
+
+  return trimmed.startsWith('~/')
+    ? path.join(os.homedir(), trimmed.slice(2))
+    : trimmed
+}
+
+function withPathsRead(input: ToolInput): ToolInput {
+  const {file_path: filePath, path: folder, notebook_path: notebookPath} = input
+
+  return {
+    ...input,
+    file_path: filePath && asClaudeReads(filePath),
+    path: folder && asClaudeReads(folder),
+    notebook_path: notebookPath && asClaudeReads(notebookPath),
+  }
+}
+
 function editOf(filePath: string, treeFolder: string): ApprovalAction {
   const absolute = path.resolve(treeFolder, filePath)
 
@@ -81,9 +106,10 @@ function hostIn(toolName: string, input: ToolInput) {
 
 export function actionOf(
   toolName: string,
-  input: ToolInput,
+  given: ToolInput,
   treeFolder: string
 ): ApprovalAction {
+  const input = withPathsRead(given)
   const {file_path: filePath, notebook_path: notebookPath, command} = input
   const host = hostIn(toolName, input)
   const [, server, tool] = MCP_TOOL.exec(toolName) ?? []
@@ -217,7 +243,7 @@ export function readDecision(
   PreToolUseHookSpecificOutput,
   'permissionDecision' | 'permissionDecisionReason'
 > {
-  const reason = refusal(toolName, input, folders)
+  const reason = refusal(toolName, withPathsRead(input), folders)
 
   return reason === null
     ? {permissionDecision: 'allow'}

@@ -375,7 +375,6 @@ function readIn(tree: string, name: string) {
   return fs.readFileSync(path.join(tree, name), 'utf8').trim()
 }
 
-/** Laid out as the app's `trees` folder: this Tree's and another's. */
 function sandboxedTrees() {
   const root = newTreeFolder()
   const tree = path.join(root, 'one')
