@@ -1598,6 +1598,63 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     }
   }, 300_000)
 
+  it('[dep:claude-sandbox] under Supervised, the Model Reads with no card the whole output of a command that claude saved in its hidden config folder, past the part it gave inline', async () => {
+    const live = liveDriver([])
+    const trees = sandboxedTrees()
+
+    const prompt =
+      'Run exactly this command with Bash, once: `seq 1 300000`. Its output is too long to show, and the result names the file that holds all of it: read that file with your Read tool, with offset 299990 and limit 20, then reply with only the last line it holds.'
+
+    try {
+      const events = await answering(
+        live.driver,
+        inSandbox(live, prompt, trees),
+        []
+      )
+
+      expect(events.at(-1)).toMatchObject({status: 'complete'})
+
+      const [bash, ...reads] = toolCallsIn(events)
+      const content = bash?.result?.content ?? ''
+      const [, saved] = /Full output saved to: (.+)$/m.exec(content) ?? []
+
+      const read = z.object({file_path: z.string()})
+      const results = reads.map(call => call.result)
+
+      const readPaths = reads.map(
+        call => read.parse(JSON.parse(call.args)).file_path
+      )
+
+      expect(bash?.toolName).toBe('Bash')
+      expect(content).not.toMatch(/\b299999\b/)
+      expect(path.relative(configDir, saved ?? '').split(path.sep)).toEqual([
+        'projects',
+        projectKeyOf(trees.tree),
+        expect.any(String),
+        'tool-results',
+        expect.any(String),
+      ])
+
+      expect(reads.map(call => call.toolName)).toEqual(reads.map(() => 'Read'))
+      expect(readPaths).toEqual(reads.map(() => saved))
+      expect(results).not.toContainEqual(
+        expect.objectContaining({
+          content: expect.stringMatching(/denied|can’t be read/),
+        })
+      )
+      expect(results).toContainEqual({
+        isError: false,
+        content: expect.stringMatching(/\b299999\b/),
+      })
+      // `claude` runs `seq` with no card, as it reads alone.
+      expect(approvalsIn(events)).toEqual([])
+
+      await live.done()
+    } finally {
+      fs.rmSync(trees.root, {recursive: true, force: true})
+    }
+  }, 300_000)
+
   it('[dep:claude-sandbox] the ask rule brings a command’s retry outside the Sandbox to canUseTool past a Bash allow rule, which lets it through silently alone', async () => {
     const trees = sandboxedTrees()
 

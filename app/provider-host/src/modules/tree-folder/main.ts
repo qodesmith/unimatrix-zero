@@ -6,7 +6,7 @@ import path from 'node:path'
  * Only `native` returns the letter case on disk: Node's own keeps the case
  * it was given.
  */
-function realPath(target: string): string {
+export function realPath(target: string): string {
   try {
     return fs.realpathSync.native(target)
   } catch {
@@ -18,10 +18,16 @@ function realPath(target: string): string {
   }
 }
 
-function isAtOrUnder(folder: string, file: string) {
+/** The names from `folder` down to `file`, or null when `file` is outside it. */
+export function namesBelow(folder: string, file: string) {
   const relative = path.relative(realPath(folder), realPath(file))
+  const names = relative === '' ? [] : relative.split(path.sep)
 
-  return relative.split(path.sep)[0] !== '..' && !path.isAbsolute(relative)
+  return names[0] === '..' || path.isAbsolute(relative) ? null : names
+}
+
+export function isAtOrUnder(folder: string, file: string) {
+  return namesBelow(folder, file) !== null
 }
 
 /**
@@ -53,6 +59,19 @@ export function isInAnotherTree(
 }
 
 /**
+ * Whether `file`, read from the Tree's folder, is in one of the app's hidden
+ * folders.
+ */
+export function isHidden(
+  {treeFolder, hiddenFolders}: {treeFolder: string; hiddenFolders: string[]},
+  file: string
+) {
+  const absolute = path.resolve(treeFolder, file)
+
+  return hiddenFolders.some(folder => isAtOrUnder(folder, absolute))
+}
+
+/**
  * Whether `file`, read from the Tree's folder, is one the AI may never change:
  * another Tree's, or in one of the app's hidden folders.
  */
@@ -60,12 +79,7 @@ export function isOffLimits(
   folders: {treeFolder: string; treesFolder: string; hiddenFolders: string[]},
   file: string
 ) {
-  const absolute = path.resolve(folders.treeFolder, file)
-
-  return (
-    isInAnotherTree(folders, absolute) ||
-    folders.hiddenFolders.some(folder => isAtOrUnder(folder, absolute))
-  )
+  return isInAnotherTree(folders, file) || isHidden(folders, file)
 }
 
 /**
@@ -77,4 +91,14 @@ export function holdsEveryTree(
   folder: string
 ) {
   return isAtOrUnder(path.resolve(treeFolder, folder), treesFolder)
+}
+
+/** Whether a search that starts at `folder` would walk into a hidden folder. */
+export function holdsHiddenFolder(
+  {treeFolder, hiddenFolders}: {treeFolder: string; hiddenFolders: string[]},
+  folder: string
+) {
+  const searched = path.resolve(treeFolder, folder)
+
+  return hiddenFolders.some(hidden => isAtOrUnder(searched, hidden))
 }

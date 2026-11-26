@@ -2270,13 +2270,13 @@ it('runs claude under Supervised in its default mode, with no full access, askin
   expect(report?.args).not.toContain('--allow-dangerously-skip-permissions')
 })
 
-it('runs claude under Supervised inside the Sandbox: it writes only in the Tree’s folder, temp and the package caches, reads no credentials, other Tree or app folder, reaches no host, and asks before every command and before leaving the Sandbox', async () => {
+it('runs claude under Supervised inside the Sandbox: it writes only in the Tree’s folder, temp and the package caches, reads no credentials, other Tree or app folder, reaches no host, and asks before every command and before leaving the Sandbox, while the Read tool’s deny rules leave out claude’s config folder', async () => {
   const claude = await setUp(['read-outside.ndjson'])
   const home = os.homedir()
 
   await claude.reply('Read the file outside.', null, {
     permissionMode: 'supervised',
-    hiddenFolders: ['/app/providers', '/app/tree-stores'],
+    hiddenFolders: [claude.configDir, '/app/tree-stores', '/app/data'],
     treesFolder: '/app/trees',
   })
   const [options] = claude.queried
@@ -2307,8 +2307,9 @@ it('runs claude under Supervised inside the Sandbox: it writes only in the Tree�
         path.join(home, '.kube'),
         path.join(home, '.gnupg'),
         path.join(home, 'Library', 'Keychains'),
-        '/app/providers',
+        claude.configDir,
         '/app/tree-stores',
+        '/app/data',
       ],
       allowRead: [claude.treeFolder],
     },
@@ -2322,8 +2323,8 @@ it('runs claude under Supervised inside the Sandbox: it writes only in the Tree�
         `Read(/${path.join(home, '.kube')}/**)`,
         `Read(/${path.join(home, '.gnupg')}/**)`,
         `Read(/${path.join(home, 'Library', 'Keychains')}/**)`,
-        'Read(//app/providers/**)',
         'Read(//app/tree-stores/**)',
+        'Read(//app/data/**)',
       ],
       ask: ['Bash(dangerouslyDisableSandbox:true)'],
     },

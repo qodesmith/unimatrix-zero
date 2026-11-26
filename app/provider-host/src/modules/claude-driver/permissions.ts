@@ -16,13 +16,20 @@ import {
 } from '#modules/sandbox/main'
 import {
   holdsEveryTree,
+  holdsHiddenFolder,
+  isAtOrUnder,
+  isHidden,
   isInAnotherTree,
   isInTreeFolder,
   isOffLimits,
+  namesBelow,
+  realPath,
 } from '#modules/tree-folder/main'
 import os from 'node:os'
 import path from 'node:path'
 import {z} from 'zod'
+
+import {projectKeyOf} from './transcripts'
 
 /** The Reply being written on a `claude`, whose callback is fixed at start. */
 export interface SessionApprovals {
@@ -38,7 +45,7 @@ const DENIED = 'The user denied this.'
 
 const NO_HOST = 'This connection names no host, so it can’t be allowed.'
 
-const ANOTHER_TREE = 'This path is in a folder that can’t be read from here.'
+const CANT_BE_READ = 'This path is in a folder that can’t be read from here.'
 
 const CHANGED_ELSEWHERE =
   'This path is in a folder that can’t be changed from here.'
@@ -226,37 +233,78 @@ function searchRoots(toolName: string, input: ToolInput, treeFolder: string) {
   return toolName === 'Glob' && pattern ? [globRoot(searched, pattern)] : []
 }
 
-function refusal(
-  toolName: string,
-  input: ToolInput,
-  folders: Pick<ReplyRequest, 'treeFolder' | 'treesFolder'>
+type SandboxFolders = Pick<
+  ReplyRequest,
+  'treeFolder' | 'treesFolder' | 'hiddenFolders'
+>
+
+/** `configDir` is `claude`'s config folder, which may sit in a hidden folder. */
+type ReadFolders = SandboxFolders & {configDir: string}
+
+/**
+ * `claude` saves a tool's output too large to give inline under
+ * `<configDir>/projects/<key of its folder>/<session>/tool-results/`, then
+ * tells the Model to Read it there. Other Trees' sessions sit under other keys.
+ */
+function isSavedOutput({configDir, treeFolder}: ReadFolders, file: string) {
+  const key = projectKeyOf(realPath(treeFolder))
+
+  const [, folder] =
+    namesBelow(
+      path.join(configDir, 'projects', key),
+      path.resolve(treeFolder, file)
+    ) ?? []
+
+  return folder === 'tool-results'
+}
+
+function hiddenRefusal(
+  roots: string[],
+  file: string | undefined,
+  folders: ReadFolders
 ) {
-  const {treeFolder} = folders
+  const looked = file === undefined ? roots : [file]
 
   if (
-    searchRoots(toolName, input, treeFolder).some(root =>
-      holdsEveryTree(folders, root)
+    looked.some(
+      target => isHidden(folders, target) && !isSavedOutput(folders, target)
     )
   ) {
-    return ABOVE_THE_TREES
+    return CANT_BE_READ
   }
 
-  return readTargets(toolName, input, treeFolder).some(target =>
-    isInAnotherTree(folders, target)
-  )
-    ? ANOTHER_TREE
+  return roots.some(root => holdsHiddenFolder(folders, root))
+    ? ABOVE_THE_TREES
     : null
 }
 
+function refusal(toolName: string, input: ToolInput, folders: ReadFolders) {
+  const {treeFolder} = folders
+  const roots = searchRoots(toolName, input, treeFolder)
+
+  if (roots.some(root => holdsEveryTree(folders, root))) return ABOVE_THE_TREES
+
+  if (
+    readTargets(toolName, input, treeFolder).some(target =>
+      isInAnotherTree(folders, target)
+    )
+  ) {
+    return CANT_BE_READ
+  }
+
+  return hiddenRefusal(roots, input.file_path, folders)
+}
+
 /**
- * The Sandbox hides other Trees from commands only, and a Read deny rule for
- * their folder would hide this Tree's own, so the hook refuses them
- * (ADR 0018).
+ * The Sandbox hides other Trees and the hidden folders from commands only. A
+ * Read deny rule for the Trees' folder would hide this Tree's own, and one for
+ * `claude`'s config folder would hide the outputs it saves there, since a deny
+ * beats every allow, so the hook refuses them (ADR 0018).
  */
 export function readDecision(
   toolName: string,
   input: ToolInput,
-  folders: Pick<ReplyRequest, 'treeFolder' | 'treesFolder'>
+  folders: ReadFolders
 ): Decision {
   const reason = refusal(toolName, withPathsRead(input), folders)
 
@@ -268,11 +316,6 @@ export function readDecision(
 type Decision = Pick<
   PreToolUseHookSpecificOutput,
   'permissionDecision' | 'permissionDecisionReason'
->
-
-type SandboxFolders = Pick<
-  ReplyRequest,
-  'treeFolder' | 'treesFolder' | 'hiddenFolders'
 >
 
 /**
@@ -322,10 +365,12 @@ function preToolUse(
 
 /** Full access asks nothing; Supervised asks the user through `asking`. */
 export function permissionOptions(
-  request: Pick<ReplyRequest, 'permissionMode'> & SandboxFolders,
+  request: Pick<ReplyRequest, 'permissionMode' | 'vendorProgram'> &
+    SandboxFolders,
   asking: SessionApprovals
 ): Options {
-  const {permissionMode, treeFolder} = request
+  const {permissionMode, treeFolder, vendorProgram} = request
+  const folders = {...request, configDir: vendorProgram.configDir}
 
   if (permissionMode === 'full-access') {
     return {
@@ -341,7 +386,7 @@ export function permissionOptions(
     hooks: {
       PreToolUse: [
         preToolUse(READS, (toolName, input) =>
-          readDecision(toolName, input, request)
+          readDecision(toolName, input, folders)
         ),
         preToolUse(EDITS, (toolName, input) =>
           editDecision(toolName, input, request)
@@ -363,7 +408,7 @@ function readDenied(folder: string) {
 }
 
 function sandboxOf(
-  {treeFolder, treesFolder, hiddenFolders}: ReplyRequest,
+  {treeFolder, treesFolder, hiddenFolders}: SandboxFolders,
   home: string
 ): SandboxSettings {
   return {
@@ -383,22 +428,28 @@ function sandboxOf(
 
 /**
  * Supervised runs every command inside the Sandbox where it can run. The
- * deny rules hold for the Read tool, over the hook that lets reads through.
+ * deny rules hold for the Read tool, over the hook that lets reads through,
+ * but for the hidden folder that holds `claude`'s config folder, which the hook
+ * guards alone.
  */
 export function sandboxSettings(
-  request: ReplyRequest,
+  request: Pick<ReplyRequest, 'permissionMode' | 'vendorProgram'> &
+    SandboxFolders,
   platform: NodeJS.Platform
 ) {
   if (request.permissionMode === 'full-access') return {}
 
   const home = os.homedir()
+  const {hiddenFolders, vendorProgram} = request
+
+  const denied = hiddenFolders.filter(
+    folder => !isAtOrUnder(folder, vendorProgram.configDir)
+  )
 
   return {
     sandbox: hasSandbox(platform) ? sandboxOf(request, home) : {enabled: false},
     permissions: {
-      deny: [...credentialFolders(home), ...request.hiddenFolders].map(
-        readDenied
-      ),
+      deny: [...credentialFolders(home), ...denied].map(readDenied),
       ask: [LEAVING_THE_SANDBOX],
     },
   }
