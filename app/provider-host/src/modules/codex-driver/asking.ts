@@ -132,7 +132,7 @@ export function createTurnAsking({
   platform,
 }: TurnAskingOptions) {
   // Under the Sandbox's profile, a command Codex runs outside still can't read
-  // the folders the profile denies.
+  // the folders the profile denies (ADR 0018).
   const credentialsDenied = isSandboxed(request, platform)
   const toolCalls = new Set<string>()
   const changedPaths = new Map<string, string[]>()
