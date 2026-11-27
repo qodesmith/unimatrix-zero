@@ -25,6 +25,7 @@ import {
   isRecording,
   unrewritten,
 } from './recordings.ts'
+import {runBoth} from './run-both.ts'
 import {
   HOST_PACKAGE,
   INSTALLED_SDK,
@@ -32,6 +33,7 @@ import {
   SDK,
   pinsOf,
 } from './vendor-pins.ts'
+import {forwardLines} from './whole-lines.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const GATE_JOB = 'Provider checks on a vendor bump or a live test change'
@@ -206,7 +208,8 @@ async function isCleanAt(head: string) {
 async function runLiveChecks(ids: string[], env: Record<string, string>) {
   const report = path.join(os.tmpdir(), `uz-provider-checks-${Date.now()}.json`)
 
-  const exitCode = await Bun.spawn(
+  // Piped, so Vitest draws no summary in place over the reviews' lines.
+  const vitest = Bun.spawn(
     [
       'bun',
       'run',
@@ -224,9 +227,15 @@ async function runLiveChecks(ids: string[], env: Record<string, string>) {
     {
       cwd: root,
       env: {...process.env, ...env, UZ_RECORD: 'yes'},
-      stdio: ['inherit', 'inherit', 'inherit'],
+      stdio: ['inherit', 'pipe', 'pipe'],
     }
-  ).exited
+  )
+
+  const [exitCode] = await Promise.all([
+    vitest.exited,
+    forwardLines(vitest.stdout, text => process.stdout.write(text)),
+    forwardLines(vitest.stderr, text => process.stderr.write(text)),
+  ])
 
   const outcomes = new Map<string, string[]>()
 
@@ -360,7 +369,12 @@ const live = entries.flatMap(entry =>
 )
 
 const since = Date.now()
-const {checks, failed} = await runLiveChecks(live, env)
+
+const [{checks, failed}, reviews] = await runBoth(
+  async () => runLiveChecks(live, env),
+  async () => reviewAll(entries, builds)
+)
+
 const kept = await whyKept(since, failed)
 const committed = postTo && kept === null ? await commitRecordings() : null
 
@@ -369,7 +383,7 @@ const result = {
   pinChanges: postTo?.pinChanges ?? [],
   gatedFiles: postTo?.files ?? [],
   checks,
-  reviews: await reviewAll(entries, builds),
+  reviews,
   whyKept: kept,
   everydayTests: await runEverydayTests(),
 }
