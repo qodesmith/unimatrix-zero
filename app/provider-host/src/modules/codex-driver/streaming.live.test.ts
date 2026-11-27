@@ -2822,7 +2822,12 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       })
 
       expect(left.cards.map(card => card.action)).toEqual([
-        {kind: 'command', command: leaving, outsideSandbox: true},
+        {
+          kind: 'command',
+          command: leaving,
+          outsideSandbox: true,
+          credentialsDenied: true,
+        },
       ])
       expect(left.requests.map(request => request.params.reason)).toEqual([
         expect.stringMatching(/\S/u),

@@ -2606,7 +2606,11 @@ it('under Supervised, asks about a connection from inside the Sandbox on a card 
 
   const [, host] = askedIn(events)
 
-  expect(host?.action).toEqual({kind: 'host', host: 'example.com'})
+  expect(host?.action).toEqual({
+    kind: 'host',
+    host: 'example.com',
+    fromCommand: true,
+  })
   expect(host).not.toHaveProperty('toolCallId')
   expect(answersTo(claude)).toEqual([
     expect.objectContaining({behavior: 'allow'}),

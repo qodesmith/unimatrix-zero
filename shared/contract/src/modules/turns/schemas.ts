@@ -217,8 +217,15 @@ export const ApprovalActionSchema = z.discriminatedUnion('kind', [
     command: z.string(),
     /** The AI asks to run it outside the Sandbox. */
     outsideSandbox: z.literal(true).optional(),
+    /** Run outside, it still can't read the credential folders. */
+    credentialsDenied: z.literal(true).optional(),
   }),
-  z.strictObject({kind: z.literal('host'), host: z.string().min(1)}),
+  z.strictObject({
+    kind: z.literal('host'),
+    host: z.string().min(1),
+    /** A command inside the Sandbox asks, not a web fetch. */
+    fromCommand: z.literal(true).optional(),
+  }),
   z.strictObject({
     kind: z.literal('mcp-tool'),
     server: z.string(),

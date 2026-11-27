@@ -73,6 +73,27 @@ function CommandText({action}: {action: ApprovalAction}) {
   )
 }
 
+/** What the command could then read, change or reach, in plain words. */
+function reachOf(action: ApprovalAction) {
+  if (action.kind === 'host' && action.fromCommand) {
+    return `A command wants this connection. With it, the command could send your files to ${action.host} and download from there.`
+  }
+
+  if (action.kind !== 'command' || !action.outsideSandbox) return null
+
+  return action.credentialsDenied
+    ? 'Outside the Sandbox, it could read and change your files and reach the internet, but not use your saved logins.'
+    : 'Outside the Sandbox, it could read and change any of your files, use your saved logins and reach the internet.'
+}
+
+function WhatItReaches({action}: {action: ApprovalAction}) {
+  const reach = reachOf(action)
+
+  return reach === null ? null : (
+    <p className="text-xs text-muted-foreground">{reach}</p>
+  )
+}
+
 const ANSWERS: {answer: ApprovalAnswer; label: string}[] = [
   {answer: 'allow-once', label: 'Allow once'},
   {answer: 'always-allow', label: 'Always allow in this Tree'},
@@ -134,12 +155,7 @@ function AskingCard({
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         <CommandText action={action} />
-        {action.kind === 'command' && action.outsideSandbox && (
-          <p className="text-xs text-muted-foreground">
-            Outside the Sandbox, it could read and change any of your files, use
-            your saved logins and reach the internet.
-          </p>
-        )}
+        <WhatItReaches action={action} />
         {landsOutsideTree(action) && (
           <p className="text-xs text-muted-foreground">
             This happens outside the conversation, so other Branches will see it

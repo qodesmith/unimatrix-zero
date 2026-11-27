@@ -153,7 +153,7 @@ it('asks about the retry of a command outside the Sandbox as that form alone, an
     )
   ).toEqual({kind: 'command', command: 'touch made.txt'})
   expect(actionOf('SandboxNetworkAccess', {host: 'example.com'}, tree)).toEqual(
-    {kind: 'host', host: 'example.com'}
+    {kind: 'host', host: 'example.com', fromCommand: true}
   )
 })
 

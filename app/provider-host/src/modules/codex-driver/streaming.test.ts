@@ -2280,7 +2280,12 @@ it('asks about a command the Model wants to run outside the Sandbox on a card of
 
   expect(cardsIn(blocked).at(-1)).toMatchObject({answer: 'always-allow'})
   expect(actionsAsked(leaving)).toEqual([
-    {kind: 'command', command: LEAVING, outsideSandbox: true},
+    {
+      kind: 'command',
+      command: LEAVING,
+      outsideSandbox: true,
+      credentialsDenied: true,
+    },
   ])
   expect(toolCallsOf(leaving).map(call => call.result?.isError)).toEqual([
     false,

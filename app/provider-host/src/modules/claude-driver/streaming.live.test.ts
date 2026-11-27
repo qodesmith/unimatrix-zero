@@ -1524,7 +1524,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
       expect(asked).toEqual([
         {kind: 'command', command: expect.stringContaining('curl')},
-        {kind: 'host', host: 'example.com'},
+        {kind: 'host', host: 'example.com', fromCommand: true},
       ])
       expect(toolCallsIn(events)[0]?.result?.content).toMatch(/200/)
 

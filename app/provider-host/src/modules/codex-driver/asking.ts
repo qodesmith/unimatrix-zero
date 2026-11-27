@@ -8,6 +8,7 @@ import {isInTreeFolder, isOffLimits} from '#modules/tree-folder/main'
 import {z} from 'zod'
 
 import {READ_ACTIONS, approvalAnswer} from './approval-wire'
+import {isSandboxed} from './threads'
 import {McpToolCallItemSchema, ToolItemSchema} from './wire'
 
 /** What a turn reads, in the order it happened. */
@@ -32,6 +33,7 @@ interface TurnAskingOptions {
   request: ReplyRequest
   threadId: string
   push: (received: Received) => void
+  platform: NodeJS.Platform
 }
 
 const ReasonSchema = z.string().min(1)
@@ -92,19 +94,31 @@ function unwrapped(command: string) {
   return (script === undefined ? null : shellWord(script)) ?? command
 }
 
-function commandCard(params: CommandRequest): Card | null {
+/**
+ * Under the Sandbox's profile, Codex keeps its denied folders from a command
+ * run outside.
+ */
+function commandCard(
+  params: CommandRequest,
+  credentialsDenied: boolean
+): Card | null {
   const host = params.networkApprovalContext?.host
 
-  if (host) return {action: {kind: 'host', host}}
+  if (host) return {action: {kind: 'host', host, fromCommand: true}}
 
   if (!params.command) return null
 
   const command = unwrapped(params.command)
 
+  if (!leavesSandbox(params)) return {action: {kind: 'command', command}}
+
   return {
-    action: leavesSandbox(params)
-      ? {kind: 'command', command, outsideSandbox: true}
-      : {kind: 'command', command},
+    action: {
+      kind: 'command',
+      command,
+      outsideSandbox: true,
+      ...(credentialsDenied ? {credentialsDenied: true} : {}),
+    },
   }
 }
 
@@ -119,7 +133,9 @@ export function createTurnAsking({
   request,
   threadId,
   push,
+  platform,
 }: TurnAskingOptions) {
+  const credentialsDenied = isSandboxed(request, platform)
   const toolCalls = new Set<string>()
   const changedPaths = new Map<string, string[]>()
   const offLimitsChanges = new Set<string>()
@@ -190,7 +206,7 @@ export function createTurnAsking({
   function cardOf(asked: ApprovalRequest): Card | null {
     switch (asked.method) {
       case 'item/commandExecution/requestApproval': {
-        const card = commandCard(asked.params)
+        const card = commandCard(asked.params, credentialsDenied)
 
         return card && {...card, ...linked(asked.params.itemId)}
       }
