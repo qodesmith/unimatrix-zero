@@ -102,3 +102,25 @@ export function holdsHiddenFolder(
 
   return hiddenFolders.some(hidden => isAtOrUnder(searched, hidden))
 }
+
+/**
+ * Every other Tree's folder by name, or the folder of every Tree when the
+ * Tree's folder is outside it.
+ */
+export function otherTreeFolders({
+  treeFolder,
+  treesFolder,
+}: {
+  treeFolder: string
+  treesFolder: string
+}) {
+  const names = namesBelow(treesFolder, treeFolder)
+
+  if (names === null) return [treesFolder]
+
+  return fs
+    .readdirSync(treesFolder)
+    .filter(name => name !== names[0])
+    .toSorted()
+    .map(name => path.join(treesFolder, name))
+}
