@@ -1,7 +1,11 @@
 import type {CodexCommand, CodexProcess, SpawnCodex} from './app-server'
 import type {RecordedLine} from './replay'
 
-import {buildOf, tempFolderNames} from '#modules/test-recordings/main'
+import {
+  buildOf,
+  claimRecordings,
+  tempFolderNames,
+} from '#modules/test-recordings/main'
 import {spawn} from 'node:child_process'
 import {EventEmitter} from 'node:events'
 import fs from 'node:fs'
@@ -80,9 +84,11 @@ function scrub(
 /**
  * Records each real `codex app-server` process into the next of `files`,
  * stamped with its build, the Tree's folder as a stand-in a replay fills in.
+ * A process that exits after a later recorder claimed its file writes nothing.
  */
 export function createRecorder(files: string[], folders: Recorded = {}) {
   let run = 0
+  const write = claimRecordings(files)
 
   function record(
     {command, args}: CodexCommand,
@@ -123,8 +129,7 @@ export function createRecorder(files: string[], folders: Recorded = {}) {
 
     child.on('error', error => recorded.emit('error', error))
     child.on('exit', (code, signal) => {
-      if (file)
-        fs.writeFileSync(file, scrub(lines, env.CODEX_HOME ?? cwd, folders))
+      if (file) write(file, scrub(lines, env.CODEX_HOME ?? cwd, folders))
 
       recorded.emit('exit', code, signal)
     })

@@ -1,24 +1,34 @@
 import {describe, expect, it} from 'vitest'
 
-import {LIVE_RUNS, liveOutcome} from './provider-checks-live.ts'
+import {liveOutcome, liveTestArgs} from './provider-checks-live.ts'
 
-function retriesFor(name: string) {
-  return LIVE_RUNS.filter(run => new RegExp(run.pattern).test(name)).map(
-    run => run.retry
-  )
-}
+describe('the live run of provider-checks', () => {
+  const args = liveTestArgs('/tmp/report.json')
 
-describe('the live runs of provider-checks', () => {
-  it('retry a live check once, a test that records never, and skip an untagged test', () => {
-    expect(retriesFor('a live Claude [dep:prompt-uuid] stores it')).toEqual([1])
-    expect(retriesFor('a live Claude [records] compacts')).toEqual([0])
+  it('takes each live check and each test that records, tagged with an id or not, and skips an untagged test', () => {
+    const tagged = new RegExp(args[args.indexOf('-t') + 1] ?? '^$')
+
     expect(
-      retriesFor('a live Claude [records] [dep:claude-sandbox] asks')
-    ).toEqual([0])
-    expect(
-      retriesFor('a live Claude [dep:claude-sandbox] [records] asks')
-    ).toEqual([0])
-    expect(retriesFor('a live Claude forgets a failed Prompt')).toEqual([])
+      [
+        'a live Claude [dep:prompt-uuid] stores it',
+        'a live Claude [records] compacts',
+        'a live Claude [records] [dep:claude-sandbox] asks',
+        'a live Claude [dep:claude-sandbox] [records] asks',
+        'a live Claude forgets a failed Prompt',
+      ].filter(name => tagged.test(name))
+    ).toEqual([
+      'a live Claude [dep:prompt-uuid] stores it',
+      'a live Claude [records] compacts',
+      'a live Claude [records] [dep:claude-sandbox] asks',
+      'a live Claude [dep:claude-sandbox] [records] asks',
+    ])
+  })
+
+  it('runs a failed test once more', () => {
+    expect(args.slice(args.indexOf('--retry')).slice(0, 2)).toEqual([
+      '--retry',
+      '1',
+    ])
   })
 })
 

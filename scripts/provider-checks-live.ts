@@ -5,14 +5,24 @@ import {z} from 'zod'
 import {tagsIn} from './provider-dependencies.ts'
 
 /**
- * Between them the two runs take each tagged live test once. A test that
- * records gets no retry: a recorder writes its file when the vendor program
- * exits, so a failed first try could still write over the retry's recording.
+ * Vitest's arguments for the one run of every tagged live test. Retrying a
+ * test that records is safe only while its recorder uses `claimRecordings`.
  */
-export const LIVE_RUNS = [
-  {pattern: String.raw`\[records\]`, retry: 0},
-  {pattern: String.raw`^(?!.*\[records\]).*\[dep:`, retry: 1},
-]
+export function liveTestArgs(report: string) {
+  return [
+    'run',
+    '.live.test.ts',
+    '--project',
+    'node',
+    '-t',
+    String.raw`\[records\]|\[dep:`,
+    '--retry',
+    '1',
+    '--reporter=default',
+    '--reporter=json',
+    `--outputFile.json=${report}`,
+  ]
+}
 
 export const VitestReport = z.looseObject({
   testResults: z.array(

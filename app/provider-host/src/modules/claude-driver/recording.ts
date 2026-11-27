@@ -3,12 +3,11 @@ import type {SpawnOptions, SpawnedProcess} from '@anthropic-ai/claude-agent-sdk'
 
 import {
   buildOf,
+  claimRecordings,
   replaceAcross,
   tempFolderNames,
 } from '#modules/test-recordings/main'
-import fs from 'node:fs/promises'
 import os from 'node:os'
-import path from 'node:path'
 import {createInterface} from 'node:readline'
 import {PassThrough} from 'node:stream'
 import {z} from 'zod'
@@ -213,13 +212,14 @@ function scrub(lines: RecordedLine[]) {
 
 /**
  * Records each `claude` into `files` in the order they start, stamped with its
- * build, once it exits.
+ * build, once it exits, unless a later recorder has claimed the file.
  */
 export function createRecorder(
   spawn: (options: SpawnOptions) => SpawnedProcess,
   files: string[]
 ) {
   const written: Promise<void>[] = []
+  const write = claimRecordings(files)
 
   function record(options: SpawnOptions): SpawnedProcess {
     const file = files[written.length]
@@ -258,8 +258,7 @@ export function createRecorder(
         await new Promise(resolve => {
           child.once('exit', resolve)
         })
-        await fs.mkdir(path.dirname(file), {recursive: true})
-        await fs.writeFile(file, scrub(lines))
+        write(file, scrub(lines))
       })()
     )
 

@@ -17,6 +17,27 @@ const VERSION = /\d+\.\d+\.\d+[\w.+-]*/
 
 const TEMP_FOLDER_STAND_IN = '/temp-folder'
 
+const claims = new Map<string, symbol>()
+
+/**
+ * Claims each of `files` for a new recorder, and gives its `write`, which
+ * writes a file only while no later recorder has claimed it. A retried live
+ * test's first try shares this process, so it can't write over the retry's.
+ */
+export function claimRecordings(files: string[]) {
+  const claim = Symbol('recorder')
+
+  for (const file of files) claims.set(path.resolve(file), claim)
+
+  // Synchronous, so no claim is taken between the check and the write.
+  return function write(file: string, text: string) {
+    if (claims.get(path.resolve(file)) !== claim) return
+
+    fs.mkdirSync(path.dirname(file), {recursive: true})
+    fs.writeFileSync(file, text)
+  }
+}
+
 function asProjectKey(folder: string) {
   return folder.replaceAll(/[^a-zA-Z0-9]/g, '-')
 }

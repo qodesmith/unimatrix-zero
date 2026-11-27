@@ -16,7 +16,11 @@ import {z} from 'zod'
 
 import {devUserData} from './dev-data.ts'
 import {mapLimited} from './map-limited.ts'
-import {LIVE_RUNS, VitestReport, liveOutcome} from './provider-checks-live.ts'
+import {
+  VitestReport,
+  liveOutcome,
+  liveTestArgs,
+} from './provider-checks-live.ts'
 import {passed, renderResult} from './provider-checks-result.ts'
 import {LIST, entriesOf, liveCheckOf} from './provider-dependencies.ts'
 import {entriesToReview, reviewsOf} from './provider-review-scope.ts'
@@ -197,28 +201,11 @@ async function isCleanAt(head: string) {
 }
 
 /** Each `[records]` test also rewrites its recordings. */
-async function runLiveTests(
-  {pattern, retry}: (typeof LIVE_RUNS)[number],
-  env: Record<string, string>
-) {
+async function runLiveChecks(ids: string[], env: Record<string, string>) {
   const report = path.join(os.tmpdir(), `uz-provider-checks-${Date.now()}.json`)
 
   const exitCode = await Bun.spawn(
-    [
-      'bun',
-      'run',
-      'scripts/vitest.ts',
-      'run',
-      '.live.test.ts',
-      '--project',
-      'node',
-      '-t',
-      pattern,
-      ...(retry > 0 ? ['--retry', String(retry)] : []),
-      '--reporter=default',
-      '--reporter=json',
-      `--outputFile.json=${report}`,
-    ],
+    ['bun', 'run', 'scripts/vitest.ts', ...liveTestArgs(report)],
     {
       cwd: root,
       env: {...process.env, ...env, UZ_RECORD: 'yes'},
@@ -230,27 +217,12 @@ async function runLiveTests(
     .json()
     .catch(() => ({testResults: []}))
 
-  const tests = VitestReport.parse(ran).testResults.flatMap(
-    file => file.assertionResults
-  )
-
-  return {tests, exitCode}
-}
-
-async function runLiveChecks(ids: string[], env: Record<string, string>) {
-  const runs = []
-
-  for (const run of LIVE_RUNS) runs.push(await runLiveTests(run, env))
-
   const outcome = liveOutcome(
     ids,
-    runs.flatMap(run => run.tests)
+    VitestReport.parse(ran).testResults.flatMap(file => file.assertionResults)
   )
 
-  return {
-    ...outcome,
-    failed: outcome.failed || runs.some(run => run.exitCode !== 0),
-  }
+  return {...outcome, failed: outcome.failed || exitCode !== 0}
 }
 
 async function recordings() {
