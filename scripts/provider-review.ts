@@ -30,7 +30,7 @@ const Output = z.looseObject({
 
 const TOOLS = ['Read', 'Grep', 'Glob', 'Bash(strings:*)', 'Bash(grep:*)']
 
-const TIME_LIMIT_MS = 10 * 60 * 1000
+const TIME_LIMIT_MS = 15 * 60 * 1000
 
 function promptFor(entry: Entry, builds: Builds) {
   const fields = Object.entries(entry.fields).map(
@@ -76,7 +76,30 @@ function outputOf(stdout: string) {
   }
 }
 
-export async function review(
+/**
+ * Tries once more when the first try ends with no verdict, such as past its
+ * time limit.
+ */
+export async function retriedOnce(
+  tryOnce: () => Promise<Review>
+): Promise<Review> {
+  const first = await tryOnce()
+
+  if (first.verdict !== 'not reviewed') return first
+
+  const second = await tryOnce()
+
+  if (second.verdict !== 'not reviewed') return second
+
+  const reasons =
+    first.reason === second.reason
+      ? first.reason
+      : `${first.reason}, then ${second.reason}`
+
+  return {...second, reason: `tried twice: ${reasons}`}
+}
+
+async function attempt(
   entry: Entry,
   builds: Builds,
   root: string
@@ -111,7 +134,9 @@ export async function review(
     }
   )
 
-  // The whole group, so a search the reviewer started dies with it.
+  // The whole group, so a search the reviewer started dies with it. The
+  // attempt ends only once the group's pipes close, so a retry never runs
+  // beside it.
   const limit = setTimeout(() => {
     process.kill(-child.pid, 'SIGKILL')
   }, TIME_LIMIT_MS)
@@ -148,4 +173,8 @@ export async function review(
         verdict: 'stale',
         reason: `${answer.verdict}: ${answer.evidence}`,
       }
+}
+
+export async function review(entry: Entry, builds: Builds, root: string) {
+  return retriedOnce(async () => attempt(entry, builds, root))
 }
