@@ -22,7 +22,6 @@ function result(head: string | null, change: Partial<Result> = {}): Result {
     gatedFiles: [],
     whyKept: null,
     everydayTests: 'passed',
-    resumed: null,
     ...change,
   }
 }
@@ -108,24 +107,6 @@ describe('the provider-checks gate on a PR it holds', () => {
   it('goes by the owner’s newest result for the head commit', () => {
     expect(verdict([OWNER, passing], [OWNER, stale])).toBe(false)
     expect(verdict([OWNER, stale], [OWNER, passing])).toBe(true)
-  })
-
-  it('passes on a resumed run’s passing result, which says what it ran again', () => {
-    const resumed = renderResult(
-      result(HEAD, {
-        resumed: {
-          from: 'older12',
-          liveTests: 3,
-          reviews: 1,
-          everydayTests: true,
-        },
-      })
-    )
-
-    expect(resumed).toContain(
-      'Resumed the run for older12, running 3 live tests, 1 review and the everyday tests again.'
-    )
-    expect(verdict([OWNER, resumed])).toBe(true)
   })
 
   it('ignores a garbled result', () => {

@@ -2,8 +2,7 @@
  * Run by hand by the maintainer: re-records the recordings, and posts results
  * on the PR CI's gate holds.
  */
-import type {CheckStatus, Result} from './provider-checks-result.ts'
-import type {LiveRun} from './provider-checks-resume.ts'
+import type {CheckStatus} from './provider-checks-result.ts'
 import type {Entry} from './provider-dependencies.ts'
 import type {Builds} from './provider-review.ts'
 import type {Pins} from './vendor-pins.ts'
@@ -17,25 +16,15 @@ import {z} from 'zod'
 
 import {devUserData} from './dev-data.ts'
 import {mapLimited} from './map-limited.ts'
-import {
-  dirtyIn,
-  headOf,
-  resumeFrom,
-  saveRun,
-  savedRunFile,
-} from './provider-checks-checkout.ts'
 import {passed, renderResult} from './provider-checks-result.ts'
-import {
-  checksOf,
-  isTagged,
-  mergedLive,
-  mergedReviews,
-  rerunOf,
-  unrewrittenSince,
-} from './provider-checks-resume.ts'
-import {LIST, entriesOf} from './provider-dependencies.ts'
+import {LIST, entriesOf, liveCheckOf, tagsIn} from './provider-dependencies.ts'
 import {review} from './provider-review.ts'
-import {filesIn, gatedChangesOf, isRecording} from './recordings.ts'
+import {
+  filesIn,
+  gatedChangesOf,
+  isRecording,
+  unrewritten,
+} from './recordings.ts'
 import {runBoth} from './run-both.ts'
 import {
   HOST_PACKAGE,
@@ -63,7 +52,6 @@ const PullPages = z.array(
 const VitestReport = z.looseObject({
   testResults: z.array(
     z.looseObject({
-      name: z.string(),
       assertionResults: z.array(
         z.looseObject({title: z.string(), status: z.string()})
       ),
@@ -210,16 +198,14 @@ async function findGated(repo: string, wanted: number | null) {
 }
 
 async function isCleanAt(head: string) {
+  const current = (await $`git rev-parse HEAD`.cwd(root).text()).trim()
   const dirty = (await $`git status --porcelain`.cwd(root).text()).trim()
 
-  return (await headOf(root)) === head && !dirty
+  return current === head && !dirty
 }
 
-/** Each `[records]` test it runs also rewrites its recordings. */
-async function runLiveTests(
-  pattern: string,
-  env: Record<string, string>
-): Promise<LiveRun> {
+/** Each `[records]` test also rewrites its recordings. */
+async function runLiveChecks(ids: string[], env: Record<string, string>) {
   const report = path.join(os.tmpdir(), `uz-provider-checks-${Date.now()}.json`)
 
   // Piped, so Vitest draws no summary in place over the reviews' lines.
@@ -233,7 +219,7 @@ async function runLiveTests(
       '--project',
       'node',
       '-t',
-      pattern,
+      String.raw`\[dep:|\[records\]`,
       '--reporter=default',
       '--reporter=json',
       `--outputFile.json=${report}`,
@@ -251,18 +237,24 @@ async function runLiveTests(
     forwardLines(vitest.stderr, text => process.stderr.write(text)),
   ])
 
+  const outcomes = new Map<string, string[]>()
+
   const ran = await Bun.file(report)
     .json()
     .catch(() => ({testResults: []}))
 
-  const tests = VitestReport.parse(ran).testResults.flatMap(file =>
-    file.assertionResults.flatMap(({title, status}) =>
-      isTagged(title) ? [{file: file.name, title, status}] : []
-    )
+  const tests = VitestReport.parse(ran).testResults.flatMap(
+    file => file.assertionResults
   )
 
+  for (const test of tests) {
+    for (const id of tagsIn(test.title)) {
+      outcomes.set(id, [...(outcomes.get(id) ?? []), test.status])
+    }
+  }
+
   return {
-    tests,
+    checks: ids.map(id => ({id, status: statusOf(outcomes.get(id) ?? [])})),
     failed: exitCode !== 0 || tests.some(test => test.status === 'failed'),
   }
 }
@@ -271,20 +263,17 @@ async function recordings() {
   return (await filesIn(root)).filter(isRecording)
 }
 
-async function recordingTimes() {
-  return (await recordings()).map(file => ({
-    file,
-    modified: fs.statSync(path.join(root, file)).mtimeMs,
-  }))
-}
-
-async function leftRecordings() {
-  return (await dirtyIn(root)).filter(state => isRecording(state.file))
-}
-
 /** Why the run must keep the old recordings, or null when it can commit. */
-function whyKept(failed: boolean, missed: string[]) {
+async function whyKept(since: number, failed: boolean) {
   if (failed) return 'a live test failed'
+
+  const missed = unrewritten(
+    (await recordings()).map(file => ({
+      file,
+      modified: fs.statSync(path.join(root, file)).mtimeMs,
+    })),
+    since
+  )
 
   return missed.length > 0
     ? `no live test rewrote ${missed.map(file => `\`${file}\``).join(', ')}`
@@ -297,7 +286,7 @@ async function commitRecordings() {
     root
   )
 
-  return headOf(root)
+  return (await $`git rev-parse HEAD`.cwd(root).text()).trim()
 }
 
 async function runEverydayTests(): Promise<CheckStatus> {
@@ -314,6 +303,14 @@ async function runEverydayTests(): Promise<CheckStatus> {
   }).exited
 
   return exitCode === 0 ? 'passed' : 'failed'
+}
+
+function statusOf(outcomes: string[]): CheckStatus {
+  if (outcomes.includes('failed')) return 'failed'
+
+  return outcomes.length > 0 && outcomes.every(outcome => outcome === 'passed')
+    ? 'passed'
+    : 'not run'
 }
 
 async function reviewAll(entries: Entry[], builds: Builds) {
@@ -355,26 +352,7 @@ async function rerunGate(repo: string, pull: Gated) {
   console.log(`Re-running "${GATE_JOB}" on #${pull.number}.`)
 }
 
-async function resumable(pull: Gated | null, builds: Builds) {
-  const {pins, ...paths} = builds
-
-  const {saved, why} = await resumeFrom(root, {
-    pull,
-    pins: [...pins],
-    builds: paths,
-  })
-
-  if (why !== null) {
-    fail(`${why} Run \`bun run provider-checks\` in full, without --resume.`)
-  }
-
-  return saved
-}
-
-const {values} = parseArgs({
-  options: {pr: {type: 'string'}, resume: {type: 'boolean'}},
-})
-
+const {values} = parseArgs({options: {pr: {type: 'string'}}})
 const {builds, env} = liveBuilds()
 
 const repo = (
@@ -382,73 +360,33 @@ const repo = (
 ).trim()
 
 const pull = await findGated(repo, values.pr ? Number(values.pr) : null)
-const saved = values.resume ? await resumable(pull, builds) : null
-const postTo = pull && (saved || (await isCleanAt(pull.head))) ? pull : null
-const head = await headOf(root)
+const postTo = pull && (await isCleanAt(pull.head)) ? pull : null
 
-const list = readText(LIST)
-const entries = entriesOf(list)
-const rerun = rerunOf(saved, {list, head})
-const since = Date.now()
+const entries = entriesOf(readText(LIST))
 
-const [liveRan, reviewsRan] = await runBoth(
-  async () =>
-    rerun.liveTests === null ? null : runLiveTests(rerun.liveTests, env),
-  async () =>
-    reviewAll(
-      entries.filter(entry => rerun.reviews.includes(entry.id)),
-      builds
-    )
+const live = entries.flatMap(entry =>
+  liveCheckOf(entry) === entry.id ? [entry.id] : []
 )
 
-const live = mergedLive(saved?.live ?? null, liveRan)
-const missed = unrewrittenSince(saved, await recordingTimes(), since)
-const kept = whyKept(live.failed, missed)
+const since = Date.now()
 
-const committed =
-  postTo && kept === null && (await leftRecordings()).length > 0
-    ? await commitRecordings()
-    : null
+const [{checks, failed}, reviews] = await runBoth(
+  async () => runLiveChecks(live, env),
+  async () => reviewAll(entries, builds)
+)
 
-const result: Result = {
-  head: postTo ? (committed ?? head) : null,
+const kept = await whyKept(since, failed)
+const committed = postTo && kept === null ? await commitRecordings() : null
+
+const result = {
+  head: committed ?? postTo?.head ?? null,
   pinChanges: postTo?.pinChanges ?? [],
   gatedFiles: postTo?.files ?? [],
-  checks: checksOf(entries, live),
-  reviews: mergedReviews(entries, saved?.reviews ?? [], reviewsRan),
+  checks,
+  reviews,
   whyKept: kept,
-  everydayTests: rerun.everydayTests
-    ? await runEverydayTests()
-    : (saved?.everydayTests ?? 'not run'),
-  resumed: saved?.head
-    ? {
-        from: saved.head,
-        liveTests: (liveRan?.tests ?? []).filter(test =>
-          ['passed', 'failed'].includes(test.status)
-        ).length,
-        reviews: reviewsRan.length,
-        everydayTests: rerun.everydayTests,
-      }
-    : null,
+  everydayTests: await runEverydayTests(),
 }
-
-const savedFile = await savedRunFile(root)
-const {pins, ...paths} = builds
-
-saveRun(savedFile, {
-  version: 1,
-  pr: postTo?.number ?? null,
-  head: result.head,
-  startedAt: saved?.startedAt ?? since,
-  pins: [...pins],
-  builds: paths,
-  list,
-  live,
-  reviews: result.reviews,
-  unrewritten: missed,
-  left: await leftRecordings(),
-  everydayTests: result.everydayTests,
-})
 
 const body = renderResult(result)
 
@@ -460,9 +398,9 @@ if (postTo) {
   )
 
   // Pushed after the comment, so CI's gate on the new commit finds its result.
-  await (result.head === postTo.head
-    ? rerunGate(repo, postTo)
-    : $`git push origin ${`HEAD:refs/heads/${postTo.branch}`}`.cwd(root))
+  await (committed
+    ? $`git push origin ${`HEAD:refs/heads/${postTo.branch}`}`.cwd(root)
+    : rerunGate(repo, postTo))
 } else if (pull) {
   console.warn(
     `Nothing was posted or committed: a result for #${pull.number} must come from a clean checkout of its head ${pull.head} (gh pr checkout ${pull.number}).`
@@ -472,7 +410,5 @@ if (postTo) {
     'No open PR needs provider-checks: nothing was posted, and the new recordings are left uncommitted.'
   )
 }
-
-if (passed(result)) fs.rmSync(savedFile, {force: true})
 
 process.exit(passed(result) ? 0 : 1)

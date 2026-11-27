@@ -1,23 +1,11 @@
 import {z} from 'zod'
 
-export const CheckStatusSchema = z.enum(['passed', 'failed', 'not run'])
+export type CheckStatus = 'passed' | 'failed' | 'not run'
 
-export type CheckStatus = z.infer<typeof CheckStatusSchema>
-
-export const ReviewSchema = z.object({
-  id: z.string(),
-  verdict: z.enum(['holds', 'stale', 'not reviewed']),
-  reason: z.string(),
-})
-
-export type Review = z.infer<typeof ReviewSchema>
-
-/** What a resumed run ran again, on top of the saved run for `from`. */
-interface Resumed {
-  from: string
-  liveTests: number
-  reviews: number
-  everydayTests: boolean
+export interface Review {
+  id: string
+  verdict: 'holds' | 'stale' | 'not reviewed'
+  reason: string
 }
 
 export interface Result {
@@ -30,7 +18,6 @@ export interface Result {
   reviews: Review[]
   whyKept: string | null
   everydayTests: CheckStatus
-  resumed: Resumed | null
 }
 
 const MARKER = /<!-- provider-checks (\{.*?\}) -->/
@@ -54,25 +41,6 @@ function counts(values: string[]) {
   return [...tally].map(([value, count]) => `${count} ${value}`).join(', ')
 }
 
-function plural(count: number, noun: string) {
-  return `${count} ${noun}${count === 1 ? '' : 's'}`
-}
-
-function resumedLine(resumed: Resumed) {
-  const reran = [
-    ...(resumed.liveTests > 0 ? [plural(resumed.liveTests, 'live test')] : []),
-    ...(resumed.reviews > 0 ? [plural(resumed.reviews, 'review')] : []),
-    ...(resumed.everydayTests ? ['the everyday tests'] : []),
-  ]
-
-  const listed =
-    reran.length > 1
-      ? `${reran.slice(0, -1).join(', ')} and ${reran.at(-1)}`
-      : (reran[0] ?? 'nothing')
-
-  return `Resumed the run for ${resumed.from}, running ${listed} again.`
-}
-
 function escaped(text: string) {
   return text.replaceAll('|', String.raw`\|`).replaceAll('\n', ' ')
 }
@@ -90,7 +58,6 @@ export function renderResult(result: Result) {
     `## Provider checks: ${passed(result) ? 'passed' : 'failed'}`,
     '',
     ...(result.head ? [`For ${result.head}.`] : []),
-    ...(result.resumed ? [resumedLine(result.resumed)] : []),
     ...(result.pinChanges.length > 0
       ? [`Pins: ${result.pinChanges.join(', ')}.`]
       : []),
