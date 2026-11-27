@@ -2,7 +2,7 @@
  * Run by hand by the maintainer: re-records the recordings, and posts results
  * on the PR CI's gate holds.
  */
-import type {CheckStatus, Review} from './provider-checks-result.ts'
+import type {CheckStatus} from './provider-checks-result.ts'
 import type {Entry} from './provider-dependencies.ts'
 import type {Builds} from './provider-review.ts'
 import type {Pins} from './vendor-pins.ts'
@@ -15,6 +15,7 @@ import {parseArgs} from 'node:util'
 import {z} from 'zod'
 
 import {devUserData} from './dev-data.ts'
+import {mapLimited} from './map-limited.ts'
 import {passed, renderResult} from './provider-checks-result.ts'
 import {LIST, entriesOf, liveCheckOf, tagsIn} from './provider-dependencies.ts'
 import {review} from './provider-review.ts'
@@ -304,21 +305,11 @@ function statusOf(outcomes: string[]): CheckStatus {
 }
 
 async function reviewAll(entries: Entry[], builds: Builds) {
-  const reviews: Review[] = []
-  let next = 0
+  return mapLimited(entries, REVIEWERS, async entry => {
+    console.log(`Reviewing ${entry.id}…`)
 
-  async function reviewer() {
-    for (let entry = entries[next++]; entry; entry = entries[next++]) {
-      console.log(`Reviewing ${entry.id}…`)
-      reviews.push(await review(entry, builds, root))
-    }
-  }
-
-  await Promise.all(Array.from({length: REVIEWERS}, reviewer))
-
-  return entries.flatMap(entry =>
-    reviews.filter(reviewed => reviewed.id === entry.id)
-  )
+    return review(entry, builds, root)
+  })
 }
 
 async function rerunGate(repo: string, pull: Gated) {
