@@ -350,7 +350,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **App side:** each driver's environment sets the switch. `vendor-program` re-hashes `claude` on every check, so a self-updated `claude` is downloaded again; for Codex it checks only the entrypoint and its note.
 - **User would see:** a vendor program that updates itself off the pin: `claude` downloaded again every time, and a Codex update that goes unnoticed.
 - **Changed by:** upgrade
-- **Check:** `[dep:self-updates-off]` in `claude-driver` and `codex-driver`: each pinned program still holds the name of every switch its driver sets, this one included, so it also catches a renamed `cli_auth_credentials_store`. Whether it's honored has no check: testing it could update the program.
+- **Check:** `[dep:self-updates-off]` in `claude-driver` and `codex-driver`: each pinned program still holds the name of every switch its driver sets, this one included, so it also catches a renamed `cli_auth_credentials_store`. Codex's binary doesn't hold `agents.enabled` whole, so `[dep:codex-subagents-off]` checks that one. Whether it's honored has no check: testing it could update the program.
 
 ### A cut with no target resumes at the newest entry
 
@@ -800,7 +800,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Id:** `setup-tokens`
 - **Kind:** D
 - **Provider:** both
-- **Relies on:** how many tokens the vendor program puts before the Thread in a new session's first turn, as the app starts it: about 9,200 for `claude` with Claude Code's own prompt and the app's tools, and about 14,500 for Codex.
+- **Relies on:** how many tokens the vendor program puts before the Thread in a new session's first turn, as the app starts it: about 9,200 for `claude` with Claude Code's own prompt and the app's tools, and about 12,000 for Codex.
 - **App side:** a Reply's Context size includes its own Provider's overhead, so the re-read note's estimate swaps that overhead for the new Provider's, each rounded up, before a Prompt goes to another Provider (`canvas`).
 - **User would see:** an estimate off by the difference, and a note shown or left out near its 20k mark.
 - **Changed by:** upgrade + drift. The program's own instructions change with releases, and Codex's with its server-side Model catalog.

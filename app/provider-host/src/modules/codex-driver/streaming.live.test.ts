@@ -1811,7 +1811,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       },
     })
 
-    const padding = 'The harbor log lists no ships today. '.repeat(400)
+    const padding = 'The harbor log lists no ships today. '.repeat(1000)
 
     try {
       const padded = await reply(
@@ -3393,9 +3393,11 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
     const binary = fs.readFileSync(program)
 
     // Linux's arguments hold every other platform's, plus `allow_login_shell`.
+    // The binary holds `agents` and `enabled` apart, so `[dep:codex-subagents-off]` checks that one.
     const settings = codexArgs('linux')
       .filter(arg => arg !== '-c')
       .map(arg => arg.split('=')[0]?.replace(/^features\./, '') ?? '')
+      .filter(name => name !== 'agents.enabled')
 
     expect(settings.length).toBeGreaterThan(0)
     expect(settings.filter(name => !binary.includes(name))).toEqual([])

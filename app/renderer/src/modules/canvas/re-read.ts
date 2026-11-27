@@ -14,7 +14,7 @@ export const RE_READ_NOTE_FROM = 20_000
  */
 export const SETUP_TOKENS: Record<ProviderId, number> = {
   claude: 10_000,
-  chatgpt: 15_000,
+  chatgpt: 13_000,
 }
 
 /** A Context size, and the Provider whose setup it includes. */
