@@ -41,21 +41,28 @@ interface RecordedReply {
   streamedBeforeInterrupt: number
   /** As the last `message_delta` reports it: what that request sent and wrote. */
   contextSize: number | null
+  /** As the `result` reports it for the Reply's Model, which it may not. */
+  contextWindow: number | null
   boundaryIds: string[]
   toolCalls: RecordedToolCall[]
 }
 
 interface Draft extends Omit<
   RecordedReply,
-  'sessionId' | 'messageId' | 'streamedBeforeInterrupt'
+  'sessionId' | 'messageId' | 'streamedBeforeInterrupt' | 'contextWindow'
 > {
   messageId: string | null
+  model: string | null
   streamedBeforeInterrupt: number | null
 }
 
 const ResultSchema = z.looseObject({
   type: z.literal('result'),
   session_id: z.string(),
+  modelUsage: z.record(
+    z.string(),
+    z.looseObject({contextWindow: z.number().optional()})
+  ),
 })
 
 const AssistantSchema = z.looseObject({
@@ -127,6 +134,7 @@ const InterruptSchema = z.looseObject({
 function newDraft(): Draft {
   return {
     messageId: null,
+    model: null,
     text: '',
     textDeltas: [],
     streamedBeforeInterrupt: null,
@@ -140,6 +148,7 @@ function addAssistant(draft: Draft, message: z.infer<typeof AssistantSchema>) {
   if (message.message.model === '<synthetic>') return
 
   draft.messageId = message.uuid
+  draft.model = message.message.model
 
   for (const part of message.message.content) {
     const text = TextPartSchema.safeParse(part)
@@ -217,14 +226,17 @@ function repliesIn(lines: RecordedLine[]) {
 
     if (!result.success) continue
 
-    const {messageId} = draft
+    const {messageId, model, ...rest} = draft
 
-    if (messageId === null) throw new Error('A Reply has no assistant entry')
+    if (messageId === null || model === null) {
+      throw new Error('A Reply has no assistant entry')
+    }
 
     replies.push({
-      ...draft,
+      ...rest,
       sessionId: result.data.session_id,
       messageId,
+      contextWindow: result.data.modelUsage[model]?.contextWindow ?? null,
       streamedBeforeInterrupt:
         draft.streamedBeforeInterrupt ?? draft.textDeltas.length,
     })
@@ -245,6 +257,39 @@ export function recordedReply(name: string, index: number) {
   if (!reply) throw new Error(`${name} has no Reply ${index}`)
 
   return reply
+}
+
+const ModelsListedSchema = z.looseObject({
+  type: z.literal('control_response'),
+  response: z.looseObject({
+    response: z.looseObject({
+      models: z.array(
+        z.looseObject({
+          value: z.string(),
+          displayName: z.string(),
+          resolvedModel: z.string().optional(),
+        })
+      ),
+    }),
+  }),
+})
+
+/** The Models the recording's `claude` listed, under the driver's names. */
+export function recordedModels(name: string) {
+  for (const line of readRecording(name)) {
+    const listed =
+      line.kind === 'out' ? ModelsListedSchema.safeParse(line.message) : null
+
+    if (listed?.success) {
+      return listed.data.response.response.models.map(model => ({
+        id: model.value,
+        name: model.displayName,
+        resolvesTo: model.resolvedModel ?? null,
+      }))
+    }
+  }
+
+  throw new Error(`${name} lists no Models`)
 }
 
 function quoted(text: string) {

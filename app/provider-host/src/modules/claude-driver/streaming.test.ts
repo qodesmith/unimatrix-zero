@@ -42,7 +42,12 @@ import {afterEach, expect, it} from 'vitest'
 import {z} from 'zod'
 
 import {createClaudeDriver, spawnClaude} from './main'
-import {inFolder, readRecording, recordedReply} from './recorded-replies'
+import {
+  inFolder,
+  readRecording,
+  recordedModels,
+  recordedReply,
+} from './recorded-replies'
 import {
   FakeClaudeRunSchema,
   RECORDINGS,
@@ -92,6 +97,10 @@ function again(uuid: string) {
 }
 
 const THIRD_MESSAGE = again(SECOND_MESSAGE)
+
+function windowOf({contextWindow}: {contextWindow: number | null}) {
+  return contextWindow === null ? {} : {contextWindow}
+}
 
 type Streamed = StartReplyEvent
 
@@ -461,11 +470,13 @@ it('streams a Reply, records where Claude saved it, and reports its Context size
       model: MODEL,
       session: {sessionId: SESSION_ID, messageId: FIRST_MESSAGE},
     }),
-    expect.objectContaining({
+    {
+      treeId: expect.any(String),
+      replyId: expect.any(String),
       type: 'RUN_FINISHED',
       status: 'complete',
-      contextWindow: 1_000_000,
-    }),
+      ...windowOf(FIRST_REPLY),
+    },
   ])
   expect(
     claude.store
@@ -1789,7 +1800,7 @@ it('stops a Reply where it is, records it, and continues the Thread warm from it
       replyId: expect.any(String),
       type: 'RUN_FINISHED',
       status: 'stopped',
-      contextWindow: 1_000_000,
+      ...windowOf(STOPPED_REPLY),
     },
   ])
   expect(
@@ -2117,8 +2128,25 @@ function listedOnly() {
   )
 }
 
+const NEWER_MODEL = {id: 'claude-newer', name: 'Newer', resolvesTo: null}
+
+/** A re-record may give both `claude`s the same Models, which tells no change. */
+function listingMore() {
+  const newer = `{"value":"${NEWER_MODEL.id}","displayName":"${NEWER_MODEL.name}"}`
+
+  return edited('resumed.ndjson', lines =>
+    lines.map(line =>
+      RecordedLineSchema.parse(
+        JSON.parse(
+          JSON.stringify(line).replace('"models":[', `"models":[${newer},`)
+        )
+      )
+    )
+  )
+}
+
 it('lists the Models from a `claude` it starts before any Prompt, then those of the newest one, telling each change', async () => {
-  const claude = await setUp([listedOnly(), 'warm.ndjson', 'resumed.ndjson'])
+  const claude = await setUp([listedOnly(), 'warm.ndjson', listingMore()])
   const changes: Model[][] = []
   claude.driver.onModelsChanged(models => changes.push(models))
 
@@ -2134,28 +2162,15 @@ it('lists the Models from a `claude` it starts before any Prompt, then those of 
   const first = await claude.reply(FIRST_PROMPT)
   const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
 
-  expect(changes[0]?.slice(0, 2)).toEqual([
-    {
-      id: 'default',
-      name: 'Default (recommended)',
-      isDefault: true,
-      resolvesTo: 'claude-opus-5-5',
-      needsAppUpdate: false,
-    },
-    {
-      id: 'opus',
-      name: 'Opus 5.5',
-      isDefault: false,
-      resolvesTo: 'claude-opus-5-5',
-      needsAppUpdate: false,
-    },
-  ])
-  expect(changes[0]).toHaveLength(13)
+  expect(changes[0]).toMatchObject(recordedModels('warm.ndjson'))
 
   await claude.reply(THIRD_PROMPT, recordedIn(second), {model: 'sonnet'})
   await expect.poll(() => changes.length).toBe(2)
 
-  expect(changes[1]?.[0]).toMatchObject({resolvesTo: 'claude-fable-5-1'})
+  expect(changes[1]).toMatchObject([
+    NEWER_MODEL,
+    ...recordedModels('resumed.ndjson'),
+  ])
   await expect(claude.driver.listModels(claude.vendorProgram)).resolves.toEqual(
     changes[1]
   )
@@ -2194,7 +2209,7 @@ it('learns nothing from a `claude` whose Models can’t be read, and writes the 
   await claude.reply(THIRD_PROMPT, recordedIn(second), {model: 'sonnet'})
   await expect.poll(() => changes.length).toBe(1)
 
-  expect(changes[0]?.[0]).toMatchObject({resolvesTo: 'claude-fable-5-1'})
+  expect(changes[0]).toMatchObject(recordedModels('resumed.ndjson'))
 })
 
 it('starts claude with the Compaction Settings, and with nothing for the defaults', async () => {
@@ -2271,6 +2286,13 @@ function answersTo(claude: {reports: () => {answers: unknown[]}[]}) {
     .map(
       answer => z.looseObject({response: z.unknown()}).parse(answer).response
     )
+}
+
+/** The edit hook's answer for a Write in the Tree's files: decide at its card. */
+const NO_DECISION = {hookSpecificOutput: {hookEventName: 'PreToolUse'}}
+
+function writesIn(name: string) {
+  return recordedReply(name, 0).toolCalls.filter(call => call.name === 'Write')
 }
 
 it('runs claude under Supervised in its default mode, with no full access, asking the app before a tool runs', async () => {
@@ -2410,6 +2432,7 @@ it('under Supervised, asks about a Write in the Tree’s files at its tool call 
   ).toBeLessThan(asked)
   expect(write?.result?.isError).toBe(false)
   expect(answersTo(claude)).toEqual([
+    NO_DECISION,
     {
       behavior: 'allow',
       updatedInput: asWritten,
@@ -2434,6 +2457,10 @@ it('under Supervised, asks about a Write in the Tree’s files at its tool call 
 })
 
 it('under Supervised, asks once for two Writes in the Tree’s files after Always allow, and lets the second run without a card', async () => {
+  const writes = writesIn('always-allowed.ndjson')
+
+  if (writes.length < 2) throw new Error('The recording holds no second Write')
+
   const claude = await setUp(['always-allowed.ndjson'])
 
   const events = await claude.reply('Write a.txt, then b.txt.', null, {
@@ -2445,10 +2472,12 @@ it('under Supervised, asks once for two Writes in the Tree’s files after Alway
     'APPROVAL_REQUESTED',
     'APPROVAL_RESOLVED',
   ])
-  expect(answersTo(claude)).toEqual([
-    expect.objectContaining({behavior: 'allow'}),
-    expect.objectContaining({behavior: 'allow'}),
-  ])
+  expect(answersTo(claude)).toEqual(
+    writes.flatMap(({id}) => [
+      NO_DECISION,
+      expect.objectContaining({behavior: 'allow', toolUseID: id}),
+    ])
+  )
   expect(events.at(-1)).toMatchObject({status: 'complete'})
 })
 
@@ -2461,9 +2490,12 @@ it('under Supervised, shows no card for a Write a grant the Reply carries covers
   })
 
   expect(approvalsIn(events)).toEqual([])
-  expect(answersTo(claude)).toEqual([
-    expect.objectContaining({behavior: 'allow'}),
-  ])
+  expect(answersTo(claude)).toEqual(
+    writesIn('granted.ndjson').flatMap(({id}) => [
+      NO_DECISION,
+      expect.objectContaining({behavior: 'allow', toolUseID: id}),
+    ])
+  )
   expect(events.at(-1)).toMatchObject({status: 'complete'})
 })
 
@@ -2481,6 +2513,7 @@ it('under Supervised, denies a Write the user denies with a short reason, and th
 
   expect(approvalsIn(events).at(-1)).toMatchObject({answer: 'deny'})
   expect(answersTo(claude)).toEqual([
+    NO_DECISION,
     {
       behavior: 'deny',
       message: expect.stringMatching(/\S/),
@@ -2532,6 +2565,7 @@ it('under Supervised, ends a Reply stopped while a card waits as stopped, answer
     'APPROVAL_REQUESTED',
   ])
   expect(answersTo(claude)).toEqual([
+    NO_DECISION,
     expect.objectContaining({behavior: 'deny'}),
   ])
   expect(events.at(-1)).toMatchObject({status: 'stopped'})

@@ -2383,7 +2383,10 @@ it('asks about a command the Model wants to run outside the Sandbox on a card of
     },
   ])
   expect(toolCallsOf(leaving).map(call => call.result)).toEqual([
-    {content: 'This command didn’t run to the end.', isError: true},
+    {
+      content: SANDBOX.commandOutput(SANDBOX.commandRequest(2).itemId) ?? '',
+      isError: true,
+    },
   ])
 })
 

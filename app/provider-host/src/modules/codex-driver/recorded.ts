@@ -31,6 +31,13 @@ const CompletedSchema = z.looseObject({
   item: z.looseObject({type: z.string(), text: z.string().optional()}),
 })
 
+const CompletedCommandSchema = z.looseObject({
+  item: z.looseObject({
+    id: z.string(),
+    aggregatedOutput: z.string().nullable(),
+  }),
+})
+
 const TokenUsageSchema = z.looseObject({
   tokenUsage: z.looseObject({
     last: z.looseObject({totalTokens: z.number()}),
@@ -164,6 +171,21 @@ export function readRecording(name: string) {
       )
 
       return {itemId, command, parsed: commandActions[0].command}
+    },
+    commandOutput(itemId: string) {
+      const completed = sent('item/completed', false).flatMap(params => {
+        const {item} = CompletedSchema.parse(params)
+
+        return item.type === 'commandExecution'
+          ? [CompletedCommandSchema.parse(params).item]
+          : []
+      })
+
+      return nth(
+        completed.filter(item => item.id === itemId),
+        0,
+        `item/completed for ${itemId}`
+      ).aggregatedOutput
     },
     rateLimits(at = 0) {
       return RateLimitsSchema.parse(
