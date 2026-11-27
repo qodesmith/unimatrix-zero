@@ -456,14 +456,46 @@ it('replaces only the text after a tool call when its message ends other than it
   ).toEqual(['Let me write it.', 'Write', 'Bash', endedText])
 })
 
+const MessageDeltaSchema = z.looseObject({
+  type: z.literal('stream_event'),
+  event: z.looseObject({type: z.literal('message_delta')}),
+})
+
+function withUsage(name: string) {
+  return edited(name, lines =>
+    lines.map(line => {
+      const ended =
+        line.kind === 'out' ? MessageDeltaSchema.safeParse(line.message) : null
+
+      return ended?.success
+        ? {
+            kind: 'out',
+            message: {
+              ...ended.data,
+              event: {
+                ...ended.data.event,
+                usage: {
+                  input_tokens: 2,
+                  cache_creation_input_tokens: 157,
+                  cache_read_input_tokens: 586,
+                  output_tokens: 12,
+                },
+              },
+            },
+          }
+        : line
+    })
+  )
+}
+
 it('streams a Reply, records where Claude saved it, and reports its Context size', async () => {
-  const claude = await setUp(['warm.ndjson'])
+  const claude = await setUp([withUsage('warm.ndjson')])
 
   const events = await claude.reply(FIRST_PROMPT)
 
   expect(events[0]?.type).toBe('RUN_STARTED')
   expect(textOf(events)).toBe(FIRST_REPLY.text)
-  expect(shown(events).contextSize).toBe(FIRST_REPLY.contextSize)
+  expect(shown(events).contextSize).toBe(757)
   expect(events.slice(-2)).toEqual([
     expect.objectContaining({
       type: 'REPLY_RECORDED',
@@ -1782,7 +1814,7 @@ it('never gives up on a claude once it is heard, however long it then takes', as
 })
 
 it('stops a Reply where it is, records it, and continues the Thread warm from it', async () => {
-  const claude = await setUp(['stopped.ndjson'])
+  const claude = await setUp([withUsage('stopped.ndjson')])
 
   const stopped = await claude.reply(COUNT_PROMPT, null, {
     stopAfterDeltas: STOPPED_REPLY.streamedBeforeInterrupt,
@@ -1816,7 +1848,7 @@ it('stops a Reply where it is, records it, and continues the Thread warm from it
     sessionId: STOPPED_SESSION_ID,
     messageId: ASKED_MESSAGE,
   })
-  expect(shown(asked).contextSize).toBe(ASKED_REPLY.contextSize)
+  expect(shown(asked).contextSize).toBe(757)
 
   await claude.allClosed()
   const [report] = claude.reports()

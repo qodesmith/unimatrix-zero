@@ -1,7 +1,3 @@
-/**
- * A recording is a real conversation a live test saved for the everyday tests
- * to replay. Its `start` line names the build that made it.
- */
 import type {GitHubApi, Pins} from './vendor-pins.ts'
 
 import {execFile} from 'node:child_process'

@@ -39,8 +39,6 @@ interface RecordedReply {
   textDeltas: string[]
   /** Text deltas streamed before the SDK asked `claude` to stop, else all. */
   streamedBeforeInterrupt: number
-  /** As the last `message_delta` reports it: what that request sent and wrote. */
-  contextSize: number | null
   /** As the `result` reports it for the Reply's Model, which it may not. */
   contextWindow: number | null
   boundaryIds: string[]
@@ -110,16 +108,6 @@ const TextDeltaSchema = z.looseObject({
   delta: z.looseObject({type: z.literal('text_delta'), text: z.string()}),
 })
 
-const MessageDeltaSchema = z.looseObject({
-  type: z.literal('message_delta'),
-  usage: z.looseObject({
-    input_tokens: z.number().nullish(),
-    cache_creation_input_tokens: z.number().nullish(),
-    cache_read_input_tokens: z.number().nullish(),
-    output_tokens: z.number(),
-  }),
-})
-
 const BoundarySchema = z.looseObject({
   type: z.literal('system'),
   subtype: z.literal('compact_boundary'),
@@ -138,7 +126,6 @@ function newDraft(): Draft {
     text: '',
     textDeltas: [],
     streamedBeforeInterrupt: null,
-    contextSize: null,
     boundaryIds: [],
     toolCalls: [],
   }
@@ -180,19 +167,8 @@ function addStreamEvent(
   {event}: z.infer<typeof StreamEventSchema>
 ) {
   const delta = TextDeltaSchema.safeParse(event)
-  const ended = MessageDeltaSchema.safeParse(event)
 
   if (delta.success) draft.textDeltas.push(delta.data.delta.text)
-
-  if (ended.success) {
-    const {usage} = ended.data
-
-    draft.contextSize =
-      (usage.input_tokens ?? 0) +
-      (usage.cache_creation_input_tokens ?? 0) +
-      (usage.cache_read_input_tokens ?? 0) +
-      usage.output_tokens
-  }
 }
 
 function addOut(draft: Draft, message: z.infer<typeof RecordedMessageSchema>) {
