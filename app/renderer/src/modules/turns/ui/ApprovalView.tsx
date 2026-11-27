@@ -49,9 +49,11 @@ function whatItDoes(action: ApprovalAction) {
     case 'edit':
       return `edit ${listed(action.inTreeFiles ? action.paths.map(fileName) : action.paths)}`
     case 'command':
-      return action.outsideSandbox
-        ? 'run this command on your whole computer'
-        : 'run this command'
+      if (!action.outsideSandbox) return 'run this command'
+
+      return action.credentialsDenied
+        ? 'run this command outside the Sandbox'
+        : 'run this command on your whole computer'
     case 'host':
       return `connect to ${action.host}`
     case 'mcp-tool':

@@ -215,7 +215,7 @@ it('leads a command that would leave the Sandbox with what it could then reach, 
   expect(screen.getByText(UNSANDBOXED).all()).toHaveLength(1)
 })
 
-it('leaves saved logins out of what a command outside the Sandbox could reach when they stay denied there', async () => {
+it('leaves your whole computer and saved logins out of what a command outside the Sandbox could reach when the credential folders stay denied there', async () => {
   const screen = await renderReply(
     asked({
       kind: 'command',
@@ -225,6 +225,14 @@ it('leaves saved logins out of what a command outside the Sandbox could reach wh
     })
   )
 
+  await expect
+    .element(
+      card(screen).getByText(
+        'The AI wants to run this command outside the Sandbox'
+      )
+    )
+    .toBeVisible()
+  expect(screen.getByText(/whole computer/u).query()).toBeNull()
   await expect
     .element(
       card(screen).getByText(
