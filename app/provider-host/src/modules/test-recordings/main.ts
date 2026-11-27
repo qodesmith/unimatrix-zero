@@ -44,12 +44,17 @@ function asProjectKey(folder: string) {
   return folder.replaceAll(/[^a-zA-Z0-9]/g, '-')
 }
 
+/** The real path first, since the other can sit inside it. */
+function tempFolders() {
+  return [fs.realpathSync(os.tmpdir()), os.tmpdir()]
+}
+
 /**
  * Each way a recording can name this machine's temp folder, with its stand-in,
  * the real path first since the other can sit inside it.
  */
 export function tempFolderNames() {
-  const folders = [fs.realpathSync(os.tmpdir()), os.tmpdir()].map(folder =>
+  const folders = tempFolders().map(folder =>
     JSON.stringify(folder).slice(1, -1)
   )
 
@@ -68,9 +73,7 @@ export function tempFolderNames() {
  */
 export function machineStandIns() {
   return [
-    ...[fs.realpathSync(os.tmpdir()), os.tmpdir()].map(
-      folder => [folder, TEMP_FOLDER_STAND_IN] as const
-    ),
+    ...tempFolders().map(folder => [folder, TEMP_FOLDER_STAND_IN] as const),
     ...[fs.realpathSync(os.homedir()), os.homedir()].map(
       folder => [folder, HOME_STAND_IN] as const
     ),
@@ -81,6 +84,8 @@ export function machineStandIns() {
 export interface SkippedSetting<Field extends string = string> {
   field: Field
   reason: string
+  /** Only the vendor program started at this place, from 0; else every one. */
+  run?: number
 }
 
 /**

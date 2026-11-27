@@ -15,12 +15,14 @@ export const TREE_FOLDER_STAND_IN = '/tree-folder'
 
 export const TREES_FOLDER_STAND_IN = '/trees-folder'
 
+const THREAD_SETTINGS = ['config', 'sandbox', 'approvalPolicy', 'cwd'] as const
+
+const TURN_SETTINGS = ['sandboxPolicy', 'approvalPolicy', 'cwd'] as const
+
+/** What the fake compares on a thread's and a turn's request. */
 export type CodexSetting =
-  | 'config'
-  | 'sandbox'
-  | 'approvalPolicy'
-  | 'cwd'
-  | 'sandboxPolicy'
+  | (typeof THREAD_SETTINGS)[number]
+  | (typeof TURN_SETTINGS)[number]
 
 export const RecordedMessageSchema = z.looseObject({})
 
@@ -143,8 +145,8 @@ const [, ...steps] = fs.readFileSync(recording, 'utf8')
   .split('\\n').filter(Boolean).map(line => JSON.parse(line))
 
 ${SETTINGS_CHECK}
-const THREAD_SETTINGS = ['config', 'sandbox', 'approvalPolicy', 'cwd']
-const SETTINGS = {'thread/start': THREAD_SETTINGS, 'thread/resume': THREAD_SETTINGS, 'thread/fork': THREAD_SETTINGS, 'turn/start': ['sandboxPolicy', 'approvalPolicy', 'cwd']}
+const THREAD_SETTINGS = ${JSON.stringify(THREAD_SETTINGS)}
+const SETTINGS = {'thread/start': THREAD_SETTINGS, 'thread/resume': THREAD_SETTINGS, 'thread/fork': THREAD_SETTINGS, 'turn/start': ${JSON.stringify(TURN_SETTINGS)}}
 const recordedTree = steps.find(step => step.kind === 'in' && step.message.method in SETTINGS)?.message.params.cwd
 const standIns = [[home, standIn], [options.tree, recordedTree], ...(options.standIns ?? []), ...options.machine]
 
@@ -291,7 +293,7 @@ process.stdin.on('data', chunk => {
       reverting = cutBefore(message.params.threadId, message.params.beforeTurnId)
     }
     const recorded = expected(message)
-    const changed = message.method in SETTINGS ? changedSetting(message.method, SETTINGS[message.method], recorded.params, withStandIns(message.params, standIns), options.skip ?? []) : null
+    const changed = message.method in SETTINGS ? changedSetting(message.method, SETTINGS[message.method], recorded.params, withStandIns(message.params, standIns), (options.skip ?? []).filter(skip => skip.run === undefined || skip.run === run)) : null
     if (changed) {
       report.changed = changed
       end('changed-setting', 3)

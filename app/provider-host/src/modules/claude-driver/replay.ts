@@ -173,7 +173,7 @@ save()
 
 ${SETTINGS_CHECK}
 // Ids and the Model, which a replay doesn't compare.
-const NOT_COMPARED = ['--model', '--resume', '--resume-session-at', '--fork-session']
+const NOT_COMPARED = ['--model', '--resume', '--resume-session-at']
 const PROMPT_TEXT = ['systemPrompt', 'appendSystemPrompt']
 
 function optionsIn(args) {
@@ -197,9 +197,9 @@ function optionsIn(args) {
 
 const standIns = [[projectKey, start.projectKey], [fs.realpathSync(process.cwd()), start.cwd], [configDir, start.configDir], ...(options.standIns ?? []), ...options.machine]
 
-const skipped = options.skip ?? []
+const skipped = (options.skip ?? []).filter(skip => skip.run === undefined || skip.run === run)
 
-function sameSettings(where, recorded, sent) {
+function exitOnChangedSetting(where, recorded, sent) {
   if (skipped.some(({field}) => field === '*')) return
   const fields = [...new Set([...Object.keys(recorded), ...Object.keys(sent)])]
   const changed = changedSetting(where, fields, recorded, withStandIns(sent, standIns), skipped)
@@ -211,7 +211,7 @@ function sameSettings(where, recorded, sent) {
   process.exit(3)
 }
 
-sameSettings('claude option', optionsIn(start.args), optionsIn(args))
+exitOnChangedSetting('claude option', optionsIn(start.args), optionsIn(args))
 
 const requestIds = new Map()
 const renamed = new Map()
@@ -319,7 +319,7 @@ process.stdin.on('data', chunk => {
     if (message.type === 'control_response') report.answers.push(message.response)
     if (message.type === 'control_request' && message.request.subtype === 'initialize') {
       const settings = request => Object.fromEntries(Object.entries(request).filter(([name]) => !PROMPT_TEXT.includes(name)))
-      sameSettings('initialize', settings(step.message.request), settings(message.request))
+      exitOnChangedSetting('initialize', settings(step.message.request), settings(message.request))
       const prompt = message.request.systemPrompt
       report.systemPrompt = Array.isArray(prompt) ? prompt : prompt == null ? [] : [prompt]
       report.appendedPrompt = message.request.appendSystemPrompt ?? null

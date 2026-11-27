@@ -126,14 +126,32 @@ function edited(name: string, edit: (lines: RecordedLine[]) => RecordedLine[]) {
   return file
 }
 
-/** Settings a test sends differently from its recording on purpose, and why. */
-function skipping(reason: string, ...fields: string[]) {
-  return {skip: fields.map(field => ({field, reason}))}
+/**
+ * Settings a test sends differently from its recording on purpose, and why:
+ * to the `claude` started at `run`, from 0, or to every one.
+ */
+function skipping(reason: string, fields: string[], run?: number) {
+  return {skip: fields.map(field => ({field, reason, run}))}
 }
 
-const NO_RECORDING_OF_ITS_OWN = skipping(
-  'No recording was made of a one-shot or of the claude that lists the Models: a Reply’s stands in for what claude answers them.',
-  '*'
+/**
+ * For each `claude` started at one of `runs`, from 0, that is a one-shot or
+ * lists the Models: a Reply's recording stands in for what `claude` answers.
+ */
+function noRecordingOf(...runs: number[]) {
+  return {
+    skip: runs.map(run => ({
+      field: '*',
+      reason:
+        'No recording was made of a one-shot or of the claude that lists the Models.',
+      run,
+    })),
+  }
+}
+
+const RECORDED_ON_A_MAC = skipping(
+  'warm.ndjson ran on a Mac, and the driver names another tool on Windows.',
+  ['--tools']
 )
 
 async function setUp(
@@ -968,10 +986,7 @@ it('names the app’s developer folder to a claude that starts on a Mac with no 
 })
 
 it('puts the folder of the app’s own git last on the PATH of a Reply’s claude and a one-shot’s, and names none of git’s own folders', async () => {
-  const claude = await setUp(
-    ['warm.ndjson', 'warm.ndjson'],
-    NO_RECORDING_OF_ITS_OWN
-  )
+  const claude = await setUp(['warm.ndjson', 'warm.ndjson'], noRecordingOf(1))
 
   const last = `${process.env.PATH ?? ''}${path.delimiter}${claude.vendorProgram.gitFolder}`
 
@@ -1004,10 +1019,7 @@ it('starts a Reply’s claude with no setting sources, so neither a `CLAUDE.md` 
 it('gives claude the PowerShell tool on Windows', async () => {
   const claude = await setUp(
     ['warm.ndjson'],
-    skipping(
-      'warm.ndjson ran on a Mac: the test checks the tools the driver names on Windows.',
-      '--tools'
-    ),
+    RECORDED_ON_A_MAC,
     fakeStore(),
     'win32'
   )
@@ -1031,7 +1043,7 @@ it('gives a Reply’s claude and a one-shot’s none of git’s login settings, 
   for (const platform of ['linux', 'darwin', 'win32'] as const) {
     const claude = await setUp(
       ['warm.ndjson', 'warm.ndjson'],
-      NO_RECORDING_OF_ITS_OWN,
+      {skip: [...noRecordingOf(1).skip, ...RECORDED_ON_A_MAC.skip]},
       fakeStore(),
       platform
     )
@@ -1065,7 +1077,7 @@ it('gives a Reply’s claude and a one-shot’s none of git’s login settings, 
 it('names the app’s developer folder to a one-shot’s claude on a Mac with no developer tools, and to none on a Mac with them', async () => {
   const claude = await setUp(
     ['warm.ndjson', 'warm.ndjson'],
-    NO_RECORDING_OF_ITS_OWN
+    noRecordingOf(0, 1)
   )
 
   const {signal} = new AbortController()
@@ -1087,7 +1099,7 @@ it('names the app’s developer folder to a one-shot’s claude on a Mac with no
 })
 
 it('names the app’s developer folder to the claude that lists the Models on a Mac with no developer tools', async () => {
-  const claude = await setUp([listedOnly()], NO_RECORDING_OF_ITS_OWN)
+  const claude = await setUp([listedOnly()], noRecordingOf(0))
   claude.developerTools.present = false
 
   await claude.driver.listModels(claude.vendorProgram)
@@ -2259,7 +2271,7 @@ function listingMore() {
 it('lists the Models from a `claude` it starts before any Prompt, then those of the newest one, telling each change', async () => {
   const claude = await setUp(
     [listedOnly(), 'warm.ndjson', listingMore()],
-    NO_RECORDING_OF_ITS_OWN
+    noRecordingOf(0)
   )
 
   const changes: Model[][] = []
@@ -2332,8 +2344,8 @@ it('starts claude with the Compaction Settings, and with nothing for the default
     ['warm.ndjson', 'resumed.ndjson'],
     skipping(
       'resumed.ndjson resumed on the default Compaction Settings: the test checks the ones the driver starts claude with.',
-      '--settings.autoCompactEnabled',
-      '--settings.autoCompactWindow'
+      ['--settings.autoCompactEnabled', '--settings.autoCompactWindow'],
+      1
     )
   )
 
@@ -2365,8 +2377,8 @@ it('runs claude with the web, account connectors and built-in Skills only as the
     ['warm.ndjson', 'resumed.ndjson'],
     skipping(
       'resumed.ndjson resumed on the default Tools: the test checks the ones the driver starts claude with.',
-      '--tools',
-      '--strict-mcp-config'
+      ['--tools', '--strict-mcp-config'],
+      1
     )
   )
 
@@ -2443,8 +2455,7 @@ it('runs claude under Supervised inside the Sandbox: it writes only in the Tree�
     ['read-outside.ndjson'],
     skipping(
       'read-outside.ndjson hid no folder: the test checks the Sandbox settings the driver builds from the app’s folders.',
-      '--settings.sandbox',
-      '--settings.permissions'
+      ['--settings.sandbox', '--settings.permissions']
     )
   )
 
@@ -2513,7 +2524,7 @@ it('runs claude with no Sandbox where the Sandbox can’t run, and under Full ac
     ['read-outside.ndjson'],
     skipping(
       'read-outside.ndjson ran inside the Sandbox: the test checks that the driver turns it off where it can’t run.',
-      '--settings.sandbox'
+      ['--settings.sandbox']
     ),
     fakeStore(),
     'linux'
@@ -2889,12 +2900,15 @@ it('resumes the session in a new claude for a Reply under another Permission mod
     ['warm.ndjson', 'resumed.ndjson'],
     skipping(
       'resumed.ndjson resumed under full access: the test checks the Permission mode the driver starts claude with.',
-      '--permission-mode',
-      '--allow-dangerously-skip-permissions',
-      '--permission-prompt-tool',
-      '--settings.sandbox',
-      '--settings.permissions',
-      'hooks'
+      [
+        '--permission-mode',
+        '--allow-dangerously-skip-permissions',
+        '--permission-prompt-tool',
+        '--settings.sandbox',
+        '--settings.permissions',
+        'hooks',
+      ],
+      1
     )
   )
 

@@ -2352,10 +2352,6 @@ it('unsubscribes a loaded thread and resumes it on the permission profile for a 
 const LEAVING = SANDBOX.commandRequest(1).parsed
 
 /**
- * The Replies of `sandbox.ndjson`, in order: a command inside the Sandbox,
- * `LEAVING` refused by it, `LEAVING` asked to run outside, a connection.
- */
-/**
  * Replays `sandbox.ndjson` in folders laid out as its live test's were: the
  * Tree beside each other Tree the profile denied, and its hidden folders.
  */
@@ -2383,6 +2379,10 @@ async function sandboxSetUp() {
   return {...codex, folders: {treesFolder, hiddenFolders}}
 }
 
+/**
+ * The Replies of `sandbox.ndjson`, in order: a command inside the Sandbox,
+ * `LEAVING` refused by it, `LEAVING` asked to run outside, a connection.
+ */
 async function sandboxReplies(
   codex: Awaited<ReturnType<typeof sandboxSetUp>>,
   count: number,
