@@ -54,6 +54,13 @@ it('tells a list once, and again only when a later `claude` lists other Models',
     ['opus'],
     ['opus', 'haiku'],
   ])
+  expect(changes[0]?.[0]).toEqual({
+    id: 'opus',
+    name: 'Opus',
+    isDefault: false,
+    resolvesTo: 'claude-opus-5-5',
+    needsAppUpdate: false,
+  })
   expect(changes[1]?.[1]).toEqual({
     id: 'haiku',
     name: 'Haiku',

@@ -379,7 +379,7 @@ const result = {
   gatedFiles: postTo?.files ?? [],
   checks,
   reviews: await reviewAll(entries, builds),
-  keptRecordings: kept,
+  whyKept: kept,
   everyday: await runEverydayTests(),
 }
 

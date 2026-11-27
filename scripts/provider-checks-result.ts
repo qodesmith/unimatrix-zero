@@ -16,8 +16,7 @@ export interface Result {
   gatedFiles: string[]
   checks: {id: string; status: CheckStatus}[]
   reviews: Review[]
-  /** Why the run kept the old recordings, or null once it rewrote them all. */
-  keptRecordings: string | null
+  whyKept: string | null
   /** The everyday tests, run against the recordings the run left. */
   everyday: CheckStatus
 }
@@ -30,7 +29,7 @@ export function passed(result: Result) {
   return (
     result.checks.every(check => check.status === 'passed') &&
     result.reviews.every(review => review.verdict === 'holds') &&
-    result.keptRecordings === null &&
+    result.whyKept === null &&
     result.everyday === 'passed'
   )
 }
@@ -69,7 +68,7 @@ export function renderResult(result: Result) {
         ]
       : []),
     '',
-    `**Recordings:** ${result.keptRecordings === null ? 're-recorded' : `kept the old ones, since ${result.keptRecordings}`}`,
+    `**Recordings:** ${result.whyKept === null ? 're-recorded' : `kept the old ones, since ${result.whyKept}`}`,
     '',
     `**Everyday tests:** ${result.everyday}`,
     '',

@@ -20,7 +20,7 @@ function result(head: string | null, change: Partial<Result> = {}): Result {
       {id: 'cut-short-replies', verdict: 'holds', reason: ''},
     ],
     gatedFiles: [],
-    keptRecordings: null,
+    whyKept: null,
     everyday: 'passed',
     ...change,
   }
@@ -59,7 +59,7 @@ const unreviewed = renderResult(
   })
 )
 
-const kept = renderResult(result(HEAD, {keptRecordings: 'a live test failed'}))
+const kept = renderResult(result(HEAD, {whyKept: 'a live test failed'}))
 
 const everydayFailed = renderResult(result(HEAD, {everyday: 'failed'}))
 
