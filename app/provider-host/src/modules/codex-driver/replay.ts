@@ -48,7 +48,7 @@ export interface FakeCodexOptions {
    */
   keepRunningOnRefusal?: boolean
   /** The test's Tree folder, read as the folder the recording's threads ran in. */
-  tree?: string
+  treeFolder?: string
   /** Other folders of the test's, each with the name the recording has for it. */
   standIns?: [string, string][]
   /** Settings the test sends differently from the recording on purpose. */
@@ -148,7 +148,7 @@ ${SETTINGS_CHECK}
 const THREAD_SETTINGS = ${JSON.stringify(THREAD_SETTINGS)}
 const SETTINGS = {'thread/start': THREAD_SETTINGS, 'thread/resume': THREAD_SETTINGS, 'thread/fork': THREAD_SETTINGS, 'turn/start': ${JSON.stringify(TURN_SETTINGS)}}
 const recordedTree = steps.find(step => step.kind === 'in' && step.message.method in SETTINGS)?.message.params.cwd
-const standIns = [[home, standIn], [options.tree, recordedTree], ...(options.standIns ?? []), ...options.machine]
+const standIns = [[home, standIn], [options.treeFolder, recordedTree], ...(options.standIns ?? []), ...options.machine]
 
 function rollouts() {
   const sessions = path.join(home, 'sessions')

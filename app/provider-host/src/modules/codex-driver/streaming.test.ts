@@ -230,7 +230,7 @@ async function setUp(
           path.isAbsolute(name) ? name : path.join(RECORDINGS, name)
         ),
         reports,
-        {tree: treeFolder, ...behavior}
+        {treeFolder, ...behavior}
       ),
     },
     whenIdle: idle.whenIdle,
