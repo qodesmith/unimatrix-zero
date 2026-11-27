@@ -1047,7 +1047,12 @@ it('gives a Reply’s claude and a one-shot’s none of git’s login settings, 
   for (const platform of ['linux', 'darwin', 'win32'] as const) {
     const claude = await setUp(
       ['warm.ndjson', 'warm.ndjson'],
-      {skip: [...noRecordingOf(1).skip, ...RECORDED_ON_A_MAC.skip]},
+      {
+        skip: [
+          ...noRecordingOf(1).skip,
+          ...(platform === 'win32' ? RECORDED_ON_A_MAC.skip : []),
+        ],
+      },
       fakeStore(),
       platform
     )
