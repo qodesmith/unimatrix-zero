@@ -47,6 +47,7 @@ import {
   readRecording,
   recordedModels,
   recordedReply,
+  recordedTreeFolder,
 } from './recorded-replies'
 import {
   FakeClaudeRunSchema,
@@ -125,16 +126,33 @@ function edited(name: string, edit: (lines: RecordedLine[]) => RecordedLine[]) {
   return file
 }
 
+/** Settings a test sends differently from its recording on purpose, and why. */
+function skipping(reason: string, ...fields: string[]) {
+  return {skip: fields.map(field => ({field, reason}))}
+}
+
+const NO_RECORDING_OF_ITS_OWN = skipping(
+  'No recording was made of a one-shot or of the claude that lists the Models: a Reply’s stands in for what claude answers them.',
+  '*'
+)
+
 async function setUp(
   recordings: string[],
   behavior: FakeClaudeOptions = {},
   store = fakeStore(),
-  platform: NodeJS.Platform = 'darwin'
+  platform: NodeJS.Platform = 'darwin',
+  treeFolder = folder('uz-claude-tree-')
 ) {
+  const changed: string[] = []
+
+  // Last of the clean-ups, so the others still run.
+  cleanUps.push(async () => {
+    if (changed.length > 0) throw new Error(changed.join('\n\n'))
+  })
+
   const fake = await replayClaude()
   cleanUps.push(fake.cleanUp)
   const configDir = folder('uz-claude-config-')
-  const treeFolder = folder('uz-claude-tree-')
   const reports = folder('uz-claude-reports-')
   const idle = heldIdle()
   const silence = heldIdle()
@@ -292,6 +310,7 @@ async function setUp(
   cleanUps.push(async () => {
     idle.pass()
     await Promise.all(exits)
+    changed.push(...reportsSoFar().flatMap(report => report.changed ?? []))
   })
 
   return {
@@ -949,7 +968,11 @@ it('names the app’s developer folder to a claude that starts on a Mac with no 
 })
 
 it('puts the folder of the app’s own git last on the PATH of a Reply’s claude and a one-shot’s, and names none of git’s own folders', async () => {
-  const claude = await setUp(['warm.ndjson', 'warm.ndjson'])
+  const claude = await setUp(
+    ['warm.ndjson', 'warm.ndjson'],
+    NO_RECORDING_OF_ITS_OWN
+  )
+
   const last = `${process.env.PATH ?? ''}${path.delimiter}${claude.vendorProgram.gitFolder}`
 
   await claude.reply(FIRST_PROMPT)
@@ -979,7 +1002,16 @@ it('starts a Reply’s claude with no setting sources, so neither a `CLAUDE.md` 
 })
 
 it('gives claude the PowerShell tool on Windows', async () => {
-  const claude = await setUp(['warm.ndjson'], {}, fakeStore(), 'win32')
+  const claude = await setUp(
+    ['warm.ndjson'],
+    skipping(
+      'warm.ndjson ran on a Mac: the test checks the tools the driver names on Windows.',
+      '--tools'
+    ),
+    fakeStore(),
+    'win32'
+  )
+
   await claude.reply(FIRST_PROMPT)
   const [report] = claude.reports()
 
@@ -999,7 +1031,7 @@ it('gives a Reply’s claude and a one-shot’s none of git’s login settings, 
   for (const platform of ['linux', 'darwin', 'win32'] as const) {
     const claude = await setUp(
       ['warm.ndjson', 'warm.ndjson'],
-      {},
+      NO_RECORDING_OF_ITS_OWN,
       fakeStore(),
       platform
     )
@@ -1031,7 +1063,11 @@ it('gives a Reply’s claude and a one-shot’s none of git’s login settings, 
 })
 
 it('names the app’s developer folder to a one-shot’s claude on a Mac with no developer tools, and to none on a Mac with them', async () => {
-  const claude = await setUp(['warm.ndjson', 'warm.ndjson'])
+  const claude = await setUp(
+    ['warm.ndjson', 'warm.ndjson'],
+    NO_RECORDING_OF_ITS_OWN
+  )
+
   const {signal} = new AbortController()
 
   const request = {
@@ -1051,7 +1087,7 @@ it('names the app’s developer folder to a one-shot’s claude on a Mac with no
 })
 
 it('names the app’s developer folder to the claude that lists the Models on a Mac with no developer tools', async () => {
-  const claude = await setUp([listedOnly()])
+  const claude = await setUp([listedOnly()], NO_RECORDING_OF_ITS_OWN)
   claude.developerTools.present = false
 
   await claude.driver.listModels(claude.vendorProgram)
@@ -2221,7 +2257,11 @@ function listingMore() {
 }
 
 it('lists the Models from a `claude` it starts before any Prompt, then those of the newest one, telling each change', async () => {
-  const claude = await setUp([listedOnly(), 'warm.ndjson', listingMore()])
+  const claude = await setUp(
+    [listedOnly(), 'warm.ndjson', listingMore()],
+    NO_RECORDING_OF_ITS_OWN
+  )
+
   const changes: Model[][] = []
   claude.driver.onModelsChanged(models => changes.push(models))
 
@@ -2288,7 +2328,15 @@ it('learns nothing from a `claude` whose Models can’t be read, and writes the 
 })
 
 it('starts claude with the Compaction Settings, and with nothing for the defaults', async () => {
-  const claude = await setUp(['warm.ndjson', 'resumed.ndjson'])
+  const claude = await setUp(
+    ['warm.ndjson', 'resumed.ndjson'],
+    skipping(
+      'resumed.ndjson resumed on the default Compaction Settings: the test checks the ones the driver starts claude with.',
+      '--settings.autoCompactEnabled',
+      '--settings.autoCompactWindow'
+    )
+  )
+
   const first = await claude.reply(FIRST_PROMPT)
   const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
 
@@ -2313,7 +2361,15 @@ function toolsOf(args: string[] = []) {
 }
 
 it('runs claude with the web, account connectors and built-in Skills only as the Tree’s Tools panel says, from the Reply after a switch flips', async () => {
-  const claude = await setUp(['warm.ndjson', 'resumed.ndjson'])
+  const claude = await setUp(
+    ['warm.ndjson', 'resumed.ndjson'],
+    skipping(
+      'resumed.ndjson resumed on the default Tools: the test checks the ones the driver starts claude with.',
+      '--tools',
+      '--strict-mcp-config'
+    )
+  )
+
   const first = await claude.reply(FIRST_PROMPT)
   const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
 
@@ -2383,7 +2439,15 @@ it('runs claude under Supervised in its default mode, with no full access, askin
 })
 
 it('runs claude under Supervised inside the Sandbox: it writes only in the Tree’s folder, temp and the package caches, reads no credentials, other Tree or app folder, reaches no host, and asks before every command and before leaving the Sandbox, while the Read tool’s deny rules leave out claude’s config folder', async () => {
-  const claude = await setUp(['read-outside.ndjson'])
+  const claude = await setUp(
+    ['read-outside.ndjson'],
+    skipping(
+      'read-outside.ndjson hid no folder: the test checks the Sandbox settings the driver builds from the app’s folders.',
+      '--settings.sandbox',
+      '--settings.permissions'
+    )
+  )
+
   const home = os.homedir()
 
   await claude.reply('Read the file outside.', null, {
@@ -2447,7 +2511,10 @@ it('runs claude under Supervised inside the Sandbox: it writes only in the Tree�
 it('runs claude with no Sandbox where the Sandbox can’t run, and under Full access', async () => {
   const elsewhere = await setUp(
     ['read-outside.ndjson'],
-    {},
+    skipping(
+      'read-outside.ndjson ran inside the Sandbox: the test checks that the driver turns it off where it can’t run.',
+      '--settings.sandbox'
+    ),
     fakeStore(),
     'linux'
   )
@@ -2677,11 +2744,49 @@ function toolCallsOf(events: Streamed[]) {
   )
 }
 
+/**
+ * Replays a recording in folders laid out as its live Sandbox test's were:
+ * the Tree in a folder of Trees, with `claude`'s config folder hidden and a
+ * folder for each of `recordedHidden`, the other hidden folders it names.
+ */
+async function sandboxSetUp(name: string, recordedHidden: string[] = []) {
+  const recordedTree = recordedTreeFolder(name)
+  const treesFolder = folder('uz-claude-trees-')
+  const treeFolder = path.join(treesFolder, path.posix.basename(recordedTree))
+  const hidden = recordedHidden.map(() => folder('uz-claude-hidden-'))
+  fs.mkdirSync(treeFolder)
+
+  const claude = await setUp(
+    [name],
+    {
+      standIns: [
+        [treesFolder, path.posix.dirname(recordedTree)],
+        ...hidden.map((made, at): [string, string] => [
+          made,
+          recordedHidden[at] ?? '',
+        ]),
+      ],
+    },
+    fakeStore(),
+    'darwin',
+    treeFolder
+  )
+
+  return {
+    ...claude,
+    sandbox: {
+      permissionMode: 'supervised' as const,
+      treesFolder,
+      hiddenFolders: [claude.configDir, ...hidden],
+    },
+  }
+}
+
 it('under Supervised, asks about a command inside the Sandbox at its tool call, as a command that stays in', async () => {
-  const claude = await setUp(['sandboxed.ndjson'])
+  const claude = await sandboxSetUp('sandboxed.ndjson')
 
   const events = await claude.reply('Run the command.', null, {
-    permissionMode: 'supervised',
+    ...claude.sandbox,
     answers: ['allow-once'],
   })
 
@@ -2708,10 +2813,10 @@ it('under Supervised, asks about a command inside the Sandbox at its tool call, 
 })
 
 it('under Supervised, asks again to run a command outside the Sandbox after an Always allow for it, as that form alone, and leaves it undone once denied', async () => {
-  const claude = await setUp(['left-sandbox.ndjson'])
+  const claude = await sandboxSetUp('left-sandbox.ndjson')
 
   const events = await claude.reply('Write outside.', null, {
-    permissionMode: 'supervised',
+    ...claude.sandbox,
     answers: ['always-allow', 'deny'],
   })
 
@@ -2735,10 +2840,10 @@ it('under Supervised, asks again to run a command outside the Sandbox after an A
 })
 
 it('under Supervised, asks about a connection from inside the Sandbox on a card naming its host, which sits at no tool call', async () => {
-  const claude = await setUp(['network.ndjson'])
+  const claude = await sandboxSetUp('network.ndjson')
 
   const events = await claude.reply('Fetch the page.', null, {
-    permissionMode: 'supervised',
+    ...claude.sandbox,
     answers: ['allow-once', 'always-allow'],
   })
 
@@ -2758,10 +2863,14 @@ it('under Supervised, asks about a connection from inside the Sandbox on a card 
 })
 
 it('under Supervised, shows a refused Read of a hidden folder and one of another Tree with no card', async () => {
-  const claude = await setUp(['read-denied.ndjson'])
+  const [hiddenRead] = recordedReply('read-denied.ndjson', 0).toolCalls
+
+  const claude = await sandboxSetUp('read-denied.ndjson', [
+    path.posix.dirname(hiddenRead?.input.file_path ?? ''),
+  ])
 
   const events = await claude.reply('Read the hidden file.', null, {
-    permissionMode: 'supervised',
+    ...claude.sandbox,
     answers: ['allow-once', 'allow-once'],
   })
 
@@ -2776,7 +2885,19 @@ it('under Supervised, shows a refused Read of a hidden folder and one of another
 })
 
 it('resumes the session in a new claude for a Reply under another Permission mode, closing the warm one', async () => {
-  const claude = await setUp(['warm.ndjson', 'resumed.ndjson'])
+  const claude = await setUp(
+    ['warm.ndjson', 'resumed.ndjson'],
+    skipping(
+      'resumed.ndjson resumed under full access: the test checks the Permission mode the driver starts claude with.',
+      '--permission-mode',
+      '--allow-dangerously-skip-permissions',
+      '--permission-prompt-tool',
+      '--settings.sandbox',
+      '--settings.permissions',
+      'hooks'
+    )
+  )
+
   const first = await claude.reply(FIRST_PROMPT)
   const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
 

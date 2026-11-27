@@ -1,3 +1,6 @@
+import type {SkippedSetting} from '#modules/test-recordings/main'
+
+import {SETTINGS_CHECK, machineStandIns} from '#modules/test-recordings/main'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -9,6 +12,15 @@ export const CODEX_HOME_STAND_IN = '/codex-home'
 
 /** A replay puts back the `cwd` the driver last opened a thread or turn in. */
 export const TREE_FOLDER_STAND_IN = '/tree-folder'
+
+export const TREES_FOLDER_STAND_IN = '/trees-folder'
+
+export type CodexSetting =
+  | 'config'
+  | 'sandbox'
+  | 'approvalPolicy'
+  | 'cwd'
+  | 'sandboxPolicy'
 
 export const RecordedMessageSchema = z.looseObject({})
 
@@ -33,6 +45,12 @@ export interface FakeCodexOptions {
    * The recording leaves that request out.
    */
   keepRunningOnRefusal?: boolean
+  /** The test's Tree folder, read as the folder the recording's threads ran in. */
+  tree?: string
+  /** Other folders of the test's, each with the name the recording has for it. */
+  standIns?: [string, string][]
+  /** Settings the test sends differently from the recording on purpose. */
+  skip?: SkippedSetting<CodexSetting>[]
 }
 
 const OPTIONS_VARIABLE = 'FAKE_CODEX_OPTIONS'
@@ -44,7 +62,12 @@ export function fakeCodexEnv(
   options: FakeCodexOptions = {}
 ) {
   return {
-    [OPTIONS_VARIABLE]: JSON.stringify({recordings, reports, ...options}),
+    [OPTIONS_VARIABLE]: JSON.stringify({
+      recordings,
+      reports,
+      machine: machineStandIns(),
+      ...options,
+    }),
   }
 }
 
@@ -72,12 +95,20 @@ export const FakeCodexRunSchema = z.strictObject({
   /** At each `turn/start`, the ids of what the thread held. */
   contexts: z.array(z.array(z.string())),
   injected: z.array(z.looseObject({})),
+  /** Which setting differed from the recording, and how. */
+  changed: NullableStringSchema,
   forkedThrough: NullableStringSchema,
   interrupted: NullableStringSchema,
   reverted: NullableStringSchema,
   ended: z
     .union([
-      z.enum(['input-closed', 'killed', 'refused', 'exited']),
+      z.enum([
+        'input-closed',
+        'killed',
+        'refused',
+        'exited',
+        'changed-setting',
+      ]),
       z.templateLiteral(['unexpected-', z.string()]),
     ])
     .nullable(),
@@ -86,6 +117,7 @@ export const FakeCodexRunSchema = z.strictObject({
 /**
  * Like `codex`, resumes or forks only a thread with a rollout under
  * `sessions/`, and a revert writes a new rollout pointing into the old one.
+ * Exits when a thread or a turn comes with settings the recording didn't see.
  */
 const SCRIPT = `
 import fs from 'node:fs'
@@ -100,7 +132,7 @@ const standIn = ${JSON.stringify(CODEX_HOME_STAND_IN)}
 const treeStandIn = ${JSON.stringify(TREE_FOLDER_STAND_IN)}
 let treeFolder = null
 const vendorVariables = Object.keys(process.env).filter(name => /^(OPENAI|CODEX|ANTHROPIC|CLAUDE)_/i.test(name))
-const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], answers: [], prompts: [], inputs: [], threadModels: [], threadConfigs: [], threadInstructions: [], threadAccess: [], turnModels: [], turnAccess: [], modelLists: [], resumedFrom: [], contexts: [], injected: [], forkedThrough: null, interrupted: null, reverted: null, ended: null}
+const report = {args: process.argv.slice(2), home, cwd: process.cwd(), vendorVariables, methods: [], answers: [], prompts: [], inputs: [], threadModels: [], threadConfigs: [], threadInstructions: [], threadAccess: [], turnModels: [], turnAccess: [], modelLists: [], resumedFrom: [], contexts: [], injected: [], changed: null, forkedThrough: null, interrupted: null, reverted: null, ended: null}
 
 function save() {
   fs.writeFileSync(reportFile, JSON.stringify(report))
@@ -109,6 +141,12 @@ save()
 const recording = options.recordings[run]
 const [, ...steps] = fs.readFileSync(recording, 'utf8')
   .split('\\n').filter(Boolean).map(line => JSON.parse(line))
+
+${SETTINGS_CHECK}
+const THREAD_SETTINGS = ['config', 'sandbox', 'approvalPolicy', 'cwd']
+const SETTINGS = {'thread/start': THREAD_SETTINGS, 'thread/resume': THREAD_SETTINGS, 'thread/fork': THREAD_SETTINGS, 'turn/start': ['sandboxPolicy', 'approvalPolicy', 'cwd']}
+const recordedTree = steps.find(step => step.kind === 'in' && step.message.method in SETTINGS)?.message.params.cwd
+const standIns = [[home, standIn], [options.tree, recordedTree], ...(options.standIns ?? []), ...options.machine]
 
 function rollouts() {
   const sessions = path.join(home, 'sessions')
@@ -253,6 +291,11 @@ process.stdin.on('data', chunk => {
       reverting = cutBefore(message.params.threadId, message.params.beforeTurnId)
     }
     const recorded = expected(message)
+    const changed = message.method in SETTINGS ? changedSetting(message.method, SETTINGS[message.method], recorded.params, withStandIns(message.params, standIns), options.skip ?? []) : null
+    if (changed) {
+      report.changed = changed
+      end('changed-setting', 3)
+    }
     if ('id' in message) ids.set(recorded.id, message.id)
     save()
     answer()

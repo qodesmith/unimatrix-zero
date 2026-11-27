@@ -2,6 +2,7 @@ import type {CodexCommand, CodexProcess, SpawnCodex} from './app-server'
 import type {RecordedLine} from './replay'
 
 import {
+  HOME_STAND_IN,
   buildOf,
   claimRecordings,
   tempFolderNames,
@@ -16,6 +17,7 @@ import {PassThrough} from 'node:stream'
 import {
   CODEX_HOME_STAND_IN,
   RecordedMessageSchema,
+  TREES_FOLDER_STAND_IN,
   TREE_FOLDER_STAND_IN,
 } from './replay'
 
@@ -25,11 +27,6 @@ const ID =
   /"(chatgptAccountId|accountId|userId|chatgpt_user_id|installationId)":"[^"]*"/g
 
 const MACHINE = /"(serverName|userAgent)":"[^"]*"/g
-
-/** A Supervised thread's `config` names folders in the user's home. */
-const HOME_STAND_IN = '/Users/sam'
-
-const TREES_FOLDER_STAND_IN = '/trees-folder'
 
 function escaped(folder: string) {
   return [fs.realpathSync(folder), folder].map(name =>

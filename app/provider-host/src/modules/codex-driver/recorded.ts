@@ -1,8 +1,14 @@
+import {HOME_STAND_IN} from '#modules/test-recordings/main'
 import fs from 'node:fs'
 import path from 'node:path'
 import {z} from 'zod'
 
-import {CODEX_HOME_STAND_IN, RECORDINGS, RecordedLineSchema} from './replay'
+import {
+  CODEX_HOME_STAND_IN,
+  RECORDINGS,
+  RecordedLineSchema,
+  TREES_FOLDER_STAND_IN,
+} from './replay'
 
 const RequestSchema = z.looseObject({id: z.number(), method: z.string()})
 const ResultSchema = z.looseObject({id: z.number(), result: z.looseObject({})})
@@ -51,6 +57,19 @@ const CommandRequestSchema = z.looseObject({
 const RateLimitsSchema = z.looseObject({
   rateLimits: z.looseObject({
     primary: z.looseObject({resetsAt: z.number()}),
+  }),
+})
+
+const ProfiledThreadSchema = z.looseObject({
+  method: z.literal('thread/start'),
+  params: z.looseObject({
+    config: z.looseObject({
+      default_permissions: z.string(),
+      permissions: z.record(
+        z.string(),
+        z.looseObject({filesystem: z.record(z.string(), z.string())})
+      ),
+    }),
   }),
 })
 
@@ -178,6 +197,40 @@ export function readRecording(name: string) {
         0,
         `item/completed for ${itemId}`
       ).aggregatedOutput
+    },
+    /**
+     * What the first thread's permission profile denies besides the
+     * credentials: each other Tree by name, and the hidden folders as the
+     * recording names them.
+     */
+    deniedFolders() {
+      const started = lines.flatMap(line => {
+        const thread =
+          line.kind === 'in'
+            ? ProfiledThreadSchema.safeParse(line.message)
+            : null
+
+        return thread?.success ? [thread.data.params.config] : []
+      })
+
+      const config = nth(started, 0, 'thread/start on a permission profile')
+      const profile = config.permissions[config.default_permissions]
+
+      const denied = Object.entries(profile?.filesystem ?? {}).flatMap(
+        ([folder, access]) => (access === 'deny' ? [folder] : [])
+      )
+
+      const trees = `${TREES_FOLDER_STAND_IN}/`
+
+      return {
+        otherTrees: denied.flatMap(folder =>
+          folder.startsWith(trees) ? [folder.slice(trees.length)] : []
+        ),
+        hiddenFolders: denied.filter(
+          folder =>
+            !folder.startsWith(trees) && !folder.startsWith(HOME_STAND_IN)
+        ),
+      }
     },
     rateLimits() {
       return RateLimitsSchema.parse(

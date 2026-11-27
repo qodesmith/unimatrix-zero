@@ -2,6 +2,7 @@ import type {RecordedLine} from './replay'
 import type {SpawnOptions, SpawnedProcess} from '@anthropic-ai/claude-agent-sdk'
 
 import {
+  HOME_STAND_IN,
   buildOf,
   claimRecordings,
   replaceAcross,
@@ -191,7 +192,7 @@ function scrub(lines: RecordedLine[]) {
   const replacements: (readonly [string, string])[] = [
     ...temp.paths,
     ...temp.projectKeys,
-    [os.homedir(), '/Users/sam'],
+    [os.homedir(), HOME_STAND_IN],
     ...emails.map(email => [email, 'sam@example.com'] as const),
     ...ids.map(id => [id, STAND_IN_UUID] as const),
     [os.userInfo().username, 'sam'],
@@ -233,6 +234,7 @@ export function createRecorder(
         configDir: options.env.CLAUDE_CONFIG_DIR ?? '',
         projectKey: projectKeyOf(options.cwd ?? '.'),
         cwd: options.cwd ?? '',
+        args: options.args,
       },
     ]
 

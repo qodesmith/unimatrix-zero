@@ -258,6 +258,20 @@ export function recordedModels(name: string) {
   throw new Error(`${name} lists no Models`)
 }
 
+/**
+ * The folder the recording's `claude` ran in, under the recording's name for
+ * it.
+ */
+export function recordedTreeFolder(name: string) {
+  const [start] = readRecording(name)
+
+  if (start?.kind !== 'start' || !start.cwd) {
+    throw new Error(`${name} names no folder`)
+  }
+
+  return start.cwd
+}
+
 function quoted(text: string) {
   return JSON.stringify(text).slice(1, -1)
 }

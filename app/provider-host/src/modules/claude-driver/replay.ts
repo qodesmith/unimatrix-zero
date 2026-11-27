@@ -1,3 +1,6 @@
+import type {SkippedSetting} from '#modules/test-recordings/main'
+
+import {SETTINGS_CHECK, machineStandIns} from '#modules/test-recordings/main'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -17,6 +20,8 @@ export const RecordedLineSchema = z.discriminatedUnion('kind', [
     projectKey: z.string(),
     /** Read as the folder the fake runs in wherever an out line names it. */
     cwd: z.string().optional(),
+    /** What the SDK started `claude` with, which holds the app's options. */
+    args: z.array(z.string()),
   }),
   z.strictObject({kind: z.literal('in'), message: RecordedMessageSchema}),
   z.strictObject({kind: z.literal('out'), message: RecordedMessageSchema}),
@@ -39,6 +44,15 @@ export interface FakeClaudeOptions {
   silentFrom?: {run: number; prompt: number}
   /** Holds the rest of its answer until this file exists. */
   holdAfterFirstDelta?: string
+  /** Other folders of the test's, each with the name the recording has for it. */
+  standIns?: [string, string][]
+  /**
+   * Settings the test sends differently from the recording on purpose: an
+   * option by its flag, such as `--tools`, a key of a flag that holds JSON as
+   * `--settings.sandbox`, or a field of the `initialize` request. `*` is
+   * every one, for a `claude` no recording was made of.
+   */
+  skip?: SkippedSetting[]
 }
 
 const OPTIONS_VARIABLE = 'FAKE_CLAUDE_OPTIONS'
@@ -53,7 +67,12 @@ export function fakeClaudeEnv(
   options: FakeClaudeOptions = {}
 ) {
   return {
-    [OPTIONS_VARIABLE]: JSON.stringify({recordings, reports, ...options}),
+    [OPTIONS_VARIABLE]: JSON.stringify({
+      recordings,
+      reports,
+      machine: machineStandIns(),
+      ...options,
+    }),
   }
 }
 
@@ -80,8 +99,11 @@ export const FakeClaudeRunSchema = z.strictObject({
   /** What the SDK answered each control request `claude` sent. */
   answers: z.array(z.looseObject({subtype: z.string()})),
   inputClosed: z.boolean(),
+  /** Which setting differed from the recording, and how. */
+  changed: z.string().nullable(),
   ended: z
     .enum([
+      'changed-setting',
       'input-closed',
       'killed',
       'refused',
@@ -92,7 +114,10 @@ export const FakeClaudeRunSchema = z.strictObject({
     .nullable(),
 })
 
-/** Exits on any line the SDK writes that isn't the next one recorded. */
+/**
+ * Exits on any line the SDK writes that isn't the next one recorded, and when
+ * the app's options or its `initialize` request aren't the recorded ones.
+ */
 const SCRIPT = `
 import fs from 'node:fs'
 import path from 'node:path'
@@ -111,7 +136,7 @@ function stillRunning(file) {
 const runningAtStart = fs.readdirSync(reports).filter(stillRunning).map(file => Number.parseInt(file, 10))
 const args = process.argv.slice(2)
 const configDir = process.env.CLAUDE_CONFIG_DIR
-const report = {args, configDir, developerDir: process.env.DEVELOPER_DIR ?? null, cwd: process.cwd(), runningAtStart, prompts: [], clientComposed: [], systemPrompt: [], appendedPrompt: null, promptSnapshot: null, resumedFrom: [], toolResults: [], silentRequests: [], answers: [], inputClosed: false, ended: null}
+const report = {args, configDir, developerDir: process.env.DEVELOPER_DIR ?? null, cwd: process.cwd(), runningAtStart, prompts: [], clientComposed: [], systemPrompt: [], appendedPrompt: null, promptSnapshot: null, resumedFrom: [], toolResults: [], silentRequests: [], answers: [], inputClosed: false, changed: null, ended: null}
 save()
 const recording = options.recordings[run]
 const lines = fs.readFileSync(recording, 'utf8')
@@ -145,6 +170,48 @@ if (resume) {
   report.toolResults = fs.existsSync(toolResults) ? fs.readdirSync(toolResults) : []
 }
 save()
+
+${SETTINGS_CHECK}
+// Ids and the Model, which a replay doesn't compare.
+const NOT_COMPARED = ['--model', '--resume', '--resume-session-at', '--fork-session']
+const PROMPT_TEXT = ['systemPrompt', 'appendSystemPrompt']
+
+function optionsIn(args) {
+  const found = {}
+  for (let at = 0; at < args.length; at++) {
+    const arg = args[at]
+    const equals = arg.indexOf('=')
+    const name = equals < 0 ? arg : arg.slice(0, equals)
+    const next = args[at + 1]
+    const value = equals >= 0 ? arg.slice(equals + 1) : next === undefined || next.startsWith('--') ? true : args[++at]
+    if (NOT_COMPARED.includes(name)) continue
+    let parts = null
+    try {
+      parts = JSON.parse(value)
+    } catch {}
+    if (parts === null || typeof parts !== 'object' || Array.isArray(parts)) found[name] = value
+    else for (const [key, part] of Object.entries(parts)) found[name + '.' + key] = part
+  }
+  return found
+}
+
+const standIns = [[projectKey, start.projectKey], [fs.realpathSync(process.cwd()), start.cwd], [configDir, start.configDir], ...(options.standIns ?? []), ...options.machine]
+
+const skipped = options.skip ?? []
+
+function sameSettings(where, recorded, sent) {
+  if (skipped.some(({field}) => field === '*')) return
+  const fields = [...new Set([...Object.keys(recorded), ...Object.keys(sent)])]
+  const changed = changedSetting(where, fields, recorded, withStandIns(sent, standIns), skipped)
+  if (!changed) return
+  report.changed = changed
+  report.ended = 'changed-setting'
+  save()
+  process.stderr.write(changed + '\\n')
+  process.exit(3)
+}
+
+sameSettings('claude option', optionsIn(start.args), optionsIn(args))
 
 const requestIds = new Map()
 const renamed = new Map()
@@ -251,6 +318,8 @@ process.stdin.on('data', chunk => {
     if (message.type === 'control_request') requestIds.set(step.message.request_id, message.request_id)
     if (message.type === 'control_response') report.answers.push(message.response)
     if (message.type === 'control_request' && message.request.subtype === 'initialize') {
+      const settings = request => Object.fromEntries(Object.entries(request).filter(([name]) => !PROMPT_TEXT.includes(name)))
+      sameSettings('initialize', settings(step.message.request), settings(message.request))
       const prompt = message.request.systemPrompt
       report.systemPrompt = Array.isArray(prompt) ? prompt : prompt == null ? [] : [prompt]
       report.appendedPrompt = message.request.appendSystemPrompt ?? null
