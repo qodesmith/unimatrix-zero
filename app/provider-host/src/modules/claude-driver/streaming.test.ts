@@ -459,7 +459,16 @@ const MessageDeltaSchema = z.looseObject({
 
 const ResultLineSchema = z.looseObject({type: z.literal('result')})
 
-function withUsage(name: string) {
+/**
+ * The nth `result` gets `modelUsages[n]`, or a window of 200,000 past the
+ * list's end.
+ */
+function withUsage(
+  name: string,
+  modelUsages: Record<string, {contextWindow: number}>[] = []
+) {
+  let results = 0
+
   return edited(name, lines =>
     lines.map(line => {
       const ended =
@@ -469,13 +478,13 @@ function withUsage(name: string) {
         line.kind === 'out' ? ResultLineSchema.safeParse(line.message) : null
 
       if (result?.success) {
-        return {
-          kind: 'out',
-          message: {
-            ...result.data,
-            modelUsage: {[MODEL]: {contextWindow: 200_000}},
-          },
+        const modelUsage = modelUsages[results] ?? {
+          [MODEL]: {contextWindow: 200_000},
         }
+
+        results += 1
+
+        return {kind: 'out', message: {...result.data, modelUsage}}
       }
 
       return ended?.success
@@ -743,6 +752,22 @@ function firstReplyDeltas() {
     expect.objectContaining({type: 'TEXT_DELTA', delta})
   )
 }
+
+it('sends no Context window when `claude` reports one of 0', async () => {
+  const claude = await setUp([
+    withUsage('warm.ndjson', [{[MODEL]: {contextWindow: 0}}]),
+  ])
+
+  const events = await claude.reply(FIRST_PROMPT)
+
+  expect(events.at(-1)).toStrictEqual({
+    treeId: expect.any(String),
+    replyId: expect.any(String),
+    type: 'RUN_FINISHED',
+    status: 'complete',
+  })
+  await claude.allClosed()
+})
 
 it('replaces the text when a broken stream is sent again', async () => {
   const resent = edited('warm.ndjson', lines => {
@@ -1825,14 +1850,17 @@ it('never gives up on a claude once it is heard, however long it then takes', as
 })
 
 it('stops a Reply where it is, records it, and continues the Thread warm from it', async () => {
-  const claude = await setUp([withUsage('stopped.ndjson')])
+  // `claude` reports no window on a stopped Reply.
+  const claude = await setUp([
+    withUsage('stopped.ndjson', [{}, {[MODEL]: {contextWindow: 200_000}}]),
+  ])
 
   const stopped = await claude.reply(COUNT_PROMPT, null, {
     stopAfterDeltas: STOPPED_REPLY.streamedBeforeInterrupt,
   })
 
   expect(textOf(stopped)).toBe(STOPPED_REPLY.text)
-  expect(stopped.slice(-2)).toEqual([
+  expect(stopped.slice(-2)).toStrictEqual([
     expect.objectContaining({
       type: 'REPLY_RECORDED',
       model: MODEL,
@@ -1843,7 +1871,6 @@ it('stops a Reply where it is, records it, and continues the Thread warm from it
       replyId: expect.any(String),
       type: 'RUN_FINISHED',
       status: 'stopped',
-      contextWindow: 200_000,
     },
   ])
   expect(
@@ -1860,6 +1887,11 @@ it('stops a Reply where it is, records it, and continues the Thread warm from it
     messageId: ASKED_MESSAGE,
   })
   expect(shown(asked).contextSize).toBe(757)
+  expect(asked.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'complete',
+    contextWindow: 200_000,
+  })
 
   await claude.allClosed()
   const [report] = claude.reports()
