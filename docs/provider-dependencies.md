@@ -30,10 +30,10 @@ A live check is a test whose name carries `[dep:<id>]` (one test can carry sever
 
 Live checks need the maintainer's signed-in account, so they never run in CI. They use the checkout's own dev data: run `bun run dev` in the checkout to be checked and connect Claude and ChatGPT, so it holds the pinned builds and both sign-ins. Then, on the maintainer's machine, `bun run provider-checks`:
 
-1. Runs every `[dep:]` live check and every `[records]` live test with `UZ_RECORD=yes`, so each test that writes a recording rewrites it from the pinned builds.
-2. Commits no recordings when a live test fails or a recording wasn't rewritten in the run, and says why; what the run did rewrite stays in the checkout, uncommitted. Otherwise, on a clean checkout of the PR's head, it commits the new recordings.
-3. Runs the everyday tests against the recordings the run left.
-4. Has an agent on the maintainer's own `claude` login read each entry against the current code and the pinned builds, and report the ones that no longer hold on either side.
+1. Runs every `[records]` live test, then every other `[dep:]` live check, with `UZ_RECORD=yes`, so each test that writes a recording rewrites it from the pinned builds. A live check that fails runs once more, and the result names each one that passed only on that retry. A `[records]` test gets no retry: a recorder writes its file when the vendor program exits, so a failed first try could still write over the retry's recording.
+2. Commits no recordings when a live test fails or a recording wasn't rewritten in the run, and says why; what the run did rewrite stays in the checkout, uncommitted. Otherwise, on a clean checkout of the PR's head, it commits the new recordings, when the run changed any.
+3. Has an agent on the maintainer's own `claude` login read entries against the current code and the pinned builds, and report the ones that no longer hold on either side. [Which entries a run reviews](#which-entries-a-run-reviews) says which.
+4. Runs the everyday tests against the recordings the run left.
 5. Posts the results in one comment on the open PR that CI's gate holds, tied to a commit. When it committed recordings, that is the new commit, which it pushes once the comment is up. Otherwise it is the PR's head, and it re-runs that PR's gate. With more than one such PR open, pass `--pr <n>`. With none open, or when the checkout isn't a clean copy of the PR's head, it prints the results, posts and commits nothing, and says why.
 
 The gate holds two kinds of PR:
@@ -41,9 +41,19 @@ The gate holds two kinds of PR:
 - A bump PR: any PR that moves a vendor pin, the version of `claude` or `codex` under `vendorPrograms` in `app/main/src/modules/vendor-programs/dev-manifest.json`, or the Agent SDK version in `app/provider-host/package.json`. A bump of the `git` vendor program is not one (ADR 0024).
 - A PR that changes a live test (`*.live.test.ts`), a recorder (`recording.ts`) or a file under a `recordings/` folder, since its recordings must come from its live tests as they now stand.
 
-CI's "Provider checks on a vendor bump or a live test change" job keeps such a PR red until the repo owner's result for its current head commit passes: every check passed, no entry is stale, every recording was re-recorded and the everyday tests passed. Every other PR passes that job.
+CI's "Provider checks on a vendor bump or a live test change" job keeps such a PR red until the repo owner's result for its current head commit passes: every check passed, no reviewed entry is stale, every recording was re-recorded and the everyday tests passed. Every other PR passes that job.
 
 Entries the vendor's servers can change (`upgrade + drift`) are checked only when the run happens; run it by hand at any time to catch drift between releases.
+
+### Which entries a run reviews
+
+A review asks whether the pinned builds still behave as an entry says, so it is due when a pin moves or the entry itself changes.
+
+- **A bump PR:** every entry, whatever else the PR changes.
+- **A PR that moves no pin:** only the entries it adds or changes, which are the ones whose Id is new or whose fields differ from the list on the PR's merge base. The result counts every other entry as `not needed`, which passes. A change to an entry's title, to the entries' order or to the text above `## Entries` puts no entry up for review: none of them states what a vendor does.
+- **A run with no PR to post on:** every entry.
+
+An entry that goes stale on the app side in a PR that moves no pin and leaves the entry alone therefore waits for the next bump PR, as it does in every PR the gate doesn't hold.
 
 ## Entries
 

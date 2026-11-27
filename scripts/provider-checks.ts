@@ -16,8 +16,10 @@ import {z} from 'zod'
 
 import {devUserData} from './dev-data.ts'
 import {mapLimited} from './map-limited.ts'
+import {LIVE_RUNS, VitestReport, liveOutcome} from './provider-checks-live.ts'
 import {passed, renderResult} from './provider-checks-result.ts'
-import {LIST, entriesOf, liveCheckOf, tagsIn} from './provider-dependencies.ts'
+import {LIST, entriesOf, liveCheckOf} from './provider-dependencies.ts'
+import {entriesToReview, reviewsOf} from './provider-review-scope.ts'
 import {review} from './provider-review.ts'
 import {
   filesIn,
@@ -47,16 +49,6 @@ const PullPages = z.array(
   )
 )
 
-const VitestReport = z.looseObject({
-  testResults: z.array(
-    z.looseObject({
-      assertionResults: z.array(
-        z.looseObject({title: z.string(), status: z.string()})
-      ),
-    })
-  ),
-})
-
 const Runs = z.looseObject({
   workflow_runs: z.array(
     z.looseObject({id: z.number(), status: z.string().nullable()})
@@ -71,6 +63,7 @@ const Jobs = z.looseObject({
 
 interface Gated {
   number: number
+  base: string
   head: string
   branch: string
   pinChanges: string[]
@@ -172,6 +165,7 @@ async function findGated(repo: string, wanted: number | null) {
     if (pinChanges.length > 0 || files.length > 0) {
       gated.push({
         number: pull.number,
+        base: pull.base.sha,
         head: pull.head.sha,
         branch: pull.head.ref,
         pinChanges,
@@ -203,7 +197,10 @@ async function isCleanAt(head: string) {
 }
 
 /** Each `[records]` test also rewrites its recordings. */
-async function runLiveChecks(ids: string[], env: Record<string, string>) {
+async function runLiveTests(
+  {pattern, retry}: (typeof LIVE_RUNS)[number],
+  env: Record<string, string>
+) {
   const report = path.join(os.tmpdir(), `uz-provider-checks-${Date.now()}.json`)
 
   const exitCode = await Bun.spawn(
@@ -216,7 +213,8 @@ async function runLiveChecks(ids: string[], env: Record<string, string>) {
       '--project',
       'node',
       '-t',
-      String.raw`\[dep:|\[records\]`,
+      pattern,
+      ...(retry > 0 ? ['--retry', String(retry)] : []),
       '--reporter=default',
       '--reporter=json',
       `--outputFile.json=${report}`,
@@ -228,8 +226,6 @@ async function runLiveChecks(ids: string[], env: Record<string, string>) {
     }
   ).exited
 
-  const outcomes = new Map<string, string[]>()
-
   const ran = await Bun.file(report)
     .json()
     .catch(() => ({testResults: []}))
@@ -238,15 +234,22 @@ async function runLiveChecks(ids: string[], env: Record<string, string>) {
     file => file.assertionResults
   )
 
-  for (const test of tests) {
-    for (const id of tagsIn(test.title)) {
-      outcomes.set(id, [...(outcomes.get(id) ?? []), test.status])
-    }
-  }
+  return {tests, exitCode}
+}
+
+async function runLiveChecks(ids: string[], env: Record<string, string>) {
+  const runs = []
+
+  for (const run of LIVE_RUNS) runs.push(await runLiveTests(run, env))
+
+  const outcome = liveOutcome(
+    ids,
+    runs.flatMap(run => run.tests)
+  )
 
   return {
-    checks: ids.map(id => ({id, status: statusOf(outcomes.get(id) ?? [])})),
-    failed: exitCode !== 0 || tests.some(test => test.status === 'failed'),
+    ...outcome,
+    failed: outcome.failed || runs.some(run => run.exitCode !== 0),
   }
 }
 
@@ -302,15 +305,24 @@ async function runEverydayTests(): Promise<CheckStatus> {
   return exitCode === 0 ? 'passed' : 'failed'
 }
 
-function statusOf(outcomes: string[]): CheckStatus {
-  if (outcomes.includes('failed')) return 'failed'
+async function baseListOf(pull: Gated) {
+  const mergeBase = await $`git merge-base HEAD ${pull.base}`
+    .cwd(root)
+    .nothrow()
+    .quiet()
 
-  return outcomes.length > 0 && outcomes.every(outcome => outcome === 'passed')
-    ? 'passed'
-    : 'not run'
+  if (mergeBase.exitCode !== 0) {
+    fail(
+      `This checkout lacks ${pull.base}, the base of #${pull.number}: run \`git fetch origin\`, then run this again.`
+    )
+  }
+
+  return $`git show ${`${mergeBase.text().trim()}:${LIST}`}`.cwd(root).text()
 }
 
 async function reviewAll(entries: Entry[], builds: Builds) {
+  console.log(`Reviewing ${entries.length} of the list's entries.`)
+
   return mapLimited(entries, REVIEWERS, async entry => {
     console.log(`Reviewing ${entry.id}…`)
 
@@ -359,14 +371,23 @@ const repo = (
 const pull = await findGated(repo, values.pr ? Number(values.pr) : null)
 const postTo = pull && (await isCleanAt(pull.head)) ? pull : null
 
-const entries = entriesOf(readText(LIST))
+const list = readText(LIST)
+const entries = entriesOf(list)
+
+const toReview = pull
+  ? entriesToReview({
+      pinMoved: pull.pinChanges.length > 0,
+      baseList: await baseListOf(pull),
+      headList: list,
+    })
+  : entries
 
 const live = entries.flatMap(entry =>
   liveCheckOf(entry) === entry.id ? [entry.id] : []
 )
 
 const since = Date.now()
-const {checks, failed} = await runLiveChecks(live, env)
+const {checks, failed, retried} = await runLiveChecks(live, env)
 const kept = await whyKept(since, failed)
 const committed = postTo && kept === null ? await commitRecordings() : null
 
@@ -375,7 +396,8 @@ const result = {
   pinChanges: postTo?.pinChanges ?? [],
   gatedFiles: postTo?.files ?? [],
   checks,
-  reviews: await reviewAll(entries, builds),
+  retried,
+  reviews: reviewsOf(entries, await reviewAll(toReview, builds)),
   whyKept: kept,
   everydayTests: await runEverydayTests(),
 }

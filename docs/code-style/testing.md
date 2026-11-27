@@ -31,7 +31,7 @@
 - Assert that something has not happened only when nothing but the code under test could make it happen, and only after reaching the state where broken code would make it happen. While a real timer runs, that assertion is a race.
 - To show a promise is still pending, race it against `setTimeout(resolve, 0)` under real timers: broken code settles before the timer fires, and only the test can settle working code. `claude-driver/warm.test.ts` is the example. An already-resolved promise wins every race and proves nothing.
 - A test that guards a race goes red on every run with the behavior broken, under CPU load too.
-- A failure on a commit that passes in another run is a bug. Find the race, make it fail every time, then remove it. The fix adds no sleep and no retry, and Vitest's `retry` stays unset.
+- A failure on a commit that passes in another run is a bug. Find the race, make it fail every time, then remove it. The fix adds no sleep and no retry, and Vitest's `retry` stays unset. The one exception is `bun run provider-checks`, which runs a failed live check once more and names it in its result (`docs/provider-dependencies.md`, section Checking the list): no test controls how a Model answers.
 - Raise a limit only when it was checking speed rather than catching a hang. A longer limit never fixes a race.
 
 ## Re-record a changed live test's recordings in the same PR

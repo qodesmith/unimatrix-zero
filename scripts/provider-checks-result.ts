@@ -2,9 +2,15 @@ import {z} from 'zod'
 
 export type CheckStatus = 'passed' | 'failed' | 'not run'
 
+const VERDICTS = ['holds', 'stale', 'not reviewed', 'not needed'] as const
+
 export interface Review {
   id: string
-  verdict: 'holds' | 'stale' | 'not reviewed'
+  /**
+   * `not reviewed` is a review that ran and gave no verdict. `not needed` is
+   * an entry left out on purpose, which passes only when no pin moved.
+   */
+  verdict: (typeof VERDICTS)[number]
   reason: string
 }
 
@@ -15,6 +21,8 @@ export interface Result {
   /** The live tests, recorders and recordings the PR changes. */
   gatedFiles: string[]
   checks: {id: string; status: CheckStatus}[]
+  /** The live tests that passed only on their retry. */
+  retried: string[]
   reviews: Review[]
   whyKept: string | null
   everydayTests: CheckStatus
@@ -27,7 +35,11 @@ const Marker = z.object({head: z.string(), passed: z.boolean()})
 export function passed(result: Result) {
   return (
     result.checks.every(check => check.status === 'passed') &&
-    result.reviews.every(review => review.verdict === 'holds') &&
+    result.reviews.every(
+      review =>
+        review.verdict === 'holds' ||
+        (review.verdict === 'not needed' && result.pinChanges.length === 0)
+    ) &&
     result.whyKept === null &&
     result.everydayTests === 'passed'
   )
@@ -41,6 +53,18 @@ function counts(values: string[]) {
   return [...tally].map(([value, count]) => `${count} ${value}`).join(', ')
 }
 
+function reviewLine(reviews: Review[]) {
+  const tally = VERDICTS.flatMap(verdict => {
+    const count = reviews.filter(review => review.verdict === verdict).length
+
+    return count > 0 ? [`${count} ${verdict}`] : []
+  }).join(', ')
+
+  const why = reviews.find(review => review.verdict === 'not needed')?.reason
+
+  return `${tally || 'none'}${why ? `: ${why}` : ''}`
+}
+
 function escaped(text: string) {
   return text.replaceAll('|', String.raw`\|`).replaceAll('\n', ' ')
 }
@@ -52,7 +76,9 @@ export function renderResult(result: Result) {
       ]
     : []
 
-  const unsettled = result.reviews.filter(review => review.verdict !== 'holds')
+  const unsettled = result.reviews.filter(
+    review => review.verdict === 'stale' || review.verdict === 'not reviewed'
+  )
 
   return [
     `## Provider checks: ${passed(result) ? 'passed' : 'failed'}`,
@@ -76,8 +102,16 @@ export function renderResult(result: Result) {
     '| Entry | Live check |',
     '| --- | --- |',
     ...result.checks.map(check => `| \`${check.id}\` | ${check.status} |`),
+    ...(result.retried.length > 0
+      ? [
+          '',
+          `**Passed on a retry:** ${result.retried.length}`,
+          '',
+          ...result.retried.map(title => `- ${title.replaceAll('<', '&lt;')}`),
+        ]
+      : []),
     '',
-    `**Review:** ${counts(result.reviews.map(review => review.verdict)) || 'none'}`,
+    `**Review:** ${reviewLine(result.reviews)}`,
     ...(unsettled.length > 0
       ? [
           '',
