@@ -104,11 +104,16 @@ const LIMIT_LIFTS = new Date(
 type Streamed = StartReplyEvent
 
 const cleanUps: (() => Promise<void>)[] = []
+const changedSettings: string[] = []
 
 afterEach(async () => {
   vi.useRealTimers()
 
   for (const cleanUp of cleanUps.splice(0).toReversed()) await cleanUp()
+
+  const messages = changedSettings.splice(0)
+
+  if (messages.length > 0) throw new Error(messages.join('\n\n'))
 })
 
 function folder(prefix: string) {
@@ -192,13 +197,6 @@ async function setUp(
     treeFolder?: string
   } & FakeCodexOptions = {}
 ) {
-  const changed: string[] = []
-
-  // Last of the clean-ups, so the others still run.
-  cleanUps.push(async () => {
-    if (changed.length > 0) throw new Error(changed.join('\n\n'))
-  })
-
   const fake = await replayCodex()
   cleanUps.push(fake.cleanUp)
   const configDir = folder('uz-codex-home-')
@@ -363,7 +361,9 @@ async function setUp(
   cleanUps.push(async () => {
     idle.pass()
     await Promise.all(exits)
-    changed.push(...reportsSoFar().flatMap(report => report.changed ?? []))
+    changedSettings.push(
+      ...reportsSoFar().flatMap(report => report.changed ?? [])
+    )
   })
 
   async function cut(sessionId: string, keptTurn: string, dropFrom: string) {

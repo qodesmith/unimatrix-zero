@@ -49,10 +49,7 @@ function tempFolders() {
   return [fs.realpathSync(os.tmpdir()), os.tmpdir()]
 }
 
-/**
- * Each way a recording can name this machine's temp folder, with its stand-in,
- * the real path first since the other can sit inside it.
- */
+/** Each way a recording can name this machine's temp folder, with its stand-in. */
 export function tempFolderNames() {
   const folders = tempFolders().map(folder =>
     JSON.stringify(folder).slice(1, -1)
