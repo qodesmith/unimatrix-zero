@@ -44,6 +44,26 @@ CI's "Provider checks on a vendor bump or a live test change" job keeps such a P
 
 Entries the vendor's servers can change (`upgrade + drift`) are checked only when the run happens; run it by hand at any time to catch drift between releases.
 
+### Resuming a failed run: `--resume`
+
+After a run that failed, such as on one review that ran out of time, `bun run provider-checks --resume` on the same checkout runs again only what failed, and posts one result for both runs, as a full run would. Each run saves its outcomes at `git rev-parse --git-path provider-checks/saved-run.json`, which is per worktree and never committed, and a passing run deletes them.
+
+It runs again:
+
+- Each live check that didn't pass, by its `[dep:<id>]` tag, and each `[records]` test that didn't pass, by its name, with `UZ_RECORD=yes`. Every live test runs again when the saved live run failed with no test to blame.
+- Each review that came back stale or not reviewed, and each entry that is new or changed since. Every entry, when the text above `## Entries` changed.
+- The everyday tests, unless they passed, no live test runs again and HEAD hasn't moved.
+
+When the saved run committed its recordings, HEAD is that commit, and the resumed run posts for it with no new recordings and no new commit. When it kept them, they are still uncommitted: the resumed run commits them once every live test has passed and each recording was rewritten by one run or the other. It posts for HEAD, pushes HEAD after the comment when the PR's head is behind it, and otherwise re-runs the gate.
+
+It refuses, and says to run in full, when:
+
+- No run was saved in this checkout, or the saved run posted nothing.
+- The PR, the pins or the vendor builds differ from the saved run's.
+- HEAD differs from the saved run's head in any file but this one. A commit that changes only this file, such as a fix for a stale entry, is allowed: the entries it changed are reviewed again, and so are the everyday tests.
+- The PR's head has commits this checkout lacks.
+- The tree differs from HEAD by anything but the saved run's uncommitted recordings, or one of those recordings was discarded or changed since. The resumed run can't vouch for a recording it didn't see written, so a full run re-records it.
+
 ## Entries
 
 ### Cut-short Replies
