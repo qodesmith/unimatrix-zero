@@ -2052,7 +2052,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       return {events, session: recorded.session}
     }
 
-    const padding = 'The harbor log lists no ships today. '.repeat(400)
+    const padding = 'The harbor log lists no ships today. '.repeat(1000)
 
     try {
       const padded = await reply(
