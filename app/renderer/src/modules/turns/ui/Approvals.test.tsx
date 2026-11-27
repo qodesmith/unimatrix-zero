@@ -228,7 +228,7 @@ it('leaves saved logins out of what a command outside the Sandbox could reach wh
   await expect
     .element(
       card(screen).getByText(
-        'Outside the Sandbox, it could read and change your files and reach the internet, but not use your saved logins.'
+        'Outside the Sandbox, it could read and change your files and reach the internet.'
       )
     )
     .toBeVisible()
@@ -258,7 +258,6 @@ it('says what a connection lets a command inside the Sandbox do, which a web fet
   await expect
     .element(screen.getByText('The AI wants to connect to docs.example.com'))
     .toBeVisible()
-  expect(screen.getByText(SENDS).all()).toHaveLength(1)
   expect(screen.getByText(/could send your files/u).all()).toHaveLength(1)
 })
 

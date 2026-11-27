@@ -73,8 +73,7 @@ function CommandText({action}: {action: ApprovalAction}) {
   )
 }
 
-/** What the command could then read, change or reach, in plain words. */
-function reachOf(action: ApprovalAction) {
+function whatItCouldReach(action: ApprovalAction) {
   if (action.kind === 'host' && action.fromCommand) {
     return `A command wants this connection. With it, the command could send your files to ${action.host} and download from there.`
   }
@@ -82,12 +81,12 @@ function reachOf(action: ApprovalAction) {
   if (action.kind !== 'command' || !action.outsideSandbox) return null
 
   return action.credentialsDenied
-    ? 'Outside the Sandbox, it could read and change your files and reach the internet, but not use your saved logins.'
+    ? 'Outside the Sandbox, it could read and change your files and reach the internet.'
     : 'Outside the Sandbox, it could read and change any of your files, use your saved logins and reach the internet.'
 }
 
 function WhatItReaches({action}: {action: ApprovalAction}) {
-  const reach = reachOf(action)
+  const reach = whatItCouldReach(action)
 
   return reach === null ? null : (
     <p className="text-xs text-muted-foreground">{reach}</p>
