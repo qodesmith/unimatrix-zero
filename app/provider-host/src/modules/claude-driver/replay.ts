@@ -178,6 +178,15 @@ const PROMPT_TEXT = ['systemPrompt', 'appendSystemPrompt']
 
 function optionsIn(args) {
   const found = {}
+  const repeated = new Set()
+  function keep(name, value) {
+    if (!(name in found)) found[name] = value
+    else if (repeated.has(name)) found[name].push(value)
+    else {
+      repeated.add(name)
+      found[name] = [found[name], value]
+    }
+  }
   for (let at = 0; at < args.length; at++) {
     const arg = args[at]
     const equals = arg.indexOf('=')
@@ -189,8 +198,8 @@ function optionsIn(args) {
     try {
       parts = JSON.parse(value)
     } catch {}
-    if (parts === null || typeof parts !== 'object' || Array.isArray(parts)) found[name] = value
-    else for (const [key, part] of Object.entries(parts)) found[name + '.' + key] = part
+    if (parts === null || typeof parts !== 'object' || Array.isArray(parts)) keep(name, value)
+    else for (const [key, part] of Object.entries(parts)) keep(name + '.' + key, part)
   }
   return found
 }

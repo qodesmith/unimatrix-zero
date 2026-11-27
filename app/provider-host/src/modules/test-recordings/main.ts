@@ -98,7 +98,7 @@ function quoted(text) {
 function withStandIns(value, pairs) {
   let text = JSON.stringify(value ?? null)
   for (const [real, recorded] of pairs) {
-    if (real) text = text.replaceAll(quoted(real), quoted(recorded))
+    if (real && recorded) text = text.replaceAll(quoted(real), quoted(recorded))
   }
   return JSON.parse(text)
 }
