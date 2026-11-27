@@ -105,9 +105,13 @@ const cleanUps: (() => Promise<void>)[] = []
 const changedSettings: string[] = []
 
 afterEach(async () => {
-  for (const cleanUp of cleanUps.splice(0).toReversed()) await cleanUp()
+  let messages: string[] = []
 
-  const messages = changedSettings.splice(0)
+  try {
+    for (const cleanUp of cleanUps.splice(0).toReversed()) await cleanUp()
+  } finally {
+    messages = changedSettings.splice(0)
+  }
 
   if (messages.length > 0) throw new Error(messages.join('\n\n'))
 })

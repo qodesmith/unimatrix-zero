@@ -51,7 +51,6 @@ export interface FakeCodexOptions {
   treeFolder?: string
   /** Other folders of the test's, each with the name the recording has for it. */
   standIns?: [string, string][]
-  /** Settings the test sends differently from the recording on purpose. */
   skip?: SkippedSetting<CodexSetting>[]
 }
 
