@@ -180,7 +180,7 @@ jobs:
           bun run test:node app/main/src/modules/git-wrapper
 
   provider-checks:
-    name: Provider checks on a vendor bump
+    name: Provider checks on a vendor bump or a live test change
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -30,11 +30,18 @@ A live check is a test whose name carries `[dep:<id>]` (one test can carry sever
 
 Live checks need the maintainer's signed-in account, so they never run in CI. They use the checkout's own dev data: run `bun run dev` in the checkout to be checked and connect Claude and ChatGPT, so it holds the pinned builds and both sign-ins. Then, on the maintainer's machine, `bun run provider-checks`:
 
-1. Runs every `[dep:]` live check.
-2. Has an agent on the maintainer's own `claude` login read each entry against the current code and the pinned builds, and report the ones that no longer hold on either side.
-3. Posts both results in one comment on the open bump PR, tied to its head commit, and re-runs that PR's gate. With more than one bump PR open, pass `--pr <n>`. With none open, or when the checkout isn't a clean copy of the bump PR's head, it prints the results, posts nothing and says why.
+1. Runs every `[dep:]` live check and every `[records]` live test with `UZ_RECORD=yes`, so each test that writes a recording rewrites it from the pinned builds.
+2. Keeps the old recordings when a live test fails or a recording wasn't rewritten in the run, and says why. Otherwise, on a clean checkout of the PR's head, it commits the new ones.
+3. Runs the everyday tests against the recordings the run left.
+4. Has an agent on the maintainer's own `claude` login read each entry against the current code and the pinned builds, and report the ones that no longer hold on either side.
+5. Posts the results in one comment on the open PR that CI's gate holds, tied to a commit. When it committed recordings, that is the new commit, which it pushes once the comment is up. Otherwise it is the PR's head, and it re-runs that PR's gate. With more than one such PR open, pass `--pr <n>`. With none open, or when the checkout isn't a clean copy of the PR's head, it prints the results, posts and commits nothing, and says why.
 
-A bump PR is any PR that moves a vendor pin: the version of `claude` or `codex` under `vendorPrograms` in `app/main/src/modules/vendor-programs/dev-manifest.json`, or the Agent SDK version in `app/provider-host/package.json`. A bump of the `git` vendor program is not one (ADR 0024). CI's "Provider checks on a vendor bump" job keeps it red until the repo owner's result for its current head commit reports passing checks and no stale entries. Every other PR passes that job.
+The gate holds two kinds of PR:
+
+- A bump PR: any PR that moves a vendor pin, the version of `claude` or `codex` under `vendorPrograms` in `app/main/src/modules/vendor-programs/dev-manifest.json`, or the Agent SDK version in `app/provider-host/package.json`. A bump of the `git` vendor program is not one (ADR 0024).
+- A PR that changes a live test (`*.live.test.ts`), a recorder (`recording.ts`) or a file under a `recordings/` folder, since its recordings must come from its live tests as they now stand.
+
+CI's "Provider checks on a vendor bump or a live test change" job keeps such a PR red until the repo owner's result for its current head commit passes: every check passed, no entry is stale, every recording was re-recorded and the everyday tests passed. Every other PR passes that job.
 
 Entries the vendor's servers can change (`upgrade + drift`) are checked only when the run happens; run it by hand at any time to catch drift between releases.
 

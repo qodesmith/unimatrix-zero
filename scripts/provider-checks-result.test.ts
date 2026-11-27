@@ -19,6 +19,9 @@ function result(head: string | null, change: Partial<Result> = {}): Result {
       {id: 'synthetic-marker', verdict: 'holds', reason: ''},
       {id: 'cut-short-replies', verdict: 'holds', reason: ''},
     ],
+    gatedFiles: [],
+    keptRecordings: null,
+    everyday: 'passed',
     ...change,
   }
 }
@@ -56,6 +59,10 @@ const unreviewed = renderResult(
   })
 )
 
+const kept = renderResult(result(HEAD, {keptRecordings: 'a live test failed'}))
+
+const everydayFailed = renderResult(result(HEAD, {everyday: 'failed'}))
+
 function verdict(...comments: [login: string, body: string][]) {
   return gateVerdict({
     owner: OWNER,
@@ -64,7 +71,7 @@ function verdict(...comments: [login: string, body: string][]) {
   }).pass
 }
 
-describe('the provider-checks gate on a bump PR', () => {
+describe('the provider-checks gate on a PR it holds', () => {
   it('passes on the owner’s passing result for the head commit', () => {
     expect(verdict(['someone', 'LGTM'], [OWNER, passing])).toBe(true)
   })
@@ -90,6 +97,11 @@ describe('the provider-checks gate on a bump PR', () => {
     expect(verdict([OWNER, unrun])).toBe(false)
     expect(verdict([OWNER, stale])).toBe(false)
     expect(verdict([OWNER, unreviewed])).toBe(false)
+  })
+
+  it('fails on a result that kept the old recordings, or whose everyday tests failed against the new ones', () => {
+    expect(verdict([OWNER, kept])).toBe(false)
+    expect(verdict([OWNER, everydayFailed])).toBe(false)
   })
 
   it('goes by the owner’s newest result for the head commit', () => {

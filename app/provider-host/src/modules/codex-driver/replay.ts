@@ -14,7 +14,8 @@ export const RecordedMessageSchema = z.looseObject({})
 
 /** `in` is what the driver wrote to `codex`; `out`, what it wrote back. */
 const RecordedLineSchema = z.discriminatedUnion('kind', [
-  z.strictObject({kind: z.literal('start')}),
+  /** `build` names the `codex` that made the recording, such as `codex 0.163.0`. */
+  z.strictObject({kind: z.literal('start'), build: z.string()}),
   z.strictObject({kind: z.literal('in'), message: RecordedMessageSchema}),
   z.strictObject({kind: z.literal('out'), message: RecordedMessageSchema}),
   z.strictObject({kind: z.literal('end')}),

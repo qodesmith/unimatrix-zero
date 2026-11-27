@@ -11,6 +11,8 @@ export const RecordedMessageSchema = z.looseObject({type: z.string()})
 export const RecordedLineSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('start'),
+    /** The `claude` that made the recording, such as `claude 2.1.307`. */
+    build: z.string(),
     configDir: z.string(),
     projectKey: z.string(),
     /** Read as the folder the fake runs in wherever an out line names it. */

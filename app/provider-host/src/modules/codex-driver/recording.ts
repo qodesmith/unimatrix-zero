@@ -1,6 +1,7 @@
 import type {CodexCommand, CodexProcess, SpawnCodex} from './app-server'
 import type {RecordedLine} from './replay'
 
+import {buildOf, tempFolderNames} from '#modules/test-recordings/main'
 import {spawn} from 'node:child_process'
 import {EventEmitter} from 'node:events'
 import fs from 'node:fs'
@@ -60,6 +61,9 @@ function scrub(
       for (const root of roots)
         text = text.replaceAll(root, TREES_FOLDER_STAND_IN)
 
+      for (const [temp, standIn] of tempFolderNames().paths)
+        text = text.replaceAll(temp, standIn)
+
       for (const home of escaped(os.homedir()))
         text = text.replaceAll(home, HOME_STAND_IN)
 
@@ -74,8 +78,8 @@ function scrub(
 }
 
 /**
- * Records each real `codex app-server` process into the next of `files`, with
- * the Tree's folder as a stand-in a replay fills in.
+ * Records each real `codex app-server` process into the next of `files`, named
+ * by its build, with the Tree's folder as a stand-in a replay fills in.
  */
 export function createRecorder(files: string[], folders: Recorded = {}) {
   let run = 0
@@ -92,7 +96,10 @@ export function createRecorder(files: string[], folders: Recorded = {}) {
       stdio: ['pipe', 'pipe', 'ignore'],
     })
 
-    const lines: RecordedLine[] = [{kind: 'start'}]
+    const lines: RecordedLine[] = [
+      {kind: 'start', build: buildOf('codex', command)},
+    ]
+
     const stdin = new PassThrough()
     const stdout = new PassThrough()
 

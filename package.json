@@ -24,7 +24,7 @@
     "build": "bun run --filter '@uz/*' build",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
-    "lint": "bun run scripts/check-bun-version.ts && bun run scripts/check-oxlint-version.ts && bun run scripts/check-electron-runtime.ts && bun run scripts/check-vendor-binary-overrides.ts && oxlint && bun run scripts/check-css-tokens.ts && bun run scripts/check-provider-dependencies.ts && bun run scripts/check-us-english.ts",
+    "lint": "bun run scripts/check-bun-version.ts && bun run scripts/check-oxlint-version.ts && bun run scripts/check-electron-runtime.ts && bun run scripts/check-vendor-binary-overrides.ts && oxlint && bun run scripts/check-css-tokens.ts && bun run scripts/check-provider-dependencies.ts && bun run scripts/check-recordings.ts && bun run scripts/check-us-english.ts",
     "lint:fix": "oxlint --fix",
     "typecheck": "tsc -b",
     "knip": "knip",

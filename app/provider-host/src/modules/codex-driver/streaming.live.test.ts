@@ -1,5 +1,5 @@
-// Record one test at a time (`-t`) with `UZ_RECORD=yes`: each run changes
-// the ids the driver tests pin.
+// With `UZ_RECORD=yes`, each `[records]` test rewrites its files in
+// `recordings/`, which the driver tests replay.
 import type {SpawnCodex} from './app-server'
 import type {RateLimitReachedType} from './protocol/v2/RateLimitReachedType'
 import type {HostAttachment} from '@uz/contract/attachments'
@@ -979,7 +979,7 @@ function skillListings(items: ResponsesBody['input']) {
 }
 
 describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
-  it('[dep:codex-rollout-files] streams, continues the loaded thread, appending to one rollout under sessions/, resumes from the app’s copy alone, then forks mid-Thread', async () => {
+  it('[records] [dep:codex-rollout-files] streams, continues the loaded thread, appending to one rollout under sessions/, resumes from the app’s copy alone, then forks mid-Thread', async () => {
     if (!folder || !signedIn) return
 
     const store = fakeStore()
@@ -1143,7 +1143,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 180_000)
 
-  it('[dep:codex-thread-revert] stops a Reply mid-stream and continues after it, then rewinds the loaded thread for a Retry', async () => {
+  it('[records] [dep:codex-thread-revert] stops a Reply mid-stream and continues after it, then rewinds the loaded thread for a Retry', async () => {
     if (!folder || !signedIn) return
 
     const store = fakeStore()
@@ -1311,7 +1311,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 180_000)
 
-  it('[dep:codex-thread-revert] cuts an unloaded thread from a mid-Thread Prompt, dropping every Turn after it, then resumes from the app’s copy alone', async () => {
+  it('[records] [dep:codex-thread-revert] cuts an unloaded thread from a mid-Thread Prompt, dropping every Turn after it, then resumes from the app’s copy alone', async () => {
     if (!folder || !signedIn) return
 
     const store = fakeStore()
@@ -1606,7 +1606,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 180_000)
 
-  it('[dep:codex-reconnect-new-message] [dep:codex-retry-notice] says it is reconnecting while its connections are refused mid-Reply, then shows only the message Codex starts over, as a new item that leaves the first unfinished, once they are back', async () => {
+  it('[records] [dep:codex-reconnect-new-message] [dep:codex-retry-notice] says it is reconnecting while its connections are refused mid-Reply, then shows only the message Codex starts over, as a new item that leaves the first unfinished, once they are back', async () => {
     if (!folder || !signedIn) return
 
     const proxy = await startProxy()
@@ -1979,7 +1979,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 180_000)
 
-  it('reports a compaction Codex makes on its own inside a turn, with the thread it compacted', async () => {
+  it('[records] reports a compaction Codex makes on its own inside a turn, with the thread it compacted', async () => {
     if (!folder || !signedIn) return
 
     const home = homeFrom(signedIn)
@@ -2084,7 +2084,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 300_000)
 
-  it('[dep:codex-compaction-limit] compacts a thread past the threshold set, from the next Reply on a thread already loaded', async () => {
+  it('[records] [dep:codex-compaction-limit] compacts a thread past the threshold set, from the next Reply on a thread already loaded', async () => {
     if (!folder || !signedIn) return
 
     const home = homeFrom(signedIn)
@@ -2389,7 +2389,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     300_000
   )
 
-  it('[dep:codex-full-access] [dep:codex-server-requests-refused] writes a file in the Tree’s folder and runs a command there, asking the app nothing, and shows each tool call', async () => {
+  it('[records] [dep:codex-full-access] [dep:codex-server-requests-refused] writes a file in the Tree’s folder and runs a command there, asking the app nothing, and shows each tool call', async () => {
     if (!folder || !signedIn) return
 
     const home = homeFrom(signedIn)
@@ -2593,7 +2593,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 300_000)
 
-  it('[dep:codex-approval-requests] [dep:codex-full-access] under Supervised, on a thread loaded under full access, asks before a file write in the Tree’s folder at its file change, writes it only once allowed, and goes on after a denied one; asks before `ls` with listFiles alone, wrapped in a shell, which runs with no card; drops a waiting request on a Stop; lets an Always allow or a grant the request carries answer later writes; and asks nothing of the thread back under full access', async () => {
+  it('[records] [dep:codex-approval-requests] [dep:codex-full-access] under Supervised, on a thread loaded under full access, asks before a file write in the Tree’s folder at its file change, writes it only once allowed, and goes on after a denied one; asks before `ls` with listFiles alone, wrapped in a shell, which runs with no card; drops a waiting request on a Stop; lets an Always allow or a grant the request carries answer later writes; and asks nothing of the thread back under full access', async () => {
     if (!folder || !signedIn) return
 
     const home = homeFrom(signedIn)
@@ -2750,7 +2750,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 600_000)
 
-  it('[dep:codex-sandbox-profile] [dep:codex-refused-command-unfinished] under Supervised, an allowed command writes in the Tree’s folder and a package cache; one that writes outside fails with no second run and no item/completed; the same command the Model asks to run outside the Sandbox asks again with a reason, past an Always allow, and then works in its own Tree but still can’t read another Tree, a hidden folder or the keychains; a connection fails; and a read of another Tree fails', async () => {
+  it('[records] [dep:codex-sandbox-profile] [dep:codex-refused-command-unfinished] under Supervised, an allowed command writes in the Tree’s folder and a package cache; one that writes outside fails with no second run and no item/completed; the same command the Model asks to run outside the Sandbox asks again with a reason, past an Always allow, and then works in its own Tree but still can’t read another Tree, a hidden folder or the keychains; a connection fails; and a read of another Tree fails', async () => {
     if (!folder || !signedIn) return
 
     const home = homeFrom(signedIn)

@@ -12,8 +12,14 @@ export interface Result {
   /** Null when there was no PR to post on. */
   head: string | null
   pinChanges: string[]
+  /** The live tests, recorders and recordings the PR changes. */
+  gatedFiles: string[]
   checks: {id: string; status: CheckStatus}[]
   reviews: Review[]
+  /** Why the run kept the old recordings, or null once it rewrote them all. */
+  keptRecordings: string | null
+  /** The everyday tests, run against the recordings the run left. */
+  everyday: CheckStatus
 }
 
 const MARKER = /<!-- provider-checks (\{.*?\}) -->/
@@ -23,7 +29,9 @@ const Marker = z.object({head: z.string(), passed: z.boolean()})
 export function passed(result: Result) {
   return (
     result.checks.every(check => check.status === 'passed') &&
-    result.reviews.every(review => review.verdict === 'holds')
+    result.reviews.every(review => review.verdict === 'holds') &&
+    result.keptRecordings === null &&
+    result.everyday === 'passed'
   )
 }
 
@@ -55,6 +63,15 @@ export function renderResult(result: Result) {
     ...(result.pinChanges.length > 0
       ? [`Pins: ${result.pinChanges.join(', ')}.`]
       : []),
+    ...(result.gatedFiles.length > 0
+      ? [
+          `Changes ${result.gatedFiles.length} live test, recorder or recording files.`,
+        ]
+      : []),
+    '',
+    `**Recordings:** ${result.keptRecordings === null ? 're-recorded' : `kept the old ones, since ${result.keptRecordings}`}`,
+    '',
+    `**Everyday tests:** ${result.everyday}`,
     '',
     `**Live checks:** ${counts(result.checks.map(check => check.status)) || 'none'}`,
     '',
@@ -97,7 +114,7 @@ export interface Comment {
 }
 
 /**
- * A bump PR passes on the newest result its owner posted for its head commit,
+ * A PR the gate holds passes on its owner's newest result for its head commit,
  * so a push after the run, or anyone else's comment, doesn't count.
  */
 export function gateVerdict(input: {
@@ -127,6 +144,6 @@ export function gateVerdict(input: {
     ? {pass: true, reason: `${owner}'s provider-checks passed on ${head}.`}
     : {
         pass: false,
-        reason: `${owner}'s provider-checks on ${head} found a failing check or a stale entry.`,
+        reason: `${owner}'s provider-checks on ${head} found a failing check, a stale entry, a recording it kept or a failing everyday test.`,
       }
 }

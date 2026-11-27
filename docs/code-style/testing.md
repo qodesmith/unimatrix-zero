@@ -34,6 +34,13 @@
 - A failure on a commit that passes in another run is a bug. Find the race, make it fail every time, then remove it. The fix adds no sleep and no retry, and Vitest's `retry` stays unset.
 - Raise a limit only when it was checking speed rather than catching a hang. A longer limit never fixes a race.
 
+## Re-record a changed live test's recordings in the same PR
+
+- A recording is a real conversation that a live test saved under its module's `recordings/`, for the driver tests to replay. A live test that writes one carries `[records]` in its name.
+- A PR that changes a live test that writes a recording re-records it in the same PR, so the replays test what the live test now sends. `bun run provider-checks` re-records them all, and CI holds the PR until it has (`docs/provider-dependencies.md`, section Checking the list).
+- A replay test reads the ids, paths and Model text it checks from the recording, since each re-record changes them.
+- A recording names the build that made it, and a live test writes it. Enforced by: `bun run lint` (`scripts/check-recordings.ts`).
+
 ## Assert on what the unit produced, not on a value the test built. Enforced by: uz/no-fixture-assertion
 
 The lint message says what to assert instead.

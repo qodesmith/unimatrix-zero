@@ -34,6 +34,7 @@ import {afterEach, expect, it, vi} from 'vitest'
 import {z} from 'zod'
 
 import {createCodexDriver, spawnCodex} from './main'
+import {readRecording} from './recorded'
 import {
   FakeCodexRunSchema,
   RECORDINGS,
@@ -42,12 +43,28 @@ import {
 } from './replay'
 import {folderOf} from './rollouts'
 
-const THREAD_ID = '01a168e8-439c-71f2-bbd1-52697c97d40d'
-const FIRST_TURN = '01a168e8-4e8e-7312-b51e-dcc3f2d051eb'
-const SECOND_TURN = '01a168e8-60f5-71c3-81f4-a35411c1913a'
-const RESUMED_TURN = '01a168e8-7ae7-71d3-b6fa-169bec1fd887'
-const FORKED_THREAD_ID = '01a168e8-9d25-7df2-b2f4-208bfb1bbd5e'
-const FORKED_TURN = '01a168e8-9d50-7fb1-a539-2fd85f3c4b2b'
+const STARTED = readRecording('started.ndjson')
+const RESUMED = readRecording('resumed.ndjson')
+const FORKED = readRecording('forked.ndjson')
+const STOPPED = readRecording('stopped.ndjson')
+const REWOUND = readRecording('reverted.ndjson')
+const THANKED = readRecording('thanked.ndjson')
+const RECONNECTED = readRecording('reconnected.ndjson')
+const COMPACTED = readRecording('compacted.ndjson')
+const COMPACTION_SETTINGS = readRecording('compaction-settings.ndjson')
+const TOOLS = readRecording('tools.ndjson')
+const APPROVALS = readRecording('approvals.ndjson')
+const SANDBOX = readRecording('sandbox.ndjson')
+
+const {id: THREAD_ID, rollout: ROLLOUT} = STARTED.thread('thread/start')
+const FIRST_TURN = STARTED.turn(0).id
+const SECOND_TURN = STARTED.turn(1).id
+const RESUMED_TURN = RESUMED.turn(0).id
+
+const {id: FORKED_THREAD_ID, rollout: FORKED_ROLLOUT} =
+  FORKED.thread('thread/fork')
+
+const FORKED_TURN = FORKED.turn(0).id
 const MODEL = 'gpt-6.1-sol'
 
 const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
@@ -55,30 +72,33 @@ const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
   threshold: null,
 }
 
-const ROLLOUT = `sessions/2026/10/23/rollout-2026-10-23T09-16-57-${THREAD_ID}.jsonl`
-const FORKED_ROLLOUT = `sessions/2026/10/23/rollout-2026-10-23T09-17-17-${FORKED_THREAD_ID}.jsonl`
+const {id: STOPPED_THREAD_ID, rollout: STOPPED_ROLLOUT} =
+  STOPPED.thread('thread/start')
 
-const STOPPED_THREAD_ID = '01a170a9-cc05-7142-8908-96e20ff7d881'
-const STOPPED_TURN = '01a170a9-ce9a-7972-abbb-60582c32b871'
-const AFTER_STOP_TURN = '01a170a9-de52-7e32-98fa-57fc6eeb8640'
-const STOPPED_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-39-${STOPPED_THREAD_ID}.jsonl`
+const STOPPED_TURN = STOPPED.turn(0).id
+const AFTER_STOP_TURN = STOPPED.turn(1).id
 
-const REWOUND_THREAD_ID = '01a170a9-f825-72a1-bba2-c0fac2f606fd'
-const HI_TURN = '01a170a9-fa94-7543-b644-2fe7cf5a34fc'
-const BYE_TURN = '01a170aa-0e03-7b72-8de6-8e269c1f5388'
-const RETRIED_TURN = '01a170aa-1476-75b0-892c-bd4587e4d57b'
-const REWOUND_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-50-${REWOUND_THREAD_ID}.jsonl`
-const REVERTED_ROLLOUT = `sessions/2026/10/24/rollout-2026-10-24T21-25-56-${REWOUND_THREAD_ID}_01a170aa-145c-7992-b8a7-bcfb762e8621.jsonl`
+const {id: REWOUND_THREAD_ID, rollout: REWOUND_ROLLOUT} =
+  REWOUND.thread('thread/start')
 
-const THANKED_THREAD_ID = '01a1893a-31f8-76f2-8050-38ee9d75c720'
-const HELLO_TURN = '01a1893a-3439-7c23-9c2d-69d52b12a8b4'
-const GOODBYE_TURN = '01a1893a-4532-7b33-804e-21ff70011737'
-const THANKS_TURN = '01a1893a-4f0d-71a0-9828-93cd3ea3291e'
+const HI_TURN = REWOUND.turn(0).id
+const BYE_TURN = REWOUND.turn(1).id
+const RETRIED_TURN = REWOUND.turn(2).id
+const REVERTED_ROLLOUT = REWOUND.thread('thread/revert').rollout
 
-const RECONNECTED_THREAD_ID = '01a1c264-7cf0-7403-a69a-cdef675814f6'
-const RECONNECTED_TURN = '01a1c264-7f60-77f1-8637-990e960884d7'
+const THANKED_THREAD_ID = THANKED.thread('thread/start').id
+const HELLO_TURN = THANKED.turn(0).id
+const GOODBYE_TURN = THANKED.turn(1).id
+const THANKS_TURN = THANKED.turn(2).id
 
-const COMPACTED_THREAD_ID = '01a1c55f-23dd-7593-a186-df8b3a434f75'
+const RECONNECTED_THREAD_ID = RECONNECTED.thread('thread/start').id
+const RECONNECTED_TURN = RECONNECTED.turn(0).id
+
+const COMPACTED_THREAD_ID = COMPACTED.thread('thread/start').id
+
+const LIMIT_LIFTS = new Date(
+  STARTED.rateLimits().primary.resetsAt * 1000
+).toISOString()
 
 type Streamed = StartReplyEvent
 
@@ -396,10 +416,14 @@ it('streams a Reply, records where Codex saved it, and reports its Context size'
 
   const events = await codex.reply(FIRST_PROMPT)
 
-  expect(events.filter(event => event.type === 'TEXT_DELTA').length).toBe(5)
-  expect(textOf(events)).toBe('Hi there, friend!')
-  expect(shown(events).contextSize).toBe(14_487)
-  expect(shown(events).contextWindow).toBe(475_000)
+  const turn = STARTED.turn(0)
+
+  expect(events.filter(event => event.type === 'TEXT_DELTA').length).toBe(
+    turn.deltas.length
+  )
+  expect(textOf(events)).toBe(turn.text)
+  expect(shown(events).contextSize).toBe(turn.contextSizes.at(-1))
+  expect(shown(events).contextWindow).toBe(turn.contextWindow)
   expect(events.slice(-2)).toEqual([
     expect.objectContaining({
       type: 'REPLY_RECORDED',
@@ -418,9 +442,10 @@ it('streams a Reply, records where Codex saved it, and reports its Context size'
 it('shows a file change and a command as tool calls with their results, the text after them a part of its own', async () => {
   const codex = await setUp(['tools.ndjson'])
   const events = await codex.reply('Write notes.txt, then cat it.')
+  const [before, after] = TOOLS.turn(0).messages
 
   expect(shown(events).content).toEqual([
-    {type: 'text', text: 'I’ll create the file, then read it in the shell.\n'},
+    {type: 'text', text: before},
     {
       type: 'tool-call',
       toolCallId: expect.any(String),
@@ -438,7 +463,7 @@ it('shows a file change and a command as tool calls with their results, the text
       args: expect.stringContaining('cat notes.txt'),
       result: {content: 'HERON\n', isError: false},
     },
-    {type: 'text', text: 'HERON'},
+    {type: 'text', text: after},
   ])
   expect(events.at(-1)).toMatchObject({status: 'complete'})
 })
@@ -588,7 +613,7 @@ it('continues the Provider session in the app-server that has it loaded, then cl
   const first = await codex.reply(FIRST_PROMPT)
   const second = await codex.reply(SECOND_PROMPT, recordedIn(first))
 
-  expect(textOf(second)).toBe('Bye for now!')
+  expect(textOf(second)).toBe(STARTED.turn(1).text)
   expect(recordedIn(second)).toEqual({
     sessionId: THREAD_ID,
     messageId: SECOND_TURN,
@@ -612,7 +637,7 @@ it('resumes the Provider session from the app’s copy alone, written back under
   const codex = await setUp(['resumed.ndjson'], {store: opened.store})
   const third = await codex.reply(THIRD_PROMPT, recordedIn(second))
 
-  expect(textOf(third)).toBe('“Say hi in three words.”')
+  expect(textOf(third)).toBe(RESUMED.turn(0).text)
   expect(recordedIn(third)).toEqual({
     sessionId: THREAD_ID,
     messageId: RESUMED_TURN,
@@ -657,9 +682,11 @@ it('reports only its own turn’s token count, not the one a resume repeats or a
   const codex = await setUp([crossed], {store: opened.store})
   const third = await codex.reply(THIRD_PROMPT, recordedIn(second))
 
-  expect(third.filter(event => event.type === 'TOKENS')).toEqual([
-    expect.objectContaining({contextSize: 16_789}),
-  ])
+  expect(third.filter(event => event.type === 'TOKENS')).toEqual(
+    RESUMED.turn(0).contextSizes.map(contextSize =>
+      expect.objectContaining({contextSize})
+    )
+  )
 })
 
 it('resumes from Codex’s rollout when it carries the app’s copy further, as after a quit mid-Reply', async () => {
@@ -696,7 +723,7 @@ it('forks the Provider session through a mid-Thread Reply into a new thread with
     {compactionSettings: {auto: true, threshold: 30_000}}
   )
 
-  expect(textOf(forked)).toBe('You asked: “Say hi in three words.”')
+  expect(textOf(forked)).toBe(FORKED.turn(0).text)
   expect(recordedIn(forked)).toEqual({
     sessionId: FORKED_THREAD_ID,
     messageId: FORKED_TURN,
@@ -736,11 +763,7 @@ it('shows only the message Codex starts over after a dropped connection', async 
     'Make up a three-word ship name, put it on the first line, then write the numbers 1 to 50, one per line.'
   )
 
-  expect(textOf(events)).toBe(
-    ['Silver Moon Voyager', ...Array.from({length: 50}, (_, i) => i + 1)].join(
-      '\n'
-    )
-  )
+  expect(textOf(events)).toBe(RECONNECTED.turn(0).text)
   expect(shown(events).status).toBe('complete')
   expect(recordedIn(events)).toEqual({
     sessionId: RECONNECTED_THREAD_ID,
@@ -811,7 +834,7 @@ it('unsubscribes a loaded thread and resumes it with a changed Compaction thresh
     'thread/read',
   ])
   expect(compactionsIn(lowered)).toHaveLength(1)
-  expect(textOf(lowered)).toBe('HERON')
+  expect(textOf(lowered)).toBe(COMPACTION_SETTINGS.turn(2).text)
 })
 
 it('turns web search, built-in Skills and remote plugins on or off as the Tools panel says, unsubscribing a loaded thread to change them', async () => {
@@ -870,7 +893,7 @@ it('turns web search, built-in Skills and remote plugins on or off as the Tools 
     'thread/resume',
     'thread/read',
   ])
-  expect(textOf(flipped)).toBe('HERON')
+  expect(textOf(flipped)).toBe(COMPACTION_SETTINGS.turn(2).text)
 })
 
 it('loads a thread again with no Compaction limit in its config to go back to Codex’s default', async () => {
@@ -907,7 +930,7 @@ it('reports a compaction Codex made inside a turn, with the thread it compacted'
       boundaryId: null,
     }),
   ])
-  expect(textOf(compacting)).toBe('OTTER')
+  expect(textOf(compacting)).toBe(COMPACTED.turn(1).text)
   expect(compactionsIn(filled)).toEqual([])
 })
 
@@ -926,7 +949,7 @@ it('reports no compaction for one Codex started and never finished, as when it f
   const {compacting} = await compactingThread(unfinished)
 
   expect(compactionsIn(compacting)).toEqual([])
-  expect(textOf(compacting)).toBe('OTTER')
+  expect(textOf(compacting)).toBe(COMPACTED.turn(1).text)
 })
 
 it('stops a Reply where it is, records it, and continues the Provider session after it', async () => {
@@ -940,7 +963,7 @@ it('stops a Reply where it is, records it, and continues the Provider session af
     }
   )
 
-  expect(textOf(stopped)).toBe('1\n2\n3\n4\n5\n6\n7\n')
+  expect(textOf(stopped)).toBe(STOPPED.turn(0).deltas.join(''))
   expect(shown(stopped).status).toBe('stopped')
   expect(stopped.slice(-2)).toEqual([
     expect.objectContaining({
@@ -960,7 +983,7 @@ it('stops a Reply where it is, records it, and continues the Provider session af
     recordedIn(stopped)
   )
 
-  expect(textOf(continued)).toBe('Count one through three hundred.')
+  expect(textOf(continued)).toBe(STOPPED.turn(1).text)
   expect(continued.at(-1)).toMatchObject({status: 'complete'})
   expect(recordedIn(continued)).toEqual({
     sessionId: STOPPED_THREAD_ID,
@@ -998,7 +1021,7 @@ it('rewinds the loaded thread to the Reply a Retry answers, keeping both rollout
     {...recordedIn(hi), type: 'rewind'}
   )
 
-  expect(textOf(retried)).toBe('Say hi in three words.')
+  expect(textOf(retried)).toBe(REWOUND.turn(2).text)
   expect(recordedIn(retried)).toEqual({
     sessionId: REWOUND_THREAD_ID,
     messageId: RETRIED_TURN,
@@ -1062,7 +1085,7 @@ it('resumes a Retry from the app’s copy when the thread isn’t loaded, with n
     type: 'rewind',
   })
 
-  expect(textOf(third)).toBe('“Say hi in three words.”')
+  expect(textOf(third)).toBe(RESUMED.turn(0).text)
   expect(third.at(-1)).toMatchObject({status: 'complete'})
 
   const [report] = codex.reports()
@@ -1423,7 +1446,7 @@ it('fails the Reply as a crash, keeping its text, when Codex stops mid-stream', 
 
   const events = await codex.reply(FIRST_PROMPT)
 
-  expect(textOf(events)).toBe('Hi there, friend!')
+  expect(textOf(events)).toBe(STARTED.turn(0).text)
   expect(promptRecordedIn(events)).toEqual({
     sessionId: THREAD_ID,
     messageId: FIRST_TURN,
@@ -1460,7 +1483,7 @@ it('fails the Reply when the app can’t save its rollout, and still closes Code
 it('names when a limit lifts by the full window Codex reported', async () => {
   const limited = edited('started.ndjson', text =>
     text
-      .replace('"usedPercent":0', '"usedPercent":100')
+      .replace(/"usedPercent":[\d.]+/u, '"usedPercent":100')
       .replace(
         '"status":"completed","error":null',
         '"status":"failed","error":{"message":"You’ve hit your usage limit.","codexErrorInfo":"usageLimitExceeded"}'
@@ -1474,14 +1497,14 @@ it('names when a limit lifts by the full window Codex reported', async () => {
 
   expect(events.at(-1)).toMatchObject({
     status: 'failed',
-    failure: {code: 'limit-reached', resetsAt: '2026-10-29T18:43:34.000Z'},
+    failure: {code: 'limit-reached', resetsAt: LIMIT_LIFTS},
   })
 })
 
 it('names a workspace out of credits a reached limit, with no reset time, though a window is full', async () => {
   const limited = edited('started.ndjson', text =>
     text
-      .replace('"usedPercent":0', '"usedPercent":100')
+      .replace(/"usedPercent":[\d.]+/u, '"usedPercent":100')
       .replace(
         '"rateLimitReachedType":null',
         '"rateLimitReachedType":"workspace_owner_credits_depleted"'
@@ -1507,7 +1530,7 @@ it('names a workspace out of credits a reached limit, with no reset time, though
 it('names when a limit lifts by a full window a later update leaves out', async () => {
   const limited = edited('started.ndjson', text => {
     const lines = text
-      .replace('"usedPercent":0', '"usedPercent":100')
+      .replace(/"usedPercent":[\d.]+/u, '"usedPercent":100')
       .replace(
         '"status":"completed","error":null',
         '"status":"failed","error":{"message":"You’ve hit your usage limit.","codexErrorInfo":"usageLimitExceeded"}'
@@ -1540,7 +1563,7 @@ it('names when a limit lifts by a full window a later update leaves out', async 
 
   expect(events.at(-1)).toMatchObject({
     status: 'failed',
-    failure: {code: 'limit-reached', resetsAt: '2026-10-29T18:43:34.000Z'},
+    failure: {code: 'limit-reached', resetsAt: LIMIT_LIFTS},
   })
 })
 
@@ -1552,7 +1575,7 @@ it('takes the Prompt to a new app-server when the last one stopped unheard', asy
 
   const events = await codex.reply(FIRST_PROMPT)
 
-  expect(textOf(events)).toBe('Hi there, friend!')
+  expect(textOf(events)).toBe(STARTED.turn(0).text)
   expect(events.at(-1)).toMatchObject({status: 'complete'})
   const [stopped, fresh] = codex.reports()
 
@@ -1954,9 +1977,13 @@ it('where the Sandbox can’t run, starts a Supervised thread in workspace-write
   ])
 })
 
-const APPROVALS_THREAD_ID = '01a21886-e0d5-78b1-b757-26aba0a145ca'
-const ALLOWED_CHANGE = 'exec-b10a3dc9-0351-4680-8d71-8ba1b8271a31'
-const LISTING = 'exec-9232779d-c178-478e-a269-3a55fe93aff7'
+const APPROVALS_THREAD_ID = APPROVALS.thread('thread/start').id
+
+const ALLOWED_CHANGE = APPROVALS.approvalRequest(
+  'item/fileChange/requestApproval'
+).itemId
+
+const {itemId: LISTING, command: LISTING_COMMAND} = APPROVALS.commandRequest()
 
 function cardsIn(events: Streamed[]) {
   return events.flatMap(event =>
@@ -2125,7 +2152,7 @@ function unparsedListing(command: string) {
         '{"type":"listFiles","command":"ls","path":null}',
         '{"type":"unknown","command":"ls"}'
       )
-      .replaceAll('"/bin/zsh -lc ls"', JSON.stringify(command))
+      .replaceAll(JSON.stringify(LISTING_COMMAND), JSON.stringify(command))
   )
 }
 
@@ -2161,7 +2188,7 @@ it('declines a command request that names no command, with no card', async () =>
           '{"type":"unknown","command":"ls"}'
         )
         .replace(
-          '"environmentId":"local","command":"/bin/zsh -lc ls",',
+          `"environmentId":"local","command":${JSON.stringify(LISTING_COMMAND)},`,
           '"environmentId":"local","command":null,'
         )
     ),
@@ -2262,8 +2289,7 @@ it('unsubscribes a loaded thread and resumes it on the permission profile for a 
   })
 })
 
-const LEAVING =
-  'echo KESTREL > /Library/Caches/uz-sandbox-5b4ee66d-587b-4642-8515-54739a590b82.txt && sh /var/folders/47/6jxrn9415rb7mh91hmdtz5dm0000gn/T/uz-peek-434756fa-775a-498a-8be1-7491f7f76c38.sh'
+const LEAVING = SANDBOX.commandRequest(1).parsed
 
 /**
  * The Replies of `sandbox.ndjson`, in order: a command inside the Sandbox,
@@ -2685,7 +2711,7 @@ it('takes over a Thread Claude wrote: a new thread holding each Turn as a messag
 
   const events = await codex.reply(FIRST_PROMPT, null, {thread: HANDED_OVER})
 
-  expect(textOf(events)).toBe('Hi there, friend!')
+  expect(textOf(events)).toBe(STARTED.turn(0).text)
   expect(recordedIn(events)).toEqual({
     sessionId: THREAD_ID,
     messageId: FIRST_TURN,
@@ -2746,7 +2772,7 @@ it('keeps the line that explains the labels when a rebuilt thread resumes in a n
     {
       prompt: FIRST_PROMPT,
       attachments: [],
-      reply: [{type: 'text', text: 'Hi there, friend!'}],
+      reply: [{type: 'text', text: STARTED.turn(0).text}],
       label: null,
     },
   ]
