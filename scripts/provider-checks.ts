@@ -19,8 +19,8 @@ import {passed, renderResult} from './provider-checks-result.ts'
 import {LIST, entriesOf, liveCheckOf, tagsIn} from './provider-dependencies.ts'
 import {review} from './provider-review.ts'
 import {
-  changedFilesOf,
-  gatedFiles,
+  filesIn,
+  gatedChangesOf,
   isRecording,
   unrewritten,
 } from './recordings.ts'
@@ -29,7 +29,6 @@ import {
   INSTALLED_SDK,
   MANIFEST,
   SDK,
-  bumpOf,
   pinsOf,
 } from './vendor-pins.ts'
 
@@ -163,12 +162,11 @@ async function findGated(repo: string, wanted: number | null) {
   for (const pull of open) {
     if (wanted !== null && pull.number !== wanted) continue
 
-    const [pinChanges, changed] = await Promise.all([
-      bumpOf(api, repo, {base: pull.base.sha, head: pull.head.sha}),
-      changedFilesOf(api, repo, pull.number),
-    ])
-
-    const files = gatedFiles(changed)
+    const {pinChanges, files} = await gatedChangesOf(api, repo, {
+      number: pull.number,
+      base: pull.base.sha,
+      head: pull.head.sha,
+    })
 
     if (pinChanges.length > 0 || files.length > 0) {
       gated.push({
@@ -252,11 +250,7 @@ async function runLiveChecks(ids: string[], env: Record<string, string>) {
 }
 
 async function recordings() {
-  const listed = await $`git ls-files --cached --others --exclude-standard`
-    .cwd(root)
-    .text()
-
-  return listed.split('\n').filter(isRecording)
+  return (await filesIn(root)).filter(isRecording)
 }
 
 /** Why the run must keep the old recordings, or null when it can commit. */
@@ -276,7 +270,6 @@ async function whyKept(since: number, failed: boolean) {
     : null
 }
 
-/** Returns the new head commit. */
 async function commitRecordings() {
   await $`git add -- ${await recordings()}`.cwd(root)
   await $`git commit --quiet -m ${'Re-record the recordings for provider-checks'}`.cwd(

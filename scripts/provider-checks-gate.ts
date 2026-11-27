@@ -3,8 +3,7 @@ import type {Comment} from './provider-checks-result.ts'
 import {z} from 'zod'
 
 import {gateVerdict} from './provider-checks-result.ts'
-import {changedFilesOf, gatedFiles} from './recordings.ts'
-import {bumpOf} from './vendor-pins.ts'
+import {gatedChangesOf} from './recordings.ts'
 
 const Env = z.object({
   GITHUB_EVENT_NAME: z.string(),
@@ -68,12 +67,11 @@ const {pull_request: pr} = PullRequestEvent.parse(
   await Bun.file(env.GITHUB_EVENT_PATH).json()
 )
 
-const [pinChanges, changed] = await Promise.all([
-  bumpOf(api, env.GITHUB_REPOSITORY, {base: pr.base.sha, head: pr.head.sha}),
-  changedFilesOf(api, env.GITHUB_REPOSITORY, pr.number),
-])
-
-const files = gatedFiles(changed)
+const {pinChanges, files} = await gatedChangesOf(api, env.GITHUB_REPOSITORY, {
+  number: pr.number,
+  base: pr.base.sha,
+  head: pr.head.sha,
+})
 
 if (pinChanges.length === 0 && files.length === 0) {
   console.log(

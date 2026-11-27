@@ -65,7 +65,7 @@ export function renderResult(result: Result) {
       : []),
     ...(result.gatedFiles.length > 0
       ? [
-          `Changes ${result.gatedFiles.length} live test, recorder or recording files.`,
+          `Live tests, recorders or recordings changed: ${result.gatedFiles.length}.`,
         ]
       : []),
     '',

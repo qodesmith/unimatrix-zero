@@ -1,8 +1,7 @@
-import {$} from 'bun'
 import path from 'node:path'
 
 import {finishCheck} from './finish-check.ts'
-import {isLiveTest, isRecording, problemsOf} from './recordings.ts'
+import {filesIn, isLiveTest, isRecording, problemsOf} from './recordings.ts'
 import {HOST_PACKAGE, MANIFEST, pinsOf} from './vendor-pins.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -11,11 +10,7 @@ async function read(file: string) {
   return Bun.file(path.join(root, file)).text()
 }
 
-const files = (
-  await $`git ls-files --cached --others --exclude-standard`.cwd(root).text()
-)
-  .split('\n')
-  .filter(Boolean)
+const files = await filesIn(root)
 
 const recordings = await Promise.all(
   files.filter(isRecording).map(async file => ({file, text: await read(file)}))

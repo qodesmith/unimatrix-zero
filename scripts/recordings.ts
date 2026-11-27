@@ -4,8 +4,12 @@
  */
 import type {GitHubApi, Pins} from './vendor-pins.ts'
 
+import {execFile} from 'node:child_process'
 import path from 'node:path'
+import {promisify} from 'node:util'
 import {z} from 'zod'
+
+import {bumpOf} from './vendor-pins.ts'
 
 const RECORDING = /(?:^|\/)recordings\//
 const LIVE_TEST = /\.live\.test\.ts$/
@@ -55,7 +59,7 @@ function stampProblem(file: string, build: string | null, pins: Pins) {
   const pinned = pins.get(program)
 
   if (pinned === undefined) {
-    return `  ${file} was made by ${build}, a program with no pin.`
+    return `  ${file} was made by ${build}, a program with no pin: ${RE_RECORD}`
   }
 
   return version === pinned
@@ -110,6 +114,31 @@ export async function changedFilesOf(api: GitHubApi, repo: string, pr: number) {
 
     if (batch.length < 100) return files
   }
+}
+
+/** Why CI's gate holds a PR, which is when either list has something. */
+export async function gatedChangesOf(
+  api: GitHubApi,
+  repo: string,
+  pr: {number: number; base: string; head: string}
+) {
+  const [pinChanges, changed] = await Promise.all([
+    bumpOf(api, repo, {base: pr.base, head: pr.head}),
+    changedFilesOf(api, repo, pr.number),
+  ])
+
+  return {pinChanges, files: gatedFiles(changed)}
+}
+
+/** Every file in the checkout at `root` that git doesn't ignore. */
+export async function filesIn(root: string) {
+  const {stdout} = await promisify(execFile)(
+    'git',
+    ['ls-files', '--cached', '--others', '--exclude-standard'],
+    {cwd: root, maxBuffer: 64 * 1024 * 1024}
+  )
+
+  return stdout.split('\n').filter(Boolean)
 }
 
 /** The recordings last written before `since`, a run's start in ms. */

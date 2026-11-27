@@ -61,7 +61,7 @@ describe('the recordings lint', () => {
       )
     ).toEqual([
       `  ${MODULE}/recordings/started.ndjson was made by codex 0.162.0, not the pinned codex 0.163.0: run \`bun run provider-checks\` to re-record it.`,
-      `  ${MODULE}/recordings/resumed.ndjson was made by gemini 1.0.0, a program with no pin.`,
+      `  ${MODULE}/recordings/resumed.ndjson was made by gemini 1.0.0, a program with no pin: run \`bun run provider-checks\` to re-record it.`,
     ])
   })
 

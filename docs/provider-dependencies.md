@@ -31,7 +31,7 @@ A live check is a test whose name carries `[dep:<id>]` (one test can carry sever
 Live checks need the maintainer's signed-in account, so they never run in CI. They use the checkout's own dev data: run `bun run dev` in the checkout to be checked and connect Claude and ChatGPT, so it holds the pinned builds and both sign-ins. Then, on the maintainer's machine, `bun run provider-checks`:
 
 1. Runs every `[dep:]` live check and every `[records]` live test with `UZ_RECORD=yes`, so each test that writes a recording rewrites it from the pinned builds.
-2. Keeps the old recordings when a live test fails or a recording wasn't rewritten in the run, and says why. Otherwise, on a clean checkout of the PR's head, it commits the new ones.
+2. Commits no recordings when a live test fails or a recording wasn't rewritten in the run, and says why; what the run did rewrite stays in the checkout, uncommitted. Otherwise, on a clean checkout of the PR's head, it commits the new recordings.
 3. Runs the everyday tests against the recordings the run left.
 4. Has an agent on the maintainer's own `claude` login read each entry against the current code and the pinned builds, and report the ones that no longer hold on either side.
 5. Posts the results in one comment on the open PR that CI's gate holds, tied to a commit. When it committed recordings, that is the new commit, which it pushes once the comment is up. Otherwise it is the PR's head, and it re-runs that PR's gate. With more than one such PR open, pass `--pr <n>`. With none open, or when the checkout isn't a clean copy of the PR's head, it prints the results, posts and commits nothing, and says why.

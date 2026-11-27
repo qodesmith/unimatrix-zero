@@ -31,7 +31,7 @@ interface RecordedToolCall {
 }
 
 /** What one Prompt's run up to its `result` holds that a re-record changes. */
-interface RecordedTurn {
+interface RecordedReply {
   sessionId: string
   /** The last assistant entry, which the Reply is recorded at. */
   messageId: string
@@ -46,7 +46,7 @@ interface RecordedTurn {
 }
 
 interface Draft extends Omit<
-  RecordedTurn,
+  RecordedReply,
   'sessionId' | 'messageId' | 'streamedBeforeInterrupt'
 > {
   messageId: string | null
@@ -201,8 +201,8 @@ function addOut(draft: Draft, message: z.infer<typeof RecordedMessageSchema>) {
   if (boundary.success) draft.boundaryIds.push(boundary.data.uuid)
 }
 
-function turnsIn(lines: RecordedLine[]) {
-  const turns: RecordedTurn[] = []
+function repliesIn(lines: RecordedLine[]) {
+  const replies: RecordedReply[] = []
   let draft = newDraft()
 
   for (const line of lines) {
@@ -219,9 +219,9 @@ function turnsIn(lines: RecordedLine[]) {
 
     const {messageId} = draft
 
-    if (messageId === null) throw new Error('A turn has no assistant entry')
+    if (messageId === null) throw new Error('A Reply has no assistant entry')
 
-    turns.push({
+    replies.push({
       ...draft,
       sessionId: result.data.session_id,
       messageId,
@@ -231,20 +231,20 @@ function turnsIn(lines: RecordedLine[]) {
     draft = newDraft()
   }
 
-  return turns
+  return replies
 }
 
-const read = new Map<string, RecordedTurn[]>()
+const read = new Map<string, RecordedReply[]>()
 
-/** The turn of the recording's `index`th `result`, counted from 0. */
-export function recordedTurn(name: string, index: number) {
-  const turns = read.get(name) ?? turnsIn(readRecording(name))
-  read.set(name, turns)
-  const turn = turns[index]
+/** The Reply of the recording's `index`th `result`, counted from 0. */
+export function recordedReply(name: string, index: number) {
+  const replies = read.get(name) ?? repliesIn(readRecording(name))
+  read.set(name, replies)
+  const reply = replies[index]
 
-  if (!turn) throw new Error(`${name} has no turn ${index}`)
+  if (!reply) throw new Error(`${name} has no Reply ${index}`)
 
-  return turn
+  return reply
 }
 
 function quoted(text: string) {

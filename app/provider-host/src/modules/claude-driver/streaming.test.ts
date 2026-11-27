@@ -42,7 +42,7 @@ import {afterEach, expect, it} from 'vitest'
 import {z} from 'zod'
 
 import {createClaudeDriver, spawnClaude} from './main'
-import {inFolder, readRecording, recordedTurn} from './recorded-turns'
+import {inFolder, readRecording, recordedReply} from './recorded-replies'
 import {
   FakeClaudeRunSchema,
   RECORDINGS,
@@ -57,17 +57,17 @@ const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
   threshold: null,
 }
 
-const FIRST_REPLY = recordedTurn('warm.ndjson', 0)
-const SECOND_REPLY = recordedTurn('warm.ndjson', 1)
-const RESUMED_REPLY = recordedTurn('resumed.ndjson', 0)
-const FORKED_REPLY = recordedTurn('forked.ndjson', 0)
-const STOPPED_REPLY = recordedTurn('stopped.ndjson', 0)
-const ASKED_REPLY = recordedTurn('stopped.ndjson', 1)
-const TEAL_REPLY = recordedTurn('rewound-warm.ndjson', 0)
-const OTTER_REPLY = recordedTurn('rewound-warm.ndjson', 1)
-const REWOUND_REPLY = recordedTurn('rewound.ndjson', 0)
-const COMPACTING_REPLY = recordedTurn('compacted.ndjson', 2)
-const TOOLS_REPLY = recordedTurn('tools.ndjson', 0)
+const FIRST_REPLY = recordedReply('warm.ndjson', 0)
+const SECOND_REPLY = recordedReply('warm.ndjson', 1)
+const RESUMED_REPLY = recordedReply('resumed.ndjson', 0)
+const FORKED_REPLY = recordedReply('forked.ndjson', 0)
+const STOPPED_REPLY = recordedReply('stopped.ndjson', 0)
+const ASKED_REPLY = recordedReply('stopped.ndjson', 1)
+const TEAL_REPLY = recordedReply('rewound-warm.ndjson', 0)
+const OTTER_REPLY = recordedReply('rewound-warm.ndjson', 1)
+const REWOUND_REPLY = recordedReply('rewound.ndjson', 0)
+const COMPACTING_REPLY = recordedReply('compacted.ndjson', 2)
+const TOOLS_REPLY = recordedReply('tools.ndjson', 0)
 
 const SESSION_ID = FIRST_REPLY.sessionId
 const FIRST_MESSAGE = FIRST_REPLY.messageId
@@ -2381,7 +2381,7 @@ it('under Supervised, asks about a Write in the Tree’s files at its tool call 
 
   const asked = events.findIndex(event => event.type === 'APPROVAL_REQUESTED')
   const notes = path.join(claude.treeFolder, 'notes.txt')
-  const [recordedWrite] = recordedTurn('approved.ndjson', 0).toolCalls
+  const [recordedWrite] = recordedReply('approved.ndjson', 0).toolCalls
 
   // The recording was made on a Mac, so on Windows its path mixes separators.
   const asWritten = inFolder(
@@ -2577,7 +2577,7 @@ it('under Supervised, asks about a command inside the Sandbox at its tool call, 
   })
 
   const [bash] = toolCallsOf(events)
-  const [recordedBash] = recordedTurn('sandboxed.ndjson', 0).toolCalls
+  const [recordedBash] = recordedReply('sandboxed.ndjson', 0).toolCalls
 
   expect(askedIn(events)).toEqual([
     expect.objectContaining({
@@ -2609,7 +2609,7 @@ it('under Supervised, asks again to run a command outside the Sandbox after an A
   const [, outside] = toolCallsOf(events)
   const [first, leaving, ...rest] = askedIn(events).map(event => event.action)
 
-  const [inside] = recordedTurn('left-sandbox.ndjson', 0).toolCalls
+  const [inside] = recordedReply('left-sandbox.ndjson', 0).toolCalls
 
   expect(first).toEqual({
     kind: 'command',
