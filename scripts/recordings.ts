@@ -93,7 +93,12 @@ export function problemsOf(
   })
 }
 
-const PullFiles = z.array(z.looseObject({filename: z.string()}))
+const PullFiles = z.array(
+  z.looseObject({
+    filename: z.string(),
+    previous_filename: z.string().optional(),
+  })
+)
 
 /** GitHub lists at most 3,000 of a PR's files, which is plenty here. */
 export async function changedFilesOf(api: GitHubApi, repo: string, pr: number) {
@@ -106,7 +111,12 @@ export async function changedFilesOf(api: GitHubApi, repo: string, pr: number) {
       )
     )
 
-    files.push(...batch.map(file => file.filename))
+    files.push(
+      ...batch.flatMap(file => [
+        file.filename,
+        ...(file.previous_filename ? [file.previous_filename] : []),
+      ])
+    )
 
     if (batch.length < 100) return files
   }

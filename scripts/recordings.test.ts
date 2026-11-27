@@ -125,6 +125,21 @@ describe('a PR the Provider checks gate holds', () => {
     expect(files).toHaveLength(101)
     expect(gatedFiles(files)).toEqual([`${MODULE}/recordings/started.ndjson`])
   })
+
+  it('moves a recording out of its folder', async () => {
+    async function api() {
+      return JSON.stringify([
+        {
+          filename: `${MODULE}/started.ndjson`,
+          previous_filename: `${MODULE}/recordings/started.ndjson`,
+        },
+      ])
+    }
+
+    expect(gatedFiles(await changedFilesOf(api, 'o/r', 7))).toEqual([
+      `${MODULE}/recordings/started.ndjson`,
+    ])
+  })
 })
 
 describe('a Provider checks run', () => {
