@@ -212,7 +212,7 @@ function scrub(lines: RecordedLine[]) {
 }
 
 /**
- * Records each `claude` into `files` in the order they start, named by its
+ * Records each `claude` into `files` in the order they start, stamped with its
  * build, once it exits.
  */
 export function createRecorder(

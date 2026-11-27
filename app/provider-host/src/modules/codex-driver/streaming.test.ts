@@ -444,6 +444,10 @@ it('shows a file change and a command as tool calls with their results, the text
   const events = await codex.reply('Write notes.txt, then cat it.')
   const [before, after] = TOOLS.turn(0).messages
 
+  const command = toolCallsOf(events).find(
+    call => call.toolName === 'commandExecution'
+  )
+
   expect(shown(events).content).toEqual([
     {type: 'text', text: before},
     {
@@ -461,7 +465,10 @@ it('shows a file change and a command as tool calls with their results, the text
       toolCallId: expect.any(String),
       toolName: 'commandExecution',
       args: expect.stringContaining('cat notes.txt'),
-      result: {content: 'HERON\n', isError: false},
+      result: {
+        content: TOOLS.commandOutput(command?.toolCallId ?? '') ?? '',
+        isError: false,
+      },
     },
     {type: 'text', text: after},
   ])

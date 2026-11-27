@@ -78,8 +78,8 @@ function scrub(
 }
 
 /**
- * Records each real `codex app-server` process into the next of `files`, named
- * by its build, with the Tree's folder as a stand-in a replay fills in.
+ * Records each real `codex app-server` process into the next of `files`,
+ * stamped with its build, the Tree's folder as a stand-in a replay fills in.
  */
 export function createRecorder(files: string[], folders: Recorded = {}) {
   let run = 0
