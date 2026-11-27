@@ -2750,7 +2750,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 600_000)
 
-  it('[dep:codex-sandbox-profile] [dep:codex-refused-command-unfinished] under Supervised, an allowed command writes in the Tree’s folder and a package cache; one that writes outside fails with no second run and no item/completed; the same command the Model asks to run outside the Sandbox asks again with a reason, past an Always allow, and then writes but still can’t read another Tree; a connection fails; and a read of another Tree fails', async () => {
+  it('[dep:codex-sandbox-profile] [dep:codex-refused-command-unfinished] under Supervised, an allowed command writes in the Tree’s folder and a package cache; one that writes outside fails with no second run and no item/completed; the same command the Model asks to run outside the Sandbox asks again with a reason, past an Always allow, and then works in its own Tree but still can’t read another Tree, a hidden folder or the keychains; a connection fails; and a read of another Tree fails', async () => {
     if (!folder || !signedIn) return
 
     const home = homeFrom(signedIn)
@@ -2758,11 +2758,21 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     const name = `uz-sandbox-${crypto.randomUUID()}.txt`
     const cached = path.join(os.homedir(), 'Library', 'Caches', name)
     const outside = path.join('/Library/Caches', name)
-    // Outside the Sandbox a command can't read the Tree, which sits in a
-    // denied folder, so the script that reads another Tree sits in temp.
-    const peek = path.join(os.tmpdir(), `uz-peek-${crypto.randomUUID()}.sh`)
-    fs.writeFileSync(peek, `cat ${trees.other}/secret.txt >> ${outside} 2>&1\n`)
-    const leaving = `echo KESTREL > ${outside} && sh ${peek}`
+    const hidden = newTreeFolder()
+    fs.writeFileSync(path.join(hidden, 'secret.txt'), 'GANNET\n')
+    const keychains = path.join(os.homedir(), 'Library', 'Keychains')
+    fs.writeFileSync(
+      path.join(trees.tree, 'peek.sh'),
+      [
+        'echo WREN > wrote.txt',
+        `cat wrote.txt >> ${outside}`,
+        `cat ${trees.other}/secret.txt >> ${outside} 2>&1`,
+        `cat ${hidden}/secret.txt >> ${outside} 2>&1`,
+        `ls ${keychains} >> ${outside} 2>&1`,
+        '',
+      ].join('\n')
+    )
+    const leaving = `echo KESTREL > ${outside} && sh peek.sh`
 
     const recorder = createRecorder([path.join(RECORDINGS, 'sandbox.ndjson')], {
       treeFolder: trees.tree,
@@ -2773,6 +2783,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
 
     const live = approvalReplies(folder, home, trees.tree, start, {
       treesFolder: trees.root,
+      hiddenFolders: [hidden],
     })
 
     const treeId = crypto.randomUUID()
@@ -2837,12 +2848,17 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         expect.stringMatching(/\S/u),
       ])
 
-      const wrote = fs.readFileSync(outside, 'utf8')
+      const wrote = fs.readFileSync(outside, 'utf8').split('\n')
 
-      expect(wrote).toMatch(
-        /^KESTREL\n.*secret\.txt: Operation not permitted/su
+      expect(wrote.slice(0, 2)).toEqual(['KESTREL', 'WREN'])
+      expect(wrote.slice(2, 5)).toEqual([
+        expect.stringMatching(/two\/secret\.txt: Operation not permitted$/u),
+        expect.stringMatching(/secret\.txt: Operation not permitted$/u),
+        expect.stringMatching(/Keychains: Operation not permitted$/u),
+      ])
+      expect(fs.readFileSync(path.join(trees.tree, 'wrote.txt'), 'utf8')).toBe(
+        'WREN\n'
       )
-      expect(wrote).not.toContain('PLOVER')
 
       const connected = await live.reply(
         `${ONCE}\n\ncurl -sS -m 8 -o /dev/null https://example.com`,
@@ -2877,7 +2893,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       fs.rmSync(trees.root, {recursive: true, force: true})
       fs.rmSync(cached, {force: true})
       fs.rmSync(outside, {force: true})
-      fs.rmSync(peek, {force: true})
+      fs.rmSync(hidden, {recursive: true, force: true})
     }
   }, 600_000)
 

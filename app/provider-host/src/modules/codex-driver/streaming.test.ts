@@ -31,6 +31,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import {afterEach, expect, it, vi} from 'vitest'
+import {z} from 'zod'
 
 import {createCodexDriver, spawnCodex} from './main'
 import {
@@ -148,17 +149,18 @@ async function setUp(
     store = fakeStore(),
     platform = 'darwin',
     readLoginShellPath = async () => undefined,
+    treeFolder = folder('uz-codex-tree-'),
     ...behavior
   }: {
     store?: ReturnType<typeof fakeStore>
     platform?: NodeJS.Platform
     readLoginShellPath?: () => Promise<string | undefined>
+    treeFolder?: string
   } & FakeCodexOptions = {}
 ) {
   const fake = await replayCodex()
   cleanUps.push(fake.cleanUp)
   const configDir = folder('uz-codex-home-')
-  const treeFolder = folder('uz-codex-tree-')
   const reports = folder('uz-codex-reports-')
   const idle = heldIdle()
   const exits: Promise<unknown>[] = []
@@ -1844,6 +1846,73 @@ it('starts, resumes and forks every thread under Supervised in the Tree’s fold
   expect(opened.reports()[0]?.turnAccess).toStrictEqual(
     [1, 2].map(() => ({cwd: opened.treeFolder, approvalPolicy: 'untrusted'}))
   )
+})
+
+it('under Supervised, denies each other Tree’s folder rather than the folder of every Tree, and resumes the thread with a Tree made since its last Reply denied too', async () => {
+  const trees = folder('uz-codex-trees-')
+  const own = path.join(trees, 'own')
+  const other = path.join(trees, 'other')
+  const newer = path.join(trees, 'newer')
+  fs.mkdirSync(own)
+  fs.mkdirSync(other)
+
+  const codex = await setUp(['compaction-settings.ndjson'], {treeFolder: own})
+
+  const supervised = {
+    permissionMode: 'supervised' as const,
+    treesFolder: trees,
+  }
+
+  const first = await codex.reply(
+    'Reply with the single word TEAL.',
+    null,
+    supervised
+  )
+
+  const second = await codex.reply(
+    'Reply with the single word OTTER.',
+    recordedIn(first),
+    supervised
+  )
+
+  fs.mkdirSync(newer)
+
+  await codex.reply(
+    'Reply with the single word HERON.',
+    recordedIn(second),
+    supervised
+  )
+  await codex.allClosed()
+  const [report] = codex.reports()
+
+  const Profile = z.object({
+    permissions: z.object({
+      uz: z.object({filesystem: z.record(z.string(), z.string())}),
+    }),
+  })
+
+  expect(
+    report?.threadConfigs.map(config =>
+      Object.entries(Profile.parse(config).permissions.uz.filesystem).filter(
+        ([entry]) => entry.startsWith(trees)
+      )
+    )
+  ).toEqual([
+    [
+      [other, 'deny'],
+      [own, 'write'],
+    ],
+    [
+      [newer, 'deny'],
+      [other, 'deny'],
+      [own, 'write'],
+    ],
+  ])
+  expect(
+    report?.methods.filter(method =>
+      ['thread/start', 'thread/unsubscribe', 'thread/resume'].includes(method)
+    )
+  ).toEqual(['thread/start', 'thread/unsubscribe', 'thread/resume'])
 })
 
 it('where the Sandbox can’t run, starts a Supervised thread in workspace-write that asks before anything that isn’t trusted, on no permission profile, its turns writing only in the Tree’s folder with the network off, and a later turn under full access goes back to it', async () => {

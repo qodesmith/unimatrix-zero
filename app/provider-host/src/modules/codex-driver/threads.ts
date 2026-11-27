@@ -5,7 +5,10 @@ import {
   hasSandbox,
   packageCaches,
 } from '#modules/sandbox/main'
+import {namesBelow, realPath} from '#modules/tree-folder/main'
+import fs from 'node:fs'
 import os from 'node:os'
+import path from 'node:path'
 
 export interface LoadedThread {
   id: string
@@ -38,16 +41,39 @@ export function isSandboxed(
 const PROFILE = 'uz'
 
 /**
+ * Each by name: a command the user lets run outside the Sandbox keeps only the
+ * `deny` entries, so denying the folder of every Tree would hide this one too.
+ */
+function otherTreeFolders({
+  treeFolder,
+  treesFolder,
+}: Pick<Configured, 'treeFolder' | 'treesFolder'>) {
+  if (namesBelow(treesFolder, treeFolder)?.length !== 1) return [treesFolder]
+
+  const own = realPath(treeFolder)
+
+  return fs
+    .readdirSync(treesFolder)
+    .toSorted()
+    .map(name => path.join(treesFolder, name))
+    .filter(folder => realPath(folder) !== own)
+}
+
+/**
  * A permission profile, since a denied read is what stops Codex from running
  * a command again outside the Sandbox, unasked, once the Sandbox blocks it
  * (ADR 0018). `:workspace` writes in `cwd` and temp, with the network off.
- * The Tree's folder sits inside the folder of every Tree, which is denied.
  */
 function sandboxProfile(
   {treeFolder, treesFolder, hiddenFolders}: Configured,
   home: string
 ) {
-  const denied = [...credentialFolders(home), ...hiddenFolders, treesFolder]
+  const denied = [
+    ...credentialFolders(home),
+    ...hiddenFolders,
+    ...otherTreeFolders({treeFolder, treesFolder}),
+  ]
+
   const writable = [treeFolder, ...packageCaches(home)]
 
   return {
