@@ -271,8 +271,14 @@ async function whyKept(since: number, failed: boolean) {
     : null
 }
 
+/** Null when the run rewrote every recording as it was. */
 async function commitRecordings() {
   await $`git add -- ${await recordings()}`.cwd(root)
+
+  const staged = await $`git diff --cached --quiet`.cwd(root).nothrow()
+
+  if (staged.exitCode === 0) return null
+
   await $`git commit --quiet -m ${'Re-record the recordings for provider-checks'}`.cwd(
     root
   )
