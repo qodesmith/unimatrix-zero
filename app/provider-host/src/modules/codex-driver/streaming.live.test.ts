@@ -2750,7 +2750,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     }
   }, 600_000)
 
-  it('[dep:codex-sandbox-profile] [dep:codex-refused-command-unfinished] under Supervised, an allowed command writes in the Tree’s folder and a package cache; one that writes outside fails with no second run and no item/completed; the same command the Model asks to run outside the Sandbox asks again with a reason, past an Always allow, and then writes; a connection fails; and a read of another Tree fails', async () => {
+  it('[dep:codex-sandbox-profile] [dep:codex-refused-command-unfinished] under Supervised, an allowed command writes in the Tree’s folder and a package cache; one that writes outside fails with no second run and no item/completed; the same command the Model asks to run outside the Sandbox asks again with a reason, past an Always allow, and then writes but still can’t read another Tree; a connection fails; and a read of another Tree fails', async () => {
     if (!folder || !signedIn) return
 
     const home = homeFrom(signedIn)
@@ -2758,7 +2758,11 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     const name = `uz-sandbox-${crypto.randomUUID()}.txt`
     const cached = path.join(os.homedir(), 'Library', 'Caches', name)
     const outside = path.join('/Library/Caches', name)
-    const leaving = `echo KESTREL > ${outside}`
+    // Outside the Sandbox a command can't read the Tree, which sits in a
+    // denied folder, so the script that reads another Tree sits in temp.
+    const peek = path.join(os.tmpdir(), `uz-peek-${crypto.randomUUID()}.sh`)
+    fs.writeFileSync(peek, `cat ${trees.other}/secret.txt >> ${outside} 2>&1\n`)
+    const leaving = `echo KESTREL > ${outside} && sh ${peek}`
 
     const recorder = createRecorder([path.join(RECORDINGS, 'sandbox.ndjson')], {
       treeFolder: trees.tree,
@@ -2832,7 +2836,13 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       expect(left.requests.map(request => request.params.reason)).toEqual([
         expect.stringMatching(/\S/u),
       ])
-      expect(fs.readFileSync(outside, 'utf8')).toBe('KESTREL\n')
+
+      const wrote = fs.readFileSync(outside, 'utf8')
+
+      expect(wrote).toMatch(
+        /^KESTREL\n.*secret\.txt: Operation not permitted/su
+      )
+      expect(wrote).not.toContain('PLOVER')
 
       const connected = await live.reply(
         `${ONCE}\n\ncurl -sS -m 8 -o /dev/null https://example.com`,
@@ -2867,6 +2877,7 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       fs.rmSync(trees.root, {recursive: true, force: true})
       fs.rmSync(cached, {force: true})
       fs.rmSync(outside, {force: true})
+      fs.rmSync(peek, {force: true})
     }
   }, 600_000)
 
