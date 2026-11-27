@@ -30,13 +30,30 @@ A live check is a test whose name carries `[dep:<id>]` (one test can carry sever
 
 Live checks need the maintainer's signed-in account, so they never run in CI. They use the checkout's own dev data: run `bun run dev` in the checkout to be checked and connect Claude and ChatGPT, so it holds the pinned builds and both sign-ins. Then, on the maintainer's machine, `bun run provider-checks`:
 
-1. Runs every `[dep:]` live check.
-2. Has an agent on the maintainer's own `claude` login read each entry against the current code and the pinned builds, and report the ones that no longer hold on either side.
-3. Posts both results in one comment on the open bump PR, tied to its head commit, and re-runs that PR's gate. With more than one bump PR open, pass `--pr <n>`. With none open, or when the checkout isn't a clean copy of the bump PR's head, it prints the results, posts nothing and says why.
+1. Runs every `[dep:]` live check and every `[records]` live test with `UZ_RECORD=yes`, so each test that writes a recording rewrites it from the pinned builds. A live test that fails runs once more, and the result names each one that passed only on that retry. A retried `[records]` test's recordings all come from the try that passed: a recorder writes a file only while no later recorder has claimed it (`claimRecordings` in `test-recordings`), and the retry's recorder claims its files when it is created, so a vendor program the first try left running writes nothing when it exits.
+2. Commits no recordings when a live test fails or a recording wasn't rewritten in the run, and says why; what the run did rewrite stays in the checkout, uncommitted. Otherwise, on a clean checkout of the PR's head, it commits the new recordings, when the run changed any.
+3. Has an agent on the maintainer's own `claude` login read entries against the current code and the pinned builds, and report the ones that no longer hold on either side. [Which entries a run reviews](#which-entries-a-run-reviews) says which.
+4. Runs the everyday tests against the recordings the run left.
+5. Posts the results in one comment on the open PR that CI's gate holds, tied to a commit. When it committed recordings, that is the new commit, which it pushes once the comment is up. Otherwise it is the PR's head, and it re-runs that PR's gate. With more than one such PR open, pass `--pr <n>`. With none open, or when the checkout isn't a clean copy of the PR's head, it prints the results, posts and commits nothing, and says why.
 
-A bump PR is any PR that moves a vendor pin: the version of `claude` or `codex` under `vendorPrograms` in `app/main/src/modules/vendor-programs/dev-manifest.json`, or the Agent SDK version in `app/provider-host/package.json`. A bump of the `git` vendor program is not one (ADR 0024). CI's "Provider checks on a vendor bump" job keeps it red until the repo owner's result for its current head commit reports passing checks and no stale entries. Every other PR passes that job.
+The gate holds two kinds of PR:
+
+- A bump PR: any PR that moves a vendor pin, the version of `claude` or `codex` under `vendorPrograms` in `app/main/src/modules/vendor-programs/dev-manifest.json`, or the Agent SDK version in `app/provider-host/package.json`. A bump of the `git` vendor program is not one (ADR 0024).
+- A PR that changes a live test (`*.live.test.ts`), a recorder (`recording.ts`) or a file under a `recordings/` folder, since its recordings must come from its live tests as they now stand.
+
+CI's "Provider checks on a vendor bump or a live test change" job keeps such a PR red until the repo owner's result for its current head commit passes: every check passed, no reviewed entry is stale, every recording was re-recorded and the everyday tests passed. Every other PR passes that job.
 
 Entries the vendor's servers can change (`upgrade + drift`) are checked only when the run happens; run it by hand at any time to catch drift between releases.
+
+### Which entries a run reviews
+
+A review asks whether the pinned builds still behave as an entry says, so it is due when a pin moves or the entry itself changes.
+
+- **A bump PR:** every entry, whatever else the PR changes.
+- **A PR that moves no pin:** only the entries it adds or changes, which are the ones whose Id is new or whose fields differ from the list on the PR's merge base. The result counts every other entry as `not needed`, which passes. A change to an entry's title, to the entries' order or to the text above `## Entries` puts no entry up for review: none of them states what a vendor does.
+- **A run with no PR to post on:** every entry.
+
+An entry that goes stale on the app side in a PR that moves no pin and leaves the entry alone therefore waits for the next bump PR, as it does in every PR the gate doesn't hold.
 
 ## Entries
 
@@ -167,7 +184,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Kind:** D
 - **Provider:** Claude
 - **Relies on:** `claude` honors the SDK's `verbatimPrompts` option, which sends each user message marked `client_composed`: `claude` delivers its text as written, with no slash-command dispatch and no `@path` file-mention expansion. Without the mark, a Prompt such as `/compact` is run as a command, and its turn ends with no assistant message. The mark also skips the turn-start attachment pass: nested `CLAUDE.md` and rules files, skill and tool listings, and per-turn reminders arrive only after the turn's first tool call. A session's start still carries its own context (the working folder, platform, date, Model and account), as a recorded first Reply with tools shows. The CLI has an internal `text_not_typed` mark that keeps the pass; the SDK doesn't offer it.
-- **App side:** `claude-driver` turns the option on for every Reply and every one-shot, so each Prompt reaches the AI as text, and each Reply ends at a message the app can record. With no settings, Skills or MCP servers, the pass has no `CLAUDE.md` or listings to add; its per-turn reminders, such as a file changed since the AI read it, reach a turn only after its first tool call.
+- **App side:** `claude-driver` turns the option on for every Reply and every one-shot, so each Prompt reaches the AI as text, and each Reply ends at a message the app can record. With no settings, the pass has no `CLAUDE.md` to add. It has listings only when the Tools panel's switches add them: the built-in Skills with "Built-in Skills" on, and the account's MCP connectors with "Claude account connectors" on. Those listings, and its per-turn reminders such as a file changed since the AI read it, reach a turn only after its first tool call.
 - **User would see:** a Prompt such as `/compact` run instead of answered: a Reply with no text, marked complete, whose Input says it can't be continued. An `@path` in a Prompt would show the AI that file.
 - **Changed by:** upgrade
 - **Check:** `[dep:verbatim-prompts]` in `claude-driver`: `/compact` sent as a Prompt gets an answer and no Compaction, and the next Prompt goes on from it. `@path`, and one-shots, have no check.
@@ -343,7 +360,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **App side:** each driver's environment sets the switch. `vendor-program` re-hashes `claude` on every check, so a self-updated `claude` is downloaded again; for Codex it checks only the entrypoint and its note.
 - **User would see:** a vendor program that updates itself off the pin: `claude` downloaded again every time, and a Codex update that goes unnoticed.
 - **Changed by:** upgrade
-- **Check:** `[dep:self-updates-off]` in `claude-driver` and `codex-driver`: each pinned program still holds the name of every switch its driver sets, this one included, so it also catches a renamed `cli_auth_credentials_store`. Whether it's honored has no check: testing it could update the program.
+- **Check:** `[dep:self-updates-off]` in `claude-driver` and `codex-driver`: each pinned program still holds the name of every switch its driver sets, this one included, so it also catches a renamed `cli_auth_credentials_store`. Codex's binary doesn't hold `agents.enabled` whole, so `[dep:codex-subagents-off]` checks that one. Whether it's honored has no check: testing it could update the program.
 
 ### A cut with no target resumes at the newest entry
 
@@ -793,7 +810,7 @@ Entries the vendor's servers can change (`upgrade + drift`) are checked only whe
 - **Id:** `setup-tokens`
 - **Kind:** D
 - **Provider:** both
-- **Relies on:** how many tokens the vendor program puts before the Thread in a new session's first turn, as the app starts it: about 9,200 for `claude` with Claude Code's own prompt and the app's tools, and about 14,500 for Codex.
+- **Relies on:** how many tokens the vendor program puts before the Thread in a new session's first turn, as the app starts it: about 9,200 for `claude` with Claude Code's own prompt and the app's tools, and about 12,000 for Codex.
 - **App side:** a Reply's Context size includes its own Provider's overhead, so the re-read note's estimate swaps that overhead for the new Provider's, each rounded up, before a Prompt goes to another Provider (`canvas`).
 - **User would see:** an estimate off by the difference, and a note shown or left out near its 20k mark.
 - **Changed by:** upgrade + drift. The program's own instructions change with releases, and Codex's with its server-side Model catalog.

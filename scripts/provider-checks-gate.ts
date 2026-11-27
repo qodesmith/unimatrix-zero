@@ -3,7 +3,7 @@ import type {Comment} from './provider-checks-result.ts'
 import {z} from 'zod'
 
 import {gateVerdict} from './provider-checks-result.ts'
-import {bumpOf} from './vendor-pins.ts'
+import {gatedChangesOf} from './recordings.ts'
 
 const Env = z.object({
   GITHUB_EVENT_NAME: z.string(),
@@ -67,17 +67,26 @@ const {pull_request: pr} = PullRequestEvent.parse(
   await Bun.file(env.GITHUB_EVENT_PATH).json()
 )
 
-const changes = await bumpOf(api, env.GITHUB_REPOSITORY, {
+const {pinChanges, files} = await gatedChangesOf(api, env.GITHUB_REPOSITORY, {
+  number: pr.number,
   base: pr.base.sha,
   head: pr.head.sha,
 })
 
-if (changes.length === 0) {
-  console.log('This PR moves no vendor pin: nothing to gate.')
+if (pinChanges.length === 0 && files.length === 0) {
+  console.log(
+    'This PR moves no vendor pin and changes no live test, recorder or recording: nothing to gate.'
+  )
   process.exit(0)
 }
 
-console.log(`A bump PR: ${changes.join(', ')}.`)
+if (pinChanges.length > 0) console.log(`A bump PR: ${pinChanges.join(', ')}.`)
+
+if (files.length > 0) {
+  console.log(
+    `It changes a live test, a recorder or a recording: ${files.join(', ')}.`
+  )
+}
 
 const verdict = gateVerdict({
   owner: env.GITHUB_REPOSITORY_OWNER,

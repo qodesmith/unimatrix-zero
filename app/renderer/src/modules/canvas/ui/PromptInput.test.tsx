@@ -442,7 +442,7 @@ function sized(contextSize: number) {
 }
 
 const SWITCH_NOTE =
-  'Switching to ChatGPT will re-read ~54k tokens of this conversation (uses more of your limit).'
+  'Switching to ChatGPT will re-read ~52k tokens of this conversation (uses more of your limit).'
 
 it('says above the Input how much of a long Thread another Provider will re-read, once it’s picked', async () => {
   await renderInput({attachedTo: sized(49_000)})

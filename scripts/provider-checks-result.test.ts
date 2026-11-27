@@ -19,6 +19,10 @@ function result(head: string | null, change: Partial<Result> = {}): Result {
       {id: 'synthetic-marker', verdict: 'holds', reason: ''},
       {id: 'cut-short-replies', verdict: 'holds', reason: ''},
     ],
+    retried: [],
+    gatedFiles: [],
+    whyKept: null,
+    everydayTests: 'passed',
     ...change,
   }
 }
@@ -56,6 +60,25 @@ const unreviewed = renderResult(
   })
 )
 
+const NOT_NEEDED = {
+  id: 'cut-short-replies',
+  verdict: 'not needed',
+  reason: 'no pin moved',
+} as const
+
+const noPinMoved = result(HEAD, {
+  pinChanges: [],
+  reviews: [
+    NOT_NEEDED,
+    {id: 'synthetic-marker', verdict: 'holds', reason: ''},
+    {...NOT_NEEDED, id: 'prompt-uuid'},
+  ],
+})
+
+const kept = renderResult(result(HEAD, {whyKept: 'a live test failed'}))
+
+const everydayFailed = renderResult(result(HEAD, {everydayTests: 'failed'}))
+
 function verdict(...comments: [login: string, body: string][]) {
   return gateVerdict({
     owner: OWNER,
@@ -64,7 +87,7 @@ function verdict(...comments: [login: string, body: string][]) {
   }).pass
 }
 
-describe('the provider-checks gate on a bump PR', () => {
+describe('the provider-checks gate on a PR it holds', () => {
   it('passes on the owner’s passing result for the head commit', () => {
     expect(verdict(['someone', 'LGTM'], [OWNER, passing])).toBe(true)
   })
@@ -90,6 +113,39 @@ describe('the provider-checks gate on a bump PR', () => {
     expect(verdict([OWNER, unrun])).toBe(false)
     expect(verdict([OWNER, stale])).toBe(false)
     expect(verdict([OWNER, unreviewed])).toBe(false)
+  })
+
+  it('passes with reviews not needed when no pin moved, counting them on the Review line with no row each', () => {
+    const body = renderResult(noPinMoved)
+
+    expect(verdict([OWNER, body])).toBe(true)
+    expect(body).toContain('**Review:** 1 holds, 2 not needed: no pin moved\n')
+    expect(body).not.toContain('| `cut-short-replies` |')
+  })
+
+  it('fails on a review not needed when a pin moved', () => {
+    const bump = renderResult(
+      result(HEAD, {...noPinMoved, pinChanges: ['claude 2.1.307 → 2.1.322']})
+    )
+
+    expect(verdict([OWNER, bump])).toBe(false)
+  })
+
+  it('passes on a result with a live test that passed on a retry, and names the test', () => {
+    const retried = renderResult(
+      result(HEAD, {retried: ['[dep:prompt-uuid] stores <synthetic>']})
+    )
+
+    expect(verdict([OWNER, retried])).toBe(true)
+    expect(retried).toContain(
+      '**Passed on a retry:** 1\n\n- [dep:prompt-uuid] stores &lt;synthetic>\n'
+    )
+    expect(passing).not.toContain('Passed on a retry')
+  })
+
+  it('fails on a result that kept the old recordings, or whose everyday tests failed against the new ones', () => {
+    expect(verdict([OWNER, kept])).toBe(false)
+    expect(verdict([OWNER, everydayFailed])).toBe(false)
   })
 
   it('goes by the owner’s newest result for the head commit', () => {

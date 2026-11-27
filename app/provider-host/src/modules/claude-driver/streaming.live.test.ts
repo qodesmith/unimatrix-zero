@@ -1,6 +1,7 @@
 /**
- * Needs a real plan and the env `bun run provider-checks` sets.
- * `UZ_RECORD=yes` rewrites `recordings/`, which the driver tests replay.
+ * Needs a real plan and the env `bun run provider-checks` sets. With
+ * `UZ_RECORD=yes`, each `[records]` test rewrites its files in `recordings/`,
+ * which the driver tests replay.
  */
 import type {Query} from '@anthropic-ai/claude-agent-sdk'
 import type {
@@ -185,7 +186,7 @@ function liveDriver(
 
   const idle = heldIdle()
   const exits: Promise<unknown>[] = []
-  const start = recording ? recorder.spawn : spawnClaude
+  const start = recording && files.length > 0 ? recorder.spawn : spawnClaude
 
   const driver = createClaudeDriver({
     store: store.client,
@@ -639,7 +640,7 @@ function compacted(events: Streamed[]) {
 }
 
 describe.skipIf(!program || !configDir)('a live Claude', () => {
-  it('[dep:project-key-copy] [dep:resume-config-swap-keychain] streams into the project folder the app computes, continues warm, resumes signed in from the app’s copy alone, then forks mid-Thread', async () => {
+  it('[records] [dep:project-key-copy] [dep:resume-config-swap-keychain] streams into the project folder the app computes, continues warm, resumes signed in from the app’s copy alone, then forks mid-Thread', async () => {
     const live = liveDriver(['warm.ndjson', 'resumed.ndjson', 'forked.ndjson'])
 
     const first = await live.reply('Reply with the single word TEAL.', null)
@@ -684,7 +685,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 180_000)
 
-  it('[dep:cut-short-replies] [dep:stop-terminal-reason] stops a Reply mid-stream, which claude ends as aborted yet still marks an error, noting the stop in the session, and continues warm from it, then rewinds a session to an earlier Reply', async () => {
+  it('[records] [dep:cut-short-replies] [dep:stop-terminal-reason] stops a Reply mid-stream, which claude ends as aborted yet still marks an error, noting the stop in the session, and continues warm from it, then rewinds a session to an earlier Reply', async () => {
     const live = liveDriver([
       'stopped.ndjson',
       'rewound-warm.ndjson',
@@ -894,7 +895,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 300_000)
 
-  it('reports a compaction Claude makes on its own inside a Reply, with the session and its boundary entry', async () => {
+  it('[records] reports a compaction Claude makes on its own inside a Reply, with the session and its boundary entry', async () => {
     const live = liveDriver(['compacted.ndjson'], {
       CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '0.2',
     })
@@ -1157,7 +1158,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
   // windows-powershell-keeps-path covers the tools on Windows.
   it.skipIf(process.platform === 'win32')(
-    '[dep:claude-tools-full-access] writes a file in the Tree’s folder and runs a command there, asking nothing, with Claude Code’s tools but no Subagents, and shows each tool call',
+    '[records] [dep:claude-tools-full-access] writes a file in the Tree’s folder and runs a command there, asking nothing, with Claude Code’s tools but no Subagents, and shows each tool call',
     async () => {
       const live = liveDriver(['tools.ndjson'])
 
@@ -1220,7 +1221,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     300_000
   )
 
-  it('[dep:claude-supervised-asks] under Supervised, asks about a Write in the Tree’s folder once its tool call shows, at that call, and writes the file once allowed, then asks the next Reply’s own card in the same claude', async () => {
+  it('[records] [dep:claude-supervised-asks] under Supervised, asks about a Write in the Tree’s folder once its tool call shows, at that call, and writes the file once allowed, then asks the next Reply’s own card in the same claude', async () => {
     const live = liveDriver(['approved.ndjson'])
     const tree = newTreeFolder()
 
@@ -1276,7 +1277,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     }
   }, 300_000)
 
-  it('[dep:claude-supervised-asks] under Supervised, asks once for two Writes in the Tree’s files after Always allow, and not at all in a Reply that carries the grant, though claude asks the app each time', async () => {
+  it('[records] [dep:claude-supervised-asks] under Supervised, asks once for two Writes in the Tree’s files after Always allow, and not at all in a Reply that carries the grant, though claude asks the app each time', async () => {
     const live = liveDriver(['always-allowed.ndjson'])
     const tree = newTreeFolder()
 
@@ -1327,7 +1328,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     }
   }, 300_000)
 
-  it('[dep:claude-supervised-asks] under Supervised, leaves a denied Write undone and the Reply goes on', async () => {
+  it('[records] [dep:claude-supervised-asks] under Supervised, leaves a denied Write undone and the Reply goes on', async () => {
     const live = liveDriver(['denied.ndjson'])
     const tree = newTreeFolder()
 
@@ -1350,7 +1351,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     }
   }, 300_000)
 
-  it('[dep:claude-supervised-asks] under Supervised, a Stop while a card waits ends the Reply stopped, and the Write never happens', async () => {
+  it('[records] [dep:claude-supervised-asks] under Supervised, a Stop while a card waits ends the Reply stopped, and the Write never happens', async () => {
     const live = liveDriver(['stopped-asking.ndjson'])
     const tree = newTreeFolder()
     const request = supervised(live, SUPERVISED_WRITE, tree)
@@ -1377,7 +1378,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     }
   }, 300_000)
 
-  it('[dep:claude-supervised-asks] under Supervised, reads a file outside the Tree’s folder without asking, which claude asks about without the hook', async () => {
+  it('[records] [dep:claude-supervised-asks] under Supervised, reads a file outside the Tree’s folder without asking, which claude asks about without the hook', async () => {
     const live = liveDriver(['read-outside.ndjson'])
     const tree = newTreeFolder()
     const outside = newTreeFolder()
@@ -1429,7 +1430,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     }
   }, 300_000)
 
-  it('[dep:claude-sandbox] under Supervised, asks before a command, then runs it inside the Sandbox, where it writes in the Tree’s folder though every other Tree is hidden', async () => {
+  it('[records] [dep:claude-sandbox] under Supervised, asks before a command, then runs it inside the Sandbox, where it writes in the Tree’s folder though every other Tree is hidden', async () => {
     const live = liveDriver(['sandboxed.ndjson'])
     const trees = sandboxedTrees()
 
@@ -1462,7 +1463,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     }
   }, 300_000)
 
-  it('[dep:claude-sandbox] under Supervised, a write outside the Tree’s folder fails inside the Sandbox, and its retry outside asks on a card of its own', async () => {
+  it('[records] [dep:claude-sandbox] under Supervised, a write outside the Tree’s folder fails inside the Sandbox, and its retry outside asks on a card of its own', async () => {
     const live = liveDriver(['left-sandbox.ndjson'])
     const trees = sandboxedTrees()
 
@@ -1505,7 +1506,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     }
   }, 300_000)
 
-  it('[dep:claude-sandbox] under Supervised, a connection from inside the Sandbox asks on a card naming its host, and goes through once allowed', async () => {
+  it('[records] [dep:claude-sandbox] under Supervised, a connection from inside the Sandbox asks on a card naming its host, and goes through once allowed', async () => {
     const live = liveDriver(['network.ndjson'])
     const trees = sandboxedTrees()
 
@@ -1534,7 +1535,7 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     }
   }, 300_000)
 
-  it('[dep:claude-sandbox] under Supervised, refuses with no card a Read of a hidden folder and a Read of another Tree, and the Sandbox refuses an allowed command reading either', async () => {
+  it('[records] [dep:claude-sandbox] under Supervised, refuses with no card a Read of a hidden folder and a Read of another Tree, and the Sandbox refuses an allowed command reading either', async () => {
     const live = liveDriver(['read-denied.ndjson'])
     const trees = sandboxedTrees()
     const hidden = newTreeFolder()

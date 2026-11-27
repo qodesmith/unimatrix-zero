@@ -43,6 +43,12 @@ import {z} from 'zod'
 
 import {createClaudeDriver, spawnClaude} from './main'
 import {
+  inFolder,
+  readRecording,
+  recordedModels,
+  recordedReply,
+} from './recorded-replies'
+import {
   FakeClaudeRunSchema,
   RECORDINGS,
   RecordedLineSchema,
@@ -56,26 +62,34 @@ const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
   threshold: null,
 }
 
-/** From the recordings: re-recording changes them. */
-const SESSION_ID = '6b3fb527-e561-4b5c-810d-0ef9ac53978c'
-const FIRST_MESSAGE = '62e0dab1-d770-4979-863e-4df4e2be3150'
-const SECOND_MESSAGE = '7e7158ab-59c9-4e14-9828-54466ba8084e'
-const RESUMED_MESSAGE = '54a838e7-618e-41c6-a747-d57b47a7908e'
-const FORKED_SESSION_ID = '830530ec-a381-4e19-98a4-d7383b717af5'
-const FORKED_MESSAGE = '1f72cfd4-d1f2-4d35-aa13-f8df39b2bdb1'
+const FIRST_REPLY = recordedReply('warm.ndjson', 0)
+const SECOND_REPLY = recordedReply('warm.ndjson', 1)
+const RESUMED_REPLY = recordedReply('resumed.ndjson', 0)
+const FORKED_REPLY = recordedReply('forked.ndjson', 0)
+const STOPPED_REPLY = recordedReply('stopped.ndjson', 0)
+const ASKED_REPLY = recordedReply('stopped.ndjson', 1)
+const TEAL_REPLY = recordedReply('rewound-warm.ndjson', 0)
+const OTTER_REPLY = recordedReply('rewound-warm.ndjson', 1)
+const REWOUND_REPLY = recordedReply('rewound.ndjson', 0)
+const COMPACTING_REPLY = recordedReply('compacted.ndjson', 2)
+const TOOLS_REPLY = recordedReply('tools.ndjson', 0)
 
-const STOPPED_SESSION_ID = '3a5d1c74-2159-4d23-a6a3-fd192b046074'
-const STOPPED_MESSAGE = '8ce30d53-0856-4a14-a476-50e3b6184868'
-const ASKED_MESSAGE = '2f4dc5fc-2bbc-434b-a571-f92d02cbda82'
+const SESSION_ID = FIRST_REPLY.sessionId
+const FIRST_MESSAGE = FIRST_REPLY.messageId
+const SECOND_MESSAGE = SECOND_REPLY.messageId
+const RESUMED_MESSAGE = RESUMED_REPLY.messageId
+const FORKED_SESSION_ID = FORKED_REPLY.sessionId
+const FORKED_MESSAGE = FORKED_REPLY.messageId
 
-const REWOUND_SESSION_ID = '0dcd3d7c-ebce-4799-8da8-bdf836d1cbf3'
-const TEAL_MESSAGE = '90b7a04e-36fa-4aa1-84e8-66380ab18fe0'
-const OTTER_MESSAGE = '52786f10-3dd8-4f5b-995f-c5f9c5a27a0e'
-const REWOUND_MESSAGE = '18fb8495-3399-43a8-bc37-573286cfc9ed'
+const STOPPED_SESSION_ID = STOPPED_REPLY.sessionId
+const STOPPED_MESSAGE = STOPPED_REPLY.messageId
+const ASKED_MESSAGE = ASKED_REPLY.messageId
+
+const REWOUND_SESSION_ID = TEAL_REPLY.sessionId
+const TEAL_MESSAGE = TEAL_REPLY.messageId
+const OTTER_MESSAGE = OTTER_REPLY.messageId
+const REWOUND_MESSAGE = REWOUND_REPLY.messageId
 const MODEL = 'claude-haiku-5-5'
-
-const COMPACTED_SESSION_ID = '471b5fd5-abf7-498b-9216-26c3ae547643'
-const BOUNDARY_ENTRY = '42429c6a-0cbe-4ef9-aaa6-afcc496c9bed'
 
 /** An entry `warmThrice()` repeats, under its new uuid. */
 function again(uuid: string) {
@@ -99,19 +113,11 @@ function folder(prefix: string) {
   return made
 }
 
-function read(name: string): RecordedLine[] {
-  return fs
-    .readFileSync(path.join(RECORDINGS, name), 'utf8')
-    .split('\n')
-    .filter(Boolean)
-    .map(line => RecordedLineSchema.parse(JSON.parse(line)))
-}
-
 function edited(name: string, edit: (lines: RecordedLine[]) => RecordedLine[]) {
   const file = path.join(folder('uz-recording-'), name)
   fs.writeFileSync(
     file,
-    edit(read(name))
+    edit(readRecording(name))
       .map(line => `${JSON.stringify(line)}\n`)
       .join('')
   )
@@ -360,13 +366,14 @@ it('runs claude in the Tree’s folder with full access, its tools for files, co
 it('shows each tool call with its arguments and result, the text after them a part of its own', async () => {
   const claude = await setUp(['tools.ndjson'])
   const events = await claude.reply('Write notes.txt, then cat it.')
+  const [write, bash] = TOOLS_REPLY.toolCalls
 
   expect(shown(events).content).toEqual([
     {
       type: 'tool-call',
       toolCallId: expect.any(String),
       toolName: 'Write',
-      args: expect.stringMatching(/"content": ?"HERON"/),
+      args: expect.stringContaining(JSON.stringify(write?.input.content)),
       result: {
         content: expect.stringMatching(
           /^File created successfully at: \S+\/notes\.txt/
@@ -378,10 +385,10 @@ it('shows each tool call with its arguments and result, the text after them a pa
       type: 'tool-call',
       toolCallId: expect.any(String),
       toolName: 'Bash',
-      args: expect.stringContaining('cat notes.txt'),
-      result: {content: 'HERON', isError: false},
+      args: expect.stringContaining(JSON.stringify(bash?.input.command)),
+      result: {content: bash?.result, isError: false},
     },
-    {type: 'text', text: 'HERON'},
+    {type: 'text', text: TOOLS_REPLY.text},
   ])
   expect(events.at(-1)).toMatchObject({status: 'complete'})
 })
@@ -394,6 +401,9 @@ function isOut(line: RecordedLine, ...parts: string[]) {
 }
 
 it('replaces only the text after a tool call when its message ends other than it streamed', async () => {
+  const streamedText = `"text":${JSON.stringify(TOOLS_REPLY.text)}`
+  const endedText = `${TOOLS_REPLY.text}.`
+
   const ended = edited('tools.ndjson', lines => {
     const start = lines.findIndex(line => isOut(line, '"message_start"'))
     const write = lines.find(line => isOut(line, '"assistant"', '"Write"'))
@@ -418,12 +428,12 @@ it('replaces only the text after a tool call when its message ends other than it
       ...lines
         .slice(start)
         .map(line =>
-          isOut(line, '"assistant"', '"text":"HERON"')
+          isOut(line, '"assistant"', streamedText)
             ? RecordedLineSchema.parse(
                 JSON.parse(
                   JSON.stringify(line).replace(
-                    '"text":"HERON"',
-                    '"text":"HERON."'
+                    streamedText,
+                    `"text":${JSON.stringify(endedText)}`
                   )
                 )
               )
@@ -439,29 +449,86 @@ it('replaces only the text after a tool call when its message ends other than it
     shown(events).content.map(part =>
       part.type === 'text' ? part.text : part.toolName
     )
-  ).toEqual(['Let me write it.', 'Write', 'Bash', 'HERON.'])
+  ).toEqual(['Let me write it.', 'Write', 'Bash', endedText])
 })
 
+const MessageDeltaSchema = z.looseObject({
+  type: z.literal('stream_event'),
+  event: z.looseObject({type: z.literal('message_delta')}),
+})
+
+const ResultLineSchema = z.looseObject({type: z.literal('result')})
+
+/**
+ * The nth `result` gets `modelUsages[n]`, or a window of 200,000 past the
+ * list's end.
+ */
+function withUsage(
+  name: string,
+  modelUsages: Record<string, {contextWindow: number}>[] = []
+) {
+  let results = 0
+
+  return edited(name, lines =>
+    lines.map(line => {
+      const ended =
+        line.kind === 'out' ? MessageDeltaSchema.safeParse(line.message) : null
+
+      const result =
+        line.kind === 'out' ? ResultLineSchema.safeParse(line.message) : null
+
+      if (result?.success) {
+        const modelUsage = modelUsages[results] ?? {
+          [MODEL]: {contextWindow: 200_000},
+        }
+
+        results += 1
+
+        return {kind: 'out', message: {...result.data, modelUsage}}
+      }
+
+      return ended?.success
+        ? {
+            kind: 'out',
+            message: {
+              ...ended.data,
+              event: {
+                ...ended.data.event,
+                usage: {
+                  input_tokens: 2,
+                  cache_creation_input_tokens: 157,
+                  cache_read_input_tokens: 586,
+                  output_tokens: 12,
+                },
+              },
+            },
+          }
+        : line
+    })
+  )
+}
+
 it('streams a Reply, records where Claude saved it, and reports its Context size', async () => {
-  const claude = await setUp(['warm.ndjson'])
+  const claude = await setUp([withUsage('warm.ndjson')])
 
   const events = await claude.reply(FIRST_PROMPT)
 
   expect(events[0]?.type).toBe('RUN_STARTED')
-  expect(textOf(events)).toBe('TEAL')
-  // Provider-reported: what this request sent and wrote, not a running sum.
-  expect(shown(events).contextSize).toBe(2 + 0 + 584 + 6)
+  expect(textOf(events)).toBe(FIRST_REPLY.text)
+  expect(shown(events).contextSize).toBe(757)
   expect(events.slice(-2)).toEqual([
     expect.objectContaining({
       type: 'REPLY_RECORDED',
       model: MODEL,
       session: {sessionId: SESSION_ID, messageId: FIRST_MESSAGE},
     }),
-    expect.objectContaining({
+    {
+      treeId: expect.any(String),
+      replyId: expect.any(String),
       type: 'RUN_FINISHED',
       status: 'complete',
-      contextWindow: 1_000_000,
-    }),
+      contextWindow: 200_000,
+    },
   ])
   expect(
     claude.store
@@ -493,7 +560,7 @@ it('resumes a cold session from the app’s copy alone', async () => {
 
   const third = await claude.reply(THIRD_PROMPT, session)
 
-  expect(textOf(third)).toBe('TEAL OTTER')
+  expect(textOf(third)).toBe(RESUMED_REPLY.text)
   expect(recordedIn(third)).toEqual({
     sessionId: SESSION_ID,
     messageId: RESUMED_MESSAGE,
@@ -517,7 +584,7 @@ it('forks the session through a mid-Thread Reply into a new session, leaving the
   const first = {sessionId: SESSION_ID, messageId: FIRST_MESSAGE}
   const forked = await claude.reply(FORK_PROMPT, {...first, type: 'fork'})
 
-  expect(textOf(forked)).toBe('TEAL')
+  expect(textOf(forked)).toBe(FORKED_REPLY.text)
   expect(recordedIn(forked)).toEqual({
     sessionId: FORKED_SESSION_ID,
     messageId: FORKED_MESSAGE,
@@ -566,7 +633,7 @@ it('forks from the app’s copy of the session served only through a Reply', asy
   const forked = await claude.reply(FORK_PROMPT, REACHING)
   const [, fork] = claude.reports()
 
-  expect(textOf(forked)).toBe('TEAL')
+  expect(textOf(forked)).toBe(FORKED_REPLY.text)
   expect(fork?.configDir).not.toBe(claude.configDir)
   expect(fork?.resumedFrom.at(-1)).toBe(FIRST_MESSAGE)
   expect(fork?.resumedFrom).not.toContain(SECOND_MESSAGE)
@@ -585,7 +652,7 @@ it('writes the transcript back only through that Reply when forking from the sto
   const forked = await claude.reply(FORK_PROMPT, REACHING)
   const [, refused, fallback] = claude.reports()
 
-  expect(textOf(forked)).toBe('TEAL')
+  expect(textOf(forked)).toBe(FORKED_REPLY.text)
   expect(refused?.ended).toBe('refused')
   expect(fallback?.configDir).toBe(claude.configDir)
   expect(fallback?.resumedFrom.at(-1)).toBe(FIRST_MESSAGE)
@@ -606,7 +673,7 @@ it('resumes from the app’s copy when the warm session’s `claude` exited whil
 
   const third = await claude.reply(THIRD_PROMPT, recordedIn(second))
 
-  expect(textOf(third)).toBe('TEAL OTTER')
+  expect(textOf(third)).toBe(RESUMED_REPLY.text)
   expect(third.at(-1)).toMatchObject({status: 'complete'})
 
   await claude.allClosed()
@@ -627,7 +694,7 @@ it('writes the transcript back when resuming from the store fails', async () => 
 
   const third = await claude.reply(THIRD_PROMPT, session, {messageId})
 
-  expect(textOf(third)).toBe('TEAL OTTER')
+  expect(textOf(third)).toBe(RESUMED_REPLY.text)
   expect(third.at(-1)).toMatchObject({status: 'complete'})
   expect(
     claude.store
@@ -680,6 +747,28 @@ it('fails the Reply when the app can’t save its files, and closes its `claude`
   await expect.poll(() => claude.reports()[0]?.inputClosed).toBe(true)
 })
 
+function firstReplyDeltas() {
+  return FIRST_REPLY.textDeltas.map(delta =>
+    expect.objectContaining({type: 'TEXT_DELTA', delta})
+  )
+}
+
+it('sends no Context window when `claude` reports one of 0', async () => {
+  const claude = await setUp([
+    withUsage('warm.ndjson', [{[MODEL]: {contextWindow: 0}}]),
+  ])
+
+  const events = await claude.reply(FIRST_PROMPT)
+
+  expect(events.at(-1)).toStrictEqual({
+    treeId: expect.any(String),
+    replyId: expect.any(String),
+    type: 'RUN_FINISHED',
+    status: 'complete',
+  })
+  await claude.allClosed()
+})
+
 it('replaces the text when a broken stream is sent again', async () => {
   const resent = edited('warm.ndjson', lines => {
     const start = lines.findIndex(
@@ -689,13 +778,16 @@ it('replaces the text when a broken stream is sent again', async () => {
         JSON.stringify(line.message).includes('"message_start"')
     )
 
-    const broken = lines
-      .slice(start, start + 3)
-      .map(line =>
-        line.kind === 'out'
-          ? JSON.parse(JSON.stringify(line).replace('"TEAL"', '"TE"'))
-          : line
-      )
+    const delta = lines.findIndex(line => isOut(line, '"text_delta"'))
+
+    const broken = [
+      ...lines.slice(start, delta),
+      streamed({
+        type: 'content_block_delta',
+        index: 0,
+        delta: {type: 'text_delta', text: 'TE'},
+      }),
+    ]
 
     return [...lines.slice(0, start), ...broken, ...lines.slice(start)]
   })
@@ -713,9 +805,9 @@ it('replaces the text when a broken stream is sent again', async () => {
   ).toEqual([
     expect.objectContaining({type: 'TEXT_DELTA', delta: 'TE'}),
     expect.objectContaining({type: 'TEXT_REPLACE', text: ''}),
-    expect.objectContaining({type: 'TEXT_DELTA', delta: 'TEAL'}),
+    ...firstReplyDeltas(),
   ])
-  expect(textOf(events)).toBe('TEAL')
+  expect(textOf(events)).toBe(FIRST_REPLY.text)
 
   await claude.reply(SECOND_PROMPT, recordedIn(events))
   await claude.allClosed()
@@ -735,7 +827,7 @@ function streamed(event: SDKPartialAssistantMessage['event']): RecordedLine {
 }
 
 function cutOff(texts: string[], fromBlock: number): RecordedLine[] {
-  const start = read('warm.ndjson').find(
+  const start = readRecording('warm.ndjson').find(
     line =>
       line.kind === 'out' &&
       JSON.stringify(line.message).includes('"message_start"')
@@ -978,9 +1070,9 @@ it('reports each retry, and shows once the message Claude starts over after cutt
     expect.objectContaining({type: 'RECONNECTING', busy: false}),
     expect.objectContaining({type: 'RECONNECTING', busy: false}),
     expect.objectContaining({type: 'TEXT_REPLACE', text: ''}),
-    expect.objectContaining({type: 'TEXT_DELTA', delta: 'TEAL'}),
+    ...firstReplyDeltas(),
   ])
-  expect(textOf(events)).toBe('TEAL')
+  expect(textOf(events)).toBe(FIRST_REPLY.text)
 
   await claude.reply(SECOND_PROMPT, recordedIn(events))
   await claude.allClosed()
@@ -1012,7 +1104,7 @@ it('keeps the blocks of a cut-off message that come before the first one Claude 
 
   const events = await claude.reply(FIRST_PROMPT)
 
-  expect(textOf(events)).toBe('Kept. TEAL')
+  expect(textOf(events)).toBe(`Kept. ${FIRST_REPLY.text}`)
 
   await claude.reply(SECOND_PROMPT, recordedIn(events))
   await claude.allClosed()
@@ -1089,7 +1181,7 @@ const SHOWN_AFTER_CUT_TOOL_CALL = [
     result: expect.objectContaining({isError: false}),
   }),
   expect.objectContaining({type: 'tool-call', toolName: 'Bash'}),
-  {type: 'text', text: 'HERON'},
+  {type: 'text', text: TOOLS_REPLY.text},
 ]
 
 it('takes back a tool call Claude threw away, and shows the text before it once', async () => {
@@ -1161,7 +1253,7 @@ it('shows thinking as it streams, and never as part of the Reply', async () => {
       delta: 'One word, then.',
     })
   )
-  expect(textOf(events)).toBe('TEAL')
+  expect(textOf(events)).toBe(FIRST_REPLY.text)
 
   await claude.reply(SECOND_PROMPT, recordedIn(events))
   await claude.allClosed()
@@ -1200,11 +1292,11 @@ it('reports a compaction Claude made inside a Reply, with the session and its bo
   expect(compactionsIn(compacting)).toEqual([
     expect.objectContaining({
       replyId,
-      sessionId: COMPACTED_SESSION_ID,
-      boundaryId: BOUNDARY_ENTRY,
+      sessionId: COMPACTING_REPLY.sessionId,
+      boundaryId: COMPACTING_REPLY.boundaryIds[0],
     }),
   ])
-  expect(textOf(compacting)).toBe('OTTER')
+  expect(textOf(compacting)).toBe(COMPACTING_REPLY.text)
   expect(compactionsIn([...first, ...failedCompacting])).toEqual([])
 })
 
@@ -1224,7 +1316,7 @@ it('reports no compaction when a hook blocked it, which ends the compacting with
   const {compacting} = await compactingThread(blocked)
 
   expect(compactionsIn(compacting)).toEqual([])
-  expect(textOf(compacting)).toBe('OTTER')
+  expect(textOf(compacting)).toBe(COMPACTING_REPLY.text)
 })
 
 it('fails the Reply with Claude’s reason, without recording it', async () => {
@@ -1502,7 +1594,7 @@ it('fails the Reply as a crash when `claude` exits before its result, keeping th
 
   const events = await claude.reply(FIRST_PROMPT, null, {messageId})
 
-  expect(textOf(events)).toBe('TEAL')
+  expect(textOf(events)).toBe(FIRST_REPLY.text)
   expect(events.map(event => event.type)).not.toContain('REPLY_RECORDED')
   expect(
     claude.store
@@ -1581,7 +1673,7 @@ it('ends a Reply stopped before its claude is heard at once, closing that claude
 
   const next = await claude.reply(FIRST_PROMPT)
 
-  expect(textOf(next)).toBe('TEAL')
+  expect(textOf(next)).toBe(FIRST_REPLY.text)
   await expect.poll(() => claude.reports()[0]?.ended).toBe('input-closed')
   await claude.allClosed()
   expect(claude.reports()).toHaveLength(2)
@@ -1611,7 +1703,7 @@ it('interrupts and closes a warm claude stopped before it is heard, and the Thre
 
   const next = await claude.reply(THIRD_PROMPT, session)
 
-  expect(textOf(next)).toBe('TEAL OTTER')
+  expect(textOf(next)).toBe(RESUMED_REPLY.text)
   await claude.allClosed()
   const [stalled, resumed] = claude.reports()
 
@@ -1702,7 +1794,7 @@ it('ends a Reply asked to stop before its claude starts, starting none, and the 
   // A `claude` started for the stopped Reply would have taken this recording.
   const next = await claude.reply(FIRST_PROMPT)
 
-  expect(textOf(next)).toBe('TEAL')
+  expect(textOf(next)).toBe(FIRST_REPLY.text)
   await claude.allClosed()
 })
 
@@ -1727,7 +1819,7 @@ it('fails a Reply as connection-lost when its claude says nothing in time, closi
 
   const retry = await claude.reply(FIRST_PROMPT)
 
-  expect(textOf(retry)).toBe('TEAL')
+  expect(textOf(retry)).toBe(FIRST_REPLY.text)
   await expect.poll(() => claude.reports()[0]?.ended).toBe('input-closed')
   await claude.allClosed()
   expect(claude.reports()).toHaveLength(2)
@@ -1753,19 +1845,22 @@ it('never gives up on a claude once it is heard, however long it then takes', as
   fs.writeFileSync(held, '')
   const events = await replying
 
-  expect(textOf(events)).toBe('TEAL')
+  expect(textOf(events)).toBe(FIRST_REPLY.text)
   expect(events.at(-1)).toMatchObject({status: 'complete'})
 })
 
 it('stops a Reply where it is, records it, and continues the Thread warm from it', async () => {
-  const claude = await setUp(['stopped.ndjson'])
+  // `claude` reports no window on a stopped Reply.
+  const claude = await setUp([
+    withUsage('stopped.ndjson', [{}, {[MODEL]: {contextWindow: 200_000}}]),
+  ])
 
-  const stopped = await claude.reply(COUNT_PROMPT, null, {stopAfterDeltas: 5})
+  const stopped = await claude.reply(COUNT_PROMPT, null, {
+    stopAfterDeltas: STOPPED_REPLY.streamedBeforeInterrupt,
+  })
 
-  expect(textOf(stopped)).toBe(
-    Array.from({length: 30}, (_, index) => index + 1).join('\n')
-  )
-  expect(stopped.slice(-2)).toEqual([
+  expect(textOf(stopped)).toBe(STOPPED_REPLY.text)
+  expect(stopped.slice(-2)).toStrictEqual([
     expect.objectContaining({
       type: 'REPLY_RECORDED',
       model: MODEL,
@@ -1776,7 +1871,6 @@ it('stops a Reply where it is, records it, and continues the Thread warm from it
       replyId: expect.any(String),
       type: 'RUN_FINISHED',
       status: 'stopped',
-      contextWindow: 1_000_000,
     },
   ])
   expect(
@@ -1787,12 +1881,17 @@ it('stops a Reply where it is, records it, and continues the Thread warm from it
 
   const asked = await claude.reply(ASK_PROMPT, recordedIn(stopped))
 
-  expect(textOf(asked)).toBe('Count from 1 to 300.')
+  expect(textOf(asked)).toBe(ASKED_REPLY.text)
   expect(recordedIn(asked)).toEqual({
     sessionId: STOPPED_SESSION_ID,
     messageId: ASKED_MESSAGE,
   })
-  expect(shown(asked).contextSize).toBe(2 + 157 + 586 + 12)
+  expect(shown(asked).contextSize).toBe(757)
+  expect(asked.at(-1)).toMatchObject({
+    type: 'RUN_FINISHED',
+    status: 'complete',
+    contextWindow: 200_000,
+  })
 
   await claude.allClosed()
   const [report] = claude.reports()
@@ -1818,7 +1917,7 @@ it('rewinds a cold session to an earlier Reply and goes on from there, in the sa
     type: 'rewind',
   })
 
-  expect(textOf(rewound)).toBe('TEAL')
+  expect(textOf(rewound)).toBe(REWOUND_REPLY.text)
   expect(recordedIn(rewound)).toEqual({
     sessionId: REWOUND_SESSION_ID,
     messageId: REWOUND_MESSAGE,
@@ -1851,7 +1950,7 @@ it('never rewinds in the warm session standing there: it closes, and a new `clau
     type: 'rewind',
   })
 
-  expect(textOf(rewound)).toBe('TEAL')
+  expect(textOf(rewound)).toBe(REWOUND_REPLY.text)
   expect(recordedIn(rewound).sessionId).toBe(REWOUND_SESSION_ID)
   await expect.poll(() => claude.reports()[0]?.ended).not.toBeNull()
 
@@ -2008,7 +2107,7 @@ it('resumes the session in a new `claude` on the Model a Prompt asks for, closin
     model: 'sonnet',
   })
 
-  expect(textOf(third)).toBe('TEAL OTTER')
+  expect(textOf(third)).toBe(RESUMED_REPLY.text)
   const [warm, resumed] = claude.reports()
 
   expect(warm?.prompts).toEqual([FIRST_PROMPT, SECOND_PROMPT])
@@ -2035,9 +2134,11 @@ it('starts the next Prompt’s `claude` on the Model it asks for after a Reply f
         : line
     )
 
-    const second = failing.findIndex(
-      (line, at) => at > 2 && line.kind === 'in' && line.message.type === 'user'
+    const [, second] = failing.flatMap((line, at) =>
+      line.kind === 'in' && line.message.type === 'user' ? [at] : []
     )
+
+    if (second === undefined) throw new Error('The recording has one Prompt')
 
     const end = failing.findIndex(line => line.kind === 'end')
 
@@ -2102,8 +2203,25 @@ function listedOnly() {
   )
 }
 
+const NEWER_MODEL = {id: 'claude-newer', name: 'Newer', resolvesTo: null}
+
+/** A re-record may give both `claude`s the same Models, which tells no change. */
+function listingMore() {
+  const newer = `{"value":"${NEWER_MODEL.id}","displayName":"${NEWER_MODEL.name}"}`
+
+  return edited('resumed.ndjson', lines =>
+    lines.map(line =>
+      RecordedLineSchema.parse(
+        JSON.parse(
+          JSON.stringify(line).replace('"models":[', `"models":[${newer},`)
+        )
+      )
+    )
+  )
+}
+
 it('lists the Models from a `claude` it starts before any Prompt, then those of the newest one, telling each change', async () => {
-  const claude = await setUp([listedOnly(), 'warm.ndjson', 'resumed.ndjson'])
+  const claude = await setUp([listedOnly(), 'warm.ndjson', listingMore()])
   const changes: Model[][] = []
   claude.driver.onModelsChanged(models => changes.push(models))
 
@@ -2119,28 +2237,15 @@ it('lists the Models from a `claude` it starts before any Prompt, then those of 
   const first = await claude.reply(FIRST_PROMPT)
   const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
 
-  expect(changes[0]?.slice(0, 2)).toEqual([
-    {
-      id: 'default',
-      name: 'Default (recommended)',
-      isDefault: true,
-      resolvesTo: 'claude-opus-5-5',
-      needsAppUpdate: false,
-    },
-    {
-      id: 'opus',
-      name: 'Opus 5.5',
-      isDefault: false,
-      resolvesTo: 'claude-opus-5-5',
-      needsAppUpdate: false,
-    },
-  ])
-  expect(changes[0]).toHaveLength(13)
+  expect(changes[0]).toMatchObject(recordedModels('warm.ndjson'))
 
   await claude.reply(THIRD_PROMPT, recordedIn(second), {model: 'sonnet'})
   await expect.poll(() => changes.length).toBe(2)
 
-  expect(changes[1]?.[0]).toMatchObject({resolvesTo: 'claude-fable-5-1'})
+  expect(changes[1]).toMatchObject([
+    NEWER_MODEL,
+    ...recordedModels('resumed.ndjson'),
+  ])
   await expect(claude.driver.listModels(claude.vendorProgram)).resolves.toEqual(
     changes[1]
   )
@@ -2172,14 +2277,14 @@ it('learns nothing from a `claude` whose Models can’t be read, and writes the 
 
   const first = await claude.reply(FIRST_PROMPT)
 
-  expect(textOf(first)).toBe('TEAL')
+  expect(textOf(first)).toBe(FIRST_REPLY.text)
   expect(first.at(-1)).toMatchObject({status: 'complete'})
 
   const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
   await claude.reply(THIRD_PROMPT, recordedIn(second), {model: 'sonnet'})
   await expect.poll(() => changes.length).toBe(1)
 
-  expect(changes[0]?.[0]).toMatchObject({resolvesTo: 'claude-fable-5-1'})
+  expect(changes[0]).toMatchObject(recordedModels('resumed.ndjson'))
 })
 
 it('starts claude with the Compaction Settings, and with nothing for the defaults', async () => {
@@ -2191,7 +2296,7 @@ it('starts claude with the Compaction Settings, and with nothing for the default
     compactionSettings: {auto: false, threshold: 150_000},
   })
 
-  expect(textOf(third)).toBe('TEAL OTTER')
+  expect(textOf(third)).toBe(RESUMED_REPLY.text)
 
   await claude.allClosed()
   const [warm, changed] = claude.reports()
@@ -2221,7 +2326,7 @@ it('runs claude with the web, account connectors and built-in Skills only as the
     },
   })
 
-  expect(textOf(third)).toBe('TEAL OTTER')
+  expect(textOf(third)).toBe(RESUMED_REPLY.text)
 
   await claude.allClosed()
   const [warm, changed] = claude.reports()
@@ -2256,6 +2361,13 @@ function answersTo(claude: {reports: () => {answers: unknown[]}[]}) {
     .map(
       answer => z.looseObject({response: z.unknown()}).parse(answer).response
     )
+}
+
+/** The edit hook's answer for a Write in the Tree's files: decide at its card. */
+const NO_DECISION = {hookSpecificOutput: {hookEventName: 'PreToolUse'}}
+
+function writesIn(name: string) {
+  return recordedReply(name, 0).toolCalls.filter(call => call.name === 'Write')
 }
 
 it('runs claude under Supervised in its default mode, with no full access, asking the app before a tool runs', async () => {
@@ -2366,8 +2478,14 @@ it('under Supervised, asks about a Write in the Tree’s files at its tool call 
 
   const asked = events.findIndex(event => event.type === 'APPROVAL_REQUESTED')
   const notes = path.join(claude.treeFolder, 'notes.txt')
+  const [recordedWrite] = recordedReply('approved.ndjson', 0).toolCalls
+
   // The recording was made on a Mac, so on Windows its path mixes separators.
-  const asWritten = `${claude.treeFolder}/notes.txt`
+  const asWritten = inFolder(
+    'approved.ndjson',
+    recordedWrite?.input,
+    claude.treeFolder
+  )
 
   expect(approvalsIn(events)).toEqual([
     {
@@ -2389,9 +2507,10 @@ it('under Supervised, asks about a Write in the Tree’s files at its tool call 
   ).toBeLessThan(asked)
   expect(write?.result?.isError).toBe(false)
   expect(answersTo(claude)).toEqual([
+    NO_DECISION,
     {
       behavior: 'allow',
-      updatedInput: {file_path: asWritten, content: 'HERON'},
+      updatedInput: asWritten,
       toolUseID: write?.toolCallId,
     },
   ])
@@ -2413,6 +2532,10 @@ it('under Supervised, asks about a Write in the Tree’s files at its tool call 
 })
 
 it('under Supervised, asks once for two Writes in the Tree’s files after Always allow, and lets the second run without a card', async () => {
+  const writes = writesIn('always-allowed.ndjson')
+
+  if (writes.length < 2) throw new Error('The recording holds no second Write')
+
   const claude = await setUp(['always-allowed.ndjson'])
 
   const events = await claude.reply('Write a.txt, then b.txt.', null, {
@@ -2424,10 +2547,12 @@ it('under Supervised, asks once for two Writes in the Tree’s files after Alway
     'APPROVAL_REQUESTED',
     'APPROVAL_RESOLVED',
   ])
-  expect(answersTo(claude)).toEqual([
-    expect.objectContaining({behavior: 'allow'}),
-    expect.objectContaining({behavior: 'allow'}),
-  ])
+  expect(answersTo(claude)).toEqual(
+    writes.flatMap(({id}) => [
+      NO_DECISION,
+      expect.objectContaining({behavior: 'allow', toolUseID: id}),
+    ])
+  )
   expect(events.at(-1)).toMatchObject({status: 'complete'})
 })
 
@@ -2440,9 +2565,12 @@ it('under Supervised, shows no card for a Write a grant the Reply carries covers
   })
 
   expect(approvalsIn(events)).toEqual([])
-  expect(answersTo(claude)).toEqual([
-    expect.objectContaining({behavior: 'allow'}),
-  ])
+  expect(answersTo(claude)).toEqual(
+    writesIn('granted.ndjson').flatMap(({id}) => [
+      NO_DECISION,
+      expect.objectContaining({behavior: 'allow', toolUseID: id}),
+    ])
+  )
   expect(events.at(-1)).toMatchObject({status: 'complete'})
 })
 
@@ -2460,6 +2588,7 @@ it('under Supervised, denies a Write the user denies with a short reason, and th
 
   expect(approvalsIn(events).at(-1)).toMatchObject({answer: 'deny'})
   expect(answersTo(claude)).toEqual([
+    NO_DECISION,
     {
       behavior: 'deny',
       message: expect.stringMatching(/\S/),
@@ -2511,6 +2640,7 @@ it('under Supervised, ends a Reply stopped while a card waits as stopped, answer
     'APPROVAL_REQUESTED',
   ])
   expect(answersTo(claude)).toEqual([
+    NO_DECISION,
     expect.objectContaining({behavior: 'deny'}),
   ])
   expect(events.at(-1)).toMatchObject({status: 'stopped'})
@@ -2556,13 +2686,18 @@ it('under Supervised, asks about a command inside the Sandbox at its tool call, 
   })
 
   const [bash] = toolCallsOf(events)
+  const [recordedBash] = recordedReply('sandboxed.ndjson', 0).toolCalls
 
   expect(askedIn(events)).toEqual([
     expect.objectContaining({
       toolCallId: bash?.toolCallId,
       action: {
         kind: 'command',
-        command: 'echo HERON > notes.txt && printenv SANDBOX_RUNTIME',
+        command: inFolder(
+          'sandboxed.ndjson',
+          recordedBash?.input,
+          claude.treeFolder
+        )?.command,
       },
     }),
   ])
@@ -2583,9 +2718,12 @@ it('under Supervised, asks again to run a command outside the Sandbox after an A
   const [, outside] = toolCallsOf(events)
   const [first, leaving, ...rest] = askedIn(events).map(event => event.action)
 
+  const [inside] = recordedReply('left-sandbox.ndjson', 0).toolCalls
+
   expect(first).toEqual({
     kind: 'command',
-    command: expect.stringMatching(/^echo KESTREL > \/Library\/Caches\//),
+    command: inFolder('left-sandbox.ndjson', inside?.input, claude.treeFolder)
+      ?.command,
   })
   expect(leaving).toEqual({...first, outsideSandbox: true})
   expect(rest).toEqual([])
@@ -2646,7 +2784,7 @@ it('resumes the session in a new claude for a Reply under another Permission mod
     permissionMode: 'supervised',
   })
 
-  expect(textOf(third)).toBe('TEAL OTTER')
+  expect(textOf(third)).toBe(RESUMED_REPLY.text)
 
   await claude.allClosed()
   const [warm, changed] = claude.reports()
@@ -2786,7 +2924,7 @@ it('rebuilds a session the app has no copy of from the Thread, in a new session'
   )
 
   expect(events.at(-1)).toMatchObject({status: 'complete'})
-  expect(textOf(events)).toBe('TEAL')
+  expect(textOf(events)).toBe(FIRST_REPLY.text)
   expect(recordedIn(events).sessionId).toBe(SESSION_ID)
 
   await claude.allClosed()

@@ -1,9 +1,13 @@
 import type {RecordedLine} from './replay'
 import type {SpawnOptions, SpawnedProcess} from '@anthropic-ai/claude-agent-sdk'
 
-import fs from 'node:fs/promises'
+import {
+  buildOf,
+  claimRecordings,
+  replaceAcross,
+  tempFolderNames,
+} from '#modules/test-recordings/main'
 import os from 'node:os'
-import path from 'node:path'
 import {createInterface} from 'node:readline'
 import {PassThrough} from 'node:stream'
 import {z} from 'zod'
@@ -49,13 +53,122 @@ function withoutAccountLists(message: RecordedMessage): RecordedMessage {
   return {...message, slash_commands: [], agents: [], skills: [], plugins: []}
 }
 
+const DeltaSchema = z.looseObject({
+  type: z.literal('stream_event'),
+  session_id: z.string(),
+  event: z.looseObject({
+    type: z.literal('content_block_delta'),
+    index: z.number(),
+    delta: z.looseObject({
+      text: z.string().optional(),
+      partial_json: z.string().optional(),
+      thinking: z.string().optional(),
+    }),
+  }),
+})
+
+const BlockStartSchema = z.looseObject({
+  type: z.literal('stream_event'),
+  session_id: z.string(),
+  event: z.looseObject({
+    type: z.literal('content_block_start'),
+    index: z.number(),
+  }),
+})
+
+const STREAMED_FIELDS = ['text', 'partial_json', 'thinking'] as const
+
+interface Piece {
+  at: number
+  field: (typeof STREAMED_FIELDS)[number]
+  text: string
+}
+
+function blocksOf(lines: RecordedLine[]) {
+  const open = new Map<string, Piece[]>()
+  const blocks: Piece[][] = []
+
+  for (const [at, line] of lines.entries()) {
+    if (line.kind !== 'out') continue
+
+    const started = BlockStartSchema.safeParse(line.message)
+
+    if (started.success) {
+      const {session_id: session, event} = started.data
+
+      for (const field of STREAMED_FIELDS) {
+        const key = `${session}:${event.index}:${field}`
+        const block = open.get(key)
+
+        if (block) blocks.push(block)
+        open.delete(key)
+      }
+    }
+
+    const delta = DeltaSchema.safeParse(line.message)
+
+    if (!delta.success) continue
+
+    const {session_id: session, event} = delta.data
+
+    for (const field of STREAMED_FIELDS) {
+      const text = event.delta[field]
+
+      if (text === undefined) continue
+
+      const key = `${session}:${event.index}:${field}`
+      open.set(key, [...(open.get(key) ?? []), {at, field, text}])
+    }
+  }
+
+  return [...blocks, ...open.values()]
+}
+
+/** A content block streams in pieces, so one path can be split between them. */
+function withDeltasScrubbed(
+  lines: RecordedLine[],
+  replacements: (readonly [string, string])[]
+) {
+  const scrubbed = new Map<number, Record<string, string>>()
+
+  for (const block of blocksOf(lines)) {
+    let texts = block.map(piece => piece.text)
+
+    for (const [from, to] of replacements) {
+      texts = replaceAcross(texts, from, to)
+    }
+
+    for (const [at, piece] of block.entries()) {
+      scrubbed.set(piece.at, {
+        ...scrubbed.get(piece.at),
+        [piece.field]: texts[at] ?? '',
+      })
+    }
+  }
+
+  return lines.map((line, at) => {
+    const fields = scrubbed.get(at)
+    const delta = line.kind === 'out' && DeltaSchema.safeParse(line.message)
+
+    if (!fields || !delta || !delta.success) return line
+
+    const {event} = delta.data
+
+    return {
+      ...line,
+      message: {
+        ...delta.data,
+        event: {...event, delta: {...event.delta, ...fields}},
+      },
+    }
+  })
+}
+
 function scrub(lines: RecordedLine[]) {
-  const texts = lines.map(line =>
-    JSON.stringify(
-      line.kind === 'out'
-        ? {...line, message: withoutAccountLists(line.message)}
-        : line
-    )
+  const listed = lines.map(line =>
+    line.kind === 'out'
+      ? {...line, message: withoutAccountLists(line.message)}
+      : line
   )
 
   const emails = lines.flatMap(line => {
@@ -67,20 +180,26 @@ function scrub(lines: RecordedLine[]) {
     return answer?.success ? [answer.data.response.response.account.email] : []
   })
 
-  const ids = texts.flatMap(text =>
-    [...text.matchAll(ACCOUNT_ID)].flatMap(([, id]) => (id ? [id] : []))
+  const ids = listed.flatMap(line =>
+    [...JSON.stringify(line).matchAll(ACCOUNT_ID)].flatMap(([, id]) =>
+      id ? [id] : []
+    )
   )
 
-  const replacements: [string, string][] = [
+  const temp = tempFolderNames()
+
+  const replacements: (readonly [string, string])[] = [
+    ...temp.paths,
+    ...temp.projectKeys,
     [os.homedir(), '/Users/sam'],
-    ...emails.map((email): [string, string] => [email, 'sam@example.com']),
-    ...ids.map((id): [string, string] => [id, STAND_IN_UUID]),
+    ...emails.map(email => [email, 'sam@example.com'] as const),
+    ...ids.map(id => [id, STAND_IN_UUID] as const),
     [os.userInfo().username, 'sam'],
   ]
 
-  return texts
-    .map(text => {
-      let scrubbed = text
+  return withDeltasScrubbed(listed, replacements)
+    .map(line => {
+      let scrubbed = JSON.stringify(line)
 
       for (const [from, to] of replacements) {
         scrubbed = scrubbed.replaceAll(from, to)
@@ -91,12 +210,16 @@ function scrub(lines: RecordedLine[]) {
     .join('')
 }
 
-/** Records each `claude` into `files` in the order they start, once it exits. */
+/**
+ * Records each `claude` into `files` in the order they start, stamped with its
+ * build, once it exits, unless a later recorder has claimed the file.
+ */
 export function createRecorder(
   spawn: (options: SpawnOptions) => SpawnedProcess,
   files: string[]
 ) {
   const written: Promise<void>[] = []
+  const write = claimRecordings(files)
 
   function record(options: SpawnOptions): SpawnedProcess {
     const file = files[written.length]
@@ -106,6 +229,7 @@ export function createRecorder(
     const lines: RecordedLine[] = [
       {
         kind: 'start',
+        build: buildOf('claude', options.command),
         configDir: options.env.CLAUDE_CONFIG_DIR ?? '',
         projectKey: projectKeyOf(options.cwd ?? '.'),
         cwd: options.cwd ?? '',
@@ -134,8 +258,7 @@ export function createRecorder(
         await new Promise(resolve => {
           child.once('exit', resolve)
         })
-        await fs.mkdir(path.dirname(file), {recursive: true})
-        await fs.writeFile(file, scrub(lines))
+        write(file, scrub(lines))
       })()
     )
 

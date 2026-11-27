@@ -1,5 +1,8 @@
-/** Run by hand by the maintainer: posts results on the bump PR for CI's gate. */
-import type {CheckStatus, Review} from './provider-checks-result.ts'
+/**
+ * Run by hand by the maintainer: re-records the recordings, and posts results
+ * on the PR CI's gate holds.
+ */
+import type {CheckStatus} from './provider-checks-result.ts'
 import type {Entry} from './provider-dependencies.ts'
 import type {Builds} from './provider-review.ts'
 import type {Pins} from './vendor-pins.ts'
@@ -12,20 +15,32 @@ import {parseArgs} from 'node:util'
 import {z} from 'zod'
 
 import {devUserData} from './dev-data.ts'
+import {mapLimited} from './map-limited.ts'
+import {
+  VitestReport,
+  liveOutcome,
+  liveTestArgs,
+} from './provider-checks-live.ts'
 import {passed, renderResult} from './provider-checks-result.ts'
-import {LIST, entriesOf, liveCheckOf, tagsIn} from './provider-dependencies.ts'
+import {LIST, entriesOf, liveCheckOf} from './provider-dependencies.ts'
+import {entriesToReview, reviewsOf} from './provider-review-scope.ts'
 import {review} from './provider-review.ts'
+import {
+  filesIn,
+  gatedChangesOf,
+  isRecording,
+  unrewritten,
+} from './recordings.ts'
 import {
   HOST_PACKAGE,
   INSTALLED_SDK,
   MANIFEST,
   SDK,
-  bumpOf,
   pinsOf,
 } from './vendor-pins.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-const GATE_JOB = 'Provider checks on a vendor bump'
+const GATE_JOB = 'Provider checks on a vendor bump or a live test change'
 const REVIEWERS = 4
 
 const PullPages = z.array(
@@ -33,20 +48,10 @@ const PullPages = z.array(
     z.looseObject({
       number: z.number(),
       base: z.looseObject({sha: z.string()}),
-      head: z.looseObject({sha: z.string()}),
+      head: z.looseObject({sha: z.string(), ref: z.string()}),
     })
   )
 )
-
-const VitestReport = z.looseObject({
-  testResults: z.array(
-    z.looseObject({
-      assertionResults: z.array(
-        z.looseObject({title: z.string(), status: z.string()})
-      ),
-    })
-  ),
-})
 
 const Runs = z.looseObject({
   workflow_runs: z.array(
@@ -60,10 +65,13 @@ const Jobs = z.looseObject({
   jobs: z.array(z.looseObject({id: z.number(), name: z.string()})),
 })
 
-interface Bump {
+interface Gated {
   number: number
+  base: string
   head: string
-  changes: string[]
+  branch: string
+  pinChanges: string[]
+  files: string[]
 }
 
 function fail(message: string): never {
@@ -142,37 +150,47 @@ function readText(file: string) {
   return fs.readFileSync(path.join(root, file), 'utf8')
 }
 
-async function findBump(repo: string, wanted: number | null) {
+async function findGated(repo: string, wanted: number | null) {
   const call = `repos/${repo}/pulls?state=open&per_page=100`
   const pages = await $`gh api --paginate --slurp ${call}`.text()
   const open = PullPages.parse(JSON.parse(pages)).flat()
 
-  const bumps: Bump[] = []
+  const gated: Gated[] = []
 
   for (const pull of open) {
     if (wanted !== null && pull.number !== wanted) continue
 
-    const changes = await bumpOf(api, repo, {
+    const {pinChanges, files} = await gatedChangesOf(api, repo, {
+      number: pull.number,
       base: pull.base.sha,
       head: pull.head.sha,
     })
 
-    if (changes.length > 0) {
-      bumps.push({number: pull.number, head: pull.head.sha, changes})
+    if (pinChanges.length > 0 || files.length > 0) {
+      gated.push({
+        number: pull.number,
+        base: pull.base.sha,
+        head: pull.head.sha,
+        branch: pull.head.ref,
+        pinChanges,
+        files,
+      })
     }
   }
 
-  if (wanted !== null && bumps.length === 0) {
-    fail(`#${wanted} isn't an open PR that moves a vendor pin.`)
-  }
-
-  if (bumps.length > 1) {
+  if (wanted !== null && gated.length === 0) {
     fail(
-      `${bumps.length} bump PRs are open (${bumps.map(bump => `#${bump.number}`).join(', ')}): pick one with --pr <n>.`
+      `#${wanted} isn't an open PR that moves a vendor pin or changes a live test, a recorder or a recording.`
     )
   }
 
-  return bumps[0] ?? null
+  if (gated.length > 1) {
+    fail(
+      `${gated.length} open PRs need provider-checks (${gated.map(pull => `#${pull.number}`).join(', ')}): pick one with --pr <n>.`
+    )
+  }
+
+  return gated[0] ?? null
 }
 
 async function isCleanAt(head: string) {
@@ -182,88 +200,122 @@ async function isCleanAt(head: string) {
   return current === head && !dirty
 }
 
+/** Each `[records]` test also rewrites its recordings. */
 async function runLiveChecks(ids: string[], env: Record<string, string>) {
   const report = path.join(os.tmpdir(), `uz-provider-checks-${Date.now()}.json`)
 
-  await Bun.spawn(
-    [
-      'bun',
-      'run',
-      'scripts/vitest.ts',
-      'run',
-      '.live.test.ts',
-      '--project',
-      'node',
-      '-t',
-      String.raw`\[dep:`,
-      '--reporter=default',
-      '--reporter=json',
-      `--outputFile.json=${report}`,
-    ],
+  const exitCode = await Bun.spawn(
+    ['bun', 'run', 'scripts/vitest.ts', ...liveTestArgs(report)],
     {
       cwd: root,
-      env: {...process.env, ...env},
+      env: {...process.env, ...env, UZ_RECORD: 'yes'},
       stdio: ['inherit', 'inherit', 'inherit'],
     }
   ).exited
-
-  const outcomes = new Map<string, string[]>()
 
   const ran = await Bun.file(report)
     .json()
     .catch(() => ({testResults: []}))
 
-  for (const file of VitestReport.parse(ran).testResults) {
-    for (const test of file.assertionResults) {
-      for (const id of tagsIn(test.title)) {
-        outcomes.set(id, [...(outcomes.get(id) ?? []), test.status])
-      }
-    }
-  }
+  const outcome = liveOutcome(
+    ids,
+    VitestReport.parse(ran).testResults.flatMap(file => file.assertionResults)
+  )
 
-  return ids.map(id => ({id, status: statusOf(outcomes.get(id) ?? [])}))
+  return {...outcome, failed: outcome.failed || exitCode !== 0}
 }
 
-function statusOf(outcomes: string[]): CheckStatus {
-  if (outcomes.includes('failed')) return 'failed'
+async function recordings() {
+  return (await filesIn(root)).filter(isRecording)
+}
 
-  return outcomes.length > 0 && outcomes.every(outcome => outcome === 'passed')
-    ? 'passed'
-    : 'not run'
+/** Why the run must keep the old recordings, or null when it can commit. */
+async function whyKept(since: number, failed: boolean) {
+  if (failed) return 'a live test failed'
+
+  const missed = unrewritten(
+    (await recordings()).map(file => ({
+      file,
+      modified: fs.statSync(path.join(root, file)).mtimeMs,
+    })),
+    since
+  )
+
+  return missed.length > 0
+    ? `no live test rewrote ${missed.map(file => `\`${file}\``).join(', ')}`
+    : null
+}
+
+/** Null when the run rewrote every recording as it was. */
+async function commitRecordings() {
+  await $`git add -- ${await recordings()}`.cwd(root)
+
+  const staged = await $`git diff --cached --quiet`.cwd(root).nothrow()
+
+  if (staged.exitCode === 0) return null
+
+  await $`git commit --quiet -m ${'Re-record the recordings for provider-checks'}`.cwd(
+    root
+  )
+
+  return (await $`git rev-parse HEAD`.cwd(root).text()).trim()
+}
+
+async function runEverydayTests(): Promise<CheckStatus> {
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([name]) => !name.startsWith('UZ_LIVE_') && name !== 'UZ_RECORD'
+    )
+  )
+
+  const exitCode = await Bun.spawn(['bun', 'run', 'test'], {
+    cwd: root,
+    env,
+    stdio: ['inherit', 'inherit', 'inherit'],
+  }).exited
+
+  return exitCode === 0 ? 'passed' : 'failed'
+}
+
+async function baseListOf(pull: Gated) {
+  const mergeBase = await $`git merge-base HEAD ${pull.base}`
+    .cwd(root)
+    .nothrow()
+    .quiet()
+
+  if (mergeBase.exitCode !== 0) {
+    fail(
+      `This checkout lacks ${pull.base}, the base of #${pull.number}: run \`git fetch origin\`, then run this again.`
+    )
+  }
+
+  return $`git show ${`${mergeBase.text().trim()}:${LIST}`}`.cwd(root).text()
 }
 
 async function reviewAll(entries: Entry[], builds: Builds) {
-  const reviews: Review[] = []
-  let next = 0
+  console.log(`Reviewing ${entries.length} of the list's entries.`)
 
-  async function reviewer() {
-    for (let entry = entries[next++]; entry; entry = entries[next++]) {
-      console.log(`Reviewing ${entry.id}…`)
-      reviews.push(await review(entry, builds, root))
-    }
-  }
+  return mapLimited(entries, REVIEWERS, async entry => {
+    console.log(`Reviewing ${entry.id}…`)
 
-  await Promise.all(Array.from({length: REVIEWERS}, reviewer))
-
-  return entries.flatMap(entry =>
-    reviews.filter(reviewed => reviewed.id === entry.id)
-  )
+    return review(entry, builds, root)
+  })
 }
 
-async function rerunGate(repo: string, bump: Bump) {
+async function rerunGate(repo: string, pull: Gated) {
   const {
     workflow_runs: [run],
   } = Runs.parse(
     JSON.parse(
       await api(
-        `repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${bump.head}&event=pull_request`
+        `repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${pull.head}&event=pull_request`
       )
     )
   )
 
   if (run?.status !== 'completed') {
     console.warn(
-      `CI on ${bump.head} hasn't finished: once it has, re-run its "${GATE_JOB}" job.`
+      `CI on ${pull.head} hasn't finished: once it has, re-run its "${GATE_JOB}" job.`
     )
 
     return
@@ -278,7 +330,7 @@ async function rerunGate(repo: string, bump: Bump) {
   if (!gate) fail(`CI run ${run.id} has no "${GATE_JOB}" job.`)
 
   await $`gh api -X POST repos/${repo}/actions/jobs/${gate.id}/rerun`.quiet()
-  console.log(`Re-running "${GATE_JOB}" on #${bump.number}.`)
+  console.log(`Re-running "${GATE_JOB}" on #${pull.number}.`)
 }
 
 const {values} = parseArgs({options: {pr: {type: 'string'}}})
@@ -288,20 +340,38 @@ const repo = (
   await $`gh repo view --json nameWithOwner --jq .nameWithOwner`.text()
 ).trim()
 
-const bump = await findBump(repo, values.pr ? Number(values.pr) : null)
-const postTo = bump && (await isCleanAt(bump.head)) ? bump : null
+const pull = await findGated(repo, values.pr ? Number(values.pr) : null)
+const postTo = pull && (await isCleanAt(pull.head)) ? pull : null
 
-const entries = entriesOf(readText(LIST))
+const list = readText(LIST)
+const entries = entriesOf(list)
+
+const toReview = pull
+  ? entriesToReview({
+      pinMoved: pull.pinChanges.length > 0,
+      baseList: await baseListOf(pull),
+      headList: list,
+    })
+  : entries
 
 const live = entries.flatMap(entry =>
   liveCheckOf(entry) === entry.id ? [entry.id] : []
 )
 
+const since = Date.now()
+const {checks, failed, retried} = await runLiveChecks(live, env)
+const kept = await whyKept(since, failed)
+const committed = postTo && kept === null ? await commitRecordings() : null
+
 const result = {
-  head: postTo?.head ?? null,
-  pinChanges: postTo?.changes ?? [],
-  checks: await runLiveChecks(live, env),
-  reviews: await reviewAll(entries, builds),
+  head: committed ?? postTo?.head ?? null,
+  pinChanges: postTo?.pinChanges ?? [],
+  gatedFiles: postTo?.files ?? [],
+  checks,
+  retried,
+  reviews: reviewsOf(entries, await reviewAll(toReview, builds)),
+  whyKept: kept,
+  everydayTests: await runEverydayTests(),
 }
 
 const body = renderResult(result)
@@ -312,13 +382,19 @@ if (postTo) {
   await $`gh pr comment ${postTo.number} --body-file - < ${new Response(body)}`.cwd(
     root
   )
-  await rerunGate(repo, postTo)
-} else if (bump) {
+
+  // Pushed after the comment, so CI's gate on the new commit finds its result.
+  await (committed
+    ? $`git push origin ${`HEAD:refs/heads/${postTo.branch}`}`.cwd(root)
+    : rerunGate(repo, postTo))
+} else if (pull) {
   console.warn(
-    `Nothing was posted: a result for #${bump.number} must come from a clean checkout of its head ${bump.head} (gh pr checkout ${bump.number}).`
+    `Nothing was posted or committed: a result for #${pull.number} must come from a clean checkout of its head ${pull.head} (gh pr checkout ${pull.number}).`
   )
 } else {
-  console.warn('No bump PR is open: there was nothing to comment on.')
+  console.warn(
+    'No open PR needs provider-checks: nothing was posted, and the new recordings are left uncommitted.'
+  )
 }
 
 process.exit(passed(result) ? 0 : 1)
