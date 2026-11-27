@@ -243,7 +243,6 @@ function rename(entry) {
 const realCwd = fs.realpathSync(process.cwd())
 function inThisFolder(message) {
   if (!start.cwd) return message
-  const quoted = folder => JSON.stringify(folder).slice(1, -1)
   return JSON.parse(JSON.stringify(message).replaceAll(quoted(start.cwd), quoted(realCwd)))
 }
 
