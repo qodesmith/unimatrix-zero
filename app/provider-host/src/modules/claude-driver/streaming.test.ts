@@ -98,10 +98,6 @@ function again(uuid: string) {
 
 const THIRD_MESSAGE = again(SECOND_MESSAGE)
 
-function windowOf({contextWindow}: {contextWindow: number | null}) {
-  return contextWindow === null ? {} : {contextWindow}
-}
-
 type Streamed = StartReplyEvent
 
 const cleanUps: (() => Promise<void>)[] = []
@@ -461,11 +457,26 @@ const MessageDeltaSchema = z.looseObject({
   event: z.looseObject({type: z.literal('message_delta')}),
 })
 
+const ResultLineSchema = z.looseObject({type: z.literal('result')})
+
 function withUsage(name: string) {
   return edited(name, lines =>
     lines.map(line => {
       const ended =
         line.kind === 'out' ? MessageDeltaSchema.safeParse(line.message) : null
+
+      const result =
+        line.kind === 'out' ? ResultLineSchema.safeParse(line.message) : null
+
+      if (result?.success) {
+        return {
+          kind: 'out',
+          message: {
+            ...result.data,
+            modelUsage: {[MODEL]: {contextWindow: 200_000}},
+          },
+        }
+      }
 
       return ended?.success
         ? {
@@ -507,7 +518,7 @@ it('streams a Reply, records where Claude saved it, and reports its Context size
       replyId: expect.any(String),
       type: 'RUN_FINISHED',
       status: 'complete',
-      ...windowOf(FIRST_REPLY),
+      contextWindow: 200_000,
     },
   ])
   expect(
@@ -1832,7 +1843,7 @@ it('stops a Reply where it is, records it, and continues the Thread warm from it
       replyId: expect.any(String),
       type: 'RUN_FINISHED',
       status: 'stopped',
-      ...windowOf(STOPPED_REPLY),
+      contextWindow: 200_000,
     },
   ])
   expect(

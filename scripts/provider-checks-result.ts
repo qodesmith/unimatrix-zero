@@ -17,8 +17,7 @@ export interface Result {
   checks: {id: string; status: CheckStatus}[]
   reviews: Review[]
   whyKept: string | null
-  /** The everyday tests, run against the recordings the run left. */
-  everyday: CheckStatus
+  everydayTests: CheckStatus
 }
 
 const MARKER = /<!-- provider-checks (\{.*?\}) -->/
@@ -30,7 +29,7 @@ export function passed(result: Result) {
     result.checks.every(check => check.status === 'passed') &&
     result.reviews.every(review => review.verdict === 'holds') &&
     result.whyKept === null &&
-    result.everyday === 'passed'
+    result.everydayTests === 'passed'
   )
 }
 
@@ -70,7 +69,7 @@ export function renderResult(result: Result) {
     '',
     `**Recordings:** ${result.whyKept === null ? 're-recorded' : `kept the old ones, since ${result.whyKept}`}`,
     '',
-    `**Everyday tests:** ${result.everyday}`,
+    `**Everyday tests:** ${result.everydayTests}`,
     '',
     `**Live checks:** ${counts(result.checks.map(check => check.status)) || 'none'}`,
     '',

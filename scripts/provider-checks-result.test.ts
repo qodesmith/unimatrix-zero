@@ -21,7 +21,7 @@ function result(head: string | null, change: Partial<Result> = {}): Result {
     ],
     gatedFiles: [],
     whyKept: null,
-    everyday: 'passed',
+    everydayTests: 'passed',
     ...change,
   }
 }
@@ -61,7 +61,7 @@ const unreviewed = renderResult(
 
 const kept = renderResult(result(HEAD, {whyKept: 'a live test failed'}))
 
-const everydayFailed = renderResult(result(HEAD, {everyday: 'failed'}))
+const everydayFailed = renderResult(result(HEAD, {everydayTests: 'failed'}))
 
 function verdict(...comments: [login: string, body: string][]) {
   return gateVerdict({

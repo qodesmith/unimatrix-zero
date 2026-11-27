@@ -39,28 +39,21 @@ interface RecordedReply {
   textDeltas: string[]
   /** Text deltas streamed before the SDK asked `claude` to stop, else all. */
   streamedBeforeInterrupt: number
-  /** As the `result` reports it for the Reply's Model, which it may not. */
-  contextWindow: number | null
   boundaryIds: string[]
   toolCalls: RecordedToolCall[]
 }
 
 interface Draft extends Omit<
   RecordedReply,
-  'sessionId' | 'messageId' | 'streamedBeforeInterrupt' | 'contextWindow'
+  'sessionId' | 'messageId' | 'streamedBeforeInterrupt'
 > {
   messageId: string | null
-  model: string | null
   streamedBeforeInterrupt: number | null
 }
 
 const ResultSchema = z.looseObject({
   type: z.literal('result'),
   session_id: z.string(),
-  modelUsage: z.record(
-    z.string(),
-    z.looseObject({contextWindow: z.number().optional()})
-  ),
 })
 
 const AssistantSchema = z.looseObject({
@@ -122,7 +115,6 @@ const InterruptSchema = z.looseObject({
 function newDraft(): Draft {
   return {
     messageId: null,
-    model: null,
     text: '',
     textDeltas: [],
     streamedBeforeInterrupt: null,
@@ -135,7 +127,6 @@ function addAssistant(draft: Draft, message: z.infer<typeof AssistantSchema>) {
   if (message.message.model === '<synthetic>') return
 
   draft.messageId = message.uuid
-  draft.model = message.message.model
 
   for (const part of message.message.content) {
     const text = TextPartSchema.safeParse(part)
@@ -202,9 +193,9 @@ function repliesIn(lines: RecordedLine[]) {
 
     if (!result.success) continue
 
-    const {messageId, model, ...rest} = draft
+    const {messageId, ...rest} = draft
 
-    if (messageId === null || model === null) {
+    if (messageId === null) {
       throw new Error('A Reply has no assistant entry')
     }
 
@@ -212,7 +203,6 @@ function repliesIn(lines: RecordedLine[]) {
       ...rest,
       sessionId: result.data.session_id,
       messageId,
-      contextWindow: result.data.modelUsage[model]?.contextWindow ?? null,
       streamedBeforeInterrupt:
         draft.streamedBeforeInterrupt ?? draft.textDeltas.length,
     })

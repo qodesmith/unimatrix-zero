@@ -380,7 +380,7 @@ const result = {
   checks,
   reviews: await reviewAll(entries, builds),
   whyKept: kept,
-  everyday: await runEverydayTests(),
+  everydayTests: await runEverydayTests(),
 }
 
 const body = renderResult(result)
