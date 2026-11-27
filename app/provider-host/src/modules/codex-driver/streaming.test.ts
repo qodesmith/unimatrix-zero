@@ -2194,7 +2194,7 @@ it('unsubscribes a loaded thread and resumes it on the permission profile for a 
 })
 
 const LEAVING =
-  'echo KESTREL > /Library/Caches/uz-sandbox-1ae95c20-aaa1-4a36-b7f1-ab621a0cd009.txt'
+  'echo KESTREL > /Library/Caches/uz-sandbox-5b4ee66d-587b-4642-8515-54739a590b82.txt && sh /var/folders/47/6jxrn9415rb7mh91hmdtz5dm0000gn/T/uz-peek-434756fa-775a-498a-8be1-7491f7f76c38.sh'
 
 /**
  * The Replies of `sandbox.ndjson`, in order: a command inside the Sandbox,
@@ -2280,10 +2280,15 @@ it('asks about a command the Model wants to run outside the Sandbox on a card of
 
   expect(cardsIn(blocked).at(-1)).toMatchObject({answer: 'always-allow'})
   expect(actionsAsked(leaving)).toEqual([
-    {kind: 'command', command: LEAVING, outsideSandbox: true},
+    {
+      kind: 'command',
+      command: LEAVING,
+      outsideSandbox: true,
+      credentialsDenied: true,
+    },
   ])
-  expect(toolCallsOf(leaving).map(call => call.result?.isError)).toEqual([
-    false,
+  expect(toolCallsOf(leaving).map(call => call.result)).toEqual([
+    {content: 'This command didn’t run to the end.', isError: true},
   ])
 })
 

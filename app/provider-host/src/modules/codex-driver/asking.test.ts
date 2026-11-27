@@ -22,7 +22,10 @@ type CommandParams = Extract<
   {method: 'item/commandExecution/requestApproval'}
 >['params']
 
-function setUp(grants: ApprovalGrant[] = []) {
+function setUp(
+  grants: ApprovalGrant[] = [],
+  platform: NodeJS.Platform = 'linux'
+) {
   const responses: unknown[] = []
   const shown: Extract<Received, {method: 'shown'}>['event'][] = []
   const taking: ((request: ApprovalRequest) => boolean)[] = []
@@ -38,6 +41,7 @@ function setUp(grants: ApprovalGrant[] = []) {
       },
     },
     approvals: createApprovals(),
+    platform,
     request: ReplyRequestSchema.parse({
       treeId: '01a16096-00ad-7d3b-8205-6b76ddc26ce0',
       replyId: '01a16096-00ad-7d3b-8205-6b76ddc26ce1',
@@ -180,7 +184,20 @@ it('keeps a host request a host card, whatever its reason', () => {
     networkApprovalContext: {host: 'example.com'},
   })
 
-  expect(codex.cards()).toEqual([{kind: 'host', host: 'example.com'}])
+  expect(codex.cards()).toEqual([
+    {kind: 'host', host: 'example.com', fromCommand: true},
+  ])
+})
+
+it('marks a command outside the Sandbox as still kept from the credential folders where the Sandbox’s profile denies them', () => {
+  const mac = setUp([], 'darwin')
+  const linux = setUp([], 'linux')
+
+  mac.command({reason: REASON})
+  linux.command({reason: REASON})
+
+  expect(mac.cards()).toEqual([{...OUTSIDE_GRANT, credentialsDenied: true}])
+  expect(linux.cards()).toEqual([OUTSIDE_GRANT])
 })
 
 it('runs a read with no card, but asks before one that would leave the Sandbox', async () => {

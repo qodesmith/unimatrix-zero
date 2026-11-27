@@ -49,9 +49,11 @@ function whatItDoes(action: ApprovalAction) {
     case 'edit':
       return `edit ${listed(action.inTreeFiles ? action.paths.map(fileName) : action.paths)}`
     case 'command':
-      return action.outsideSandbox
-        ? 'run this command on your whole computer'
-        : 'run this command'
+      if (!action.outsideSandbox) return 'run this command'
+
+      return action.credentialsDenied
+        ? 'run this command outside the Sandbox'
+        : 'run this command on your whole computer'
     case 'host':
       return `connect to ${action.host}`
     case 'mcp-tool':
@@ -70,6 +72,26 @@ function CommandText({action}: {action: ApprovalAction}) {
     <pre className="overflow-x-auto rounded-md bg-muted px-2 py-1 text-xs whitespace-pre-wrap">
       {action.command}
     </pre>
+  )
+}
+
+function whatItCouldReach(action: ApprovalAction) {
+  if (action.kind === 'host' && action.fromCommand) {
+    return `A command wants this connection. With it, the command could send your files to ${action.host} and download from there.`
+  }
+
+  if (action.kind !== 'command' || !action.outsideSandbox) return null
+
+  return action.credentialsDenied
+    ? 'Outside the Sandbox, it could read and change your files and reach the internet.'
+    : 'Outside the Sandbox, it could read and change any of your files, use your saved logins and reach the internet.'
+}
+
+function WhatItReaches({action}: {action: ApprovalAction}) {
+  const reach = whatItCouldReach(action)
+
+  return reach === null ? null : (
+    <p className="text-xs text-muted-foreground">{reach}</p>
   )
 }
 
@@ -134,12 +156,7 @@ function AskingCard({
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         <CommandText action={action} />
-        {action.kind === 'command' && action.outsideSandbox && (
-          <p className="text-xs text-muted-foreground">
-            Outside the Sandbox, it could read and change any of your files, use
-            your saved logins and reach the internet.
-          </p>
-        )}
+        <WhatItReaches action={action} />
         {landsOutsideTree(action) && (
           <p className="text-xs text-muted-foreground">
             This happens outside the conversation, so other Branches will see it

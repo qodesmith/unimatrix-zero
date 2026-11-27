@@ -343,6 +343,7 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       request,
       threadId: thread.id,
       push: received => inbox.push(received),
+      platform: deps.platform,
     })
 
     let unstoppable: (() => void) | null = null

@@ -215,6 +215,60 @@ it('leads a command that would leave the Sandbox with what it could then reach, 
   expect(screen.getByText(UNSANDBOXED).all()).toHaveLength(1)
 })
 
+it('leaves your whole computer and saved logins out of what a command outside the Sandbox could reach when the credential folders stay denied there', async () => {
+  const screen = await renderReply(
+    asked({
+      kind: 'command',
+      command: 'rm -rf build',
+      outsideSandbox: true,
+      credentialsDenied: true,
+    })
+  )
+
+  await expect
+    .element(
+      card(screen).getByText(
+        'The AI wants to run this command outside the Sandbox'
+      )
+    )
+    .toBeVisible()
+  expect(screen.getByText(/whole computer/u).query()).toBeNull()
+  await expect
+    .element(
+      card(screen).getByText(
+        'Outside the Sandbox, it could read and change your files and reach the internet.'
+      )
+    )
+    .toBeVisible()
+  expect(screen.getByText(UNSANDBOXED).query()).toBeNull()
+})
+
+const SENDS =
+  'A command wants this connection. With it, the command could send your files to example.com and download from there.'
+
+it('says what a connection lets a command inside the Sandbox do, which a web fetch leaves out', async () => {
+  const screen = await renderReply(
+    asked({kind: 'host', host: 'example.com', fromCommand: true})
+  )
+
+  await expect
+    .element(card(screen).getByText('The AI wants to connect to example.com'))
+    .toBeVisible()
+  await expect.element(card(screen).getByText(SENDS)).toBeVisible()
+
+  main.publish({
+    ...ids,
+    type: 'APPROVAL_REQUESTED',
+    approvalId: 'approval-2',
+    action: {kind: 'host', host: 'docs.example.com'},
+  })
+
+  await expect
+    .element(screen.getByText('The AI wants to connect to docs.example.com'))
+    .toBeVisible()
+  expect(screen.getByText(/could send your files/u).all()).toHaveLength(1)
+})
+
 it('says the Reply waits for you while a card waits, not that it is writing', async () => {
   const screen = await renderReply()
 

@@ -147,7 +147,11 @@ export function actionOf(
       : {kind: 'command', command}
   }
 
-  if (host) return {kind: 'host', host}
+  if (host) {
+    return toolName === SANDBOX_NETWORK
+      ? {kind: 'host', host, fromCommand: true}
+      : {kind: 'host', host}
+  }
 
   if (server && tool) return {kind: 'mcp-tool', server, tool}
 
