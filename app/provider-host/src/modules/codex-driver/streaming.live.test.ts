@@ -2758,9 +2758,13 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     const name = `uz-sandbox-${crypto.randomUUID()}.txt`
     const cached = path.join(os.homedir(), 'Library', 'Caches', name)
     const outside = path.join('/Library/Caches', name)
-    const hidden = newTreeFolder()
-    fs.writeFileSync(path.join(hidden, 'secret.txt'), 'GANNET\n')
     const keychains = path.join(os.homedir(), 'Library', 'Keychains')
+
+    const hidden = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'uz-live-hidden-'))
+    )
+
+    fs.writeFileSync(path.join(hidden, 'secret.txt'), 'GANNET\n')
     fs.writeFileSync(
       path.join(trees.tree, 'peek.sh'),
       [
