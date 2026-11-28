@@ -4,7 +4,6 @@ import {execFile} from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-/** Each aims a vendor program at another account or user setup (ADR 0014). */
 export const STRIPPED_PREFIXES = ['ANTHROPIC_', 'CLAUDE_', 'OPENAI_', 'CODEX_']
 
 export function vendorEnvironment(base: NodeJS.ProcessEnv) {
@@ -48,7 +47,6 @@ async function isExecutable(file: string) {
   }
 }
 
-/** Stubs run the folder's `xcrun`. `DEVELOPER_DIR` may name an Xcode app. */
 async function isDeveloperFolder(folder: string | undefined) {
   if (!folder) return false
 

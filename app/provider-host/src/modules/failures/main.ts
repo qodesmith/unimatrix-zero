@@ -37,19 +37,15 @@ export function isBusyStatus(status: number | null) {
 export interface ClaudeSignals {
   terminalReason?: TerminalReason | undefined
   apiErrorStatus?: number | null | undefined
-  /** The last `api_retry`'s `error_status`; undefined when none came. */
   retryStatus?: number | null | undefined
   assistantError?: SDKAssistantMessageError | undefined
-  /** Set when the last `rate_limit_event` was rejected; in epoch seconds. */
   rejectedLimit?: {resetsAt?: number | undefined} | undefined
   compactionFailed?: boolean | undefined
 }
 
 export interface CodexSignals {
   codexErrorInfo?: unknown
-  /** The `codexErrorInfo` of the last `error` notification with `willRetry`. */
   retryErrorInfo?: unknown
-  /** From the rate-limit snapshot, in epoch seconds. */
   resetsAt?: number | undefined
 }
 

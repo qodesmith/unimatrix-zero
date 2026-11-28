@@ -957,14 +957,12 @@ function offersSubagents(body: ResponsesBody) {
   return JSON.stringify(body).includes('spawn_agent')
 }
 
-/** Codex offers web search inside its `exec` tool, as `web__run`. */
 function offersWebSearch(body: ResponsesBody) {
   return JSON.stringify(
     body.input.filter(item => item.type === 'additional_tools')
   ).includes('web__run')
 }
 
-/** Codex lists the Skills again in a turn whose list changed. */
 function skillListings(items: ResponsesBody['input']) {
   return items
     .map(item => JSON.stringify(item))

@@ -14,7 +14,6 @@ export type UserInput =
 export interface Attempt<Input extends object> {
   inbox: Inbox<Input | UserInput>
   signal: AbortSignal
-  /** A function so it is read afresh after each wait. */
   canceled: () => boolean
 }
 

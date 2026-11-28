@@ -27,10 +27,6 @@ type ReplyOf = Pick<
   'treeId' | 'replyId' | 'grants' | 'treeFolder'
 >
 
-/**
- * An edit is granted when each of its paths is: by its own grant, or by
- * `edits-in-tree` when it lies in the Tree's files.
- */
 function isGranted(
   grants: ApprovalGrant[],
   action: ApprovalAction,

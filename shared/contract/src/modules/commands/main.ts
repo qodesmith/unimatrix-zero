@@ -98,7 +98,6 @@ export const PromptSendCommand = z
     parentReplyId: z.uuid().nullable(),
     text: z.string().trim(),
     attachmentIds: z.array(z.uuid()).max(ATTACHMENTS_PER_PROMPT).optional(),
-    /** As the Input's picker shows it; main never swaps it for another. */
     model: ModelChoiceSchema,
   })
   .refine(
@@ -116,7 +115,6 @@ export type TurnIds = z.infer<typeof TurnIdsSchema>
 export const PromptSendResult = z.strictObject({
   prompt: PromptSchema,
   reply: ReplySchema,
-  /** The failed Turns the new Prompt replaced, with every Turn below them. */
   removed: TurnIdsSchema,
 })
 
@@ -175,7 +173,6 @@ export const SignInCancelCommand = z.strictObject({
   provider: ProviderIdSchema,
 })
 
-/** Fetched without cookies or a referrer; answered with a `data:` URL. */
 export const ImageLoadCommand = z.strictObject({
   type: z.literal('image.load'),
   url: z.url({protocol: /^https?$/u}),
@@ -201,7 +198,6 @@ export const AttachmentAddCommand = z.strictObject({
         .refine(bytes => bytes.byteLength <= ATTACHMENT_SIZE_LIMIT),
     }),
   ]),
-  /** The window's shrunk copy of a too-large image, sent inline instead. */
   shrunk: z
     .instanceof(Uint8Array)
     .refine(bytes => bytes.byteLength <= INLINE_IMAGE_SIZE_LIMIT)
@@ -212,12 +208,10 @@ export const AttachmentAddResult = z.strictObject({
   attachment: AttachmentSchema,
 })
 
-/** `SNAPSHOTS_DOWNLOADED` or `SNAPSHOTS_DOWNLOAD_FAILED` follows. */
 export const SnapshotsDownloadAgainCommand = z.strictObject({
   type: z.literal('snapshots.download-again'),
 })
 
-/** `SETTINGS_CHANGED` follows with every Setting. */
 export const SettingsUpdateCommand = z.strictObject({
   type: z.literal('settings.update'),
   changes: SettingsUpdateSchema,
@@ -303,7 +297,6 @@ export const TreeFileSaveCopyCommand = z.strictObject({
   fileId: TreeFileIdSchema,
 })
 
-/** The OS's thumbnail, on macOS only; null where there is none. */
 export const TreeFileThumbnailCommand = z.strictObject({
   type: z.literal('tree-file.thumbnail'),
   fileId: TreeFileIdSchema,
@@ -313,7 +306,6 @@ export const TreeFileThumbnailResult = z.strictObject({
   dataUrl: z.string().startsWith('data:image/').nullable(),
 })
 
-/** `LAYOUT_CHANGED` follows with the whole Layout. */
 export const LayoutUpdateCommand = z.strictObject({
   type: z.literal('layout.update'),
   changes: LayoutUpdateSchema,

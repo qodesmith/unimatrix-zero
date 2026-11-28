@@ -67,7 +67,6 @@ export const TreeDeletedEvent = z.strictObject({
   treeId: z.uuid(),
 })
 
-/** Sent once per launch, at the first wait a window can hear. */
 export const SnapshotsWaitingEvent = z.strictObject({
   type: z.literal('SNAPSHOTS_WAITING'),
 })

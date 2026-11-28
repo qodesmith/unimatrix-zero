@@ -86,10 +86,7 @@ function mayBeUnsupported(input: Uint8Array) {
   return candidate === 'zip' || candidate === 'ipynb'
 }
 
-/**
- * The window is hostile: anything off in its output discards all of it.
- * `input` is the file the job was given.
- */
+/** The window is hostile: anything off in its output discards all of it. */
 export function validateOutput(
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the window's message: ExtractorOutputSchema parses it below
   data: unknown,

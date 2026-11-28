@@ -49,7 +49,6 @@ function tempFolders() {
   return [fs.realpathSync(os.tmpdir()), os.tmpdir()]
 }
 
-/** Each way a recording can name this machine's temp folder, with its stand-in. */
 export function tempFolderNames() {
   const folders = tempFolders().map(folder =>
     JSON.stringify(folder).slice(1, -1)
@@ -77,19 +76,12 @@ export function machineStandIns() {
   ]
 }
 
-/** A setting a replay test changes on purpose, which its fake won't compare. */
 export interface SkippedSetting<Field extends string = string> {
   field: Field
   reason: string
-  /** Only the vendor program started at this place, from 0; else every one. */
   run?: number
 }
 
-/**
- * For a fake's script: `changedSetting` says which of `fields` the app sent
- * differently from the recording, once `withStandIns` has named the test's
- * folders as the recording does.
- */
 export const SETTINGS_CHECK = `
 function quoted(text) {
   return JSON.stringify(text).slice(1, -1)
@@ -148,7 +140,6 @@ export function replaceAcross(pieces: string[], from: string, to: string) {
   return out
 }
 
-/** What a recording's `start` line names it by, such as `codex 0.163.0`. */
 export function buildOf(name: string, program: string) {
   const {stdout} = spawnSync(program, ['--version'], {encoding: 'utf8'})
   const version = VERSION.exec(stdout)?.[0]

@@ -17,7 +17,6 @@ import {reaching, targetOf} from './reach'
 
 const {prompts, replies, systemPrompts} = schema
 
-/** Ended early with its text kept; its Provider may not have saved it. */
 const CUT_SHORT = new Set<Reply['status']>(['stopped', 'interrupted'])
 
 type ContinuedSession = Extract<

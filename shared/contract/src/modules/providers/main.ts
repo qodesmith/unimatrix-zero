@@ -99,7 +99,6 @@ export const UsageSchema = z.strictObject({
 
 export type Usage = z.infer<typeof UsageSchema>
 
-/** `account` is set once connected; the other statuses are its host's. */
 export const ProviderStatusSchema = z.strictObject({
   provider: ProviderIdSchema,
   status: z.enum([

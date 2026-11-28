@@ -28,7 +28,6 @@ const {prompts, replies} = schema
 export interface TreeFilesDeps {
   db: Database
   userData: string
-  /** Main's own, never a shared temp folder: copies of files to open or serve. */
   tempDir: string
   desktop: Desktop
   publish: (event: AppEvent) => void

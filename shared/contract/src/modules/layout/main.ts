@@ -9,7 +9,6 @@ export const SidebarSectionIdSchema = z.enum(['trees', 'files', 'usage'])
 export type SidebarSectionId = z.infer<typeof SidebarSectionIdSchema>
 
 export const SidebarSectionSchema = z.strictObject({
-  /** Its share of the sidebar's height while open, in percent. */
   size: z.number().min(0).max(100),
   /** Shrunk to its header; `size` is what expanding restores. */
   collapsed: z.boolean(),
@@ -20,7 +19,6 @@ export type SidebarSection = z.infer<typeof SidebarSectionSchema>
 /** How the window is arranged, restored on its own; never a Setting (ADR 0021). */
 export const LayoutSchema = z.strictObject({
   sidebarOpen: z.boolean(),
-  /** In CSS pixels. */
   sidebarWidth: z.number().min(SIDEBAR_MIN_WIDTH).max(SIDEBAR_MAX_WIDTH),
   sidebarSections: z.record(SidebarSectionIdSchema, SidebarSectionSchema),
 })

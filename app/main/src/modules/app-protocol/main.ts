@@ -72,7 +72,6 @@ export function serveFiles(target: Protocol, lookups: FileLookups) {
   )
 }
 
-/** `app://unimatrix-zero`: Node's URL gives a custom scheme no origin. */
 export function originOf(appUrl: string) {
   const {protocol: scheme, host} = new URL(appUrl)
 
@@ -118,7 +117,6 @@ interface DevServer {
   scriptNonce: string
 }
 
-/** The packaged origin rules; the page reaches only the HMR socket directly. */
 export function proxyDevServer(target: Protocol, dev: DevServer) {
   const upstream = `http://localhost:${dev.port}`
 

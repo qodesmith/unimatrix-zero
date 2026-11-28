@@ -17,7 +17,6 @@ import {createSessionStoreClient} from '#modules/session-store/main'
 import {HostCommandSchema} from '@uz/contract/host'
 import {signInFailed} from '@uz/contract/providers'
 
-/** The host's side of its link to main: Electron's `process.parentPort`. */
 export interface HostPort {
   postMessage(message: HostMessage): void
   on(event: 'message', listener: (event: {data: unknown}) => void): void

@@ -2,7 +2,6 @@ import {FILE_SCHEME} from '#modules/attachments/main'
 import {ChangedFileSchema} from '#modules/turns/main'
 import {z} from 'zod'
 
-/** Main's name for one file at one Reply's Snapshot; it never holds a path. */
 export const TreeFileIdSchema = z.string().regex(/^[\da-f]{32}$/u)
 
 export type TreeFileId = z.infer<typeof TreeFileIdSchema>
@@ -10,9 +9,7 @@ export type TreeFileId = z.infer<typeof TreeFileIdSchema>
 export const TreeFileSchema = z.strictObject({
   id: TreeFileIdSchema,
   path: z.string().min(1),
-  /** In bytes; a deleted file's size before the Reply deleted it. */
   size: z.number().int().nonnegative(),
-  /** What this Reply did to it; null when an earlier Reply left it so. */
   change: ChangedFileSchema.shape.change.nullable(),
 })
 
@@ -27,7 +24,6 @@ export const TreeFilePreviewSchema = z.enum([
   'csv',
   'html',
   'text',
-  /** Nothing the app shows itself: the OS, or the fallback card. */
   'other',
 ])
 
@@ -57,7 +53,6 @@ export const TreeFileDetailsSchema = z.strictObject({
 
 export type TreeFileDetails = z.infer<typeof TreeFileDetailsSchema>
 
-/** `html` serves an HTML file to run in an `allow-scripts`-only frame. */
 export function treeFileUrl(id: TreeFileId, view?: 'html') {
   const url = `${FILE_SCHEME}://unimatrix-zero/tree-files/${id}`
 

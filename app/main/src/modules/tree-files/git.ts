@@ -86,7 +86,6 @@ export type Git = (
   input?: string
 ) => Promise<string>
 
-/** Runs the app's own `git`, never one on `PATH` (ADR 0024). */
 export function createGit(program: string, env: NodeJS.ProcessEnv): Git {
   return async (target, args, input) =>
     new Promise((resolve, reject) => {

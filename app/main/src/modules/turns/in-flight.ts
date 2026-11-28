@@ -51,7 +51,6 @@ export interface FinishedReply {
 
 interface Entry {
   provider: ProviderId
-  /** The Model asked for, until its Provider reports the one it used. */
   model: string
   promptMessageId: string
   reply: StreamingReply

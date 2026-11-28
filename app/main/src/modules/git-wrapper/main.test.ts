@@ -66,7 +66,6 @@ async function initPushCloneFetch(git: Git) {
 
   const init = await git(['init', '-b', 'main'], first)
 
-  // The templates' own file: a `git` with no templates writes no `info`.
   const excludes = fs.existsSync(path.join(first, '.git', 'info', 'exclude'))
 
   fs.writeFileSync(path.join(first, 'note.txt'), 'one\n')
@@ -74,7 +73,6 @@ async function initPushCloneFetch(git: Git) {
   await git([...identity, 'commit', '-m', 'one'], first)
   await git(['init', '--bare', '-b', 'main', origin], work)
 
-  // A plain path copies files, skipping git-upload-pack and git-receive-pack.
   const url = pathToFileURL(origin).href
   const push = await git(['push', url, 'main'], first)
   const clone = await git(['clone', url, second], work)

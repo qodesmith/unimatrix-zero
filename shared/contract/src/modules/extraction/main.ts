@@ -4,14 +4,12 @@ import {z} from 'zod'
 /** Raise it when the extractor's output changes: older Extractions are redone. */
 export const EXTRACTOR_VERSION = 1
 
-/** Pixels, on the long side. */
 export const PAGE_IMAGE_PIXELS = 1600
 
 export const PAGE_IMAGES_PER_PDF = 100
 
 export const EXTRACTED_TEXT_LIMIT = 32 * MIB
 
-/** Characters. */
 export const FAILURE_MESSAGE_LIMIT = 1000
 
 export const ExtractionFormatSchema = z.enum([
@@ -71,7 +69,6 @@ export const ExtractorOutputSchema = z.discriminatedUnion('type', [
 
 export type ExtractorOutput = z.infer<typeof ExtractorOutputSchema>
 
-/** What main keeps of an Extraction, and what the renderer sees of it. */
 export const ExtractionSchema = z.discriminatedUnion('status', [
   z.strictObject({
     status: z.literal('read'),

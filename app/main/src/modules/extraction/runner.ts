@@ -77,7 +77,6 @@ export async function runExtraction(
       finish(FAILED)
     }
 
-    // A window that failed while opening ended the job before it was known.
     if (job.result) destroy()
   })
 }

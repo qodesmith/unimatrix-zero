@@ -18,7 +18,6 @@ export type ThemeMode = z.infer<typeof ThemeModeSchema>
  */
 export const SendKeySchema = z.enum(['enter', 'mod-enter'])
 
-/** In pixels. */
 export const FONT_SIZE = {min: 12, max: 24, step: 2}
 
 export interface CompactionThresholdRange {

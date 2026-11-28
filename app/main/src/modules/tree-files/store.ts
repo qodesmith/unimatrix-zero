@@ -27,7 +27,6 @@ export function storeExists(store: string) {
   return fs.existsSync(path.join(store, 'HEAD'))
 }
 
-/** No template, so the store starts with no hooks. */
 async function makeStore(git: Git, store: string) {
   fs.mkdirSync(store, {recursive: true, mode: 0o700})
   await git({store}, ['init', '--bare', '--quiet', '--template=', store])

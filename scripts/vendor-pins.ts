@@ -73,7 +73,6 @@ async function pinsAt(api: GitHubApi, repo: string, sha: string) {
   return pinsOf(manifest ?? '', hostPackage ?? '')
 }
 
-/** Reads whole files, since GitHub's list of a PR's changed files stops at 300. */
 export async function bumpOf(
   api: GitHubApi,
   repo: string,

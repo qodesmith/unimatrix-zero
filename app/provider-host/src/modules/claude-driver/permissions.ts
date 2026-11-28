@@ -414,7 +414,6 @@ function sandboxOf(
     enabled: true,
     failIfUnavailable: false,
     allowUnsandboxedCommands: true,
-    // The Sandbox is the floor under the cards, never a reason to skip one.
     autoAllowBashIfSandboxed: false,
     network: {allowedDomains: []},
     filesystem: {

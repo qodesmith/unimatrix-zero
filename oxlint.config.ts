@@ -180,7 +180,6 @@ const config: OxlintConfig = {
 
     'accessor-pairs': 'error',
     'array-callback-return': 'error',
-    // Replaced by the type-aware typescript/switch-exhaustiveness-check.
     'default-case': 'off',
     'default-case-last': 'error',
     eqeqeq: 'error',

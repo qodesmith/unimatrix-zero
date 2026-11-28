@@ -404,7 +404,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
 
         if (finished.status === 'failed') return {finished}
 
-        // A stopped turn stays in the thread as a completed one does.
         const {configDir} = request.vendorProgram
         const files = await readRollouts(server, configDir, thread.id)
         await deps.store.saveFiles(folderOf(thread.id), files)

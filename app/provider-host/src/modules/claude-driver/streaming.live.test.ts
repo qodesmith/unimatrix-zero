@@ -338,7 +338,6 @@ function approvalsIn(events: Streamed[]) {
   )
 }
 
-/** Answers each card in turn while the Reply waits, as the user would. */
 async function answering(
   driver: ProviderDriver,
   request: ReplyRequest,
@@ -611,7 +610,6 @@ async function startStandInApi(answer: StandInAnswer = 'five-hour') {
 
   return {
     url: await listenLocally(server),
-    /** In seconds since the epoch. */
     resets,
     answer(next: StandInAnswer) {
       current = next
@@ -624,7 +622,6 @@ function failureIn(events: Streamed[]) {
   return events.filter(isReplyEvent).reduce(foldReplyEvent, NEW_REPLY).failure
 }
 
-/** About 12 tokens a sentence, measured. */
 function padding(tokens: number) {
   return 'The harbor log lists no ships today. '.repeat(Math.round(tokens / 12))
 }
@@ -1157,7 +1154,6 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 300_000)
 
-  // windows-powershell-keeps-path covers the tools on Windows.
   it.skipIf(process.platform === 'win32')(
     '[records] [dep:claude-tools-full-access] writes a file in the Tree’s folder and runs a command there, asking nothing, with Claude Code’s tools but no Subagents, and shows each tool call',
     async () => {
@@ -1779,7 +1775,6 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     300_000
   )
 
-  // The probe is a shell script.
   it.skipIf(process.platform === 'win32')(
     '[dep:claude-keeps-path] runs a program by name from a folder added last to the PATH claude starts with, where it is still last',
     async () => {
@@ -2115,7 +2110,6 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
       proxy.letThrough()
 
-      // As main does for a stopped Reply never saved.
       const above =
         events.find(
           (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'

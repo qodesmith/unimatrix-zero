@@ -43,7 +43,6 @@ export const SignInRequestSchema = z.strictObject({
     .strictObject({path: z.string().min(1), build: VendorBuildSchema})
     .nullable(),
   configDir: z.string().min(1),
-  /** The vendor program's `DEVELOPER_DIR` on a Mac with no developer tools. */
   developerDir: z.string().min(1).optional(),
   /** Windows and Linux: goes last on `PATH`, so the user's own `git` wins. */
   gitFolder: z.string().min(1).optional(),
@@ -69,7 +68,6 @@ export const DeletionCutSchema = SessionCutSchema.extend({
 
 export type DeletionCut = z.infer<typeof DeletionCutSchema>
 
-/** `messageId` is the Reply being answered. */
 export const ReplySessionSchema = z.discriminatedUnion('type', [
   SessionRefSchema.extend({type: z.literal('continue')}),
   /** The Reply already has a Prompt after it; forking spares that Branch. */
@@ -81,20 +79,17 @@ export const ReplySessionSchema = z.discriminatedUnion('type', [
      */
     servedThrough: z.string().min(1).optional(),
   }),
-  /** The session may run past `messageId` with a failed turn, dropped first. */
   SessionRefSchema.extend({type: z.literal('rewind')}),
   SessionCutSchema,
 ])
 
 export type ReplySession = z.infer<typeof ReplySessionSchema>
 
-/** Oldest first, and the whole Thread: never cut or summarized. */
 export const ThreadSchema = z.array(
   z.strictObject({
     prompt: z.string(),
     attachments: z.array(HostAttachmentSchema),
     reply: z.array(ReplyPartSchema),
-    /** Shown to the AI alone, before a Reply another Model wrote. */
     label: z.string().min(1).nullable(),
   })
 )
@@ -105,7 +100,6 @@ export function replyLabel(name: string) {
   return `[Reply written by ${name}]`
 }
 
-/** The shape `node:crypto` types a UUID as, which the Claude SDK asks for. */
 const UuidPartsSchema = z.templateLiteral([
   z.string(),
   '-',
@@ -131,14 +125,12 @@ export const ReplyRequestSchema = z.strictObject({
   vendorProgram: SignInRequestSchema,
   treeFolder: z.string().min(1),
   session: ReplySessionSchema.nullable(),
-  /** Rebuilds the session when `session` is null or one the Provider lost. */
   thread: ThreadSchema,
   compactionSettings: CompactionSettingsSchema,
   /** Codex keeps a thread's first System prompt for good; Claude ignores this. */
   systemPromptChanged: z.boolean(),
   tools: TreeToolsSchema,
   permissionMode: PermissionModeSchema,
-  /** The app's own folders, which the Sandbox hides from the AI. */
   hiddenFolders: z.array(z.string().min(1)),
   treesFolder: z.string().min(1),
   grants: z.array(ApprovalGrantSchema),
@@ -211,16 +203,12 @@ export type OneShotRequest = z.infer<typeof OneShotRequestSchema>
 export interface ProviderDriver {
   readonly capabilities: Capabilities
   readConnection(): Promise<Connection>
-  /** Ends with `SIGN_IN_FINISHED`, including after `cancelSignIn`. */
   signIn(request: SignInRequest): AsyncIterable<SignInUpdate>
-  /** The app opened the sign-in page again; that page shows a code. */
   signInPageOpened(): void
   submitSignInCode(code: string): void
   cancelSignIn(): void
   listModels(vendorProgram: SignInRequest): Promise<Model[]>
-  /** Lists the driver learned on its own, such as from a session it started. */
   onModelsChanged(listener: (models: Model[]) => void): void
-  /** For one-shots; null when the account can't run them. */
   smallestModel(): Promise<string | null>
   readUsage(): Promise<Usage>
   /**
@@ -254,13 +242,11 @@ export interface ProviderDriver {
 export const HostCommandSchema = z.discriminatedUnion('type', [
   z.strictObject({type: z.literal('reply.start'), request: ReplyRequestSchema}),
   z.strictObject({type: z.literal('reply.stop'), replyId: z.uuid()}),
-  /** `APPROVAL_RESOLVED` follows, unless the Reply already moved on. */
   z.strictObject({
     type: z.literal('approval.answer'),
     approvalId: z.string(),
     answer: ApprovalAnswerSchema,
   }),
-  /** `SESSION_CUT` follows once the driver's `cutSession` has cut. */
   z.strictObject({
     type: z.literal('session.cut'),
     treeId: z.uuid(),
@@ -268,7 +254,6 @@ export const HostCommandSchema = z.discriminatedUnion('type', [
     session: DeletionCutSchema,
     vendorProgram: SignInRequestSchema,
   }),
-  /** `ONE_SHOT_FINISHED` follows with the same `requestId`. */
   z.strictObject({
     type: z.literal('one-shot.run'),
     requestId: z.string().min(1),
@@ -285,7 +270,6 @@ export const HostCommandSchema = z.discriminatedUnion('type', [
   z.strictObject({type: z.literal('sign-in.page-opened')}),
   z.strictObject({type: z.literal('sign-in.code'), code: z.string()}),
   z.strictObject({type: z.literal('sign-in.cancel')}),
-  /** `MODELS_CHANGED` follows once the driver can list them. */
   z.strictObject({
     type: z.literal('models.list'),
     vendorProgram: SignInRequestSchema,

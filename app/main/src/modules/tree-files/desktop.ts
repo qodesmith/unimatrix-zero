@@ -1,4 +1,3 @@
-/** What the computer does with a file: Electron's in the app, a fake in tests. */
 export interface Desktop {
   platform: NodeJS.Platform
   editor: () => string | null

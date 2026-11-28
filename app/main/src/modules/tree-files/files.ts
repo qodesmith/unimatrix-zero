@@ -70,7 +70,6 @@ export function createSnapshotFiles(context: FilesContext) {
       .get()
   }
 
-  /** One folder holds the Tree's files: the newest Reply's, once it ends. */
   function replyOnDisk(treeId: string, replyId: string) {
     const newest = db
       .select({id: replies.id, status: replies.status})
@@ -158,7 +157,6 @@ export function createSnapshotFiles(context: FilesContext) {
     }
   }
 
-  /** A link is written as a file holding the path it points to. */
   async function writeSnapshot(treeId: string, commit: string, target: string) {
     const indexes = path.join(context.tempDir, 'indexes')
     fs.mkdirSync(indexes, {recursive: true, mode: 0o700})

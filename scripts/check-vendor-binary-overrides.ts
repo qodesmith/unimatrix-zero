@@ -16,7 +16,6 @@ const stub = 'file:./tooling/no-vendor-binary'
 interface Watched {
   name: string
   workspace: string
-  /** Regular dependencies checked for native code, or `'any'`. */
   allowed: 'any' | string[]
 }
 

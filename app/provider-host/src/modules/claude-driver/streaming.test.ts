@@ -92,7 +92,6 @@ const OTTER_MESSAGE = OTTER_REPLY.messageId
 const REWOUND_MESSAGE = REWOUND_REPLY.messageId
 const MODEL = 'claude-haiku-5-5'
 
-/** An entry `warmThrice()` repeats, under its new uuid. */
 function again(uuid: string) {
   return `cccccccc${uuid.slice(8)}`
 }
@@ -238,7 +237,6 @@ async function setUp(
     hiddenFolders?: string[]
     treesFolder?: string
     grants?: ApprovalGrant[]
-    /** Each card's answer in turn, or a Stop while it waits. */
     answers?: (ApprovalAnswer | 'stop')[]
   }
 
@@ -252,7 +250,6 @@ async function setUp(
     gitFolder: path.join(configDir, 'git'),
   }
 
-  /** Answers each card in turn, as the user would; past the list, Deny. */
   function answering(replyId: string, answers: ReplyOptions['answers'] = []) {
     const left = [...answers]
 

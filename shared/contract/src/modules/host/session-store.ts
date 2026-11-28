@@ -25,7 +25,6 @@ export const SessionEntrySchema = z.looseObject({
 export type SessionEntry = z.infer<typeof SessionEntrySchema>
 
 export const SessionFileSchema = z.strictObject({
-  /** Relative to the session's own folder, with `/` between parts. */
   path: z.string().min(1),
   base64: z.string(),
 })

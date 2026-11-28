@@ -80,7 +80,6 @@ export type RunFailure = z.infer<typeof RunFailureSchema>
 export const ChangedFileSchema = z.strictObject({
   path: z.string().min(1),
   change: z.enum(['created', 'edited', 'deleted']),
-  /** Bytes; null once deleted. */
   size: z.number().int().nonnegative().nullable(),
 })
 
@@ -141,7 +140,6 @@ export const TextDeltaEvent = z.strictObject({
   delta: z.string(),
 })
 
-/** A re-sent stream: the text so far of the current text part, replaced. */
 export const TextReplaceEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('TEXT_REPLACE'),
@@ -159,7 +157,6 @@ export const ContentCutBackEvent = z.strictObject({
   text: z.string(),
 })
 
-/** Display only: thinking is never stored. */
 export const ReasoningDeltaEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('REASONING_DELTA'),
@@ -199,7 +196,6 @@ export const ApprovalActionSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('edit'),
     paths: z.array(z.string().min(1)).min(1),
-    /** Every path is inside the Tree's files, so the Branch versions it. */
     inTreeFiles: z.boolean(),
   }),
   z.strictObject({
@@ -211,7 +207,6 @@ export const ApprovalActionSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('host'),
     host: z.string().min(1),
-    /** A command inside the Sandbox asks, not a web fetch. */
     fromCommand: z.literal(true).optional(),
   }),
   z.strictObject({
@@ -291,7 +286,6 @@ export const TokensEvent = z.strictObject({
   type: z.literal('TOKENS'),
   inputTokens: tokenCount,
   outputTokens: tokenCount,
-  /** As the Provider reports it, never summed from Turns. */
   contextSize: tokenCount,
   contextWindow: z.number().int().positive().optional(),
 })
@@ -315,7 +309,6 @@ export const SessionRebuiltEvent = z.strictObject({
 export const ReconnectingEvent = z.strictObject({
   ...replyIds,
   type: z.literal('RECONNECTING'),
-  /** The server answered with a 429 or a 529, so the connection is fine. */
   busy: z.boolean(),
 })
 
@@ -324,7 +317,6 @@ export const RunFinishedEvent = z.strictObject({
   type: z.literal('RUN_FINISHED'),
   status: FinishedStatusSchema,
   failure: RunFailureSchema.optional(),
-  /** Claude reports it only at the end; Codex with every usage report. */
   contextWindow: z.number().int().positive().optional(),
 })
 

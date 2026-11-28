@@ -26,7 +26,6 @@ export function removeTurns(tx: Writer, {promptIds, cut}: Removal) {
       .run()
   }
 
-  // The Turns below go by cascade. Their Provider session data stays.
   tx.delete(prompts).where(inArray(prompts.id, promptIds)).run()
 }
 
@@ -138,7 +137,6 @@ export function failedToReplace(
   }
 }
 
-/** A newer deletion below the Reply keeps its own cut. */
 export function clearCutOnReport(
   db: Database,
   provider: ProviderId,
@@ -207,7 +205,6 @@ export function clearCutOnPrompt(
   }
 }
 
-/** Only a cut session drops a Prompt, so the cut is made. */
 export function clearCutOnDrop(db: Database, treeId: string, replyId: string) {
   const prompt = parentOf(db, treeId, replyId)
 

@@ -8,10 +8,8 @@ export const ATTACHMENT_SIZE_LIMIT = 50 * MIB
 
 export const ATTACHMENTS_PER_PROMPT = 100
 
-/** Pixels, on the long side. */
 export const INLINE_IMAGE_PIXELS = 2000
 
-/** A larger image is shrunk before it goes inline. */
 export const INLINE_IMAGE_SIZE_LIMIT = 10 * MIB
 
 export const INLINE_IMAGES_PER_PROMPT_LIMIT = 80 * MIB
@@ -75,9 +73,7 @@ export const AttachmentSchema = z.strictObject({
   id: z.uuid(),
   name: z.string().min(1),
   mediaType: AttachmentMediaTypeSchema,
-  /** Of the copy the app keeps; 0 for a folder, which is never copied. */
   size: z.number().int().nonnegative(),
-  /** Of an image's shrunk inline copy; null if it has none. */
   shrunkSize: z.number().int().positive().nullable(),
   folderPath: z.string().min(1).nullable(),
   /**

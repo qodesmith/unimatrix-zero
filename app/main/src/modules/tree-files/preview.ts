@@ -5,7 +5,6 @@ import path from 'node:path'
 
 export const SAMPLE_BYTES = 8 * 1024
 
-/** Over these, a file isn't previewed; text-like files preview their start. */
 export const PREVIEW_SIZE_LIMIT = {
   image: 64 * MIB,
   audio: 2048 * MIB,
@@ -78,7 +77,6 @@ export function mediaTypeOf(name: string) {
   return MEDIA_TYPES.get(extensionOf(name))?.[1] ?? null
 }
 
-/** `whole` when the sample holds every byte, so none is cut off at its end. */
 function isText(sample: Buffer, whole: boolean) {
   if (sample.includes(0)) return false
 

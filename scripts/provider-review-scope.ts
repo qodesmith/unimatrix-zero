@@ -29,7 +29,6 @@ export function entriesToReview(scope: {
   )
 }
 
-/** A review for every entry, in the list's order. */
 export function reviewsOf(entries: Entry[], reviewed: Review[]): Review[] {
   return entries.map(
     entry =>
