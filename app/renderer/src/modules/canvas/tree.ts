@@ -40,12 +40,10 @@ export function isEmpty(index: TreeIndex) {
   return index.prompts.length === 0
 }
 
-/** The Prompts answering a Reply, oldest first; the root Prompt under null. */
 export function branchesOf(index: TreeIndex, replyId: string | null): Prompt[] {
   return index.promptsByParent.get(replyId) ?? []
 }
 
-/** Every Turn id from the root to a Turn, in order; empty for an unknown Turn. */
 export function pathTo(index: TreeIndex, turnId: string): string[] {
   const path: string[] = []
   let current: string | null = turnId
@@ -71,7 +69,6 @@ export function pathTo(index: TreeIndex, turnId: string): string[] {
   return path
 }
 
-/** The Reply before this one on its Thread. */
 export function previousReply(index: TreeIndex, reply: Reply): Reply | null {
   const parentReplyId =
     index.promptById.get(reply.promptId)?.parentReplyId ?? null
@@ -89,12 +86,10 @@ export function newestReply(index: TreeIndex): Reply | null {
   return index.replies.at(-1) ?? null
 }
 
-/** A Reply itself or a Prompt's Reply; null for a Prompt without one yet. */
 export function replyOf(index: TreeIndex, turnId: string): Reply | null {
   return index.replyById.get(turnId) ?? index.replyByPrompt.get(turnId) ?? null
 }
 
-/** A Prompt's id and the id of every Prompt and Reply below it. */
 export function turnsFrom(index: TreeIndex, promptId: string): string[] {
   const ids: string[] = []
   const prompts = [promptId]
@@ -112,7 +107,6 @@ export function turnsFrom(index: TreeIndex, promptId: string): string[] {
   return ids
 }
 
-/** Every Reply in a Reply's Branches, however deep. */
 export function repliesUnder(index: TreeIndex, replyId: string): Reply[] {
   return branchesOf(index, replyId)
     .flatMap(branch => turnsFrom(index, branch.id))

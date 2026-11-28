@@ -27,7 +27,6 @@ interface ExtractorFile {
   mimeType: string
 }
 
-/** By URL path. */
 export type ExtractorFiles = ReadonlyMap<string, ExtractorFile>
 
 const HEADERS = {

@@ -32,7 +32,6 @@ const debugPort = worktreePort(9222, 1000)
 const fakeProvider = process.argv.includes('--fake')
 const supervised = process.argv.includes('--supervised')
 
-// A fake connection saved in the real data would pass for a real one.
 const dataFolder = devDataFolderName(root, fakeProvider)
 
 const scriptNonce = randomBytes(16).toString('base64')

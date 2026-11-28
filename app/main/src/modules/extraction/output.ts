@@ -13,7 +13,6 @@ import {jpegSize} from './jpeg'
 
 type ReadOutput = Extract<ExtractorOutput, {type: 'read'}>
 
-/** Output that passed every check; anything else is a failure. */
 export type ExtractionResult =
   | (Omit<ReadOutput, 'text'> & {text: string})
   | Extract<ExtractorOutput, {type: 'unsupported'}>
@@ -81,17 +80,13 @@ function validRead(output: ReadOutput, input: Uint8Array): ExtractionResult {
       }
 }
 
-/** Only a zip or a notebook can be a file of none of the formats. */
 function mayBeUnsupported(input: Uint8Array) {
   const candidate = extractionCandidate(input)
 
   return candidate === 'zip' || candidate === 'ipynb'
 }
 
-/**
- * The window is hostile: anything off in its output discards all of it.
- * `input` is the file the job was given.
- */
+/** The window is hostile: anything off in its output discards all of it. */
 export function validateOutput(
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the window's message: ExtractorOutputSchema parses it below
   data: unknown,

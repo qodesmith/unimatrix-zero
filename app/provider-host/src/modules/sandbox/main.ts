@@ -20,7 +20,6 @@ export function packageCaches(home: string) {
     ['.yarn', 'berry'],
     ['.cargo', 'registry'],
     ['.cargo', 'git'],
-    // The OS cache folder, which holds pip's, Yarn 1's and pnpm's too.
     ['Library', 'Caches'],
   ].map(parts => path.join(home, ...parts))
 }

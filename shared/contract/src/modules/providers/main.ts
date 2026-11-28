@@ -9,7 +9,6 @@ export const PROVIDER_NAMES: Record<ProviderId, string> = {
   chatgpt: 'ChatGPT',
 }
 
-/** The UI branches on these, never on the Provider. */
 export const CapabilitiesSchema = z.strictObject({
   pdfAttachments: z.boolean(),
   skillScriptsInPlainTrees: z.boolean(),
@@ -23,23 +22,13 @@ export type Capabilities = z.infer<typeof CapabilitiesSchema>
 export const ModelSchema = z.strictObject({
   id: z.string().min(1),
   name: z.string().min(1),
-  /** The Provider's current default; at most one in a list. */
   isDefault: z.boolean(),
-  /**
-   * The Model an alias or the Provider's default names now, when that isn't
-   * `id`: what a Prompt picked on it sends and its Reply records.
-   */
   resolvesTo: z.string().min(1).nullable(),
-  /** The vendor program is too old for it, so the picker shows it disabled. */
   needsAppUpdate: z.boolean(),
 })
 
 export type Model = z.infer<typeof ModelSchema>
 
-/**
- * A Reply records the id it was written on, which may be a `resolvesTo`; the
- * default resolves to another entry's Model too, which names it better.
- */
 export function findModel(models: Model[], id: string) {
   const resolved = models.filter(model => model.resolvesTo === id)
 
@@ -102,7 +91,6 @@ export const UsageSchema = z.strictObject({
 
 export type Usage = z.infer<typeof UsageSchema>
 
-/** `account` is set once connected; the other statuses are its host's. */
 export const ProviderStatusSchema = z.strictObject({
   provider: ProviderIdSchema,
   status: z.enum([
@@ -144,9 +132,7 @@ export const ModelsChangedEvent = z.strictObject({
 export const SignInStepUpdate = z.strictObject({
   type: z.literal('SIGN_IN_STEP'),
   step: z.enum(['get-ready', 'sign-in-page', 'paste-code', 'check-plan']),
-  /** The Provider's sign-in page, from `sign-in-page` on. */
   url: z.url().optional(),
-  /** The vendor program's download, during `get-ready`. */
   progress: z
     .strictObject({
       receivedBytes: z.int().min(0),

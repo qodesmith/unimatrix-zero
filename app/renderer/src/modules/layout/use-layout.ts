@@ -19,7 +19,6 @@ export function useLayout(): Layout {
   return useSelector(useLayoutStore(), state => state)
 }
 
-/** Shows the change at once; main's answer or refusal settles it. */
 export function useUpdateLayout() {
   const store = useLayoutStore()
 

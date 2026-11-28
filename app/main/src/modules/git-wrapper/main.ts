@@ -12,18 +12,13 @@ const NOT_READY =
 const NO_LIBCURL =
   "git: if this needed an https:// address, it can't work on this computer, which lacks the libcurl.so.4 library."
 
-/**
- * Needs `$program` and `$tool` set. Its folders and no-login settings stay in
- * this call, never in what else the AI runs (ADR 0024, ADR 0027).
- */
+/** Needs `$program` and `$tool` set. */
 export function runningBuild(gitProgram: string) {
   const root = path.join(path.dirname(gitProgram), '..')
   const subPrograms = quoted(path.join(root, 'libexec', 'git-core'))
 
-  // An empty `GIT_ASKPASS` blocks `core.askPass` and `SSH_ASKPASS` for `git`'s
-  // own prompts; `GIT_TERMINAL_PROMPT=0` does not. `ssh` reads neither, so
-  // `SSH_ASKPASS_REQUIRE=never` keeps its window shut. The text ends
-  // mid-command, on a `\`, so the line after it must run `"$program"`.
+  // An empty `GIT_ASKPASS` blocks `core.askPass` too; `GIT_TERMINAL_PROMPT=0`
+  // does not. The text ends on a `\`, so the next line must run `"$program"`.
   const beforeProgram = `if [ ! -x "$program" ]; then
   echo "$tool: ${NOT_READY}" >&2
   exit 127
@@ -43,10 +38,6 @@ GIT_CONFIG_SYSTEM=${quoted(path.join(root, 'etc', 'gitconfig'))} \\`
     subPrograms,
     lines: `${beforeProgram}
 exec "$program" "$@"`,
-    /**
-     * Only `git-remote-http` needs `libcurl.so.4`, so the rest of `git` runs
-     * without it (ADR 0026).
-     */
     linesTellingNoLibcurl: `${beforeProgram}
 "$program" "$@"
 code=$?
@@ -68,10 +59,7 @@ export function writeScript(file: string, script: string) {
   fs.renameSync(writing, file)
 }
 
-/**
- * One folder per target, named as `scripts/build-git-exe.ts` writes them (ADR
- * 0028).
- */
+/** Folder names match what `scripts/build-git-exe.ts` writes. */
 export function shippedGitExe(builds: string, arch: string) {
   return path.join(builds, `win32-${arch}`, 'git.exe')
 }
@@ -119,7 +107,7 @@ export function writeWindowsGitWrapper(
   }
 }
 
-/** Linux's: a Mac runs the developer folder's script instead (ADR 0025). */
+/** Linux's: a Mac runs the developer folder's script instead. */
 export function writeGitWrapper(folder: string, gitProgram: string) {
   writeScript(
     path.join(folder, 'git'),

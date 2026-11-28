@@ -17,7 +17,6 @@ export function devDataFolderName(root: string, fake: boolean) {
   return `${DEV_FOLDER_PREFIX}${checkoutHash(root)}${fake ? '-fake' : ''}`
 }
 
-/** Electron's `appData`, where the shell puts the dev data folder. */
 export function appData() {
   if (process.platform === 'darwin') {
     return path.join(os.homedir(), 'Library', 'Application Support')
@@ -35,8 +34,8 @@ export function devUserData(root: string) {
 }
 
 /**
- * `claude` names its Keychain item after a hash of a non-default config folder.
- * The Keychain is macOS-only, so the path joins POSIX-style everywhere.
+ * `claude` names its Keychain item after a hash of a non-default config folder;
+ * the path joins POSIX-style everywhere.
  */
 function claudeKeychainOf(appDataPath: string, folder: string) {
   const configDir = path.posix.join(appDataPath, folder, 'providers', 'claude')

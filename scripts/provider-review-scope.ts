@@ -5,12 +5,6 @@ import {isDeepStrictEqual} from 'node:util'
 
 import {entriesOf} from './provider-dependencies.ts'
 
-/**
- * A moved pin puts every entry up for review, since any vendor behavior may
- * have changed. With no pin moved, only the entries whose id is new or whose
- * fields differ from the base list's: the text above the entries states no
- * vendor behavior, so a change to it alone puts none up.
- */
 export function entriesToReview(scope: {
   pinMoved: boolean
   baseList: string
@@ -29,7 +23,6 @@ export function entriesToReview(scope: {
   )
 }
 
-/** A review for every entry, in the list's order. */
 export function reviewsOf(entries: Entry[], reviewed: Review[]): Review[] {
   return entries.map(
     entry =>

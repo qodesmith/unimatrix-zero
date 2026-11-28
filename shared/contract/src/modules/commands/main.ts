@@ -49,7 +49,6 @@ export const TreeListResult = z.strictObject({
   trees: z.array(TreeSchema),
 })
 
-/** Opening a Tree shows its failures, so it no longer has an unseen one. */
 export const TreeOpenCommand = z.strictObject({
   type: z.literal('tree.open'),
   treeId: z.uuid(),
@@ -61,20 +60,17 @@ export const TreeRenameCommand = z.strictObject({
   title: z.string().trim().min(1).max(TREE_TITLE_MAX_LENGTH),
 })
 
-/** For good, once its streaming Replies stop. */
 export const TreeDeleteCommand = z.strictObject({
   type: z.literal('tree.delete'),
   treeId: z.uuid(),
 })
 
-/** From the Tree's next Reply; `TREE_CHANGED` follows. */
 export const TreeSetSystemPromptCommand = z.strictObject({
   type: z.literal('tree.set-system-prompt'),
   treeId: z.uuid(),
   text: SystemPromptTextSchema,
 })
 
-/** From the Tree's next Reply; `TREE_CHANGED` follows. */
 export const TreeSetToolsCommand = z.strictObject({
   type: z.literal('tree.set-tools'),
   treeId: z.uuid(),
@@ -101,9 +97,7 @@ export const PromptSendCommand = z
     treeId: z.uuid(),
     parentReplyId: z.uuid().nullable(),
     text: z.string().trim(),
-    /** From `attachment.add`, in the order the Prompt shows them. */
     attachmentIds: z.array(z.uuid()).max(ATTACHMENTS_PER_PROMPT).optional(),
-    /** As the Input's picker shows it; main never swaps it for another. */
     model: ModelChoiceSchema,
   })
   .refine(
@@ -121,11 +115,9 @@ export type TurnIds = z.infer<typeof TurnIdsSchema>
 export const PromptSendResult = z.strictObject({
   prompt: PromptSchema,
   reply: ReplySchema,
-  /** The failed Turns the new Prompt replaced, with every Turn below them. */
   removed: TurnIdsSchema,
 })
 
-/** The Prompt and every Turn below it, for good; refused while one streams. */
 export const PromptDeleteCommand = z.strictObject({
   type: z.literal('prompt.delete'),
   treeId: z.uuid(),
@@ -134,14 +126,12 @@ export const PromptDeleteCommand = z.strictObject({
 
 export const PromptDeleteResult = TurnIdsSchema
 
-/** Keeps the text so far; `RUN_FINISHED` follows once the Provider lets go. */
 export const ReplyStopCommand = z.strictObject({
   type: z.literal('reply.stop'),
   treeId: z.uuid(),
   replyId: z.uuid(),
 })
 
-/** Always allow also keeps the grant for the Tree's later Replies. */
 export const ReplyAnswerApprovalCommand = z.strictObject({
   type: z.literal('reply.answer-approval'),
   treeId: z.uuid(),
@@ -150,7 +140,6 @@ export const ReplyAnswerApprovalCommand = z.strictObject({
   answer: ApprovalAnswerSchema,
 })
 
-/** In place: the Reply streams afresh in the session rewound to before it. */
 export const ReplyRetryCommand = z.strictObject({
   type: z.literal('reply.retry'),
   treeId: z.uuid(),
@@ -161,7 +150,6 @@ export const ReplyRetryResult = z.strictObject({
   reply: ReplySchema,
 })
 
-/** `SIGN_IN_STEP` and `SIGN_IN_FINISHED` follow. */
 export const ProviderConnectCommand = z.strictObject({
   type: z.literal('provider.connect'),
   provider: ProviderIdSchema,
@@ -183,7 +171,6 @@ export const SignInCancelCommand = z.strictObject({
   provider: ProviderIdSchema,
 })
 
-/** Fetched without cookies or a referrer; answered with a `data:` URL. */
 export const ImageLoadCommand = z.strictObject({
   type: z.literal('image.load'),
   url: z.url({protocol: /^https?$/u}),
@@ -194,8 +181,8 @@ export const ImageLoadResult = z.strictObject({
 })
 
 /**
- * A dropped or picked file comes by the id `registerDroppedFile` gave it; a
- * pasted one, with no path, by its bytes. A folder is kept as its path alone.
+ * A pasted file, with no path, comes by its bytes; a folder is kept as its path
+ * alone.
  */
 export const AttachmentAddCommand = z.strictObject({
   type: z.literal('attachment.add'),
@@ -209,7 +196,6 @@ export const AttachmentAddCommand = z.strictObject({
         .refine(bytes => bytes.byteLength <= ATTACHMENT_SIZE_LIMIT),
     }),
   ]),
-  /** The window's shrunk copy of a too-large image, sent inline instead. */
   shrunk: z
     .instanceof(Uint8Array)
     .refine(bytes => bytes.byteLength <= INLINE_IMAGE_SIZE_LIMIT)
@@ -220,18 +206,15 @@ export const AttachmentAddResult = z.strictObject({
   attachment: AttachmentSchema,
 })
 
-/** `SNAPSHOTS_DOWNLOADED` or `SNAPSHOTS_DOWNLOAD_FAILED` follows. */
 export const SnapshotsDownloadAgainCommand = z.strictObject({
   type: z.literal('snapshots.download-again'),
 })
 
-/** `SETTINGS_CHANGED` follows with every Setting. */
 export const SettingsUpdateCommand = z.strictObject({
   type: z.literal('settings.update'),
   changes: SettingsUpdateSchema,
 })
 
-/** One of the user's own; `SYSTEM_PROMPTS_CHANGED` follows. */
 export const SystemPromptCreateCommand = z.strictObject({
   type: z.literal('system-prompt.create'),
   name: SystemPromptNameSchema,
@@ -252,10 +235,6 @@ export const SystemPromptDeleteCommand = z.strictObject({
   id: SystemPromptEntryIdSchema,
 })
 
-/**
- * The Snapshot of the Reply, or the nearest one above it while it has none
- * yet, with the files the Reply deleted.
- */
 export const TreeFilesListCommand = z.strictObject({
   type: z.literal('tree-files.list'),
   treeId: z.uuid(),
@@ -264,11 +243,9 @@ export const TreeFilesListCommand = z.strictObject({
 
 export const TreeFilesListResult = z.strictObject({
   files: z.array(TreeFileSchema),
-  /** The Tree's folder holds this Snapshot: Open and Reveal act on it there. */
   onDisk: z.boolean(),
 })
 
-/** Every file of the Reply's Snapshot into an empty folder the user picks. */
 export const TreeFilesSaveCopyCommand = z.strictObject({
   type: z.literal('tree-files.save-copy'),
   treeId: z.uuid(),
@@ -276,7 +253,6 @@ export const TreeFilesSaveCopyCommand = z.strictObject({
 })
 
 export const SavedResult = z.strictObject({
-  /** False when the user canceled the dialog. */
   saved: z.boolean(),
 })
 
@@ -295,9 +271,8 @@ const TreeFileOpenWithSchema = z.enum([
 export type TreeFileOpenWith = z.infer<typeof TreeFileOpenWithSchema>
 
 /**
- * In the Tree's folder when `onDisk`, else a read-only copy of this Snapshot's
- * file. `default-app` is refused for a file `notOpened`, and `browser` for a
- * program or a file that isn't HTML.
+ * `default-app` is refused for a file `notOpened`, and `browser` for a program
+ * or a file that isn't HTML.
  */
 export const TreeFileOpenCommand = z.strictObject({
   type: z.literal('tree-file.open'),
@@ -305,7 +280,6 @@ export const TreeFileOpenCommand = z.strictObject({
   with: TreeFileOpenWithSchema,
 })
 
-/** Only when `onDisk`. */
 export const TreeFileRevealCommand = z.strictObject({
   type: z.literal('tree-file.reveal'),
   fileId: TreeFileIdSchema,
@@ -316,7 +290,6 @@ export const TreeFileSaveCopyCommand = z.strictObject({
   fileId: TreeFileIdSchema,
 })
 
-/** The OS's thumbnail, on macOS only; null where there is none. */
 export const TreeFileThumbnailCommand = z.strictObject({
   type: z.literal('tree-file.thumbnail'),
   fileId: TreeFileIdSchema,
@@ -326,7 +299,6 @@ export const TreeFileThumbnailResult = z.strictObject({
   dataUrl: z.string().startsWith('data:image/').nullable(),
 })
 
-/** `LAYOUT_CHANGED` follows with the whole Layout. */
 export const LayoutUpdateCommand = z.strictObject({
   type: z.literal('layout.update'),
   changes: LayoutUpdateSchema,

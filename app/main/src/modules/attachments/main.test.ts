@@ -252,7 +252,6 @@ describe('adding a file', () => {
     expect(fs.readFileSync(kept, 'utf8')).toBe('abc')
   })
 
-  // Windows has no owner-only mode to read back.
   it.skipIf(process.platform === 'win32')(
     'keeps the copy readable by its owner alone',
     async () => {
@@ -415,7 +414,6 @@ describe('checking the copies of Prompts’ files', () => {
     ])
   })
 
-  // Windows has no owner-only mode to take away.
   it.skipIf(process.platform === 'win32')(
     'marks a file whose copy its owner can’t read missing',
     async () => {
@@ -481,7 +479,6 @@ describe('an Extraction', () => {
     expect(fs.readdirSync(path.join(dir, 'extractions'))).toEqual([PDF_SHA256])
   })
 
-  // Windows has no owner-only mode to read back.
   it.skipIf(process.platform === 'win32')(
     'is readable by its owner alone',
     async () => {

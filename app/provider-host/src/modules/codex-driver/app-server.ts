@@ -56,17 +56,14 @@ type Outgoing =
   | {id: RequestId; error: {code: number; message: string}}
   | {id: RequestId; result: ApprovalResult}
 
-/** True when it takes the request, and so answers it with `respond`. */
 type ApprovalListener = (request: ApprovalRequest) => boolean
 
-/** `codex app-server` over stdio: an object per line, no `jsonrpc` field. */
 export interface AppServer {
   request<M extends Method>(
     method: M,
     params: ParamsOf<M>
   ): Promise<ResponseOf<M>>
   listen(listener: (notification: Notification) => void): () => void
-  /** A request no listener takes is refused. */
   takeApprovals(listener: ApprovalListener): () => void
   respond(id: RequestId, result: ApprovalResult): void
   readonly exited: Promise<void>
@@ -140,7 +137,6 @@ export async function startAppServer(
         return
       }
 
-      // Nothing else the app turns on asks the app anything.
       write({
         id: asked.data.id,
         error: {code: -32_601, message: 'Unimatrix Zero can’t answer this.'},

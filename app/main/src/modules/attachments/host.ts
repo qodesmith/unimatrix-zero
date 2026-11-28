@@ -39,7 +39,6 @@ function inlineImage(dir: string, row: AttachmentRow, original: string) {
   }
 }
 
-/** None for a PDF that goes inline: the Model reads it whole. */
 function extractedFiles(
   dir: string,
   row: AttachmentRow,

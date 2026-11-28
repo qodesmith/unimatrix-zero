@@ -15,7 +15,6 @@ const USER_SECTION = [
   'Don’t promise to do something yourself once the user signs in elsewhere, such as in GitHub Desktop: the git you run may not see that sign-in.',
 ].join('\n\n')
 
-/** What a Provider is sent as the System prompt: the user's, then the app's. */
 export function withAppSections(systemPrompt: string, treeFolder: string) {
   const sections = `${filesSection(treeFolder)}\n\n${USER_SECTION}`
 

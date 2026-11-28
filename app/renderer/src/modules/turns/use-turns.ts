@@ -21,10 +21,6 @@ export function useTurns(treeId: string) {
 
 export type SendOutcome = {ok: true; reply: Reply} | {ok: false; error: string}
 
-/**
- * Sends the root Prompt when `parentReplyId` is null. The saved Turns are
- * fetched again in case the Reply finished before the send returned.
- */
 export function useSendPrompt(treeId: string, parentReplyId: string | null) {
   const queryClient = useQueryClient()
 
@@ -53,7 +49,6 @@ export function useSendPrompt(treeId: string, parentReplyId: string | null) {
 
 export type DeleteOutcome = {ok: true} | {ok: false; error: string}
 
-/** Refetches either way, since a refusal can mean the saved Turns are stale. */
 export function useDeletePrompt(treeId: string) {
   const queryClient = useQueryClient()
 

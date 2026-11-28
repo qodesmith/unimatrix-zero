@@ -16,10 +16,7 @@ interface WindowOptions {
   packaged: boolean
 }
 
-/**
- * What every window of the app sets, the hidden extraction window too:
- * explicit values, never Electron's defaults (ADR 0014).
- */
+/** Explicit values, never Electron's defaults, for every window (ADR 0014). */
 export const LOCKED_DOWN_PREFERENCES = {
   contextIsolation: true,
   sandbox: true,
@@ -85,10 +82,7 @@ function lockNavigation(contents: WebContents, appUrl: string) {
   contents.on('will-attach-webview', event => event.preventDefault())
 }
 
-/**
- * Stops WebRTC's UDP; its TCP still goes direct without `hardenSession`'s
- * proxy.
- */
+/** Stops WebRTC's UDP; its TCP needs `hardenSession`'s proxy. */
 export function lockWebRtc(contents: WebContents) {
   contents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp')
 }
@@ -113,9 +107,8 @@ export function openLink(url: string) {
  * download: `uzfile://` serves a file it doesn't preview as one.
  */
 export function hardenSession(session: Session, allowedOrigins: string[]) {
-  // Neither the CSP nor the request filter covers WebRTC: with `lockWebRtc` it
-  // may send only through this proxy, on a closed port. Chromium never proxies
-  // loopback, so Vite's HMR socket still connects (ADR 0014).
+  // The CSP and request filter don't cover WebRTC; this closed-port proxy does.
+  // Chromium never proxies loopback, so Vite's HMR socket still connects.
   void session.setProxy({
     mode: 'fixed_servers',
     proxyRules: 'http://127.0.0.1:9',

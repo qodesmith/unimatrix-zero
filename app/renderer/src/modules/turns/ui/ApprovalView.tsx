@@ -24,7 +24,6 @@ import {useState} from 'react'
 
 import {useSubagentDescription} from '../use-live-reply'
 
-/** Only an edit inside the Tree's files is versioned with the Branch. */
 function landsOutsideTree(action: ApprovalAction) {
   return !(action.kind === 'edit' && action.inTreeFiles)
 }
@@ -43,7 +42,6 @@ function listed(names: string[]) {
   return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
 }
 
-/** An edit inside the Tree's files names the file; one elsewhere, its path. */
 function whatItDoes(action: ApprovalAction) {
   switch (action.kind) {
     case 'edit':
@@ -251,7 +249,6 @@ function ReviewView({review}: {review: ReviewItem}) {
   return <ReviewChip action={review.action} decision={review.decision} />
 }
 
-/** An approval card, its chip once answered, or the Reviewer's decision. */
 export function ApprovalView({
   treeId,
   replyId,

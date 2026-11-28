@@ -56,7 +56,6 @@ function toReply(row: ReplyRow, compacted: boolean): Reply {
     failure: FailureSchema.parse(row.failure ?? null),
     compacted,
     rebuilt: row.rebuilt,
-    // Read from its Snapshot, which only the Tree's files module can do.
     files: [],
     createdAt: row.createdAt.toISOString(),
   }
@@ -142,7 +141,6 @@ export function startedUnder(
   return row?.systemPromptId ?? null
 }
 
-/** What the Tree's next Reply runs under. */
 export function treeSystemPrompt(db: Database, treeId: string) {
   const row = db
     .select({id: systemPrompts.id, text: systemPrompts.text})
@@ -201,7 +199,6 @@ export interface NewExchange {
   treeId: string
   parentReplyId: string | null
   text: string
-  /** In the order the Prompt shows them. */
   attachmentIds: string[]
   provider: ProviderId
   model: string

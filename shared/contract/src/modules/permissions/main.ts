@@ -4,12 +4,10 @@ import {z} from 'zod'
 
 export type {ApprovalAction} from '#modules/turns/main'
 
-/** Full access asks nothing; Supervised brings an approval card. */
 export const PermissionModeSchema = z.enum(['full-access', 'supervised'])
 
 export type PermissionMode = z.infer<typeof PermissionModeSchema>
 
-/** One "Always allow in this Tree", for every Branch of the Tree. */
 export const ApprovalGrantSchema = z.discriminatedUnion('kind', [
   z.strictObject({kind: z.literal('edits-in-tree')}),
   z.strictObject({kind: z.literal('edit'), path: z.string().min(1)}),
@@ -30,7 +28,6 @@ export const ApprovalGrantSchema = z.discriminatedUnion('kind', [
 
 export type ApprovalGrant = z.infer<typeof ApprovalGrantSchema>
 
-/** What "Always allow in this Tree" on this action grants. */
 export function grantsFor(action: ApprovalAction): ApprovalGrant[] {
   switch (action.kind) {
     case 'edit':
@@ -60,7 +57,6 @@ export function sameGrant(a: ApprovalGrant, b: ApprovalGrant) {
   return JSON.stringify(a) === JSON.stringify(b)
 }
 
-/** Without the ones already there. */
 export function withGrants(
   grants: ApprovalGrant[],
   added: ApprovalGrant[]

@@ -1,6 +1,5 @@
 /**
- * The contract's `EXTRACTION_PORT_MESSAGE`, copied: importing the contract
- * would put a chunk the app's preload shares into this one, and a sandboxed
- * preload can't `require` a chunk.
+ * The contract's `EXTRACTION_PORT_MESSAGE`, copied: a sandboxed preload can't
+ * `require` a shared chunk.
  */
 export const EXTRACTION_PORT_MESSAGE = 'uz:extraction-port'

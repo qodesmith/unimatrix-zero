@@ -71,8 +71,8 @@ async function unpackInPlace(
 }
 
 /**
- * The download goes beside `path` and is moved or unpacked into place only once
- * its size and hash match; anything else throws and leaves nothing behind.
+ * Moved or unpacked into place only once its size and hash match; anything else
+ * throws and leaves nothing behind.
  */
 export async function* getProgramReady(
   target: ProgramTarget,

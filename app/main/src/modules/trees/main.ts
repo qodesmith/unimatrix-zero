@@ -128,7 +128,6 @@ export function createTrees(db: Database) {
       )
     },
 
-    /** From its next Reply on; earlier Replies keep what they ran under. */
     setSystemPrompt(id: string, text: string): Tree | null {
       if (!get(id)) return null
 

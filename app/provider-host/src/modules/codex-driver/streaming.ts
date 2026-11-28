@@ -59,7 +59,6 @@ function resumable(request: ReplyRequest) {
   return request.systemPromptChanged ? null : request.session
 }
 
-/** ChatGPT's Replies through one `codex app-server` that every Thread shares. */
 export function createCodexReplies(deps: CodexRepliesDeps) {
   let current: Running | null = null
   let starting: Promise<Running> | null = null
@@ -177,7 +176,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     const {configDir} = request.vendorProgram
     const settings = settingsOf(request, deps.platform)
 
-    // A resume or fork that brings no `config` keeps the thread's old one.
     const config = configOf(request, deps.platform)
 
     const {sessionId: id, messageId, type} = session
@@ -265,7 +263,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     return loadThread(running.threads, opened, thread.turns, config)
   }
 
-  /** Saves the reverted rollout, so a later resume lacks what it dropped. */
   async function cutThread(
     {session, vendorProgram}: CutRequest,
     before: Promise<unknown> | undefined
@@ -349,7 +346,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     let unstoppable: (() => void) | null = null
 
     try {
-      // A thread loaded on another Model switches to this one from here on.
       const started = await server.request('turn/start', {
         threadId: thread.id,
         input,
@@ -364,7 +360,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       const turnId = started.turn.id
       thread.turns.push(turnId)
 
-      // Codex has the turn on disk by now; a Retry reverts before it.
       yield {
         ...ids,
         type: 'PROMPT_RECORDED',
@@ -406,7 +401,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
 
         if (finished.status === 'failed') return {finished}
 
-        // A stopped turn stays in the thread as a completed one does.
         const {configDir} = request.vendorProgram
         const files = await readRollouts(server, configDir, thread.id)
         await deps.store.saveFiles(folderOf(thread.id), files)

@@ -25,7 +25,6 @@ export function isLiveTest(file: string) {
   return LIVE_TEST.test(file)
 }
 
-/** A PR that changes one of these needs a re-record, as a bump PR does. */
 export function gatedFiles(files: string[]) {
   return files.filter(
     file => isRecording(file) || isLiveTest(file) || RECORDER.test(file)
@@ -100,7 +99,6 @@ const PullFiles = z.array(
   })
 )
 
-/** GitHub lists at most 3,000 of a PR's files, which is plenty here. */
 export async function changedFilesOf(api: GitHubApi, repo: string, pr: number) {
   const files: string[] = []
 
@@ -122,7 +120,6 @@ export async function changedFilesOf(api: GitHubApi, repo: string, pr: number) {
   }
 }
 
-/** Why CI's gate holds a PR, which is when either list has something. */
 export async function gatedChangesOf(
   api: GitHubApi,
   repo: string,
@@ -136,7 +133,6 @@ export async function gatedChangesOf(
   return {pinChanges, files: gatedFiles(changed)}
 }
 
-/** Every file in the checkout at `root` that git doesn't ignore. */
 export async function filesIn(root: string) {
   const {stdout} = await promisify(execFile)(
     'git',
@@ -147,7 +143,6 @@ export async function filesIn(root: string) {
   return stdout.split('\n').filter(Boolean)
 }
 
-/** The recordings last written before `since`, a run's start in ms. */
 export function unrewritten(
   recordings: {file: string; modified: number}[],
   since: number

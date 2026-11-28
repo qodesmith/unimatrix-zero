@@ -121,7 +121,6 @@ function PageNote({provider, step, openPage}: StepDetailProps) {
   )
 }
 
-/** Without a link while a new page replaces one whose code was refused. */
 function PasteCode({provider, step, openPage, submitCode}: StepDetailProps) {
   const urlId = useId()
 

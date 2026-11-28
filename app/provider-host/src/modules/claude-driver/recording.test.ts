@@ -16,7 +16,6 @@ it('holds no email, home folder, temp folder or account id but the stand-ins in 
       '/Users/sam',
       '-Users-sam',
       '00000000-0000-4000-8000-000000000000',
-      // Claude Code's commit attribution, which every session carries.
       'noreply@anthropic.com',
     ])
   ).toEqual([])
@@ -26,7 +25,6 @@ it('writes nothing for a claude that exits after a newer recorder claimed its fi
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-recorder-'))
   const file = path.join(folder, 'retried.ndjson')
 
-  // Stands in for `claude`: prints a version, and exits once its input ends.
   const standIn = {
     command: process.execPath,
     args: ['-e', 'process.stdin.resume()'],

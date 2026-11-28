@@ -55,12 +55,10 @@ function unfoldedOver(index: TreeIndex, replyId: string) {
 
 interface EmptyTreeProps {
   treeId: string
-  /** The Input's place on the canvas and its width as a share of a Turn's. */
   onPlaced: (at: Viewport) => void
   onSent: (replyId: string) => void
 }
 
-/** One centered Input, a Turn wide, so the root Prompt can take its place. */
 function EmptyTree({treeId, onPlaced, onSent}: EmptyTreeProps) {
   const pane = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)

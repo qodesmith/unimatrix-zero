@@ -8,13 +8,11 @@ import {initialPromptSend, promptSendTransition} from './machine'
 
 interface Submission {
   text: string
-  /** In the order the Prompt shows them. */
   attachmentIds: readonly string[]
   model: ModelChoice
   onSent: (replyId: string) => void
 }
 
-/** One send at a time: a submit while another is in flight does nothing. */
 export function usePromptSend(treeId: string, parentReplyId: string | null) {
   const sendPrompt = useSendPrompt(treeId, parentReplyId)
 

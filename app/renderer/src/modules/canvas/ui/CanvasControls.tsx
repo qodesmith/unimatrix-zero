@@ -16,9 +16,7 @@ import {TooltipButton} from './TooltipButton'
 interface CanvasControlsProps {
   orientation: CanvasOrientation
   onOrientation: (orientation: CanvasOrientation) => void
-  /** Oldest first. */
   streaming: string[]
-  /** Oldest first. */
   failed: string[]
   onJump: (replyId: string) => void
   onZoomToActive: (() => void) | null

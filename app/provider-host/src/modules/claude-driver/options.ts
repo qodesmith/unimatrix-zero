@@ -31,7 +31,6 @@ function toolsOn(platform: NodeJS.Platform, tools: TreeTools) {
   ]
 }
 
-/** Nothing for a default, so `claude` compacts where it would on its own. */
 function claudeSettingsOf({auto, threshold}: CompactionSettings) {
   return {
     ...(auto ? {} : {autoCompactEnabled: false}),
@@ -60,7 +59,6 @@ export function replyOptions(
     },
     ...(sandbox && {sandbox}),
     tools: toolsOn(platform, request.tools),
-    // The app can't show Subagents yet.
     disallowedTools: ['Agent'],
     ...permissionOptions(request, asking),
     // On, `claude` loads no MCP servers but these, so the account's connectors stay out.

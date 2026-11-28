@@ -5,7 +5,6 @@ import type {Viewport} from '@xyflow/react'
 import {useReactFlow, useStore} from '@xyflow/react'
 import {useCallback, useLayoutEffect, useRef} from 'react'
 
-/** The room kept between a followed Reply's box and the canvas's edge, in px. */
 const MARGIN = 24
 
 interface Span {
@@ -26,7 +25,6 @@ function shiftInto({start, end}: Span, length: number) {
 
 interface Followed {
   replyId: string
-  /** False while the user has panned its bottom off the canvas. */
   pinned: boolean
 }
 
@@ -131,7 +129,6 @@ export function useFollow({
     followed.current = null
   }, [])
 
-  /** As a pan does: panning the Reply's bottom back follows it again. */
   const letGo = useCallback(() => {
     if (followed.current)
       followed.current = {...followed.current, pinned: false}

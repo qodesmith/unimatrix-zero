@@ -2,7 +2,6 @@ import type {MachineEvent, MachineState} from '@uz/contract/state-machine'
 
 import {useReducer} from 'react'
 
-/** Runs a machine from `machine()` in this component. */
 export function useStateMachine<
   S extends MachineState,
   E extends MachineEvent,

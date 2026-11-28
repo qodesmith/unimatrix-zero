@@ -136,7 +136,6 @@ interface TarEntry {
   name: string
   body?: string
   mode?: number
-  /** `0` a file, `5` a folder, `x` a pax header, `2` a symbolic link. */
   type?: string
   link?: string
 }

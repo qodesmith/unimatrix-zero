@@ -20,7 +20,6 @@ type CodexTurn = Extract<
   {method: 'turn/completed'}
 >['params']['turn']
 
-/** A malformed tool item reads as some other item, as an unknown one does. */
 function toolItemOf(item: Item): ToolItem | null {
   const tool = ToolItemSchema.safeParse(item)
 
@@ -147,7 +146,6 @@ export function createReplyMapper(ids: ReplyIds) {
 
     message.done = true
 
-    // A later message started and dropped this one, so its finish changes nothing.
     if (message.text === text || last !== itemId) return []
 
     message.text = text
@@ -156,7 +154,6 @@ export function createReplyMapper(ids: ReplyIds) {
     return [{...ids, type: 'TEXT_REPLACE', text: shown}]
   }
 
-  /** A message cut short before a tool call stays as it is. */
   function startToolCall(item: ToolItem): ContentEvent[] {
     toolCalls.add(item.id)
     shown = ''
@@ -298,7 +295,6 @@ export function createReplyMapper(ids: ReplyIds) {
       ]
     },
 
-    /** `resetsAt` is in seconds since the epoch. */
     finished(turn: CodexTurn, resetsAt?: number): RunFinished {
       if (turn.status === 'completed') {
         return {...ids, type: 'RUN_FINISHED', status: 'complete'}

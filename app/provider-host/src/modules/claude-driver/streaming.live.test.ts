@@ -1,8 +1,4 @@
-/**
- * Needs a real plan and the env `bun run provider-checks` sets. With
- * `UZ_RECORD=yes`, each `[records]` test rewrites its files in `recordings/`,
- * which the driver tests replay.
- */
+/** Needs a real plan and the env `bun run provider-checks` sets. */
 import type {Query} from '@anthropic-ai/claude-agent-sdk'
 import type {
   ProviderDriver,
@@ -276,7 +272,6 @@ function liveDriver(
     setEnv(env: Record<string, string>) {
       addedEnv = env
     },
-    /** For each `claude` started from here on, even ones the driver sets. */
     dropEnv(names: string[]) {
       droppedEnv = names
     },
@@ -338,7 +333,6 @@ function approvalsIn(events: Streamed[]) {
   )
 }
 
-/** Answers each card in turn while the Reply waits, as the user would. */
 async function answering(
   driver: ProviderDriver,
   request: ReplyRequest,
@@ -387,7 +381,6 @@ function sandboxedTrees() {
   return {root, tree, other}
 }
 
-/** With the folder that holds `claude`'s own config hidden, as the app has it. */
 function inSandbox(
   live: Live,
   text: string,
@@ -414,7 +407,6 @@ function readingPrompt(secret: string, otherSecret: string) {
   return `Do these four steps in order, each once, with no retry, whatever happens: read ${secret} with your Read tool; then read ${otherSecret} with your Read tool; then run exactly \`cat ${otherSecret}\` with Bash; then run exactly \`sh read.sh\` with Bash. Then reply with only the word DONE.`
 }
 
-/** The SDK runs a `.mjs` with the `node` on PATH. */
 function exitWatcher(ended: string) {
   return `
 import {spawn} from 'node:child_process'
@@ -582,7 +574,6 @@ function forward(request: http.IncomingMessage, response: http.ServerResponse) {
 }
 
 async function startStandInApi(answer: StandInAnswer = 'five-hour') {
-  // One reset for every request, so each failure names the same time.
   const resets = Math.floor(Date.now() / 1000) + 2 * HOUR_IN_SECONDS
   let current = answer
 
@@ -611,7 +602,6 @@ async function startStandInApi(answer: StandInAnswer = 'five-hour') {
 
   return {
     url: await listenLocally(server),
-    /** In seconds since the epoch. */
     resets,
     answer(next: StandInAnswer) {
       current = next
@@ -624,7 +614,6 @@ function failureIn(events: Streamed[]) {
   return events.filter(isReplyEvent).reduce(foldReplyEvent, NEW_REPLY).failure
 }
 
-/** About 12 tokens a sentence, measured. */
 function padding(tokens: number) {
   return 'The harbor log lists no ships today. '.repeat(Math.round(tokens / 12))
 }
@@ -1157,7 +1146,6 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     await live.done()
   }, 300_000)
 
-  // windows-powershell-keeps-path covers the tools on Windows.
   it.skipIf(process.platform === 'win32')(
     '[records] [dep:claude-tools-full-access] writes a file in the Tree’s folder and runs a command there, asking nothing, with Claude Code’s tools but no Subagents, and shows each tool call',
     async () => {
@@ -1648,7 +1636,6 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
         isError: false,
         content: expect.stringMatching(/\b299999\b/),
       })
-      // `claude` runs `seq` with no card, as it reads alone.
       expect(approvalsIn(events)).toEqual([])
 
       await live.done()
@@ -1779,7 +1766,6 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     300_000
   )
 
-  // The probe is a shell script.
   it.skipIf(process.platform === 'win32')(
     '[dep:claude-keeps-path] runs a program by name from a folder added last to the PATH claude starts with, where it is still last',
     async () => {
@@ -2093,7 +2079,6 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       for await (const event of live.driver.startReply(counting)) {
         events.push(event)
 
-        // Longer than the test runs, so only Stop can end the wait.
         if (event.type === 'TEXT_DELTA' && ++deltas === 12) {
           proxy.refuseFor(30 * 60_000)
         }
@@ -2115,7 +2100,6 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
 
       proxy.letThrough()
 
-      // As main does for a stopped Reply never saved.
       const above =
         events.find(
           (event): event is ReplyRecorded => event.type === 'REPLY_RECORDED'
@@ -2515,7 +2499,6 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     const first = await live.reply(teal, null)
     const second = await live.reply(otter, continuing(first.recorded.session))
 
-    // A rewind to the first Reply leaves the second off the newest chain.
     await live.reply('Now reply with the single word HERON.', {
       ...first.recorded.session,
       type: 'rewind',

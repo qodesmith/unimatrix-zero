@@ -6,7 +6,9 @@ import {promisify} from 'node:util'
 import {z} from 'zod'
 
 import {runElectronAsNode} from './electron-as-node.ts'
+import {mapLimited} from './map-limited.ts'
 import {isLiveTest, isRecording} from './recordings.ts'
+import {isCode, sameCode} from './same-code.ts'
 import {CODEX_PROTOCOL, HOST_PACKAGE, MANIFEST} from './vendor-pins.ts'
 
 const LOCKFILE = 'bun.lock'
@@ -47,7 +49,43 @@ async function isAncestor(root: string, from: string, head: string) {
   }
 }
 
-/** The files changed from `from` to `head`, when `from` is in `head`'s history. */
+async function textAt(root: string, commit: string, file: string) {
+  try {
+    return await git(root, 'show', `${commit}:${file}`)
+  } catch {
+    return null
+  }
+}
+
+function isCodexProtocol(file: string) {
+  return file.startsWith(`${CODEX_PROTOCOL}/`)
+}
+
+/**
+ * Drops each file whose two versions hold the same code: a change to its
+ * comments, layout or types can't change what a live test does. A Codex
+ * protocol type stays, since the Codex live test compares its text.
+ */
+export async function codeChanged(
+  root: string,
+  from: string,
+  head: string,
+  files: string[]
+) {
+  const same = await mapLimited(files, 8, async file => {
+    if (!isCode(file) || isCodexProtocol(file)) return false
+
+    const [before, after] = await Promise.all([
+      textAt(root, from, file),
+      textAt(root, head, file),
+    ])
+
+    return before !== null && after !== null && sameCode(file, before, after)
+  })
+
+  return files.filter((_, at) => !same[at])
+}
+
 export async function filesChangedSince(
   root: string,
   from: string,
@@ -67,11 +105,15 @@ export async function filesChangedSince(
 
   return {
     ancestor: true,
-    files: changed.split('\0').filter(Boolean).toSorted(),
+    files: await codeChanged(
+      root,
+      from,
+      head,
+      changed.split('\0').filter(Boolean).toSorted()
+    ),
   } as const
 }
 
-/** The live tests in the checkout at `root` that import each of `files`. */
 export function liveTestsReached(root: string, files: string[]) {
   const {status, stdout, stderr} = runElectronAsNode(
     [REACHED_SCRIPT, ...files],
@@ -96,10 +138,7 @@ export function liveTestsReached(root: string, files: string[]) {
 const RULES: [matches: (file: string) => boolean, why: string][] = [
   [isLiveTest, 'a live test'],
   [isRecording, 'a recording'],
-  [
-    file => file.startsWith(`${CODEX_PROTOCOL}/`),
-    'checked by the Codex live test',
-  ],
+  [isCodexProtocol, 'checked by the Codex live test'],
   [file => file === MANIFEST || file === HOST_PACKAGE, 'a vendor pin file'],
   [file => file === LOCKFILE, 'the lockfile'],
   [file => file.endsWith('/package.json'), 'a workspace package.json'],
@@ -113,7 +152,6 @@ function whyOf(file: string, reached: string[]) {
   return reached.length > 0 ? `imported by ${reached.join(', ')}` : null
 }
 
-/** What changed from a result's commit to `head`, the checkout at `root`. */
 export async function changesSince(
   root: string,
   from: string,
@@ -129,10 +167,6 @@ export async function changesSince(
   }
 }
 
-/**
- * The changed files that need a new live run. `reached` maps a file to the
- * live tests that import it, at any depth.
- */
 export function reRunCauses(
   changed: string[],
   reached: Map<string, string[]>

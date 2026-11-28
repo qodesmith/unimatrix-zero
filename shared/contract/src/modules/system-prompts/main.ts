@@ -13,7 +13,6 @@ export const PresetIdSchema = z.enum([
 
 export type PresetId = z.infer<typeof PresetIdSchema>
 
-/** A preset's id, or a UUIDv7 for one of the user's own. */
 export const SystemPromptEntryIdSchema = z.union([PresetIdSchema, z.uuid()])
 
 export const SystemPromptTextSchema = z.string().max(SYSTEM_PROMPT_MAX_LENGTH)
@@ -28,20 +27,17 @@ export const SystemPromptEntrySchema = z.strictObject({
   id: SystemPromptEntryIdSchema,
   name: z.string(),
   text: SystemPromptTextSchema,
-  /** Ships with the app; read-only. */
   preset: z.boolean(),
 })
 
 export type SystemPromptEntry = z.infer<typeof SystemPromptEntrySchema>
 
 export const SystemPromptLibrarySchema = z.strictObject({
-  /** The presets in this order, then the user's own, oldest first. */
   entries: z.array(SystemPromptEntrySchema),
 })
 
 export type SystemPromptLibrary = z.infer<typeof SystemPromptLibrarySchema>
 
-/** What a Tree runs under, as saved: the id changes with the text. */
 export const TreeSystemPromptSchema = z.strictObject({
   id: z.uuid(),
   text: SystemPromptTextSchema,
@@ -76,7 +72,6 @@ export const PRESETS: readonly SystemPromptEntry[] = [
   ),
 ]
 
-/** An id no entry has any more, as after a deletion, falls back to Default. */
 export function defaultEntry(
   entries: readonly SystemPromptEntry[],
   defaultId: string

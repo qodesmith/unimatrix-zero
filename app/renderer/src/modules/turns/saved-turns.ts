@@ -32,7 +32,6 @@ export function withProgress(
   }
 }
 
-/** Leaves the Turns alone when they aren't loaded or hold no such Reply. */
 export function updateSavedReply(
   queryClient: QueryClient,
   {treeId, replyId}: {treeId: string; replyId: string},
@@ -70,7 +69,6 @@ export function removeDeleted(
   )
 }
 
-/** The failed Turns the Prompt took the place of go in the same update. */
 export function addSent(
   queryClient: QueryClient,
   treeId: string,

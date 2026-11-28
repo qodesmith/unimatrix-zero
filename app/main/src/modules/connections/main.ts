@@ -67,7 +67,6 @@ export function createConnections({
     return row ? ModelsSchema.parse(row.models) : []
   }
 
-  /** Saved only while the Provider has an account saved. */
   function saveModels(provider: ProviderId, models: Model[]) {
     db.update(providers)
       .set({models})
@@ -119,7 +118,6 @@ export function createConnections({
       .run()
   }
 
-  /** The host answers with `MODELS_CHANGED` once its driver can list them. */
   function listModels(provider: ProviderId) {
     const vendorProgram = requestFor(provider)
 

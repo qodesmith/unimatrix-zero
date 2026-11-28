@@ -6,28 +6,22 @@ import {createContext, use} from 'react'
 
 export interface Collapsed {
   ids: ReadonlySet<string>
-  /** Kept where it was on screen as the canvas layout changes around it. */
   toggledReplyId: string | null
 }
 
 export interface Expanded {
   ids: ReadonlySet<string>
-  /** Kept where it was on screen as the canvas layout changes around it. */
   toggledTurnId: string | null
 }
 
-/** What every Turn on the canvas needs, without carrying it in node data. */
 export interface CanvasState {
   treeId: string
-  /** The Tree's own, which its next Reply runs under. */
   systemPromptId: string
   index: TreeIndex
   activeReplyId: string | null
   onInputFocus: (replyId: string) => void
   onSent: (replyId: string, parentReplyId: string | null) => void
-  /** The Reply whose Input takes focus once it is drawn: the one just sent for. */
   inputToFocus: string | null
-  /** Before main is asked, so the canvas is ready the moment the Turns go. */
   onDeleteConfirmed: (promptId: string) => void
   openChat: (replyId: string) => void
   /** Kept here, not in the node, so it survives an orientation switch. */
@@ -35,7 +29,6 @@ export interface CanvasState {
   toggleExpanded: (turnId: string) => void
   collapsedReplyIds: ReadonlySet<string>
   toggleCollapsed: (replyId: string) => void
-  /** Kept here so a draft outlives its box folding or redrawing. */
   drafts: ReadonlyMap<DraftKey, Draft>
   setDraft: (at: DraftKey, draft: Draft) => void
   limitTurnHeight: boolean

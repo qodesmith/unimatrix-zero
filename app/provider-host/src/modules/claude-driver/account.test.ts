@@ -16,7 +16,6 @@ it.each([['Claude API'], ['Anthropic Pro'], ['Claude ']])(
   }
 )
 
-/** Takes longer than the SDK's 2 s to exit once its input closes. */
 const SESSION = `
 import fs from 'node:fs'
 const ended = how => fs.writeFileSync(process.env.FAKE_ENDED, how)
@@ -54,7 +53,6 @@ process.stdin.on('end', () => {
 
 it('lets claude exit by itself after reading the account and its Models', async () => {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'uz-fake-session-'))
-  // The SDK runs a `.mjs` with the `node` on PATH.
   const program = path.join(folder, 'claude.mjs')
   const endedFile = path.join(folder, 'ended')
   await fs.writeFile(program, SESSION)

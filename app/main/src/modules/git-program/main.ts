@@ -17,10 +17,8 @@ export type GitNews =
 
 interface GitProgramDeps {
   target: ProgramTarget | null
-  /** The build can't run here, so `target` is null and nothing downloads. */
   needsNewerLinux: boolean
   getProgramReady: typeof getProgramReady
-  /** False if no window heard. */
   tell: (news: GitNews) => boolean
 }
 
@@ -79,7 +77,6 @@ export function createGitProgram({
     program: () =>
       target && state.status === 'in-place' ? programOf(target) : null,
 
-    /** Never rejects. */
     prepare,
 
     snapshotWaited() {
@@ -98,7 +95,6 @@ export function createGitProgram({
       void prepare()
     },
 
-    /** The user's Try again. Never rejects; true once `git` is in place. */
     async tryAgain() {
       waitedOn = true
       await prepare()

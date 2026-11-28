@@ -17,10 +17,6 @@ function useTreeFilesStore() {
   return store
 }
 
-/**
- * The canvas names the Reply the Files section follows, and lets go of it,
- * and of a file of its Tree in the preview, when it closes.
- */
 export function useShowTreeFiles(treeId: string, replyId: string | null) {
   const store = useTreeFilesStore()
 
@@ -64,8 +60,8 @@ export function useCloseTreeFile() {
 }
 
 /**
- * `keepLastShown` shows the last Reply's list until this one's comes, so a
- * tree drawn from it keeps its open folders and scroll.
+ * `keepLastShown` keeps the last Reply's list until this one's comes, so open
+ * folders and scroll hold.
  */
 export function useTreeFileList(
   treeId: string,

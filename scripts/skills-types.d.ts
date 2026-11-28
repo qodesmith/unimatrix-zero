@@ -1,5 +1,3 @@
-// Inferred from the `skills` package's output.
-
 export type RiskLevel = 'safe' | 'low' | 'medium' | 'high' | 'critical'
 
 export type SkillsAddJsonResult =
@@ -11,7 +9,7 @@ export type SkillsAddJsonResult =
       hash: string | null
       path: string
       scope: 'project' | 'global'
-      agents: string[] // display names like "Claude Code", not ids
+      agents: string[]
       mode: 'symlink' | 'copy'
       security: {
         gen?: RiskLevel

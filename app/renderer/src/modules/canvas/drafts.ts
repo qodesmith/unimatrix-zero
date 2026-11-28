@@ -5,17 +5,14 @@ import type {Prompt} from '@uz/contract/turns'
 
 export interface Draft {
   text: string
-  /** In the order they were attached, and sent in it. */
   attachments: readonly Attachment[]
   model: WantedModel | null
 }
 
-/** The Reply an Input continues from; null for the root Input. */
 export type DraftKey = string | null
 
 export const EMPTY_DRAFT: Draft = {text: '', attachments: [], model: null}
 
-/** What sending a failed Reply's Prompt back did to the Input it came from. */
 interface Restored {
   at: DraftKey
   before: Draft | undefined
@@ -24,7 +21,6 @@ interface Restored {
 
 export interface Drafts {
   byInput: ReadonlyMap<DraftKey, Draft>
-  /** By failed Reply id; kept through a Retry, dropped once it succeeds. */
   restored: ReadonlyMap<string, Restored>
 }
 
@@ -85,7 +81,6 @@ function withPromptBelow(
   }
 }
 
-/** The restore made on top of `under`'s, while the Input still holds it. */
 function stackedOn(
   restored: ReadonlyMap<string, Restored>,
   byInput: ReadonlyMap<DraftKey, Draft>,

@@ -22,19 +22,15 @@ interface ChatSlideoutProps {
   container: HTMLElement | null
   end: Reply
   scrollToTurnId: string
-  /** Off: it slides away, then calls `onClosed` to be unmounted. */
   open: boolean
   onClose: () => void
   onClosed: () => void
   onFocus: (replyId: string) => void
-  /** Main started this Reply for a Prompt sent from the Input. */
   onSent: (replyId: string, parentReplyId: string | null) => void
 }
 
-/** Room left above the Turn scrolled to, in px. */
 const SCROLL_MARGIN = 12
 
-/** Chat mode: one Thread as a conventional chat in a slideout over the canvas. */
 export function ChatSlideout({
   container,
   end,

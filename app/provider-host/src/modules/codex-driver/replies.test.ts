@@ -367,7 +367,6 @@ it.each([
 })
 
 it('ends a turn that overran the Context window as too long', () => {
-  // Hand-built from the pinned protocol: nobody has made Codex send one.
   const turn = {
     id: 'turn',
     status: 'failed',

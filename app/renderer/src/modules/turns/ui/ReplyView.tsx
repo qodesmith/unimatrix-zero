@@ -42,7 +42,6 @@ type Aside =
   | {kind: 'thinking'; at: number; key: string; block: ThinkingBlock}
   | {kind: 'approval'; at: number; key: string; item: ApprovalItem}
 
-/** What sits before part `part` of the content, in the order it arrived. */
 function asidesBefore(
   part: number,
   blocks: ThinkingBlock[],

@@ -2,7 +2,6 @@ import {bridge} from '#modules/bridge/main'
 import {useEffect} from 'react'
 import {toast} from 'sonner'
 
-/** One toast at a time: a failure takes the place of "still downloading". */
 const DOWNLOAD_TOAST = 'snapshots-download'
 
 export function SnapshotsWaiting() {

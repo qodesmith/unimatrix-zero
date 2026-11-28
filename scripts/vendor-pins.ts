@@ -1,7 +1,3 @@
-/**
- * A bump PR is known by what it changes, never by its branch or labels, which a
- * fork can copy.
- */
 import path from 'node:path'
 import {z} from 'zod'
 
@@ -51,7 +47,6 @@ function pinChanges(base: Pins, head: Pins) {
   )
 }
 
-/** GETs the path after `https://api.github.com/` and resolves its JSON text. */
 export type GitHubApi = (path: string) => Promise<string>
 
 const Compare = z.looseObject({
@@ -74,7 +69,6 @@ async function pinsAt(api: GitHubApi, repo: string, sha: string) {
   return pinsOf(manifest ?? '', hostPackage ?? '')
 }
 
-/** Reads whole files, since GitHub's list of a PR's changed files stops at 300. */
 export async function bumpOf(
   api: GitHubApi,
   repo: string,

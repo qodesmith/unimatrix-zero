@@ -42,10 +42,6 @@ export async function read(pieces: Piece[]): Promise<CodexPart[]> {
   })
 }
 
-/**
- * Reads the Prompt's inline files at once, so an unreadable one fails the
- * Reply before Codex starts.
- */
 export async function codexContent(request: ReplyRequest) {
   const prompt = await read(prompted(request.prompt))
 

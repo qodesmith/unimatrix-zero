@@ -4,7 +4,6 @@ import type {RateLimits} from './wire'
 /** A plain usage limit: credits and spend caps lift on no window's reset. */
 const WINDOWED = 'rate_limit_reached' satisfies RateLimitReachedType
 
-/** When all full windows lift, in seconds since the epoch; else undefined. */
 export function limitLifts({
   primary,
   secondary,

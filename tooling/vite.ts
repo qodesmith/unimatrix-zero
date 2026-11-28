@@ -14,7 +14,6 @@ function major(version: string) {
   return version.split('.')[0]
 }
 
-/** Electron's own Chromium, so the renderer build down-levels nothing. */
 export const chromeTarget = `chrome${major(runtime.chrome)}`
 
 interface NodeBundleOptions {
@@ -26,7 +25,6 @@ interface NodeBundleOptions {
   plugins?: Plugin[]
 }
 
-/** One fully bundled Node-side build (main, preload, Provider hosts, shell). */
 export function nodeBundle({
   root,
   entry,

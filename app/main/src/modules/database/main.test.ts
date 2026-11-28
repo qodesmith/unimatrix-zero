@@ -93,7 +93,6 @@ function backups() {
   return fs.existsSync(backupsFolder) ? fs.readdirSync(backupsFolder) : []
 }
 
-/** Opens it as the app left it before `migration`, which `migrate` applies. */
 function openBefore(migration: string) {
   const held = fs
     .readdirSync(migrationsFolder)

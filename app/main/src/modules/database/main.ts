@@ -20,7 +20,6 @@ export function dataFolderOf(userData: string) {
   return path.join(userData, 'data')
 }
 
-/** A reason the app can't open its data, in words the user can act on. */
 export class DatabaseOpenError extends Error {
   override name = 'DatabaseOpenError'
 }

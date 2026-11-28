@@ -15,7 +15,6 @@ import {
 import {replyRunTransition} from './reply-run/machine'
 import {updateSavedReply, withProgress} from './saved-turns'
 
-/** Display only; never stored. */
 export interface ThinkingBlock {
   text: string
   beforePart: number
@@ -25,12 +24,10 @@ export interface ThinkingBlock {
 
 interface LiveState {
   replies: Record<string, StreamingReply>
-  /** Kept after the Reply finishes; only a reload clears it. */
   thinking: Record<string, ThinkingBlock[]>
   runs: Record<string, ReplyRunState>
   waiting: Record<string, Wait>
   approvals: ApprovalsByReply
-  /** Each Subagent's description, by Reply. */
   subagents: SubagentsByReply
 }
 
@@ -101,7 +98,6 @@ function foldThinking(
     : blocks
 }
 
-/** A Subagent's reasoning isn't the Reply's; a Retry thinks from nothing. */
 function thinkingAfter(
   thinking: LiveState['thinking'],
   event: ReplyEvent,
@@ -179,7 +175,6 @@ export function markStreamingWaiting(store: ReplyStore) {
   }))
 }
 
-/** At `RUN_FINISHED`, main has already saved the Reply as this writes it. */
 export function applyLiveEvent(
   event: AppEvent,
   store: ReplyStore,
@@ -213,7 +208,6 @@ export function applyLiveEvent(
 
   if (!('replyId' in event)) return
 
-  // Main sends it after `RUN_FINISHED`, so the Reply is among the saved Turns.
   if (event.type === 'FILES_CHANGED') {
     updateSavedReply(queryClient, event, saved => ({
       ...saved,

@@ -106,10 +106,6 @@ function inside(folder: string, name: string) {
   return target
 }
 
-/**
- * A link to a name in its own folder, never a path: no chain of such links
- * leads out of the folder the archive unpacks into.
- */
 function isSibling(link: string) {
   return link !== '' && link !== '.' && link !== '..' && !/[/\\:]/.test(link)
 }
@@ -151,7 +147,6 @@ export async function untar(
     if (type === '5') {
       await fs.mkdir(target, {recursive: true})
     } else if (type === '0' || type === '') {
-      // The permission bits, without set-user-ID and the like.
       await writeFile(reader, target, octal(header, 100, 8) % 0o1000, size)
       await reader.exactly(padding)
     } else if (type === '2' && isSibling(text(header, 157, 100))) {

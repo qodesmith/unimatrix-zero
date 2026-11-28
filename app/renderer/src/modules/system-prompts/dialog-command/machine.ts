@@ -2,7 +2,6 @@ import type {Transitions} from '#modules/state-machine/main'
 
 import {machine} from '#modules/state-machine/main'
 
-/** A dialog that asks, then sends main one command it may refuse. */
 export type DialogCommandState =
   | {status: 'idle'}
   | {status: 'asking'}

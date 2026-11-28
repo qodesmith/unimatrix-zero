@@ -24,7 +24,6 @@ const env = Object.fromEntries(
   )
 )
 
-// Stands in for `codex`: prints a version, and exits once its input ends.
 function start(recorder: ReturnType<typeof createRecorder>, cwd: string) {
   return recorder.spawn(
     {command: process.execPath, args: ['-e', 'process.stdin.resume()']},

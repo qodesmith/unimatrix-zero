@@ -6,7 +6,6 @@ const FILE = '/home/me/.config/Unimatrix Zero/tree-folders/a/page.html'
 
 const NO_BROWSER = /default browser/u
 
-/** Answers each program by name, as the computer would; records each call. */
 function computer(answers: Record<string, string | Error>) {
   const ran: string[][] = []
 

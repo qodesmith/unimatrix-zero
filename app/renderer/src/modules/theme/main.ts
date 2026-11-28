@@ -10,7 +10,6 @@ function setForMode(theme: Theme, mode: ResolvedThemeMode): ThemeSet {
   return set
 }
 
-/** Light, then dark. */
 export function shikiThemes(): [string, string] {
   return [setForMode(hearth, 'light').shiki, setForMode(hearth, 'dark').shiki]
 }

@@ -127,7 +127,6 @@ function folder(prefix: string) {
   return made
 }
 
-/** What the default Tools panel turns off, which Codex has on by default. */
 const DEFAULT_TOOLS_OFF = {
   'skills.bundled.enabled': false,
   'features.plugins': false,
@@ -173,7 +172,6 @@ function extendSavedRollout(
 
 const SYSTEM_PROMPT = 'You answer in as few words as you can.'
 
-/** Settings a test sends differently from its recording on purpose, and why. */
 function skipping(reason: string, ...fields: CodexSetting[]) {
   return fields.map(field => ({field, reason}))
 }
@@ -225,7 +223,6 @@ async function setUp(
     commandFor: program => ({command: process.execPath, args: [program]}),
     env: {
       PATH: process.env.PATH ?? '',
-      // Tests run under Electron's Node; without this the fake never exits.
       ELECTRON_RUN_AS_NODE: '1',
       OPENAI_API_KEY: 'sk-outranks-the-plan',
       CODEX_HOME: '/Users/sam/.codex',
@@ -279,7 +276,6 @@ async function setUp(
       tools?: TreeTools
       permissionMode?: PermissionMode
       grants?: ApprovalGrant[]
-      /** Each card's answer; `stop` stops the Reply instead. */
       answer?: ApprovalAnswer | 'stop'
       inTree?: string
       hiddenFolders?: string[]
@@ -547,7 +543,6 @@ it('names the app’s developer folder to an app-server that starts on a Mac wit
     undefined,
     codex.vendorProgram.developerDir,
   ])
-  // Git's own folders are named inside the folder's script, for one call.
   expect(
     codex.environments.flatMap(env =>
       Object.keys(env).filter(name => name.startsWith('GIT_'))
@@ -774,14 +769,12 @@ it('forks the Provider session through a mid-Thread Reply into a new thread with
   expect(report?.threadConfigs).toEqual([
     {model_auto_compact_token_limit: 30_000, ...DEFAULT_TOOLS_OFF},
   ])
-  // Written back whole for Codex to fork; the fork is Codex's to cut.
   expect(report?.resumedFrom.map(line => line.id)).toEqual([
     THREAD_ID,
     FIRST_TURN,
     SECOND_TURN,
   ])
 
-  // The fork's rollout points into the original's, so both are kept under it.
   const fork = folderOf(FORKED_THREAD_ID)
 
   expect([
@@ -1693,7 +1686,6 @@ function readOf(threadId: string, rollout: string) {
   ]
 }
 
-/** Main's switches differ from the empty `config` a cut loads a thread with. */
 function reloadOf(threadId: string, rollout: string) {
   return [
     {
@@ -2050,7 +2042,6 @@ function cardsIn(events: Streamed[]) {
   )
 }
 
-/** The Replies of `approvals.ndjson`, in order, up to `count` of them. */
 async function approvalReplies(
   codex: Awaited<ReturnType<typeof setUp>>,
   count: number,
@@ -2172,7 +2163,6 @@ it('drops the card of a Reply stopped while it waits, answering Codex nothing', 
   ])
   expect(stopped.at(-1)).toMatchObject({status: 'stopped'})
 
-  // An answer after the Reply moved on reaches no one.
   if (card) await codex.driver.answerApproval(card.approvalId, 'allow-once')
 
   await new Promise(resolve => {
@@ -2201,7 +2191,6 @@ it('shows no card in a Tree once a write there was always allowed, nor in anothe
   ])
 })
 
-/** `approvals.ndjson` with its `ls` run as `command`, not parsed as a read. */
 function unparsedListing(command: string) {
   return edited('approvals.ndjson', text =>
     text
@@ -2270,7 +2259,6 @@ it('shows no card for a command Claude’s Always allow granted in the Tree, and
 
   const allowed = await codex.reply('allowed', recordedIn(ready), {
     permissionMode: 'supervised',
-    // What an Always allow on Claude's Bash `ls` grants.
     grants: [{kind: 'command', command: 'ls'}],
   })
 
@@ -2285,7 +2273,6 @@ it('shows no card for a command Claude’s Always allow granted in the Tree, and
   ])
 })
 
-/** Without the first reload, which a Reply under the same mode never asks for. */
 function withoutReload(name: string) {
   return edited(name, text => {
     const lines = text.split('\n')
@@ -2355,10 +2342,6 @@ it('unsubscribes a loaded thread and resumes it on the permission profile for a 
 
 const LEAVING = SANDBOX.commandRequest(1).parsed
 
-/**
- * Replays `sandbox.ndjson` in folders laid out as its live test's were: the
- * Tree beside each other Tree, and its hidden folders.
- */
 async function sandboxSetUp() {
   const {otherTrees, hiddenFolders: recordedHidden} = SANDBOX.sandboxFolders()
   const treesFolder = folder('uz-codex-trees-')
@@ -2383,10 +2366,6 @@ async function sandboxSetUp() {
   return {...codex, folders: {treesFolder, hiddenFolders}}
 }
 
-/**
- * The Replies of `sandbox.ndjson`, in order: a command inside the Sandbox,
- * `LEAVING` refused by it, `LEAVING` asked to run outside, a connection.
- */
 async function sandboxReplies(
   codex: Awaited<ReturnType<typeof sandboxSetUp>>,
   count: number,
@@ -2557,7 +2536,6 @@ it('starts a Reply in a thread only once a cut of it has finished, in the Tree�
 
   expect(report?.contexts).toEqual([[THREAD_ID, FIRST_TURN]])
   expect(report?.threadConfigs).toEqual([{}, DEFAULT_TOOLS_OFF])
-  // The turn undoes the cut's read-only load in the config folder.
   expect(report?.turnAccess).toEqual([
     {
       cwd: codex.treeFolder,

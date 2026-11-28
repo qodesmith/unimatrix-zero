@@ -29,12 +29,9 @@ export function fileDetails(
 }
 
 interface FakeMainOptions {
-  /** The one file of the Snapshot at `replyId`. */
   file: TreeFileDetails
-  /** The Snapshot is in the Tree's folder; the file's own `onDisk` if unset. */
   onDisk?: boolean
   thumbnail?: string
-  /** Main's message for every command that opens, reveals or saves. */
   refuses?: string
 }
 

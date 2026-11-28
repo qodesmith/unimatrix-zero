@@ -2,10 +2,7 @@ import {SYSTEM_PROMPT_MAX_LENGTH} from '@uz/contract/system-prompts'
 
 import {isTooLong} from '../too-long'
 
-/**
- * In place of a textarea `maxLength`, which would cut a long paste short
- * without a word.
- */
+/** Not a textarea `maxLength`, which would cut a long paste short silently. */
 export function TooLong({text}: {text: string}) {
   if (!isTooLong(text)) return null
 

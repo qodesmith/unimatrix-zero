@@ -3,7 +3,6 @@ import type {PDFOperatorList} from 'pdfjs-dist/types/src/display/api'
 import {OPS} from 'pdfjs-dist'
 import {z} from 'zod'
 
-/** A PDF matrix `[a, b, c, d, e, f]`, as pdf.js passes it. */
 const MatrixSchema = z.preprocess(
   value => (value instanceof Float32Array ? [...value] : value),
   z.tuple([
@@ -28,9 +27,8 @@ interface GraphicsState {
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0]
 
 /**
- * Each paints one image into the unit square of the current matrix.
- * `getOperatorList()` skips pdf.js's optimizer, so the merged operators
- * (`paintImageXObjectRepeat` and the groups) never appear in it.
+ * `getOperatorList()` skips the optimizer, so merged operators
+ * (`paintImageXObjectRepeat`, groups) never appear.
  */
 const IMAGES = new Set<number>([
   OPS.paintImageXObject,
@@ -53,7 +51,6 @@ function groupMatrix(value: unknown) {
   return group.success ? matrixOf(group.data.matrix) : IDENTITY
 }
 
-/** `outer` applied after `inner`, as canvas's `transform()` does. */
 function multiply(outer: Matrix, inner: Matrix): Matrix {
   const [a, b, c, d, e, f] = outer
   const [g, h, i, j, k, l] = inner
@@ -68,7 +65,6 @@ function multiply(outer: Matrix, inner: Matrix): Matrix {
   ]
 }
 
-/** Follows the current matrix through one operator, as pdf.js's canvas does. */
 function track(state: GraphicsState, op: number, args: unknown[]) {
   switch (op) {
     case OPS.save:
@@ -94,7 +90,6 @@ function track(state: GraphicsState, op: number, args: unknown[]) {
   }
 }
 
-/** The unit square under `matrix`: its bounding box's area, clipped to `view`. */
 function areaOnPage(matrix: Matrix, view: number[]) {
   const [a, b, c, d, e, f] = matrix
   const xs = [e, a + e, c + e, a + c + e]
@@ -110,10 +105,7 @@ function areaOnPage(matrix: Matrix, view: number[]) {
   return width > 0 && height > 0 ? width * height : 0
 }
 
-/**
- * The share of the page its images cover: each image's bounding box on the
- * page, summed, over the page's area. Overlaps count twice.
- */
+/** Overlaps count twice. */
 export function imageCoverage(operators: PDFOperatorList, view: number[]) {
   const [left = 0, bottom = 0, right = 0, top = 0] = view
   const pageArea = (right - left) * (top - bottom)

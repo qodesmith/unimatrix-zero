@@ -2,18 +2,15 @@ import type {Ending, ReplyRun} from '#modules/reply-runs/main'
 import type {SDKMessage} from '@anthropic-ai/claude-agent-sdk'
 import type {ReplyRequest} from '@uz/contract/host'
 
-/** As long as the SDK gives `claude` to start. */
 export const HEARD_WITHIN_MS = 60_000
 
 /** Calls `giveUp` once `claude` is silent too long; the return cancels it. */
 export type WhenSilent = (giveUp: () => void) => () => void
 
-/** A Reply given up on before `claude` was heard: Stop, or the wait ran out. */
 export interface Silent {
   silent: 'stopped' | 'timed-out'
 }
 
-/** The first of `messages`, unless Stop or `whenSilent` comes first. */
 export async function firstHeard(
   messages: AsyncGenerator<SDKMessage>,
   run: ReplyRun,

@@ -7,7 +7,6 @@ import {pathOnlyNow, threadEndFor} from '../media-budget'
 
 interface SentAttachmentsProps {
   prompt: Prompt
-  /** Left out on the canvas, which uses the Active Thread's end. */
   threadEnd?: Reply
   className?: string
 }

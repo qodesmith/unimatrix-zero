@@ -55,7 +55,6 @@ export type {FinishedReply} from './in-flight'
 
 export interface ReplyHosts {
   ready(provider: ProviderId): boolean
-  /** Throws when the host can't be reached. */
   send(provider: ProviderId, command: HostCommand): void
 }
 
@@ -77,7 +76,6 @@ export interface TurnsDeps {
   attachmentsDir: string
   now: () => Date
   onTurnsChanged: (treeId: string) => void
-  /** Every way a Reply ends, a failure to reach its host included. */
   onReplyFinished: (finished: FinishedReply) => void
 }
 
@@ -128,7 +126,6 @@ export function createTurns({
     }
   }
 
-  /** Its Tree may be deleted while it waits; then nothing is sent. */
   async function sendAfter(
     snapshot: Promise<void>,
     provider: ProviderId,
@@ -161,7 +158,6 @@ export function createTurns({
     clearCutOnPrompt(db, recorded)
   }
 
-  /** A failed attempt may have left its Prompt in the session, so reuse it. */
   function sessionOn(
     provider: ProviderId,
     {treeId, parentReplyId}: Pick<NewPrompt, 'treeId' | 'parentReplyId'>,
@@ -348,7 +344,6 @@ export function createTurns({
       )
     },
 
-    /** Its `RUN_FINISHED` comes from the host. */
     stop(treeId: string, replyId: string) {
       const provider = inFlight.writer(treeId, replyId)
 
@@ -380,7 +375,6 @@ export function createTurns({
       return true
     },
 
-    /** For deleting the Tree: anything its hosts send after this is dropped. */
     stopAll(treeId: string) {
       for (const {provider, replyId} of inFlight.endIn(treeId)) {
         try {
@@ -394,7 +388,6 @@ export function createTurns({
     hostEvent: (provider: ProviderId, event: ReplyEvent) =>
       inFlight.apply(provider, event),
 
-    /** Refused while a Reply below streams. */
     deletePrompt(
       treeId: string,
       promptId: string
@@ -466,7 +459,6 @@ export function createTurns({
       })
     },
 
-    /** Saves partial text still waiting on its timer, after the hosts stop. */
     quitting: () => inFlight.saveAll(),
   }
 }

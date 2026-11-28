@@ -47,7 +47,6 @@ export function SaveToLibraryDialog({
   )
 }
 
-/** Mounts with the dialog, so each opening starts with no name. */
 function NameForm({
   running,
   error,

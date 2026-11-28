@@ -18,7 +18,6 @@ type Reader = Pick<Database, 'select'>
 
 type Writer = Pick<Database, 'select' | 'insert'>
 
-/** Null for a row with none, and for one that doesn't parse. */
 export function extractionOf(row: Pick<AttachmentRow, 'extraction'>) {
   const parsed = ExtractionSchema.nullable().safeParse(row.extraction)
 
@@ -79,7 +78,6 @@ export function attachToPrompt(tx: Writer, promptId: string, ids: string[]) {
     .run()
 }
 
-/** In order; a Prompt with none has no entry. */
 export function rowsOf(
   db: Reader,
   promptIds: string[]
@@ -104,7 +102,6 @@ export function rowsOf(
   return byPrompt
 }
 
-/** In order; a Prompt with none has no entry. */
 export function attachmentsOf(
   db: Reader,
   promptIds: string[]

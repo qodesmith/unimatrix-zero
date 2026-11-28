@@ -20,7 +20,6 @@ interface Placed {
   arrivedAt: number
 }
 
-/** Display only; never stored. */
 export type ApprovalItem =
   | (Placed & {kind: 'card'; answer: ApprovalAnswer | null})
   | (Placed & {kind: 'review'; decision: ReviewDecision | null})
@@ -105,7 +104,6 @@ function foldItems(
   return items
 }
 
-/** Kept after the Reply finishes, as its Thinking blocks are. */
 export function approvalsAfter(
   approvals: ApprovalsByReply,
   event: ReplyEvent,
@@ -122,10 +120,7 @@ export function approvalsAfter(
   return next === items ? approvals : {...approvals, [replyId]: next}
 }
 
-/**
- * Main lists the cards still waiting, for a window that opened meanwhile. A
- * card open here that main no longer lists was answered or dropped then.
- */
+/** A card open here that main no longer lists was answered or dropped meanwhile. */
 export function approvalsFromSnapshot(
   approvals: ApprovalsByReply,
   waiting: ApprovalRequested[],
@@ -157,7 +152,6 @@ export function approvalsFromSnapshot(
   return next
 }
 
-/** So a card can name the Subagent asking. */
 export function subagentsAfter(subagents: SubagentsByReply, event: ReplyEvent) {
   const {replyId} = event
 

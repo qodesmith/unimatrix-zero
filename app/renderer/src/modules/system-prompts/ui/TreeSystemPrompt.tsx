@@ -15,7 +15,6 @@ interface TreeSystemPromptProps {
   systemPrompt: Saved
 }
 
-/** The Tree panel's own copy, which changes no library entry. */
 export function TreeSystemPrompt({
   treeId,
   systemPrompt,

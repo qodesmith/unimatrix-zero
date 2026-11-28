@@ -92,7 +92,6 @@ const OTTER_MESSAGE = OTTER_REPLY.messageId
 const REWOUND_MESSAGE = REWOUND_REPLY.messageId
 const MODEL = 'claude-haiku-5-5'
 
-/** An entry `warmThrice()` repeats, under its new uuid. */
 function again(uuid: string) {
   return `cccccccc${uuid.slice(8)}`
 }
@@ -238,7 +237,6 @@ async function setUp(
     hiddenFolders?: string[]
     treesFolder?: string
     grants?: ApprovalGrant[]
-    /** Each card's answer in turn, or a Stop while it waits. */
     answers?: (ApprovalAnswer | 'stop')[]
   }
 
@@ -252,7 +250,6 @@ async function setUp(
     gitFolder: path.join(configDir, 'git'),
   }
 
-  /** Answers each card in turn, as the user would; past the list, Deny. */
   function answering(replyId: string, answers: ReplyOptions['answers'] = []) {
     const left = [...answers]
 
@@ -598,7 +595,6 @@ async function warmThread(claude: Awaited<ReturnType<typeof setUp>>) {
   const second = await claude.reply(SECOND_PROMPT, recordedIn(first))
   await claude.allClosed()
 
-  // Gone from `claude`'s own folder, so only the app's copy can bring it back.
   fs.rmSync(path.join(claude.configDir, 'projects'), {
     recursive: true,
     force: true,
@@ -658,7 +654,6 @@ it('forks the session through a mid-Thread Reply into a new session, leaving the
       '--fork-session',
     ])
   )
-  // Restored whole for `claude` to fork; the fork is its to cut.
   expect(fork?.resumedFrom).toEqual(
     expect.arrayContaining([FIRST_MESSAGE, SECOND_MESSAGE])
   )
@@ -991,7 +986,6 @@ it('names the app’s developer folder to a claude that starts on a Mac with no 
     undefined,
     claude.vendorProgram.developerDir,
   ])
-  // Git's own folders are named inside the folder's script, for one call.
   expect(
     claude.environments.flatMap(env =>
       Object.keys(env).filter(name => name.startsWith('GIT_'))
@@ -1542,7 +1536,6 @@ it.each([
     const claude = await setUp([
       failedAfter(
         [
-          // The first retry has the other status, so only the last one decides.
           retryStatus === null
             ? retried(1, 500, 'server_error')
             : retried(1, null, 'unknown'),
@@ -1920,7 +1913,6 @@ it('never gives up on a claude once it is heard, however long it then takes', as
 })
 
 it('stops a Reply where it is, records it, and continues the Thread warm from it', async () => {
-  // `claude` reports no window on a stopped Reply.
   const claude = await setUp([
     withUsage('stopped.ndjson', [{}, {[MODEL]: {contextWindow: 200_000}}]),
   ])
@@ -2003,7 +1995,6 @@ it('rewinds a cold session to an earlier Reply and goes on from there, in the sa
     ])
   )
   expect(rewind?.args).not.toContain('--fork-session')
-  // Restored whole from the app's copy; the cut is `claude`'s to make.
   expect(rewind?.resumedFrom).toEqual(
     expect.arrayContaining([TEAL_MESSAGE, OTTER_MESSAGE])
   )
@@ -2152,7 +2143,6 @@ it('waits for the warm `claude` it closes to end before resuming that session at
   })
 
   await expect.poll(() => claude.reports()[0]?.inputClosed).toBe(true)
-  // The warm one is held open, so any ask by now came from the driver.
   expect(
     claude.store.asked.slice(askedBefore).filter(op => op !== 'append')
   ).toEqual([])
@@ -2212,7 +2202,6 @@ it('starts the next Prompt’s `claude` on the Model it asks for after a Reply f
 
     const end = failing.findIndex(line => line.kind === 'end')
 
-    // Only the failed Prompt: a second one in this `claude` is unexpected.
     return failing.toSpliced(second, end - second)
   })
 
@@ -2453,7 +2442,6 @@ function answersTo(claude: {reports: () => {answers: unknown[]}[]}) {
     )
 }
 
-/** The edit hook's answer for a Write in the Tree's files: decide at its card. */
 const NO_DECISION = {hookSpecificOutput: {hookEventName: 'PreToolUse'}}
 
 function writesIn(name: string) {

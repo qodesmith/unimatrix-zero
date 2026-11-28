@@ -52,7 +52,6 @@ export function pathOnlyNow(
   )
 }
 
-/** A failed Reply's Prompt is back in the Input, so its Thread ends above. */
 function sentEnd(index: TreeIndex, replyId: string): Reply | null {
   const reply = index.replyById.get(replyId)
 

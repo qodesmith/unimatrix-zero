@@ -21,7 +21,6 @@ import {parseDelimited} from '../csv'
 import {extensionOf} from '../file-kinds'
 import {useTextStart} from '../preview-queries'
 
-/** More rows would make the panel slow and nobody reads that far in it. */
 const CSV_ROWS_SHOWN = 500
 
 function CsvTable({text, path}: {text: string; path: string}) {
@@ -94,11 +93,9 @@ export interface TextPreviewProps {
   at: FileAt
   details: TreeFileDetails
   kind: TextKind
-  /** Opens the whole file; null when the file may not be opened. */
   onOpen: (() => void) | null
 }
 
-/** Markdown, CSV and text: the file's start, and only that. */
 export function TextPreview({at, details, kind, onOpen}: TextPreviewProps) {
   const start = useTextStart(at, details)
 

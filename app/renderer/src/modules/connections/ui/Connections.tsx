@@ -9,7 +9,6 @@ import {ProviderCard} from './ProviderCard'
 
 interface ConnectionsProps {
   connections: ConnectionsControls
-  /** First launch only: the introduction, and "Start chatting" once ready. */
   onStart?: () => void
 }
 

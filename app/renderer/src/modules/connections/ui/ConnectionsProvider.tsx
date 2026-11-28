@@ -10,8 +10,8 @@ import {
 import {ConnectionsStoreContext} from '../use-connections'
 
 /**
- * One subscription for everything inside: each subscription makes main send a
- * `SNAPSHOT`, which every listener in the window takes as a fresh start.
+ * Each subscription makes main send a `SNAPSHOT`, which every listener takes as
+ * a fresh start.
  */
 export function ConnectionsProvider({children}: {children: ReactNode}) {
   // oxlint-disable-next-line react/hook-use-state -- created once and never replaced

@@ -41,6 +41,14 @@ The gate holds two kinds of PR:
 - A bump PR: any PR that moves a vendor pin, the version of `claude` or `codex` under `vendorPrograms` in `app/main/src/modules/vendor-programs/dev-manifest.json`, or the Agent SDK version in `app/provider-host/package.json`. A bump of the `git` vendor program is not one (ADR 0024).
 - A PR that changes a live test (`*.live.test.ts`), a recorder (`recording.ts`) or a file under a `recordings/` folder, since its recordings must come from its live tests as they now stand.
 
+A change to a TypeScript or JavaScript file's comments, layout or types alone counts as no change, here and in the list below (`scripts/same-code.ts`): with their types erased, the file's two versions parse to the same syntax tree. Three changes still count:
+
+- a comment that names an `@` tag or a `__PURE__`-style mark, when it is added, changed or reordered, since a tool may read it, as Vitest reads `@vitest-environment`;
+- an `import` that becomes an `import type` or the reverse, since only the first loads its module;
+- any change to a generated Codex protocol type, since the Codex live test compares the file's text.
+
+`bun run provider-checks` doesn't apply this: it still takes such a PR as one to run for.
+
 CI's "Provider checks on a vendor bump or a live test change" job keeps such a PR red until a passing result of the repo owner's covers its current head commit (below): every check passed, no reviewed entry is stale, every recording was re-recorded and the everyday tests passed. Every other PR passes that job.
 
 With no result for the head commit, the owner's newest result carries over when it passed, its commit is still in the PR's history, and nothing changed since then needs a new run. These changes do:

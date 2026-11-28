@@ -18,7 +18,6 @@ async function holdsTurn(server: AppServer, threadId: string, turnId: string) {
   return false
 }
 
-/** Null when Codex no longer has `beforeTurnId`, so nothing is left to drop. */
 export async function requestRevert(
   server: AppServer,
   threadId: string,

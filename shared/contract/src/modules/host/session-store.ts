@@ -7,17 +7,12 @@ export const SessionFolderSchema = z.strictObject({
 
 export type SessionFolder = z.infer<typeof SessionFolderSchema>
 
-/** `subpath` names a Subagent's transcript inside the session. */
 export const SessionKeySchema = SessionFolderSchema.extend({
   subpath: z.string().min(1).optional(),
 })
 
 export type SessionKey = z.infer<typeof SessionKeySchema>
 
-/**
- * Opaque: kept and given back unchanged, read only for the `uuid` it is
- * deduplicated on and the `type` the vendor's SDK files it by.
- */
 export const SessionEntrySchema = z.looseObject({
   type: z.string(),
   uuid: z.string().optional(),
@@ -26,7 +21,6 @@ export const SessionEntrySchema = z.looseObject({
 export type SessionEntry = z.infer<typeof SessionEntrySchema>
 
 export const SessionFileSchema = z.strictObject({
-  /** Relative to the session's own folder, with `/` between parts. */
   path: z.string().min(1),
   base64: z.string(),
 })
@@ -42,10 +36,6 @@ export const SessionStoreRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({
     op: z.literal('load'),
     key: SessionKeySchema,
-    /**
-     * Ends the transcript at the entry with this `uuid`, and leaves out every
-     * entry that has none.
-     */
     through: z.string().min(1).optional(),
   }),
   z.strictObject({op: z.literal('list-subkeys'), ...SessionFolderSchema.shape}),
@@ -63,7 +53,6 @@ type SessionStoreOp = SessionStoreRequest['op']
 
 export const SESSION_STORE_RESULTS = {
   append: z.null(),
-  /** Null when nothing was ever kept for the key. */
   load: z.array(SessionEntrySchema).nullable(),
   'list-subkeys': z.array(z.string()),
   'save-files': z.null(),

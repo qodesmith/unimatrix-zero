@@ -13,7 +13,6 @@ export const RECORDINGS = path.join(import.meta.dirname, 'recordings')
 
 export const RecordedMessageSchema = z.looseObject({type: z.string()})
 
-/** What a recording's variables name the app's config folder. */
 export const CONFIG_FOLDER_STAND_IN = '/config-folder'
 
 /**
@@ -28,19 +27,14 @@ export const APP_VARIABLE = new RegExp(
   'i'
 )
 
-/** One line of a recording; the first is `start`, saying where it ran. */
 export const RecordedLineSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('start'),
-    /** The `claude` that made the recording, such as `claude 2.1.307`. */
     build: z.string(),
     configDir: z.string(),
     projectKey: z.string(),
-    /** Read as the folder the fake runs in wherever an out line names it. */
     cwd: z.string().optional(),
-    /** What the SDK started `claude` with, which holds the app's options. */
     args: z.array(z.string()),
-    /** Each variable `APP_VARIABLE` names that `claude` started with. */
     env: z.record(z.string(), z.string()),
   }),
   z.strictObject({kind: z.literal('in'), message: RecordedMessageSchema}),
@@ -51,27 +45,18 @@ export const RecordedLineSchema = z.discriminatedUnion('kind', [
 export type RecordedLine = z.infer<typeof RecordedLineSchema>
 
 export interface FakeClaudeOptions {
-  /** Exits, as a crash would, once it has taken this many Prompts. */
   exitAfter?: number
-  /** Writes a tool result file of this name beside the session it answers. */
   toolResult?: string
-  /** Refuses to resume from the SDK's temporary folder. */
   refuseStore?: boolean
   refuseResumeAt?: boolean
-  /** Keeps it going once its input closes, until this file exists. */
   holdExit?: string
-  /** Goes silent from this Prompt of this run, both counted from 0. */
   silentFrom?: {run: number; prompt: number}
-  /** Holds the rest of its answer until this file exists. */
   holdAfterFirstDelta?: string
-  /** Other folders of the test's, each with the name the recording has for it. */
   standIns?: [string, string][]
   /**
-   * Settings the test sends differently from the recording on purpose: an
-   * option by its flag, such as `--tools`, a key of a flag that holds JSON as
-   * `--settings.sandbox`, an environment variable as `env.DISABLE_UPDATES`, or
-   * a field of the `initialize` request. `*` is every one, for a `claude` no
-   * recording was made of.
+   * Settings sent differently from the recording on purpose: a flag
+   * (`--tools`), a key of a JSON flag (`--settings.sandbox`), an environment
+   * variable (`env.DISABLE_UPDATES`) or an `initialize` field. `*` is all.
    */
   skip?: SkippedSetting[]
 }
@@ -109,21 +94,15 @@ export const FakeClaudeRunSchema = z.strictObject({
   prompts: z.array(
     z.union([z.string(), z.array(z.looseObject({type: z.string()}))])
   ),
-  /** Per Prompt, whether it came marked to be delivered as written. */
   clientComposed: z.array(z.boolean()),
-  /** Empty when `claude` runs its own. */
   systemPrompt: z.array(z.string()),
   appendedPrompt: z.string().nullable(),
-  /** False when `claude` renders the System prompt afresh each request. */
   promptSnapshot: z.boolean().nullable(),
   resumedFrom: z.array(z.string()),
   toolResults: z.array(z.string()),
-  /** The subtype of each control request it took after it went silent. */
   silentRequests: z.array(z.string()),
-  /** What the SDK answered each control request `claude` sent. */
   answers: z.array(z.looseObject({subtype: z.string()})),
   inputClosed: z.boolean(),
-  /** Which setting differed from the recording, and how. */
   changed: z.string().nullable(),
   ended: z
     .enum([
@@ -407,7 +386,6 @@ process.stdin.on('end', () => {
 })
 `
 
-/** The SDK runs the fake with `node`. */
 export async function replayClaude() {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'uz-replay-claude-'))
   const program = path.join(folder, 'claude.mjs')

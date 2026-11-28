@@ -15,7 +15,6 @@ interface IpcSender {
   sender: {mainFrame: Frame}
 }
 
-/** The one trust check every IPC channel runs on its sender. */
 export function isTopLevelAppFrame(event: IpcSender, appUrl: string): boolean {
   const frame = event.senderFrame
 

@@ -59,7 +59,6 @@ Decide whether it still holds, on both sides:
 A live check covers what only running the program can show; you settle what reading can. Call the entry stale only on evidence you found: name the file and what it says. When reading can't settle it, it holds. Give the evidence in a few sentences.`
 }
 
-/** The environment for the reviewer: the maintainer's login, never an API key. */
 function reviewerEnvironment() {
   return Object.fromEntries(
     Object.entries(process.env).filter(
@@ -76,10 +75,6 @@ function outputOf(stdout: string) {
   }
 }
 
-/**
- * Tries once more when the first try ends with no verdict, such as past its
- * time limit.
- */
 export async function retriedOnce(
   tryOnce: () => Promise<Review>
 ): Promise<Review> {

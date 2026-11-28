@@ -25,7 +25,6 @@ function uint16(bytes: Uint8Array, at: number) {
   return high === undefined || low === undefined ? null : high * 256 + low
 }
 
-/** A frame header: its length, precision, height, width, then components. */
 const FRAME_HEADER_LENGTH = 11
 
 function frameSize(bytes: Uint8Array, at: number, length: number) {
@@ -37,10 +36,7 @@ function frameSize(bytes: Uint8Array, at: number, length: number) {
   return height === null || width === null ? null : {width, height}
 }
 
-/**
- * Walks the marker segments to the first frame header. Null when the bytes
- * are not a JPEG or end before it.
- */
+/** Null when the bytes are not a JPEG or end before the frame header. */
 export function jpegSize(bytes: Uint8Array) {
   if (bytes[0] !== MARKER || bytes[1] !== 0xd8 || bytes[2] !== MARKER) {
     return null

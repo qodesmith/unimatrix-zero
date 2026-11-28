@@ -1,7 +1,6 @@
 /**
- * An open dialog, which Base UI marks `data-open`, owns Esc over the canvas.
- * A file's preview is one. The slideout shares Esc with the canvas, so it
- * doesn't count.
+ * An open dialog (Base UI's `data-open`) owns Esc; the slideout shares it, so
+ * it doesn't count.
  */
 export function dialogOpen() {
   return (
@@ -11,7 +10,6 @@ export function dialogOpen() {
   )
 }
 
-/** A file's preview takes Esc before the slideout under it. */
 export function filePreviewOpen() {
   return document.querySelector('[data-file-preview][data-open]') !== null
 }

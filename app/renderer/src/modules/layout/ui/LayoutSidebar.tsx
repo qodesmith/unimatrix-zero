@@ -29,7 +29,6 @@ interface LayoutSidebarProps {
   children: ReactNode
 }
 
-/** A drag of the divider saves only where it ends. */
 export function LayoutSidebar({sidebar, children}: LayoutSidebarProps) {
   const layout = useLayout()
   const updateLayout = useUpdateLayout()

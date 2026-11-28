@@ -12,22 +12,16 @@ const cn = path.join(import.meta.dirname, 'node_modules/cn')
 
 const pdfjs = path.join(import.meta.dirname, 'node_modules/pdfjs-dist')
 
-/** Pdf.js fetches these at run time, from `tree-files/pdf.ts`'s URLs. */
 const PDFJS_FOLDERS = ['cmaps', 'iccs', 'standard_fonts', 'wasm']
 
 const PDFJS_PREFIX = '/pdfjs'
 
-/**
- * The window's CSP compiles no wasm, so only the JS decoders in `wasm/` are
- * served.
- */
 function pdfjsFiles(folder: string) {
   return readdirSync(path.join(pdfjs, folder)).filter(
     file => !file.endsWith('.wasm')
   )
 }
 
-/** The page's own origin serves them: in `dist/pdfjs/`, or from Vite in dev. */
 function pdfjsAssets(): Plugin {
   return {
     name: 'uz-pdfjs-assets',

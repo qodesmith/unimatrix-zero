@@ -7,7 +7,6 @@ import {useEffect, useRef, useState} from 'react'
 
 import {usePdf} from '../preview-queries'
 
-/** Pages this far outside the panel are drawn before they scroll in. */
 const DRAW_AHEAD = '100% 0px'
 
 interface PageProps {
@@ -84,7 +83,6 @@ function Pages({pdf}: {pdf: PdfFile}) {
   )
 }
 
-/** Through pdf.js only: never a frame, where Chromium's viewer would show it. */
 export function PdfPreview({file}: {file: TreeFile}) {
   const pdf = usePdf(file)
 

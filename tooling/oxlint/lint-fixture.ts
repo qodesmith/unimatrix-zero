@@ -15,7 +15,6 @@ const Report = z.looseObject({
 
 type Diagnostic = z.output<typeof Report>['diagnostics'][number]
 
-/** The real oxlint over fixture files, with only `rules` turned on. */
 export function lintFixture(
   rules: readonly string[],
   files: Readonly<Record<string, string>>

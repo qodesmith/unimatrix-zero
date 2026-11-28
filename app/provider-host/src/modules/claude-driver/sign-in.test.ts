@@ -247,7 +247,6 @@ it('starts a new sign-in when Claude refuses the code', async () => {
   const updates = await connect(signIn, update => {
     if (isStep(update, 'sign-in-page')) signIn.signInPageOpened()
 
-    // The card takes a code only while it has a page.
     if (
       update.type === 'SIGN_IN_STEP' &&
       update.url &&

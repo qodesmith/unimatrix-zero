@@ -22,7 +22,6 @@ export type Piece =
   | {type: 'file'; file: InlineFile}
   | {type: 'earlier-file'; file: HostAttachment}
 
-/** What a Provider is sent, before a driver puts it in its own wire format. */
 export type ContentPart =
   | Text
   | {type: 'image'; mediaType: ImageMediaType; base64: string}

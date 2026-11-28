@@ -22,7 +22,6 @@ interface Ended {
   stderr: string
 }
 
-/** A space in the path, as `Application Support` has. */
 function temporaryFolder() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'uz developer folder '))
 }
@@ -89,7 +88,6 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     const init = await stub(folder, 'git', ['init', '-b', 'main'], first)
 
     expect(init.stderr).toBe('')
-    // The templates' own file: a `git` with no templates writes no `info`.
     expect(fs.existsSync(path.join(first, '.git', 'info', 'exclude'))).toBe(
       true
     )
@@ -99,7 +97,6 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     await stub(folder, 'git', [...identity, 'commit', '-m', 'one'], first)
     await stub(folder, 'git', ['init', '--bare', '-b', 'main', origin], work)
 
-    // A plain path copies files, skipping git-upload-pack and git-receive-pack.
     const url = `file://${origin}`
     const push = await stub(folder, 'git', ['push', url, 'main'], first)
 
@@ -151,7 +148,6 @@ describe.runIf(process.platform === 'darwin')('on a Mac', () => {
     for (const tool of ['git-receive-pack', 'git-upload-archive']) {
       const ended = await stub(folder, tool, [path.join(work, 'missing')])
 
-      // Git's own refusal, where the script's would be 127.
       expect(ended.code).toBe(128)
       expect(ended.stderr).toMatch(/^fatal: /)
     }

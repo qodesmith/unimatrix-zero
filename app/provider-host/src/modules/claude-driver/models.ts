@@ -16,7 +16,6 @@ const ModelInfosSchema = z.array(
   Pick<ModelInfo, 'value' | 'displayName' | 'resolvedModel'>[]
 >
 
-/** The SDK's entry for the Model `claude` runs when given none. */
 const SDK_DEFAULT = 'default'
 
 export type ReadModels = (vendorProgram: SignInRequest) => Promise<ModelInfo[]>
@@ -30,7 +29,6 @@ export function createModelList(read: ReadModels) {
   let reading: Promise<Model[]> | null = null
   const listeners: ((models: Model[]) => void)[] = []
 
-  /** A list that doesn't parse changes nothing. */
   function learn(infos: ModelInfo[]) {
     const parsed = ModelInfosSchema.safeParse(infos)
 
@@ -55,7 +53,6 @@ export function createModelList(read: ReadModels) {
     listeners.push(listener)
   }
 
-  /** The Model a listed name stands for, and any other name as it is. */
   function resolve(id: string) {
     return concreteId(kept ?? [], id)
   }

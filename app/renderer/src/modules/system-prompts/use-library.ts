@@ -6,7 +6,6 @@ import {createContext, use} from 'react'
 
 export const LibraryStoreContext = createContext<LibraryStore | null>(null)
 
-/** The presets, then the user's own, oldest first. */
 export function useLibrary(): SystemPromptEntry[] {
   const store = use(LibraryStoreContext)
 

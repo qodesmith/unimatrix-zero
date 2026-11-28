@@ -3,7 +3,6 @@ import type {Transitions} from '@uz/contract/state-machine'
 
 import {machine} from '@uz/contract/state-machine'
 
-/** After the last, the host stays down. */
 export const RESTART_DELAYS_MS = [1000, 5000, 30_000]
 
 export type HostState =

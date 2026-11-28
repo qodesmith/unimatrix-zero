@@ -41,7 +41,6 @@ async function runToEnd(program: string, args: string[]) {
   return stdout
 }
 
-/** The default browser, never whatever app opens HTML files. */
 async function openInBrowser(file: string) {
   if (process.platform === 'linux') return openInLinuxBrowser(runToEnd, file)
 
@@ -52,7 +51,6 @@ async function openInBrowser(file: string) {
     : launch(browser.path, [file])
 }
 
-/** `window` is the app's, which dialogs and Quick Look belong to. */
 export function createDesktop(window: () => BrowserWindow | null): Desktop {
   let editor: Editor | null | undefined
 

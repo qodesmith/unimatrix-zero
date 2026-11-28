@@ -5,8 +5,8 @@ import {z} from 'zod'
 import {tagsIn} from './provider-dependencies.ts'
 
 /**
- * Vitest's arguments for the one run of every tagged live test. Retrying a
- * test that records is safe only while its recorder uses `claimRecordings`.
+ * Retrying a test that records is safe only while its recorder uses
+ * `claimRecordings`.
  */
 export function liveTestArgs(report: string) {
   return [
@@ -62,8 +62,6 @@ export function liveOutcome(ids: string[], tests: LiveTest[]) {
   return {
     checks: ids.map(id => ({id, status: statusOf(outcomes.get(id) ?? [])})),
     failed: tests.some(test => test.status === 'failed'),
-    // Vitest's JSON report gives no retry count, but a passed test keeps the
-    // failure messages of the tries before.
     retried: tests.flatMap(test =>
       test.status === 'passed' && (test.failureMessages ?? []).length > 0
         ? [test.title]

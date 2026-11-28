@@ -14,7 +14,6 @@ export type UserInput =
 export interface Attempt<Input extends object> {
   inbox: Inbox<Input | UserInput>
   signal: AbortSignal
-  /** A function so it is read afresh after each wait. */
   canceled: () => boolean
 }
 
@@ -41,7 +40,6 @@ export async function* getReady(
   return attempt.canceled() ? SIGN_IN_CANCELED : null
 }
 
-/** Each `signIn` is a new go at connecting; the user's input goes to the latest. */
 export function createSignIn<Input extends object>(
   connect: (
     attempt: Attempt<Input>,

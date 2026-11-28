@@ -38,12 +38,10 @@ function escaped(folder: string) {
 
 interface Recorded {
   treeFolder?: string
-  /** The folder of every Tree, which a Supervised thread's `config` names. */
   treesFolder?: string
   hiddenFolders?: string[]
 }
 
-/** Listed as the driver lists them, when the live test names both folders. */
 function sandboxOf({treeFolder, treesFolder, hiddenFolders = []}: Recorded) {
   if (treeFolder === undefined || treesFolder === undefined) return {}
 
@@ -95,12 +93,6 @@ function scrub(
     .join('')
 }
 
-/**
- * Records each real `codex app-server` process into the next of `files`,
- * stamped with its build and the Sandbox's `folders`, each folder as a
- * stand-in a replay fills in.
- * A process that exits after a later recorder claimed its file writes nothing.
- */
 export function createRecorder(files: string[], folders: Recorded = {}) {
   let run = 0
   const write = claimRecordings(files)

@@ -7,13 +7,11 @@ import path from 'node:path'
 import {LINK_REFUSED} from './location'
 
 export interface Openable {
-  /** Inside the Tree's files. */
   path: string
   onDisk: boolean
   preview: TreeFileDetails['preview']
   notOpened: TreeFileDetails['notOpened']
   link: boolean
-  /** The file in the Tree's folder when `onDisk`, else a read-only copy. */
   locate: () => Promise<{file: string; executable: boolean}>
 }
 

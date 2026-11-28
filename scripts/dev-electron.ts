@@ -7,7 +7,6 @@ export type DevElectronState =
   | {
       status: 'settling'
       bundle: string
-      /** A rebuild of the same bundle still re-arms the settle timer. */
       since: number
     }
   | {status: 'restarting'}
@@ -40,7 +39,6 @@ const transitions = {
     exited: stopping,
     stopAsked: stopping,
   },
-  // Ignores `rebuilt`: the next Electron starts after it, so it loads the new bundle.
   restarting: {exited: () => initialDevElectron, stopAsked: stopping},
   stopping: {},
 } satisfies Transitions<DevElectronState, DevElectronEvent>

@@ -24,7 +24,6 @@ type PageStep = Extract<SignInUpdate, {type: 'SIGN_IN_STEP'}>
 interface Page {
   run: number
   url: string | null
-  /** Opened again by the app, so it shows a code. */
   opened: boolean
   pasted: boolean
   refused: boolean
@@ -60,7 +59,6 @@ export interface ClaudeSignInDeps {
   timeoutMs: number
 }
 
-/** Claude's page shows the code followed by `#` and the state in its own link. */
 function belongsTo(code: string, url: string) {
   const state = new URL(url).searchParams.get('state')
 
@@ -84,9 +82,7 @@ function pageStep({url, opened, refused}: Page): PageStep {
   return step
 }
 
-/** Connecting Claude: the program, `claude auth login`, then the account's plan. */
 export function createClaudeSignIn(deps: ClaudeSignInDeps) {
-  /** Null once signed in, else the update to end with. */
   async function* signInOnPage(
     {inbox}: Attempt<Input>,
     command: ClaudeCommand,

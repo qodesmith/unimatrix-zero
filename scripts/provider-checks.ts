@@ -1,7 +1,3 @@
-/**
- * Run by hand by the maintainer: re-records the recordings, and posts results
- * on the PR CI's gate holds.
- */
 import type {CheckStatus} from './provider-checks-result.ts'
 import type {Entry} from './provider-dependencies.ts'
 import type {Builds} from './provider-review.ts'
@@ -200,7 +196,6 @@ async function isCleanAt(head: string) {
   return current === head && !dirty
 }
 
-/** Each `[records]` test also rewrites its recordings. */
 async function runLiveChecks(ids: string[], env: Record<string, string>) {
   const report = path.join(os.tmpdir(), `uz-provider-checks-${Date.now()}.json`)
 
@@ -229,7 +224,6 @@ async function recordings() {
   return (await filesIn(root)).filter(isRecording)
 }
 
-/** Why the run must keep the old recordings, or null when it can commit. */
 async function whyKept(since: number, failed: boolean) {
   if (failed) return 'a live test failed'
 
@@ -246,7 +240,6 @@ async function whyKept(since: number, failed: boolean) {
     : null
 }
 
-/** Null when the run rewrote every recording as it was. */
 async function commitRecordings() {
   await $`git add -- ${await recordings()}`.cwd(root)
 
@@ -383,7 +376,6 @@ if (postTo) {
     root
   )
 
-  // Pushed after the comment, so CI's gate on the new commit finds its result.
   await (committed
     ? $`git push origin ${`HEAD:refs/heads/${postTo.branch}`}`.cwd(root)
     : rerunGate(repo, postTo))

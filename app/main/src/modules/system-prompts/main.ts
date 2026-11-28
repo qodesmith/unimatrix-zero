@@ -53,7 +53,6 @@ function refusePreset(id: string, change: string) {
 
 export type SystemPrompts = ReturnType<typeof createSystemPrompts>
 
-/** The library: the presets, then the user's own. Changing it changes no Tree. */
 export function createSystemPrompts(db: Database, settings: SettingsStore) {
   function list(): SystemPromptLibrary {
     const own = db
@@ -79,7 +78,6 @@ export function createSystemPrompts(db: Database, settings: SettingsStore) {
       )
     },
 
-    /** Null for an entry the library doesn't have. */
     update(id: string, {name, text}: NamedText): SystemPromptEntry | null {
       refusePreset(id, 'changed')
 
@@ -119,7 +117,6 @@ export function createSystemPrompts(db: Database, settings: SettingsStore) {
       }
     },
 
-    /** What a new Tree copies. */
     defaultText(): string {
       return defaultEntry(list().entries, settings.read().defaultSystemPromptId)
         .text

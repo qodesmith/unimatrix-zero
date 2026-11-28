@@ -6,9 +6,7 @@ export interface ClaudeCommand {
 }
 
 export interface LoginEvents {
-  /** The sign-in page that shows a code to paste, as `claude` printed it. */
   onUrl(url: string): void
-  /** `code` is null when `claude` didn't start; `output` is its stderr. */
   onExit(code: number | null, output: string): void
 }
 

@@ -1,4 +1,3 @@
-/** The extraction window's page: its own bundle, its worker and wasm, no more. */
 export const EXTRACTOR_CSP = [
   "default-src 'none'",
   "script-src 'self' 'wasm-unsafe-eval'",
@@ -32,9 +31,7 @@ export function renderCsp({
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: uzfile:",
     'media-src uzfile:',
-    // An HTML file's preview, under its own response's sandbox.
     'frame-src uzfile:',
-    // pdf.js's worker, from the bundle.
     "worker-src 'self'",
     "font-src 'self' data:",
     `connect-src ${["'self'", 'uzfile:', ...connectSources].join(' ')}`,

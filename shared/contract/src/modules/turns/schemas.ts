@@ -7,7 +7,6 @@ export const PromptSchema = z.strictObject({
   treeId: z.uuid(),
   parentReplyId: z.uuid().nullable(),
   text: z.string(),
-  /** In the order they were attached. */
   attachments: z.array(AttachmentSchema),
   createdAt: z.iso.datetime(),
 })
@@ -23,14 +22,12 @@ export const ToolCallPartSchema = z.strictObject({
   type: z.literal('tool-call'),
   toolCallId: z.string(),
   toolName: z.string(),
-  /** The arguments as the Provider streamed them, usually JSON. */
   args: z.string(),
   result: z
     .strictObject({content: z.string(), isError: z.boolean()})
     .nullable(),
 })
 
-/** In the order it happened. */
 export const ReplyPartSchema = z.discriminatedUnion('type', [
   TextPartSchema,
   ToolCallPartSchema,
@@ -38,10 +35,6 @@ export const ReplyPartSchema = z.discriminatedUnion('type', [
 
 export type ReplyPart = z.infer<typeof ReplyPartSchema>
 
-/**
- * `interrupted`: the app quit while the Reply was streaming; set at the next
- * launch, and from then on like `stopped`.
- */
 export const ReplyStatusSchema = z.enum([
   'streaming',
   'complete',
@@ -69,24 +62,16 @@ export const RunFailureSchema = z.strictObject({
     'fake-failure',
   ]),
   message: z.string(),
-  /** For `limit-reached`, when the limit lifts, if the Provider said. */
   resetsAt: z.iso.datetime().optional(),
-  /**
-   * For `too-long`, when the Provider caps one Prompt's text: the characters
-   * it counted and its cap. Neither is set when the Context window was full.
-   */
   promptChars: z.number().int().nonnegative().optional(),
   maxPromptChars: z.number().int().nonnegative().optional(),
 })
 
 export type RunFailure = z.infer<typeof RunFailureSchema>
 
-/** A file whose contents differ between a Reply's Snapshot and its parent's. */
 export const ChangedFileSchema = z.strictObject({
-  /** Inside the Tree's files, with `/` between parts. */
   path: z.string().min(1),
   change: z.enum(['created', 'edited', 'deleted']),
-  /** In bytes, as the Reply left it; null once deleted. */
   size: z.number().int().nonnegative().nullable(),
 })
 
@@ -99,7 +84,6 @@ export const ReplyProgressSchema = z.strictObject({
   contextWindow: z.number().int().positive().nullable(),
   failure: RunFailureSchema.nullable(),
   compacted: z.boolean(),
-  /** Its session was rebuilt from the Thread. */
   rebuilt: z.boolean(),
 })
 
@@ -112,9 +96,7 @@ export const ReplySchema = z.strictObject({
   promptId: z.uuid(),
   provider: ProviderIdSchema,
   model: z.string(),
-  /** The System prompt it ran under, as `TreeSystemPromptSchema`'s id. */
   systemPromptId: z.uuid(),
-  /** Empty until the Reply has finished. */
   files: z.array(ChangedFileSchema),
   createdAt: z.iso.datetime(),
 })
@@ -150,17 +132,12 @@ export const TextDeltaEvent = z.strictObject({
   delta: z.string(),
 })
 
-/** A re-sent stream: the text so far of the current text part, replaced. */
 export const TextReplaceEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('TEXT_REPLACE'),
   text: z.string(),
 })
 
-/**
- * A re-sent stream that threw a tool call away: the content cut back to before
- * that call, with the text part before it replaced, or dropped when empty.
- */
 export const ContentCutBackEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('CONTENT_CUT_BACK'),
@@ -168,7 +145,6 @@ export const ContentCutBackEvent = z.strictObject({
   text: z.string(),
 })
 
-/** Display only: thinking is never stored. */
 export const ReasoningDeltaEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('REASONING_DELTA'),
@@ -203,27 +179,21 @@ export const ToolResultEvent = z.strictObject({
   isError: z.boolean(),
 })
 
-/** What an approval card asks about. Reads never ask, so none is a read. */
 export const ApprovalActionSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('edit'),
-    /** Absolute, in the order the Provider named them. */
     paths: z.array(z.string().min(1)).min(1),
-    /** Every path is inside the Tree's files, so the Branch versions it. */
     inTreeFiles: z.boolean(),
   }),
   z.strictObject({
     kind: z.literal('command'),
     command: z.string(),
-    /** The AI asks to run it outside the Sandbox. */
     outsideSandbox: z.literal(true).optional(),
-    /** Run outside, it still can't read the credential folders. */
     credentialsDenied: z.literal(true).optional(),
   }),
   z.strictObject({
     kind: z.literal('host'),
     host: z.string().min(1),
-    /** A command inside the Sandbox asks, not a web fetch. */
     fromCommand: z.literal(true).optional(),
   }),
   z.strictObject({
@@ -231,7 +201,6 @@ export const ApprovalActionSchema = z.discriminatedUnion('kind', [
     server: z.string(),
     tool: z.string(),
   }),
-  /** Any other tool, by the name the Provider gives it. */
   z.strictObject({kind: z.literal('tool'), name: z.string().min(1)}),
 ])
 
@@ -245,12 +214,10 @@ export const ApprovalAnswerSchema = z.enum([
 
 export type ApprovalAnswer = z.infer<typeof ApprovalAnswerSchema>
 
-/** The Reply waits on the user's answer; display only, as is the answer. */
 export const ApprovalRequestedEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('APPROVAL_REQUESTED'),
   approvalId: z.string(),
-  /** The tool call it sits at, when the Provider streamed one first. */
   toolCallId: z.string().optional(),
   action: ApprovalActionSchema,
 })
@@ -262,7 +229,6 @@ export const ApprovalResolvedEvent = z.strictObject({
   answer: ApprovalAnswerSchema,
 })
 
-/** Under Auto the Reviewer decides instead of the user. */
 export const ReviewStartedEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('REVIEW_STARTED'),
@@ -271,7 +237,6 @@ export const ReviewStartedEvent = z.strictObject({
   action: ApprovalActionSchema,
 })
 
-/** `unanswered`: it timed out or failed, which counts as declined. */
 export const ReviewFinishedEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('REVIEW_FINISHED'),
@@ -294,7 +259,6 @@ export const SubagentFinishedEvent = z.strictObject({
   status: FinishedStatusSchema,
 })
 
-/** Sent after the Reply's `RUN_FINISHED`, when the Snapshot is taken. */
 export const FilesChangedEvent = z.strictObject({
   ...replyIds,
   type: z.literal('FILES_CHANGED'),
@@ -308,7 +272,6 @@ export const TokensEvent = z.strictObject({
   type: z.literal('TOKENS'),
   inputTokens: tokenCount,
   outputTokens: tokenCount,
-  /** As the Provider reports it, never summed from Turns. */
   contextSize: tokenCount,
   contextWindow: z.number().int().positive().optional(),
 })
@@ -317,7 +280,6 @@ export const ContextCompactedEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('CONTEXT_COMPACTED'),
   sessionId: z.string(),
-  /** Claude's boundary entry in that session; Codex reports none. */
   boundaryId: z.string().nullable(),
 })
 
@@ -326,24 +288,17 @@ export const SessionRebuiltEvent = z.strictObject({
   type: z.literal('SESSION_REBUILT'),
 })
 
-/**
- * Display only: the vendor program is retrying a request. Its next content
- * says the retry went through, since nothing else does.
- */
 export const ReconnectingEvent = z.strictObject({
   ...replyIds,
   type: z.literal('RECONNECTING'),
-  /** The server answered with a 429 or a 529, so the connection is fine. */
   busy: z.boolean(),
 })
 
-/** Ends the whole Reply; a Subagent ends with SUBAGENT_FINISHED. */
 export const RunFinishedEvent = z.strictObject({
   ...replyIds,
   type: z.literal('RUN_FINISHED'),
   status: FinishedStatusSchema,
   failure: RunFailureSchema.optional(),
-  /** Claude reports it only at the end; Codex with every usage report. */
   contextWindow: z.number().int().positive().optional(),
 })
 

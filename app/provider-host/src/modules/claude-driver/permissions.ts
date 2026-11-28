@@ -31,7 +31,6 @@ import {z} from 'zod'
 
 import {projectKeyOf} from './transcripts'
 
-/** The Reply being written on a `claude`, whose callback is fixed at start. */
 export interface SessionApprovals {
   current: ReplyApprovals | null
 }
@@ -53,18 +52,14 @@ const CHANGED_ELSEWHERE =
 const ABOVE_THE_TREES =
   'This search covers folders that can’t be read from here. Search a narrower folder.'
 
-/** What a card needs of a tool call's input; anything else is left out. */
 const ToolInputSchema = z.object({
   file_path: z.string().min(1).optional().catch(undefined),
-  /** The folder a Glob or a Grep searches. */
   path: z.string().min(1).optional().catch(undefined),
   pattern: z.string().min(1).optional().catch(undefined),
   notebook_path: z.string().min(1).optional().catch(undefined),
   command: z.string().optional().catch(undefined),
   url: z.string().optional().catch(undefined),
-  /** The Sandbox blocked the command, and the Model asks to run it outside. */
   dangerouslyDisableSandbox: z.boolean().optional().catch(undefined),
-  /** The host a sandboxed command wants to reach. */
   host: z.string().min(1).optional().catch(undefined),
 })
 
@@ -72,13 +67,9 @@ type ToolInput = z.infer<typeof ToolInputSchema>
 
 const MCP_TOOL = /^mcp__(.+?)__(.+)$/
 
-/** `claude`'s prompt when a command inside the Sandbox opens a connection. */
 const SANDBOX_NETWORK = 'SandboxNetworkAccess'
 
-/**
- * `claude` trims a path, then reads `~` as the home folder, before it
- * resolves it.
- */
+/** `claude` trims a path and expands `~` before resolving it. */
 function asClaudeReads(given: string) {
   const trimmed = given.trim()
 
@@ -204,7 +195,6 @@ const HookInputSchema = z.object({
   tool_input: ToolInputSchema,
 })
 
-/** A Glob's pattern may itself name a folder, from the one it searches. */
 function readTargets(toolName: string, input: ToolInput, treeFolder: string) {
   const {file_path: filePath, path: folder, pattern} = input
 
@@ -218,7 +208,6 @@ function readTargets(toolName: string, input: ToolInput, treeFolder: string) {
 
 const GLOB_CHARACTER = /[*?[{]/u
 
-/** The deepest folder that holds every file `pattern` can match. */
 function globRoot(searched: string, pattern: string) {
   const wildcardAt = pattern.search(GLOB_CHARACTER)
 
@@ -227,7 +216,6 @@ function globRoot(searched: string, pattern: string) {
     : path.dirname(path.resolve(searched, `${pattern.slice(0, wildcardAt)}_`))
 }
 
-/** The folders a Glob or a Grep walks down from; a Read walks none. */
 function searchRoots(toolName: string, input: ToolInput, treeFolder: string) {
   const {path: folder, pattern} = input
   const searched = path.resolve(treeFolder, folder ?? '.')
@@ -242,15 +230,12 @@ type SandboxFolders = Pick<
   'treeFolder' | 'treesFolder' | 'hiddenFolders'
 >
 
-/** `configDir` is `claude`'s config folder, which may sit in a hidden folder. */
 type ReadFolders = SandboxFolders & {configDir: string}
 
 /**
- * `claude` saves a tool's output too large to give inline under
- * `<configDir>/projects/<key of its folder>/<session>/tool-results/`, then
- * tells the Model to Read it there. Other Trees' sessions sit under other keys.
- * The key follows the folder's spelling as given, which on Windows may hold a
- * short name like `RUNNER~1`, or its letter case on disk.
+ * Oversized tool output lives under
+ * `<configDir>/projects/<key>/<session>/tool-results/`; on Windows the key may
+ * hold a short name like `RUNNER~1`.
  */
 function isSavedOutput({configDir, treeFolder}: ReadFolders, file: string) {
   const keys = new Set([
@@ -307,10 +292,9 @@ function refusal(toolName: string, input: ToolInput, folders: ReadFolders) {
 }
 
 /**
- * The Sandbox hides other Trees and the hidden folders from commands only. A
- * Read deny rule for the Trees' folder would hide this Tree's own, and one for
- * `claude`'s config folder would hide the outputs it saves there, since a deny
- * beats every allow, so the hook refuses them (ADR 0018).
+ * A Read deny rule can't hide the Trees' folder or `claude`'s config folder,
+ * since a deny beats every allow and would hide this Tree's own files and saved
+ * outputs; the hook refuses those reads instead (ADR 0018).
  */
 export function readDecision(
   toolName: string,
@@ -330,9 +314,8 @@ type Decision = Pick<
 >
 
 /**
- * An edit into another Tree's files or the app's own folders is refused, not
- * carded: the user can't judge one there (ADR 0018). Any other edit gets its
- * card.
+ * An edit into another Tree's files or the app's folders is refused, not carded
+ * (ADR 0018).
  */
 export function editDecision(
   toolName: string,
@@ -374,7 +357,6 @@ function preToolUse(
   }
 }
 
-/** Full access asks nothing; Supervised asks the user through `asking`. */
 export function permissionOptions(
   request: Pick<ReplyRequest, 'permissionMode' | 'vendorProgram'> &
     SandboxFolders,
@@ -426,7 +408,6 @@ function sandboxOf(
     enabled: true,
     failIfUnavailable: false,
     allowUnsandboxedCommands: true,
-    // The Sandbox is the floor under the cards, never a reason to skip one.
     autoAllowBashIfSandboxed: false,
     network: {allowedDomains: []},
     filesystem: {
@@ -438,10 +419,8 @@ function sandboxOf(
 }
 
 /**
- * Supervised runs every command inside the Sandbox where it can run. The
- * deny rules hold for the Read tool, over the hook that lets reads through,
- * but for the hidden folder that holds `claude`'s config folder, which the hook
- * guards alone.
+ * Deny rules beat the read hook, except for the hidden folder holding
+ * `claude`'s config folder, which only the hook guards.
  */
 export function sandboxSettings(
   request: Pick<ReplyRequest, 'permissionMode' | 'vendorProgram'> &

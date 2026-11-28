@@ -150,7 +150,6 @@ it('tells main nothing when the driver fails to list its Models', async () => {
 
   expect(unhandled).toEqual([])
 
-  // The lists settle in order, so a post for the failed one comes first.
   expect(
     main.sent.filter(message => message.type === 'MODELS_CHANGED')
   ).toEqual([{type: 'MODELS_CHANGED', models: [pro]}])
@@ -227,7 +226,6 @@ it('drops a command that does not parse', async () => {
   main.command({type: 'reply.start', request: next})
   await finished(main.sent)
 
-  // Had it run, the dropped command would have streamed first.
   expect(
     main.sent.filter(
       message => 'replyId' in message && message.replyId !== next.replyId
@@ -424,7 +422,6 @@ it('tells main nothing when the driver leaves the cut for later or fails it', as
 
   expect(unhandled).toEqual([])
 
-  // The cuts settle in order, so a post for either earlier one comes first.
   expect(main.sent.filter(message => message.type === 'SESSION_CUT')).toEqual([
     {
       type: 'SESSION_CUT',

@@ -9,7 +9,6 @@ import {spawn} from 'node:child_process'
 import {once} from 'node:events'
 import {setTimeout as delay} from 'node:timers/promises'
 
-/** Far longer than a token refresh; a `claude` still running then is stuck. */
 const EXIT_TIMEOUT_MS = 30_000
 
 const PREFIX = 'Claude '
@@ -57,7 +56,6 @@ export async function readAccount({
       cwd,
       settingSources: [],
       settings: {autoMemoryEnabled: false},
-      // Spawned here only to know when `claude` has exited.
       spawnClaudeCodeProcess: ({
         command,
         args,

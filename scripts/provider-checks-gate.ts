@@ -4,7 +4,7 @@ import {execFile} from 'node:child_process'
 import {promisify} from 'node:util'
 import {z} from 'zod'
 
-import {changesSince} from './changes-since.ts'
+import {changesSince, codeChanged} from './changes-since.ts'
 import {gateVerdict} from './provider-checks-result.ts'
 import {gatedChangesOf} from './recordings.ts'
 
@@ -70,15 +70,39 @@ const {pull_request: pr} = PullRequestEvent.parse(
   await Bun.file(env.GITHUB_EVENT_PATH).json()
 )
 
-const {pinChanges, files} = await gatedChangesOf(api, env.GITHUB_REPOSITORY, {
-  number: pr.number,
-  base: pr.base.sha,
-  head: pr.head.sha,
-})
+const root = process.cwd()
+const execFileAsync = promisify(execFile)
+
+async function git(...args: string[]) {
+  return (await execFileAsync('git', args, {cwd: root})).stdout.trim()
+}
+
+const checkedOut = await git('rev-parse', 'HEAD')
+
+if (checkedOut !== pr.head.sha) {
+  throw new Error(
+    `The checkout is at ${checkedOut}, not the PR's head ${pr.head.sha}, so it can't tell what a live test imports there.`
+  )
+}
+
+const {pinChanges, files: touched} = await gatedChangesOf(
+  api,
+  env.GITHUB_REPOSITORY,
+  {number: pr.number, base: pr.base.sha, head: pr.head.sha}
+)
+
+const files = await codeChanged(
+  root,
+  await git('merge-base', pr.base.sha, pr.head.sha),
+  pr.head.sha,
+  touched
+)
 
 if (pinChanges.length === 0 && files.length === 0) {
   console.log(
-    'This PR moves no vendor pin and changes no live test, recorder or recording: nothing to gate.'
+    touched.length > 0
+      ? `This PR moves no vendor pin, and changes only comments or layout in ${touched.join(', ')}: nothing to gate.`
+      : 'This PR moves no vendor pin and changes no live test, recorder or recording: nothing to gate.'
   )
   process.exit(0)
 }
@@ -88,18 +112,6 @@ if (pinChanges.length > 0) console.log(`A bump PR: ${pinChanges.join(', ')}.`)
 if (files.length > 0) {
   console.log(
     `It changes a live test, a recorder or a recording: ${files.join(', ')}.`
-  )
-}
-
-const root = process.cwd()
-
-const checkedOut = (
-  await promisify(execFile)('git', ['rev-parse', 'HEAD'], {cwd: root})
-).stdout.trim()
-
-if (checkedOut !== pr.head.sha) {
-  throw new Error(
-    `The checkout is at ${checkedOut}, not the PR's head ${pr.head.sha}, so it can't tell what a live test imports there.`
   )
 }
 

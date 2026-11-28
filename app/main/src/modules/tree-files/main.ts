@@ -28,13 +28,11 @@ const {prompts, replies} = schema
 export interface TreeFilesDeps {
   db: Database
   userData: string
-  /** Main's own, never a shared temp folder: copies of files to open or serve. */
   tempDir: string
   desktop: Desktop
   publish: (event: AppEvent) => void
   onFailure: (error: Error) => void
   gitProgram: () => string | null
-  /** A Snapshot failed because `gitProgram` is null. */
   onWaitingForGit: () => void
 }
 
@@ -227,7 +225,6 @@ export function createTreeFiles({
     ...files,
     folderFor,
 
-    /** However the Reply ended. Never rejects. */
     async replyFinished({treeId, replyId}: {treeId: string; replyId: string}) {
       return queue(treeId, async () => snapshotReporting(treeId, replyId))
     },

@@ -11,7 +11,6 @@ import {READ_ACTIONS, approvalAnswer} from './approval-wire'
 import {isSandboxed} from './threads'
 import {McpToolCallItemSchema, ToolItemSchema} from './wire'
 
-/** What a turn reads, in the order it happened. */
 export type Received =
   | Notification
   | {method: 'exited'}
@@ -65,7 +64,6 @@ const SHELL_WRAPPED = /^\/(?:[^\s/]+\/)*(?:ba|da|k|z)?sh -l?c (?<script>.+)$/su
 const WORD_PIECE =
   /^(?:'(?<single>[^']*)'|"(?<double>(?:[^"$\\`]|\\["$\\`])*)"|\\(?<escaped>[^\n])|(?<plain>[\w%+,./:@^-]+))/u
 
-/** Null when the text is anything but a single shell word. */
 function shellWord(text: string) {
   let word = ''
   let rest = text
@@ -118,11 +116,6 @@ function commandCard(
   }
 }
 
-/**
- * Answers the approval requests of one turn's thread: a read at once, anything
- * else through the Reply's cards. Under full access it takes none, so each is
- * refused. `itemId` is the tool call's id.
- */
 export function createTurnAsking({
   server,
   approvals,
@@ -184,7 +177,6 @@ export function createTurnAsking({
     }
   }
 
-  /** The elicitation names no call, so it's the oldest one of its server. */
   function mcpCard(serverName: string): Card | null {
     for (const [id, call] of mcpCalls) {
       if (call.server !== serverName) continue
@@ -200,7 +192,6 @@ export function createTurnAsking({
     return null
   }
 
-  /** Null: nothing to show on a card, so it's declined. */
   function cardOf(asked: ApprovalRequest): Card | null {
     switch (asked.method) {
       case 'item/commandExecution/requestApproval': {
@@ -218,7 +209,6 @@ export function createTurnAsking({
     }
   }
 
-  /** Null: Codex dropped the request, so it wants no answer. */
   async function ask(asked: ApprovalRequest) {
     const card = cardOf(asked)
 
@@ -297,7 +287,6 @@ export function createTurnAsking({
       return true
     },
 
-    /** The turn's own notifications, for what an approval request leaves out. */
     seen(notification: Notification) {
       if (notification.method === 'item/started') {
         started(notification.params.item)
@@ -310,7 +299,6 @@ export function createTurnAsking({
       }
     },
 
-    /** A card still waiting once the turn ends is dropped. */
     close() {
       untake()
 

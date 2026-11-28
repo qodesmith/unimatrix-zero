@@ -22,7 +22,6 @@
   --transition-duration-slide: 400ms;
 }
 
-/* Theme tokens, set on :root by the theme module. */
 @theme inline {
   --font-sans: var(--font);
   --radius-sm: calc(var(--radius) - 4px);

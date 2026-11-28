@@ -1197,7 +1197,6 @@ it('switches to one card per Exchange, left to right, and writes the Setting', a
 
 const longText = Array.from({length: 40}, (_, i) => `Line ${i + 1}`).join('\n')
 
-// Markdown folds single newlines into one paragraph.
 const longReply = longText.replaceAll('\n', '\n\n')
 
 function rootPrompt() {
@@ -1572,7 +1571,6 @@ it('counts the Replies streaming on several Threads at once and jumps to each in
   await expect.poll(viewport).not.toBe(first)
 })
 
-// A 720px window, the narrowest, leaves the canvas about 464px beside the sidebar.
 it.each([
   {pane: 'wide', width: 1280},
   {pane: 'narrow', width: 464},
@@ -1615,7 +1613,6 @@ function slideoutInput() {
   return slideout().getByRole('textbox', {name: 'Prompt'})
 }
 
-/** The one in the card's header, before the one under the Reply's text. */
 function chatButtonOf(replyText: string) {
   return nodeOf(replyText)
     .getByRole('button', {name: 'Open in Chat mode'})
@@ -1680,7 +1677,6 @@ it('switches the slideout to another Reply’s Thread with its Input focused, an
   await renderCanvas(forkedTree())
   await expect.element(page.getByText('Reply five')).toBeVisible()
 
-  // The slideout covers the right of the canvas: the Branch on the left stays clickable.
   await openChatAt('Reply three')
   await expect
     .poll(chatTurns)
@@ -1798,7 +1794,6 @@ function slideDistance(element: Element) {
   const [x = ''] = String(offset?.translate).split(' ')
   const distance = Math.abs(Number.parseFloat(x))
 
-  // A full slide comes back as a share of the width, like `100%`.
   return x.endsWith('%') ? (distance / 100) * element.clientWidth : distance
 }
 
@@ -2000,7 +1995,6 @@ it('shows the connections after an orientation switch where no Turn moves, with 
   await expect.element(page.getByText('Reply one')).toBeVisible()
   await settledViewport()
 
-  // Both orientations measured, so the Reply comes back already in place.
   await page.getByRole('button', {name: 'Horizontal'}).click()
   await expect.element(canvas().getByText('Reply one')).toBeVisible()
   await page.getByRole('button', {name: 'Vertical'}).click()
@@ -2082,7 +2076,6 @@ it('widens the slideout to full screen and back with a transition rather than a 
   await expect.poll(slideoutWidth).toBeLessThan(canvasWidth / 2)
 })
 
-/** '' clears the emulation: no preference. */
 async function emulateReducedMotion(value: 'reduce' | '') {
   await cdp().send('Emulation.setEmulatedMedia', {
     features: [{name: 'prefers-reduced-motion', value}],
@@ -2683,7 +2676,6 @@ function promptWith(sent: Prompt, attachments: Attachment[]): Prompt {
   return {...sent, attachments}
 }
 
-/** Over Claude's inline limit: a 9 MiB image is 12 MiB of base64, the PDF 4 MiB. */
 function mediaTree(provider: Reply['provider'] = 'claude'): Saved {
   clock = 0
 
@@ -2790,7 +2782,6 @@ it('says on an earlier Prompt’s attachment that it now goes by path only, once
   await expect
     .element(thumbnailIn(two, 'second.png'))
     .toHaveAccessibleDescription('Sent by path only now')
-  // Prompt three passes the budget by itself, so third.png never went inline.
   await expect
     .element(thumbnailIn(three, 'third.png'))
     .toHaveAccessibleDescription('')
@@ -3091,7 +3082,6 @@ it('shows a root Reply that fails with the slideout open on it only as the chip,
 
 it('badges a Turn whose Reply waits on an approval card until it is answered', async () => {
   const {main} = await renderCanvas(endingIn('streaming', ''))
-  // The Reply's own line says it too, below the badge.
   const badge = page.getByText('Waiting for you').first()
 
   await expect.element(page.getByText('Writing…')).toBeVisible()
@@ -3445,7 +3435,6 @@ function bottomOf(element: Element) {
   return element.getBoundingClientRect().bottom
 }
 
-/** A wheel, then the end of its gesture, which the canvas waits a timer for. */
 async function wheelGesture(deltaY: number) {
   vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']})
   onTestFinished(() => {
@@ -3499,7 +3488,6 @@ it('keeps a streaming Reply’s bottom on the canvas as it grows, until the user
   await everyFrameUntil(
     () => canvas().getByText('A line mid-scroll').query() !== null
   )
-  // The canvas measures the grown Reply as that frame draws.
   await new Promise(requestAnimationFrame)
   await reactCaughtUp()
   expect(viewport()).toBe(scrolled)

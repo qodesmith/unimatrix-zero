@@ -77,7 +77,6 @@ function Snapshot({treeId, replyId}: SnapshotProps) {
   )
 }
 
-/** The Snapshot of the Reply the canvas follows, without touching disk. */
 export function FilesSection() {
   const shown = useShownTreeFiles()
 

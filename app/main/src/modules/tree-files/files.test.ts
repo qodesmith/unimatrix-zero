@@ -156,7 +156,6 @@ async function finish(replyId: string) {
   await Promise.all(snapshots)
 }
 
-/** A Reply that writes `files`, then finishes. */
 async function replyWriting(
   parentReplyId: string | null,
   files: Record<string, string | Uint8Array>
@@ -566,7 +565,6 @@ function inFolder(filePath: string) {
   return fs.realpathSync(path.join(folder(), filePath))
 }
 
-/** A folder outside the Tree's, holding `name`. */
 function outside(name: string) {
   const elsewhere = fs.mkdtempSync(path.join(userData, 'elsewhere-'))
   fs.writeFileSync(path.join(elsewhere, name), 'secret')

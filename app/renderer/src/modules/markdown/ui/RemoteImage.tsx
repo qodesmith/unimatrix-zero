@@ -28,10 +28,6 @@ function remoteUrl(src: ImageProps['src']): string | null {
   return src !== undefined && /^https?:/iu.test(src) ? src : null
 }
 
-/**
- * A chip until clicked: nothing in a Reply reaches the network on its own
- * (ADR 0014).
- */
 export function RemoteImage({src, alt, title}: ImageProps) {
   const url = remoteUrl(src)
 

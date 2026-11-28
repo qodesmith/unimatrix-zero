@@ -24,7 +24,6 @@ interface Ended {
   stderr: string
 }
 
-/** A space in the path, as a user's data folder can have. */
 function temporaryFolder() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'uz git folder '))
 }
@@ -67,7 +66,6 @@ async function initPushCloneFetch(git: Git) {
 
   const init = await git(['init', '-b', 'main'], first)
 
-  // The templates' own file: a `git` with no templates writes no `info`.
   const excludes = fs.existsSync(path.join(first, '.git', 'info', 'exclude'))
 
   fs.writeFileSync(path.join(first, 'note.txt'), 'one\n')
@@ -75,7 +73,6 @@ async function initPushCloneFetch(git: Git) {
   await git([...identity, 'commit', '-m', 'one'], first)
   await git(['init', '--bare', '-b', 'main', origin], work)
 
-  // A plain path copies files, skipping git-upload-pack and git-receive-pack.
   const url = pathToFileURL(origin).href
   const push = await git(['push', url, 'main'], first)
   const clone = await git(['clone', url, second], work)
@@ -106,7 +103,6 @@ const worked = {
   fetched: 'two',
 }
 
-/** A build adds its own ending: `.windows.1`, or `.dirty` on Linux arm64. */
 const PINNED_VERSION = new RegExp(
   `^git version ${DEV_MANIFEST.vendorPrograms.git.version.replaceAll('.', String.raw`\.`)}\\b`
 )
@@ -114,7 +110,6 @@ const PINNED_VERSION = new RegExp(
 /** CI sets it on a machine whose only `git` is the app's, last on `PATH`. */
 const noGit = process.env.UZ_NO_GIT === '1'
 
-/** Runs `git` by name, as a command the AI runs finds it. */
 function gitIn(folder: string): Git {
   return async (args, cwd = os.tmpdir()) =>
     ended('/bin/sh', ['-c', 'git "$@"', 'sh', ...args], {
@@ -272,7 +267,6 @@ describe.runIf(noGit && process.platform === 'linux')(
   }
 )
 
-/** Built by `bun run build:git-exe`, which CI runs before these tests. */
 const gitExes = path.resolve(
   import.meta.dirname,
   '../../../../../shell/git-exe/dist'

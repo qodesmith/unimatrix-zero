@@ -12,7 +12,6 @@ const END_OF_IMAGE = [0xff, 0xd9]
 
 const COMPONENTS = [1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]
 
-/** A JFIF JPEG's headers and a baseline frame: enough to read its size. */
 export function jpegBytes(width: number, height: number, size?: number) {
   const frame = [0xff, 0xc0, 0, 17, 8, ...uint16(height), ...uint16(width), 3]
 

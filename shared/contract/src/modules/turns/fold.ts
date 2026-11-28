@@ -111,7 +111,7 @@ function foldContent(content: ReplyPart[], event: ContentEvent): ReplyPart[] {
 
 /**
  * Main and the window run the same fold, so what main saves is what the window
- * displayed. A Subagent's events are not part of its Reply's own content.
+ * displayed.
  */
 export function foldReplyEvent<T extends ReplyProgress>(
   reply: T,

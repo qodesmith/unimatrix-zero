@@ -4,7 +4,6 @@ import {QueryClient} from '@tanstack/react-query'
 
 import {applyLiveEvent, createReplyStore} from './live-replies'
 
-/** A live store whose clock starts at 1000 and moves 100 ms per event. */
 export function createReplay() {
   const store = createReplyStore()
   const queryClient = new QueryClient()

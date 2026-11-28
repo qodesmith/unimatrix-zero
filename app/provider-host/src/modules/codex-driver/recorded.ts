@@ -56,7 +56,6 @@ const RateLimitsSchema = z.looseObject({
 
 type ThreadMethod = 'thread/start' | 'thread/fork' | 'thread/revert'
 
-/** What a live run made, picked from its recording by place in the protocol. */
 export function readRecording(name: string) {
   const lines = fs
     .readFileSync(path.join(RECORDINGS, name), 'utf8')
@@ -139,7 +138,6 @@ export function readRecording(name: string) {
   }
 
   return {
-    /** `rollout` is the thread's path under `CODEX_HOME`, as the app keeps it. */
     thread(method: ThreadMethod) {
       const {thread} = ThreadResultSchema.parse(
         nth(resultsOf(method), 0, `${method} result`)
@@ -154,7 +152,6 @@ export function readRecording(name: string) {
     approvalRequest(method: string) {
       return ApprovalRequestSchema.parse(nth(sent(method, true), 0, method))
     },
-    /** `parsed` is the command Codex read out of the shell `command` runs in. */
     commandRequest(at = 0) {
       const method = 'item/commandExecution/requestApproval'
 
@@ -179,10 +176,6 @@ export function readRecording(name: string) {
         `item/completed for ${itemId}`
       ).aggregatedOutput
     },
-    /**
-     * The folders the live test gave the Sandbox, as the recording names
-     * them: each other Tree by its name in the folder of every Tree.
-     */
     sandboxFolders() {
       const [start] = lines
 

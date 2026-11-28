@@ -92,7 +92,6 @@ function actionsFor({details, run}: FileActionsProps): ReactNode {
   )
 }
 
-/** Opening needs the file in the Tree's folder, or a read-only copy of it. */
 export function FileActions(props: FileActionsProps) {
   return (
     <div className="flex flex-col gap-2">

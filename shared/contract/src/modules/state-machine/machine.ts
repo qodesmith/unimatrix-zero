@@ -8,7 +8,7 @@ export interface MachineEvent {
 
 /**
  * A handler is pure: one that mutates the state and returns it reads as
- * unchanged. A non-literal `status` or `type` gives its handler `never`.
+ * unchanged.
  */
 export type Transitions<S extends MachineState, E extends MachineEvent> = {
   [K in S['status']]: {
@@ -36,7 +36,6 @@ function shallowEqual(a: MachineState, b: MachineState) {
   )
 }
 
-/** Ignored events and results shallow-equal to the input return the input. */
 export function machine<S extends MachineState, E extends MachineEvent>(
   transitions: Transitions<S, E>
 ) {

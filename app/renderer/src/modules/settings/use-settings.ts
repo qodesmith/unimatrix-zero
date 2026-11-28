@@ -19,7 +19,6 @@ export function useSettings(): Settings {
   return useSelector(useSettingsStore(), state => state)
 }
 
-/** Shows the change at once; resolves to whether main saved it. */
 export function useUpdateSettings() {
   const store = useSettingsStore()
 

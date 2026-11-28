@@ -31,12 +31,10 @@ type ToolResultContent = Extract<
   {type: 'tool_result'}
 >['content']
 
-/** What `claude` names the Model of a message it made up, such as an error. */
 const SYNTHETIC_MODEL = '<synthetic>'
 
 type ReplyIds = Pick<ReplyRequest, 'treeId' | 'replyId'>
 
-/** Where a message `claude` cut off starts over, and the tool calls it drops. */
 interface Cut {
   text: string
   toolCalls: string[]
@@ -69,16 +67,13 @@ export function createReplyMapper(ids: ReplyIds) {
   let atMessageStart = ''
   let atBlockStart = ''
   let block: string | null = null
-  /** The text shown as each block of the open message began, by index. */
   let blockStarts: string[] = []
   let messageOpen = false
-  /** Where the blocks `claude` cut off, and will send again, began. */
   let atCut: Cut | null = null
   let mirrorFailed = false
   let lastMessage: {uuid: string; model: string} | null = null
   const signals: ClaudeSignals = {}
   const toolCalls = new Set<string>()
-  /** The tool call each block of the open message streams, by index. */
   let toolBlocks: string[] = []
 
   function replace(text: string): ContentEvent[] {
@@ -134,7 +129,6 @@ export function createReplyMapper(ids: ReplyIds) {
     return []
   }
 
-  /** As this request's own usage reports it: what it sent and wrote. */
   function tokens(usage: MessageUsage): ContentEvent {
     const inputTokens =
       (usage.input_tokens ?? 0) +
@@ -397,7 +391,6 @@ export function createReplyMapper(ids: ReplyIds) {
       }
     },
 
-    /** Null when an entry didn't reach the app's copy of the session. */
     recorded() {
       return mirrorFailed ? null : lastMessage
     },

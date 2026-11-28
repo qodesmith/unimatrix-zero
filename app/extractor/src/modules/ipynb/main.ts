@@ -14,10 +14,6 @@ const OutputSchema = z.looseObject({
 const CellSchema = z.looseObject({
   cell_type: z.string(),
   source: MultilineSchema,
-  /**
-   * An output that is not text, or is malformed, is left out rather than
-   * failing the notebook.
-   */
   outputs: z.array(OutputSchema.nullable().catch(null)).optional(),
 })
 
@@ -38,7 +34,6 @@ function joined(text: z.infer<typeof MultilineSchema> | undefined) {
   return (Array.isArray(text) ? text.join('') : (text ?? '')).replace(/\n$/, '')
 }
 
-/** The bytes as a notebook, or null when they are not one. */
 export function parseNotebook(bytes: Uint8Array) {
   const bom = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf
 

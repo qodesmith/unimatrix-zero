@@ -41,7 +41,6 @@ export function inTreeFolder(folder: string, filePath: string) {
   return {file: real, stat}
 }
 
-/** Any of its execute bits; Windows keeps none. */
 export function hasExecuteBit(stat: fs.Stats) {
   // oxlint-disable-next-line no-bitwise -- the mode's execute bits
   return process.platform !== 'win32' && (stat.mode & 0o111) !== 0

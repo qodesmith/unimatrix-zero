@@ -5,7 +5,6 @@ import {randomUUID} from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
-/** Left out of every Snapshot unless a `.gitignore` un-ignores them. */
 const DEFAULT_EXCLUDES = [
   'node_modules/',
   '.venv/',
@@ -18,7 +17,6 @@ const DEFAULT_EXCLUDES = [
   '.DS_Store',
 ]
 
-/** The tree git gives a folder with no files, in a SHA-1 store. */
 const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
 export interface VersionedFolder extends Checkout {
@@ -29,7 +27,6 @@ export function storeExists(store: string) {
   return fs.existsSync(path.join(store, 'HEAD'))
 }
 
-/** No template, so the store starts with no hooks. */
 async function makeStore(git: Git, store: string) {
   fs.mkdirSync(store, {recursive: true, mode: 0o700})
   await git({store}, ['init', '--bare', '--quiet', '--template=', store])
@@ -66,10 +63,7 @@ async function ownRepositories(git: Git, store: string, checkout: Checkout) {
   return untracked.split('\0').filter(entry => entry.endsWith('/'))
 }
 
-/**
- * A nested repository staged alone reads only its own `.gitignore` files, and
- * `git add` never drops a file already in the index.
- */
+/** `git add` never drops a file already in the index. */
 async function untrackIgnored(
   git: Git,
   store: string,
@@ -104,8 +98,8 @@ async function untrackIgnored(
 }
 
 /**
- * Git stores a nested repository as an empty entry and refuses one with no
- * commit, so its files go into the index once; `git add` keeps them after.
+ * Git stores a nested repository as an empty entry, so its files go into the
+ * index once.
  */
 async function stage(git: Git, store: string, checkout: Checkout) {
   for (const repository of await ownRepositories(git, store, checkout)) {
@@ -131,10 +125,7 @@ async function treeOf(git: Git, store: string, checkout: Checkout) {
   }
 }
 
-/**
- * Returns `parent` when nothing differs. The index persists so git re-hashes
- * only files whose size or modified time changed.
- */
+/** Returns `parent` when nothing differs. */
 export async function takeSnapshot(
   git: Git,
   {store, folder, index}: VersionedFolder,
@@ -164,7 +155,6 @@ export async function takeSnapshot(
   return commit
 }
 
-/** A null `from` is no files at all. */
 export interface SnapshotPair {
   replyId: string
   from: string | null
@@ -187,9 +177,8 @@ interface RawChange {
 }
 
 /**
- * `diff-tree --stdin -z` answers each pair of trees with a line naming them,
- * then one `:modes old new status`, NUL, path, NUL per file. The next pair's
- * line follows the last NUL directly, in the same field as its first file.
+ * In `diff-tree --stdin -z` output, the next pair's name line shares a field
+ * with its first file's record.
  */
 function parseDiffs(output: string): RawChange[][] {
   const perPair: RawChange[][] = []
@@ -205,7 +194,6 @@ function parseDiffs(output: string): RawChange[][] {
     const change = changeOf(status)
     const filePath = fields[at + 1]
 
-    // A file whose mode alone changed has the same contents.
     if (blob && change && filePath && blob !== blobBefore) {
       perPair.at(-1)?.push({path: filePath, change, blob})
     }
@@ -240,7 +228,6 @@ async function sizesOf(git: Git, store: string, blobs: string[]) {
   return new Map(blobs.map((blob, at) => [blob, Number(sizes[at])]))
 }
 
-/** Three `git` runs however many pairs. A Reply with no changes has no entry. */
 export async function changedFiles(
   git: Git,
   store: string,

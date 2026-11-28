@@ -1,4 +1,3 @@
-/** Bun ignores `.bun-version` and `devEngines`, yet CI installs `.bun-version`. */
 import path from 'node:path'
 
 import {finishCheck} from './finish-check.ts'

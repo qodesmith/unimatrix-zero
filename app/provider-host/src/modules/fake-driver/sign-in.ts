@@ -22,7 +22,6 @@ interface Input {
 
 export interface FakeSignInOptions {
   delayMs: number
-  /** Null: the page never answers by itself, so only a code finishes. */
   answerMs: number | null
 }
 
@@ -35,7 +34,6 @@ async function pause(ms: number) {
 }
 
 export function createFakeSignIn({delayMs, answerMs}: FakeSignInOptions) {
-  /** The plan signed in on, or null if canceled. */
   async function* signInOnPage({
     inbox,
   }: Attempt<Input>): AsyncGenerator<SignInUpdate, string | null> {

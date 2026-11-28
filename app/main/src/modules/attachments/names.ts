@@ -13,7 +13,6 @@ const FALLBACK_NAMES = {
   'inode/directory': 'Folder',
 } satisfies Record<AttachmentMediaType, string>
 
-/** UTF-8 bytes: what common file systems allow for one name. */
 const NAME_BYTES = 255
 
 const EXTENSION_BYTES = 32
@@ -41,7 +40,6 @@ function capped(name: string) {
   return stem.trimEnd() + extension
 }
 
-/** A name any file system takes that can't leave the folder it's written to. */
 export function safeName(raw: string, mediaType: AttachmentMediaType) {
   // Both separators on every platform: a pasted name can come from any.
   const name = path.win32

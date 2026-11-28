@@ -82,7 +82,6 @@ function opened(main: ReturnType<typeof fakeMain>) {
   )
 }
 
-/** The file's bytes, as `fetch` would get them over `uzfile:`. */
 function served(text: string) {
   return vi
     .spyOn(globalThis, 'fetch')
@@ -93,10 +92,6 @@ function holdTrusted(event: Event) {
   if (event.isTrusted) event.stopPropagation()
 }
 
-/**
- * A real load of an unknown scheme fails; only the test's own errors get
- * through.
- */
 function holdLoadErrors() {
   globalThis.addEventListener('error', holdTrusted, true)
   onTestFinished(() => {

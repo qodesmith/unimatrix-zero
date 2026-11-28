@@ -1,5 +1,3 @@
-// With `UZ_RECORD=yes`, each `[records]` test rewrites its files in
-// `recordings/`, which the driver tests replay.
 import type {SpawnCodex} from './app-server'
 import type {RateLimitReachedType} from './protocol/v2/RateLimitReachedType'
 import type {HostAttachment} from '@uz/contract/attachments'
@@ -169,7 +167,6 @@ function programIn(pinned: string) {
   })
 }
 
-/** Starts the app-server as the app starts it and asks it one thing. */
 async function askAppServer(
   pinned: string,
   home: string,
@@ -405,7 +402,6 @@ function threadReplies(program: string, home: string) {
     await Promise.all(exits)
   }
 
-  /** A text replay opens a second thread for a Reply; injected items don't. */
   function threadsStarted() {
     return wireLinesIn(output).filter(line => line.method === 'thread/started')
       .length
@@ -447,11 +443,9 @@ interface ApprovalReplyOptions {
   session: SessionRef | ReplySession | null
   permissionMode?: PermissionMode
   grants?: ApprovalGrant[]
-  /** How the test answers each card; `stop` stops the Reply instead. */
   answer?: ApprovalAnswer | 'stop'
 }
 
-/** Replies on one app-server in `tree`, answering each card as told. */
 function approvalReplies(
   program: string,
   home: string,
@@ -588,7 +582,6 @@ function sandboxedTrees() {
   fs.mkdirSync(tree)
   fs.mkdirSync(other)
   fs.writeFileSync(path.join(other, 'secret.txt'), 'PLOVER\n')
-  // The Model refuses a command it can see reads a denied folder.
   fs.writeFileSync(path.join(tree, 'check.sh'), `cat ${other}/secret.txt\n`)
 
   return {root, tree, other}
@@ -605,7 +598,6 @@ const ItemLine = z.looseObject({
   params: z.looseObject({item: z.looseObject({id: z.string()})}),
 })
 
-/** The methods of the notifications that carry one item, in order. */
 function itemLinesOf(lines: unknown[], itemId: string | undefined) {
   return lines.flatMap(line => {
     const {data} = ItemLine.safeParse(line)
@@ -622,7 +614,6 @@ const TurnCompleted = z.looseObject({
 
 interface CodedRepliesOptions {
   args?: string[]
-  /** `-c` values of the app's own to leave out. */
   dropArgs?: string[]
   env?: NodeJS.ProcessEnv
   platform?: NodeJS.Platform
@@ -964,14 +955,12 @@ function offersSubagents(body: ResponsesBody) {
   return JSON.stringify(body).includes('spawn_agent')
 }
 
-/** Codex offers web search inside its `exec` tool, as `web__run`. */
 function offersWebSearch(body: ResponsesBody) {
   return JSON.stringify(
     body.input.filter(item => item.type === 'additional_tools')
   ).includes('web__run')
 }
 
-/** Codex lists the Skills again in a turn whose list changed. */
 function skillListings(items: ResponsesBody['input']) {
   return items
     .map(item => JSON.stringify(item))
@@ -2359,7 +2348,6 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
         env: withGitLast(process.env, last),
       })
 
-      // 0 in a login shell, under bash's name for it or zsh's.
       const login =
         'shopt -q login_shell 2>/dev/null || [[ -o login ]] 2>/dev/null; echo "login=$?"'
 
@@ -2627,7 +2615,6 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
 
       expect(ready.requests).toEqual([])
 
-      // A thread loaded under full access asks from the next turn.
       const allowed = await live.reply(
         `${writing('allowed.txt')} Then run \`ls\` in your shell, and reply with only what it printed.`,
         {treeId, session: ready.session}
@@ -2712,7 +2699,6 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
       ])
       expect(written('first.txt')).toBe(true)
 
-      // Codex still asks; the Tree's Always allow answers.
       const again = await live.reply(writing('second.txt'), {
         treeId,
         session: always.session,
@@ -3285,7 +3271,6 @@ describe.skipIf(!folder)('a live Codex nobody signed in to', () => {
       )
 
       expect(sent.text).toMatch(/heron/i)
-      // The image's path is in the Prompt too: a tool call would read it there.
       expect(sent.calls).toEqual([])
 
       const fromClaude: Thread = [

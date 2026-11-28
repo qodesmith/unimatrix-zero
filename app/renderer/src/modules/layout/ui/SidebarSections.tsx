@@ -24,7 +24,6 @@ import {useLayout, useUpdateLayout} from '../use-layout'
 
 export interface SectionContent {
   title: string
-  /** Shown while collapsed too. */
   actions?: ReactNode
   children?: ReactNode
 }
@@ -35,7 +34,6 @@ const MIN_HEIGHT: Record<SidebarSectionId, string> = {
   usage: '90px',
 }
 
-// The header's `h-8`, which is all a collapsed section shows.
 const HEADER_HEIGHT = '2rem'
 
 function sectionLayout(layout: PanelLayout): SectionLayout {

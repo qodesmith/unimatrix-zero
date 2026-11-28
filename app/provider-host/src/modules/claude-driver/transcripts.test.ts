@@ -40,7 +40,6 @@ function readEntries(file: string): unknown[] {
     .map(line => JSON.parse(line))
 }
 
-/** As the SDK's store mirror keeps a Subagent's transcript under its subpath. */
 function subagent(agentId: string): SessionEntry[] {
   return [
     {type: 'user', uuid: `${agentId}-1`, isSidechain: true, agentId},

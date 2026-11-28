@@ -11,8 +11,6 @@ import {z} from 'zod'
 
 import {RequestIdSchema, inTurn} from './wire'
 
-// Each schema `satisfies` its generated type, so a Codex bump fails typecheck.
-
 function serverRequest<M extends ServerRequest['method'], P extends z.ZodType>(
   method: M,
   params: P
@@ -27,17 +25,12 @@ function serverRequest<M extends ServerRequest['method'], P extends z.ZodType>(
 /** A string, so a kind a later Codex adds reads as no read. */
 const CommandActionSchema = z.looseObject({type: z.string()})
 
-/** What Codex parsed a command into; these only read. */
 export const READ_ACTIONS: readonly string[] = [
   'read',
   'listFiles',
   'search',
 ] satisfies CommandAction['type'][]
 
-/**
- * The server requests that ask before a tool runs. Any other, or an MCP
- * elicitation that isn't a tool's approval, is refused.
- */
 export const ApprovalRequestSchema = z.discriminatedUnion('method', [
   serverRequest(
     'item/commandExecution/requestApproval',
