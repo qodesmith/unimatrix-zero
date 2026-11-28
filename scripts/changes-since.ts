@@ -6,7 +6,9 @@ import {promisify} from 'node:util'
 import {z} from 'zod'
 
 import {runElectronAsNode} from './electron-as-node.ts'
+import {mapLimited} from './map-limited.ts'
 import {isLiveTest, isRecording} from './recordings.ts'
+import {isCode, sameCode} from './same-code.ts'
 import {CODEX_PROTOCOL, HOST_PACKAGE, MANIFEST} from './vendor-pins.ts'
 
 const LOCKFILE = 'bun.lock'
@@ -47,6 +49,38 @@ async function isAncestor(root: string, from: string, head: string) {
   }
 }
 
+async function textAt(root: string, commit: string, file: string) {
+  try {
+    return await git(root, 'show', `${commit}:${file}`)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Drops each file whose two versions hold the same code: a change to its
+ * comments or its layout can't change what a live test does.
+ */
+export async function codeChanged(
+  root: string,
+  from: string,
+  head: string,
+  files: string[]
+) {
+  const same = await mapLimited(files, 8, async file => {
+    if (!isCode(file)) return false
+
+    const [before, after] = await Promise.all([
+      textAt(root, from, file),
+      textAt(root, head, file),
+    ])
+
+    return before !== null && after !== null && sameCode(file, before, after)
+  })
+
+  return files.filter((_, at) => !same[at])
+}
+
 export async function filesChangedSince(
   root: string,
   from: string,
@@ -66,7 +100,12 @@ export async function filesChangedSince(
 
   return {
     ancestor: true,
-    files: changed.split('\0').filter(Boolean).toSorted(),
+    files: await codeChanged(
+      root,
+      from,
+      head,
+      changed.split('\0').filter(Boolean).toSorted()
+    ),
   } as const
 }
 

@@ -119,10 +119,17 @@ async function repo() {
 }
 
 describe('the files changed since a result', () => {
-  it('lists each file changed after the result’s commit, a moved file under both names', async () => {
+  it('lists each file changed after the result’s commit, a moved file under both names, and none whose comments alone changed', async () => {
     const {root, commit} = await repo()
-    const from = await commit({'a.ts': '1', 'old.ts': 'kept', 'same.ts': ''})
-    await commit({'a.ts': '2'})
+
+    const from = await commit({
+      'a.ts': '1',
+      'old.ts': 'kept',
+      'same.ts': '',
+      'noted.ts': '// old\nf()',
+    })
+
+    await commit({'a.ts': '2', 'noted.ts': 'f() // new'})
     const head = await commit({'new.ts': 'kept'}, ['old.ts'])
 
     expect(await filesChangedSince(root, from, head)).toEqual({
