@@ -2,6 +2,7 @@ import type {RecordedLine} from './replay'
 import type {SpawnOptions, SpawnedProcess} from '@anthropic-ai/claude-agent-sdk'
 
 import {
+  HOME_STAND_IN,
   buildOf,
   claimRecordings,
   replaceAcross,
@@ -12,7 +13,11 @@ import {createInterface} from 'node:readline'
 import {PassThrough} from 'node:stream'
 import {z} from 'zod'
 
-import {RecordedMessageSchema} from './replay'
+import {
+  APP_VARIABLE,
+  CONFIG_FOLDER_STAND_IN,
+  RecordedMessageSchema,
+} from './replay'
 import {projectKeyOf} from './transcripts'
 
 type RecordedMessage = z.infer<typeof RecordedMessageSchema>
@@ -191,7 +196,7 @@ function scrub(lines: RecordedLine[]) {
   const replacements: (readonly [string, string])[] = [
     ...temp.paths,
     ...temp.projectKeys,
-    [os.homedir(), '/Users/sam'],
+    [os.homedir(), HOME_STAND_IN],
     ...emails.map(email => [email, 'sam@example.com'] as const),
     ...ids.map(id => [id, STAND_IN_UUID] as const),
     [os.userInfo().username, 'sam'],
@@ -210,13 +215,25 @@ function scrub(lines: RecordedLine[]) {
     .join('')
 }
 
+function appVariables(env: SpawnOptions['env'], configDir: string) {
+  return Object.fromEntries(
+    Object.entries(env).flatMap(([name, value]) =>
+      value !== undefined && APP_VARIABLE.test(name)
+        ? [[name, value.replaceAll(configDir, CONFIG_FOLDER_STAND_IN)]]
+        : []
+    )
+  )
+}
+
 /**
  * Records each `claude` into `files` in the order they start, stamped with its
  * build, once it exits, unless a later recorder has claimed the file.
+ * `configDir` is the app's config folder, which the SDK swaps on a resume.
  */
 export function createRecorder(
   spawn: (options: SpawnOptions) => SpawnedProcess,
-  files: string[]
+  files: string[],
+  configDir: string
 ) {
   const written: Promise<void>[] = []
   const write = claimRecordings(files)
@@ -233,6 +250,8 @@ export function createRecorder(
         configDir: options.env.CLAUDE_CONFIG_DIR ?? '',
         projectKey: projectKeyOf(options.cwd ?? '.'),
         cwd: options.cwd ?? '',
+        args: options.args,
+        env: appVariables(options.env, configDir),
       },
     ]
 

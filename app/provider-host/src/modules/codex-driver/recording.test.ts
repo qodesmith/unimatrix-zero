@@ -18,27 +18,27 @@ it('holds no email, home folder, temp folder or account id but the stand-ins in 
   ).toEqual([])
 })
 
+const env = Object.fromEntries(
+  Object.entries(process.env).flatMap(([name, value]) =>
+    value === undefined ? [] : [[name, value]]
+  )
+)
+
+// Stands in for `codex`: prints a version, and exits once its input ends.
+function start(recorder: ReturnType<typeof createRecorder>, cwd: string) {
+  return recorder.spawn(
+    {command: process.execPath, args: ['-e', 'process.stdin.resume()']},
+    {cwd, env}
+  )
+}
+
 it('writes nothing for a codex that exits after a newer recorder claimed its file, which the newer one writes with its build', async () => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-recorder-'))
   const file = path.join(folder, 'retried.ndjson')
 
-  const env = Object.fromEntries(
-    Object.entries(process.env).flatMap(([name, value]) =>
-      value === undefined ? [] : [[name, value]]
-    )
-  )
-
-  // Stands in for `codex`: prints a version, and exits once its input ends.
-  function start(recorder: ReturnType<typeof createRecorder>) {
-    return recorder.spawn(
-      {command: process.execPath, args: ['-e', 'process.stdin.resume()']},
-      {cwd: folder, env}
-    )
-  }
-
   try {
-    const stale = start(createRecorder([file]))
-    const fresh = start(createRecorder([file]))
+    const stale = start(createRecorder([file]), folder)
+    const fresh = start(createRecorder([file]), folder)
 
     fresh.stdin.end()
     await once(fresh, 'exit')
@@ -53,6 +53,43 @@ it('writes nothing for a codex that exits after a newer recorder claimed its fil
 
     expect(fs.existsSync(file)).toBe(false)
   } finally {
+    fs.rmSync(folder, {recursive: true, force: true})
+  }
+})
+
+it('names the Sandbox folders a live test gave it on the start line, each other Tree by name and each hidden folder under its stand-in', async () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-recorder-'))
+  const file = path.join(folder, 'sandboxed.ndjson')
+  const treesFolder = path.join(folder, 'trees')
+  const hidden = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-recorder-hidden-'))
+
+  for (const name of ['one', 'three', 'two']) {
+    fs.mkdirSync(path.join(treesFolder, name), {recursive: true})
+  }
+
+  try {
+    const codex = start(
+      createRecorder([file], {
+        treeFolder: path.join(treesFolder, 'two'),
+        treesFolder,
+        hiddenFolders: [hidden],
+      }),
+      folder
+    )
+
+    codex.stdin.end()
+    await once(codex, 'exit')
+
+    expect(
+      JSON.parse(fs.readFileSync(file, 'utf8').split('\n')[0] ?? '')
+    ).toMatchObject({
+      sandbox: {
+        otherTrees: ['one', 'three'],
+        hiddenFolders: [`/temp-folder${path.sep}${path.basename(hidden)}`],
+      },
+    })
+  } finally {
+    fs.rmSync(hidden, {recursive: true, force: true})
     fs.rmSync(folder, {recursive: true, force: true})
   }
 })

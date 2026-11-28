@@ -1,4 +1,4 @@
-import type {FakeCodexOptions} from './replay'
+import type {CodexSetting, FakeCodexOptions} from './replay'
 import type {HostAttachment} from '@uz/contract/attachments'
 import type {
   PromptRecorded,
@@ -38,6 +38,7 @@ import {readRecording} from './recorded'
 import {
   FakeCodexRunSchema,
   RECORDINGS,
+  TREES_FOLDER_STAND_IN,
   fakeCodexEnv,
   replayCodex,
 } from './replay'
@@ -103,11 +104,20 @@ const LIMIT_LIFTS = new Date(
 type Streamed = StartReplyEvent
 
 const cleanUps: (() => Promise<void>)[] = []
+const changedSettings: string[] = []
 
 afterEach(async () => {
   vi.useRealTimers()
 
-  for (const cleanUp of cleanUps.splice(0).toReversed()) await cleanUp()
+  let messages: string[] = []
+
+  try {
+    for (const cleanUp of cleanUps.splice(0).toReversed()) await cleanUp()
+  } finally {
+    messages = changedSettings.splice(0)
+  }
+
+  if (messages.length > 0) throw new Error(messages.join('\n\n'))
 })
 
 function folder(prefix: string) {
@@ -163,6 +173,19 @@ function extendSavedRollout(
 
 const SYSTEM_PROMPT = 'You answer in as few words as you can.'
 
+/** Settings a test sends differently from its recording on purpose, and why. */
+function skipping(reason: string, ...fields: CodexSetting[]) {
+  return fields.map(field => ({field, reason}))
+}
+
+const RECORDED_UNDER_FULL_ACCESS = skipping(
+  'The recording ran under full access: the test checks what the driver sends under Supervised, not what Codex answers.',
+  'config',
+  'sandbox',
+  'approvalPolicy',
+  'sandboxPolicy'
+)
+
 async function setUp(
   recordings: string[],
   {
@@ -211,7 +234,7 @@ async function setUp(
           path.isAbsolute(name) ? name : path.join(RECORDINGS, name)
         ),
         reports,
-        behavior
+        {treeFolder, ...behavior}
       ),
     },
     whenIdle: idle.whenIdle,
@@ -342,6 +365,9 @@ async function setUp(
   cleanUps.push(async () => {
     idle.pass()
     await Promise.all(exits)
+    changedSettings.push(
+      ...reportsSoFar().flatMap(report => report.changed ?? [])
+    )
   })
 
   async function cut(sessionId: string, keptTurn: string, dropFrom: string) {
@@ -722,7 +748,13 @@ it('forks the Provider session through a mid-Thread Reply into a new thread with
   await opened.reply(SECOND_PROMPT, recordedIn(first))
   await opened.allClosed()
 
-  const codex = await setUp(['forked.ndjson'], {store: opened.store})
+  const codex = await setUp(['forked.ndjson'], {
+    store: opened.store,
+    skip: skipping(
+      'forked.ndjson forked with no Compaction threshold: the test checks that the driver sends one.',
+      'config'
+    ),
+  })
 
   const forked = await codex.reply(
     FORK_PROMPT,
@@ -844,8 +876,16 @@ it('unsubscribes a loaded thread and resumes it with a changed Compaction thresh
   expect(textOf(lowered)).toBe(COMPACTION_SETTINGS.turn(2).text)
 })
 
+const RESUMED_ON_ANOTHER_THRESHOLD = skipping(
+  'compaction-settings.ndjson resumed its thread to lower the Compaction threshold: the test checks the config the driver resumes it with for another change.',
+  'config'
+)
+
 it('turns web search, built-in Skills and remote plugins on or off as the Tools panel says, unsubscribing a loaded thread to change them', async () => {
-  const codex = await setUp(['compaction-settings.ndjson'])
+  const codex = await setUp(['compaction-settings.ndjson'], {
+    skip: RESUMED_ON_ANOTHER_THRESHOLD,
+  })
+
   const lowered = {compactionSettings: {auto: true, threshold: 30_000}}
 
   const padded = await codex.reply(
@@ -904,7 +944,10 @@ it('turns web search, built-in Skills and remote plugins on or off as the Tools 
 })
 
 it('loads a thread again with no Compaction limit in its config to go back to Codex’s default', async () => {
-  const codex = await setUp(['compaction-settings.ndjson'])
+  const codex = await setUp(['compaction-settings.ndjson'], {
+    skip: RESUMED_ON_ANOTHER_THRESHOLD,
+  })
+
   const lowered = {compactionSettings: {auto: true, threshold: 30_000}}
 
   const padded = await codex.reply(
@@ -1817,15 +1860,16 @@ it('starts, resumes and forks every thread under Supervised in the Tree’s fold
     treesFolder: '/app/trees',
   }
 
-  const opened = await setUp(['started.ndjson'])
+  const skip = RECORDED_UNDER_FULL_ACCESS
+  const opened = await setUp(['started.ndjson'], {skip})
   const first = await opened.reply(FIRST_PROMPT, null, supervised)
   await opened.reply(SECOND_PROMPT, recordedIn(first), supervised)
   await opened.allClosed()
 
-  const resumed = await setUp(['resumed.ndjson'], {store: opened.store})
+  const resumed = await setUp(['resumed.ndjson'], {store: opened.store, skip})
   await resumed.reply(THIRD_PROMPT, recordedIn(first), supervised)
 
-  const forked = await setUp(['forked.ndjson'], {store: opened.store})
+  const forked = await setUp(['forked.ndjson'], {store: opened.store, skip})
 
   await forked.reply(
     FORK_PROMPT,
@@ -1886,7 +1930,10 @@ it('under Supervised, denies each other Tree’s folder rather than the folder o
   fs.mkdirSync(own)
   fs.mkdirSync(other)
 
-  const codex = await setUp(['compaction-settings.ndjson'], {treeFolder: own})
+  const codex = await setUp(['compaction-settings.ndjson'], {
+    treeFolder: own,
+    skip: RECORDED_UNDER_FULL_ACCESS,
+  })
 
   const supervised = {
     permissionMode: 'supervised' as const,
@@ -1946,7 +1993,10 @@ it('under Supervised, denies each other Tree’s folder rather than the folder o
 })
 
 it('where the Sandbox can’t run, starts a Supervised thread in workspace-write that asks before anything that isn’t trusted, on no permission profile, its turns writing only in the Tree’s folder with the network off, and a later turn under full access goes back to it', async () => {
-  const codex = await setUp(['started.ndjson'], {platform: 'linux'})
+  const codex = await setUp(['started.ndjson'], {
+    platform: 'linux',
+    skip: RECORDED_UNDER_FULL_ACCESS,
+  })
 
   const first = await codex.reply(FIRST_PROMPT, null, {
     permissionMode: 'supervised',
@@ -2250,7 +2300,14 @@ function withoutReload(name: string) {
 }
 
 it('refuses every approval request under full access, with no card', async () => {
-  const codex = await setUp([withoutReload('approvals.ndjson')])
+  const codex = await setUp([withoutReload('approvals.ndjson')], {
+    skip: skipping(
+      'approvals.ndjson asked under Supervised: the test checks that the driver refuses the same requests under full access.',
+      'approvalPolicy',
+      'sandboxPolicy'
+    ),
+  })
+
   const [, allowed = []] = await approvalReplies(codex, 2, 'full-access')
 
   expect(cardsIn(allowed)).toEqual([])
@@ -2299,11 +2356,39 @@ it('unsubscribes a loaded thread and resumes it on the permission profile for a 
 const LEAVING = SANDBOX.commandRequest(1).parsed
 
 /**
+ * Replays `sandbox.ndjson` in folders laid out as its live test's were: the
+ * Tree beside each other Tree, and its hidden folders.
+ */
+async function sandboxSetUp() {
+  const {otherTrees, hiddenFolders: recordedHidden} = SANDBOX.sandboxFolders()
+  const treesFolder = folder('uz-codex-trees-')
+  const treeFolder = path.join(treesFolder, 'own')
+  const hiddenFolders = recordedHidden.map(() => folder('uz-codex-hidden-'))
+
+  for (const name of ['own', ...otherTrees]) {
+    fs.mkdirSync(path.join(treesFolder, name))
+  }
+
+  const codex = await setUp(['sandbox.ndjson'], {
+    treeFolder,
+    standIns: [
+      [treesFolder, TREES_FOLDER_STAND_IN],
+      ...hiddenFolders.map((hidden, at): [string, string] => [
+        hidden,
+        recordedHidden[at] ?? '',
+      ]),
+    ],
+  })
+
+  return {...codex, folders: {treesFolder, hiddenFolders}}
+}
+
+/**
  * The Replies of `sandbox.ndjson`, in order: a command inside the Sandbox,
  * `LEAVING` refused by it, `LEAVING` asked to run outside, a connection.
  */
 async function sandboxReplies(
-  codex: Awaited<ReturnType<typeof setUp>>,
+  codex: Awaited<ReturnType<typeof sandboxSetUp>>,
   count: number,
   asking: {answer?: ApprovalAnswer; grants?: ApprovalGrant[]} = {}
 ) {
@@ -2317,6 +2402,7 @@ async function sandboxReplies(
     replies.push(
       await codex.reply(prompt, before ? recordedIn(before) : null, {
         permissionMode: 'supervised',
+        ...codex.folders,
         ...asking,
       })
     )
@@ -2338,7 +2424,7 @@ function toolCallsOf(events: Streamed[]) {
 }
 
 it('under Supervised, asks about a command at its tool call as one that stays inside the Sandbox, and shows what it printed once allowed', async () => {
-  const codex = await setUp(['sandbox.ndjson'])
+  const codex = await sandboxSetUp()
   const [inside = []] = await sandboxReplies(codex, 1)
   const [ran] = toolCallsOf(inside)
 
@@ -2361,7 +2447,7 @@ it('under Supervised, asks about a command at its tool call as one that stays in
 })
 
 it('ends the tool call of an allowed command the Sandbox refused as failed once its turn completes, having answered Codex about it once', async () => {
-  const codex = await setUp(['sandbox.ndjson'])
+  const codex = await sandboxSetUp()
   const [, blocked = []] = await sandboxReplies(codex, 2)
 
   expect(actionsAsked(blocked)).toEqual([{kind: 'command', command: LEAVING}])
@@ -2374,7 +2460,7 @@ it('ends the tool call of an allowed command the Sandbox refused as failed once 
 })
 
 it('asks about a command the Model wants to run outside the Sandbox on a card of that form, past an Always allow for the command inside it', async () => {
-  const codex = await setUp(['sandbox.ndjson'])
+  const codex = await sandboxSetUp()
 
   const [, blocked = [], leaving = []] = await sandboxReplies(codex, 3, {
     answer: 'always-allow',
@@ -2398,7 +2484,7 @@ it('asks about a command the Model wants to run outside the Sandbox on a card of
 })
 
 it('asks about a command inside the Sandbox past a grant to run it outside, which answers the Model’s ask to run it there with no card', async () => {
-  const codex = await setUp(['sandbox.ndjson'])
+  const codex = await sandboxSetUp()
 
   const [, blocked = [], leaving = []] = await sandboxReplies(codex, 3, {
     grants: [{kind: 'command', command: LEAVING, outsideSandbox: true}],
@@ -2413,7 +2499,7 @@ it('asks about a command inside the Sandbox past a grant to run it outside, whic
 })
 
 it('shows a connection the Sandbox blocked as a command that failed, after its card', async () => {
-  const codex = await setUp(['sandbox.ndjson'])
+  const codex = await sandboxSetUp()
   const replies = await sandboxReplies(codex, 4)
   const connecting = replies[3] ?? []
 
@@ -2448,7 +2534,16 @@ it('starts a Reply in a thread only once a cut of it has finished, in the Tree�
         {rest: true}
       ),
     ],
-    {store: opened.store}
+    {
+      store: opened.store,
+      skip: skipping(
+        'The cut’s read-only load in the config folder takes the place of the resume resumed.ndjson holds, and the Reply’s own resume is written by hand with no settings.',
+        'config',
+        'sandbox',
+        'approvalPolicy',
+        'cwd'
+      ),
+    }
   )
 
   const [cut, next] = await Promise.all([

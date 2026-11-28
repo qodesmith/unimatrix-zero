@@ -1,11 +1,32 @@
+import type {SkippedSetting} from '#modules/test-recordings/main'
+
+import {SETTINGS_CHECK, machineStandIns} from '#modules/test-recordings/main'
+import {STRIPPED_PREFIXES} from '#modules/vendor-environment/main'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import {z} from 'zod'
 
+import {claudeReplyEnvironment} from './environment'
+
 export const RECORDINGS = path.join(import.meta.dirname, 'recordings')
 
 export const RecordedMessageSchema = z.looseObject({type: z.string()})
+
+/** What a recording's variables name the app's config folder. */
+export const CONFIG_FOLDER_STAND_IN = '/config-folder'
+
+/**
+ * Names a variable the app, the SDK or a live test gave `claude`: the driver
+ * strips every inherited one under these prefixes.
+ */
+export const APP_VARIABLE = new RegExp(
+  `^(?:${[
+    ...STRIPPED_PREFIXES,
+    ...Object.keys(claudeReplyEnvironment({}, '')).map(name => `${name}$`),
+  ].join('|')})`,
+  'i'
+)
 
 /** One line of a recording; the first is `start`, saying where it ran. */
 export const RecordedLineSchema = z.discriminatedUnion('kind', [
@@ -17,6 +38,10 @@ export const RecordedLineSchema = z.discriminatedUnion('kind', [
     projectKey: z.string(),
     /** Read as the folder the fake runs in wherever an out line names it. */
     cwd: z.string().optional(),
+    /** What the SDK started `claude` with, which holds the app's options. */
+    args: z.array(z.string()),
+    /** Each variable `APP_VARIABLE` names that `claude` started with. */
+    env: z.record(z.string(), z.string()),
   }),
   z.strictObject({kind: z.literal('in'), message: RecordedMessageSchema}),
   z.strictObject({kind: z.literal('out'), message: RecordedMessageSchema}),
@@ -39,21 +64,39 @@ export interface FakeClaudeOptions {
   silentFrom?: {run: number; prompt: number}
   /** Holds the rest of its answer until this file exists. */
   holdAfterFirstDelta?: string
+  /** Other folders of the test's, each with the name the recording has for it. */
+  standIns?: [string, string][]
+  /**
+   * Settings the test sends differently from the recording on purpose: an
+   * option by its flag, such as `--tools`, a key of a flag that holds JSON as
+   * `--settings.sandbox`, an environment variable as `env.DISABLE_UPDATES`, or
+   * a field of the `initialize` request. `*` is every one, for a `claude` no
+   * recording was made of.
+   */
+  skip?: SkippedSetting[]
 }
 
 const OPTIONS_VARIABLE = 'FAKE_CLAUDE_OPTIONS'
 
 /**
  * The nth `claude` started replays the nth of `recordings` and records its
- * run in `<reports>/<n>.json`.
+ * run in `<reports>/<n>.json`. `configDir` is the app's config folder, which
+ * the SDK swaps for a temporary one on a resume.
  */
 export function fakeClaudeEnv(
   recordings: string[],
   reports: string,
+  configDir: string,
   options: FakeClaudeOptions = {}
 ) {
   return {
-    [OPTIONS_VARIABLE]: JSON.stringify({recordings, reports, ...options}),
+    [OPTIONS_VARIABLE]: JSON.stringify({
+      recordings,
+      reports,
+      configFolder: configDir,
+      machine: machineStandIns(),
+      ...options,
+    }),
   }
 }
 
@@ -80,8 +123,11 @@ export const FakeClaudeRunSchema = z.strictObject({
   /** What the SDK answered each control request `claude` sent. */
   answers: z.array(z.looseObject({subtype: z.string()})),
   inputClosed: z.boolean(),
+  /** Which setting differed from the recording, and how. */
+  changed: z.string().nullable(),
   ended: z
     .enum([
+      'changed-setting',
       'input-closed',
       'killed',
       'refused',
@@ -92,7 +138,11 @@ export const FakeClaudeRunSchema = z.strictObject({
     .nullable(),
 })
 
-/** Exits on any line the SDK writes that isn't the next one recorded. */
+/**
+ * Exits on any line the SDK writes that isn't the next one recorded, and when
+ * the app's options, its environment variables or its `initialize` request
+ * aren't the recorded ones.
+ */
 const SCRIPT = `
 import fs from 'node:fs'
 import path from 'node:path'
@@ -111,7 +161,7 @@ function stillRunning(file) {
 const runningAtStart = fs.readdirSync(reports).filter(stillRunning).map(file => Number.parseInt(file, 10))
 const args = process.argv.slice(2)
 const configDir = process.env.CLAUDE_CONFIG_DIR
-const report = {args, configDir, developerDir: process.env.DEVELOPER_DIR ?? null, cwd: process.cwd(), runningAtStart, prompts: [], clientComposed: [], systemPrompt: [], appendedPrompt: null, promptSnapshot: null, resumedFrom: [], toolResults: [], silentRequests: [], answers: [], inputClosed: false, ended: null}
+const report = {args, configDir, developerDir: process.env.DEVELOPER_DIR ?? null, cwd: process.cwd(), runningAtStart, prompts: [], clientComposed: [], systemPrompt: [], appendedPrompt: null, promptSnapshot: null, resumedFrom: [], toolResults: [], silentRequests: [], answers: [], inputClosed: false, changed: null, ended: null}
 save()
 const recording = options.recordings[run]
 const lines = fs.readFileSync(recording, 'utf8')
@@ -146,6 +196,65 @@ if (resume) {
 }
 save()
 
+${SETTINGS_CHECK}
+// Ids and the Model, which a replay doesn't compare.
+const NOT_COMPARED = ['--model', '--resume', '--resume-session-at']
+const PROMPT_TEXT = ['systemPrompt', 'appendSystemPrompt']
+
+function optionsIn(args) {
+  const found = {}
+  const repeated = new Set()
+  function keep(name, value) {
+    if (!(name in found)) found[name] = value
+    else if (repeated.has(name)) found[name].push(value)
+    else {
+      repeated.add(name)
+      found[name] = [found[name], value]
+    }
+  }
+  for (let at = 0; at < args.length; at++) {
+    const arg = args[at]
+    const equals = arg.indexOf('=')
+    const name = equals < 0 ? arg : arg.slice(0, equals)
+    const next = args[at + 1]
+    const value = equals >= 0 ? arg.slice(equals + 1) : next === undefined || next.startsWith('--') ? true : args[++at]
+    if (NOT_COMPARED.includes(name)) continue
+    let parts = null
+    try {
+      parts = JSON.parse(value)
+    } catch {}
+    if (parts === null || typeof parts !== 'object' || Array.isArray(parts)) keep(name, value)
+    else for (const [key, part] of Object.entries(parts)) keep(name + '.' + key, part)
+  }
+  return found
+}
+
+const standIns = [[projectKey, start.projectKey], [fs.realpathSync(process.cwd()), start.cwd], [configDir, start.configDir], ...(options.standIns ?? []), ...options.machine]
+
+const skipped = (options.skip ?? []).filter(skip => skip.run === undefined || skip.run === run)
+
+function exitOnChangedSetting(where, recorded, sent, first = []) {
+  if (skipped.some(({field}) => field === '*')) return
+  const fields = [...new Set([...Object.keys(recorded), ...Object.keys(sent)])]
+  const changed = changedSetting(where, fields, recorded, withStandIns(sent, [...first, ...standIns]), skipped)
+  if (!changed) return
+  report.changed = changed
+  report.ended = 'changed-setting'
+  save()
+  process.stderr.write(changed + '\\n')
+  process.exit(3)
+}
+
+exitOnChangedSetting('claude option', optionsIn(start.args), optionsIn(args))
+
+const APP_VARIABLE = new RegExp(${JSON.stringify(APP_VARIABLE.source)}, 'i')
+
+function asVariables(entries) {
+  return Object.fromEntries(entries.map(([name, value]) => ['env.' + name, value]))
+}
+
+exitOnChangedSetting('claude variable', asVariables(Object.entries(start.env ?? {})), asVariables(Object.entries(process.env).filter(([name]) => APP_VARIABLE.test(name))), [[options.configFolder, ${JSON.stringify(CONFIG_FOLDER_STAND_IN)}]])
+
 const requestIds = new Map()
 const renamed = new Map()
 let promptUuid = null
@@ -167,7 +276,6 @@ function rename(entry) {
 const realCwd = fs.realpathSync(process.cwd())
 function inThisFolder(message) {
   if (!start.cwd) return message
-  const quoted = folder => JSON.stringify(folder).slice(1, -1)
   return JSON.parse(JSON.stringify(message).replaceAll(quoted(start.cwd), quoted(realCwd)))
 }
 
@@ -251,6 +359,8 @@ process.stdin.on('data', chunk => {
     if (message.type === 'control_request') requestIds.set(step.message.request_id, message.request_id)
     if (message.type === 'control_response') report.answers.push(message.response)
     if (message.type === 'control_request' && message.request.subtype === 'initialize') {
+      const settings = request => Object.fromEntries(Object.entries(request).filter(([name]) => !PROMPT_TEXT.includes(name)))
+      exitOnChangedSetting('initialize', settings(step.message.request), settings(message.request))
       const prompt = message.request.systemPrompt
       report.systemPrompt = Array.isArray(prompt) ? prompt : prompt == null ? [] : [prompt]
       report.appendedPrompt = message.request.appendSystemPrompt ?? null

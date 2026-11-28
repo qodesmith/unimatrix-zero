@@ -5,7 +5,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 
 /** Each aims a vendor program at another account or user setup (ADR 0014). */
-const STRIPPED_PREFIXES = ['ANTHROPIC_', 'CLAUDE_', 'OPENAI_', 'CODEX_']
+export const STRIPPED_PREFIXES = ['ANTHROPIC_', 'CLAUDE_', 'OPENAI_', 'CODEX_']
 
 export function vendorEnvironment(base: NodeJS.ProcessEnv) {
   const kept = Object.entries(base).filter(

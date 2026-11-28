@@ -2,20 +2,24 @@ import type {CodexCommand, CodexProcess, SpawnCodex} from './app-server'
 import type {RecordedLine} from './replay'
 
 import {
+  HOME_STAND_IN,
   buildOf,
   claimRecordings,
   tempFolderNames,
 } from '#modules/test-recordings/main'
+import {otherTreeFolders} from '#modules/tree-folder/main'
 import {spawn} from 'node:child_process'
 import {EventEmitter} from 'node:events'
 import fs from 'node:fs'
 import os from 'node:os'
+import path from 'node:path'
 import {createInterface} from 'node:readline'
 import {PassThrough} from 'node:stream'
 
 import {
   CODEX_HOME_STAND_IN,
   RecordedMessageSchema,
+  TREES_FOLDER_STAND_IN,
   TREE_FOLDER_STAND_IN,
 } from './replay'
 
@@ -25,11 +29,6 @@ const ID =
   /"(chatgptAccountId|accountId|userId|chatgpt_user_id|installationId)":"[^"]*"/g
 
 const MACHINE = /"(serverName|userAgent)":"[^"]*"/g
-
-/** A Supervised thread's `config` names folders in the user's home. */
-const HOME_STAND_IN = '/Users/sam'
-
-const TREES_FOLDER_STAND_IN = '/trees-folder'
 
 function escaped(folder: string) {
   return [fs.realpathSync(folder), folder].map(name =>
@@ -41,6 +40,21 @@ interface Recorded {
   treeFolder?: string
   /** The folder of every Tree, which a Supervised thread's `config` names. */
   treesFolder?: string
+  hiddenFolders?: string[]
+}
+
+/** Listed as the driver lists them, when the live test names both folders. */
+function sandboxOf({treeFolder, treesFolder, hiddenFolders = []}: Recorded) {
+  if (treeFolder === undefined || treesFolder === undefined) return {}
+
+  return {
+    sandbox: {
+      otherTrees: otherTreeFolders({treeFolder, treesFolder}).map(other =>
+        path.relative(treesFolder, other)
+      ),
+      hiddenFolders,
+    },
+  }
 }
 
 function scrub(
@@ -83,7 +97,8 @@ function scrub(
 
 /**
  * Records each real `codex app-server` process into the next of `files`,
- * stamped with its build, the Tree's folder as a stand-in a replay fills in.
+ * stamped with its build and the Sandbox's `folders`, each folder as a
+ * stand-in a replay fills in.
  * A process that exits after a later recorder claimed its file writes nothing.
  */
 export function createRecorder(files: string[], folders: Recorded = {}) {
@@ -103,7 +118,7 @@ export function createRecorder(files: string[], folders: Recorded = {}) {
     })
 
     const lines: RecordedLine[] = [
-      {kind: 'start', build: buildOf('codex', command)},
+      {kind: 'start', build: buildOf('codex', command), ...sandboxOf(folders)},
     ]
 
     const stdin = new PassThrough()

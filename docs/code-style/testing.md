@@ -39,6 +39,8 @@
 - A recording is a real conversation that a live test saved under its module's `recordings/`, for the driver tests to replay. A live test that writes one carries `[records]` in its name.
 - A PR that changes a live test that writes a recording re-records it in the same PR, so the replays test what the live test now sends. `bun run provider-checks` re-records them all, and CI holds the PR until it has (`docs/provider-dependencies.md`, section Checking the list).
 - A replay test reads the ids, paths and Model text it checks from the recording, since each re-record changes them.
+- A replay's fake `claude` or `codex` fails the test, naming the field, when the app sends a setting the recording doesn't hold: the recording then shows what the Provider answered to other settings. Re-record with `bun run provider-checks`. Don't loosen the fake or add a skip to get the test green.
+- A replay test sends what its live test sent, under folders it names for the fake as the recording does. A test that changes a setting on purpose lists the field in the fake's `skip` with its reason.
 - A recorder writes each file through `claimRecordings` in `#modules/test-recordings/main`, and a `[records]` test ends only once its vendor programs have exited. `bun run provider-checks` retries a failed live test, and these two rules keep a failed try's recording out of what the run commits.
 
 ## A recording names the build that made it, and a live test writes it. Enforced by: scripts/check-recordings.ts

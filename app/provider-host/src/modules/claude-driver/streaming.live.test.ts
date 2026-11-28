@@ -181,7 +181,8 @@ function liveDriver(
   const recorder = createRecorder(
     ({command, args, cwd, env, signal}) =>
       spawn(command, args, {cwd, env, signal, stdio: 'pipe'}),
-    files.map(name => path.join(RECORDINGS, name))
+    files.map(name => path.join(RECORDINGS, name)),
+    configDir
   )
 
   const idle = heldIdle()

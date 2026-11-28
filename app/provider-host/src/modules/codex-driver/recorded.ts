@@ -179,6 +179,21 @@ export function readRecording(name: string) {
         `item/completed for ${itemId}`
       ).aggregatedOutput
     },
+    /**
+     * The folders the live test gave the Sandbox, as the recording names
+     * them: each other Tree by its name in the folder of every Tree.
+     */
+    sandboxFolders() {
+      const [start] = lines
+
+      if (start?.kind !== 'start' || !start.sandbox) {
+        throw new Error(
+          `${name} names no Sandbox folders on its start line. Re-record it with bun run provider-checks (docs/code-style/testing.md).`
+        )
+      }
+
+      return start.sandbox
+    },
     rateLimits() {
       return RateLimitsSchema.parse(
         nth(sent('account/rateLimits/updated', false), 0, 'rate limits')
