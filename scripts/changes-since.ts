@@ -15,13 +15,26 @@ const REACHED_SCRIPT = path.join(import.meta.dirname, 'live-tests-reached.ts')
 
 const Reached = z.array(z.tuple([z.string(), z.array(z.string())]))
 
-const git = promisify(execFile)
+export type Reached = z.infer<typeof Reached>
+
+const MAX_BUFFER = 64 * 1024 * 1024
+
+const execFileAsync = promisify(execFile)
+
+async function git(root: string, ...args: string[]) {
+  const {stdout} = await execFileAsync('git', args, {
+    cwd: root,
+    maxBuffer: MAX_BUFFER,
+  })
+
+  return stdout
+}
 
 const GitExit = z.object({code: z.number()})
 
 async function isAncestor(root: string, from: string, head: string) {
   try {
-    await git('git', ['merge-base', '--is-ancestor', from, head], {cwd: root})
+    await git(root, 'merge-base', '--is-ancestor', from, head)
 
     return true
   } catch (error) {
@@ -42,15 +55,19 @@ export async function filesChangedSince(
 ) {
   if (!(await isAncestor(root, from, head))) return {ancestor: false} as const
 
-  const {stdout} = await git(
-    'git',
-    ['diff', '--name-only', '--no-renames', '-z', from, head],
-    {cwd: root, maxBuffer: 64 * 1024 * 1024}
+  const changed = await git(
+    root,
+    'diff',
+    '--name-only',
+    '--no-renames',
+    '-z',
+    from,
+    head
   )
 
   return {
     ancestor: true,
-    files: stdout.split('\0').filter(Boolean).toSorted(),
+    files: changed.split('\0').filter(Boolean).toSorted(),
   } as const
 }
 
@@ -61,7 +78,7 @@ export function liveTestsReached(root: string, files: string[]) {
     {
       cwd: root,
       encoding: 'utf8',
-      maxBuffer: 64 * 1024 * 1024,
+      maxBuffer: MAX_BUFFER,
     }
   )
 

@@ -63,13 +63,13 @@ describe('what a push since a result needs', () => {
   })
 })
 
-const git = promisify(execFile)
+const execFileAsync = promisify(execFile)
 
 async function repo() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'changes-since-'))
 
   async function run(...args: string[]) {
-    const {stdout} = await git(
+    const {stdout} = await execFileAsync(
       'git',
       ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', ...args],
       {cwd: root}
@@ -126,7 +126,7 @@ describe('the files changed since a result', () => {
 })
 
 describe('the live tests a change reaches', () => {
-  it('are each live test that imports the file at any depth, through Vitest’s own import walk, and a root package.json reaches none', () => {
+  it('are each live test that imports the file at any depth, through Vitest’s own import walk, every live test for the Vitest config, and none for a root package.json or the UI’s Vite config', () => {
     const reached = liveTestsReached(ROOT, [
       `${CLAUDE}/transcripts.ts`,
       'app/provider-host/src/modules/test-recordings/main.ts',
@@ -134,18 +134,20 @@ describe('the live tests a change reaches', () => {
       'app/renderer/src/modules/canvas/re-read.ts',
       'docs/provider-dependencies.md',
       'package.json',
+      'vitest.config.ts',
+      'app/renderer/vite.config.ts',
     ])
+
+    const both = [
+      `${CLAUDE}/streaming.live.test.ts`,
+      `${CODEX}/streaming.live.test.ts`,
+    ]
 
     expect(reached).toEqual(
       new Map([
         [`${CLAUDE}/transcripts.ts`, [`${CLAUDE}/streaming.live.test.ts`]],
-        [
-          'app/provider-host/src/modules/test-recordings/main.ts',
-          [
-            `${CLAUDE}/streaming.live.test.ts`,
-            `${CODEX}/streaming.live.test.ts`,
-          ],
-        ],
+        ['app/provider-host/src/modules/test-recordings/main.ts', both],
+        ['vitest.config.ts', both],
       ])
     )
   })

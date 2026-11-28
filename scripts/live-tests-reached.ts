@@ -1,4 +1,6 @@
 // Runs under Electron as Node, as Vitest does: call it through `liveTestsReached`.
+import type {Reached} from './changes-since.ts'
+
 import path from 'node:path'
 import {createVitest} from 'vitest/node'
 
@@ -13,9 +15,10 @@ async function liveTestsImporting(file: string) {
       project: ['node'],
       reporters: [],
       related: [path.join(root, file)],
-      // Vitest's default also re-runs every test on any `package.json`. The
-      // gate's own rules already cover the pins and the lockfile.
-      forceRerunTriggers: ['**/{vitest,vite}.config.*'],
+      // Vitest's default re-runs every test on any `package.json` or Vite
+      // config. The gate's rules cover the pins and the lockfile, and Vitest
+      // counts the root config and the global setup without a trigger.
+      forceRerunTriggers: [],
     },
     {},
     {stdout: process.stderr}
@@ -35,7 +38,7 @@ async function liveTestsImporting(file: string) {
   }
 }
 
-const reached: [string, string[]][] = []
+const reached: Reached = []
 
 for (const file of process.argv.slice(2)) {
   reached.push([file, await liveTestsImporting(file)])
