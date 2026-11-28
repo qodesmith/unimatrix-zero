@@ -23,7 +23,7 @@ while ($true) {
     'Unimatrix Zero #318 test card', 'YesNo', 'Warning')
 
   if ($answer -eq 'Yes') {
-    $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $elevate -Command $command | Out-String
+    $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $elevate $command | Out-String
   } else {
     $output = "uz318 broker: denied on the card`n"
   }

@@ -19,7 +19,8 @@ The goal: the app's card comes first, then the command runs with admin rights, a
 
    `S-1-5-32-544` listed means the account is an administrator. `TypeOfAdminApprovalMode` of 2 means administrator protection is on. Ask the human whether a standard (non-admin) account exists for test 6.
 
-3. The scripts are in this folder. Write its absolute path wherever a step says `<here>`.
+3. The scripts are in this folder. Write its absolute path wherever a step says `<here>`. A test command goes after the script's name with no quotes around it: nested quotes get lost on the way from the AI's shell.
+4. Where the dev app can't run (a bare VM, say), `claude-reply.ps1` and `codex-reply.ps1` give one live Reply from each vendor program with the app's settings. Say in the findings that the dev app wasn't used.
 
 The app has two Permission modes to test with: Full access (`bun run dev`) and Supervised (`bun run dev --supervised`). Under Supervised, ChatGPT's commands run inside the Sandbox where the Windows build allows it, and Claude has no Sandbox on Windows (ADR 0018).
 
@@ -40,17 +41,17 @@ Send each command to the AI in a Prompt of this shape, once per Provider: "This 
 Run each on Claude and on ChatGPT. Run tests 1 to 4 under Full access first, then again under Supervised.
 
 1. **Baseline.** `net session`. Record the error an admin command gives without admin rights.
-2. **Route A, the AI's command asks UAC itself.** `powershell -NoProfile -ExecutionPolicy Bypass -File <here>\elevate.ps1 -Command "net session; whoami /groups | findstr S-1-16"`
-   - With the human clicking **Yes**: does the output come back, and does it show `S-1-16-12288` (High)?
+2. **Route A, the AI's command asks UAC itself.** `powershell -NoProfile -ExecutionPolicy Bypass -File <here>\elevate.ps1 net session`
+   - With the human clicking **Yes**: does the output come back, and does it show `S-1-16-12288` (High)? The script adds that line itself.
    - With the human clicking **No**: record the line `elevate.ps1` prints.
    - With the human doing nothing: record how long UAC waits and what comes back.
    - Under Supervised on ChatGPT: does the Sandbox let the UAC prompt appear at all?
-3. **Route B, the card first.** The human starts `broker.ps1` in a normal PowerShell window, as its header says. Then: `powershell -NoProfile -ExecutionPolicy Bypass -File <here>\ask.ps1 -Command "net session"`
+3. **Route B, the card first.** The human starts `broker.ps1` in a normal PowerShell window, as its header says. Then: `powershell -NoProfile -ExecutionPolicy Bypass -File <here>\ask.ps1 net session`
    - Yes on the card, then Yes on UAC: the order of what appeared, and the output.
    - No on the card: no UAC prompt should appear.
    - Yes on the card, then No on UAC.
    - Under Supervised on ChatGPT: can `ask.ps1` reach the broker's pipe from inside the Sandbox?
-4. **Two at once.** With the broker running: `Start-Job { powershell -File <here>\ask.ps1 -Command "whoami" }; powershell -File <here>\ask.ps1 -Command "hostname"`. The broker answers one request at a time; record how the cards and UAC prompts queue. Then the same with `elevate.ps1` in both places: do two UAC prompts stack, and can the human tell which command each one is for?
+4. **Two at once.** With the broker running: `Start-Job { powershell -File <here>\ask.ps1 whoami }; powershell -File <here>\ask.ps1 hostname`. The broker answers one request at a time; record how the cards and UAC prompts queue. Then the same with `elevate.ps1` in both places: do two UAC prompts stack, and can the human tell which command each one is for?
 5. **Windows sudo** (Windows 11 24H2 or later; Full access is enough).
    - Off: `sudo net session`. Record the message and exit code.
    - The human turns it on from an elevated PowerShell: `sudo config --enable normal` (inline mode). Then `sudo net session` twice in a row from the AI: does output come back with no console attached, what is the exit code, and does UAC ask both times?

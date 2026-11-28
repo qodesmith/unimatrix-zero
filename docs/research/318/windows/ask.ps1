@@ -1,8 +1,10 @@
 # Test for #318, route B: the AI's command asks the broker (broker.ps1) to run
 # one command with admin rights, and prints what comes back.
 #
-#   powershell -NoProfile -ExecutionPolicy Bypass -File ask.ps1 -Command "net session"
-param([Parameter(Mandatory)][string]$Command)
+#   powershell -NoProfile -ExecutionPolicy Bypass -File ask.ps1 net session
+param([Parameter(Mandatory, ValueFromRemainingArguments)][string[]]$Words)
+
+$Command = $Words -join ' '
 
 $pipe = New-Object System.IO.Pipes.NamedPipeClientStream('.', 'uz318', 'InOut')
 try {
