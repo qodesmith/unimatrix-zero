@@ -4,26 +4,36 @@ import {createVitest} from 'vitest/node'
 
 const root = process.cwd()
 
-const vitest = await createVitest(
-  'test',
-  {root, watch: false, project: ['node'], reporters: []},
-  {},
-  {stdout: process.stderr}
-)
+async function liveTestsImporting(file: string) {
+  const vitest = await createVitest(
+    'test',
+    {
+      root,
+      watch: false,
+      project: ['node'],
+      reporters: [],
+      related: [path.join(root, file)],
+      // Vitest's default also re-runs every test on any `package.json`. The
+      // gate's own rules already cover the pins and the lockfile.
+      forceRerunTriggers: ['**/{vitest,vite}.config.*'],
+    },
+    {},
+    {stdout: process.stderr}
+  )
+
+  try {
+    const specs = await vitest.getRelevantTestSpecifications(['.live.test.ts'])
+
+    return specs.map(spec => path.relative(root, spec.moduleId)).toSorted()
+  } finally {
+    await vitest.close()
+  }
+}
 
 const reached: [string, string[]][] = []
 
 for (const file of process.argv.slice(2)) {
-  vitest.config.related = [path.join(root, file)]
-
-  const specs = await vitest.getRelevantTestSpecifications(['.live.test.ts'])
-
-  reached.push([
-    file,
-    specs.map(spec => path.relative(root, spec.moduleId)).toSorted(),
-  ])
+  reached.push([file, await liveTestsImporting(file)])
 }
-
-await vitest.close()
 
 process.stdout.write(JSON.stringify(reached))

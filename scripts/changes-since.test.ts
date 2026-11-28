@@ -126,13 +126,14 @@ describe('the files changed since a result', () => {
 })
 
 describe('the live tests a change reaches', () => {
-  it('are each live test that imports the file at any depth, through Vitest’s own import walk', () => {
+  it('are each live test that imports the file at any depth, through Vitest’s own import walk, and a root package.json reaches none', () => {
     const reached = liveTestsReached(ROOT, [
       `${CLAUDE}/transcripts.ts`,
       'app/provider-host/src/modules/test-recordings/main.ts',
       `${CLAUDE}/streaming.test.ts`,
       'app/renderer/src/modules/canvas/re-read.ts',
       'docs/provider-dependencies.md',
+      'package.json',
     ])
 
     expect(reached).toEqual(
