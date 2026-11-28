@@ -181,6 +181,9 @@ describe('the provider-checks gate on a PR it holds', () => {
     ])
 
     expect(newestFailed.pass).toBe(false)
+    expect(newestFailed.reason).toBe(
+      `${OWNER}'s provider-checks on older34 found a failing check, a stale entry, a recording it kept or a failing everyday test.`
+    )
     expect(newestFailed.asked).toEqual([])
 
     const headFailed = await gate([

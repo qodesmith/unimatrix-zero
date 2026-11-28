@@ -18,11 +18,12 @@ const CLAUDE = 'app/provider-host/src/modules/claude-driver'
 const CODEX = 'app/provider-host/src/modules/codex-driver'
 
 describe('what a push since a result needs', () => {
-  it('a new run for a live test, a recording, a vendor pin, the lockfile or a file a live test imports, and nothing for the rest', () => {
+  it('a new run for a live test, a recording, a Codex protocol type, a vendor pin, the lockfile or a file a live test imports, and nothing for the rest', () => {
     const causes = reRunCauses(
       [
         `${CLAUDE}/streaming.live.test.ts`,
         `${CODEX}/recordings/started.ndjson`,
+        `${CODEX}/protocol/v2/RateLimitReachedType.ts`,
         'app/main/src/modules/vendor-programs/dev-manifest.json',
         'app/provider-host/package.json',
         'bun.lock',
@@ -50,6 +51,10 @@ describe('what a push since a result needs', () => {
     expect(causes).toEqual([
       {file: `${CLAUDE}/streaming.live.test.ts`, why: 'a live test'},
       {file: `${CODEX}/recordings/started.ndjson`, why: 'a recording'},
+      {
+        file: `${CODEX}/protocol/v2/RateLimitReachedType.ts`,
+        why: 'checked by the Codex live test',
+      },
       {
         file: 'app/main/src/modules/vendor-programs/dev-manifest.json',
         why: 'a vendor pin',

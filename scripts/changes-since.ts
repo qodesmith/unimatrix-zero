@@ -7,7 +7,7 @@ import {z} from 'zod'
 
 import {runElectronAsNode} from './electron-as-node.ts'
 import {isLiveTest, isRecording} from './recordings.ts'
-import {HOST_PACKAGE, MANIFEST} from './vendor-pins.ts'
+import {CODEX_PROTOCOL, HOST_PACKAGE, MANIFEST} from './vendor-pins.ts'
 
 const LOCKFILE = 'bun.lock'
 
@@ -96,6 +96,10 @@ export function liveTestsReached(root: string, files: string[]) {
 const RULES: [matches: (file: string) => boolean, why: string][] = [
   [isLiveTest, 'a live test'],
   [isRecording, 'a recording'],
+  [
+    file => file.startsWith(`${CODEX_PROTOCOL}/`),
+    'checked by the Codex live test',
+  ],
   [file => file === MANIFEST || file === HOST_PACKAGE, 'a vendor pin'],
   [file => file === LOCKFILE, 'the lockfile'],
 ]
