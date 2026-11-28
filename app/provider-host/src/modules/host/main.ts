@@ -23,7 +23,6 @@ export interface HostPort {
   on(event: 'message', listener: (event: {data: unknown}) => void): void
 }
 
-/** Runs one driver behind the port; commands that don't parse are dropped. */
 export async function runHost(
   port: HostPort,
   createDriver: (store: SessionStoreClient) => ProviderDriver

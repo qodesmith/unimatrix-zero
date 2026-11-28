@@ -7,7 +7,6 @@ import path from 'node:path'
 import {LINK_REFUSED} from './location'
 
 export interface Openable {
-  /** Inside the Tree's files. */
   path: string
   onDisk: boolean
   preview: TreeFileDetails['preview']

@@ -22,12 +22,9 @@ export const SnapshotEvent = z.strictObject({
   type: z.literal('SNAPSHOT'),
   app: z.strictObject({version: z.string()}),
   replies: z.array(StreamingReplySchema),
-  /** The cards still waiting, so a window opened meanwhile can answer them. */
   approvals: z.array(ApprovalRequestedEvent),
   providers: z.array(ProviderStatusSchema),
-  /** Each Provider's Models as it last listed them; empty if it never has. */
   models: z.record(ProviderIdSchema, z.array(ModelSchema)),
-  /** The newest Reply's Model in any Tree, where a new Tree starts. */
   lastModel: ModelChoiceSchema.nullable(),
   signIn: SignInStepEvent.nullable(),
   settings: SettingsSchema,
@@ -50,7 +47,6 @@ export const LayoutChangedEvent = z.strictObject({
   layout: LayoutSchema,
 })
 
-/** A Prompt was sent; a new Tree now starts from its Model. */
 export const LastModelChangedEvent = z.strictObject({
   type: z.literal('LAST_MODEL_CHANGED'),
   model: ModelChoiceSchema,
@@ -84,7 +80,6 @@ export const SnapshotsDownloadFailedEvent = z.strictObject({
   type: z.literal('SNAPSHOTS_DOWNLOAD_FAILED'),
 })
 
-/** Sent only after a `SNAPSHOTS_DOWNLOAD_FAILED`. */
 export const SnapshotsDownloadedEvent = z.strictObject({
   type: z.literal('SNAPSHOTS_DOWNLOADED'),
 })

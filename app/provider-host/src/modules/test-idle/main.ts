@@ -1,6 +1,5 @@
 import type {WhenIdle} from '#modules/idle/main'
 
-/** Idle time for tests: none passes until the test passes it. */
 export function heldIdle() {
   const waiting = new Set<{close: () => void}>()
 

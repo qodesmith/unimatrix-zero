@@ -16,12 +16,10 @@ import {baseName, iconOf, typeName} from '../file-kinds'
 interface FileCardProps {
   details: TreeFileDetails
   note: string
-  /** In place of the icon, such as the OS's thumbnail. */
   media?: ReactNode
   actions?: ReactNode
 }
 
-/** What the app can say about a file it doesn't show. */
 export function FileCard({details, note, media, actions}: FileCardProps) {
   const Icon = iconOf(details)
 

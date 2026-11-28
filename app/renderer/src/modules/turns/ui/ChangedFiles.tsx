@@ -53,7 +53,6 @@ function ChangedFileChip({file: {path, change, size}, onOpen}: ChipProps) {
   )
 }
 
-/** Each chip opens its file as it was at this Reply. */
 export function ChangedFiles({reply}: {reply: Reply}) {
   const open = useOpenTreeFile()
   const {files, treeId, id: replyId} = reply

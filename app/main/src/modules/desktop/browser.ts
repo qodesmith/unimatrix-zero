@@ -1,4 +1,3 @@
-/** Runs `program` until it exits, resolving with its output. */
 export type RunProgram = (program: string, args: string[]) => Promise<string>
 
 /** A desktop file's name, which never starts like an option or holds a path. */

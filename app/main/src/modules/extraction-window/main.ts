@@ -7,7 +7,6 @@ import {LOCKED_DOWN_PREFERENCES} from '#modules/window/main'
 import {EXTRACTION_PORT_MESSAGE} from '@uz/contract/extraction'
 import {BrowserWindow, MessageChannelMain, session} from 'electron'
 
-/** In memory: nothing the extractor does outlives the run. */
 const PARTITION = 'uz-extraction'
 
 const REFUSED_URLS = [

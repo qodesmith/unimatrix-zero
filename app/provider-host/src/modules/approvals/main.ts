@@ -15,12 +15,10 @@ export interface Asking {
   action: ApprovalAction
   toolCallId?: string
   subagentId?: string
-  /** Once it aborts, the card is dropped and the action doesn't go ahead. */
   signal?: AbortSignal
 }
 
 export interface ReplyApprovals {
-  /** True to go ahead: already granted in the Tree, or allowed on the card. */
   ask(asking: Asking): Promise<boolean>
 }
 
@@ -127,7 +125,6 @@ export function createApprovals() {
   return {
     forReply,
 
-    /** An answer to a card no longer waiting is dropped. */
     answer(approvalId: string, answer: ApprovalAnswer) {
       waiting.get(approvalId)?.(answer)
     },

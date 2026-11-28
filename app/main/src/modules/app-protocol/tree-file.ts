@@ -11,11 +11,9 @@ const FILE_HOST = 'unimatrix-zero'
 
 const TREE_FILE_PATH = /^\/tree-files\/([\da-f]{32})$/u
 
-/** A copy of the file as its Snapshot holds it, never the Tree's folder. */
 export interface ServedTreeFile {
   path: string
   preview: TreeFilePreview
-  /** The image, audio or video type its name gives. */
   mediaType: string | null
   tooLarge: boolean
 }
@@ -25,11 +23,9 @@ type TreeFileLookup = (id: string) => Promise<ServedTreeFile | null>
 export interface FileLookups {
   attachment: OriginalLookup
   treeFile: TreeFileLookup
-  /** The window's, which fetches text and PDFs from this scheme. */
   appOrigin: string
 }
 
-/** Scripts run, with nothing to reach: no network, no other file. */
 const HTML_VIEW_CSP = [
   'sandbox allow-scripts',
   "default-src 'none'",

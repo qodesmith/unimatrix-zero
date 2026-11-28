@@ -7,7 +7,6 @@ import type {
 
 import {PROVIDER_NAMES, concreteOf, findModel} from '@uz/contract/providers'
 
-/** `entry` is the listed entry the user picked, null when it came from a Reply. */
 export type WantedModel = ModelChoice & {entry: string | null}
 
 export interface ModelPickInput {
@@ -25,7 +24,6 @@ type SelectedModel = WantedModel & {name: string}
 
 export interface ModelPick {
   groups: ModelGroup[]
-  /** `model` is the concrete id to send, whatever entry names it. */
   selected: SelectedModel | null
   notice: string | null
   signInAgain: ProviderId | null

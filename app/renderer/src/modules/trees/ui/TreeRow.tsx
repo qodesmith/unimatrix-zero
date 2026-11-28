@@ -32,7 +32,6 @@ interface TreeRowProps {
   renaming: boolean
   onOpen: () => void
   onStartRename: () => void
-  /** The new title, or null when renaming was abandoned. */
   onRenamed: (title: string | null) => void
 }
 

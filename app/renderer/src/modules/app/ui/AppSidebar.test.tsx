@@ -34,7 +34,6 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-/** The canvas fills its parent, so it needs one with a height. */
 function FullHeight({children}: {children: ReactNode}) {
   return <div style={{height: '100vh'}}>{children}</div>
 }
@@ -969,7 +968,6 @@ interface SavedTurn {
   snapshot: FakeSnapshot
 }
 
-/** One Thread: each Reply answers the Prompt after the one before it. */
 function savedThread(tree: Tree, ...turns: SavedTurn[]) {
   const prompts: Prompt[] = []
   const replies: Reply[] = []
@@ -1019,7 +1017,6 @@ function filesSection() {
   return page.getByRole('region', {name: 'Files'})
 }
 
-/** Each file row in the Files section's tree, with its git status. */
 function fileRows() {
   const host = filesSection().element().querySelector('file-tree-container')
   const rows = host?.shadowRoot?.querySelectorAll('[data-item-path]') ?? []

@@ -16,7 +16,6 @@ function endRow(reading: Reading) {
   reading.row = []
 }
 
-/** One character inside quotes; returns how many it used. */
 function readQuoted(reading: Reading, text: string, at: number) {
   const char = text.charAt(at)
 
@@ -37,7 +36,6 @@ function readQuoted(reading: Reading, text: string, at: number) {
   return 1
 }
 
-/** RFC 4180: a quoted field holds the delimiter, newlines and doubled quotes. */
 export function parseDelimited(text: string, delimiter: ',' | '\t') {
   const reading: Reading = {rows: [], row: [], field: '', quoted: false}
   let at = 0

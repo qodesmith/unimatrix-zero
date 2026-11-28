@@ -1,5 +1,4 @@
 import {$} from 'bun'
-/** Lists a repo's skills as JSON, like vercel-labs/skills' `discoverSkills()`. */
 import {mkdtemp, readFile, readdir, rm, stat} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {basename, join, relative, sep} from 'node:path'

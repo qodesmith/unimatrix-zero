@@ -16,7 +16,6 @@ const ContentSchema = z.array(ReplyPartSchema)
 
 export type ListedModels = (provider: ProviderId) => Model[]
 
-/** A Thread before `withAttachments` fills in its attachments. */
 export interface WalkedThread {
   thread: Thread
   promptIds: string[]

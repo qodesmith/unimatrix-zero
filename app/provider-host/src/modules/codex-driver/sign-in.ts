@@ -78,9 +78,7 @@ async function* checkPlan(
   }
 }
 
-/** Connecting ChatGPT; every plan can use Codex unless its workspace is refused. */
 export function createCodexSignIn(deps: CodexSignInDeps) {
-  /** Null once signed in, else the update to end with. */
   async function* signInOnPage(
     {inbox}: Attempt<Input>,
     server: AppServer

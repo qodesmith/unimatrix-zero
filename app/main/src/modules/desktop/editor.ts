@@ -1,6 +1,5 @@
 import path from 'node:path'
 
-/** Run as `program ...args <file>`. */
 export interface Editor {
   name: string
   program: string
@@ -14,7 +13,6 @@ export interface EditorLookup {
   exists: (file: string) => boolean
 }
 
-/** In the order they are offered, first found first. */
 const MAC_EDITORS = [
   'Visual Studio Code',
   'Cursor',

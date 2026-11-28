@@ -1,6 +1,5 @@
 import {useSyncExternalStore} from 'react'
 
-// Finer than the minutes a relative time shows, so none lags by a whole one.
 const TICK_MS = 15_000
 
 let now = Date.now()
@@ -32,7 +31,6 @@ function getSnapshot() {
   return now
 }
 
-/** The time, in ms, moving on every few seconds while anything reads it. */
 export function useNow() {
   return useSyncExternalStore(subscribe, getSnapshot)
 }

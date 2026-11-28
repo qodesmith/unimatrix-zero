@@ -9,7 +9,6 @@ import {use, useEffect} from 'react'
 import {PdfOpener} from './pdf'
 import {treeFilesKey} from './tree-files-store'
 
-/** How much of a Markdown, CSV or text file the preview shows. */
 export const TEXT_PREVIEW_BYTES = 256 * 1024
 
 function fileKey({treeId, replyId}: FileAt, file: TreeFile) {
@@ -34,11 +33,9 @@ export function useTreeFileDetails(at: FileAt, file: TreeFile) {
 
 export interface TextStart {
   text: string
-  /** In bytes; less than the file's size when the file is cut short. */
   shownSize: number
 }
 
-/** A file over the limit shows up to its last whole line. */
 async function readStart(file: TreeFile): Promise<TextStart> {
   const response = await fetch(treeFileUrl(file.id), {
     headers: {Range: `bytes=0-${TEXT_PREVIEW_BYTES - 1}`},
@@ -79,7 +76,6 @@ export function useThumbnail(at: FileAt, file: TreeFile) {
   })
 }
 
-/** One pdf.js document per file id, closed once nothing shows it. */
 export function usePdf(file: TreeFile) {
   const openPdf = use(PdfOpener)
 

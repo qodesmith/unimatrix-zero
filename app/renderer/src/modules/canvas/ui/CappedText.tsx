@@ -12,15 +12,12 @@ interface CappedTextProps {
   maxHeightClass: string
   expanded: boolean
   onToggle: () => void
-  /** The box stays on the newest text until the user scrolls up. */
   streaming?: boolean
-  /** Held at the end of Show more's line, which shows for it alone too. */
   trailing?: ReactNode
   className?: string
   children: ReactNode
 }
 
-/** The box's scroll on either side of a toggle, in canvas units. */
 interface Toggle {
   from: number
   to: number

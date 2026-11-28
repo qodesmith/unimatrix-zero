@@ -14,7 +14,6 @@ import {cdp, page, userEvent} from 'vitest/browser'
 import {account, fakeMain, receivedAt, savedTree} from '../fake-main'
 import {App} from './App'
 
-/** The canvas fills its parent, so it needs one with a height. */
 function FullHeight({children}: {children: ReactNode}) {
   return <div style={{height: '100vh'}}>{children}</div>
 }
@@ -47,7 +46,6 @@ function zoomOf() {
   return scale === undefined ? Number.NaN : Number(scale)
 }
 
-/** '' clears the emulation: no preference. */
 async function emulateReducedMotion(value: 'reduce' | '') {
   await cdp().send('Emulation.setEmulatedMedia', {
     features: [{name: 'prefers-reduced-motion', value}],

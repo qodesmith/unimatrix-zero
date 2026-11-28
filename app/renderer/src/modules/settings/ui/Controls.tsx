@@ -16,7 +16,6 @@ import {useId} from 'react'
 interface GroupProps {
   legend: string
   legendId?: string
-  /** A look-and-behavior group has none. */
   reachNote?: string
   children: ReactNode
 }

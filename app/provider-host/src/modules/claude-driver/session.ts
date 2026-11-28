@@ -57,20 +57,16 @@ function messageContent(content: ContentPart[]) {
     : content.map(blockOf)
 }
 
-/** One `claude` kept open between Prompts; `messageId` is where it continues. */
 export interface ClaudeSession {
   readonly sessionId: string | null
   messageId: string | null
   /** Whether `claude` has started; false while it may still refuse to. */
   readonly started: boolean
   readonly ended: boolean
-  /** Yields up to the Prompt's `result`; `claude` stores it as `uuid`. */
   send(content: ContentPart[], uuid: UUID): AsyncGenerator<SDKMessage>
-  /** Resolves once `claude` takes it; the `result` still follows on `send`. */
   interrupt(): Promise<void>
   /** Waits for `claude` to exit by itself, to finish writing; else stops it. */
   close(): Promise<void>
-  /** What `claude` answered as it started, which the Prompts never wait on. */
   models(): Promise<ModelInfo[]>
 }
 

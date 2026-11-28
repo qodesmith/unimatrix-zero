@@ -8,7 +8,6 @@ import {initialPromptSend, promptSendTransition} from './machine'
 
 interface Submission {
   text: string
-  /** In the order the Prompt shows them. */
   attachmentIds: readonly string[]
   model: ModelChoice
   onSent: (replyId: string) => void

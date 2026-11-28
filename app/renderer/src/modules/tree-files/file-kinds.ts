@@ -18,7 +18,6 @@ export function baseName(path: string) {
   return path.split('/').at(-1) ?? path
 }
 
-/** Lowercase, without the dot; '' for none. */
 export function extensionOf(path: string) {
   const name = baseName(path)
   const dot = name.lastIndexOf('.')
@@ -44,7 +43,6 @@ const BY_PREVIEW = {
   other: null,
 } satisfies Record<TreeFileDetails['preview'], LucideIcon | null>
 
-/** For the files the app doesn't show itself. */
 const BY_EXTENSION = new Map([
   ['zip', FileArchiveIcon],
   ['gz', FileArchiveIcon],
@@ -59,7 +57,6 @@ const BY_EXTENSION = new Map([
   ['rtf', FileTextIcon],
 ])
 
-/** The app's own icons: no OS icon reaches the renderer. */
 export function iconOf(details: TreeFileDetails): LucideIcon {
   if (details.link) return LinkIcon
 

@@ -17,7 +17,6 @@ export const SETUP_TOKENS: Record<ProviderId, number> = {
   chatgpt: 13_000,
 }
 
-/** A Context size, and the Provider whose setup it includes. */
 export interface MeasuredContext {
   provider: ProviderId
   size: number
@@ -44,7 +43,6 @@ interface ReReadInput {
   attachedTo: Reply | null
   context: MeasuredContext | null
   to: ModelChoice | null
-  /** The Tree's System prompt, which the next Reply runs under. */
   systemPromptId: string
 }
 

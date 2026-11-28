@@ -18,7 +18,6 @@ export function realPath(target: string): string {
   }
 }
 
-/** The names from `folder` down to `file`, or null when `file` is outside it. */
 export function namesBelow(folder: string, file: string) {
   const relative = path.relative(realPath(folder), realPath(file))
   const names = relative === '' ? [] : relative.split(path.sep)
@@ -30,10 +29,6 @@ export function isAtOrUnder(folder: string, file: string) {
   return namesBelow(folder, file) !== null
 }
 
-/**
- * Whether an edit to `file` lands in the Tree's files, which each Branch
- * versions.
- */
 export function isInTreeFolder(treeFolder: string, file: string) {
   const absolute = path.resolve(treeFolder, file)
 
@@ -58,10 +53,6 @@ export function isInAnotherTree(
   )
 }
 
-/**
- * Whether `file`, read from the Tree's folder, is in one of the app's hidden
- * folders.
- */
 export function isHidden(
   {treeFolder, hiddenFolders}: {treeFolder: string; hiddenFolders: string[]},
   file: string
@@ -93,7 +84,6 @@ export function holdsEveryTree(
   return isAtOrUnder(path.resolve(treeFolder, folder), treesFolder)
 }
 
-/** Whether a search that starts at `folder` would walk into a hidden folder. */
 export function holdsHiddenFolder(
   {treeFolder, hiddenFolders}: {treeFolder: string; hiddenFolders: string[]},
   folder: string
@@ -103,10 +93,6 @@ export function holdsHiddenFolder(
   return hiddenFolders.some(hidden => isAtOrUnder(searched, hidden))
 }
 
-/**
- * Every other Tree's folder by name, or the folder of every Tree when the
- * Tree's folder is outside it.
- */
 export function otherTreeFolders({
   treeFolder,
   treesFolder,

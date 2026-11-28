@@ -2,14 +2,11 @@
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import {createContext} from 'react'
 
-/** Where `vite.config.ts` puts the files pdf.js fetches at run time. */
 const PDFJS_ASSETS = 'pdfjs'
 
 export interface PdfFile {
   pageCount: number
-  /** Page 1's height over its width, for pages not drawn yet. */
   firstPageRatio: number
-  /** Draws the page `width` CSS pixels wide. */
   drawPage: (
     page: number,
     canvas: HTMLCanvasElement,
@@ -32,7 +29,6 @@ async function openPdf(url: string): Promise<PdfFile> {
 
   if (!response.ok) throw new Error('The PDF could not be read.')
 
-  // Loaded with the first PDF, so the app starts without it.
   const {GlobalWorkerOptions, getDocument} = await import('pdfjs-dist')
 
   GlobalWorkerOptions.workerSrc = workerUrl
@@ -74,5 +70,4 @@ async function openPdf(url: string): Promise<PdfFile> {
   }
 }
 
-/** Tests put a fake in its place: pdf.js itself is not this app's to test. */
 export const PdfOpener = createContext(openPdf)

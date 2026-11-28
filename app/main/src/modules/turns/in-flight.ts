@@ -56,7 +56,6 @@ interface Entry {
   promptMessageId: string
   reply: StreamingReply
   saveTimer: ReturnType<typeof setTimeout> | null
-  /** The cards waiting, by approvalId; never saved. */
   approvals: Map<string, ApprovalRequested>
 }
 
@@ -230,7 +229,6 @@ export function createInFlight(
       return entry?.reply.treeId === treeId ? entry.provider : null
     },
 
-    /** Null once the card is answered or its Reply has ended. */
     waitingApproval(treeId: string, replyId: string, approvalId: string) {
       const entry = entries.get(replyId)
 

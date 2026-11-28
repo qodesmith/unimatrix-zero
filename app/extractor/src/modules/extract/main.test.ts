@@ -71,7 +71,6 @@ function centralRecord(zip: Uint8Array, name: string) {
   throw new Error(`no entry ${name}`)
 }
 
-/** Rewrites the central directory record of `name`. */
 function patch(
   zip: Uint8Array,
   name: string,

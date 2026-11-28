@@ -32,7 +32,6 @@ export function childElements(root: Element, ns: string, name: string) {
   )
 }
 
-/** Each line trimmed at its end, and the blank lines at either end dropped. */
 export function tidyLines(lines: string[]) {
   return lines
     .join('\n')

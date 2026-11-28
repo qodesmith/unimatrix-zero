@@ -5,12 +5,10 @@ import {z} from 'zod'
  * files and running commands are not here: every Tree has them.
  */
 export const TreeToolsSchema = z.strictObject({
-  /** Claude's `WebSearch` and `WebFetch`; Codex's web search. */
   webSearch: z.boolean(),
   claudeConnectors: z.boolean(),
   claudeBuiltInSkills: z.boolean(),
   chatgptBuiltInSkills: z.boolean(),
-  /** OpenAI's remote plugins, and the connectors on the ChatGPT account. */
   chatgptRemotePlugins: z.boolean(),
 })
 

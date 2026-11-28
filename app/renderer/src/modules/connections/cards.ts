@@ -21,7 +21,6 @@ export interface ConnectionsState {
   loaded: boolean
   statuses: ProviderStatus[]
   signIn: SignInStep | null
-  /** True from the code page on; false while no connect is under way. */
   pasting: boolean
   failures: Partial<Record<ProviderId, SignInFailure>>
   models: Record<ProviderId, Model[]>
@@ -136,7 +135,6 @@ export function cardOf(state: ConnectionsState, provider: ProviderId): Card {
   return failure ? {kind: 'failed', failure} : {kind: 'idle'}
 }
 
-/** Only one Provider connects at a time: the one this one waits for. */
 export function waitingFor(
   state: ConnectionsState,
   provider: ProviderId

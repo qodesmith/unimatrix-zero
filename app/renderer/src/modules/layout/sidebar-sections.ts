@@ -7,10 +7,8 @@ import {
 
 type Sections = Layout['sidebarSections']
 
-/** Each section's share of the sidebar's height, in percent. */
 export type SectionLayout = Record<SidebarSectionId, number>
 
-/** Top to bottom. */
 export const SECTION_IDS = SidebarSectionIdSchema.options
 
 function openIds(sections: Sections) {
@@ -25,7 +23,6 @@ function free(sections: Sections, headerShare: number) {
   return 100 - (SECTION_IDS.length - openIds(sections).length) * headerShare
 }
 
-/** Collapsed sections get `headerShare`; open ones split the rest by size. */
 export function arrange(
   sections: Sections,
   headerShare: number
@@ -53,7 +50,6 @@ export function arrange(
     : layout
 }
 
-/** The inverse of `arrange`. */
 export function resized(
   sections: Sections,
   layout: SectionLayout,

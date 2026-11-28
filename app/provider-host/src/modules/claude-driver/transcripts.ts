@@ -8,7 +8,6 @@ import path from 'node:path'
 /** Where the SDK stops a project key and adds a hash of the whole path. */
 const KEY_LENGTH = 200
 
-/** The SDK's `djb2`, so a long key matches the one it computes. */
 function djb2(text: string) {
   let hash = 0
 
@@ -20,7 +19,6 @@ function djb2(text: string) {
   return Math.abs(hash).toString(36)
 }
 
-/** The project key `claude` files a session under in `cwd`, as the SDK does. */
 export function projectKeyOf(cwd: string) {
   const real = fs.realpathSync(path.resolve(cwd))
 
@@ -84,7 +82,6 @@ function sessionFolder({configDir, projectKey, sessionId}: SessionPlace) {
   return path.join(configDir, 'projects', projectKey, sessionId)
 }
 
-/** `relative` resolved in `folder`; null when it would land outside it. */
 function within(folder: string, relative: string) {
   const target = path.resolve(folder, relative)
 
@@ -159,7 +156,6 @@ export async function writeTranscriptBack(
 
 const TOOL_RESULTS = 'tool-results'
 
-/** The session's tool result files not saved before, relative to its folder. */
 export function readNewToolResults(
   place: SessionPlace,
   saved: ReadonlySet<string>

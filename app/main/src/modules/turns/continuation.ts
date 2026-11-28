@@ -95,7 +95,6 @@ function resumed(
   )
 }
 
-/** `session` is where the Reply above goes on. */
 function keepingPrompt(
   db: Database,
   row: ReplyRow,
@@ -131,7 +130,6 @@ function ownPrompt(db: Database, row: ReplyRow): SessionRef | null {
     : {sessionId, messageId}
 }
 
-/** The Reply, or only its Prompt when its Provider never saved it. */
 function lastKept(row: ReplyRow, session: SessionRef) {
   return row.sessionMessageId === null
     ? (promptIn(session, row) ?? session.messageId)
@@ -152,7 +150,6 @@ function cutBack(
 }
 
 interface Plan extends Continuation {
-  /** The last entry a `continue` keeps of its session. */
   lastKept: string | null
 }
 

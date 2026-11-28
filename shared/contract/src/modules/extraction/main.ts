@@ -35,7 +35,6 @@ export type ExtractionFormat = z.infer<typeof ExtractionFormatSchema>
  */
 export const EXTRACTION_PORT_MESSAGE = 'uz:extraction-port'
 
-/** Main posts the window the file's bytes, and nothing else. */
 export const ExtractionJobSchema = z.strictObject({
   bytes: z.instanceof(Uint8Array),
 })
@@ -77,9 +76,7 @@ export const ExtractionSchema = z.discriminatedUnion('status', [
   z.strictObject({
     status: z.literal('read'),
     version: z.number().int().positive(),
-    /** Whether a text file was written: a scan may have no text at all. */
     text: z.boolean(),
-    /** The pages that have an image, in order. */
     pageImages: z.array(z.number().int().positive()),
     imagesStopped: z.boolean(),
   }),

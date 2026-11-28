@@ -18,8 +18,8 @@ export function useReplyStore() {
 }
 
 /**
- * The Reply as it shows now: as far as it has streamed in this window, else
- * as saved. Takes null so a caller's hooks stay in order.
+ * Streamed in this window, else saved. Takes null so a caller's hooks stay in
+ * order.
  */
 export function useReply(reply: Reply): Reply
 export function useReply(reply: Reply | null): Reply | null
@@ -42,7 +42,6 @@ export function useTreeStreaming(treeId: string) {
 
 const NO_BLOCKS: never[] = []
 
-/** The Reply's Thinking blocks, while this window has been open. */
 export function useThinking(replyId: string) {
   return useSelector(
     useReplyStore(),
@@ -56,7 +55,6 @@ export function useWaiting(replyId: string) {
 
 const NO_APPROVALS: never[] = []
 
-/** The Reply's approval cards and reviews, while this window has been open. */
 export function useApprovals(replyId: string) {
   return useSelector(
     useReplyStore(),
@@ -64,7 +62,6 @@ export function useApprovals(replyId: string) {
   )
 }
 
-/** Its description, or null when the Subagent never said what it does. */
 export function useSubagentDescription(
   replyId: string,
   subagentId: string | null

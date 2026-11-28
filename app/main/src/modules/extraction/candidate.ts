@@ -1,6 +1,5 @@
 import type {ExtractionFormat} from '@uz/contract/extraction'
 
-/** What main can tell from the bytes; the window tells the formats apart. */
 export type Candidate = 'pdf' | 'zip' | 'rtf' | 'ipynb'
 
 const CANDIDATE_OF = {
@@ -28,7 +27,6 @@ const NBFORMAT = Buffer.from('"nbformat"')
 
 const OPEN_BRACE = 0x7b
 
-/** UTF-8's byte order mark, which the window's decoder drops. */
 const BOM = Uint8Array.from([0xef, 0xbb, 0xbf])
 
 const WHITESPACE = new Set([0x20, 0x09, 0x0a, 0x0d])
@@ -62,7 +60,6 @@ function isNotebook(bytes: Uint8Array) {
   )
 }
 
-/** Null when the bytes can't be any format the window reads. */
 export function extractionCandidate(bytes: Uint8Array): Candidate | null {
   const signed = PREFIXES.find(([, prefix]) => startsWith(bytes, prefix))
 

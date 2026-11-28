@@ -7,7 +7,6 @@ export const SessionFolderSchema = z.strictObject({
 
 export type SessionFolder = z.infer<typeof SessionFolderSchema>
 
-/** `subpath` names a Subagent's transcript inside the session. */
 export const SessionKeySchema = SessionFolderSchema.extend({
   subpath: z.string().min(1).optional(),
 })
@@ -63,7 +62,6 @@ type SessionStoreOp = SessionStoreRequest['op']
 
 export const SESSION_STORE_RESULTS = {
   append: z.null(),
-  /** Null when nothing was ever kept for the key. */
   load: z.array(SessionEntrySchema).nullable(),
   'list-subkeys': z.array(z.string()),
   'save-files': z.null(),

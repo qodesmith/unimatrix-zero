@@ -77,7 +77,6 @@ function thumbOf(value: number | readonly number[]) {
 
 interface ThresholdProps {
   range: CompactionThresholdRange
-  /** Null is the Provider's default, which the slider's maximum stands for. */
   saved: Threshold
   disabled: boolean
   onCommit: (threshold: Threshold) => void

@@ -28,7 +28,6 @@ export type {HostProcess} from './host-process'
 
 export {RESTART_DELAYS_MS} from './host-lifecycle/machine'
 
-/** A host that stays up this long after reporting ready has recovered. */
 export const STABLE_AFTER_MS = 60_000
 
 export const ONE_SHOT_TIMEOUT_MS = 60_000
@@ -59,7 +58,6 @@ interface ProviderHostsOptions {
   onReplyRecorded: (provider: ProviderId, recorded: ReplyRecorded) => void
   onSignInUpdate: (provider: ProviderId, update: SignInUpdate) => void
   onModels: (provider: ProviderId, models: Model[]) => void
-  /** Throws if it can't answer. */
   onSessionStore: (
     provider: ProviderId,
     request: SessionStoreRequest
@@ -70,7 +68,6 @@ interface ProviderHostsOptions {
 
 export type ProviderHosts = ReturnType<typeof createProviderHosts>
 
-/** One utility process per connected Provider, restarted after a crash. */
 export function createProviderHosts({
   spawn,
   onReplyEvent,
@@ -264,7 +261,6 @@ export function createProviderHosts({
       child.post(command)
     },
 
-    /** Runs on the Provider's smallest Model, outside any Tree. */
     async runOneShot(
       provider: ProviderId,
       request: Omit<OneShotRequest, 'model'>

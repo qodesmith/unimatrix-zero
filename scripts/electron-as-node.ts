@@ -4,7 +4,6 @@ import {spawnSync} from 'node:child_process'
 import {createRequire} from 'node:module'
 import {z} from 'zod'
 
-// The `electron` package's main export is the path to its binary.
 export const electronPath = z
   .string()
   .parse(createRequire(import.meta.url)('electron'))

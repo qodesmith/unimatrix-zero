@@ -1,6 +1,5 @@
 import {defineConfig} from 'vitest/config'
 
-// Every limit only catches a hang. A poll gives up first, so a hang names what it waited for.
 const HANG_MS = 60_000
 
 export default defineConfig({

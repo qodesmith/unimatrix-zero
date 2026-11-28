@@ -1,7 +1,6 @@
 import {MIB} from '@uz/contract/sizes'
 import {Inflate} from 'fflate'
 
-/** `ratio` is expanded bytes over compressed bytes. */
 const ZIP_LIMITS = {entries: 2048, expandedBytes: 32 * MIB, ratio: 200}
 
 const LOCAL_HEADER = 0x04_03_4b_50
@@ -16,7 +15,6 @@ const STORED = 0
 const DEFLATE = 8
 const ZIP64_MARK = 0xff_ff_ff_ff
 
-/** Small enough that one push of a bomb's input inflates a few MiB at most. */
 const INFLATE_CHUNK = 4096
 
 interface Entry {
@@ -29,7 +27,6 @@ interface Entry {
 export interface Zip {
   has: (name: string) => boolean
   names: () => string[]
-  /** The entry's bytes, or null when the archive has no such entry. */
   read: (name: string) => Uint8Array | null
 }
 
@@ -138,10 +135,7 @@ function entryData(bytes: Uint8Array, entry: Entry) {
   return bytes.subarray(start, end)
 }
 
-/**
- * Opens a zip within `ZIP_LIMITS`: the directory is checked up front, and
- * each read counts the bytes it really inflates, so lying headers stop too.
- */
+/** Each read counts the bytes it really inflates, so lying headers stop too. */
 export function openZip(bytes: Uint8Array): Zip {
   const entries = readDirectory(bytes)
   const cache = new Map<string, Uint8Array>()
@@ -210,7 +204,6 @@ function inflateEntry(
   return join(chunks, produced)
 }
 
-/** An entry name for a relative link from a part in `folder`, like `xl/`. */
 export function resolveEntry(folder: string, target: string) {
   const path = target.startsWith('/') ? target.slice(1) : folder + target
   const parts: string[] = []

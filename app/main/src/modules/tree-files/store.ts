@@ -5,7 +5,6 @@ import {randomUUID} from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
-/** Left out of every Snapshot unless a `.gitignore` un-ignores them. */
 const DEFAULT_EXCLUDES = [
   'node_modules/',
   '.venv/',
@@ -18,7 +17,6 @@ const DEFAULT_EXCLUDES = [
   '.DS_Store',
 ]
 
-/** The tree git gives a folder with no files, in a SHA-1 store. */
 const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
 export interface VersionedFolder extends Checkout {
@@ -164,7 +162,6 @@ export async function takeSnapshot(
   return commit
 }
 
-/** A null `from` is no files at all. */
 export interface SnapshotPair {
   replyId: string
   from: string | null
@@ -240,7 +237,6 @@ async function sizesOf(git: Git, store: string, blobs: string[]) {
   return new Map(blobs.map((blob, at) => [blob, Number(sizes[at])]))
 }
 
-/** Three `git` runs however many pairs. A Reply with no changes has no entry. */
 export async function changedFiles(
   git: Git,
   store: string,

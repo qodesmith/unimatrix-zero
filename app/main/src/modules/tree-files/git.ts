@@ -114,7 +114,6 @@ export function createGit(program: string, env: NodeJS.ProcessEnv): Git {
 
 export interface GitBlobs {
   write: (store: string, blob: string, file: string) => Promise<void>
-  /** Up to `bytes` from its start, read without the rest. */
   start: (store: string, blob: string, bytes: number) => Promise<Buffer>
 }
 

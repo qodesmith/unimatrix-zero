@@ -25,7 +25,6 @@ function uint16(bytes: Uint8Array, at: number) {
   return high === undefined || low === undefined ? null : high * 256 + low
 }
 
-/** A frame header: its length, precision, height, width, then components. */
 const FRAME_HEADER_LENGTH = 11
 
 function frameSize(bytes: Uint8Array, at: number, length: number) {

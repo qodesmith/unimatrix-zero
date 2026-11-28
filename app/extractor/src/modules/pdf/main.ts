@@ -11,7 +11,6 @@ import {renderPage} from './page-image'
 
 GlobalWorkerOptions.workerSrc = workerUrl
 
-/** A page gets an image when its images cover more than this share of it. */
 const PAGE_IMAGE_COVERAGE = 0.1
 
 /** Where pdf.js finds the files it fetches: each URL ends in a slash. */
@@ -28,7 +27,6 @@ export type PdfReading = Pick<Read, 'pageImages' | 'imagesStopped'> & {
   text: string
 }
 
-/** The folders the build copies from `pdfjs-dist` into `dist/`. */
 export function pdfAssetsAt(origin: string): PdfAssets {
   return {
     cMapUrl: `${origin}/cmaps/`,

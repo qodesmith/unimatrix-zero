@@ -2,7 +2,6 @@ import {tidyLines} from '#modules/xml/main'
 
 const SIGNATURE = '{\\rtf'
 
-/** Groups whose text a reader never sees as the body. */
 const HIDDEN = new Set([
   'annotation',
   'colorschememapping',
@@ -67,7 +66,6 @@ const CONTROL_WORD = /([a-z]+)(-?\d+)? ?/iy
 
 interface Group {
   hidden: boolean
-  /** How many characters follow a `\uN` as its fallback. */
   fallback: number
 }
 
@@ -77,7 +75,6 @@ interface Reader {
   group: Group
   stack: Group[]
   text: string
-  /** Fallback characters still to drop after a `\uN`. */
   dropping: number
 }
 

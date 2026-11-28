@@ -52,7 +52,6 @@ async function closeOnExit(running: Running) {
   if (!exited) running.close()
 }
 
-/** A string prompt ends `claude`'s input after its one result. */
 export async function runClaudeOneShot(
   deps: {query: OneShotQuery; env: NodeJS.ProcessEnv},
   {model, prompt, vendorProgram: {program, configDir}}: OneShotRequest,

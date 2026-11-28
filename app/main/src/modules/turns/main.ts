@@ -55,7 +55,6 @@ export type {FinishedReply} from './in-flight'
 
 export interface ReplyHosts {
   ready(provider: ProviderId): boolean
-  /** Throws when the host can't be reached. */
   send(provider: ProviderId, command: HostCommand): void
 }
 
@@ -77,7 +76,6 @@ export interface TurnsDeps {
   attachmentsDir: string
   now: () => Date
   onTurnsChanged: (treeId: string) => void
-  /** Every way a Reply ends, a failure to reach its host included. */
   onReplyFinished: (finished: FinishedReply) => void
 }
 
@@ -348,7 +346,6 @@ export function createTurns({
       )
     },
 
-    /** Its `RUN_FINISHED` comes from the host. */
     stop(treeId: string, replyId: string) {
       const provider = inFlight.writer(treeId, replyId)
 

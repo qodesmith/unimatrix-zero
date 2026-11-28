@@ -26,18 +26,14 @@ interface RecordedToolCall {
   id: string
   name: string
   input: ToolInput
-  /** Null until a result comes back, or when it isn't plain text. */
   result: string | null
 }
 
-/** What one Prompt's run up to its `result` holds that a re-record changes. */
 interface RecordedReply {
   sessionId: string
-  /** The last assistant entry, which the Reply is recorded at. */
   messageId: string
   text: string
   textDeltas: string[]
-  /** Text deltas streamed before the SDK asked `claude` to stop, else all. */
   streamedBeforeInterrupt: number
   boundaryIds: string[]
   toolCalls: RecordedToolCall[]
@@ -214,7 +210,6 @@ function repliesIn(lines: RecordedLine[]) {
 
 const read = new Map<string, RecordedReply[]>()
 
-/** The Reply of the recording's `index`th `result`, counted from 0. */
 export function recordedReply(name: string, index: number) {
   const replies = read.get(name) ?? repliesIn(readRecording(name))
   read.set(name, replies)
@@ -240,7 +235,6 @@ const ModelsListedSchema = z.looseObject({
   }),
 })
 
-/** The Models the recording's `claude` listed, under the driver's names. */
 export function recordedModels(name: string) {
   for (const line of readRecording(name)) {
     const listed =
@@ -258,10 +252,6 @@ export function recordedModels(name: string) {
   throw new Error(`${name} lists no Models`)
 }
 
-/**
- * The folder the recording's `claude` ran in, under the recording's name for
- * it.
- */
 export function recordedTreeFolder(name: string) {
   const [start] = readRecording(name)
 
@@ -276,7 +266,6 @@ function quoted(text: string) {
   return JSON.stringify(text).slice(1, -1)
 }
 
-/** As the fake writes it: the folder it ran in for the one it was recorded in. */
 export function inFolder(
   name: string,
   input: ToolInput | undefined,

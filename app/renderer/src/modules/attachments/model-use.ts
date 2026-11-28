@@ -13,7 +13,6 @@ function pageImagesNote(count: number) {
   return count === 1 ? '1 page image' : `${count} page images`
 }
 
-/** Null when the app took nothing from the file the AI could read. */
 function extractedUse({extraction}: Attachment) {
   if (extraction?.status !== 'read') return null
 

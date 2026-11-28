@@ -7,8 +7,8 @@ import {useEffect, useState} from 'react'
 import {applyEvent, sortTrees} from './apply-event'
 
 /**
- * Main answers and sends on one ordered channel, so events folded in before
- * `tree.list` answers are already part of the list.
+ * Main answers and sends on one ordered channel, so earlier events are already
+ * in the `tree.list` answer.
  */
 export function useTrees() {
   const [trees, setTrees] = useState<Tree[]>([])
@@ -40,7 +40,6 @@ export function useTrees() {
   const openTree = trees.find(tree => tree.id === openTreeId) ?? null
   const failureInOpenTree = openTree?.unseenFailure === true
 
-  // The user is looking at the open Tree, so a failure in it is seen as it comes.
   useEffect(() => {
     if (openTreeId !== null && failureInOpenTree) {
       void bridge().send({type: 'tree.open', treeId: openTreeId})
@@ -72,7 +71,6 @@ export function useTrees() {
 
   return {
     trees,
-    /** Null until main lists the Trees, unless a live event already brought one. */
     hasTrees: trees.length > 0 ? true : listed ? false : null,
     openTree,
     error,

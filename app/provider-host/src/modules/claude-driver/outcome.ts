@@ -2,7 +2,6 @@ import type {Silent} from './heard'
 import type {SDKResultMessage} from '@anthropic-ai/claude-agent-sdk'
 import type {RunFailure} from '@uz/contract/turns'
 
-/** `heard` says whether `claude` sent anything back to the Prompt. */
 export type Outcome =
   | {result: SDKResultMessage}
   | {failure: RunFailure; heard: boolean}

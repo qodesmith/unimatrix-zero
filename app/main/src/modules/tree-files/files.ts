@@ -33,7 +33,6 @@ export interface FilesContext {
   blobs: () => GitBlobs
   storeOf: (treeId: string) => string
   folderFor: (treeId: string) => string
-  /** Settles once the Tree has no Snapshot in progress. */
   settled: (treeId: string) => Promise<void>
   /** Above the nearest Reply with a Snapshot, or null. */
   snapshotAbove: (treeId: string, replyId: string) => string | null
@@ -101,7 +100,6 @@ export function createSnapshotFiles(context: FilesContext) {
     })
   }
 
-  /** Null for an id never listed, or one whose Reply is gone. */
   function knownFile(id: TreeFileId) {
     const file = known.get(id)
     const reply = file && replyOf(file.treeId, file.replyId)
@@ -263,7 +261,6 @@ export function createSnapshotFiles(context: FilesContext) {
       return {saved: true}
     },
 
-    /** Null when the Tree has no such Reply. */
     async saveFilesCopy(treeId: string, replyId: string) {
       const reply = replyOf(treeId, replyId)
 
@@ -306,7 +303,6 @@ export function createSnapshotFiles(context: FilesContext) {
       }
     },
 
-    /** Null when the Tree has no such Reply. */
     async listFiles(treeId: string, replyId: string) {
       await context.settled(treeId)
 

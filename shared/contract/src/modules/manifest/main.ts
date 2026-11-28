@@ -1,6 +1,5 @@
 import {z} from 'zod'
 
-/** `<process.platform>-<process.arch>` for every OS and arch the app ships on. */
 export const PlatformSchema = z.enum([
   'darwin-arm64',
   'darwin-x64',
@@ -16,7 +15,6 @@ export const VendorBuildSchema = z.strictObject({
   url: z.url({protocol: /^https$/}),
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
   size: z.int().positive(),
-  /** Set when the download is a folder, unpacked where the program goes. */
   archive: z
     .strictObject({
       format: z.literal('tar.gz'),

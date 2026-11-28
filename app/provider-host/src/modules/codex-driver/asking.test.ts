@@ -73,7 +73,6 @@ function setUp(
 
   return {
     responses,
-    /** Codex asks before a command; returns the request's id. */
     command(params: Partial<CommandParams>) {
       nextId += 1
 
@@ -93,7 +92,6 @@ function setUp(
 
       return nextId
     },
-    /** Codex asks before a file change; returns the request's id. */
     edit(changes: {path: string; movedTo?: string}[]) {
       nextId += 1
       const itemId = `item-${nextId}`

@@ -11,7 +11,6 @@ interface ReplyRunInput {
   send: (event: ReplyRunEvent) => void
 }
 
-/** Its `RUN_FINISHED` follows through the live events. */
 export async function askToStop({treeId, replyId, send}: ReplyRunInput) {
   const outcome = await bridge().send({type: 'reply.stop', treeId, replyId})
 

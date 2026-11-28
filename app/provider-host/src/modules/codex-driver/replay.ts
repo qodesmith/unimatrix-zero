@@ -10,7 +10,6 @@ export const RECORDINGS = path.join(import.meta.dirname, 'recordings')
 
 export const CODEX_HOME_STAND_IN = '/codex-home'
 
-/** A replay puts back the `cwd` the driver last opened a thread or turn in. */
 export const TREE_FOLDER_STAND_IN = '/tree-folder'
 
 export const TREES_FOLDER_STAND_IN = '/trees-folder'
@@ -19,20 +18,13 @@ const THREAD_SETTINGS = ['config', 'sandbox', 'approvalPolicy', 'cwd'] as const
 
 const TURN_SETTINGS = ['sandboxPolicy', 'approvalPolicy', 'cwd'] as const
 
-/** What the fake compares on a thread's and a turn's request. */
 export type CodexSetting =
   | (typeof THREAD_SETTINGS)[number]
   | (typeof TURN_SETTINGS)[number]
 
 export const RecordedMessageSchema = z.looseObject({})
 
-/** `in` is what the driver wrote to `codex`; `out`, what it wrote back. */
 export const RecordedLineSchema = z.discriminatedUnion('kind', [
-  /**
-   * `build` names the `codex` that made the recording, such as `codex 0.163.0`.
-   * `sandbox` holds the folders a live test gave the Sandbox: each other Tree
-   * by its name in the folder of every Tree, and the hidden folders.
-   */
   z.strictObject({
     kind: z.literal('start'),
     build: z.string(),
@@ -51,25 +43,16 @@ export const RecordedLineSchema = z.discriminatedUnion('kind', [
 export type RecordedLine = z.infer<typeof RecordedLineSchema>
 
 export interface FakeCodexOptions {
-  /** Exits like a crash on reading or writing this method. */
   exitAt?: string
-  /** Only this many runs, from the first, exit at `exitAt`. */
   exits?: number
-  /**
-   * Refuses a resume or fork of an unknown thread and goes on, as `codex` does.
-   * The recording leaves that request out.
-   */
   keepRunningOnRefusal?: boolean
-  /** The test's Tree folder, read as the folder the recording's threads ran in. */
   treeFolder?: string
-  /** Other folders of the test's, each with the name the recording has for it. */
   standIns?: [string, string][]
   skip?: SkippedSetting<CodexSetting>[]
 }
 
 const OPTIONS_VARIABLE = 'FAKE_CODEX_OPTIONS'
 
-/** The nth app-server replays the nth recording; reports `<reports>/<n>.json`. */
 export function fakeCodexEnv(
   recordings: string[],
   reports: string,
@@ -93,9 +76,7 @@ export const FakeCodexRunSchema = z.strictObject({
   cwd: z.string(),
   vendorVariables: z.array(z.string()),
   methods: z.array(z.string()),
-  /** What the driver answered each server request. */
   answers: z.array(z.looseObject({id: z.union([z.string(), z.number()])})),
-  /** The text of each `turn/start`'s first text item. */
   prompts: z.array(z.string()),
   inputs: z.array(z.array(z.looseObject({type: z.string()}))),
   threadModels: z.array(NullableStringSchema),
@@ -106,10 +87,8 @@ export const FakeCodexRunSchema = z.strictObject({
   turnAccess: z.array(z.looseObject({})),
   modelLists: z.array(z.looseObject({})),
   resumedFrom: z.array(z.looseObject({type: z.string(), id: z.string()})),
-  /** At each `turn/start`, the ids of what the thread held. */
   contexts: z.array(z.array(z.string())),
   injected: z.array(z.looseObject({})),
-  /** Which setting differed from the recording, and how. */
   changed: NullableStringSchema,
   forkedThrough: NullableStringSchema,
   interrupted: NullableStringSchema,
@@ -323,7 +302,6 @@ process.stdin.on('end', () => {
 })
 `
 
-/** Run `program` with this Node. */
 export async function replayCodex() {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'uz-replay-codex-'))
   const program = path.join(folder, 'codex.mjs')

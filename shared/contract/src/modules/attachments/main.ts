@@ -79,14 +79,12 @@ export const AttachmentSchema = z.strictObject({
   size: z.number().int().nonnegative(),
   /** Of an image's shrunk inline copy; null if it has none. */
   shrunkSize: z.number().int().positive().nullable(),
-  /** A folder's own path; null for a file, which the AI gets a copy of. */
   folderPath: z.string().min(1).nullable(),
   /**
    * The copy can't be read. Main checks when it lists a Tree's Turns and when
    * it answers a send; everywhere else, and for a folder, it is false.
    */
   missing: z.boolean(),
-  /** Null for a file no Extraction is made of, and for a folder. */
   extraction: ExtractionSchema.nullable(),
 })
 

@@ -31,7 +31,6 @@ import {SentAttachments} from './SentAttachments'
 import {StopButton} from './StopButton'
 import {TooltipButton} from './TooltipButton'
 
-/** A vertical Reply's line down through its Input's space, drawn as its edge. */
 export type Stem = 'none' | 'plain' | 'on-thread'
 
 export type TurnNode = Node<
@@ -39,7 +38,6 @@ export type TurnNode = Node<
   CanvasLayoutNode['kind']
 >
 
-/** Sized to nothing, so an edge meets the box's border. */
 const hiddenHandle = 'size-0! min-h-0! min-w-0! border-0! opacity-0!'
 
 function PromptText({prompt}: {prompt: Prompt}) {

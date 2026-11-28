@@ -47,10 +47,6 @@ interface ReplyMarkdownProps {
   streaming: boolean
 }
 
-/**
- * Never reaches the network on its own: links open through main's link rule,
- * and remote images are chips until clicked.
- */
 export function ReplyMarkdown({text, streaming}: ReplyMarkdownProps) {
   const mermaid = useMermaid(hasDiagram(text))
 

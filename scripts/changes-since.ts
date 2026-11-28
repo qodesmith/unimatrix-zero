@@ -47,7 +47,6 @@ async function isAncestor(root: string, from: string, head: string) {
   }
 }
 
-/** The files changed from `from` to `head`, when `from` is in `head`'s history. */
 export async function filesChangedSince(
   root: string,
   from: string,
@@ -71,7 +70,6 @@ export async function filesChangedSince(
   } as const
 }
 
-/** The live tests in the checkout at `root` that import each of `files`. */
 export function liveTestsReached(root: string, files: string[]) {
   const {status, stdout, stderr} = runElectronAsNode(
     [REACHED_SCRIPT, ...files],
@@ -113,7 +111,6 @@ function whyOf(file: string, reached: string[]) {
   return reached.length > 0 ? `imported by ${reached.join(', ')}` : null
 }
 
-/** What changed from a result's commit to `head`, the checkout at `root`. */
 export async function changesSince(
   root: string,
   from: string,

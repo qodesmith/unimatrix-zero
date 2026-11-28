@@ -51,7 +51,6 @@ function pinChanges(base: Pins, head: Pins) {
   )
 }
 
-/** GETs the path after `https://api.github.com/` and resolves its JSON text. */
 export type GitHubApi = (path: string) => Promise<string>
 
 const Compare = z.looseObject({

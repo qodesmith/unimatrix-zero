@@ -8,7 +8,6 @@ interface Deletion {
   promptId: string
   parentReplyId: string | null
   activeBelow: boolean
-  /** The parent stops being a Fork, so its pill goes and its box shrinks. */
   resizes: boolean
 }
 

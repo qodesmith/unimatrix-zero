@@ -11,7 +11,6 @@ export function dialogOpen() {
   )
 }
 
-/** A file's preview takes Esc before the slideout under it. */
 export function filePreviewOpen() {
   return document.querySelector('[data-file-preview][data-open]') !== null
 }

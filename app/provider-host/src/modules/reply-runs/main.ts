@@ -19,7 +19,6 @@ export type ContentEvent = Exclude<
   {type: 'RUN_STARTED' | 'RUN_FINISHED'}
 >
 
-/** A failed Reply is never recorded. */
 export interface Ending {
   finished: RunFinished
   recorded?: ReplyRecorded | null
@@ -33,7 +32,6 @@ export interface ReplyRun {
    * on at once. Call the returned function once that no longer stops it.
    */
   stoppable(interrupt: () => Promise<void>): () => void
-  /** Runs once the Reply has finished, however it did, before it's sent on. */
   afterward(cleanUp: (status: FinishedStatus) => void): void
 }
 
@@ -76,7 +74,6 @@ export function createReplyRuns(
     }
   }
 
-  /** A Reply its caller walks away from has failed, for the clean-ups. */
   async function* ended(
     request: ReplyRequest,
     entry: Writing
@@ -134,7 +131,6 @@ export function createReplyRuns(
     yield finished
   }
 
-  /** The Reply's stream still goes on to its `RUN_FINISHED`. */
   async function stop(replyId: string) {
     const entry = writing.get(replyId)
 

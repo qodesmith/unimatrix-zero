@@ -19,10 +19,6 @@ import {configOf, isSandboxed, loadThread} from './threads'
 
 const SESSION_LOST = /no rollout found for thread id/
 
-/**
- * `replay`: the thread holds nothing of the Thread, so the Prompt tells it.
- * `rebuilt`: the thread was started and given the Thread.
- */
 export interface Opened {
   thread: LoadedThread
   dropped: boolean
@@ -131,7 +127,6 @@ async function itemsOf(thread: Thread) {
   return turns.flat()
 }
 
-/** False when Codex refuses the items, which leaves a text replay. */
 async function injectThread(
   server: Opening['server'],
   threadId: string,
@@ -154,7 +149,6 @@ async function newThread(
 ): Promise<Opened> {
   const settings = settingsOf(request, platform)
   const config = configOf(request, platform)
-  // Before the thread starts, so a failure leaves none behind.
   const items = await itemsOf(request.thread)
 
   async function open() {
@@ -204,7 +198,6 @@ export async function openThread(
   }
 }
 
-/** A deletion cut loads its thread read-only in the config folder. */
 export async function resumeForCut(
   {server, threads}: Omit<Opening, 'platform'>,
   {sessionId: id, messageId}: DeletionCut,

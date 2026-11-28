@@ -36,7 +36,6 @@ interface ReplyTurn {
   reply: Reply
 }
 
-/** One card per Exchange, keyed by its Prompt. */
 interface ExchangeTurns {
   id: string
   kind: 'exchange'
@@ -44,7 +43,6 @@ interface ExchangeTurns {
   reply: Reply | null
 }
 
-/** A failed Reply and its Prompt as one chip, keyed by the Prompt. */
 interface FailedTurns {
   id: string
   kind: 'failed'
@@ -68,9 +66,7 @@ export interface CanvasLayout {
 }
 
 interface Gap {
-  /** Between a Turn and the one that follows it, along the reading direction. */
   rank: number
-  /** Between Branches, across it. */
   branch: number
 }
 
@@ -82,7 +78,6 @@ export const GAPS: Record<CanvasOrientation, Gap> = {
 interface Graph {
   nodes: Unplaced[]
   edges: CanvasLayoutEdge[]
-  /** In reading order. */
   children: Map<string, string[]>
   roots: string[]
 }

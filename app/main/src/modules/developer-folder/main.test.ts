@@ -22,7 +22,6 @@ interface Ended {
   stderr: string
 }
 
-/** A space in the path, as `Application Support` has. */
 function temporaryFolder() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'uz developer folder '))
 }

@@ -137,11 +137,9 @@ function Previewed({at}: {at: FileAt}) {
 }
 
 interface TreeFilePreviewProps {
-  /** Where the panel draws, over the canvas beside the sidebar. */
   container?: HTMLElement | null
 }
 
-/** One file at a time, over the canvas beside the sidebar. */
 export function TreeFilePreview({container}: TreeFilePreviewProps) {
   const previewed = usePreviewedFile()
   const close = useCloseTreeFile()

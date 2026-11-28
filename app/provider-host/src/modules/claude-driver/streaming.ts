@@ -85,7 +85,6 @@ function crashed(message: string): RunFailure {
   return {code: 'program-crashed', message}
 }
 
-/** Replies from a warm `claude`, or a new one that resumes, forks or starts. */
 export function createClaudeReplies(deps: ClaudeRepliesDeps) {
   const warm = createWarmSessions<Live>({
     whenIdle: deps.whenIdle,
@@ -295,7 +294,6 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     for (const file of files) session.saved.add(file.path)
   }
 
-  /** A rewind or a Retry's cut needs a new `claude` that resumes at the cut. */
   function claimable(request: ReplyRequest): Live | null {
     const {session} = request
 
@@ -400,7 +398,6 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     return yield* replyOnce({...request, session: null}, mapper, run)
   }
 
-  /** A refused save of the tool results fails the Reply. */
   async function* write(
     request: ReplyRequest,
     run: ReplyRun

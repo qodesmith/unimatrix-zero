@@ -15,13 +15,10 @@ export interface Review {
 }
 
 export interface Result {
-  /** Null when there was no PR to post on. */
   head: string | null
   pinChanges: string[]
-  /** The live tests, recorders and recordings the PR changes. */
   gatedFiles: string[]
   checks: {id: string; status: CheckStatus}[]
-  /** The live tests that passed only on their retry. */
   retried: string[]
   reviews: Review[]
   whyKept: string | null
@@ -145,13 +142,11 @@ export interface Comment {
   body: string
 }
 
-/** A file changed since a result's commit, and why it needs a new run. */
 export interface Cause {
   file: string
   why: string
 }
 
-/** What changed between a result's commit and the PR's head. */
 export type Since = {ancestor: false} | {ancestor: true; causes: Cause[]}
 
 function earlierResultVerdict(

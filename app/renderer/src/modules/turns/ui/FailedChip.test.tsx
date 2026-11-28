@@ -329,6 +329,5 @@ it('gates every failed Reply on one subscription to the Provider statuses', asyn
   await expect
     .element(screen.getByRole('button', {name: 'Retry'}).nth(1))
     .toBeEnabled()
-  // One for the live Replies, one for the Provider statuses.
   expect(subscriptions).toBe(2)
 })

@@ -35,7 +35,6 @@ export const COMPACTION_THRESHOLD = {
   chatgpt: {min: 20_000, max: 450_000},
 } satisfies Record<ProviderId, CompactionThresholdRange>
 
-/** Null leaves it to the Provider's default. */
 function thresholdSchema({min, max}: CompactionThresholdRange) {
   return z.int().min(min).max(max).nullable()
 }
@@ -56,14 +55,11 @@ export const SettingsSchema = z.strictObject({
     .max(FONT_SIZE.max)
     .multipleOf(FONT_SIZE.step),
   sendKey: SendKeySchema,
-  /** The note above the Input before the AI re-reads the Thread. */
   reReadNote: z.boolean(),
   escStopsReply: z.boolean(),
-  /** Automatic Compaction; a Prompt of `/compact` still compacts. */
   claudeAutoCompaction: z.boolean(),
   claudeCompactionThreshold: thresholdSchema(COMPACTION_THRESHOLD.claude),
   chatgptCompactionThreshold: thresholdSchema(COMPACTION_THRESHOLD.chatgpt),
-  /** The library entry new Trees copy their System prompt from. */
   defaultSystemPromptId: SystemPromptEntryIdSchema,
   toolDefaults: TreeToolsSchema,
 })
@@ -90,7 +86,6 @@ export const SettingsUpdateSchema = SettingsSchema.partial()
 
 export type SettingsUpdate = z.infer<typeof SettingsUpdateSchema>
 
-/** When a Provider compacts a Thread, as each Reply is sent with it. */
 export const CompactionSettingsSchema = z.strictObject({
   /** False only for a Provider that can turn automatic Compaction off. */
   auto: z.boolean(),

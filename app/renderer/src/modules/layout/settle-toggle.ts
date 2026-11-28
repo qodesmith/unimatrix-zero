@@ -1,7 +1,4 @@
-/**
- * Removes a panel group's `data-toggling` once its panels' transitions end,
- * waiting a frame so they have started. Returns a cancel.
- */
+/** Waits a frame so the panels' transitions have started. */
 export function settleToggle(group: HTMLElement | null) {
   let current = true
 

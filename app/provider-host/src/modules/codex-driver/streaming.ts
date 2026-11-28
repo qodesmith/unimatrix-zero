@@ -59,7 +59,6 @@ function resumable(request: ReplyRequest) {
   return request.systemPromptChanged ? null : request.session
 }
 
-/** ChatGPT's Replies through one `codex app-server` that every Thread shares. */
 export function createCodexReplies(deps: CodexRepliesDeps) {
   let current: Running | null = null
   let starting: Promise<Running> | null = null
@@ -265,7 +264,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     return loadThread(running.threads, opened, thread.turns, config)
   }
 
-  /** Saves the reverted rollout, so a later resume lacks what it dropped. */
   async function cutThread(
     {session, vendorProgram}: CutRequest,
     before: Promise<unknown> | undefined

@@ -36,7 +36,6 @@ export function pageImageName(page: number) {
   return `page-${page}.jpg`
 }
 
-/** False for a path that can't be read, which the read then reports. */
 export async function isFolder(filePath: string) {
   try {
     const stats = await fs.stat(filePath)

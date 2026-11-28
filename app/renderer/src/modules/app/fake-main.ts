@@ -32,7 +32,6 @@ function isTreeFileCommand(command: Command): command is TreeFileCommand {
   return command.type.startsWith('tree-file')
 }
 
-/** A Reply's Snapshot as `tree-files.list` gives it. */
 export type FakeSnapshot = CommandResult<'tree-files.list'>
 
 export function treeFile(
@@ -81,16 +80,13 @@ interface Saved {
   streaming?: StreamingReply[]
   firstLaunch?: boolean
   settings?: Partial<Settings>
-  /** The user's own System prompts, after the presets. */
   systemPrompts?: SystemPromptEntry[]
   layout?: Partial<Layout>
   /** By Reply id; a Reply missing here has no files. */
   snapshots?: Record<string, FakeSnapshot>
-  /** By file id, over what `tree-file.describe` makes of the listed file. */
   fileDetails?: Record<string, Partial<TreeFileDetails>>
 }
 
-/** A dropped folder looks like a plain file to the window. */
 function mediaTypeOf(type = '') {
   const known = AttachmentMediaTypeSchema.safeParse(type).data
 

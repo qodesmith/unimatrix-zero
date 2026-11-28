@@ -31,15 +31,10 @@ interface PromptInputProps {
   treeId: string
   parentReplyId: string | null
   onFocus?: () => void
-  /** The Reply main started for the sent Prompt. */
   onSent?: (replyId: string) => void
-  /** The draft, kept by the caller so it outlives this Input's box. */
   draft?: Draft
-  /** The draft as it changes; its text and attachments empty again once sent. */
   onDraftChange?: (draft: Draft) => void
-  /** False while the parent Reply streams: it takes a draft, not a send. */
   canSend?: boolean
-  /** The streaming Reply whose Stop takes Send's place. */
   stopReplyId?: string
   ref?: Ref<HTMLTextAreaElement>
 }

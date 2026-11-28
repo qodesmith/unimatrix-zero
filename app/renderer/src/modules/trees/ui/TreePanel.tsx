@@ -18,7 +18,6 @@ interface TreePanelProps {
   onOpenChange: (open: boolean) => void
 }
 
-/** The one place a Tree's own values are shown and changed, each in a section. */
 export function TreePanel({tree, open, onOpenChange}: TreePanelProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

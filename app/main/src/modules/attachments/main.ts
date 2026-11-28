@@ -42,7 +42,6 @@ export interface AttachmentsDeps {
   db: Database
   dir: string
   droppedPath: (fileId: string) => string | null
-  /** Called only for bytes that could be a format the window reads. */
   extract: Extractor
 }
 

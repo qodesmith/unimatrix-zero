@@ -99,7 +99,6 @@ interface Setup {
   sendKey?: Settings['sendKey']
   reReadNote?: Settings['reReadNote']
   attachments?: Attachment[]
-  /** The Tree's System prompt now. */
   systemPromptId?: string
 }
 
@@ -114,7 +113,6 @@ interface Files {
   added: Attachment[]
   byId: Map<string, File>
   noPath: boolean
-  /** By name, the path of each dropped File that main finds is a folder. */
   folders: Map<string, string>
   waiting: (() => void)[]
   hold: boolean

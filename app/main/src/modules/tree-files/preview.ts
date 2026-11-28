@@ -3,7 +3,6 @@ import type {TreeFileDetails, TreeFilePreview} from '@uz/contract/tree-files'
 import {MIB} from '@uz/contract/sizes'
 import path from 'node:path'
 
-/** How much of a file decides its preview. */
 export const SAMPLE_BYTES = 8 * 1024
 
 /** Over these, a file isn't previewed; text-like files preview their start. */
@@ -75,7 +74,6 @@ function extensionOf(name: string) {
   return path.posix.extname(name).slice(1).toLowerCase()
 }
 
-/** The image, audio or video type the name gives, or null. */
 export function mediaTypeOf(name: string) {
   return MEDIA_TYPES.get(extensionOf(name))?.[1] ?? null
 }
@@ -122,7 +120,6 @@ function overLimit(preview: TreeFilePreview, size: number) {
   return limit !== undefined && size > limit
 }
 
-/** Decided from the bytes, and the name only among text or media types. */
 export function previewOf({
   name,
   mode,

@@ -52,7 +52,6 @@ export async function servedOverHttp(root: string) {
   return listening(http.createServer(answering(root)), 'http')
 }
 
-/** CI makes and trusts the certificate. */
 export async function servedOverHttps(root: string) {
   const tls = process.env.UZ_TLS_FOLDER
 

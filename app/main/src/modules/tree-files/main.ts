@@ -34,7 +34,6 @@ export interface TreeFilesDeps {
   publish: (event: AppEvent) => void
   onFailure: (error: Error) => void
   gitProgram: () => string | null
-  /** A Snapshot failed because `gitProgram` is null. */
   onWaitingForGit: () => void
 }
 
@@ -227,7 +226,6 @@ export function createTreeFiles({
     ...files,
     folderFor,
 
-    /** However the Reply ended. Never rejects. */
     async replyFinished({treeId, replyId}: {treeId: string; replyId: string}) {
       return queue(treeId, async () => snapshotReporting(treeId, replyId))
     },

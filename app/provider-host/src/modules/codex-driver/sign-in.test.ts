@@ -23,7 +23,6 @@ const request: SignInRequest = {
   configDir: '/data/providers/chatgpt',
 }
 
-/** A method with no answer fails, as when `codex` stops. */
 type Answers = {[M in Method]?: ResponseOf<M>}
 
 function fakeServer(answers: Answers) {

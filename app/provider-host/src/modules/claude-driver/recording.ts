@@ -129,7 +129,6 @@ function blocksOf(lines: RecordedLine[]) {
   return [...blocks, ...open.values()]
 }
 
-/** A content block streams in pieces, so one path can be split between them. */
 function withDeltasScrubbed(
   lines: RecordedLine[],
   replacements: (readonly [string, string])[]

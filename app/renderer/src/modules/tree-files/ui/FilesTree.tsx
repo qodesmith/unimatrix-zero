@@ -18,7 +18,6 @@ function gitStatusOf(files: readonly TreeFile[]): GitStatusEntry[] {
   )
 }
 
-/** The file row a click landed in, through the tree's shadow root. */
 function clickedFile(event: Event) {
   for (const target of event.composedPath()) {
     if (
@@ -37,7 +36,6 @@ interface FilesTreeProps {
   onOpen: (path: string) => void
 }
 
-/** View only: a row opens its file, and nothing in the tree changes a file. */
 export function FilesTree({files, onOpen}: FilesTreeProps) {
   const opener = useRef(onOpen)
 

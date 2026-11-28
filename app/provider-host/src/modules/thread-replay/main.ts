@@ -23,7 +23,6 @@ function partText(part: Exchange['reply'][number]) {
   return `${call}\n[${answered}]\n${part.result.content}`
 }
 
-/** A Reply as a rebuilt session gives it to the AI. */
 export function replyText({reply, label}: Exchange) {
   const text = reply
     .map(partText)
@@ -43,7 +42,6 @@ function promptPieces({prompt, attachments}: Exchange) {
   return [...earlierFiles(attachments), ...(prompt === '' ? [] : lines(prompt))]
 }
 
-/** Thread and Prompt as one message, for a Provider that takes no history. */
 export function replayed(
   thread: Thread,
   prompt: Parameters<typeof prompted>[0]

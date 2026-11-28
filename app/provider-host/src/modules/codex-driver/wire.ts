@@ -23,8 +23,6 @@ import type {TurnError} from './protocol/v2/TurnError'
 import {RefusalSchema} from '#modules/failures/main'
 import {z} from 'zod'
 
-// Each schema `satisfies` its generated type, so a Codex bump fails typecheck.
-
 const ThreadSchema = z.looseObject({
   id: z.string(),
   path: z.string().nullable(),
@@ -152,7 +150,6 @@ const LastUsageSchema = z.looseObject({
 
 const ThreadTokenUsageSchema = z.looseObject({
   last: LastUsageSchema,
-  // Unknown or malformed reads as absent, so the usage itself is never lost with it.
   modelContextWindow: z.number().nullable().catch(null),
 }) satisfies z.ZodType<Pick<ThreadTokenUsage, 'modelContextWindow'>>
 
@@ -253,7 +250,6 @@ const RateLimitWindowSchema = z.looseObject({
 const RateLimitsSchema = z.looseObject({
   primary: RateLimitWindowSchema.nullable().catch(null),
   secondary: RateLimitWindowSchema.nullable().catch(null),
-  // A value this Codex doesn't know yet still means a limit was reached.
   rateLimitReachedType: z.string().nullable().optional().catch(null),
 })
 

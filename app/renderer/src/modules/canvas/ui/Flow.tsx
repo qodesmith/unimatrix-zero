@@ -30,13 +30,8 @@ import {isFork} from '../tree'
 import {whenTurnsArrive} from '../when-turns-arrive'
 import {ExchangeNode, FailedNode, PromptNode, ReplyNode} from './TurnNodes'
 
-/** A request to bring a Reply into view; every request gets a new sequence. */
 export interface Focus {
   replyId: string
-  /**
-   * `follow` shows the Reply's bottom and keeps it shown while it streams;
-   * `input` centers its Input at the zoom a new Tree starts at.
-   */
   mode: 'center' | 'follow' | 'input'
   sequence: number
 }
@@ -50,7 +45,6 @@ interface FlowProps {
   focus: Focus | null
   fitOnLoad: boolean
   startAt: Viewport | null
-  /** A new one each time a Prompt and every Turn below it are deleted. */
   deleted: Deleted | null
   showMap: boolean
   onHover: (turnId: string | null) => void
@@ -95,7 +89,6 @@ function stemOf(
 
 interface Held {
   turnId: string
-  /** Its size before its text was let out or capped, held until it changes. */
   resizing: Size | null
 }
 

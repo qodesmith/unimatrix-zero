@@ -5,7 +5,6 @@ import {replayed} from '#modules/thread-replay/main'
 
 export type Restore = 'none' | 'store' | 'file'
 
-/** The last message kept, when a fork, a rewind or a Retry's cut cuts it. */
 export function cutAt(session: ReplySession) {
   switch (session.type) {
     case 'continue':
@@ -36,7 +35,6 @@ export function resumption(session: ReplyRequest['session'], restore: Restore) {
   }
 }
 
-/** A new session gets the Thread, files read afresh, with its first Prompt. */
 export async function contentOf({session, thread, prompt}: ReplyRequest) {
   return readContent(
     session === null && thread.length > 0

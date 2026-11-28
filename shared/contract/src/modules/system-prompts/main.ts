@@ -28,7 +28,6 @@ export const SystemPromptEntrySchema = z.strictObject({
   id: SystemPromptEntryIdSchema,
   name: z.string(),
   text: SystemPromptTextSchema,
-  /** Ships with the app; read-only. */
   preset: z.boolean(),
 })
 
@@ -41,7 +40,6 @@ export const SystemPromptLibrarySchema = z.strictObject({
 
 export type SystemPromptLibrary = z.infer<typeof SystemPromptLibrarySchema>
 
-/** What a Tree runs under, as saved: the id changes with the text. */
 export const TreeSystemPromptSchema = z.strictObject({
   id: z.uuid(),
   text: SystemPromptTextSchema,

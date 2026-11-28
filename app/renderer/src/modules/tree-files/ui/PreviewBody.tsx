@@ -130,7 +130,6 @@ interface PreviewBodyProps {
   openers: PreviewOpeners
 }
 
-/** In the app, then the OS, then the fallback card. */
 export function PreviewBody({at, details, openers}: PreviewBodyProps) {
   if (details.link) {
     return (

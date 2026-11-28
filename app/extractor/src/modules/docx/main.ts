@@ -4,7 +4,6 @@ import {elements, parseXml, tidyLines} from '#modules/xml/main'
 
 const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 
-/** A paragraph's text, leaving out a nested paragraph, which has its own line. */
 function paragraphText(node: Element): string {
   let text = ''
 

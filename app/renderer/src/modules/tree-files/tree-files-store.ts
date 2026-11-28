@@ -3,7 +3,6 @@ import type {AppEvent} from '@uz/contract/events'
 
 import {Store} from '@tanstack/react-store'
 
-/** A file as it was at one Reply: the preview panel's one file. */
 export interface FileAt {
   treeId: string
   replyId: string
@@ -11,7 +10,6 @@ export interface FileAt {
 }
 
 interface TreeFilesState {
-  /** The open Tree, and the Reply whose Snapshot the Files section shows. */
   shown: {treeId: string; replyId: string | null} | null
   previewed: FileAt | null
 }
@@ -35,8 +33,8 @@ const CHANGES_SNAPSHOTS: ReadonlySet<AppEvent['type']> = new Set([
 ])
 
 /**
- * A Reply that starts takes the Tree's folder from the one before it, and one
- * that finishes takes its Snapshot, so every list of the Tree may be stale.
+ * A starting or finished Reply changes the Tree's folder or Snapshot, so every
+ * list may be stale.
  */
 export function refetchAfter(queryClient: QueryClient, event: AppEvent) {
   if (event.type === 'SNAPSHOT') {

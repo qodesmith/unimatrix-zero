@@ -63,7 +63,6 @@ export const SessionCutSchema = SessionRefSchema.extend({
 
 export type SessionCut = z.infer<typeof SessionCutSchema>
 
-/** Drops the first Prompt of Turns the Tree deleted, with all after it. */
 export const DeletionCutSchema = SessionCutSchema.extend({
   dropFrom: z.string(),
 })
@@ -127,42 +126,26 @@ export const ReplyRequestSchema = z.strictObject({
   prompt: z.strictObject({
     text: z.string(),
     attachments: z.array(HostAttachmentSchema),
-    /** Main's name for the Prompt in the session, for a Provider that takes one. */
     messageId: z.uuid().pipe(UuidPartsSchema),
   }),
   vendorProgram: SignInRequestSchema,
   treeFolder: z.string().min(1),
-  /** Null starts a session. */
   session: ReplySessionSchema.nullable(),
-  /**
-   * Rebuilds the session when `session` is null or names one the Provider no
-   * longer has. Empty for a Tree's first Prompt.
-   */
+  /** Rebuilds the session when `session` is null or one the Provider lost. */
   thread: ThreadSchema,
   compactionSettings: CompactionSettingsSchema,
-  /**
-   * The System prompt differs from the one `session` started under, which a
-   * Codex thread keeps for good. Claude takes a new one on resume and ignores
-   * this.
-   */
+  /** Codex keeps a thread's first System prompt for good; Claude ignores this. */
   systemPromptChanged: z.boolean(),
   tools: TreeToolsSchema,
   permissionMode: PermissionModeSchema,
-  /**
-   * The app's own folders, which the Sandbox keeps the AI from reading: the
-   * Provider folders, the store of Snapshots and the database, which holds
-   * every Tree's Prompts and Replies.
-   */
+  /** The app's own folders, which the Sandbox hides from the AI. */
   hiddenFolders: z.array(z.string().min(1)),
-  /** Holds every Tree's files, of which the Sandbox shows only `treeFolder`. */
   treesFolder: z.string().min(1),
-  /** The Tree's "Always allow in this Tree" answers so far. */
   grants: z.array(ApprovalGrantSchema),
 })
 
 export type ReplyRequest = z.infer<typeof ReplyRequestSchema>
 
-/** Main keeps this on the Reply; the window never sees it. */
 export const ReplyRecordedMessage = z.strictObject({
   type: z.literal('REPLY_RECORDED'),
   treeId: z.uuid(),
@@ -174,8 +157,8 @@ export const ReplyRecordedMessage = z.strictObject({
 export type ReplyRecorded = z.infer<typeof ReplyRecordedMessage>
 
 /**
- * The Provider session holds the Reply's Prompt, as `messageId`, though the
- * Reply may never finish. Main keeps it on the Reply for a Retry's cut.
+ * The session holds the Reply's Prompt as `messageId`, though the Reply may
+ * never finish.
  */
 export const PromptRecordedMessage = z.strictObject({
   type: z.literal('PROMPT_RECORDED'),
@@ -194,7 +177,6 @@ export const PromptDroppedMessage = z.strictObject({
 
 export type PromptDropped = z.infer<typeof PromptDroppedMessage>
 
-/** The Provider session no longer holds `dropFrom`, past the Reply `replyId`. */
 export const SessionCutMessage = z.strictObject({
   type: z.literal('SESSION_CUT'),
   treeId: z.uuid(),
@@ -226,7 +208,6 @@ export const OneShotRequestSchema = z.strictObject({
 
 export type OneShotRequest = z.infer<typeof OneShotRequestSchema>
 
-/** One Provider, one account; no vendor SDK type leaves its Provider host. */
 export interface ProviderDriver {
   readonly capabilities: Capabilities
   readConnection(): Promise<Connection>
@@ -243,10 +224,9 @@ export interface ProviderDriver {
   smallestModel(): Promise<string | null>
   readUsage(): Promise<Usage>
   /**
-   * Ends with `RUN_FINISHED`, even after `stop`. `PROMPT_DROPPED` comes once a
-   * Retry's cut drops `dropFrom`; `PROMPT_RECORDED` once the session holds a
-   * Prompt the driver named itself; `REPLY_RECORDED` before the end. Main
-   * records a Prompt stored under `prompt.messageId` as it stores the entry.
+   * Ends with `RUN_FINISHED`, even after `stop`. `PROMPT_DROPPED` follows a
+   * Retry's cut of `dropFrom`; `PROMPT_RECORDED` once the session holds a
+   * Prompt the driver named itself; `REPLY_RECORDED` before the end.
    */
   startReply(request: ReplyRequest): AsyncIterable<StartReplyEvent>
   stop(replyId: string): Promise<void>
@@ -271,10 +251,8 @@ export interface ProviderDriver {
   mcpSignIn(serverId: string): Promise<void>
 }
 
-/** Main → Provider host. */
 export const HostCommandSchema = z.discriminatedUnion('type', [
   z.strictObject({type: z.literal('reply.start'), request: ReplyRequestSchema}),
-  /** Interrupts the Reply's turn; its `RUN_FINISHED` follows. */
   z.strictObject({type: z.literal('reply.stop'), replyId: z.uuid()}),
   /** `APPROVAL_RESOLVED` follows, unless the Reply already moved on. */
   z.strictObject({
@@ -351,7 +329,6 @@ export const SessionStoreMessage = z.strictObject({
   request: SessionStoreRequestSchema,
 })
 
-/** Provider host → main. */
 export const HostMessageSchema = z.discriminatedUnion('type', [
   HostReadyMessage,
   HostModelsChangedMessage,

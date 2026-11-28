@@ -21,7 +21,6 @@ export function byPathOnly(attachment: HostAttachment): HostAttachment {
   return {...attachment, inline: null}
 }
 
-/** Marked inline as main would mark them for Claude. */
 export function attachedFiles(folder: string) {
   function save(name: string, ...bytes: number[]) {
     return keep(folder, name, Uint8Array.from(bytes))
@@ -207,7 +206,6 @@ export function pdfSaying(folder: string, sentence: string): HostAttachment {
   }
 }
 
-/** A file the AI can open only from its path. */
 export function fileHolding(
   folder: string,
   name: string,

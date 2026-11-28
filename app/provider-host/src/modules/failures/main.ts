@@ -36,7 +36,6 @@ export function isBusyStatus(status: number | null) {
 
 export interface ClaudeSignals {
   terminalReason?: TerminalReason | undefined
-  /** Null when no response came. */
   apiErrorStatus?: number | null | undefined
   /** The last `api_retry`'s `error_status`; undefined when none came. */
   retryStatus?: number | null | undefined

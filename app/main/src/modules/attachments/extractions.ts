@@ -33,7 +33,6 @@ interface ExtractionDeps {
 
 const FAILED: Extraction = {status: 'failed', version: EXTRACTOR_VERSION}
 
-/** True when it wrote a text file: a scan may have no text at all. */
 async function writeFiles(folder: string, result: ReadResult) {
   const file = {mode: 0o600, flag: 'wx'}
   const hasText = /\S/u.test(result.text)
@@ -88,7 +87,6 @@ async function keepExtraction(
   }
 }
 
-/** Another add of the same bytes read by this extractor, its files in place. */
 async function reusable({db, dir}: ExtractionDeps, sha256: string) {
   const rows = db
     .select({extraction: schema.attachments.extraction})

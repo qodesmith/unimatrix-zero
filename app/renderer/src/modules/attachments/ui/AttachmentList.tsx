@@ -196,7 +196,6 @@ function PendingAttachment({
   )
 }
 
-/** `form` is undefined when no Model is picked to say what it does. */
 function noteOf(
   attachment: AttachmentData,
   pathOnly: boolean,

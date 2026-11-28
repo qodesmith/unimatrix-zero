@@ -52,12 +52,10 @@ export const trees = sqliteTable('trees', {
   claudeBuiltInSkills: toolSwitch('claude_built_in_skills', false),
   chatgptBuiltInSkills: toolSwitch('chatgpt_built_in_skills', false),
   chatgptRemotePlugins: toolSwitch('chatgpt_remote_plugins', false),
-  /** As `ApprovalGrantSchema`. */
   approvalGrants: text('approval_grants', {mode: 'json'}).notNull().default([]),
   createdAt: createdAt(),
 })
 
-/** The user's own; the presets live in code. */
 export const systemPromptLibrary = sqliteTable('system_prompt_library', {
   id: id(),
   name: text('name').notNull(),
@@ -78,10 +76,8 @@ export const prompts = sqliteTable('prompts', {
   createdAt: createdAt(),
 })
 
-/** One row per add, so a file added twice gets two. */
 export const attachments = sqliteTable('attachments', {
   id: id(),
-  /** Its shared folder under `userData/attachments/`; null for a folder. */
   sha256: text('sha256'),
   name: text('name').notNull(),
   mediaType: text('media_type', {
@@ -97,14 +93,12 @@ export const attachments = sqliteTable('attachments', {
     ],
   }).notNull(),
   size: integer('size').notNull(),
-  /** A smaller copy sent in a large image's place; all three null if none. */
   shrunkSha256: text('shrunk_sha256'),
   shrunkMediaType: text('shrunk_media_type', {
     enum: ['image/png', 'image/jpeg'],
   }),
   shrunkSize: integer('shrunk_size'),
   folderPath: text('folder_path'),
-  /** As `ExtractionSchema`; null when no Extraction was made. */
   extraction: text('extraction', {mode: 'json'}),
   createdAt: createdAt(),
 })
@@ -119,7 +113,6 @@ export const promptAttachments = sqliteTable(
     attachmentId: text('attachment_id')
       .notNull()
       .references(() => attachments.id),
-    /** From 0. */
     position: integer('position').notNull(),
   },
   table => [
@@ -146,14 +139,12 @@ export const replies = sqliteTable(
       enum: ['streaming', 'complete', 'stopped', 'failed', 'interrupted'],
     }).notNull(),
     content: text('content', {mode: 'json'}).notNull().$type<unknown[]>(),
-    /** As `RunFailureSchema`; null unless the Reply failed. */
     failure: text('failure', {mode: 'json'}),
     systemPromptId: text('system_prompt_id')
       .notNull()
       .references(() => systemPrompts.id),
     sessionId: text('session_id'),
     sessionMessageId: text('session_message_id'),
-    /** Kept even if the Reply never finished. */
     sessionPromptId: text('session_prompt_id'),
     /**
      * The first Prompt of deleted Turns still in the session; the next send
@@ -163,9 +154,7 @@ export const replies = sqliteTable(
     contextSize: integer('context_size'),
     contextWindow: integer('context_window'),
     rebuilt: integer('rebuilt', {mode: 'boolean'}).notNull().default(false),
-    /** Its parent's if no file changed; null with no files or until done. */
     snapshotCommit: text('snapshot_commit'),
-    /** Null too when the app quit before taking the Snapshot. */
     noSnapshot: text('no_snapshot', {enum: ['no-files', 'failed']}),
     createdAt: createdAt(),
   },
@@ -177,7 +166,6 @@ export const compactions = sqliteTable('compactions', {
   id: id(),
   provider: text('provider', {enum: ['claude', 'chatgpt']}).notNull(),
   sessionId: text('session_id').notNull(),
-  /** Claude's boundary entry in the session; Codex reports none. */
   boundaryId: text('boundary_id'),
   replyId: text('reply_id').references(() => replies.id, {
     onDelete: 'set null',
@@ -199,9 +187,7 @@ export const sessionEntries = sqliteTable(
   {
     id: id(),
     ...sessionKey(),
-    /** A Subagent's transcript; '' for the session's own. */
     subpath: text('subpath').notNull(),
-    /** From 0. */
     position: integer('position').notNull(),
     uuid: text('uuid'),
     entry: blob('entry', {mode: 'buffer'}).notNull(),
@@ -229,7 +215,6 @@ export const sessionFiles = sqliteTable(
   {
     id: id(),
     ...sessionKey(),
-    /** Relative to the session's folder, with `/` between parts. */
     path: text('path').notNull(),
     data: blob('data', {mode: 'buffer'}).notNull(),
   },
@@ -251,7 +236,6 @@ export const providers = sqliteTable(
     email: text('email').notNull(),
     plan: text('plan').notNull(),
     connectedAt: integer('connected_at', {mode: 'timestamp_ms'}).notNull(),
-    /** As `ModelSchema`. */
     models: text('models', {mode: 'json'}).notNull().default([]),
   },
   table => [uniqueIndex('providers_provider').on(table.provider)]

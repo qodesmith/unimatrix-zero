@@ -14,7 +14,6 @@ async function jpegOf(canvas: HTMLCanvasElement) {
   return new Uint8Array(await blob.arrayBuffer())
 }
 
-/** The page on white, `PAGE_IMAGE_PIXELS` on its long side, as a JPEG. */
 export async function renderPage(page: PDFPageProxy) {
   const natural = page.getViewport({scale: 1})
 

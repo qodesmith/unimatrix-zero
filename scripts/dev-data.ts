@@ -17,7 +17,6 @@ export function devDataFolderName(root: string, fake: boolean) {
   return `${DEV_FOLDER_PREFIX}${checkoutHash(root)}${fake ? '-fake' : ''}`
 }
 
-/** Electron's `appData`, where the shell puts the dev data folder. */
 export function appData() {
   if (process.platform === 'darwin') {
     return path.join(os.homedir(), 'Library', 'Application Support')

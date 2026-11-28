@@ -39,7 +39,6 @@ export interface HandlerDeps {
   publish: (event: AppEvent) => void
 }
 
-/** A handler's way of answering `not-found` rather than `handler-failed`. */
 export class NotFoundError extends Error {
   override name = 'NotFoundError'
 }
@@ -59,14 +58,12 @@ function found(tree: Tree | null): Tree {
 
 const REPLY_GONE = 'That Reply no longer exists.'
 
-/** Null when the Tree has no such Reply. */
 function replyFound<T>(value: T | null): T {
   if (value === null) throw new NotFoundError(REPLY_GONE)
 
   return value
 }
 
-/** An id main never listed, or one whose Reply is gone. */
 function fileFound<T>(file: T | null | false): T {
   if (file === null || file === false) {
     throw new NotFoundError('That file is no longer in the Tree’s files.')
@@ -157,7 +154,6 @@ export const handlers: Handlers = {
 
     if (!sent) throw new NotFoundError(REPLY_GONE)
 
-    // Its Reply can fail before the Turns are fetched again.
     const [prompt = sent.prompt] = await attachments.withMissingCopies([
       sent.prompt,
     ])

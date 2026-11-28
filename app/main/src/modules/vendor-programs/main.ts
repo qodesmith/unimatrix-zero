@@ -9,14 +9,12 @@ import {z} from 'zod'
 
 import devManifest from './dev-manifest.json'
 
-/** Names the vendor programs until the app reads the signed manifest. */
 export const DEV_MANIFEST: Manifest = ManifestSchema.parse(devManifest)
 
 export interface Machine {
   userData: string
   platform: NodeJS.Platform
   arch: string
-  /** As `2.39`; absent off Linux, or when unknown. */
   glibcVersion?: string
 }
 
@@ -24,7 +22,6 @@ const ProcessReportSchema = z.object({
   header: z.object({glibcVersionRuntime: z.string()}),
 })
 
-/** From Node's own report, so no program runs. */
 export function readGlibcVersion() {
   if (process.platform !== 'linux') return undefined
 
@@ -85,7 +82,6 @@ export function gitFolderFor(
     : null
 }
 
-/** Each Provider's sign-in and session data, in a folder of its own. */
 export function providersFolderOf(userData: string) {
   return path.join(userData, 'providers')
 }

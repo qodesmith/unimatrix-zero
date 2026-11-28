@@ -6,7 +6,6 @@ type Node = ESTree.Node
 
 const TEST_FUNCTIONS = new Set(['it', 'test'])
 
-/** Matchers that read a mock's record, which the unit writes. */
 const MOCK_MATCHER = /^toHave(?:Been|Last|Nth)?(?:Called|Returned)/u
 
 const MODIFIERS = new Set(['not', 'resolves', 'rejects'])
@@ -141,7 +140,6 @@ function isNameOnly(node: Node, parent: Node | undefined) {
   return parent.type === 'VariableDeclarator' && parent.id === node
 }
 
-/** Bindings used outside `expect(...)`, which the unit may write, like a `ref`. */
 function escaping(root: Node, parents: Map<Node, Node>) {
   const names = new Set<string>()
 
@@ -182,7 +180,6 @@ function topLevelBindings(program: ESTree.Program) {
   return bindings
 }
 
-/** Fixtures: object literals a test can see and uses only in assertions. */
 function testsIn(program: ESTree.Program) {
   const parents = parentMap(program)
   const fileBindings = topLevelBindings(program)

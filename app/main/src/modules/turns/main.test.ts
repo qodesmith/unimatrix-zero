@@ -120,7 +120,6 @@ afterEach(() => {
   fs.rmSync(attachmentsDir, {recursive: true, force: true})
 })
 
-/** The new Reply's id, with the host's commands and the events so far cleared. */
 function sendPrompt(parentReplyId: string | null, text = 'Hi') {
   const sent = turns.sendPrompt({model: picked, treeId, parentReplyId, text})
 
@@ -2662,7 +2661,6 @@ function failedAt(parentReplyId: string | null, sessionId = 's1') {
   return {replyId, promptId: promptOf(replyId)}
 }
 
-/** Sorted, since Turns sent in the same millisecond list in any order. */
 function savedReplyIds() {
   return turns
     .list(treeId)

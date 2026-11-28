@@ -11,9 +11,7 @@ import os from 'node:os'
 export interface LoadedThread {
   id: string
   model: string
-  /** The `config` Codex loaded it with, which it keeps; null for none. */
   config: ThreadConfig | null
-  /** Oldest first: the turn it was opened at, then each one started here. */
   turns: string[]
   path: string | null
 }
@@ -28,7 +26,6 @@ type Configured = Pick<
   | 'hiddenFolders'
 >
 
-/** Supervised runs commands inside the Sandbox wherever it can run. */
 export function isSandboxed(
   {permissionMode}: Pick<ReplyRequest, 'permissionMode'>,
   platform: NodeJS.Platform
@@ -83,7 +80,6 @@ export function configOf(request: Configured, platform: NodeJS.Platform) {
     ...(threshold === null ? {} : {model_auto_compact_token_limit: threshold}),
     ...(tools.webSearch ? {} : {web_search: 'disabled'}),
     'skills.bundled.enabled': tools.chatgptBuiltInSkills,
-    // Remote plugins and the connectors that come with them.
     'features.plugins': tools.chatgptRemotePlugins,
     'features.apps': tools.chatgptRemotePlugins,
     ...(isSandboxed(request, platform)

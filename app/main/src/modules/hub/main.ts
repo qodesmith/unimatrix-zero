@@ -25,7 +25,6 @@ export function createHub(snapshot: () => Snapshot) {
     windows.delete(windowId)
   }
 
-  /** False when no window was there to get it. */
   function publish(event: AppEvent) {
     for (const send of windows.values()) send(event)
 

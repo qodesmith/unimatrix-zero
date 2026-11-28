@@ -53,7 +53,6 @@ async function shrunk(file: File, bitmap: ImageBitmap) {
   return blob ? new Uint8Array(await blob.arrayBuffer()) : undefined
 }
 
-/** Undefined when no shrink is needed or the image can't be decoded or encoded. */
 export async function shrunkImage(file: File) {
   if (!file.type.startsWith('image/') || file.size > ATTACHMENT_SIZE_LIMIT) {
     return undefined

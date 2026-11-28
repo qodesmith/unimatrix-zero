@@ -30,7 +30,6 @@ export function createSettings(
       const parsed = SettingsSchema.shape[key].safeParse(row?.value)
 
       if (parsed.success) {
-        // Each key's schema is the type of its own field.
         Object.assign(result, {[key]: parsed.data})
       }
     }

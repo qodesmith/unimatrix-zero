@@ -90,10 +90,7 @@ async function extractAny(
   return {type: 'unsupported'}
 }
 
-/**
- * Tells the format apart by its bytes alone, never a name, and reads it.
- * It never throws: an error is `failed` output.
- */
+/** Never throws: an error is `failed` output. */
 export async function extract(
   bytes: Uint8Array,
   assets?: PdfAssets

@@ -14,10 +14,6 @@ function keyText({projectKey, sessionId, subpath}: SessionKey) {
 
 type Refusals = Partial<Record<SessionStoreRequest['op'], string>>
 
-/**
- * Main's side of the session store, in memory for tests: entries deduplicated
- * on `uuid`, and answers a tick later, as from main.
- */
 export function fakeStore(refuses: Refusals = {}) {
   const entries = new Map<string, SessionEntry[]>()
   const files = new Map<string, Map<string, SessionFile>>()

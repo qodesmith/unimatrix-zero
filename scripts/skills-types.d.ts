@@ -1,5 +1,3 @@
-// Inferred from the `skills` package's output.
-
 export type RiskLevel = 'safe' | 'low' | 'medium' | 'high' | 'critical'
 
 export type SkillsAddJsonResult =

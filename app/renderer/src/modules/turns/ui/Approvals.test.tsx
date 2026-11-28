@@ -43,7 +43,6 @@ const reply: Reply = {
 
 const sent: Command[] = []
 
-/** Each answer waits here until the test lets it through. */
 let answering: {resolve: () => void} | null = null
 
 function fakeMain() {

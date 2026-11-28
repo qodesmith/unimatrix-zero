@@ -13,7 +13,6 @@ interface EscapeStops {
   index: TreeIndex
   activeReplyId: string | null
   chatOpen: boolean
-  /** The Reply the slideout ends at, kept while it slides away. */
   chatEnd: Reply | null
 }
 

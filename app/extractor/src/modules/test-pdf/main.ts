@@ -1,4 +1,3 @@
-/** A rectangle in PDF points, from the page's bottom-left corner. */
 interface Placement {
   x: number
   y: number
@@ -9,11 +8,9 @@ interface Placement {
 export interface TestPage {
   lines?: string[]
   images?: Placement[]
-  /** Draws the images inside a form XObject whose matrix scales by this. */
   formScale?: number
 }
 
-/** A letter-size page, in points. */
 export const PAGE = {width: 612, height: 792}
 
 export async function makeJpeg(width = 64, height = 48) {
@@ -54,10 +51,6 @@ function contentOf(page: TestPage) {
   return [...text, images].join('\n')
 }
 
-/**
- * Writes a PDF by hand: text in Helvetica, and each image the same
- * DCTDecode JPEG, placed and sized as asked.
- */
 export function makePdf(
   pages: TestPage[],
   jpeg: {bytes: Uint8Array; width: number; height: number}
