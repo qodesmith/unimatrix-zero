@@ -2778,17 +2778,15 @@ describe.skipIf(!folder || !signedIn)('a live ChatGPT', () => {
     )
     const leaving = `echo KESTREL > ${outside} && sh peek.sh`
 
+    const folders = {treesFolder: trees.root, hiddenFolders: [hidden]}
+
     const recorder = createRecorder([path.join(RECORDINGS, 'sandbox.ndjson')], {
       treeFolder: trees.tree,
-      treesFolder: trees.root,
+      ...folders,
     })
 
     const start = process.env.UZ_RECORD === 'yes' ? recorder.spawn : spawnCodex
-
-    const live = approvalReplies(folder, home, trees.tree, start, {
-      treesFolder: trees.root,
-      hiddenFolders: [hidden],
-    })
+    const live = approvalReplies(folder, home, trees.tree, start, folders)
 
     const treeId = crypto.randomUUID()
 

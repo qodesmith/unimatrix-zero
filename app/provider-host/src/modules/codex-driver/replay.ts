@@ -28,8 +28,21 @@ export const RecordedMessageSchema = z.looseObject({})
 
 /** `in` is what the driver wrote to `codex`; `out`, what it wrote back. */
 export const RecordedLineSchema = z.discriminatedUnion('kind', [
-  /** `build` names the `codex` that made the recording, such as `codex 0.163.0`. */
-  z.strictObject({kind: z.literal('start'), build: z.string()}),
+  /**
+   * `build` names the `codex` that made the recording, such as `codex 0.163.0`.
+   * `sandbox` holds the folders a live test gave the Sandbox: each other Tree
+   * by its name in the folder of every Tree, and the hidden folders.
+   */
+  z.strictObject({
+    kind: z.literal('start'),
+    build: z.string(),
+    sandbox: z
+      .strictObject({
+        otherTrees: z.array(z.string()),
+        hiddenFolders: z.array(z.string()),
+      })
+      .optional(),
+  }),
   z.strictObject({kind: z.literal('in'), message: RecordedMessageSchema}),
   z.strictObject({kind: z.literal('out'), message: RecordedMessageSchema}),
   z.strictObject({kind: z.literal('end')}),

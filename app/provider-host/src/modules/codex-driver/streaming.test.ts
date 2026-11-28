@@ -2357,10 +2357,10 @@ const LEAVING = SANDBOX.commandRequest(1).parsed
 
 /**
  * Replays `sandbox.ndjson` in folders laid out as its live test's were: the
- * Tree beside each other Tree the profile denied, and its hidden folders.
+ * Tree beside each other Tree, and its hidden folders.
  */
 async function sandboxSetUp() {
-  const {otherTrees, hiddenFolders: recordedHidden} = SANDBOX.deniedFolders()
+  const {otherTrees, hiddenFolders: recordedHidden} = SANDBOX.sandboxFolders()
   const treesFolder = folder('uz-codex-trees-')
   const treeFolder = path.join(treesFolder, 'own')
   const hiddenFolders = recordedHidden.map(() => folder('uz-codex-hidden-'))
