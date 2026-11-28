@@ -90,7 +90,8 @@ async function repo() {
         cwd: root,
         env: {
           ...process.env,
-          GIT_CONFIG_GLOBAL: os.devNull,
+          // Git for Windows can't open `os.devNull` (`\\.\nul`), but maps this.
+          GIT_CONFIG_GLOBAL: '/dev/null',
           GIT_CONFIG_NOSYSTEM: '1',
         },
       }
