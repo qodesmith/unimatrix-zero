@@ -27,10 +27,10 @@ os.makedirs(folder, exist_ok=True)
 log_lock = threading.Lock()
 
 DIALOG = """on run argv
-display dialog (item 1 of argv) default answer "" with hidden answer ¬
-  with title "Unimatrix Zero #318 test" giving up after 300
-if gave up of result then error number -128
-return text returned of result
+set answer to display dialog (item 1 of argv) default answer "" ¬
+  with hidden answer with title "Unimatrix Zero #318 test" giving up after 300
+if gave up of answer then error number -128
+return text returned of answer
 end run"""
 
 
