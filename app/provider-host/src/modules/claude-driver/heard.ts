@@ -11,7 +11,6 @@ export interface Silent {
   silent: 'stopped' | 'timed-out'
 }
 
-/** The first of `messages`, unless Stop or `whenSilent` comes first. */
 export async function firstHeard(
   messages: AsyncGenerator<SDKMessage>,
   run: ReplyRun,

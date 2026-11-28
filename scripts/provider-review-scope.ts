@@ -5,10 +5,6 @@ import {isDeepStrictEqual} from 'node:util'
 
 import {entriesOf} from './provider-dependencies.ts'
 
-/**
- * A moved pin puts every entry up for review; otherwise only entries new or
- * changed against the base list.
- */
 export function entriesToReview(scope: {
   pinMoved: boolean
   baseList: string

@@ -1,7 +1,3 @@
-/**
- * Each optional dependency these packages list is a binary the app never
- * loads, so it must be overridden to the stub (ADR 0007, ADR 0008).
- */
 import path from 'node:path'
 import {z} from 'zod'
 

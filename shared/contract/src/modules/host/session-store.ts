@@ -13,10 +13,6 @@ export const SessionKeySchema = SessionFolderSchema.extend({
 
 export type SessionKey = z.infer<typeof SessionKeySchema>
 
-/**
- * Opaque: kept and given back unchanged, read only for the `uuid` it is
- * deduplicated on and the `type` the vendor's SDK files it by.
- */
 export const SessionEntrySchema = z.looseObject({
   type: z.string(),
   uuid: z.string().optional(),

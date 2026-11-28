@@ -29,10 +29,6 @@ export const ModelSchema = z.strictObject({
 
 export type Model = z.infer<typeof ModelSchema>
 
-/**
- * A Reply records the id it was written on, which may be a `resolvesTo`; the
- * default resolves to another entry's Model too, which names it better.
- */
 export function findModel(models: Model[], id: string) {
   const resolved = models.filter(model => model.resolvesTo === id)
 

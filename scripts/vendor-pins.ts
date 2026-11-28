@@ -1,7 +1,3 @@
-/**
- * A bump PR is known by what it changes, never by its branch or labels, which a
- * fork can copy.
- */
 import path from 'node:path'
 import {z} from 'zod'
 

@@ -25,7 +25,6 @@ it('writes nothing for a claude that exits after a newer recorder claimed its fi
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-recorder-'))
   const file = path.join(folder, 'retried.ndjson')
 
-  // Stands in for `claude`: prints a version, and exits once its input ends.
   const standIn = {
     command: process.execPath,
     args: ['-e', 'process.stdin.resume()'],

@@ -319,8 +319,6 @@ export const NotificationSchema = z.discriminatedUnion('method', [
     'turn/completed',
     z.looseObject({threadId: z.string(), turn: TurnSchema})
   ),
-  // Codex is done with a request: answered, or dropped unanswered as on
-  // `turn/interrupt`.
   notification(
     'serverRequest/resolved',
     z.looseObject({

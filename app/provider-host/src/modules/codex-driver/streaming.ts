@@ -176,7 +176,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     const {configDir} = request.vendorProgram
     const settings = settingsOf(request, deps.platform)
 
-    // A resume or fork that brings no `config` keeps the thread's old one.
     const config = configOf(request, deps.platform)
 
     const {sessionId: id, messageId, type} = session
@@ -347,7 +346,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
     let unstoppable: (() => void) | null = null
 
     try {
-      // A thread loaded on another Model switches to this one from here on.
       const started = await server.request('turn/start', {
         threadId: thread.id,
         input,
@@ -362,7 +360,6 @@ export function createCodexReplies(deps: CodexRepliesDeps) {
       const turnId = started.turn.id
       thread.turns.push(turnId)
 
-      // Codex has the turn on disk by now; a Retry reverts before it.
       yield {
         ...ids,
         type: 'PROMPT_RECORDED',

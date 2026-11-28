@@ -63,10 +63,7 @@ async function ownRepositories(git: Git, store: string, checkout: Checkout) {
   return untracked.split('\0').filter(entry => entry.endsWith('/'))
 }
 
-/**
- * A nested repository staged alone reads only its own `.gitignore` files, and
- * `git add` never drops a file already in the index.
- */
+/** `git add` never drops a file already in the index. */
 async function untrackIgnored(
   git: Git,
   store: string,
@@ -101,8 +98,8 @@ async function untrackIgnored(
 }
 
 /**
- * Git stores a nested repository as an empty entry and refuses one with no
- * commit, so its files go into the index once; `git add` keeps them after.
+ * Git stores a nested repository as an empty entry, so its files go into the
+ * index once.
  */
 async function stage(git: Git, store: string, checkout: Checkout) {
   for (const repository of await ownRepositories(git, store, checkout)) {
@@ -128,10 +125,7 @@ async function treeOf(git: Git, store: string, checkout: Checkout) {
   }
 }
 
-/**
- * Returns `parent` when nothing differs. The index persists so git re-hashes
- * only files whose size or modified time changed.
- */
+/** Returns `parent` when nothing differs. */
 export async function takeSnapshot(
   git: Git,
   {store, folder, index}: VersionedFolder,
@@ -183,9 +177,8 @@ interface RawChange {
 }
 
 /**
- * `diff-tree --stdin -z` answers each pair of trees with a line naming them,
- * then one `:modes old new status`, NUL, path, NUL per file. The next pair's
- * line follows the last NUL directly, in the same field as its first file.
+ * In `diff-tree --stdin -z` output, the next pair's name line shares a field
+ * with its first file's record.
  */
 function parseDiffs(output: string): RawChange[][] {
   const perPair: RawChange[][] = []
@@ -201,7 +194,6 @@ function parseDiffs(output: string): RawChange[][] {
     const change = changeOf(status)
     const filePath = fields[at + 1]
 
-    // A file whose mode alone changed has the same contents.
     if (blob && change && filePath && blob !== blobBefore) {
       perPair.at(-1)?.push({path: filePath, change, blob})
     }

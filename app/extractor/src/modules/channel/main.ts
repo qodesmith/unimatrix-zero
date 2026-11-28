@@ -7,7 +7,6 @@ import {
   ExtractionJobSchema,
 } from '@uz/contract/extraction'
 
-/** A `MessagePort` as the page uses it: its output takes no transfer list. */
 export interface JobPort {
   addEventListener: (
     type: 'message',
@@ -30,8 +29,8 @@ async function answer(
 }
 
 /**
- * Answers the first job on the port, and only that one. The output is a copy:
- * an `ArrayBuffer` transferred to main's `MessagePortMain` arrives as null.
+ * The output is a copy: an `ArrayBuffer` transferred to main's
+ * `MessagePortMain` arrives as null.
  */
 export async function serveJob(port: JobPort, assets?: PdfAssets) {
   const job = new Promise<unknown>(resolve => {

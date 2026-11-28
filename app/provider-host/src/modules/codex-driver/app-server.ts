@@ -137,7 +137,6 @@ export async function startAppServer(
         return
       }
 
-      // Nothing else the app turns on asks the app anything.
       write({
         id: asked.data.id,
         error: {code: -32_601, message: 'Unimatrix Zero can’t answer this.'},

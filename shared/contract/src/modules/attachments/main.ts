@@ -17,8 +17,8 @@ export const INLINE_IMAGES_PER_PROMPT_LIMIT = 80 * MIB
 export const INLINE_TEXT_SIZE_LIMIT = 32 * 1024
 
 /**
- * Counted over the whole Thread. Kept below `claude`'s own limits, past which
- * it drops the oldest without a word.
+ * Counted over the whole Thread; kept below `claude`'s own limits, past which
+ * it drops the oldest silently.
  */
 export const CLAUDE_MEDIA_BUDGET = {base64Bytes: 20 * MIB, files: 90}
 
@@ -33,10 +33,7 @@ export type ImageMediaType = z.infer<typeof ImageMediaTypeSchema>
 
 export const FOLDER_MEDIA_TYPE = 'inode/directory'
 
-/**
- * Main reads it from the file's bytes, never from its name or the window. Text
- * is valid UTF-8 with no NUL byte; any other file is an octet stream.
- */
+/** Main reads it from the file's bytes, never its name or the window. */
 export const AttachmentMediaTypeSchema = z.enum([
   ...ImageMediaTypeSchema.options,
   'application/pdf',

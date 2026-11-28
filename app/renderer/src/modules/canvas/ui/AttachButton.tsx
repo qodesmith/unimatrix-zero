@@ -3,7 +3,6 @@ import {InputGroupButton} from '#shadcn/ui/input-group'
 import {PaperclipIcon} from 'lucide-react'
 import {useRef} from 'react'
 
-/** Any file, for any Model: one a Model can't take inline it opens by its path. */
 export function AttachButton({onPicked}: {onPicked: (files: File[]) => void}) {
   const chooser = useRef<HTMLInputElement>(null)
 

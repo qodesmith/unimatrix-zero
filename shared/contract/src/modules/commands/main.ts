@@ -181,8 +181,8 @@ export const ImageLoadResult = z.strictObject({
 })
 
 /**
- * A dropped or picked file comes by the id `registerDroppedFile` gave it; a
- * pasted one, with no path, by its bytes. A folder is kept as its path alone.
+ * A pasted file, with no path, comes by its bytes; a folder is kept as its path
+ * alone.
  */
 export const AttachmentAddCommand = z.strictObject({
   type: z.literal('attachment.add'),
@@ -271,9 +271,8 @@ const TreeFileOpenWithSchema = z.enum([
 export type TreeFileOpenWith = z.infer<typeof TreeFileOpenWithSchema>
 
 /**
- * In the Tree's folder when `onDisk`, else a read-only copy of this Snapshot's
- * file. `default-app` is refused for a file `notOpened`, and `browser` for a
- * program or a file that isn't HTML.
+ * `default-app` is refused for a file `notOpened`, and `browser` for a program
+ * or a file that isn't HTML.
  */
 export const TreeFileOpenCommand = z.strictObject({
   type: z.literal('tree-file.open'),

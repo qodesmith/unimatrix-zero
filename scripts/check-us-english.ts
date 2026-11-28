@@ -82,7 +82,6 @@ const RULES: Rule[] = [
   [
     /\b(\w+)is(e|es|ed|ing|ation|ations|er|ers)\b/gi,
     '$1iz$2',
-    // A name such as `UZ_DEV_SUPERVISED` is checked by its last word.
     ([, stem = '']) =>
       US_ISE.has(`${stem.split('_').at(-1)}ise`.toLowerCase()) ||
       /w$/i.test(stem),

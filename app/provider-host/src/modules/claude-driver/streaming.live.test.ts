@@ -1636,7 +1636,6 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
         isError: false,
         content: expect.stringMatching(/\b299999\b/),
       })
-      // `claude` runs `seq` with no card, as it reads alone.
       expect(approvalsIn(events)).toEqual([])
 
       await live.done()
@@ -2080,7 +2079,6 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
       for await (const event of live.driver.startReply(counting)) {
         events.push(event)
 
-        // Longer than the test runs, so only Stop can end the wait.
         if (event.type === 'TEXT_DELTA' && ++deltas === 12) {
           proxy.refuseFor(30 * 60_000)
         }

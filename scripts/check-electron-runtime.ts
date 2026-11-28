@@ -1,4 +1,3 @@
-/** The build targets read `electron-runtime.json`, so it must match Electron. */
 import path from 'node:path'
 import {z} from 'zod'
 

@@ -22,8 +22,8 @@ export interface CompactionThresholdRange {
 }
 
 /**
- * In tokens, the range each Provider takes. Codex's `max` is 90% of its
- * largest Model's raw Context window, past which it clamps.
+ * In tokens. Codex's `max` is 90% of its largest Model's raw Context window,
+ * past which it clamps.
  */
 export const COMPACTION_THRESHOLD = {
   claude: {min: 100_000, max: 1_000_000},

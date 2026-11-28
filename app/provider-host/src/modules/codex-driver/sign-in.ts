@@ -118,7 +118,6 @@ export function createCodexSignIn(deps: CodexSignInDeps) {
     }
 
     try {
-      // Codex's app-server leaves opening the page to the app.
       yield {
         type: 'SIGN_IN_STEP',
         step: 'sign-in-page',
@@ -154,8 +153,6 @@ export function createCodexSignIn(deps: CodexSignInDeps) {
         if (input.kind === 'exited') {
           return signInFailed('failed', 'Codex stopped before you signed in.')
         }
-
-        // Reopening the page shows the same page, and there is no code to paste.
       }
     } finally {
       clearTimeout(timer)

@@ -116,8 +116,8 @@ function sessionRef({sessionId, messageId}: SessionRef) {
 }
 
 /**
- * The Reply's session at its Prompt, when the app's copy holds that Prompt. A
- * Reply that began a fork has it in a session the Reply above was never in.
+ * A Reply that began a fork has its Prompt in a session the Reply above was
+ * never in.
  */
 function ownPrompt(db: Database, row: ReplyRow): SessionRef | null {
   const {sessionId, sessionPromptId: messageId} = row
@@ -183,10 +183,7 @@ function planned(
   }
 }
 
-/**
- * Forks when the Reply has a Prompt after it other than `except`, the one being
- * run again. A session holding deleted Turns is cut.
- */
+/** `except` is the Prompt being run again; it doesn't count as an answer. */
 export function continuation(
   db: Database,
   treeId: string,
@@ -211,10 +208,7 @@ export function continuation(
   }
 }
 
-/**
- * The cut from the first deleted Reply that went on in the parent's session.
- * `deleted` runs from the top; a Branch below forks a session of its own.
- */
+/** `deleted` runs from the top; a Branch below forks a session of its own. */
 export function cutBelow(
   db: Database,
   treeId: string,
@@ -247,8 +241,8 @@ export function cutBelow(
 }
 
 /**
- * A Prompt that started a Branch forks again, and one answering a Reply its
- * Provider never saved skips the rewind, which would drop that Reply's Prompt.
+ * A Prompt answering a Reply its Provider never saved skips the rewind, which
+ * would drop that Reply's Prompt.
  */
 export function recovery(
   db: Database,
@@ -320,8 +314,8 @@ function promptIn(session: SessionRef, reply: ReplyRow | undefined) {
 }
 
 /**
- * A cut of deleted Turns already drops the failed attempt. Always name what to
- * keep: Claude resumes a cut that names nothing at the failed attempt.
+ * Always name what to keep: Claude resumes a cut that names nothing at the
+ * failed attempt.
  */
 function rewound(
   session: ContinuedSession,

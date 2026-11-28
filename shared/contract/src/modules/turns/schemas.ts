@@ -35,10 +35,6 @@ export const ReplyPartSchema = z.discriminatedUnion('type', [
 
 export type ReplyPart = z.infer<typeof ReplyPartSchema>
 
-/**
- * `interrupted`: the app quit while the Reply was streaming; set at the next
- * launch, and from then on like `stopped`.
- */
 export const ReplyStatusSchema = z.enum([
   'streaming',
   'complete',

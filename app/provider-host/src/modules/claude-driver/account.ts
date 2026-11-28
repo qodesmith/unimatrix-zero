@@ -56,7 +56,6 @@ export async function readAccount({
       cwd,
       settingSources: [],
       settings: {autoMemoryEnabled: false},
-      // Spawned here only to know when `claude` has exited.
       spawnClaudeCodeProcess: ({
         command,
         args,

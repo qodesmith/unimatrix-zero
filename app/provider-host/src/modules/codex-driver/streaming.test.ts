@@ -223,7 +223,6 @@ async function setUp(
     commandFor: program => ({command: process.execPath, args: [program]}),
     env: {
       PATH: process.env.PATH ?? '',
-      // Tests run under Electron's Node; without this the fake never exits.
       ELECTRON_RUN_AS_NODE: '1',
       OPENAI_API_KEY: 'sk-outranks-the-plan',
       CODEX_HOME: '/Users/sam/.codex',

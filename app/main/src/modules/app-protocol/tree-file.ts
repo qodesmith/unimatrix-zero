@@ -38,10 +38,7 @@ const HTML_VIEW_CSP = [
 
 const TEXT = 'text/plain; charset=utf-8'
 
-/**
- * Never `application/pdf`: Chromium's own PDF viewer would show it in a
- * frame, and PDFs render only through pdf.js.
- */
+/** Never `application/pdf`: Chromium's PDF viewer would show it in a frame. */
 const AS_DOWNLOAD = {
   'Content-Type': 'application/octet-stream',
   'Content-Disposition': 'attachment',

@@ -14,7 +14,6 @@ export interface Expanded {
   toggledTurnId: string | null
 }
 
-/** What every Turn on the canvas needs, without carrying it in node data. */
 export interface CanvasState {
   treeId: string
   systemPromptId: string

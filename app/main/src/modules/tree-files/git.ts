@@ -4,8 +4,8 @@ import path from 'node:path'
 import {pipeline} from 'node:stream/promises'
 
 /**
- * Git reads this as an empty file on every platform, but not as a folder:
- * Windows reads `/dev/null/<hook>` as a real path on the drive.
+ * An empty file on every platform; `/dev/null/<hook>` is a real path on
+ * Windows.
  */
 const NOTHING = '/dev/null'
 
@@ -64,8 +64,8 @@ function isolated(
 }
 
 /**
- * The Mac and Linux builds look for their sub-programs in `/libexec/git-core`
- * unless told; Windows `git` finds its own (ADR 0024).
+ * Mac and Linux builds look in `/libexec/git-core` unless told; Windows finds
+ * its own.
  */
 function ownSubPrograms(program: string) {
   if (process.platform === 'win32') return {}

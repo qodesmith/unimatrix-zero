@@ -1913,7 +1913,6 @@ it('never gives up on a claude once it is heard, however long it then takes', as
 })
 
 it('stops a Reply where it is, records it, and continues the Thread warm from it', async () => {
-  // `claude` reports no window on a stopped Reply.
   const claude = await setUp([
     withUsage('stopped.ndjson', [{}, {[MODEL]: {contextWindow: 200_000}}]),
   ])
@@ -2144,7 +2143,6 @@ it('waits for the warm `claude` it closes to end before resuming that session at
   })
 
   await expect.poll(() => claude.reports()[0]?.inputClosed).toBe(true)
-  // The warm one is held open, so any ask by now came from the driver.
   expect(
     claude.store.asked.slice(askedBefore).filter(op => op !== 'append')
   ).toEqual([])

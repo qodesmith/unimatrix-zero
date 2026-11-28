@@ -206,11 +206,7 @@ export interface ProviderDriver {
   onModelsChanged(listener: (models: Model[]) => void): void
   smallestModel(): Promise<string | null>
   readUsage(): Promise<Usage>
-  /**
-   * Ends with `RUN_FINISHED`, even after `stop`. `PROMPT_DROPPED` follows a
-   * Retry's cut of `dropFrom`; `PROMPT_RECORDED` once the session holds a
-   * Prompt the driver named itself; `REPLY_RECORDED` before the end.
-   */
+  /** Ends with `RUN_FINISHED`, even after `stop`. */
   startReply(request: ReplyRequest): AsyncIterable<StartReplyEvent>
   stop(replyId: string): Promise<void>
   answerApproval(approvalId: string, answer: ApprovalAnswer): Promise<void>
@@ -219,17 +215,14 @@ export interface ProviderDriver {
     atMessageId: string
   }): Promise<SessionRef>
   /**
-   * Drops Turns the Tree deleted. True once the session no longer holds
-   * `dropFrom`; false when the cut waits for the next Reply in the session.
+   * True once the session no longer holds `dropFrom`; false when the cut waits
+   * for the next Reply.
    */
   cutSession(input: {
     session: DeletionCut
     vendorProgram: SignInRequest
   }): Promise<boolean>
-  /**
-   * Tool-free, outside any Tree. Once `signal` aborts, a driver still waiting
-   * on the answer ends its vendor program.
-   */
+  /** Once `signal` aborts, a driver still waiting ends its vendor program. */
   runOneShot(input: OneShotRequest, signal: AbortSignal): Promise<string>
   mcpSignIn(serverId: string): Promise<void>
 }

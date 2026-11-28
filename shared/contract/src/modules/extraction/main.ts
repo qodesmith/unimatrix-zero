@@ -50,10 +50,8 @@ export const ExtractorOutputSchema = z.discriminatedUnion('type', [
         bytes: z.instanceof(Uint8Array),
       })
     ),
-    /** More pages than `PAGE_IMAGES_PER_PDF` called for an image. */
     imagesStopped: z.boolean(),
   }),
-  /** Not one of the formats: the file goes by path only, with no word. */
   z.strictObject({type: z.literal('unsupported')}),
   z.strictObject({
     type: z.literal('failed'),

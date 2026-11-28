@@ -106,10 +106,6 @@ function inside(folder: string, name: string) {
   return target
 }
 
-/**
- * A link to a name in its own folder, never a path: no chain of such links
- * leads out of the folder the archive unpacks into.
- */
 function isSibling(link: string) {
   return link !== '' && link !== '.' && link !== '..' && !/[/\\:]/.test(link)
 }

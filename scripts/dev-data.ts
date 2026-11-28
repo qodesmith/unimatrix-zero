@@ -34,8 +34,8 @@ export function devUserData(root: string) {
 }
 
 /**
- * `claude` names its Keychain item after a hash of a non-default config folder.
- * The Keychain is macOS-only, so the path joins POSIX-style everywhere.
+ * `claude` names its Keychain item after a hash of a non-default config folder;
+ * the path joins POSIX-style everywhere.
  */
 function claudeKeychainOf(appDataPath: string, folder: string) {
   const configDir = path.posix.join(appDataPath, folder, 'providers', 'claude')
