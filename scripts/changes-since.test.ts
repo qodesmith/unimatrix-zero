@@ -18,7 +18,7 @@ const CLAUDE = 'app/provider-host/src/modules/claude-driver'
 const CODEX = 'app/provider-host/src/modules/codex-driver'
 
 describe('what a push since a result needs', () => {
-  it('a new run for a live test, a recording, a Codex protocol type, a vendor pin, the lockfile or a file a live test imports, and nothing for the rest', () => {
+  it('a new run for a live test, a recording, a Codex protocol type, a vendor pin file, the lockfile or a file a live test imports, and nothing for the rest', () => {
     const causes = reRunCauses(
       [
         `${CLAUDE}/streaming.live.test.ts`,
@@ -57,9 +57,9 @@ describe('what a push since a result needs', () => {
       },
       {
         file: 'app/main/src/modules/vendor-programs/dev-manifest.json',
-        why: 'a vendor pin',
+        why: 'a vendor pin file',
       },
-      {file: 'app/provider-host/package.json', why: 'a vendor pin'},
+      {file: 'app/provider-host/package.json', why: 'a vendor pin file'},
       {file: 'bun.lock', why: 'the lockfile'},
       {
         file: `${CLAUDE}/transcripts.ts`,

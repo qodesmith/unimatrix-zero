@@ -100,7 +100,7 @@ const RULES: [matches: (file: string) => boolean, why: string][] = [
     file => file.startsWith(`${CODEX_PROTOCOL}/`),
     'checked by the Codex live test',
   ],
-  [file => file === MANIFEST || file === HOST_PACKAGE, 'a vendor pin'],
+  [file => file === MANIFEST || file === HOST_PACKAGE, 'a vendor pin file'],
   [file => file === LOCKFILE, 'the lockfile'],
 ]
 
