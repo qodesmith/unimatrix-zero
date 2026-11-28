@@ -24,7 +24,12 @@ async function liveTestsImporting(file: string) {
   try {
     const specs = await vitest.getRelevantTestSpecifications(['.live.test.ts'])
 
-    return specs.map(spec => path.relative(root, spec.moduleId)).toSorted()
+    // Slashes, as git names the changed files, on Windows too.
+    return specs
+      .map(spec =>
+        path.relative(root, spec.moduleId).split(path.sep).join(path.posix.sep)
+      )
+      .toSorted()
   } finally {
     await vitest.close()
   }
