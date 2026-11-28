@@ -14,14 +14,16 @@ param(
   [ValidateSet('full', 'supervised')][string]$Mode = 'full',
   [string]$Model = 'gpt-6.1-terra',
   [string]$Folder = (Get-Location).Path,
-  [int]$TimeoutSeconds = 420
+  [int]$TimeoutSeconds = 420,
+  # More `-c key=value` settings, such as features.prefer_mxc=true.
+  [string[]]$Settings = @()
 )
 
 $env:CODEX_HOME = $CodexHome
 $start = New-Object System.Diagnostics.ProcessStartInfo
 $start.FileName = $Server
 $start.Arguments = '-c check_for_update_on_startup=false -c project_doc_max_bytes=0 ' +
-  '-c cli_auth_credentials_store=\"file\" -c features.multi_agent=false -c agents.enabled=false'
+  '-c cli_auth_credentials_store=\"file\" -c features.multi_agent=false -c agents.enabled=false' + (($Settings | ForEach-Object { " -c $_" }) -join '')
 $start.UseShellExecute = $false
 $start.RedirectStandardInput = $true
 $start.RedirectStandardOutput = $true
