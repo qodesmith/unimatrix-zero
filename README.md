@@ -14,6 +14,13 @@ bun run check        # format, lint, typecheck, knip and tests: what CI runs
 
 Each worktree gets its own ports and data folder (`unimatrix-zero-dev-<hash>` under the OS app-data folder), so two checkouts run side by side and sign in separately. One of those ports is a Chrome DevTools Protocol port, printed at startup, so an agent can attach to the window and inspect it. `bun run dev --fake` connects every Provider through the fake driver and keeps its data in `unimatrix-zero-dev-<hash>-fake`. `bun run dev --supervised` runs every Reply in the Supervised Permission mode, where the AI asks before it edits a file or runs a command, until Settings has the Permission modes (#94).
 
+On Ubuntu 24.04, `bun run dev` aborts with "The SUID sandbox helper binary was found, but is not configured correctly" until Electron's helper is root's. Ubuntu restricts the user namespaces Electron would use otherwise. Run this once after `bun install`, and again when the Electron version changes:
+
+```sh
+sudo chown root:root node_modules/.bun/electron@*/node_modules/electron/dist/chrome-sandbox
+sudo chmod 4755 node_modules/.bun/electron@*/node_modules/electron/dist/chrome-sandbox
+```
+
 ## Layout
 
 A Bun-workspaces monorepo, one private package per process plus the contract:

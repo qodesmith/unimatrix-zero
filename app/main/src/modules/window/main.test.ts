@@ -1,9 +1,9 @@
-import type {Session, WebContents} from 'electron'
+import type {BrowserWindow, Session, WebContents} from 'electron'
 
 import {fromPartial} from '@total-typescript/shoehorn'
 import {expect, it, vi} from 'vitest'
 
-import {hardenSession, lockWebRtc} from './main'
+import {hardenSession, lockWebRtc, showWhenReady} from './main'
 
 function fakeSession() {
   return {
@@ -37,4 +37,48 @@ it('lets WebRTC send nothing but through the proxy', () => {
   expect(contents.setWebRTCIPHandlingPolicy).toHaveBeenCalledWith(
     'disable_non_proxied_udp'
   )
+})
+
+function fakeWindow() {
+  const fired = new Map<string, () => void>()
+
+  const window = {
+    show: vi.fn<() => void>(),
+    once: vi.fn<(event: string, listener: () => void) => void>(
+      (event, listener) => {
+        fired.set(event, listener)
+      }
+    ),
+    webContents: {
+      once: vi.fn<(event: string, listener: () => void) => void>(
+        (event, listener) => {
+          fired.set(event, listener)
+        }
+      ),
+    },
+  }
+
+  return {window, fire: (event: string) => fired.get(event)?.()}
+}
+
+it('shows the window on Linux once the page has loaded, with no first paint', () => {
+  const {window, fire} = fakeWindow()
+
+  showWhenReady(fromPartial<BrowserWindow>(window), 'linux')
+  fire('did-finish-load')
+
+  expect(window.show).toHaveBeenCalledOnce()
+})
+
+it('keeps the window hidden on a Mac until its first paint', () => {
+  const {window, fire} = fakeWindow()
+
+  showWhenReady(fromPartial<BrowserWindow>(window), 'darwin')
+  fire('did-finish-load')
+
+  expect(window.show).not.toHaveBeenCalled()
+
+  fire('ready-to-show')
+
+  expect(window.show).toHaveBeenCalledOnce()
 })

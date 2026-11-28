@@ -59,10 +59,25 @@ export function createWindow({
 
   lockNavigation(window.webContents, url)
   lockWebRtc(window.webContents)
-  window.once('ready-to-show', () => window.show())
+  showWhenReady(window, process.platform)
   void window.loadURL(url)
 
   return window
+}
+
+/**
+ * Under Wayland a hidden window never paints this app's page, so
+ * `ready-to-show` never comes. Linux shows the window once the page has loaded.
+ */
+export function showWhenReady(
+  window: BrowserWindow,
+  platform: NodeJS.Platform
+) {
+  window.once('ready-to-show', () => window.show())
+
+  if (platform === 'linux') {
+    window.webContents.once('did-finish-load', () => window.show())
+  }
 }
 
 function lockNavigation(contents: WebContents, appUrl: string) {

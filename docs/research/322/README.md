@@ -8,8 +8,8 @@ No app code changes. A script in `docs/research/318/` that fails for a reason of
 
 The tests ran on 2026-11-28 from a session on the Mac, not from one in the VM: it built the VM by script, reached it over SSH, and drove the dev app over its debug port. The findings are on #322. Two things had to be done in the VM before the dev app showed a window, and anyone who reruns this will meet them:
 
-- **Electron's sandbox helper.** `bun run dev` aborts with "The SUID sandbox helper binary was found, but is not configured correctly". Fix: `sudo chown root:root` and `sudo chmod 4755` on `node_modules/.bun/electron@<version>/node_modules/electron/dist/chrome-sandbox`.
-- **Wayland.** Under Ubuntu's default Wayland session the app runs and answers on its debug port, and no window appears. Start it with `XDG_SESSION_TYPE=x11` in its environment.
+- **Electron's sandbox helper.** `bun run dev` aborts with "The SUID sandbox helper binary was found, but is not configured correctly". The root README has the two commands that fix it.
+- **Wayland.** Under Ubuntu's default Wayland session the app ran and no window appeared, so the tests ran with `XDG_SESSION_TYPE=x11`. This branch fixes it: Linux now shows the window once the page has loaded.
 
 The broker also has a `file` mode, which sends the contents of `/tmp/uz318/password`. It stands in for `dialog` on a test machine whose password is no secret.
 
