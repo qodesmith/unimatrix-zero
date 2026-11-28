@@ -1,14 +1,32 @@
 import type {SkippedSetting} from '#modules/test-recordings/main'
 
 import {SETTINGS_CHECK, machineStandIns} from '#modules/test-recordings/main'
+import {STRIPPED_PREFIXES} from '#modules/vendor-environment/main'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import {z} from 'zod'
 
+import {claudeReplyEnvironment} from './environment'
+
 export const RECORDINGS = path.join(import.meta.dirname, 'recordings')
 
 export const RecordedMessageSchema = z.looseObject({type: z.string()})
+
+/** What a recording's variables name the app's config folder. */
+export const CONFIG_FOLDER_STAND_IN = '/config-folder'
+
+/**
+ * Names a variable the app, the SDK or a live test gave `claude`: the driver
+ * strips every inherited one under these prefixes.
+ */
+export const APP_VARIABLE = new RegExp(
+  `^(?:${[
+    ...STRIPPED_PREFIXES,
+    ...Object.keys(claudeReplyEnvironment({}, '')).map(name => `${name}$`),
+  ].join('|')})`,
+  'i'
+)
 
 /** One line of a recording; the first is `start`, saying where it ran. */
 export const RecordedLineSchema = z.discriminatedUnion('kind', [
@@ -22,6 +40,8 @@ export const RecordedLineSchema = z.discriminatedUnion('kind', [
     cwd: z.string().optional(),
     /** What the SDK started `claude` with, which holds the app's options. */
     args: z.array(z.string()),
+    /** Each variable `APP_VARIABLE` names that `claude` started with. */
+    env: z.record(z.string(), z.string()),
   }),
   z.strictObject({kind: z.literal('in'), message: RecordedMessageSchema}),
   z.strictObject({kind: z.literal('out'), message: RecordedMessageSchema}),
@@ -49,8 +69,9 @@ export interface FakeClaudeOptions {
   /**
    * Settings the test sends differently from the recording on purpose: an
    * option by its flag, such as `--tools`, a key of a flag that holds JSON as
-   * `--settings.sandbox`, or a field of the `initialize` request. `*` is
-   * every one, for a `claude` no recording was made of.
+   * `--settings.sandbox`, an environment variable as `env.DISABLE_UPDATES`, or
+   * a field of the `initialize` request. `*` is every one, for a `claude` no
+   * recording was made of.
    */
   skip?: SkippedSetting[]
 }
@@ -59,17 +80,20 @@ const OPTIONS_VARIABLE = 'FAKE_CLAUDE_OPTIONS'
 
 /**
  * The nth `claude` started replays the nth of `recordings` and records its
- * run in `<reports>/<n>.json`.
+ * run in `<reports>/<n>.json`. `configDir` is the app's config folder, which
+ * the SDK swaps for a temporary one on a resume.
  */
 export function fakeClaudeEnv(
   recordings: string[],
   reports: string,
+  configDir: string,
   options: FakeClaudeOptions = {}
 ) {
   return {
     [OPTIONS_VARIABLE]: JSON.stringify({
       recordings,
       reports,
+      configFolder: configDir,
       machine: machineStandIns(),
       ...options,
     }),
@@ -116,7 +140,8 @@ export const FakeClaudeRunSchema = z.strictObject({
 
 /**
  * Exits on any line the SDK writes that isn't the next one recorded, and when
- * the app's options or its `initialize` request aren't the recorded ones.
+ * the app's options, its environment variables or its `initialize` request
+ * aren't the recorded ones.
  */
 const SCRIPT = `
 import fs from 'node:fs'
@@ -208,10 +233,10 @@ const standIns = [[projectKey, start.projectKey], [fs.realpathSync(process.cwd()
 
 const skipped = (options.skip ?? []).filter(skip => skip.run === undefined || skip.run === run)
 
-function exitOnChangedSetting(where, recorded, sent) {
+function exitOnChangedSetting(where, recorded, sent, first = []) {
   if (skipped.some(({field}) => field === '*')) return
   const fields = [...new Set([...Object.keys(recorded), ...Object.keys(sent)])]
-  const changed = changedSetting(where, fields, recorded, withStandIns(sent, standIns), skipped)
+  const changed = changedSetting(where, fields, recorded, withStandIns(sent, [...first, ...standIns]), skipped)
   if (!changed) return
   report.changed = changed
   report.ended = 'changed-setting'
@@ -221,6 +246,14 @@ function exitOnChangedSetting(where, recorded, sent) {
 }
 
 exitOnChangedSetting('claude option', optionsIn(start.args), optionsIn(args))
+
+const APP_VARIABLE = new RegExp(${JSON.stringify(APP_VARIABLE.source)}, 'i')
+
+function asVariables(entries) {
+  return Object.fromEntries(entries.map(([name, value]) => ['env.' + name, value]))
+}
+
+exitOnChangedSetting('claude variable', asVariables(Object.entries(start.env ?? {})), asVariables(Object.entries(process.env).filter(([name]) => APP_VARIABLE.test(name))), [[options.configFolder, ${JSON.stringify(CONFIG_FOLDER_STAND_IN)}]])
 
 const requestIds = new Map()
 const renamed = new Map()

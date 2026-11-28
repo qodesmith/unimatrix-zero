@@ -163,6 +163,17 @@ const RECORDED_ON_A_MAC = skipping(
   ['--tools']
 )
 
+const RESUMED_FROM_DISK = skipping(
+  'The fallback resumes from the transcript in the config folder, and the recording from the SDK’s temporary one.',
+  ['env.CLAUDE_CONFIG_DIR'],
+  2
+)
+
+const COMPACTED_EARLY = skipping(
+  'The live test lowers the size claude compacts at through a variable the app never sets, so no replay sends it.',
+  ['env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE']
+)
+
 async function setUp(
   recordings: string[],
   behavior: FakeClaudeOptions = {},
@@ -202,6 +213,7 @@ async function setUp(
           path.isAbsolute(name) ? name : path.join(RECORDINGS, name)
         ),
         reports,
+        configDir,
         behavior
       ),
     },
@@ -685,7 +697,7 @@ it('forks from the app’s copy of the session served only through a Reply', asy
 it('writes the transcript back only through that Reply when forking from the store fails', async () => {
   const claude = await setUp(
     ['warm.ndjson', 'forked.ndjson', 'forked.ndjson'],
-    {refuseStore: true}
+    {refuseStore: true, ...RESUMED_FROM_DISK}
   )
 
   await warmThread(claude)
@@ -727,7 +739,7 @@ it('resumes from the app’s copy when the warm session’s `claude` exited whil
 it('writes the transcript back when resuming from the store fails', async () => {
   const claude = await setUp(
     ['warm.ndjson', 'resumed.ndjson', 'resumed.ndjson'],
-    {refuseStore: true}
+    {refuseStore: true, ...RESUMED_FROM_DISK}
   )
 
   const session = await warmThread(claude)
@@ -1321,7 +1333,7 @@ function compactionsIn(events: Streamed[]) {
 }
 
 async function compactingThread(recording: string) {
-  const claude = await setUp([recording])
+  const claude = await setUp([recording], COMPACTED_EARLY)
   const first = await claude.reply('My code word is TEAL.')
 
   const failedCompacting = await claude.reply(
@@ -1821,6 +1833,7 @@ it('ends a Reply stopped while it waits for a stalled claude to close at once, s
 it('fails a Reply as connection-lost when a warm claude says nothing in time, though the Prompt before it was still completing, and interrupts that claude', async () => {
   const claude = await setUp(['compacted.ndjson'], {
     silentFrom: {run: 0, prompt: 1},
+    ...COMPACTED_EARLY,
   })
 
   const first = await claude.reply('My code word is TEAL.')
