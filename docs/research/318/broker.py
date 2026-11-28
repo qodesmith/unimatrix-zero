@@ -11,6 +11,8 @@ back `ok:<password>` or `deny`. The file `<dir>/mode` picks the answer:
     deny    what a Deny on the card would send
     dialog  a password dialog (osascript on macOS, zenity on Linux); the
             password goes to sudo only
+    file    the contents of `<dir>/password`, for a test machine whose
+            password is no secret
 
 The log holds each request and the kind of answer, never a password.
 """
@@ -88,6 +90,9 @@ def answer(connection, channel):
             reply = "deny" if password is None else f"ok:{password}"
         elif chosen == "deny":
             reply = "deny"
+        elif chosen == "file":
+            with open(os.path.join(folder, "password")) as file:
+                reply = "ok:" + file.read().rstrip("\n")
         else:
             reply = "ok:not-the-password"
         pid = re.search(r"pid=(\d+)", request)
