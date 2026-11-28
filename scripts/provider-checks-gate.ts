@@ -1,7 +1,10 @@
 import type {Comment} from './provider-checks-result.ts'
 
+import {execFile} from 'node:child_process'
+import {promisify} from 'node:util'
 import {z} from 'zod'
 
+import {changesSince} from './changes-since.ts'
 import {gateVerdict} from './provider-checks-result.ts'
 import {gatedChangesOf} from './recordings.ts'
 
@@ -88,10 +91,23 @@ if (files.length > 0) {
   )
 }
 
-const verdict = gateVerdict({
+const root = process.cwd()
+
+const checkedOut = (
+  await promisify(execFile)('git', ['rev-parse', 'HEAD'], {cwd: root})
+).stdout.trim()
+
+if (checkedOut !== pr.head.sha) {
+  throw new Error(
+    `The checkout is at ${checkedOut}, not the PR's head ${pr.head.sha}, so it can't tell what a live test imports there.`
+  )
+}
+
+const verdict = await gateVerdict({
   owner: env.GITHUB_REPOSITORY_OWNER,
   head: pr.head.sha,
   comments: await commentsOn(pr.number),
+  changesSince: async commit => changesSince(root, commit, pr.head.sha),
 })
 
 if (!verdict.pass) {

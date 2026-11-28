@@ -9,6 +9,9 @@ export const MANIFEST = 'app/main/src/modules/vendor-programs/dev-manifest.json'
 export const HOST_PACKAGE = 'app/provider-host/package.json'
 export const SDK = '@anthropic-ai/claude-agent-sdk'
 
+export const CODEX_PROTOCOL =
+  'app/provider-host/src/modules/codex-driver/protocol'
+
 export const INSTALLED_SDK = path.join(
   path.dirname(HOST_PACKAGE),
   'node_modules',

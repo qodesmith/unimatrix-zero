@@ -5,6 +5,8 @@ import os from 'node:os'
 import path from 'node:path'
 import {z} from 'zod'
 
+import {CODEX_PROTOCOL, MANIFEST} from './vendor-pins.ts'
+
 const root = path.resolve(import.meta.dirname, '..')
 
 const manifest = z
@@ -13,22 +15,9 @@ const manifest = z
       codex: z.looseObject({version: z.string()}),
     }),
   })
-  .parse(
-    JSON.parse(
-      fs.readFileSync(
-        path.join(
-          root,
-          'app/main/src/modules/vendor-programs/dev-manifest.json'
-        ),
-        'utf8'
-      )
-    )
-  )
+  .parse(JSON.parse(fs.readFileSync(path.join(root, MANIFEST), 'utf8')))
 
-const out = path.join(
-  root,
-  'app/provider-host/src/modules/codex-driver/protocol'
-)
+const out = path.join(root, CODEX_PROTOCOL)
 
 const codex = process.argv[2] ?? 'codex'
 const pinned = manifest.vendorPrograms.codex.version
