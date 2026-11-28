@@ -145,25 +145,65 @@ export interface Comment {
   body: string
 }
 
+/** A file changed since a result's commit, and why it needs a new run. */
+export interface Cause {
+  file: string
+  why: string
+}
+
+/** What changed between a result's commit and the PR's head. */
+export type Since = {ancestor: false} | {ancestor: true; causes: Cause[]}
+
+function carriedOver(owner: string, head: string, from: string, since: Since) {
+  const rerun = `Check out ${head} and run \`bun run provider-checks\`.`
+
+  if (!since.ancestor) {
+    return {
+      pass: false,
+      reason: `${owner}'s provider-checks passed on ${from}, which is no longer in this PR's history. ${rerun}`,
+    }
+  }
+
+  if (since.causes.length > 0) {
+    return {
+      pass: false,
+      reason: [
+        `${owner}'s provider-checks passed on ${from}, but these changes since need a new run:`,
+        ...since.causes.map(({file, why}) => `  ${file}: ${why}`),
+        rerun,
+      ].join('\n'),
+    }
+  }
+
+  return {
+    pass: true,
+    reason: `${owner}'s provider-checks passed on ${from}, and nothing since needs a new run, so that result carries over to ${head}.`,
+  }
+}
+
 /**
  * A PR the gate holds passes on its owner's newest result for its head commit,
- * so a push after the run, or anyone else's comment, doesn't count.
+ * so anyone else's comment doesn't count. With none, the owner's newest
+ * passing result carries over when nothing changed since needs a new run.
  */
-export function gateVerdict(input: {
+export async function gateVerdict(input: {
   owner: string
   head: string
   comments: Comment[]
+  changesSince: (commit: string) => Promise<Since>
 }) {
-  const {owner, head, comments} = input
+  const {owner, head, comments, changesSince} = input
 
-  const latest = comments
+  const results = comments
     .filter(comment => comment.login === owner)
     .flatMap(comment => {
       const marker = markerOf(comment.body)
 
-      return marker?.head === head ? [marker] : []
+      return marker ? [marker] : []
     })
-    .at(-1)
+
+  const latest =
+    results.findLast(result => result.head === head) ?? results.at(-1)
 
   if (!latest) {
     return {
@@ -172,10 +212,14 @@ export function gateVerdict(input: {
     }
   }
 
-  return latest.passed
+  if (!latest.passed) {
+    return {
+      pass: false,
+      reason: `${owner}'s provider-checks on ${latest.head} found a failing check, a stale entry, a recording it kept or a failing everyday test.`,
+    }
+  }
+
+  return latest.head === head
     ? {pass: true, reason: `${owner}'s provider-checks passed on ${head}.`}
-    : {
-        pass: false,
-        reason: `${owner}'s provider-checks on ${head} found a failing check, a stale entry, a recording it kept or a failing everyday test.`,
-      }
+    : carriedOver(owner, head, latest.head, await changesSince(latest.head))
 }
