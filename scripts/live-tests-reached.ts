@@ -16,8 +16,9 @@ async function liveTestsImporting(file: string) {
       reporters: [],
       related: [path.join(root, file)],
       // Vitest's default re-runs every test on any `package.json` or Vite
-      // config. The gate's rules cover the pins and the lockfile, and Vitest
-      // counts the root config and the global setup without a trigger.
+      // config. The gate's rules cover the pins, the lockfile and workspace
+      // `package.json` files, and Vitest counts the root config and the
+      // global setup without a trigger.
       forceRerunTriggers: [],
     },
     {},

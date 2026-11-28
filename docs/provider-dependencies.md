@@ -48,9 +48,10 @@ With no result for the head commit, the owner's newest result carries over when 
 - a live test (`*.live.test.ts`), or any file a live test imports at any depth, as Vitest's own import walk finds it (`scripts/changes-since.ts`), which covers the recorders, the drivers and every module they load. Vitest also counts its config and its global setup as reaching every test;
 - a recording, since a hand edit means it no longer comes from a live test;
 - a generated Codex protocol type (under `app/provider-host/src/modules/codex-driver/protocol/`), since the Codex live test checks the folder against what the pinned Codex generates, which Vitest's import walk doesn't see;
-- a vendor pin file or the lockfile (`dev-manifest.json`, `app/provider-host/package.json`, `bun.lock`).
+- a vendor pin file or the lockfile (`dev-manifest.json`, `app/provider-host/package.json`, `bun.lock`);
+- a workspace `package.json`, since its `exports` and `imports` decide which file a live test's import loads, which Vitest's import walk doesn't see.
 
-Every other change carries the result over: docs, replay tests, the app's UI, scripts outside a live test's imports, the root `package.json`, CI config. The job names the result it carried over, or each file that needs the new run and why. While the fakes and the recorders share modules, a change to `app/provider-host/src/modules/test-recordings/main.ts`, the fakes' shared script, still needs one.
+Every other change carries the result over: docs, replay tests, the app's UI code, scripts outside a live test's imports, the root `package.json`, CI config. The job names the result it carried over, or each file that needs the new run and why. While the fakes and the recorders share modules, a change to `app/provider-host/src/modules/test-recordings/main.ts`, the fakes' shared script, still needs one.
 
 Entries the vendor's servers can change (`upgrade + drift`) are checked only when the run happens; run it by hand at any time to catch drift between releases.
 

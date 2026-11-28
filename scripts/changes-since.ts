@@ -102,6 +102,7 @@ const RULES: [matches: (file: string) => boolean, why: string][] = [
   ],
   [file => file === MANIFEST || file === HOST_PACKAGE, 'a vendor pin file'],
   [file => file === LOCKFILE, 'the lockfile'],
+  [file => file.endsWith('/package.json'), 'a workspace package.json'],
 ]
 
 function whyOf(file: string, reached: string[]) {
