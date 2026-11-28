@@ -1,7 +1,6 @@
 /**
- * Runs `task` on each item, at most `limit` at a time, and returns the results
- * in the items' order. Once a task throws, no more start, and the first error
- * is thrown when the running ones have settled.
+ * Runs `task` at most `limit` at a time; after a throw, none start and the
+ * first error is rethrown once the running ones settle.
  */
 export async function mapLimited<Item, Result>(
   items: readonly Item[],

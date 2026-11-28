@@ -25,7 +25,6 @@ export function isLiveTest(file: string) {
   return LIVE_TEST.test(file)
 }
 
-/** A PR that changes one of these needs a re-record, as a bump PR does. */
 export function gatedFiles(files: string[]) {
   return files.filter(
     file => isRecording(file) || isLiveTest(file) || RECORDER.test(file)
@@ -121,7 +120,6 @@ export async function changedFilesOf(api: GitHubApi, repo: string, pr: number) {
   }
 }
 
-/** Why CI's gate holds a PR, which is when either list has something. */
 export async function gatedChangesOf(
   api: GitHubApi,
   repo: string,

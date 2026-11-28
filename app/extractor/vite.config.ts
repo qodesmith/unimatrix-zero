@@ -8,7 +8,6 @@ import {defineConfig} from 'vite'
 
 const pdfjs = path.join(import.meta.dirname, 'node_modules/pdfjs-dist')
 
-/** Pdf.js fetches these at run time, from the URLs `pdfAssetsAt` builds. */
 const PDFJS_FOLDERS = ['cmaps', 'iccs', 'standard_fonts', 'wasm']
 
 // Every limit only catches a hang: a 100-page PDF renders in a few seconds.

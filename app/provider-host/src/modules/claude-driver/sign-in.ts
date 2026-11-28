@@ -59,7 +59,6 @@ export interface ClaudeSignInDeps {
   timeoutMs: number
 }
 
-/** Claude's page shows the code followed by `#` and the state in its own link. */
 function belongsTo(code: string, url: string) {
   const state = new URL(url).searchParams.get('state')
 

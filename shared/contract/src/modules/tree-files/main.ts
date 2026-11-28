@@ -31,19 +31,10 @@ export type TreeFilePreview = z.infer<typeof TreeFilePreviewSchema>
 
 export const TreeFileDetailsSchema = z.strictObject({
   ...TreeFileSchema.shape,
-  /** Decided from the bytes, and the name only among text or media types. */
   preview: TreeFilePreviewSchema,
   tooLarge: z.boolean(),
-  /**
-   * Why Open with its app is refused: marked as a program, or not a document
-   * type, which can run on any platform. `program` when both apply.
-   */
   notOpened: z.enum(['program', 'not-a-document']).nullable(),
   link: z.boolean(),
-  /**
-   * This Snapshot is the one in the Tree's folder, so the file can be opened
-   * and revealed there. False for a deleted file.
-   */
   onDisk: z.boolean(),
   editor: z.string().nullable(),
   quickLook: z.boolean(),

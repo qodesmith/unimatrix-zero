@@ -226,7 +226,6 @@ const config: OxlintConfig = {
     'prefer-rest-params': 'error',
     'preserve-caught-error': 'error',
     radix: 'error',
-    // oxfmt sorts the declarations, this sorts the names inside the braces.
     'sort-imports': ['error', {ignoreDeclarationSort: true}],
     'symbol-description': 'error',
     yoda: 'error',
@@ -350,7 +349,6 @@ const config: OxlintConfig = {
     'react/only-export-components': ['error', {allowConstantExport: true}],
     'react/prefer-function-component': 'error',
     'react/react-in-jsx-scope': 'off',
-    // The React Compiler's Rules of React: they hold without the compiler too.
     'react/capitalized-calls': 'error',
     'react/error-boundaries': 'error',
     'react/exhaustive-effect-dependencies': 'error',

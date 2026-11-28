@@ -50,10 +50,6 @@ export const SignInRequestSchema = z.strictObject({
 
 export type SignInRequest = z.infer<typeof SignInRequestSchema>
 
-/**
- * Keeps through `keepThrough`, drops `dropFrom` and all after. Each Provider
- * cuts at the one it can; null leaves the session as it is.
- */
 export const SessionCutSchema = SessionRefSchema.extend({
   type: z.literal('cut'),
   keepThrough: z.string().nullable(),
@@ -70,7 +66,6 @@ export type DeletionCut = z.infer<typeof DeletionCutSchema>
 
 export const ReplySessionSchema = z.discriminatedUnion('type', [
   SessionRefSchema.extend({type: z.literal('continue')}),
-  /** The Reply already has a Prompt after it; forking spares that Branch. */
   SessionRefSchema.extend({
     type: z.literal('fork'),
     /**

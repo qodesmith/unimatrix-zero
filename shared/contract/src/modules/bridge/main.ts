@@ -10,7 +10,6 @@ export const BRIDGE_CHANNELS = {
   droppedFile: 'uz:dropped-file',
 } as const
 
-/** The page never sees the path. */
 export const DroppedFileRegistration = z.strictObject({
   path: z.string(),
 })

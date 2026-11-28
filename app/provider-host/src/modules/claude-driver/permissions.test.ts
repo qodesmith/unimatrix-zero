@@ -26,7 +26,6 @@ afterEach(() => {
   }
 })
 
-/** Under the temporary folder as the OS names it, `/var` on a Mac. */
 function treeFolder() {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'uz-tree-'))
   made.push(folder)
@@ -317,7 +316,6 @@ it('refuses a Glob and a Grep that start at or above the folder of every Tree, b
   )
 })
 
-/** `claude`'s config folder inside a hidden folder, as the app lays it out. */
 function withConfig() {
   const {folders, tree, other} = trees()
   const providers = path.join(treeFolder(), 'providers')

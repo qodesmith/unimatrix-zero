@@ -16,7 +16,6 @@ it.each([['Claude API'], ['Anthropic Pro'], ['Claude ']])(
   }
 )
 
-/** Takes longer than the SDK's 2 s to exit once its input closes. */
 const SESSION = `
 import fs from 'node:fs'
 const ended = how => fs.writeFileSync(process.env.FAKE_ENDED, how)

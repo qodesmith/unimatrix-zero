@@ -65,7 +65,6 @@ interface Live extends ClaudeSession {
   restore: Restore
   store: SessionStoreClient
   projectKey: string
-  /** The SDK swaps in its own configuration folder on a restore. */
   activeConfigDir: () => string
   saved: Set<string>
 }
@@ -99,7 +98,6 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     )
   }
 
-  /** A closing `claude` may still write to the session, so wait for it. */
   async function filesOf(request: ReplyRequest, restore: Restore) {
     if (request.session) await warm.closed(request.session.sessionId)
 
@@ -315,7 +313,6 @@ export function createClaudeReplies(deps: ClaudeRepliesDeps) {
     mapper: Mapper,
     run: ReplyRun
   ): AsyncGenerator<ContentEvent, Answered> {
-    // Before any `claude`, so an unreadable file leaves none to close.
     const sending: Sending = {request, content: await contentOf(request)}
     const claimed = claimable(request)
 

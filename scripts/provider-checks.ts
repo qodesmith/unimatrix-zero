@@ -376,7 +376,6 @@ if (postTo) {
     root
   )
 
-  // Pushed after the comment, so CI's gate on the new commit finds its result.
   await (committed
     ? $`git push origin ${`HEAD:refs/heads/${postTo.branch}`}`.cwd(root)
     : rerunGate(repo, postTo))

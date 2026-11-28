@@ -16,7 +16,6 @@ const request = {
   },
 }
 
-/** `exited` holds the fake `claude` open after its last message. */
 function fakeClaude(
   messages: OneShotMessage[],
   exited: Promise<void> = Promise.resolve()

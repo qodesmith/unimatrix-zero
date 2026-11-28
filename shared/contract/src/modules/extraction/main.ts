@@ -27,10 +27,6 @@ export const ExtractionFormatSchema = z.enum([
 
 export type ExtractionFormat = z.infer<typeof ExtractionFormatSchema>
 
-/**
- * The window's preload posts this to the page with the job's `MessagePort`,
- * the page's only channel.
- */
 export const EXTRACTION_PORT_MESSAGE = 'uz:extraction-port'
 
 export const ExtractionJobSchema = z.strictObject({
@@ -47,9 +43,7 @@ export const ExtractorOutputSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('read'),
     format: ExtractionFormatSchema,
-    /** UTF-8. A PDF's has a heading per page, an office file's per part. */
     text: z.instanceof(Uint8Array),
-    /** JPEGs, a PDF's alone, in page order. */
     pageImages: z.array(
       z.strictObject({
         page: z.number().int().positive(),

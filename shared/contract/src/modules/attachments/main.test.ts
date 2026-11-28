@@ -78,7 +78,6 @@ describe('planInline', () => {
   })
 
   it('sends Claude’s oldest by path only once a Thread passes 20 MiB of base64', () => {
-    // 6 MiB is 8 MiB of base64: two fit in 20 MiB, a third doesn't.
     const pdf = file('application/pdf', 6 * MIB)
     const plan = planInline('claude', [[pdf], [pdf, pdf]])
 
@@ -101,7 +100,6 @@ describe('planInline', () => {
   })
 
   it('marks and counts as by path only now a file that went inline with its own Prompt, not one its own Prompt left out', () => {
-    // 6 MiB is 8 MiB of base64: the newest Prompt alone passes 20 MiB.
     const pdf = file('application/pdf', 6 * MIB)
     const plan = planInline('claude', [[pdf], [pdf, pdf, pdf]])
 

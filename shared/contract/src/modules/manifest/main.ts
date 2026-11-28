@@ -18,7 +18,6 @@ export const VendorBuildSchema = z.strictObject({
   archive: z
     .strictObject({
       format: z.literal('tar.gz'),
-      /** The program to run, relative to the folder, with `/` between parts. */
       entrypoint: z.string().min(1),
     })
     .optional(),

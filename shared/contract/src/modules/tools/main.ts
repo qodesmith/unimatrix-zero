@@ -1,9 +1,5 @@
 import {z} from 'zod'
 
-/**
- * What a Tree's Tools panel switches on, from its next Reply. Reading, writing
- * files and running commands are not here: every Tree has them.
- */
 export const TreeToolsSchema = z.strictObject({
   webSearch: z.boolean(),
   claudeConnectors: z.boolean(),

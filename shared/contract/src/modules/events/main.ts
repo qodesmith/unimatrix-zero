@@ -71,10 +71,6 @@ export const SnapshotsWaitingEvent = z.strictObject({
   type: z.literal('SNAPSHOTS_WAITING'),
 })
 
-/**
- * The app's own `git` failed to download while a Snapshot waited on it, or on
- * the user's Try again (`snapshots.download-again`).
- */
 export const SnapshotsDownloadFailedEvent = z.strictObject({
   type: z.literal('SNAPSHOTS_DOWNLOAD_FAILED'),
 })
@@ -83,10 +79,6 @@ export const SnapshotsDownloadedEvent = z.strictObject({
   type: z.literal('SNAPSHOTS_DOWNLOADED'),
 })
 
-/**
- * This Linux is too old for the app's own `git`, so no Snapshot is ever
- * taken. Sent once per launch, at the first wait a window can hear.
- */
 export const SnapshotsNeedNewerLinuxEvent = z.strictObject({
   type: z.literal('SNAPSHOTS_NEED_NEWER_LINUX'),
 })

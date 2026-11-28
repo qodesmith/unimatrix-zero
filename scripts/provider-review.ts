@@ -75,10 +75,6 @@ function outputOf(stdout: string) {
   }
 }
 
-/**
- * Tries once more when the first try ends with no verdict, such as past its
- * time limit.
- */
 export async function retriedOnce(
   tryOnce: () => Promise<Review>
 ): Promise<Review> {

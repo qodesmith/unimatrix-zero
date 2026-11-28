@@ -1,4 +1,3 @@
-/** Fails until someone has read the rule changes up to the installed oxlint. */
 import path from 'node:path'
 import {z} from 'zod'
 

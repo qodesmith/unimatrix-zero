@@ -1,5 +1,3 @@
-// With `UZ_RECORD=yes`, each `[records]` test rewrites its files in
-// `recordings/`, which the driver tests replay.
 import type {SpawnCodex} from './app-server'
 import type {RateLimitReachedType} from './protocol/v2/RateLimitReachedType'
 import type {HostAttachment} from '@uz/contract/attachments'

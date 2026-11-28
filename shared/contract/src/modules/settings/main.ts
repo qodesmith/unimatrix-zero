@@ -12,10 +12,6 @@ export const ThemeModeSchema = z.enum(['system', 'light', 'dark'])
 
 export type ThemeMode = z.infer<typeof ThemeModeSchema>
 
-/**
- * `enter`: Enter sends, Shift+Enter breaks a line. `mod-enter`: ⌘/Ctrl+Enter
- * sends.
- */
 export const SendKeySchema = z.enum(['enter', 'mod-enter'])
 
 export const FONT_SIZE = {min: 12, max: 24, step: 2}
@@ -86,7 +82,6 @@ export const SettingsUpdateSchema = SettingsSchema.partial()
 export type SettingsUpdate = z.infer<typeof SettingsUpdateSchema>
 
 export const CompactionSettingsSchema = z.strictObject({
-  /** False only for a Provider that can turn automatic Compaction off. */
   auto: z.boolean(),
   threshold: z.int().positive().nullable(),
 })

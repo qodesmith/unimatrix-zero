@@ -12,7 +12,6 @@ export interface Openable {
   preview: TreeFileDetails['preview']
   notOpened: TreeFileDetails['notOpened']
   link: boolean
-  /** The file in the Tree's folder when `onDisk`, else a read-only copy. */
   locate: () => Promise<{file: string; executable: boolean}>
 }
 

@@ -126,7 +126,6 @@ export const PromptDeleteCommand = z.strictObject({
 
 export const PromptDeleteResult = TurnIdsSchema
 
-/** Keeps the text so far; `RUN_FINISHED` follows once the Provider lets go. */
 export const ReplyStopCommand = z.strictObject({
   type: z.literal('reply.stop'),
   treeId: z.uuid(),
@@ -151,7 +150,6 @@ export const ReplyRetryResult = z.strictObject({
   reply: ReplySchema,
 })
 
-/** `SIGN_IN_STEP` and `SIGN_IN_FINISHED` follow. */
 export const ProviderConnectCommand = z.strictObject({
   type: z.literal('provider.connect'),
   provider: ProviderIdSchema,
@@ -237,10 +235,6 @@ export const SystemPromptDeleteCommand = z.strictObject({
   id: SystemPromptEntryIdSchema,
 })
 
-/**
- * The Snapshot of the Reply, or the nearest one above it while it has none
- * yet, with the files the Reply deleted.
- */
 export const TreeFilesListCommand = z.strictObject({
   type: z.literal('tree-files.list'),
   treeId: z.uuid(),

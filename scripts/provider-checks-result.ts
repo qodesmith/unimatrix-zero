@@ -181,11 +181,6 @@ function earlierResultVerdict(
   }
 }
 
-/**
- * A PR the gate holds passes on its owner's newest result for its head commit,
- * so anyone else's comment doesn't count. With none, the owner's newest result
- * carries over when it passed and nothing changed since needs a new run.
- */
 export async function gateVerdict(input: {
   owner: string
   head: string

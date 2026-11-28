@@ -11,7 +11,6 @@ import type {UUID} from 'node:crypto'
 import {createInbox} from '#modules/inbox/main'
 import {setTimeout as delay} from 'node:timers/promises'
 
-/** Far longer than a token refresh; a `claude` still running then is stuck. */
 export const CLOSE_TIMEOUT_MS = 30_000
 
 export type QueryFn = (params: {
@@ -60,7 +59,6 @@ function messageContent(content: ContentPart[]) {
 export interface ClaudeSession {
   readonly sessionId: string | null
   messageId: string | null
-  /** Whether `claude` has started; false while it may still refuse to. */
   readonly started: boolean
   readonly ended: boolean
   send(content: ContentPart[], uuid: UUID): AsyncGenerator<SDKMessage>

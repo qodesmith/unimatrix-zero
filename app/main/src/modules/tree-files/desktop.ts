@@ -7,9 +7,7 @@ export interface Desktop {
   openInEditor: (file: string) => Promise<void>
   quickLook: (file: string, name: string) => void
   reveal: (file: string) => void
-  /** Null when the user cancels. */
   pickSaveFile: (defaultName: string) => Promise<string | null>
   pickFolder: () => Promise<string | null>
-  /** A `data:image/` URL, or null where the OS has none. */
   thumbnail: (file: string) => Promise<string | null>
 }

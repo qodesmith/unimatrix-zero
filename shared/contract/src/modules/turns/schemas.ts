@@ -67,10 +67,6 @@ export const RunFailureSchema = z.strictObject({
   ]),
   message: z.string(),
   resetsAt: z.iso.datetime().optional(),
-  /**
-   * For `too-long` when the Provider caps a Prompt's text; unset if the Context
-   * window was full.
-   */
   promptChars: z.number().int().nonnegative().optional(),
   maxPromptChars: z.number().int().nonnegative().optional(),
 })
@@ -146,10 +142,6 @@ export const TextReplaceEvent = z.strictObject({
   text: z.string(),
 })
 
-/**
- * A re-sent stream that threw a tool call away: the content cut back to before
- * that call, with the text part before it replaced, or dropped when empty.
- */
 export const ContentCutBackEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('CONTENT_CUT_BACK'),
@@ -191,7 +183,6 @@ export const ToolResultEvent = z.strictObject({
   isError: z.boolean(),
 })
 
-/** What an approval card asks about. Reads never ask, so none is a read. */
 export const ApprovalActionSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('edit'),
@@ -250,7 +241,6 @@ export const ReviewStartedEvent = z.strictObject({
   action: ApprovalActionSchema,
 })
 
-/** `unanswered`: it timed out or failed, which counts as declined. */
 export const ReviewFinishedEvent = z.strictObject({
   ...replyEvent,
   type: z.literal('REVIEW_FINISHED'),
@@ -302,10 +292,6 @@ export const SessionRebuiltEvent = z.strictObject({
   type: z.literal('SESSION_REBUILT'),
 })
 
-/**
- * Display only: the vendor program is retrying a request. Its next content
- * says the retry went through, since nothing else does.
- */
 export const ReconnectingEvent = z.strictObject({
   ...replyIds,
   type: z.literal('RECONNECTING'),

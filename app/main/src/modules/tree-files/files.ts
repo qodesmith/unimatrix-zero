@@ -240,7 +240,6 @@ export function createSnapshotFiles(context: FilesContext) {
       return found !== null
     },
 
-    /** Null for an id never listed. */
     async saveFileCopy(id: TreeFileId) {
       const file = knownFile(id)?.file
 

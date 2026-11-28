@@ -30,13 +30,9 @@ export interface WarmSession {
   readonly sessionId: string | null
   readonly messageId: string | null
   readonly model: string
-  /** Fixed as `claude` starts: it applies no later change to the threshold. */
   readonly compactionSettings: CompactionSettings
-  /** Fixed as `claude` starts: a changed System prompt needs a new `claude`. */
   readonly systemPrompt: string
-  /** Fixed as `claude` starts: it can't add or remove a tool later. */
   readonly tools: TreeTools
-  /** Fixed as `claude` starts, with the callback that asks. */
   readonly permissionMode: PermissionMode
   close(): Promise<void>
 }

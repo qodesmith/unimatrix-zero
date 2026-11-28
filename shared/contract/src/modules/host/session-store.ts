@@ -40,10 +40,6 @@ export const SessionStoreRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({
     op: z.literal('load'),
     key: SessionKeySchema,
-    /**
-     * Ends the transcript at the entry with this `uuid`, and leaves out every
-     * entry that has none.
-     */
     through: z.string().min(1).optional(),
   }),
   z.strictObject({op: z.literal('list-subkeys'), ...SessionFolderSchema.shape}),

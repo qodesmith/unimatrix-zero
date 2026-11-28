@@ -126,10 +126,6 @@ export async function changesSince(
   }
 }
 
-/**
- * The changed files that need a new live run. `reached` maps a file to the
- * live tests that import it, at any depth.
- */
 export function reRunCauses(
   changed: string[],
   reached: Map<string, string[]>

@@ -43,7 +43,6 @@ export const ThemeSetSchema = z.object({
   shiki: z.string(),
 })
 
-/** Token values only; unknown keys are dropped. */
 export const ThemeSchema = z
   .object({
     version: z.literal(1),

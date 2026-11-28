@@ -1,8 +1,4 @@
-/**
- * Needs a real plan and the env `bun run provider-checks` sets. With
- * `UZ_RECORD=yes`, each `[records]` test rewrites its files in `recordings/`,
- * which the driver tests replay.
- */
+/** Needs a real plan and the env `bun run provider-checks` sets. */
 import type {Query} from '@anthropic-ai/claude-agent-sdk'
 import type {
   ProviderDriver,
@@ -276,7 +272,6 @@ function liveDriver(
     setEnv(env: Record<string, string>) {
       addedEnv = env
     },
-    /** For each `claude` started from here on, even ones the driver sets. */
     dropEnv(names: string[]) {
       droppedEnv = names
     },
@@ -386,7 +381,6 @@ function sandboxedTrees() {
   return {root, tree, other}
 }
 
-/** With the folder that holds `claude`'s own config hidden, as the app has it. */
 function inSandbox(
   live: Live,
   text: string,
@@ -413,7 +407,6 @@ function readingPrompt(secret: string, otherSecret: string) {
   return `Do these four steps in order, each once, with no retry, whatever happens: read ${secret} with your Read tool; then read ${otherSecret} with your Read tool; then run exactly \`cat ${otherSecret}\` with Bash; then run exactly \`sh read.sh\` with Bash. Then reply with only the word DONE.`
 }
 
-/** The SDK runs a `.mjs` with the `node` on PATH. */
 function exitWatcher(ended: string) {
   return `
 import {spawn} from 'node:child_process'
@@ -581,7 +574,6 @@ function forward(request: http.IncomingMessage, response: http.ServerResponse) {
 }
 
 async function startStandInApi(answer: StandInAnswer = 'five-hour') {
-  // One reset for every request, so each failure names the same time.
   const resets = Math.floor(Date.now() / 1000) + 2 * HOUR_IN_SECONDS
   let current = answer
 
@@ -2509,7 +2501,6 @@ describe.skipIf(!program || !configDir)('a live Claude', () => {
     const first = await live.reply(teal, null)
     const second = await live.reply(otter, continuing(first.recorded.session))
 
-    // A rewind to the first Reply leaves the second off the newest chain.
     await live.reply('Now reply with the single word HERON.', {
       ...first.recorded.session,
       type: 'rewind',

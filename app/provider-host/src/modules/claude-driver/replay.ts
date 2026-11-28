@@ -27,7 +27,6 @@ export const APP_VARIABLE = new RegExp(
   'i'
 )
 
-/** One line of a recording; the first is `start`, saying where it ran. */
 export const RecordedLineSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('start'),

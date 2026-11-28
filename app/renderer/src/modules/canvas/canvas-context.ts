@@ -23,7 +23,6 @@ export interface CanvasState {
   onInputFocus: (replyId: string) => void
   onSent: (replyId: string, parentReplyId: string | null) => void
   inputToFocus: string | null
-  /** Before main is asked, so the canvas is ready the moment the Turns go. */
   onDeleteConfirmed: (promptId: string) => void
   openChat: (replyId: string) => void
   /** Kept here, not in the node, so it survives an orientation switch. */
@@ -31,7 +30,6 @@ export interface CanvasState {
   toggleExpanded: (turnId: string) => void
   collapsedReplyIds: ReadonlySet<string>
   toggleCollapsed: (replyId: string) => void
-  /** Kept here so a draft outlives its box folding or redrawing. */
   drafts: ReadonlyMap<DraftKey, Draft>
   setDraft: (at: DraftKey, draft: Draft) => void
   limitTurnHeight: boolean

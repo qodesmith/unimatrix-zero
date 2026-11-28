@@ -23,10 +23,6 @@ export const ModelSchema = z.strictObject({
   id: z.string().min(1),
   name: z.string().min(1),
   isDefault: z.boolean(),
-  /**
-   * The Model an alias or the Provider's default names now, when that isn't
-   * `id`: what a Prompt picked on it sends and its Reply records.
-   */
   resolvesTo: z.string().min(1).nullable(),
   needsAppUpdate: z.boolean(),
 })

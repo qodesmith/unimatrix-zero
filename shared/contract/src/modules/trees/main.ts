@@ -9,7 +9,6 @@ export const TreeSchema = z.strictObject({
   title: z.string().nullable(),
   firstLine: z.string().max(TREE_TITLE_MAX_LENGTH).nullable(),
   createdAt: z.iso.datetime(),
-  /** When its latest Prompt was sent, or `createdAt` before the first. */
   lastActiveAt: z.iso.datetime(),
   unseenFailure: z.boolean(),
   systemPrompt: TreeSystemPromptSchema,

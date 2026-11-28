@@ -13,7 +13,6 @@ interface Submission {
   onSent: (replyId: string) => void
 }
 
-/** One send at a time: a submit while another is in flight does nothing. */
 export function usePromptSend(treeId: string, parentReplyId: string | null) {
   const sendPrompt = useSendPrompt(treeId, parentReplyId)
 

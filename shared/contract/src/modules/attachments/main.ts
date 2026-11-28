@@ -76,10 +76,6 @@ export const AttachmentSchema = z.strictObject({
   size: z.number().int().nonnegative(),
   shrunkSize: z.number().int().positive().nullable(),
   folderPath: z.string().min(1).nullable(),
-  /**
-   * The copy can't be read. Main checks when it lists a Tree's Turns and when
-   * it answers a send; everywhere else, and for a folder, it is false.
-   */
   missing: z.boolean(),
   extraction: ExtractionSchema.nullable(),
 })
@@ -148,14 +144,8 @@ export interface MediaBudgetUse {
 }
 
 export interface InlinePlan {
-  /** Per Prompt, per attachment, in the order given. */
   forms: (InlineForm | null)[][]
-  /**
-   * Per Prompt, per attachment: it went inline when its Prompt was newest, and
-   * a media budget has since left it out.
-   */
   pathOnlyNow: boolean[][]
-  /** Null for a Provider with no media budget. */
   budget: MediaBudgetUse | null
 }
 
@@ -165,10 +155,6 @@ function mediaSize(form: InlineForm, attachment: Sized) {
   )
 }
 
-/**
- * Fills Claude's budget from the newest image or PDF back, and stops at the
- * first that doesn't fit: it and every older one go by path only.
- */
 function filled(
   prompts: readonly (readonly Sized[])[],
   forms: readonly (InlineForm | null)[][]
@@ -232,7 +218,6 @@ function withinBudget(
   }
 }
 
-/** `prompts` run oldest first. Every attachment also goes by its path. */
 export function planInline(
   provider: ProviderId,
   prompts: readonly (readonly Sized[])[]
@@ -252,10 +237,6 @@ export function planInline(
 
 export const HostAttachmentSchema = z.strictObject({
   name: z.string().min(1),
-  /**
-   * Absolute. A file's copy under `userData/attachments/`, ending in the
-   * file's own name; a folder's own path.
-   */
   path: z.string().min(1),
   folder: z.boolean(),
   inline: z
@@ -263,17 +244,14 @@ export const HostAttachmentSchema = z.strictObject({
       z.strictObject({
         type: z.literal('image'),
         mediaType: ImageMediaTypeSchema,
-        /** The shrunk copy's when the image has one, else `path`. */
         path: z.string().min(1),
       }),
       z.strictObject({type: z.literal('pdf')}),
       z.strictObject({type: z.literal('text')}),
     ])
     .nullable(),
-  /** Null when there is none, and when the file goes inline as a PDF. */
   extraction: z
     .strictObject({
-      /** Absolute, like `path`; null when the file has no text. */
       text: z.string().min(1).nullable(),
       pageImages: z.array(
         z.strictObject({

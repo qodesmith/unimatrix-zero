@@ -10,7 +10,6 @@ export type SidebarSectionId = z.infer<typeof SidebarSectionIdSchema>
 
 export const SidebarSectionSchema = z.strictObject({
   size: z.number().min(0).max(100),
-  /** Shrunk to its header; `size` is what expanding restores. */
   collapsed: z.boolean(),
 })
 

@@ -1,9 +1,6 @@
 /**
  * Each optional dependency these packages list is a binary the app never
- * loads, so it must be overridden to the stub. The Agent SDK's are `claude`
- * binaries the app downloads itself (ADR 0008). pdf.js's are native canvases
- * for Node, and pages render in Chromium (ADR 0007), so pdf.js may gain no
- * other dependency unchecked either.
+ * loads, so it must be overridden to the stub (ADR 0007, ADR 0008).
  */
 import path from 'node:path'
 import {z} from 'zod'
