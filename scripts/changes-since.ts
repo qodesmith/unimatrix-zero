@@ -57,9 +57,14 @@ async function textAt(root: string, commit: string, file: string) {
   }
 }
 
+function isCodexProtocol(file: string) {
+  return file.startsWith(`${CODEX_PROTOCOL}/`)
+}
+
 /**
  * Drops each file whose two versions hold the same code: a change to its
- * comments or its layout can't change what a live test does.
+ * comments, layout or types can't change what a live test does. A Codex
+ * protocol type stays, since the Codex live test compares its text.
  */
 export async function codeChanged(
   root: string,
@@ -68,7 +73,7 @@ export async function codeChanged(
   files: string[]
 ) {
   const same = await mapLimited(files, 8, async file => {
-    if (!isCode(file)) return false
+    if (!isCode(file) || isCodexProtocol(file)) return false
 
     const [before, after] = await Promise.all([
       textAt(root, from, file),
@@ -133,10 +138,7 @@ export function liveTestsReached(root: string, files: string[]) {
 const RULES: [matches: (file: string) => boolean, why: string][] = [
   [isLiveTest, 'a live test'],
   [isRecording, 'a recording'],
-  [
-    file => file.startsWith(`${CODEX_PROTOCOL}/`),
-    'checked by the Codex live test',
-  ],
+  [isCodexProtocol, 'checked by the Codex live test'],
   [file => file === MANIFEST || file === HOST_PACKAGE, 'a vendor pin file'],
   [file => file === LOCKFILE, 'the lockfile'],
   [file => file.endsWith('/package.json'), 'a workspace package.json'],

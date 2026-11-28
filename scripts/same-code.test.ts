@@ -13,12 +13,18 @@ export async function reply(prompt: string): Promise<string> {
 `
 
 describe('two versions of a file hold the same code', () => {
-  it('when only comments, blank lines and line breaks differ, in TypeScript and in JSX', () => {
+  it('when only comments, blank lines, line breaks and types differ, in TypeScript and in JSX', () => {
     const after = `import {send} from './send.ts'
 
+import type {Prompt} from './prompt.ts'
+
+interface Sent {
+  text: string
+}
+
 export async function reply(
-  prompt: string
-): Promise<string> {
+  prompt: Prompt | null
+): Promise<Sent['text']> {
   // A new note.
   return send(prompt, {tries: 3n, match: /done/u})
 }
@@ -34,19 +40,30 @@ export async function reply(
     ).toBe(true)
   })
 
-  it('but not when a statement, a string, a number or a type differs', () => {
+  it('but not when a statement, a string, a number or what a file imports differs', () => {
     for (const [from, to] of [
       ['return send(', 'return void send('],
       ["'./send.ts'", "'./sent.ts'"],
       ['3n', '4n'],
       ['/done/u', '/done/iu'],
-      ['prompt: string', 'prompt: string | null'],
+      ['import {send}', 'import type {send}'],
+      ['prompt: string', 'prompt = 1'],
     ] as const) {
       expect({
         from,
         same: sameCode('a.ts', BEFORE, BEFORE.replace(from, to)),
       }).toEqual({from, same: false})
     }
+  })
+
+  it('but not when an import a file uses only as a type stops loading its module', () => {
+    expect(
+      sameCode(
+        'a.ts',
+        "import {Prompt} from './prompt.ts'\nexport type A = Prompt",
+        "import type {Prompt} from './prompt.ts'\nexport type A = Prompt"
+      )
+    ).toBe(false)
   })
 
   it('but not when a directive comment is added, changed or moved past another, while an untouched one allows it', () => {

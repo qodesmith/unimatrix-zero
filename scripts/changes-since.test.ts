@@ -119,22 +119,30 @@ async function repo() {
 }
 
 describe('the files changed since a result', () => {
-  it('lists each file changed after the result’s commit, a moved file under both names, and none whose comments alone changed', async () => {
+  it('lists each file changed after the result’s commit, a moved file under both names, a Codex protocol type whose comment changed, and no other file whose comments alone changed', async () => {
     const {root, commit} = await repo()
+    const generated = `${CODEX}/protocol/v2/Generated.ts`
+
+    await fs.mkdir(path.join(root, path.dirname(generated)), {recursive: true})
 
     const from = await commit({
       'a.ts': '1',
       'old.ts': 'kept',
       'same.ts': '',
       'noted.ts': '// old\nf()',
+      [generated]: '// old\nexport type A = 1',
     })
 
-    await commit({'a.ts': '2', 'noted.ts': 'f() // new'})
+    await commit({
+      'a.ts': '2',
+      'noted.ts': 'f() // new',
+      [generated]: '// new\nexport type A = 1',
+    })
     const head = await commit({'new.ts': 'kept'}, ['old.ts'])
 
     expect(await filesChangedSince(root, from, head)).toEqual({
       ancestor: true,
-      files: ['a.ts', 'new.ts', 'old.ts'],
+      files: ['a.ts', generated, 'new.ts', 'old.ts'],
     })
   })
 

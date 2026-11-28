@@ -1,4 +1,5 @@
 import path from 'node:path'
+import {transformSync} from 'rolldown/utils'
 import {parseSync} from 'vite'
 import {z} from 'zod'
 
@@ -24,11 +25,21 @@ export function isCode(file: string) {
 }
 
 function treeOf(file: string, source: string) {
-  const {program, comments, errors} = parseSync(file, source, {
-    preserveParens: false,
+  const {comments} = parseSync(file, source)
+
+  // `onlyRemoveTypeImports` keeps an import the code never uses, as
+  // `verbatimModuleSyntax` does when the repo builds.
+  const erased = transformSync(file, source, {
+    jsx: 'preserve',
+    tsconfig: false,
+    typescript: {onlyRemoveTypeImports: true},
   })
 
-  if (errors.length > 0) return null
+  if (erased.errors.length > 0) return null
+
+  const {program} = parseSync('erased.jsx', erased.code, {
+    preserveParens: false,
+  })
 
   const directives = comments
     .map(comment => comment.value)
@@ -46,8 +57,8 @@ function treeOf(file: string, source: string) {
 }
 
 /**
- * Whether two versions of a file parse to the same syntax tree, types
- * included, with the same directive comments in the same order.
+ * Whether two versions of a file, with their types erased, parse to the same
+ * syntax tree and hold the same directive comments in the same order.
  */
 export function sameCode(file: string, before: string, after: string) {
   if (!isCode(file)) return false
