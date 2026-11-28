@@ -85,7 +85,7 @@ it('names the Sandbox folders a live test gave it on the start line, each other 
     ).toMatchObject({
       sandbox: {
         otherTrees: ['one', 'three'],
-        hiddenFolders: [`/temp-folder/${path.basename(hidden)}`],
+        hiddenFolders: [`/temp-folder${path.sep}${path.basename(hidden)}`],
       },
     })
   } finally {

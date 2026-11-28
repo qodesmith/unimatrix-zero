@@ -109,10 +109,15 @@ function keysSorted(value) {
   return Object.fromEntries(Object.keys(value).sort().map(key => [key, keysSorted(value[key])]))
 }
 
+// Windows joins a path with backslashes, and every recording was made on a Mac.
+function recordedSeparators(json) {
+  return process.platform === 'win32' ? json.replaceAll('\\\\\\\\', '/') : json
+}
+
 function changedSetting(where, fields, recorded, sent, skip) {
   for (const field of fields) {
     if (skip.some(skipped => skipped.field === field)) continue
-    const [was, is] = [recorded[field], sent[field]].map(value => JSON.stringify(keysSorted(value ?? null)))
+    const [was, is] = [recorded[field], sent[field]].map(value => recordedSeparators(JSON.stringify(keysSorted(value ?? null))))
     if (was !== is) {
       return 'The app sent a different ' + where + ' ' + field + ' than the recording holds, so the recording no longer shows what the Provider answers. Re-record it with bun run provider-checks (docs/code-style/testing.md).\\nRecorded: ' + was + '\\nSent: ' + is
     }
