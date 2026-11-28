@@ -45,11 +45,11 @@ CI's "Provider checks on a vendor bump or a live test change" job keeps such a P
 
 With no result for the head commit, the owner's newest result carries over when it passed, its commit is still in the PR's history, and nothing changed since then needs a new run. These changes do:
 
-- a live test (`*.live.test.ts`), or any file a live test imports at any depth, as Vitest's own import walk finds it (`scripts/changes-since.ts`), which covers the recorders, the drivers and every module they load;
+- a live test (`*.live.test.ts`), or any file a live test imports at any depth, as Vitest's own import walk finds it (`scripts/changes-since.ts`), which covers the recorders, the drivers and every module they load. Vitest also counts its config, its global setup and any `package.json` as reaching every test;
 - a recording, since a hand edit means it no longer comes from a live test;
 - a vendor pin file or the lockfile (`dev-manifest.json`, `app/provider-host/package.json`, `bun.lock`).
 
-Every other change carries the result over: docs, replay tests, the app's UI, scripts, CI config. The job names the result it carried over, or each file that needs the new run and why. While the fakes and the recorders share modules, a change to a fake's shared script still needs one.
+Every other change carries the result over: docs, replay tests, the app's UI, scripts outside a live test's imports, CI config. The job names the result it carried over, or each file that needs the new run and why. While the fakes and the recorders share modules, a change to a fake's shared script still needs one.
 
 Entries the vendor's servers can change (`upgrade + drift`) are checked only when the run happens; run it by hand at any time to catch drift between releases.
 

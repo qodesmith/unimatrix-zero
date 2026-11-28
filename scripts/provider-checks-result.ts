@@ -154,7 +154,12 @@ export interface Cause {
 /** What changed between a result's commit and the PR's head. */
 export type Since = {ancestor: false} | {ancestor: true; causes: Cause[]}
 
-function carriedOver(owner: string, head: string, from: string, since: Since) {
+function earlierResultVerdict(
+  owner: string,
+  head: string,
+  from: string,
+  since: Since
+) {
   const rerun = `Check out ${head} and run \`bun run provider-checks\`.`
 
   if (!since.ancestor) {
@@ -221,5 +226,10 @@ export async function gateVerdict(input: {
 
   return latest.head === head
     ? {pass: true, reason: `${owner}'s provider-checks passed on ${head}.`}
-    : carriedOver(owner, head, latest.head, await changesSince(latest.head))
+    : earlierResultVerdict(
+        owner,
+        head,
+        latest.head,
+        await changesSince(latest.head)
+      )
 }

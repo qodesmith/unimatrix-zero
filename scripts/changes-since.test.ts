@@ -5,7 +5,11 @@ import path from 'node:path'
 import {promisify} from 'node:util'
 import {describe, expect, it} from 'vitest'
 
-import {changedSince, liveTestsReached, reRunCauses} from './changes-since.ts'
+import {
+  filesChangedSince,
+  liveTestsReached,
+  reRunCauses,
+} from './changes-since.ts'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 
@@ -99,7 +103,7 @@ describe('the files changed since a result', () => {
     await commit({'a.ts': '2'})
     const head = await commit({'new.ts': 'kept'}, ['old.ts'])
 
-    expect(await changedSince(root, from, head)).toEqual({
+    expect(await filesChangedSince(root, from, head)).toEqual({
       ancestor: true,
       files: ['a.ts', 'new.ts', 'old.ts'],
     })
@@ -112,8 +116,10 @@ describe('the files changed since a result', () => {
     await run('reset', '--quiet', '--hard', base)
     const head = await commit({'a.ts': '3'})
 
-    expect(await changedSince(root, dropped, head)).toEqual({ancestor: false})
-    expect(await changedSince(root, 'f'.repeat(40), head)).toEqual({
+    expect(await filesChangedSince(root, dropped, head)).toEqual({
+      ancestor: false,
+    })
+    expect(await filesChangedSince(root, 'f'.repeat(40), head)).toEqual({
       ancestor: false,
     })
   })

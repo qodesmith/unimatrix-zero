@@ -1,8 +1,4 @@
-/**
- * Prints, as JSON, the live tests in the checkout at the working folder that
- * import each file named on the command line, at any depth. It runs under
- * Electron as Node, as Vitest does; call it through `liveTestsReached`.
- */
+// Runs under Electron as Node, as Vitest does: call it through `liveTestsReached`.
 import path from 'node:path'
 import {createVitest} from 'vitest/node'
 

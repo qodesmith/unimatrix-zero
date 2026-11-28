@@ -11,7 +11,7 @@ import {HOST_PACKAGE, MANIFEST} from './vendor-pins.ts'
 
 const LOCKFILE = 'bun.lock'
 
-const REACHED = path.join(import.meta.dirname, 'live-tests-reached.ts')
+const REACHED_SCRIPT = path.join(import.meta.dirname, 'live-tests-reached.ts')
 
 const Reached = z.array(z.tuple([z.string(), z.array(z.string())]))
 
@@ -35,7 +35,11 @@ async function isAncestor(root: string, from: string, head: string) {
 }
 
 /** The files changed from `from` to `head`, when `from` is in `head`'s history. */
-export async function changedSince(root: string, from: string, head: string) {
+export async function filesChangedSince(
+  root: string,
+  from: string,
+  head: string
+) {
   if (!(await isAncestor(root, from, head))) return {ancestor: false} as const
 
   const {stdout} = await git(
@@ -52,11 +56,14 @@ export async function changedSince(root: string, from: string, head: string) {
 
 /** The live tests in the checkout at `root` that import each of `files`. */
 export function liveTestsReached(root: string, files: string[]) {
-  const {status, stdout, stderr} = runElectronAsNode([REACHED, ...files], {
-    cwd: root,
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-  })
+  const {status, stdout, stderr} = runElectronAsNode(
+    [REACHED_SCRIPT, ...files],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+    }
+  )
 
   if (status !== 0) {
     throw new Error(`live-tests-reached exited ${status}: ${String(stderr)}`)
@@ -90,7 +97,7 @@ export async function changesSince(
   from: string,
   head: string
 ): Promise<Since> {
-  const since = await changedSince(root, from, head)
+  const since = await filesChangedSince(root, from, head)
 
   if (!since.ancestor) return since
 
