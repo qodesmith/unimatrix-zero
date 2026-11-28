@@ -4,6 +4,15 @@ You are in the Ubuntu VM with branch `322-admin-commands-research` checked out. 
 
 No app code changes. A script in `docs/research/318/` that fails for a reason of its own gets fixed, committed and pushed to this branch; say what changed in the findings.
 
+## How it was run
+
+The tests ran on 2026-11-28 from a session on the Mac, not from one in the VM: it built the VM by script, reached it over SSH, and drove the dev app over its debug port. The findings are on #322. Two things had to be done in the VM before the dev app showed a window, and anyone who reruns this will meet them:
+
+- **Electron's sandbox helper.** `bun run dev` aborts with "The SUID sandbox helper binary was found, but is not configured correctly". Fix: `sudo chown root:root` and `sudo chmod 4755` on `node_modules/.bun/electron@<version>/node_modules/electron/dist/chrome-sandbox`.
+- **Wayland.** Under Ubuntu's default Wayland session the app runs and answers on its debug port, and no window appears. Start it with `XDG_SESSION_TYPE=x11` in its environment.
+
+The broker also has a `file` mode, which sends the contents of `/tmp/uz318/password`. It stands in for `dialog` on a test machine whose password is no secret.
+
 ## The human's part
 
 Three things need the human, so stop and ask at each:
