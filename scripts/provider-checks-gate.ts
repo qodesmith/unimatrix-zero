@@ -93,15 +93,13 @@ if (files.length > 0) {
 
 const root = process.cwd()
 
-const {stdout: checkedOut} = await promisify(execFile)(
-  'git',
-  ['rev-parse', 'HEAD'],
-  {cwd: root}
-)
+const checkedOut = (
+  await promisify(execFile)('git', ['rev-parse', 'HEAD'], {cwd: root})
+).stdout.trim()
 
-if (checkedOut.trim() !== pr.head.sha) {
+if (checkedOut !== pr.head.sha) {
   throw new Error(
-    `The checkout is at ${checkedOut.trim()}, not the PR's head ${pr.head.sha}, so it can't tell what a live test imports there.`
+    `The checkout is at ${checkedOut}, not the PR's head ${pr.head.sha}, so it can't tell what a live test imports there.`
   )
 }
 

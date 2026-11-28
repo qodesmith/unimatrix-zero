@@ -3,9 +3,10 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import {promisify} from 'node:util'
-import {describe, expect, it} from 'vitest'
+import {describe, expect, it, onTestFinished} from 'vitest'
 
 import {
+  changesSince,
   filesChangedSince,
   liveTestsReached,
   reRunCauses,
@@ -66,13 +67,25 @@ describe('what a push since a result needs', () => {
 const execFileAsync = promisify(execFile)
 
 async function repo() {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'changes-since-'))
+  // Vitest names a test by its real path, and macOS's temp folder is a link.
+  const root = await fs.realpath(
+    await fs.mkdtemp(path.join(os.tmpdir(), 'changes-since-'))
+  )
+
+  onTestFinished(async () => fs.rm(root, {recursive: true, force: true}))
 
   async function run(...args: string[]) {
     const {stdout} = await execFileAsync(
       'git',
       ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', ...args],
-      {cwd: root}
+      {
+        cwd: root,
+        env: {
+          ...process.env,
+          GIT_CONFIG_GLOBAL: os.devNull,
+          GIT_CONFIG_NOSYSTEM: '1',
+        },
+      }
     )
 
     return stdout.trim()
@@ -126,7 +139,7 @@ describe('the files changed since a result', () => {
 })
 
 describe('the live tests a change reaches', () => {
-  it('are each live test that imports the file at any depth, through Vitest’s own import walk, every live test for the Vitest config, and none for a root package.json or the UI’s Vite config', () => {
+  it('are each live test that imports the file at any depth, every live test for the Vitest config or its global setup, and none for a root package.json or the UI’s Vite config', () => {
     const reached = liveTestsReached(ROOT, [
       `${CLAUDE}/transcripts.ts`,
       'app/provider-host/src/modules/test-recordings/main.ts',
@@ -135,6 +148,7 @@ describe('the live tests a change reaches', () => {
       'docs/provider-dependencies.md',
       'package.json',
       'vitest.config.ts',
+      'app/main/src/modules/git-program/test-setup.ts',
       'app/renderer/vite.config.ts',
     ])
 
@@ -148,7 +162,30 @@ describe('the live tests a change reaches', () => {
         [`${CLAUDE}/transcripts.ts`, [`${CLAUDE}/streaming.live.test.ts`]],
         ['app/provider-host/src/modules/test-recordings/main.ts', both],
         ['vitest.config.ts', both],
+        ['app/main/src/modules/git-program/test-setup.ts', both],
       ])
     )
+  })
+})
+
+describe('what changed since a result', () => {
+  it('names each changed file a live test imports, and nothing for a file none imports or a doc', async () => {
+    const {root, commit} = await repo()
+
+    const from = await commit({
+      'vitest.config.ts':
+        "export default {test: {projects: [{test: {name: 'node'}}]}}",
+      'a.live.test.ts': "import './b.ts'",
+      'b.ts': '',
+      'c.ts': '',
+      'notes.md': '',
+    })
+
+    const head = await commit({'b.ts': '1', 'c.ts': '1', 'notes.md': '1'})
+
+    expect(await changesSince(root, from, head)).toEqual({
+      ancestor: true,
+      causes: [{file: 'b.ts', why: 'imported by a.live.test.ts'}],
+    })
   })
 })
